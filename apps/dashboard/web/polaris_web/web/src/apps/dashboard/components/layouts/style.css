@@ -76,19 +76,6 @@
     transition: outline-color 0.15s, background 0.15s;
     cursor: pointer;
 }
-.violations-card-wrap--active {
-    outline: 1px solid #E45357;
-}
-
-/* Selected chip — soft fill with thin border. */
-.agentic-chip--active {
-    border-color: #637381;
-    background: #f4f6f8;
-}
-.agentic-chip--active .Polaris-Text--root {
-    color: #202223 !important;
-    font-weight: 600 !important;
-}
 
 /* Legend dot — colour via --dot-color custom property. */
 .agentic-dot {

@@ -398,7 +398,11 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
         <VerticalStack gap="4">
             <HorizontalGrid columns={2} gap="4" alignItems="start">
                 <VerticalStack gap="4">
-                    <Box className={selectedCard === "open" ? "violations-card-wrap violations-card-wrap--active" : "violations-card-wrap"} onClick={onOpenCardClick}>
+                    <Box
+                        className="violations-card-wrap"
+                        style={selectedCard === "open" ? { outline: "1px solid var(--p-color-border-critical)" } : undefined}
+                        onClick={onOpenCardClick}
+                    >
                         <AgenticStatsCard
                             title="Open Violations"
                             titleTooltip="Active violations that need attention, broken down by severity. Click a severity to filter the table below."
@@ -411,7 +415,11 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
                             bodyGap="4"
                         />
                     </Box>
-                    <Box className={selectedCard === "other" ? "violations-card-wrap violations-card-wrap--active" : "violations-card-wrap"} onClick={onOtherCardClick}>
+                    <Box
+                        className="violations-card-wrap"
+                        style={selectedCard === "other" ? { outline: "1px solid var(--p-color-border-critical)" } : undefined}
+                        onClick={onOtherCardClick}
+                    >
                         <AgenticStatsCard
                             title="Other Violations"
                             titleTooltip="Violations that are under review or ignored. Click a status to filter the table."
@@ -479,12 +487,13 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
                                     {Object.entries(byType).map(([label, seg]) => (
                                         <Box
                                             key={label}
-                                            className={activeTypeFilter === label ? "agentic-chip agentic-chip--active" : "agentic-chip"}
+                                            className="agentic-chip"
+                                            style={activeTypeFilter === label ? { borderColor: "var(--p-color-border)", background: "var(--p-color-bg-subdued)" } : undefined}
                                             onClick={() => onTypeClick?.(label)}
                                         >
                                             <HorizontalStack gap="1" blockAlign="center">
                                                 <Box className="agentic-dot" style={{ "--dot-color": seg.color }} />
-                                                <Text variant="bodySm" color="subdued">{label} ({seg.text})</Text>
+                                                <Text variant="bodySm" color={activeTypeFilter === label ? undefined : "subdued"} fontWeight={activeTypeFilter === label ? "semibold" : undefined}>{label} ({seg.text})</Text>
                                             </HorizontalStack>
                                         </Box>
                                     ))}

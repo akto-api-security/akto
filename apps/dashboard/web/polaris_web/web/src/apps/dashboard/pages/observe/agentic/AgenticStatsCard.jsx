@@ -93,11 +93,12 @@ function BreakdownLegend({ breakdown, onFilterClick, activeFilter }) {
                         <Box
                             key={b.label}
                             onClick={() => onFilterClick?.(b.key ?? b.label)}
-                            className={active ? "agentic-chip agentic-chip--active" : "agentic-chip"}
+                            className="agentic-chip"
+                            style={active ? { borderColor: "var(--p-color-border)", background: "var(--p-color-bg-subdued)" } : undefined}
                         >
                             <HorizontalStack gap="1" blockAlign="center">
                                 <LegendDot color={b.color} />
-                                <Text variant="bodySm" color="subdued">
+                                <Text variant="bodySm" color={active ? undefined : "subdued"} fontWeight={active ? "semibold" : undefined}>
                                     {b.label} ({typeof b.count === "number" ? b.count.toLocaleString("en-US") : b.count})
                                 </Text>
                             </HorizontalStack>
