@@ -72,18 +72,12 @@
 }
 /* Violations card — selectable with highlight. */
 .violations-card-wrap {
-    border-radius: 12px;
+    border-radius: 8px;
     transition: outline-color 0.15s, background 0.15s;
+    cursor: pointer;
 }
 .violations-card-wrap--active {
-    outline: 2px solid #2c5282;
-    outline-offset: -2px;
-}
-.violations-card-wrap--active div[class*="ShadowBevel"],
-.violations-card-wrap--active div[class*="Card"],
-.violations-card-wrap--active > div > div {
-    background: #ebf2fa !important;
-    background-color: #ebf2fa !important;
+    outline: 1px solid #E45357;
 }
 
 /* Selected chip — soft fill with thin border. */

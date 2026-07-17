@@ -358,7 +358,7 @@ function transformEvent(event, collectionsMap, usernameMap) {
 
 // ─── Dashboard summary section ───────────────────────────────────────────────────
 
-function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue }) {
+function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, latencyData, startTimestamp, endTimestamp }) {
     if (summaryLoading) return <SpinnerCentered />;
     if (!summaryData) return null;
 
@@ -394,34 +394,47 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
 
     return (
         <VerticalStack gap="4">
-            <HorizontalGrid columns={2} gap="4">
-                <div className={selectedCard === "open" ? "violations-card-wrap violations-card-wrap--active" : "violations-card-wrap"} onClick={onOpenCardClick} style={{ cursor: "pointer" }}>
-                    <AgenticStatsCard
-                        title="Open Violations"
-                        titleTooltip="Active violations that need attention, broken down by severity. Click a severity to filter the table below."
-                        total={statusCounts.ACTIVE || 0}
-                        delta={0}
-                        deltaColor="subdued"
-                        breakdown={totalBreakdown}
-                        onFilterClick={onSeverityClick}
-                        activeFilter={activeSeverityFilter}
-                    />
-                </div>
-                <div className={selectedCard === "other" ? "violations-card-wrap violations-card-wrap--active" : "violations-card-wrap"} onClick={onOtherCardClick} style={{ cursor: "pointer" }}>
-                    <AgenticStatsCard
-                        title="Other Violations"
-                        titleTooltip="Violations that are under review or ignored. Click a status to filter the table."
-                        total={(statusCounts.UNDER_REVIEW || 0) + (statusCounts.IGNORED || 0)}
-                        delta={0}
-                        deltaColor="subdued"
-                        breakdown={otherBreakdown}
-                        onFilterClick={onOtherBreakdownClick}
-                        activeFilter={selectedCard === "other" ? new Set([activeStatusValue]) : undefined}
-                    />
-                </div>
+            <HorizontalGrid columns={2} gap="4" alignItems="start">
+                <VerticalStack gap="4">
+                    <Box className={selectedCard === "open" ? "violations-card-wrap violations-card-wrap--active" : "violations-card-wrap"} onClick={onOpenCardClick}>
+                        <AgenticStatsCard
+                            title="Open Violations"
+                            titleTooltip="Active violations that need attention, broken down by severity. Click a severity to filter the table below."
+                            total={statusCounts.ACTIVE || 0}
+                            delta={0}
+                            deltaColor="subdued"
+                            breakdown={totalBreakdown}
+                            onFilterClick={onSeverityClick}
+                            activeFilter={activeSeverityFilter}
+                            bodyGap="4"
+                        />
+                    </Box>
+                    <Box className={selectedCard === "other" ? "violations-card-wrap violations-card-wrap--active" : "violations-card-wrap"} onClick={onOtherCardClick}>
+                        <AgenticStatsCard
+                            title="Other Violations"
+                            titleTooltip="Violations that are under review or ignored. Click a status to filter the table."
+                            total={(statusCounts.UNDER_REVIEW || 0) + (statusCounts.IGNORED || 0)}
+                            delta={0}
+                            deltaColor="subdued"
+                            breakdown={otherBreakdown}
+                            onFilterClick={onOtherBreakdownClick}
+                            activeFilter={selectedCard === "other" ? new Set([activeStatusValue]) : undefined}
+                            bodyGap="4"
+                        />
+                    </Box>
+                </VerticalStack>
+                <P95LatencyGraph
+                    title={`${mapLabel("Guardrail", getDashboardCategory())} Detection Latency`}
+                    subtitle="95th percentile latency metrics for guardrail detection"
+                    dataType="threat-security"
+                    startTimestamp={startTimestamp}
+                    endTimestamp={endTimestamp}
+                    latencyData={latencyData}
+                    height={230}
+                />
             </HorizontalGrid>
 
-            <HorizontalGrid columns={3} gap="4" alignItems="start">
+            <HorizontalGrid columns={3} gap="4">
                 <AgenticTopListCard
                     title="Violations by Top Users"
                     titleTooltip="Top 5 users by number of violations. Click a user to filter the table below."
@@ -733,8 +746,8 @@ function Violations() {
                 });
                 const raw = Object.entries(byTimestamp)
                     .map(([ts, vals]) => {
-                        const req = vals.GUARDRAIL_INCOMING_REQUEST_P95 || 0;
-                        const resp = vals.GUARDRAIL_OUTPUT_RESULT_P95 || 0;
+                        const req = vals.GUARDRAIL_REQUEST_LATENCY || 0;
+                        const resp = vals.GUARDRAIL_RESPONSE_LATENCY || 0;
                         return { timestamp: parseInt(ts), incomingRequestP95: req, outputResultP95: resp, totalP95: req + resp };
                     })
                     .sort((a, b) => a.timestamp - b.timestamp);
@@ -883,8 +896,17 @@ function Violations() {
         return params.data?.id === selectedViolation?.id ? "violations-row-selected" : undefined;
     }, [selectedViolation]);
 
+    const tableHeading = selectedCard === "open"
+        ? "All Open Violations"
+        : activeStatusValue === "IGNORED"
+            ? "All Ignored Violations"
+            : "All Under Review Violations";
+
     const tableComponent = (
         <Box key="table" className="violations-table-wrap">
+            <Box paddingBlockEnd="3">
+                <Text variant="headingSm">{tableHeading}</Text>
+            </Box>
             <AgGridTable
                 key={`violations-grid-${tableKey}-${startTimestamp}-${endTimestamp}`}
                 rowData={rows}
@@ -948,18 +970,10 @@ function Violations() {
             onOtherCardClick={handleOtherCardClick}
             onOtherBreakdownClick={handleOtherBreakdownClick}
             activeStatusValue={activeStatusValue}
+            latencyData={latencyData}
+            startTimestamp={startTimestamp}
+            endTimestamp={endTimestamp}
         />,
-        ...(latencyData.length > 0 ? [
-            <P95LatencyGraph
-                key="guardrail-latency"
-                title={`${mapLabel("Guardrail", getDashboardCategory())} Detection Latency`}
-                subtitle="95th percentile latency metrics for guardrail detection"
-                dataType="threat-security"
-                startTimestamp={startTimestamp}
-                endTimestamp={endTimestamp}
-                latencyData={latencyData}
-            />
-        ] : []),
         tableComponent,
         <ViolationFlyout
             key="flyout"

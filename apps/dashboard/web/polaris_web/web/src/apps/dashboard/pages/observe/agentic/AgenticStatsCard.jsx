@@ -151,10 +151,11 @@ export default function AgenticStatsCard({
     activeFilter,
     noCard,
     children,
+    bodyGap = "2",
 }) {
     const inner = (
         <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="4" paddingBlockEnd="3">
-            <VerticalStack gap="2">
+            <VerticalStack gap={bodyGap}>
                 <HorizontalStack gap="1" blockAlign="center">
                     <Text variant="headingSm" fontWeight="semibold">{title}</Text>
                     <InfoTooltipIcon content={titleTooltip} />
