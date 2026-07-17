@@ -40,6 +40,35 @@ public class SkillValidationV2Action extends ActionSupport {
         put(8, Arrays.asList("AST08"));           // obfuscation / evasion
     }};
 
+    // OWASP category → templated remediation guidance (Java-side, deterministic)
+    private static final Map<String, String> OWASP_REMEDIATION_TEMPLATES = new LinkedHashMap<String, String>() {{
+        put("AST01", "**Malicious Skills** - Do not install or run this skill. Remove it from the agent's skill "
+                + "directory, rotate any credentials or tokens the agent had access to during use, and review "
+                + "recent agent activity logs for signs of data exfiltration or unauthorized commands.");
+        put("AST02", "**Supply Chain Compromise** - Verify the skill's source and update channel. Pin the skill "
+                + "to a known-good version/commit hash, and re-fetch it from the official registry rather than "
+                + "trusting the current package in place.");
+        put("AST03", "**Over-Privileged Skills** - Restrict the skill's permissions to only what its stated "
+                + "purpose requires: scope file access to the project directory, remove wildcard paths, and "
+                + "disable network or shell access it doesn't functionally need.");
+        put("AST04", "**Insecure Metadata** - Correct the skill's name/description so it accurately reflects its "
+                + "actual behavior, and flag it for manual review if it appears to impersonate a trusted brand "
+                + "or understate its risk.");
+        put("AST05", "**Unsafe Deserialization** - Remove any eval()/exec() calls on config or memory content "
+                + "and any dangerous YAML/JSON tags. Replace with safe, schema-validated parsing.");
+        put("AST06", "**Weak Isolation** - Remove requests for host-level execution, Docker socket access, or "
+                + "sudo/root escalation. Run the skill in a sandboxed environment with the minimum privileges "
+                + "needed.");
+        put("AST07", "**Update Drift** - Pin the skill to an exact, verified version and add hash/content "
+                + "verification to its manifest instead of using unpinned version ranges.");
+        put("AST08", "**Poor Scanning / Evasion** - Treat obfuscated or indirectly-phrased content as a red flag "
+                + "on its own. Request a de-obfuscated, plain-text version of the skill before approving it.");
+        put("AST09", "**No Governance** - Require the skill to carry provenance metadata, an audit trail, and an "
+                + "explicit approval chain before it is trusted in production workflows.");
+        put("AST10", "**Cross-Platform Reuse** - Re-review the skill's security metadata for each target platform "
+                + "it claims to support; do not assume protections from one platform carry over to another.");
+    }};
+
     private static final String SKILL_VALIDATION_PROMPT =
         "You are a security analyst reviewing one AI agent skill file (for Claude, Codex, Cursor,\n" +
         "or any coding agent). You are given the skill's name, description, full content, and\n" +
@@ -165,6 +194,17 @@ public class SkillValidationV2Action extends ActionSupport {
         "  \"overallConfidence\": \"HIGH | MEDIUM | LOW\",\n" +
         "  \"reason\": \"Narrative summary of all findings.\",\n" +
         "  \"evidence\": \"Exact matching text (max 200 chars) or empty string if safe.\",\n" +
+        "  \"overview\": \"A clear overview of this skill in GitHub-flavored Markdown, written for someone who\n" +
+        "    has not read the skill file. Structure it around exactly two questions, each as its own bolded\n" +
+        "    lead-in or short heading:\n" +
+        "    - What is this? Explain what the skill is, its stated purpose, and its intended use case.\n" +
+        "    - Why is it dangerous? Explain the specific risk, malicious behavior, or attack it enables. If the\n" +
+        "      skill is safe, explain why it poses little to no danger instead.\n" +
+        "    2-4 sentences per question, in prose. No filler.\",\n" +
+        "  \"remediation\": \"Your own actionable remediation recommendation in GitHub-flavored Markdown\n" +
+        "    (a short intro plus a bulleted or numbered list of concrete steps). If the skill is malicious,\n" +
+        "    focus on containment and cleanup. If it is safe, give brief hardening/best-practice notes. Do NOT\n" +
+        "    restate the OWASP category names verbatim — that mapping is added separately.\",\n" +
         "  \"maliciousEvents\": [\n" +
         "    {\n" +
         "      \"rule\": \"injection | exfiltration | credential-theft | obfuscation | deception | privilege-escalation | deserialization | system-tampering\",\n" +
@@ -238,9 +278,12 @@ public class SkillValidationV2Action extends ActionSupport {
         String couldBeBenignReason = parsed.containsKey("couldBeBenignReason") ? String.valueOf(parsed.get("couldBeBenignReason")) : "";
         String socAnalystSummary = parsed.containsKey("socAnalystSummary") ? String.valueOf(parsed.get("socAnalystSummary")) : "";
         List<?> maliciousEvents = parsed.containsKey("maliciousEvents") ? (List<?>) parsed.get("maliciousEvents") : new ArrayList<>();
+        String overview = parsed.containsKey("overview") ? String.valueOf(parsed.get("overview")) : "";
+        String modelRemediation = parsed.containsKey("remediation") ? String.valueOf(parsed.get("remediation")) : "";
 
         // Step 4: resolve OWASP categories with confidence tiers
         List<Map<String, String>> owaspCategories = resolveOwaspCategories(parsed);
+        String remediation = buildRemediation(modelRemediation, owaspCategories);
 
         logger.infoAndAddToDb(String.format(
                 "[SkillValidation] skill=%s agent=%s flagged=%b maliciousScore=%.2f reason=%s owaspCategories=%s",
@@ -277,7 +320,38 @@ public class SkillValidationV2Action extends ActionSupport {
         validationResult.put("couldBeBenignReason", couldBeBenignReason);
         validationResult.put("socAnalystSummary", socAnalystSummary);
         validationResult.put("maliciousEvents", maliciousEvents);
+        validationResult.put("overview", overview);
+        validationResult.put("remediation", remediation);
         return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Combines the model's own remediation narrative with deterministic, templated
+     * guidance for each resolved OWASP category, rendered as GitHub-flavored Markdown.
+     */
+    private String buildRemediation(String modelRemediation, List<Map<String, String>> owaspCategories) {
+        StringBuilder sb = new StringBuilder();
+        if (modelRemediation != null && !modelRemediation.isEmpty()) {
+            sb.append(modelRemediation.trim());
+        }
+
+        if (owaspCategories != null && !owaspCategories.isEmpty()) {
+            LinkedHashSet<String> seenIds = new LinkedHashSet<>();
+            StringBuilder templated = new StringBuilder();
+            for (Map<String, String> cat : owaspCategories) {
+                String id = cat.get("id");
+                if (id == null || !seenIds.add(id)) continue;
+                String template = OWASP_REMEDIATION_TEMPLATES.get(id);
+                if (template == null) continue;
+                templated.append("- ").append(template).append("\n");
+            }
+            if (templated.length() > 0) {
+                if (sb.length() > 0) sb.append("\n\n");
+                sb.append("### Category-Specific Remediation\n\n").append(templated);
+            }
+        }
+
+        return sb.toString().trim();
     }
 
     /**
@@ -343,7 +417,7 @@ public class SkillValidationV2Action extends ActionSupport {
         Map<String, Object> payload = new HashMap<>();
         payload.put("messages", messages);
         payload.put("temperature", 0);
-        payload.put("max_tokens", 2000);
+        payload.put("max_tokens", 3500);
 
         Map<String, Object> llmResponse = LLMService.callLLM(payload);
         if (llmResponse == null) throw new RuntimeException("Empty LLM response");
