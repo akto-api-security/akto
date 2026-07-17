@@ -633,13 +633,16 @@ public class Utils {
     public static TestingRunResult generateFailedRunResultForMessage(ObjectId testingRunId,ApiInfoKey apiInfoKey, String testSuperType, 
         String testSubType, ObjectId testRunResultSummaryId, List<String> messages, String errorMessage) {
 
-        TestingRunResult testingRunResult = null;       
+        TestingRunResult testingRunResult = null;
         Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        // Set<Integer> outOfTestingScopeCollections = UsageMetricCalculator.getOutOfTestingScope();
         List<GenericTestResult> testResults = new ArrayList<>();
         String failMessage = errorMessage;
 
         if(!StringUtils.isNotEmpty(errorMessage) && deactivatedCollections.contains(apiInfoKey.getApiCollectionId())){
             failMessage = TestError.DEACTIVATED_ENDPOINT.getMessage();
+        // }else if(!StringUtils.isNotEmpty(errorMessage) && outOfTestingScopeCollections.contains(apiInfoKey.getApiCollectionId())){
+        //     failMessage = TestError.OUT_OF_TESTING_SCOPE_COLLECTION.getMessage();
         }else if(!StringUtils.isNotEmpty(errorMessage) && (messages == null || messages.isEmpty())){
             failMessage = TestError.NO_PATH.getMessage();
         }

@@ -58,6 +58,8 @@ public class UsageMetricCalculator {
     private static final int REFRESH_INTERVAL = 60 * 2; // 2 minutes.
     private static final int REFRESH_INTERVAL_RBAC = 60 * 60; // 1 hour.
     private static Map<Integer, Set<Integer>> deactivatedCollectionsMap = new HashMap<>();
+    private static Map<Integer, Integer> lastOutOfTestingScopeFetchedMap = new HashMap<>();
+    private static Map<Integer, Set<Integer>> outOfTestingScopeCollectionsMap = new HashMap<>();
 
     private static final ConcurrentHashMap<Integer, Pair<Boolean, Integer>> hasRbacFeatureEnabledMap = new ConcurrentHashMap<>();
 
@@ -72,6 +74,19 @@ public class UsageMetricCalculator {
         deactivatedCollectionsMap.put(accountId, getDeactivatedLatest());
         lastDeactivatedFetchedMap.put(accountId, Context.now());
         return deactivatedCollectionsMap.get(accountId);
+    }
+
+    public static Set<Integer> getOutOfTestingScope() {
+        int accountId = Context.accountId.get();
+        if (lastOutOfTestingScopeFetchedMap.containsKey(accountId)
+                && (lastOutOfTestingScopeFetchedMap.get(accountId) + REFRESH_INTERVAL) >= Context.now()
+                && outOfTestingScopeCollectionsMap.containsKey(accountId)) {
+            return outOfTestingScopeCollectionsMap.get(accountId);
+        }
+
+        outOfTestingScopeCollectionsMap.put(accountId, getOutOfTestingScopeLatest());
+        lastOutOfTestingScopeFetchedMap.put(accountId, Context.now());
+        return outOfTestingScopeCollectionsMap.get(accountId);
     }
 
     private static boolean checkForPaidFeature(int accountId){
@@ -155,6 +170,15 @@ public class UsageMetricCalculator {
                 deactivated.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList()));
 
         return deactivatedIds;
+    }
+
+    public static Set<Integer> getOutOfTestingScopeLatest(){
+        List<ApiCollection> outOfScope = ApiCollectionsDao.instance
+                .findAll(Filters.eq(ApiCollection.IS_OUT_OF_TESTING_SCOPE, true));
+        Set<Integer> outOfScopeIds = new HashSet<>(
+                outOfScope.stream().map(apiCollection -> apiCollection.getId()).collect(Collectors.toList()));
+
+        return outOfScopeIds;
     }
     
     public static Bson excludeDemosAndDeactivated(String key){

@@ -220,9 +220,16 @@ public class StartTestAction extends UserAction {
                 if (!unpublishedCopilotCollectionIds.isEmpty()) {
                     this.apiInfoKeyList.removeIf(k -> unpublishedCopilotCollectionIds.contains(k.getApiCollectionId()));
                 }
+                // Collections marked out of testing scope should not be tested either.
+                List<Integer> outOfScopeCustomCollectionIds = Utils.filterOutOfTestingScopeCollections(customCollectionIds);
+                if (!outOfScopeCustomCollectionIds.isEmpty()) {
+                    this.apiInfoKeyList.removeIf(k -> outOfScopeCustomCollectionIds.contains(k.getApiCollectionId()));
+                }
                 if (this.apiInfoKeyList.isEmpty()) {
                     if (!unpublishedCopilotCollectionIds.isEmpty()) {
                         addActionError("No APIs available to test. Please publish the Copilot bot before running a scan.");
+                    } else if (!outOfScopeCustomCollectionIds.isEmpty()) {
+                        addActionError("No APIs available to test. All selected collections are marked out of testing scope.");
                     } else {
                         addActionError("APIs list can't be empty");
                     }
@@ -235,6 +242,10 @@ public class StartTestAction extends UserAction {
                 ApiCollection collectionWiseCol = ApiCollectionsDao.instance.getMeta(apiCollectionId);
                 if (collectionWiseCol != null && collectionWiseCol.isCopilotBotCollection() && !collectionWiseCol.isCopilotBotPublished()) {
                     addActionError("Bot is not published. Please publish the bot before running a scan.");
+                    return null;
+                }
+                if (collectionWiseCol != null && collectionWiseCol.getIsOutOfTestingScope()) {
+                    addActionError("This collection is marked as out of testing scope. Please remove it from out of testing scope before running a scan.");
                     return null;
                 }
                 testingEndpoints = new CollectionWiseTestingEndpoints(apiCollectionId);
@@ -250,12 +261,26 @@ public class StartTestAction extends UserAction {
                     this.testScheduleWarning = "Some tests were not scheduled because the bot is not published: collection IDs " + skippedCollectionIds;
                     loggerMaker.debugAndAddToDb("createTestingRun: skipping unpublished copilot collections " + skippedCollectionIds, LogDb.DASHBOARD);
                 }
+                List<Integer> skippedOutOfScopeCollectionIds = Utils.filterOutOfTestingScopeCollections(mutableCollectionIds);
+                if (!skippedOutOfScopeCollectionIds.isEmpty()) {
+                    String outOfScopeWarning = "Some tests were not scheduled because the collections are out of testing scope: collection IDs " + skippedOutOfScopeCollectionIds;
+                    this.testScheduleWarning = StringUtils.isEmpty(this.testScheduleWarning) ? outOfScopeWarning : this.testScheduleWarning + "; " + outOfScopeWarning;
+                    loggerMaker.debugAndAddToDb("createTestingRun: skipping out of testing scope collections " + skippedOutOfScopeCollectionIds, LogDb.DASHBOARD);
+                }
                 if (mutableCollectionIds.isEmpty()) {
-                    addActionError("No collections available to test. All Copilot bot collections are not published.");
+                    boolean hasCopilotSkips = !skippedCollectionIds.isEmpty();
+                    boolean hasOutOfScopeSkips = !skippedOutOfScopeCollectionIds.isEmpty();
+                    if (hasCopilotSkips && hasOutOfScopeSkips) {
+                        addActionError("No collections available to test. All selected collections are either unpublished Copilot bots or marked out of testing scope.");
+                    } else if (hasCopilotSkips) {
+                        addActionError("No collections available to test. All Copilot bot collections are not published.");
+                    } else {
+                        addActionError("No collections available to test. All selected collections are marked out of testing scope.");
+                    }
                     return null;
                 }
                 testingEndpoints = new MultiCollectionTestingEndpoints(mutableCollectionIds);
-                break;  
+                break;
             case WORKFLOW:
                 WorkflowTest workflowTest = WorkflowTestsDao.instance.findOne(Filters.eq("_id", this.workflowTestId));
                 if (workflowTest == null) {

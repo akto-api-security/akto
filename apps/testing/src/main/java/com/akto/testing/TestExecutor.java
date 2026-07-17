@@ -1195,6 +1195,14 @@ public class TestExecutor {
                     TestResult.TestError.SKIPPING_COPILOT_INTERNAL_ENDPOINT.getMessage());
         }
 
+        Set<Integer> outOfScopteTests = UsageMetricCalculator.getOutOfTestingScope();
+        if (outOfScopteTests.contains(apiInfoKey.getApiCollectionId())) {
+            loggerMaker.infoAndAddToDb("Skipping test for out of scope collection: " + apiInfoKey);
+            return Utils.generateFailedRunResultForMessage(testRunId, apiInfoKey, testSuperType, testSubType,
+                    testRunResultSummaryId, Collections.singletonList(rawApi.getOriginalMessage()),
+                    TestResult.TestError.OUT_OF_TESTING_SCOPE_COLLECTION.getMessage());
+        }
+
         int startTime = Context.now();
 
         try {
