@@ -665,14 +665,19 @@ function Violations() {
         async function loadSummary() {
             setSummaryLoading(true);
             try {
-                const [severityResp, categoryResp, dailyResp, topNResp] = await Promise.all([
+                const results = await Promise.allSettled([
                     threatDetectionApi.fetchCountBySeverity(startTimestamp, endTimestamp, "ACTIVE"),
                     threatDetectionApi.fetchThreatCategoryCount(startTimestamp, endTimestamp, activeStatusValue),
                     threatDetectionApi.getDailyThreatActorsCount(startTimestamp, endTimestamp, []),
                     threatDetectionApi.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5),
                 ]);
 
-                // Severity counts — same parsing as ThreatDashboardPage
+                const severityResp = results[0].status === 'fulfilled' ? results[0].value : {};
+                const categoryResp = results[1].status === 'fulfilled' ? results[1].value : {};
+                const dailyResp    = results[2].status === 'fulfilled' ? results[2].value : {};
+                const topNResp     = results[3].status === 'fulfilled' ? results[3].value : {};
+
+                // Severity counts
                 const severityDistribution = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
                 let totalCount = 0;
                 (severityResp?.categoryCounts || []).forEach(item => {
