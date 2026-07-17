@@ -160,34 +160,130 @@ class GemmaVertexProvider(VertexAIProvider):
     _log_tag = "[GemmaVertex]"
 
 
-class Qwen3GuardProvider(VertexAIProvider):
-    """Qwen3Guard guard classifier — emits Safety:/Categories: and exposes a
-    probability distribution via first-token top_logprobs."""
+def _qwen3guard_params(text: str, top_logprobs: int, temperature: float) -> dict[str, Any]:
+    """OpenAI-style chatCompletions params shared by all Qwen3Guard backends."""
+    params: dict[str, Any] = {
+        "messages": [{"role": "user", "content": text}],
+        "max_tokens": 64,
+        "temperature": temperature,
+    }
+    if top_logprobs > 0:
+        params["logprobs"] = True
+        params["top_logprobs"] = top_logprobs
+    return params
 
-    name = "qwen3guard"
-    _log_tag = "[Qwen3Guard]"
+
+def _choice_content_and_logprobs(chat_completion: dict) -> tuple[str, list | None]:
+    """Extract (content, logprobs.content) from an OpenAI-shaped chat completion."""
+    choice = chat_completion["choices"][0]
+    return choice["message"]["content"], (choice.get("logprobs") or {}).get("content")
+
+
+class Qwen3GuardOutput:
+    """Qwen3Guard guard classifier — emits Safety:/Categories: and exposes a
+    probability distribution via first-token top_logprobs. Mixin shared by the
+    Vertex and Azure Foundry backends; concrete classes supply
+    complete_with_logprobs over their own transport. LLMScanner routes any
+    provider carrying this mixin through parse_qwen3guard_result."""
+
+    async def complete_with_logprobs(
+        self, text: str, top_logprobs: int = 5, temperature: float = 0.0
+    ) -> tuple[str, list | None]:
+        raise NotImplementedError
 
     async def complete(self, prompt: str) -> str:
         content, _ = await self.complete_with_logprobs(prompt, top_logprobs=0)
         return content
 
+
+class Qwen3GuardProvider(Qwen3GuardOutput, VertexAIProvider):
+    name = "qwen3guard"
+    _log_tag = "[Qwen3Guard]"
+
     async def complete_with_logprobs(
         self, text: str, top_logprobs: int = 5, temperature: float = 0.0
     ) -> tuple[str, list | None]:
-        instance: dict[str, Any] = {
-            "@requestFormat": "chatCompletions",
-            "messages": [{"role": "user", "content": text}],
-            "max_tokens": 64,
-            "temperature": temperature,
-        }
-        if top_logprobs > 0:
-            instance["logprobs"] = True
-            instance["top_logprobs"] = top_logprobs
+        instance = {"@requestFormat": "chatCompletions", **_qwen3guard_params(text, top_logprobs, temperature)}
         body = await self._post(instance)
-        choice = body["predictions"]["choices"][0]
-        content = choice["message"]["content"]
-        lp = (choice.get("logprobs") or {}).get("content")
-        return content, lp
+        return _choice_content_and_logprobs(body["predictions"])
+
+
+def _normalize_foundry_base_url(base_url: str) -> str:
+    """Accept the Foundry portal's endpoint URL in any of its shapes.
+
+    The portal displays managed-compute endpoints as ".../score" (the default
+    scoring route); the OpenAI-compatible API lives at ".../v1/chat/completions"
+    on the same host, so strip "/score" and ensure a "/v1" suffix.
+    """
+    url = (base_url or "").strip().rstrip("/")
+    if url.endswith("/score"):
+        url = url[: -len("/score")]
+    if not url.endswith("/v1"):
+        url += "/v1"
+    return url
+
+
+class AzureFoundryProvider(LLMProvider):
+    """Azure AI Foundry endpoint (managed compute / vLLM, OpenAI-compatible).
+
+    Managed-compute endpoints authenticate with the endpoint key as a Bearer
+    token and route to a specific deployment via the azureml-model-deployment
+    header; the api-key header is also sent so the same provider works against
+    serverless *.services.ai.azure.com routes."""
+
+    name = "azure_foundry"
+    _log_tag = "[AzureFoundry]"
+
+    def __init__(self, base_url: str, api_key: str, deployment: str = "", model: str = ""):
+        self.base_url = _normalize_foundry_base_url(base_url)
+        self.api_key = api_key
+        self.deployment = (deployment or "").strip()
+        self.model = (model or "").strip()
+        logger.info(f"{self._log_tag} base_url={self.base_url} deployment={self.deployment} model={self.model}")
+
+    async def _chat(self, params: dict[str, Any]) -> dict:
+        headers = dict(
+            _IDENTITY,
+            **{
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}",
+                "api-key": self.api_key,
+            },
+        )
+        if self.deployment:
+            headers["azureml-model-deployment"] = self.deployment
+        body = {"model": self.model, **params} if self.model else params
+        client = http_client.get_client()
+        resp = await client.post(f"{self.base_url}/chat/completions", headers=headers, json=body)
+        resp.raise_for_status()
+        return resp.json()
+
+    async def complete(self, prompt: str) -> str:
+        body = await self._chat(
+            {
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 512,
+                "temperature": 0.1,
+            }
+        )
+        content, _ = _choice_content_and_logprobs(body)
+        return content
+
+
+class GemmaFoundryProvider(AzureFoundryProvider):
+    name = "gemma_foundry"
+    _log_tag = "[GemmaFoundry]"
+
+
+class Qwen3GuardFoundryProvider(Qwen3GuardOutput, AzureFoundryProvider):
+    name = "qwen3guard_foundry"
+    _log_tag = "[Qwen3GuardFoundry]"
+
+    async def complete_with_logprobs(
+        self, text: str, top_logprobs: int = 5, temperature: float = 0.0
+    ) -> tuple[str, list | None]:
+        body = await self._chat(_qwen3guard_params(text, top_logprobs, temperature))
+        return _choice_content_and_logprobs(body)
 
 
 # ── Qwen3Guard parser (ported verbatim — sync) ────────────────────────────────
@@ -381,6 +477,34 @@ def _build_qwen3guard() -> LLMProvider | None:
     )
 
 
+# Foundry provider name → (class, settings-var prefix). BASE_URL/API_KEY are
+# required (entry baseUrl overrides the env); DEPLOYMENT/MODEL are optional.
+_FOUNDRY_PROVIDERS: dict[str, tuple[type[AzureFoundryProvider], str]] = {
+    "azure_foundry": (AzureFoundryProvider, "AZURE_FOUNDRY"),
+    "gemma_foundry": (GemmaFoundryProvider, "GEMMA_FOUNDRY"),
+    "qwen3guard_foundry": (Qwen3GuardFoundryProvider, "QWEN3GUARD_FOUNDRY"),
+}
+
+
+def _build_foundry(provider_name: str, model: str, base_url: str) -> LLMProvider | None:
+    cls, prefix = _FOUNDRY_PROVIDERS[provider_name]
+    env = _require(
+        {
+            f"{prefix}_BASE_URL": base_url or getattr(settings, f"{prefix}_BASE_URL"),
+            f"{prefix}_API_KEY": getattr(settings, f"{prefix}_API_KEY"),
+        },
+        label=f"[Providers] {provider_name}",
+    )
+    if env is None:
+        return None
+    return cls(
+        base_url=env[f"{prefix}_BASE_URL"],
+        api_key=env[f"{prefix}_API_KEY"],
+        deployment=getattr(settings, f"{prefix}_DEPLOYMENT"),
+        model=model or getattr(settings, f"{prefix}_MODEL"),
+    )
+
+
 _BUILDERS: dict[str, Callable[[str, str], LLMProvider | None]] = {
     "openai": lambda model, _: _build_openai_compatible(model, base_url=""),
     "openai_compatible": _build_openai_compatible,
@@ -388,6 +512,9 @@ _BUILDERS: dict[str, Callable[[str, str], LLMProvider | None]] = {
     "vertexai": lambda _m, _b: _build_vertexai(),
     "gemma_vertexai": lambda _m, _b: _build_gemma_vertexai(),
     "qwen3guard": lambda _m, _b: _build_qwen3guard(),
+    "azure_foundry": lambda model, base_url: _build_foundry("azure_foundry", model, base_url),
+    "gemma_foundry": lambda model, base_url: _build_foundry("gemma_foundry", model, base_url),
+    "qwen3guard_foundry": lambda model, base_url: _build_foundry("qwen3guard_foundry", model, base_url),
 }
 
 
@@ -414,4 +541,6 @@ def build_provider_from_config(entry: dict[str, Any]) -> LLMProvider | None:
     if name in ("openai", "ollama", "openai_compatible"):
         base_url = (entry.get("baseUrl") or "").strip() or settings.OPENAI_COMPATIBLE_BASE_URL
         return _dispatch("openai_compatible", model, base_url)
+    if name in _FOUNDRY_PROVIDERS:
+        return _dispatch(name, model, (entry.get("baseUrl") or "").strip())
     return _dispatch(name, model, "")

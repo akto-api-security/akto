@@ -142,6 +142,17 @@ async def test_result_shape_has_per_model_summaries():
     assert "execution_time_ms" in r
 
 
+async def test_foundry_providers_share_stems_with_vertex():
+    # Azure Foundry variants must land in the same qwen/gemma summary slots
+    # and cascade_decision labels as their Vertex counterparts.
+    cfg = [_entry("qwen3guard_foundry", "FAST_THREAT_FILTER"), _entry("gemma_foundry", "FINAL_ARBITER")]
+    r = await _run(cfg, {"qwen3guard_foundry": HEDGED_SAFE, "gemma_foundry": SAFE})
+    assert r["is_valid"] is True
+    assert r["details"]["cascade_decision"] == "gemma_authority"
+    assert r["details"]["qwen"]["completed"] is True
+    assert r["details"]["gemma"]["completed"] is True
+
+
 async def test_no_arbiter_configured_fails_open_with_error():
     cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER")]
     r = await _run(cfg, {"qwen3guard": UNSAFE})
