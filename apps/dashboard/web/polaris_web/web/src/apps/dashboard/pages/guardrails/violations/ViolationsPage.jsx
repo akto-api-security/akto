@@ -901,6 +901,7 @@ function Violations() {
                 domLayout="normal"
                 onServerFetch={onServerFetch}
                 filterStateUrl={gridFilterKey.current}
+                serverSideRowModel
             />
         </Box>
     );

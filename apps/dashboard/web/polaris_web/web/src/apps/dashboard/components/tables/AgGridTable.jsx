@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import { themeQuartz } from "ag-grid-enterprise";
 import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
@@ -166,6 +166,10 @@ export default function AgGridTable({
     height,
     onServerFetch,
     filterStateUrl,
+    // Opt-in: use AG Grid's native Server-Side Row Model + built-in pagination footer
+    // instead of the custom Polaris Pagination bar. Only affects callers that pass this;
+    // MessagesView/SessionsView keep the existing custom-bar behavior untouched.
+    serverSideRowModel = false,
     ...rest
 }) {
     const hasSearch = !!searchPlaceholder;
@@ -191,6 +195,7 @@ export default function AgGridTable({
 
     // ── Server-fetch state ──────────────────────────────────────────────────
     const isServerMode = !!onServerFetch;
+    const useSSRM = isServerMode && serverSideRowModel;
     const pageKey = filterStateUrl || (window.location.pathname + "/ag-grid");
 
     const filtersMap    = PersistStore(s => s.filtersMap);
@@ -219,7 +224,7 @@ export default function AgGridTable({
 
     // Call onServerFetch whenever query changes; callback returns { value, total }
     useEffect(() => {
-        if (!isServerMode) return;
+        if (!isServerMode || useSSRM) return;
         const skip = query.page * paginationPageSize;
         // Use search_after when skip >= 9980 (approaching the 10k from/size hard limit)
         const searchAfterJson = (skip >= 9980 && lastSortValues.current)
@@ -241,17 +246,81 @@ export default function AgGridTable({
 
     const handleFilterChanged = useCallback((e) => {
         if (!isServerMode) return;
-        dispatchQuery({ type: "SET_FILTERS", filters: extractFilterModel(e.api.getFilterModel()) });
-    }, [isServerMode]);
+        const filters = extractFilterModel(e.api.getFilterModel());
+        if (useSSRM) {
+            const prev = PersistStore.getState().filtersMap;
+            PersistStore.getState().setFiltersMap({ ...prev, [pageKey]: { ...(prev[pageKey] || {}), filters } });
+            return;
+        }
+        dispatchQuery({ type: "SET_FILTERS", filters });
+    }, [isServerMode, useSSRM, pageKey]);
 
     const handleSortChanged = useCallback((e) => {
         if (!isServerMode) return;
         const col = e.api.getColumnState().find(c => c.sort);
-        dispatchQuery({ type: "SET_SORT", sortKey: col?.colId || "", sortOrder: col?.sort === "asc" ? -1 : 1 });
-    }, [isServerMode]);
+        const sortKey = col?.colId || "";
+        const sortOrder = col?.sort === "asc" ? -1 : 1;
+        if (useSSRM) {
+            const prev = PersistStore.getState().filtersMap;
+            PersistStore.getState().setFiltersMap({ ...prev, [pageKey]: { ...(prev[pageKey] || {}), sortKey, sortOrder } });
+            return;
+        }
+        dispatchQuery({ type: "SET_SORT", sortKey, sortOrder });
+    }, [isServerMode, useSSRM, pageKey]);
 
-    // Custom pagination bar — only rendered in server mode; replaces AG Grid's built-in pagination.
-    const serverPaginationBar = isServerMode && query.total > 0 ? (
+    // ── SSRM datasource — AG Grid calls getRows itself on page/sort/filter change ──
+    const onServerFetchRef = useRef(onServerFetch);
+    onServerFetchRef.current = onServerFetch;
+
+    const searchRef = useRef("");
+    useEffect(() => { searchRef.current = debouncedSearchValue; }, [debouncedSearchValue]);
+
+    const firstSearchRun = useRef(true);
+    useEffect(() => {
+        if (!useSSRM) return;
+        if (firstSearchRun.current) { firstSearchRun.current = false; return; }
+        gridRef.current?.api?.refreshServerSide({ purge: true });
+    }, [debouncedSearchValue]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const serverSideDatasource = useMemo(() => {
+        if (!useSSRM) return undefined;
+        return {
+            getRows: (params) => {
+                const { startRow, endRow, sortModel, filterModel } = params.request;
+                const filters = extractFilterModel(filterModel);
+                const sortEntry = (sortModel || [])[0];
+                const sortKey = sortEntry?.colId || "";
+                const sortOrder = sortEntry?.sort === "asc" ? -1 : 1;
+                const skip = startRow;
+                const limit = (endRow ?? (startRow + paginationPageSize)) - startRow;
+                const searchString = searchRef.current.length >= 3 ? searchRef.current : "";
+                Promise.resolve(onServerFetchRef.current({ filters, sortKey, sortOrder, skip, limit, searchString }))
+                    .then(r => params.success({ rowData: r?.value || [], rowCount: r?.total ?? undefined }))
+                    .catch(() => params.fail());
+            },
+        };
+    }, [useSSRM, paginationPageSize]);
+
+    const handleGridReady = useCallback((e) => {
+        if (!useSSRM) return;
+        const persisted = filtersMap[pageKey] || {};
+        if (persisted.filters && Object.keys(persisted.filters).length > 0) {
+            const model = {};
+            Object.entries(persisted.filters).forEach(([field, values]) => {
+                model[field] = { filterType: "set", values };
+            });
+            e.api.setFilterModel(model);
+        }
+        if (persisted.sortKey) {
+            e.api.applyColumnState({
+                state: [{ colId: persisted.sortKey, sort: persisted.sortOrder === -1 ? "desc" : "asc" }],
+                defaultState: { sort: null },
+            });
+        }
+    }, [useSSRM, filtersMap, pageKey]);
+
+    // Custom pagination bar — only rendered in the non-SSRM server mode; SSRM uses AG Grid's own footer.
+    const serverPaginationBar = isServerMode && !useSSRM && query.total > 0 ? (
         <Box padding="2">
             <HorizontalStack align="center">    
                 <Pagination
@@ -279,7 +348,7 @@ export default function AgGridTable({
         <AgGridReact
             ref={gridRef}
             theme={theme}
-            rowData={rowData}
+            rowData={useSSRM ? undefined : rowData}
             columnDefs={columnDefs}
             defaultColDef={effectiveDefaultColDef}
             rowHeight={rowHeight}
@@ -290,7 +359,10 @@ export default function AgGridTable({
             onRowClicked={onRowClicked}
             onSelectionChanged={onSelectionChanged}
             getRowStyle={getRowStyle}
-            pagination={pagination}
+            rowModelType={useSSRM ? "serverSide" : undefined}
+            serverSideDatasource={useSSRM ? serverSideDatasource : undefined}
+            cacheBlockSize={useSSRM ? paginationPageSize : undefined}
+            pagination={useSSRM ? true : pagination}
             paginationPageSize={paginationPageSize}
             paginationPageSizeSelector={paginationPageSizeSelector}
             quickFilterText={isServerMode ? undefined : debouncedSearchValue}
@@ -303,6 +375,7 @@ export default function AgGridTable({
             columnTypes={AG_GRID_COLUMN_TYPES}
             onFilterChanged={handleFilterChanged}
             onSortChanged={handleSortChanged}
+            onGridReady={handleGridReady}
             domLayout={domLayout}
             {...rest}
         />
