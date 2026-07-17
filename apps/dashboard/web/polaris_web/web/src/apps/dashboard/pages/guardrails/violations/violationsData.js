@@ -71,16 +71,17 @@ export function prettyPrintIfJson(text) {
     return { text: JSON.stringify(unwrapped, null, 2), isJson: true };
 }
 
-// Some backends pre-combine metadata.reason as "<Title>: <message>" (e.g. config-scan
-// events: "Bypass Execution Policy: The command uses..."). That inner colon collides with
-// our own "<policy> policy: <reason>" wrapper, reading as "policy: Title: message" — turn
-// the short leading title into its own sentence instead. Only touches a colon within the
-// first 60 chars so it doesn't mangle a colon that's naturally part of a longer sentence.
+// Some backends pre-combine metadata.reason as "<Title>: <message>" (e.g. "Blocked: personal
+// accounts are not permitted..." or "Sandbox Disabled: The sandbox.enabled field is not
+// present..."). That leading title just restates the action/status already shown elsewhere
+// (the Blocked/Flagged badge, the policy name) — drop it and keep only the actual message.
+// Only strips a colon within the first 60 chars so it doesn't mangle a colon that's
+// naturally part of a longer sentence.
 export function normalizeReasonPunctuation(reason) {
     if (!reason) return reason;
     const idx = reason.indexOf(": ");
     if (idx === -1 || idx > 60) return reason;
-    return `${reason.slice(0, idx)}.${reason.slice(idx + 1)}`;
+    return reason.slice(idx + 2);
 }
 
 function _extractGuardrailReason(resp, req) {
@@ -209,7 +210,10 @@ export function buildFallbackDetail(row) {
     const req = _parseJson(outer.requestPayload);
     const resp = _parseJson(outer.responsePayload);
 
-    const reason = normalizeReasonPunctuation(meta.reason) || null;
+    // metadata.reason is often empty — fall back to the guardrail's own explanation
+    // extracted from the response payload (resp.error.data.reason, etc.) so the trigger
+    // line reflects what the backend actually detected instead of a generic sentence.
+    const reason = normalizeReasonPunctuation(meta.reason || guardrailReason) || null;
     const policyName = meta.policyName || (row.policyName && row.policyName !== "-" ? row.policyName : null);
     const isPromptOrTool = row.type === "Prompt" || row.type === "Tool";
     const rawPrimaryValue = coerceToText(isPromptOrTool
@@ -226,13 +230,8 @@ export function buildFallbackDetail(row) {
     // above in the evidence box (happens when there's no body/evidence field, so evidenceText
     // itself fell back to `reason`) — that reads as the same sentence said twice.
     const reasonAlreadyShown = reason && reason === evidenceText;
-    const triggerReason = policyName
-        ? (reason && !reasonAlreadyShown
-            ? `Triggered by the "${policyName}" policy: ${reason}`
-            : `Triggered by the "${policyName}" policy monitoring ${row.type} activity on this agentic asset.`)
-        : (reason && !reasonAlreadyShown
-            ? `Triggered because the request matched a guardrail policy rule: ${reason}`
-            : `Triggered by a guardrail policy monitoring ${row.type} activity on this agentic asset.`);
+    const policyLabel = policyName ? `Triggered by the "${policyName}" policy.` : "Triggered by a guardrail policy.";
+    const triggerReason = reason && !reasonAlreadyShown ? `${policyLabel} ${reason}` : policyLabel;
 
     return {
         evidence: {
