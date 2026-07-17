@@ -238,7 +238,7 @@ public class StartTestAction extends UserAction {
                     if (!unpublishedCopilotCollectionIds.isEmpty()) {
                         addActionError("No APIs available to test. Please publish the Copilot bot before running a scan.");
                     } else if (!outOfScopeCustomCollectionIds.isEmpty()) {
-                        addActionError("No APIs available to test. All selected APIs fall under collection(s) that are out of testing scope.");
+                        addActionError("No APIs available to test. All selected APIs fall under collection(s) marked as \"out of testing scope\".");
                     } else {
                         addActionError("APIs list can't be empty");
                     }
@@ -254,7 +254,7 @@ public class StartTestAction extends UserAction {
                     return null;
                 }
                 if (collectionWiseCol != null && collectionWiseCol.getIsOutOfTestingScope()) {
-                    addActionError("This collection is marked as out of testing scope. Please remove it from out of testing scope before running a scan.");
+                    addActionError("This collection is marked as \"out of testing scope\". Please remove this marking before running a scan.");
                     return null;
                 }
                 testingEndpoints = new CollectionWiseTestingEndpoints(apiCollectionId);
@@ -273,7 +273,7 @@ public class StartTestAction extends UserAction {
                     loggerMaker.debugAndAddToDb("createTestingRun: skipping " + skippedCollectionIds.size() + " unpublished copilot collections " + skippedCollectionIds, LogDb.DASHBOARD);
                 }
                 if (!skippedOutOfScopeCollectionIds.isEmpty()) {
-                    String outOfScopeWarning = "Some tests were not scheduled because the collections are out of testing scope: collection IDs " + skippedOutOfScopeCollectionIds;
+                    String outOfScopeWarning = "Some tests were not scheduled because the collections are marked as \"out of testing scope\": collection IDs " + skippedOutOfScopeCollectionIds;
                     this.testScheduleWarning = StringUtils.isEmpty(this.testScheduleWarning) ? outOfScopeWarning : this.testScheduleWarning + "; " + outOfScopeWarning;
                     loggerMaker.debugAndAddToDb("createTestingRun: skipping " + skippedOutOfScopeCollectionIds.size() + " out of testing scope collections " + skippedOutOfScopeCollectionIds, LogDb.DASHBOARD);
                 }
@@ -281,11 +281,11 @@ public class StartTestAction extends UserAction {
                     boolean hasCopilotSkips = !skippedCollectionIds.isEmpty();
                     boolean hasOutOfScopeSkips = !skippedOutOfScopeCollectionIds.isEmpty();
                     if (hasCopilotSkips && hasOutOfScopeSkips) {
-                        addActionError("No collections available to test. All selected collections are either unpublished Copilot bots or marked out of testing scope.");
+                        addActionError("No collections available to test. All selected collections are either unpublished Copilot bots or marked as \"out of testing scope\".");
                     } else if (hasCopilotSkips) {
                         addActionError("No collections available to test. All Copilot bot collections are not published.");
                     } else {
-                        addActionError("No collections available to test. All selected collections are marked out of testing scope.");
+                        addActionError("No collections available to test. All selected collections are marked as \"out of testing scope\".");
                     }
                     return null;
                 }
