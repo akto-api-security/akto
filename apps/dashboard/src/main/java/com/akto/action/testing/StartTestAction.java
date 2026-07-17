@@ -58,6 +58,7 @@ import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -214,22 +215,30 @@ public class StartTestAction extends UserAction {
                 List<Integer> customCollectionIds = this.apiInfoKeyList.stream()
                         .map(ApiInfo.ApiInfoKey::getApiCollectionId)
                         .distinct().collect(Collectors.toList());
-                // Copilot bot collections that are not published should not be tested,
-                // since the bot endpoints are not active and tests would be meaningless.
-                List<Integer> unpublishedCopilotCollectionIds = Utils.filterUnpublishedCopilotCollections(customCollectionIds);
-                if (!unpublishedCopilotCollectionIds.isEmpty()) {
-                    this.apiInfoKeyList.removeIf(k -> unpublishedCopilotCollectionIds.contains(k.getApiCollectionId()));
-                }
-                // Collections marked out of testing scope should not be tested either.
-                List<Integer> outOfScopeCustomCollectionIds = Utils.filterOutOfTestingScopeCollections(customCollectionIds);
-                if (!outOfScopeCustomCollectionIds.isEmpty()) {
-                    this.apiInfoKeyList.removeIf(k -> outOfScopeCustomCollectionIds.contains(k.getApiCollectionId()));
+                // Copilot bot collections that are not published, and collections marked out of
+                // testing scope, should not be tested.
+                Pair<List<Integer>, List<Integer>> ineligibleCustomCollectionIds = Utils.filterIneligibleCollectionsForTesting(customCollectionIds);
+                List<Integer> unpublishedCopilotCollectionIds = ineligibleCustomCollectionIds.getLeft();
+                List<Integer> outOfScopeCustomCollectionIds = ineligibleCustomCollectionIds.getRight();
+                if (!unpublishedCopilotCollectionIds.isEmpty() || !outOfScopeCustomCollectionIds.isEmpty()) {
+                    if (!unpublishedCopilotCollectionIds.isEmpty()) {
+                        long removedApisCount = this.apiInfoKeyList.stream()
+                                .filter(k -> unpublishedCopilotCollectionIds.contains(k.getApiCollectionId())).count();
+                        loggerMaker.debugAndAddToDb("createTestingRun: removing " + removedApisCount + " APIs from unpublished copilot collections " + unpublishedCopilotCollectionIds, LogDb.DASHBOARD);
+                    }
+                    if (!outOfScopeCustomCollectionIds.isEmpty()) {
+                        long removedApisCount = this.apiInfoKeyList.stream()
+                                .filter(k -> outOfScopeCustomCollectionIds.contains(k.getApiCollectionId())).count();
+                        loggerMaker.debugAndAddToDb("createTestingRun: removing " + removedApisCount + " APIs from out of testing scope collections " + outOfScopeCustomCollectionIds, LogDb.DASHBOARD);
+                    }
+                    this.apiInfoKeyList.removeIf(k -> unpublishedCopilotCollectionIds.contains(k.getApiCollectionId())
+                            || outOfScopeCustomCollectionIds.contains(k.getApiCollectionId()));
                 }
                 if (this.apiInfoKeyList.isEmpty()) {
                     if (!unpublishedCopilotCollectionIds.isEmpty()) {
                         addActionError("No APIs available to test. Please publish the Copilot bot before running a scan.");
                     } else if (!outOfScopeCustomCollectionIds.isEmpty()) {
-                        addActionError("No APIs available to test. All selected collections are marked out of testing scope.");
+                        addActionError("No APIs available to test. All selected APIs fall under collection(s) that are out of testing scope.");
                     } else {
                         addActionError("APIs list can't be empty");
                     }
@@ -256,16 +265,17 @@ public class StartTestAction extends UserAction {
                     return null;
                 }
                 List<Integer> mutableCollectionIds = new ArrayList<>(this.apiCollectionIds);
-                List<Integer> skippedCollectionIds = Utils.filterUnpublishedCopilotCollections(mutableCollectionIds);
+                Pair<List<Integer>, List<Integer>> ineligibleMultiCollectionIds = Utils.filterIneligibleCollectionsForTesting(mutableCollectionIds);
+                List<Integer> skippedCollectionIds = ineligibleMultiCollectionIds.getLeft();
+                List<Integer> skippedOutOfScopeCollectionIds = ineligibleMultiCollectionIds.getRight();
                 if (!skippedCollectionIds.isEmpty()) {
                     this.testScheduleWarning = "Some tests were not scheduled because the bot is not published: collection IDs " + skippedCollectionIds;
-                    loggerMaker.debugAndAddToDb("createTestingRun: skipping unpublished copilot collections " + skippedCollectionIds, LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("createTestingRun: skipping " + skippedCollectionIds.size() + " unpublished copilot collections " + skippedCollectionIds, LogDb.DASHBOARD);
                 }
-                List<Integer> skippedOutOfScopeCollectionIds = Utils.filterOutOfTestingScopeCollections(mutableCollectionIds);
                 if (!skippedOutOfScopeCollectionIds.isEmpty()) {
                     String outOfScopeWarning = "Some tests were not scheduled because the collections are out of testing scope: collection IDs " + skippedOutOfScopeCollectionIds;
                     this.testScheduleWarning = StringUtils.isEmpty(this.testScheduleWarning) ? outOfScopeWarning : this.testScheduleWarning + "; " + outOfScopeWarning;
-                    loggerMaker.debugAndAddToDb("createTestingRun: skipping out of testing scope collections " + skippedOutOfScopeCollectionIds, LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("createTestingRun: skipping " + skippedOutOfScopeCollectionIds.size() + " out of testing scope collections " + skippedOutOfScopeCollectionIds, LogDb.DASHBOARD);
                 }
                 if (mutableCollectionIds.isEmpty()) {
                     boolean hasCopilotSkips = !skippedCollectionIds.isEmpty();

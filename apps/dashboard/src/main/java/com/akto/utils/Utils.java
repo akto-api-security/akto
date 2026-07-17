@@ -999,13 +999,16 @@ public class Utils {
     }
 
     /**
-     * From a mutable list of collection IDs, removes any that are Copilot bot collections
-     * but not yet published. Returns the IDs that were removed.
+     * From a mutable list of collection IDs, removes any that are ineligible for testing —
+     * unpublished Copilot bot collections or collections marked out of testing scope.
+     * Fetches collection metadata once. Returns the removed IDs as
+     * Pair(unpublishedCopilotBotIds, outOfTestingScopeIds).
      */
-    public static List<Integer> filterUnpublishedCopilotCollections(List<Integer> apiCollectionIds) {
-        List<Integer> removed = new ArrayList<>();
+    public static Pair<List<Integer>, List<Integer>> filterIneligibleCollectionsForTesting(List<Integer> apiCollectionIds) {
+        List<Integer> unpublishedCopilotBotIds = new ArrayList<>();
+        List<Integer> outOfTestingScopeIds = new ArrayList<>();
         if (CollectionUtils.isEmpty(apiCollectionIds)) {
-            return removed;
+            return Pair.of(unpublishedCopilotBotIds, outOfTestingScopeIds);
         }
         List<ApiCollection> cols = ApiCollectionsDao.instance.getMetaForIds(apiCollectionIds);
         Map<Integer, ApiCollection> colMap = new HashMap<>();
@@ -1014,37 +1017,19 @@ public class Utils {
         }
         apiCollectionIds.removeIf(id -> {
             ApiCollection col = colMap.get(id);
-            if (col != null && col.isCopilotBotCollection() && !col.isCopilotBotPublished()) {
-                removed.add(id);
+            if (col == null) {
+                return false;
+            }
+            if (col.isCopilotBotCollection() && !col.isCopilotBotPublished()) {
+                unpublishedCopilotBotIds.add(id);
+                return true;
+            }
+            if (col.getIsOutOfTestingScope()) {
+                outOfTestingScopeIds.add(id);
                 return true;
             }
             return false;
         });
-        return removed;
-    }
-
-    /**
-     * From a mutable list of collection IDs, removes any that are marked out of testing scope.
-     * Returns the IDs that were removed.
-     */
-    public static List<Integer> filterOutOfTestingScopeCollections(List<Integer> apiCollectionIds) {
-        List<Integer> removed = new ArrayList<>();
-        if (CollectionUtils.isEmpty(apiCollectionIds)) {
-            return removed;
-        }
-        List<ApiCollection> cols = ApiCollectionsDao.instance.getMetaForIds(apiCollectionIds);
-        Map<Integer, ApiCollection> colMap = new HashMap<>();
-        for (ApiCollection col : cols) {
-            colMap.put(col.getId(), col);
-        }
-        apiCollectionIds.removeIf(id -> {
-            ApiCollection col = colMap.get(id);
-            if (col != null && col.getIsOutOfTestingScope()) {
-                removed.add(id);
-                return true;
-            }
-            return false;
-        });
-        return removed;
+        return Pair.of(unpublishedCopilotBotIds, outOfTestingScopeIds);
     }
 }

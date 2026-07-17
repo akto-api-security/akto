@@ -66,7 +66,7 @@ public class TestResult extends GenericTestResult {
         SKIPPING_EXECUTION_BECAUSE_AUTH("Request API failed authentication check, skipping execution", true),
         SKIPPING_EXECUTION_BECAUSE_FILTERS("Request API failed to satisfy api_selection_filters block, skipping execution", true),
         DEACTIVATED_ENDPOINT("This is a deactivated endpoint", true),
-        OUT_OF_TESTING_SCOPE_COLLECTION("This collection is marked as out of testing scope", true),
+        OUT_OF_TESTING_SCOPE_COLLECTION("This API falls under a collection that is marked as \"out of testing scope\"", true),
         USAGE_EXCEEDED("You have exceeded the limit of this feature, skipping execution", true),
         ROLE_NOT_FOUND("config doesn't exist, skipping execution", false),
         TEST_TIMED_OUT("Test took too long for execution, exited out", true),
