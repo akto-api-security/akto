@@ -5,6 +5,9 @@ public enum ModelType {
     OPENAI,
     ANTHROPIC,
     AZURE_OPENAI,
-    MISTRAL_AI
+    MISTRAL_AI,
+    GEMINI,
+    GITHUB_COPILOT,
+    OLLAMA
 
 }
