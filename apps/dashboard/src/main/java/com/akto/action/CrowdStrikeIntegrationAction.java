@@ -333,26 +333,6 @@ public class CrowdStrikeIntegrationAction extends UserAction {
         cursorHooks.put("description", "Install Akto guardrails hooks for Cursor IDE");
         guardrailTypes.add(cursorHooks);
 
-        Map<String, Object> openClawGuardrails = new HashMap<>();
-        openClawGuardrails.put("type", "openclaw-guardrails");
-        openClawGuardrails.put("displayName", "OpenClaw Guardrails");
-        openClawGuardrails.put("description", "Install MCP Endpoint Shield guardrails for OpenClaw (Clawdbot)");
-        List<Map<String, String>> openClawEnvVars = new ArrayList<>();
-        Map<String, String> openaiApiKey = new HashMap<>();
-        openaiApiKey.put("name", "OPENAI_API_KEY"); openaiApiKey.put("label", "OpenAI API Key");
-        openaiApiKey.put("placeholder", "sk-xxxxx"); openaiApiKey.put("required", "true");
-        openClawEnvVars.add(openaiApiKey);
-        Map<String, String> originalProvider = new HashMap<>();
-        originalProvider.put("name", "ORIGINAL_PROVIDER"); originalProvider.put("label", "Original Provider");
-        originalProvider.put("placeholder", "openai/gpt-4o-mini"); originalProvider.put("required", "true");
-        openClawEnvVars.add(originalProvider);
-        Map<String, String> modelId = new HashMap<>();
-        modelId.put("name", "MODEL_ID"); modelId.put("label", "Model ID");
-        modelId.put("placeholder", "gpt-4o-mini"); modelId.put("required", "true");
-        openClawEnvVars.add(modelId);
-        openClawGuardrails.put("envVars", openClawEnvVars);
-        guardrailTypes.add(openClawGuardrails);
-
         Map<String, Object> claudeCliHooks = new HashMap<>();
         claudeCliHooks.put("type", "claude-cli-hooks");
         claudeCliHooks.put("displayName", "Claude CLI Hooks");
@@ -752,53 +732,59 @@ public class CrowdStrikeIntegrationAction extends UserAction {
     private String uploadGuardrailScriptIfNeeded(String accessToken, String baseUrl, String scriptFileName) {
         if (uploadedGuardrailScripts.contains(scriptFileName)) return scriptFileName;
 
-        // Check if already in RTR library.
-        try {
-            RequestConfig cfg = buildRequestConfig();
-            try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-                HttpGet check = new HttpGet(baseUrl + "/real-time-response/queries/falcon-scripts/v1?filter=name%3A%27"
-                    + encode(scriptFileName) + "%27");
-                check.setHeader("Authorization", "Bearer " + accessToken);
-
-                try (CloseableHttpResponse resp = client.execute(check)) {
-                    JsonNode json = OBJECT_MAPPER.readTree(EntityUtils.toString(resp.getEntity()));
-                    JsonNode resources = json.path("resources");
-                    if (resources.isArray() && resources.size() > 0) {
-                        uploadedGuardrailScripts.add(scriptFileName);
-                        return scriptFileName;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            loggerMaker.error("Error checking RTR library for " + scriptFileName + ": " + e.getMessage(), LogDb.DASHBOARD);
-        }
-
-        // Upload from classpath (scripts live under /sentinelone/ — same scripts, platform-agnostic content)
         String classpathResource = "/sentinelone/" + scriptFileName;
+        byte[] scriptBytes;
         try (InputStream scriptStream = getClass().getResourceAsStream(classpathResource)) {
             if (scriptStream == null) {
                 loggerMaker.error("Guardrail script not found in classpath: " + classpathResource, LogDb.DASHBOARD);
                 return null;
             }
-            byte[] scriptBytes = readAllBytes(scriptStream);
+            scriptBytes = readAllBytes(scriptStream);
+        } catch (Exception e) {
+            loggerMaker.error("Error reading guardrail script " + scriptFileName + ": " + e.getMessage(), LogDb.DASHBOARD);
+            return null;
+        }
 
-            RequestConfig cfg = buildRequestConfig();
-            try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-                HttpPost post = new HttpPost(baseUrl + "/real-time-response/entities/scripts/v1");
-                post.setHeader("Authorization", "Bearer " + accessToken);
-                post.setEntity(buildGuardrailScriptUploadEntity(scriptFileName, scriptBytes));
+        // If a script with this exact name already exists, always push our current local content
+        // via PATCH (by id) rather than skipping — otherwise CrowdStrike keeps running whatever was
+        // uploaded first, silently ignoring any local script edits made since (e.g. a bugfix).
+        JsonNode existingMeta = findExistingGuardrailScriptMeta(scriptFileName, accessToken, baseUrl);
+        if (existingMeta != null) {
+            String scriptId = existingMeta.path("id").asText("");
+            if (!scriptId.isEmpty() && updateGuardrailScript(scriptId, scriptFileName, scriptBytes, accessToken, baseUrl)) {
+                loggerMaker.info("Updated existing guardrail script with current content: " + scriptFileName, LogDb.DASHBOARD);
+                uploadedGuardrailScripts.add(scriptFileName);
+                return scriptFileName;
+            }
+            loggerMaker.error("Failed to update guardrail script " + scriptFileName + " — reusing existing (possibly outdated) version", LogDb.DASHBOARD);
+            uploadedGuardrailScripts.add(scriptFileName);
+            return scriptFileName;
+        }
 
-                try (CloseableHttpResponse resp = client.execute(post)) {
-                    int status = resp.getStatusLine().getStatusCode();
-                    String body = EntityUtils.toString(resp.getEntity());
-                    if (status == 200 || status == 201) {
-                        uploadedGuardrailScripts.add(scriptFileName);
-                        loggerMaker.info("Uploaded guardrail script to RTR library: " + scriptFileName, LogDb.DASHBOARD);
-                        return scriptFileName;
-                    }
-                    loggerMaker.error("Failed to upload guardrail script " + scriptFileName + ": HTTP " + status + " " + body, LogDb.DASHBOARD);
-                    return null;
+        RequestConfig cfg = buildRequestConfig();
+        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+            HttpPost post = new HttpPost(baseUrl + "/real-time-response/entities/scripts/v1");
+            post.setHeader("Authorization", "Bearer " + accessToken);
+            post.setEntity(buildGuardrailScriptUploadEntity(scriptFileName, scriptBytes));
+
+            try (CloseableHttpResponse resp = client.execute(post)) {
+                int status = resp.getStatusLine().getStatusCode();
+                String body = EntityUtils.toString(resp.getEntity());
+                if (status == 200 || status == 201) {
+                    uploadedGuardrailScripts.add(scriptFileName);
+                    loggerMaker.info("Uploaded guardrail script to RTR library: " + scriptFileName, LogDb.DASHBOARD);
+                    return scriptFileName;
                 }
+                if (status == 409) {
+                    // "file with given name already exists" — a concurrent request raced
+                    // findExistingGuardrailScriptMeta above and won the upload first. The script is
+                    // present under this name either way, so reuse it.
+                    loggerMaker.info("Guardrail script " + scriptFileName + " already exists (409, concurrent upload race) — reusing", LogDb.DASHBOARD);
+                    uploadedGuardrailScripts.add(scriptFileName);
+                    return scriptFileName;
+                }
+                loggerMaker.error("Failed to upload guardrail script " + scriptFileName + ": HTTP " + status + " " + body, LogDb.DASHBOARD);
+                return null;
             }
         } catch (Exception e) {
             loggerMaker.error("Error uploading guardrail script " + scriptFileName + ": " + e.getMessage(), LogDb.DASHBOARD);
@@ -806,8 +792,80 @@ public class CrowdStrikeIntegrationAction extends UserAction {
         }
     }
 
+    // Looks up an uploaded guardrail script BY EXACT NAME and returns its full metadata (id, etc.),
+    // or null if no script with that exact name exists. Scoped strictly to exact-name match — this
+    // is what makes the always-update-on-existing logic in uploadGuardrailScriptIfNeeded safe to use
+    // in a shared CrowdStrike account: it can only ever touch a script whose name is one of our own
+    // guardrail installers, never anything else the org has uploaded to the same RTR script library.
+    private JsonNode findExistingGuardrailScriptMeta(String scriptFileName, String accessToken, String baseUrl) {
+        RequestConfig cfg = buildRequestConfig();
+        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+            HttpGet get = new HttpGet(baseUrl + "/real-time-response/entities/scripts/v1"
+                + "?filter=name%3A%22" + encode(scriptFileName) + "%22");
+            get.setHeader("Authorization", "Bearer " + accessToken);
+
+            try (CloseableHttpResponse resp = client.execute(get)) {
+                int status = resp.getStatusLine().getStatusCode();
+                String body = EntityUtils.toString(resp.getEntity());
+                if (status != 200) return null;
+
+                JsonNode json = OBJECT_MAPPER.readTree(body);
+                JsonNode resources = json.path("resources");
+                if (resources.isArray()) {
+                    for (JsonNode r : resources) {
+                        // Defense in depth: the API filter should already be exact, but never trust
+                        // a substring/fuzzy match here — only act on a byte-exact name match.
+                        if (scriptFileName.equals(r.path("name").asText(""))) {
+                            return r;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.error("Error checking existing guardrail scripts: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+        return null;
+    }
+
+    // Replaces an existing guardrail script's content in place via PATCH (by id — never a name-based
+    // lookup here, so this can only touch the exact resource findExistingGuardrailScriptMeta matched).
+    private boolean updateGuardrailScript(String scriptId, String scriptFileName, byte[] scriptBytes,
+            String accessToken, String baseUrl) {
+        RequestConfig cfg = buildRequestConfig();
+        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+            MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+            builder.addTextBody("id", scriptId);
+            appendGuardrailScriptFields(builder, scriptFileName, scriptBytes);
+
+            org.apache.http.client.methods.HttpPatch patch =
+                new org.apache.http.client.methods.HttpPatch(baseUrl + "/real-time-response/entities/scripts/v1");
+            patch.setHeader("Authorization", "Bearer " + accessToken);
+            patch.setEntity(builder.build());
+
+            try (CloseableHttpResponse resp = client.execute(patch)) {
+                int status = resp.getStatusLine().getStatusCode();
+                String body = EntityUtils.toString(resp.getEntity());
+                // 202 is this endpoint's real success status (async processing) — confirmed against
+                // the live API by the account-job-executor's identical CrowdStrikeExecutor.updateScript.
+                if (status != 200 && status != 201 && status != 202) {
+                    loggerMaker.error("Guardrail script update failed HTTP " + status + " for " + scriptFileName + ": " + body, LogDb.DASHBOARD);
+                    return false;
+                }
+                return true;
+            }
+        } catch (Exception e) {
+            loggerMaker.error("Failed to update guardrail script id=" + scriptId + ": " + e.getMessage(), LogDb.DASHBOARD);
+            return false;
+        }
+    }
+
     private org.apache.http.HttpEntity buildGuardrailScriptUploadEntity(String scriptFileName, byte[] scriptBytes) {
         MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+        appendGuardrailScriptFields(builder, scriptFileName, scriptBytes);
+        return builder.build();
+    }
+
+    private void appendGuardrailScriptFields(MultipartEntityBuilder builder, String scriptFileName, byte[] scriptBytes) {
         builder.addTextBody("name", scriptFileName);
         builder.addTextBody("permission_type", "private");
         builder.addTextBody("content_type", scriptFileName.endsWith(".ps1") ? "text/x-powershell" : "text/x-shellscript");
@@ -819,7 +877,6 @@ public class CrowdStrikeIntegrationAction extends UserAction {
             builder.addTextBody("platform", "mac");
         }
         builder.addBinaryBody("file", scriptBytes, ContentType.APPLICATION_OCTET_STREAM, scriptFileName);
-        return builder.build();
     }
 
     private boolean isBlank(String value) {
@@ -828,9 +885,8 @@ public class CrowdStrikeIntegrationAction extends UserAction {
 
     private static String getGuardrailScriptBaseName(String type) {
         switch (type) {
-            case "cursor-hooks":         return "install_cursor_hooks_sentinelone";
-            case "openclaw-guardrails":  return "install_openclaw_guardrails_sentinelone";
-            case "claude-cli-hooks":     return "install_claude_cli_hooks_sentinelone";
+            case "cursor-hooks":         return "install_cursor_hooks";
+            case "claude-cli-hooks":     return "install_claude_cli_hooks";
             case "gemini-hooks":         return "install_gemini_hooks";
             case "codex-hooks":         return "install_codex_hooks";
             case "github-cli-hooks":    return "install_github_cli_hooks";

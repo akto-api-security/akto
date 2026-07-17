@@ -159,6 +159,30 @@ check_kiro_cli() {
     return 1
 }
 
+# OpenClaw (formerly Clawdbot) — binary is "openclaw", installed via one of:
+#   - curl install.sh -> ~/.local/bin/openclaw
+#   - npm install -g openclaw -> npm global bin dir (covered by PATH lookup)
+#   - install-cli.sh prefix installer, default prefix ~/.openclaw -> ~/.openclaw/bin/openclaw
+#   - Homebrew cask (macOS menu-bar app) or tap formula (CLI)
+# Config footprint (~/.openclaw/openclaw.json) is the same path the guardrails installer
+# already assumes (install_openclaw_guardrails_sentinelone.sh) — used here as a last-resort
+# signal for installs where the binary isn't on this user's PATH.
+check_openclaw() {
+    local user_home="$1"
+    shift
+    local binary_paths=("$@")
+
+    if check_binary_paths "openclaw" "${binary_paths[@]}"; then
+        return 0
+    elif check_path_lookup "openclaw" "openclaw"; then
+        return 0
+    elif [ -f "$user_home/.openclaw/openclaw.json" ]; then
+        add_app "openclaw" "$user_home/.openclaw" "footprint"
+        return 0
+    fi
+    return 1
+}
+
 OS_TYPE="$(uname -s)"
 
 # Get all user home directories (same enumeration as scan_mcp_configs.sh / scan_skills.sh)
@@ -190,6 +214,10 @@ for user_home in $USER_HOMES; do
             "/Applications/Codex.app" "$user_home/Applications/Codex.app"
         check_app_bundle "kiroide" "Kiro" \
             "/Applications/Kiro.app" "$user_home/Applications/Kiro.app"
+        # macOS menu-bar companion app (Electron) — distinct from the openclaw CLI below,
+        # same as claude-desktop vs claude-cli-user.
+        check_app_bundle "openclaw-desktop" "OpenClaw" \
+            "/Applications/OpenClaw.app" "$user_home/Applications/OpenClaw.app"
 
         # ── Claude CLI ───────────────────────────────────────────────────────
         check_binary_paths "claude-cli-user" \
@@ -213,6 +241,11 @@ for user_home in $USER_HOMES; do
         check_kiro_cli "$user_home" \
             "/opt/homebrew/bin/kiro-cli" "/usr/local/bin/kiro-cli" "$user_home/.local/bin/kiro-cli" \
             "/opt/homebrew/bin/kiro" "/usr/local/bin/kiro" "$user_home/.local/bin/kiro"
+
+        # ── OpenClaw CLI (binary, PATH, or config footprint — mutually exclusive) ──
+        check_openclaw "$user_home" \
+            "$user_home/.local/bin/openclaw" "$user_home/.openclaw/bin/openclaw" \
+            "/opt/homebrew/bin/openclaw" "/usr/local/bin/openclaw"
 
     elif [ "$OS_TYPE" = "Linux" ]; then
         # ── Editor/desktop directory signals (matches detectLinuxAgents) ─────
@@ -241,6 +274,10 @@ for user_home in $USER_HOMES; do
         check_kiro_cli "$user_home" \
             "/usr/local/bin/kiro-cli" "$user_home/.local/bin/kiro-cli" \
             "/usr/local/bin/kiro" "$user_home/.local/bin/kiro"
+
+        check_openclaw "$user_home" \
+            "$user_home/.local/bin/openclaw" "$user_home/.openclaw/bin/openclaw" \
+            "/usr/local/bin/openclaw"
     fi
 done
 
