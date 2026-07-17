@@ -358,7 +358,7 @@ function transformEvent(event, collectionsMap, usernameMap) {
 
 // ─── Dashboard summary section ───────────────────────────────────────────────────
 
-function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, latencyData, startTimestamp, endTimestamp }) {
+function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, latencyData, startTimestamp, endTimestamp }) {
     if (summaryLoading) return <SpinnerCentered />;
     if (!summaryData) return null;
 
@@ -389,6 +389,7 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
         name: item.name,
         count: item.count,
         os: detectOs(item.host),
+        onClick: () => onHostClick?.(item.host),
         renderValue: () => <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>,
     }));
 
@@ -441,8 +442,8 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
                     columns={[{ label: "User" }, { label: "Violations" }]}
                     rows={hostRows}
                     renderIcon={(row) => <OsIcon os={row.os} size={20} />}
-                    activeRows={new Set()}
-                    onClearSelection={() => {}}
+                    activeRows={activeHostFilter}
+                    onClearSelection={onClearHostSelection}
                 />
                 <AgenticTopListCard
                     title="Top Policies Triggered"
@@ -617,6 +618,22 @@ function Violations() {
         applyGridFilter("policyName", []);
     }, [applyGridFilter]);
 
+    const [activeHostFilter, setActiveHostFilter] = useState(new Set());
+
+    const handleHostClick = useCallback((host) => {
+        setActiveHostFilter(prev => {
+            const next = new Set(prev);
+            if (next.has(host)) next.delete(host); else next.add(host);
+            applyGridFilter("user", [...next]);
+            return next;
+        });
+    }, [applyGridFilter]);
+
+    const handleClearHostSelection = useCallback(() => {
+        setActiveHostFilter(new Set());
+        applyGridFilter("user", []);
+    }, [applyGridFilter]);
+
     const handleTypeClick = useCallback((typeName) => {
         const mapping = summaryData?.typeToSubCategories || {};
         const subCategories = mapping[typeName] || [];
@@ -661,14 +678,19 @@ function Violations() {
         async function loadSummary() {
             setSummaryLoading(true);
             try {
-                const [severityResp, categoryResp, dailyResp, topNResp] = await Promise.all([
+                const results = await Promise.allSettled([
                     threatDetectionApi.fetchCountBySeverity(startTimestamp, endTimestamp, "ACTIVE"),
                     threatDetectionApi.fetchThreatCategoryCount(startTimestamp, endTimestamp, activeStatusValue),
                     threatDetectionApi.getDailyThreatActorsCount(startTimestamp, endTimestamp, []),
                     threatDetectionApi.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5),
                 ]);
 
-                // Severity counts — same parsing as ThreatDashboardPage
+                const severityResp = results[0].status === 'fulfilled' ? results[0].value : {};
+                const categoryResp = results[1].status === 'fulfilled' ? results[1].value : {};
+                const dailyResp    = results[2].status === 'fulfilled' ? results[2].value : {};
+                const topNResp     = results[3].status === 'fulfilled' ? results[3].value : {};
+
+                // Severity counts
                 const severityDistribution = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
                 let totalCount = 0;
                 (severityResp?.categoryCounts || []).forEach(item => {
@@ -963,6 +985,9 @@ function Violations() {
             onPolicyClick={handlePolicyClick}
             activePolicyFilter={activePolicyFilter}
             onClearPolicySelection={handleClearPolicySelection}
+            onHostClick={handleHostClick}
+            activeHostFilter={activeHostFilter}
+            onClearHostSelection={handleClearHostSelection}
             onTypeClick={handleTypeClick}
             activeTypeFilter={activeTypeFilter}
             selectedCard={selectedCard}
