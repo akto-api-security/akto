@@ -27,11 +27,7 @@ _LEVELS = {
 
 
 def resolve_log_level() -> int:
-    raw = (
-        os.environ.get("AGW_LOG_LEVEL")
-        or os.environ.get("LOG_LEVEL")
-        or "INFO"
-    ).strip().upper()
+    raw = (os.environ.get("AGW_LOG_LEVEL") or os.environ.get("LOG_LEVEL") or "INFO").strip().upper()
     return _LEVELS.get(raw, logging.INFO)
 
 
@@ -72,8 +68,7 @@ def log_startup_banner() -> None:
 def log_backpressure_skip(scanner_name: str) -> None:
     snap = cascade_backpressure.status_snapshot()
     logger.info(
-        "[scan-diag] path=cascade_backpressure_skip scanner=%s pid=%s "
-        "recent_avg_ms=%s sample_count=%s threshold_ms=%s",
+        "[scan-diag] path=cascade_backpressure_skip scanner=%s pid=%s recent_avg_ms=%s sample_count=%s threshold_ms=%s",
         scanner_name,
         os.getpid(),
         snap.get("recent_avg_latency_ms"),
@@ -103,7 +98,7 @@ def log_scan_outcome(
     scanner_name: str,
     elapsed_ms: float,
     *,
-    extra: Optional[Dict[str, Any]] = None,
+    extra: dict[str, Any] | None = None,
     always: bool = False,
 ) -> None:
     """Log a completed scan path. Skips and errors use always=True."""

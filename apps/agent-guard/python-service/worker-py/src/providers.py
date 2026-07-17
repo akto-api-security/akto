@@ -9,7 +9,8 @@ Differences from the container version:
 import logging
 import math
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from collections.abc import Callable
+from typing import Any, Optional
 
 import gcp_auth
 import http_client
@@ -23,11 +24,11 @@ DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 _IDENTITY = {"Accept-Encoding": "identity"}
 
 # Process-wide cache of built providers, keyed by (provider, model, base_url).
-_PROVIDER_CACHE: Dict[Tuple[str, str, str], "LLMProvider"] = {}
+_PROVIDER_CACHE: dict[tuple[str, str, str], "LLMProvider"] = {}
 
 
 def _cached_provider(
-    cache_key: Tuple[str, str, str], builder: Callable[[], Optional["LLMProvider"]]
+    cache_key: tuple[str, str, str], builder: Callable[[], Optional["LLMProvider"]]
 ) -> Optional["LLMProvider"]:
     cached = _PROVIDER_CACHE.get(cache_key)
     if cached is not None:
@@ -42,8 +43,7 @@ class LLMProvider(ABC):
     name: str = ""
 
     @abstractmethod
-    async def complete(self, prompt: str) -> str:
-        ...
+    async def complete(self, prompt: str) -> str: ...
 
 
 class OpenAIProvider(LLMProvider):
@@ -85,20 +85,22 @@ class AnthropicProvider(LLMProvider):
 
     async def complete(self, prompt: str) -> str:
         logger.info(f"[Anthropic] prompt: {prompt}")
-        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers=dict(_IDENTITY, **{
+        resp = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers=dict(
+                _IDENTITY,
+                **{
                     "Content-Type": "application/json",
                     "x-api-key": self.api_key,
                     "anthropic-version": "2023-06-01",
-                }),
-                json={
-                    "model": self.model,
-                    "max_tokens": 256,
-                    "messages": [{"role": "user", "content": prompt}],
                 },
-            )
+            ),
+            json={
+                "model": self.model,
+                "max_tokens": 256,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+        )
         resp.raise_for_status()
         return resp.json()["content"][0]["text"]
 
@@ -109,8 +111,7 @@ class VertexAIProvider(LLMProvider):
     name = "vertexai"
     _log_tag = "[VertexAI]"
 
-    def __init__(self, sa_key_json_b64: str, project: str, location: str,
-                 endpoint_id: str, dedicated_dns: str = ""):
+    def __init__(self, sa_key_json_b64: str, project: str, location: str, endpoint_id: str, dedicated_dns: str = ""):
         self.sa_info = gcp_auth.sa_info_from_b64(sa_key_json_b64)
         self.project = project
         self.location = location
@@ -121,31 +122,35 @@ class VertexAIProvider(LLMProvider):
     def _predict_url(self) -> str:
         host = self.dedicated_dns or f"{self.location}-aiplatform.googleapis.com"
         return (
-            f"https://{host}/v1/projects/{self.project}"
-            f"/locations/{self.location}/endpoints/{self.endpoint_id}:predict"
+            f"https://{host}/v1/projects/{self.project}/locations/{self.location}/endpoints/{self.endpoint_id}:predict"
         )
 
-    async def _post(self, instance: Dict[str, Any]) -> dict:
+    async def _post(self, instance: dict[str, Any]) -> dict:
         token = await gcp_auth.get_token(self.sa_info)
         client = http_client.get_client()
         resp = await client.post(
             self._predict_url(),
-            headers=dict(_IDENTITY, **{
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {token}",
-            }),
+            headers=dict(
+                _IDENTITY,
+                **{
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {token}",
+                },
+            ),
             json={"instances": [instance]},
         )
         resp.raise_for_status()
         return resp.json()
 
     async def complete(self, prompt: str) -> str:
-        body = await self._post({
-            "@requestFormat": "chatCompletions",
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 512,
-            "temperature": 0.1,
-        })
+        body = await self._post(
+            {
+                "@requestFormat": "chatCompletions",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 512,
+                "temperature": 0.1,
+            }
+        )
         return body["predictions"]["choices"][0]["message"]["content"]
 
 
@@ -167,8 +172,8 @@ class Qwen3GuardProvider(VertexAIProvider):
 
     async def complete_with_logprobs(
         self, text: str, top_logprobs: int = 5, temperature: float = 0.0
-    ) -> Tuple[str, Optional[list]]:
-        instance: Dict[str, Any] = {
+    ) -> tuple[str, list | None]:
+        instance: dict[str, Any] = {
             "@requestFormat": "chatCompletions",
             "messages": [{"role": "user", "content": text}],
             "max_tokens": 64,
@@ -188,8 +193,8 @@ class Qwen3GuardProvider(VertexAIProvider):
 
 
 def _confidence_from_logprobs(
-    content_lp: Optional[list], chosen_label: str
-) -> Tuple[Optional[float], Optional[Dict[str, float]], str]:
+    content_lp: list | None, chosen_label: str
+) -> tuple[float | None, dict[str, float] | None, str]:
     if not content_lp:
         return None, None, "unavailable"
     text = ""
@@ -209,7 +214,7 @@ def _confidence_from_logprobs(
     if label_idx is None:
         return None, None, "no-safety-token"
     entry = content_lp[label_idx]
-    pool: List[Dict[str, Any]] = list(entry.get("top_logprobs") or [])
+    pool: list[dict[str, Any]] = list(entry.get("top_logprobs") or [])
     if entry.get("token") is not None and entry.get("logprob") is not None:
         pool.append({"token": entry["token"], "logprob": entry["logprob"]})
     if not pool:
@@ -239,9 +244,7 @@ def _confidence_from_logprobs(
     return dist.get((chosen_label or "").lower()), dist, "logprobs"
 
 
-def parse_qwen3guard_result(
-    scanner_name: str, raw: str, logprobs_content: Optional[list] = None
-) -> Dict[str, Any]:
+def parse_qwen3guard_result(scanner_name: str, raw: str, logprobs_content: list | None = None) -> dict[str, Any]:
     if not raw:
         raise ValueError("empty Qwen3Guard response")
     safety = ""
@@ -275,7 +278,7 @@ def parse_qwen3guard_result(
         risk_score = discrete_risk
         decision_confidence = 1.0
 
-    details: Dict[str, Any] = {"safety": safety, "confidence_source": source}
+    details: dict[str, Any] = {"safety": safety, "confidence_source": source}
     if categories and categories.lower() != "none":
         details["categories"] = categories
         if scanner_name == "BanTopics":
@@ -294,7 +297,7 @@ def parse_qwen3guard_result(
 # ── Construction helpers ─────────────────────────────────────────────────────
 
 
-def _require(values: dict, label: str) -> Optional[dict]:
+def _require(values: dict, label: str) -> dict | None:
     missing = [k for k, v in values.items() if not v]
     if missing:
         logger.warning(f"{label}: missing required vars {missing}; skipping")
@@ -302,7 +305,7 @@ def _require(values: dict, label: str) -> Optional[dict]:
     return values
 
 
-def _build_openai_compatible(model: str, base_url: str) -> Optional[LLMProvider]:
+def _build_openai_compatible(model: str, base_url: str) -> LLMProvider | None:
     api_key = settings.OPENAI_API_KEY
     if not api_key and not base_url:
         logger.warning("[Providers] OPENAI_API_KEY not set and no baseUrl; skipping openai")
@@ -310,7 +313,7 @@ def _build_openai_compatible(model: str, base_url: str) -> Optional[LLMProvider]
     return OpenAIProvider(api_key, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
 
 
-def _build_anthropic(model: str) -> Optional[LLMProvider]:
+def _build_anthropic(model: str) -> LLMProvider | None:
     api_key = settings.ANTHROPIC_API_KEY
     if not api_key:
         logger.warning("[Providers] ANTHROPIC_API_KEY not set; skipping anthropic")
@@ -318,58 +321,76 @@ def _build_anthropic(model: str) -> Optional[LLMProvider]:
     return AnthropicProvider(api_key, model or DEFAULT_ANTHROPIC_MODEL)
 
 
-def _build_vertexai() -> Optional[LLMProvider]:
-    env = _require({
-        "VERTEX_AI_SA_KEY_JSON": settings.VERTEX_AI_SA_KEY_JSON,
-        "VERTEX_AI_PROJECT": settings.VERTEX_AI_PROJECT,
-        "VERTEX_AI_LOCATION": settings.VERTEX_AI_LOCATION,
-        "VERTEX_AI_ENDPOINT_ID": settings.VERTEX_AI_ENDPOINT_ID,
-    }, label="[Providers] vertexai")
+def _build_vertexai() -> LLMProvider | None:
+    env = _require(
+        {
+            "VERTEX_AI_SA_KEY_JSON": settings.VERTEX_AI_SA_KEY_JSON,
+            "VERTEX_AI_PROJECT": settings.VERTEX_AI_PROJECT,
+            "VERTEX_AI_LOCATION": settings.VERTEX_AI_LOCATION,
+            "VERTEX_AI_ENDPOINT_ID": settings.VERTEX_AI_ENDPOINT_ID,
+        },
+        label="[Providers] vertexai",
+    )
     if env is None:
         return None
-    return VertexAIProvider(env["VERTEX_AI_SA_KEY_JSON"], env["VERTEX_AI_PROJECT"],
-                            env["VERTEX_AI_LOCATION"], env["VERTEX_AI_ENDPOINT_ID"])
+    return VertexAIProvider(
+        env["VERTEX_AI_SA_KEY_JSON"], env["VERTEX_AI_PROJECT"], env["VERTEX_AI_LOCATION"], env["VERTEX_AI_ENDPOINT_ID"]
+    )
 
 
-def _build_gemma_vertexai() -> Optional[LLMProvider]:
-    env = _require({
-        "GEMMA_VERTEX_SA_KEY_JSON": settings.GEMMA_VERTEX_SA_KEY_JSON,
-        "GEMMA_VERTEX_PROJECT": settings.GEMMA_VERTEX_PROJECT,
-        "GEMMA_VERTEX_LOCATION": settings.GEMMA_VERTEX_LOCATION,
-        "GEMMA_VERTEX_ENDPOINT_ID": settings.GEMMA_VERTEX_ENDPOINT_ID,
-    }, label="[Providers] gemma_vertexai")
+def _build_gemma_vertexai() -> LLMProvider | None:
+    env = _require(
+        {
+            "GEMMA_VERTEX_SA_KEY_JSON": settings.GEMMA_VERTEX_SA_KEY_JSON,
+            "GEMMA_VERTEX_PROJECT": settings.GEMMA_VERTEX_PROJECT,
+            "GEMMA_VERTEX_LOCATION": settings.GEMMA_VERTEX_LOCATION,
+            "GEMMA_VERTEX_ENDPOINT_ID": settings.GEMMA_VERTEX_ENDPOINT_ID,
+        },
+        label="[Providers] gemma_vertexai",
+    )
     if env is None:
         return None
-    return GemmaVertexProvider(env["GEMMA_VERTEX_SA_KEY_JSON"], env["GEMMA_VERTEX_PROJECT"],
-                               env["GEMMA_VERTEX_LOCATION"], env["GEMMA_VERTEX_ENDPOINT_ID"],
-                               dedicated_dns=settings.GEMMA_VERTEX_DEDICATED_DNS)
+    return GemmaVertexProvider(
+        env["GEMMA_VERTEX_SA_KEY_JSON"],
+        env["GEMMA_VERTEX_PROJECT"],
+        env["GEMMA_VERTEX_LOCATION"],
+        env["GEMMA_VERTEX_ENDPOINT_ID"],
+        dedicated_dns=settings.GEMMA_VERTEX_DEDICATED_DNS,
+    )
 
 
-def _build_qwen3guard() -> Optional[LLMProvider]:
-    env = _require({
-        "QWEN3GUARD_SA_KEY_JSON": settings.QWEN3GUARD_SA_KEY_JSON,
-        "QWEN3GUARD_PROJECT": settings.QWEN3GUARD_PROJECT,
-        "QWEN3GUARD_LOCATION": settings.QWEN3GUARD_LOCATION,
-        "QWEN3GUARD_ENDPOINT_ID": settings.QWEN3GUARD_ENDPOINT_ID,
-    }, label="[Providers] qwen3guard")
+def _build_qwen3guard() -> LLMProvider | None:
+    env = _require(
+        {
+            "QWEN3GUARD_SA_KEY_JSON": settings.QWEN3GUARD_SA_KEY_JSON,
+            "QWEN3GUARD_PROJECT": settings.QWEN3GUARD_PROJECT,
+            "QWEN3GUARD_LOCATION": settings.QWEN3GUARD_LOCATION,
+            "QWEN3GUARD_ENDPOINT_ID": settings.QWEN3GUARD_ENDPOINT_ID,
+        },
+        label="[Providers] qwen3guard",
+    )
     if env is None:
         return None
-    return Qwen3GuardProvider(env["QWEN3GUARD_SA_KEY_JSON"], env["QWEN3GUARD_PROJECT"],
-                              env["QWEN3GUARD_LOCATION"], env["QWEN3GUARD_ENDPOINT_ID"],
-                              dedicated_dns=settings.QWEN3GUARD_DEDICATED_DNS)
+    return Qwen3GuardProvider(
+        env["QWEN3GUARD_SA_KEY_JSON"],
+        env["QWEN3GUARD_PROJECT"],
+        env["QWEN3GUARD_LOCATION"],
+        env["QWEN3GUARD_ENDPOINT_ID"],
+        dedicated_dns=settings.QWEN3GUARD_DEDICATED_DNS,
+    )
 
 
-_BUILDERS: Dict[str, Callable[[str, str], Optional[LLMProvider]]] = {
-    "openai":            lambda model, _: _build_openai_compatible(model, base_url=""),
+_BUILDERS: dict[str, Callable[[str, str], LLMProvider | None]] = {
+    "openai": lambda model, _: _build_openai_compatible(model, base_url=""),
     "openai_compatible": _build_openai_compatible,
-    "anthropic":         lambda model, _: _build_anthropic(model),
-    "vertexai":          lambda _m, _b: _build_vertexai(),
-    "gemma_vertexai":    lambda _m, _b: _build_gemma_vertexai(),
-    "qwen3guard":        lambda _m, _b: _build_qwen3guard(),
+    "anthropic": lambda model, _: _build_anthropic(model),
+    "vertexai": lambda _m, _b: _build_vertexai(),
+    "gemma_vertexai": lambda _m, _b: _build_gemma_vertexai(),
+    "qwen3guard": lambda _m, _b: _build_qwen3guard(),
 }
 
 
-def _dispatch(provider_name: str, model: str, base_url: str) -> Optional[LLMProvider]:
+def _dispatch(provider_name: str, model: str, base_url: str) -> LLMProvider | None:
     builder = _BUILDERS.get(provider_name)
     if builder is None:
         logger.warning(f"[Providers] Unknown provider '{provider_name}'; skipping")
@@ -377,7 +398,7 @@ def _dispatch(provider_name: str, model: str, base_url: str) -> Optional[LLMProv
     return _cached_provider((provider_name, model, base_url), lambda: builder(model, base_url))
 
 
-def build_provider_from_env(provider_name: str, model: str = "") -> Optional[LLMProvider]:
+def build_provider_from_env(provider_name: str, model: str = "") -> LLMProvider | None:
     name = provider_name.strip().lower()
     if name == "openai":
         model = model or settings.OPENAI_MODEL
@@ -386,7 +407,7 @@ def build_provider_from_env(provider_name: str, model: str = "") -> Optional[LLM
     return _dispatch(name, model, "")
 
 
-def build_provider_from_config(entry: Dict[str, Any]) -> Optional[LLMProvider]:
+def build_provider_from_config(entry: dict[str, Any]) -> LLMProvider | None:
     name = (entry.get("provider") or "").strip().lower()
     model = (entry.get("model") or "").strip()
     if name in ("openai", "ollama", "openai_compatible"):

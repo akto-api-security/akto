@@ -7,6 +7,7 @@ public enum ModelType {
     AZURE_OPENAI,
     OLLAMA,
     DATABRICKS,
-    GITHUB_COPILOT
+    GITHUB_COPILOT,
+    GEMINI
 
 }

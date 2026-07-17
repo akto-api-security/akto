@@ -30,6 +30,14 @@ type policyRefreshResult struct {
 }
 
 // policyCache holds cached policies and their metadata
+// anomalyCfg is a cached per-policy anomaly configuration used at validate time.
+type anomalyCfg struct {
+	ToolCallLimit int
+	ErrorLimit    int
+	PolicyName    string
+	Behaviour     string // "block", "warn", "alert"
+}
+
 type policyCache struct {
 	policies                     []types.Policy
 	auditPolicies                map[string]*types.AuditPolicy
@@ -37,8 +45,11 @@ type policyCache struct {
 	hasAuditRules                bool
 	blockedHosts                 []mcp.BlockedHostRule
 	ignorePhraseMatchersByPolicy map[string]*ignorePhraseMatcher // keyed by policy name, pre-compiled
-	lastFetched                  time.Time
-	mu                           sync.RWMutex
+	// anomalyByPolicy maps policy ID (== policy name) to its anomaly config.
+	// Only policies with anomaly detection enabled appear here.
+	anomalyByPolicy map[string]*anomalyCfg
+	lastFetched     time.Time
+	mu              sync.RWMutex
 }
 
 // collectionTag represents a single key-value tag on a collection
@@ -70,7 +81,9 @@ type Service struct {
 	mcpListCache          *mcpListCache
 	collectionTagsCache   *collectionTagsCache
 	sessionMgr            *session.SessionManager // Our session manager implementation for session tracking
+	anomalyDetector       *session.AnomalyDetector
 	schemaFetcher         *SchemaFetcher
+	skipPaths             *pathSkipper
 	policyRefreshGroup    singleflight.Group
 	allowlistRefreshGroup singleflight.Group
 }
@@ -129,6 +142,15 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 
 	schemaFetcher := NewSchemaFetcher(dbClient, time.Duration(cfg.PolicyRefreshIntervalMin)*time.Minute, logger)
 
+	skipPaths := newPathSkipper(cfg.SkipPaths, logger)
+	if skipPaths.enabled() {
+		logger.Info("Guardrails path skip enabled", zap.String("GUARDRAILS_SKIP_PATHS", skipPaths.rawConfig))
+	}
+
+	// Initialize anomaly detector (stateless Redis client; per-policy config is
+	// resolved at validate time from the policy cache).
+	anomalyDetector := session.NewAnomalyDetector(logger)
+
 	LogFieldMappingStartup()
 
 	svc := &Service{
@@ -140,7 +162,9 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		mcpListCache:        &mcpListCache{},
 		collectionTagsCache: &collectionTagsCache{byHostName: make(map[string]map[string]string)},
 		sessionMgr:          sessionManager,
+		anomalyDetector:     anomalyDetector,
 		schemaFetcher:       schemaFetcher,
+		skipPaths:           skipPaths,
 	}
 	bp := mcp.GetScanBackpressureSnapshot()
 	logger.Info("Scan backpressure breaker active (mcp processor, remote-scanner boundary)",
@@ -300,6 +324,55 @@ func (s *Service) filterPoliciesByDeviceId(policies []types.Policy, mcpServerNam
 	return filtered
 }
 
+// filterApprovedServers drops "approval"-behaviour policies whose target server already has a
+// valid (non-expired) entry in the policy's ApprovedServers list. Bypassing the policy here
+// means its detectors never run in ProcessRequestParallel — so an approved server is allowed
+// through with no block and no threat report. Only "approval" policies are affected; block/
+// warn/alert policies always pass through unchanged.
+func (s *Service) filterApprovedServers(policies []types.Policy, mcpServerName string) []types.Policy {
+	if mcpServerName == "" {
+		return policies
+	}
+	now := time.Now().Unix()
+	filtered := make([]types.Policy, 0, len(policies))
+	for _, p := range policies {
+		if strings.EqualFold(p.Behaviour, "approval") && isServerApproved(p.ApprovedServers, mcpServerName, now) {
+			s.logger.Info("filterApprovedServers - bypassing policy for approved server",
+				zap.String("policy", p.Info.Name),
+				zap.String("mcpServerName", mcpServerName))
+			continue
+		}
+		filtered = append(filtered, p)
+	}
+	return filtered
+}
+
+// isServerApproved reports whether mcpServerName has a currently-valid approval entry.
+// serverId is matched exactly (case-insensitive) — it is stored as the same device-prefixed
+// host the threat event uses, which is exactly valCtx.McpServerName. Mode ALWAYS is always
+// valid; DURATION is valid while now < expiredAt (epoch seconds); COUNT while expiredAfter > 0
+// (Phase 2: decrement handled elsewhere).
+func isServerApproved(approved []types.ApprovedServer, mcpServerName string, now int64) bool {
+	for _, a := range approved {
+		if !strings.EqualFold(a.ServerId, mcpServerName) {
+			continue
+		}
+		switch strings.ToUpper(a.Mode) {
+		case "ALWAYS":
+			return true
+		case "DURATION":
+			if a.ExpiredAt > now {
+				return true
+			}
+		case "COUNT":
+			if a.ExpiredAfter > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (s *Service) getMcpAllowedHostList() ([]types.McpAllowedList, error) {
 	refreshInterval := time.Duration(s.config.McpAllowedListRefreshIntervalMin) * time.Minute
 
@@ -427,7 +500,7 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 
 	s.logger.Info("Refreshing policies cache - fetching ALL policies")
 
-	policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, ignorePhraseMatchersByPolicy, err := s.fetchAndParsePolicies()
+	policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, ignorePhraseMatchersByPolicy, anomalyMap, err := s.fetchAndParsePolicies()
 	if err != nil {
 		return nil, nil, nil, false, err
 	}
@@ -438,6 +511,7 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	s.cache.compiledRules = compiledRules
 	s.cache.hasAuditRules = hasAuditRules
 	s.cache.blockedHosts = blockedHostRules
+	s.cache.anomalyByPolicy = anomalyMap
 	s.cache.ignorePhraseMatchersByPolicy = ignorePhraseMatchersByPolicy
 	s.cache.lastFetched = time.Now()
 
@@ -561,7 +635,7 @@ func (s *Service) getLoginUserEmailType(reqHeaders map[string]string) string {
 
 // TODO: move reportAndBlockPersonalAccount to mcp library so threat reporting
 // and validation live in one place alongside other policy enforcement.
-func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID, policyName string) *mcp.ValidationResult {
+func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID, policyName, behaviour string) *mcp.ValidationResult {
 	blockReason := "Blocked: personal accounts are not permitted by guardrail policy"
 
 	if s.sessionMgr != nil && sessionID != "" {
@@ -598,7 +672,7 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 				types.ContextSource(params.ContextSource),
 				extractHostHeader(reqHeaders),
 				sessionID,
-				"block",
+				behaviour,
 			); err != nil {
 				s.logger.Warn("Failed to report threat for personal account block", zap.String("policyName", policyName), zap.Error(err))
 			}
@@ -608,7 +682,7 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 	return &mcp.ValidationResult{
 		Allowed:   false,
 		Reason:    blockReason,
-		Behaviour: "block",
+		Behaviour: behaviour,
 		Metadata: types.ThreatMetadata{
 			PolicyName:   policyName,
 			RuleViolated: "BlockPersonalAccounts",
@@ -665,10 +739,26 @@ func (s *Service) checkBlockedHost(params *models.ValidateRequestParams, valCtx 
 		zap.String("policy", policyName),
 		zap.String("sessionID", sessionID),
 		zap.String("requestID", requestID))
-	return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, policyName, matchedPattern)
+	return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, policyName, matchedPattern, behaviourForPolicy(policies, policyName))
 }
 
-func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID, policyName, matchedPattern string) *mcp.ValidationResult {
+// behaviourForPolicy returns the configured behaviour (lowercased) for the named policy,
+// defaulting to "block" when the policy is missing or has no behaviour set. Mirrors the
+// mcp library's effectiveViolationBehaviour so the guardrails-service's own reporters send
+// the policy's behaviour (e.g. "approval") instead of a hardcoded "block".
+func behaviourForPolicy(policies []types.Policy, policyName string) string {
+	for _, p := range policies {
+		if p.Info.Name == policyName {
+			if b := strings.TrimSpace(p.Behaviour); b != "" {
+				return strings.ToLower(b)
+			}
+			break
+		}
+	}
+	return "block"
+}
+
+func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID, policyName, matchedPattern, behaviour string) *mcp.ValidationResult {
 	reason := "Request blocked by guardrail policy (blocked host pattern: " + matchedPattern + ")"
 	metadata := types.ThreatMetadata{
 		PolicyName:   policyName,
@@ -698,7 +788,7 @@ func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCt
 				types.ContextSource(params.ContextSource),
 				extractHostHeader(valCtx.RequestHeaders),
 				sessionID,
-				"block",
+				behaviour,
 			); err != nil {
 				s.logger.Warn("Failed to report threat for blocked host", zap.Error(err))
 			}
@@ -711,11 +801,28 @@ func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCt
 		ModifiedPayload: payloadToValidate,
 		Reason:          reason,
 		Metadata:        metadata,
-		Behaviour:       "block",
+		Behaviour:       behaviour,
 	}
 }
 
 // extractHostHeader extracts the host header value from request headers
+// isToolCallPath returns true if the path corresponds to a tool call
+// rather than a user prompt or other request type.
+// MCP tools: /mcp, non-MCP tools: /tool/<name>, GitHub Copilot: /copilot/tool/<name>
+func isToolCallPath(path string) bool {
+	return strings.HasPrefix(path, "/mcp") ||
+		strings.HasPrefix(path, "/tool") ||
+		strings.Contains(path, "/tool/")
+}
+
+// isErrorStatusCode returns true if the status code string represents an HTTP error (4xx/5xx).
+func isErrorStatusCode(statusCode string) bool {
+	if len(statusCode) == 3 && (statusCode[0] == '4' || statusCode[0] == '5') {
+		return true
+	}
+	return false
+}
+
 func extractHostHeader(headers map[string]string) string {
 	if host, ok := headers["Host"]; ok {
 		return host
@@ -726,11 +833,150 @@ func extractHostHeader(headers map[string]string) string {
 	return ""
 }
 
+// hostFromRequestHeaders parses the raw request-headers JSON and returns the
+// Host header value (empty if absent or unparseable).
+func hostFromRequestHeaders(rawHeaders string) string {
+	if rawHeaders == "" {
+		return ""
+	}
+	headers := make(map[string]string)
+	if err := json.Unmarshal([]byte(rawHeaders), &headers); err != nil {
+		return ""
+	}
+	return extractHostHeader(headers)
+}
+
+// checkToolCallAnomaly records a tool call for each filtered policy that has
+// anomaly detection enabled. Only fires for agentic tool-call paths.
+// Returns a block result if any policy with behaviour "block" triggers an anomaly.
+func (s *Service) checkToolCallAnomaly(ctx context.Context, params *models.ValidateRequestParams, sessionID string, policies []types.Policy, contextSource string) *mcp.ValidationResult {
+	if contextSource != string(types.ContextSourceAgentic) {
+		return nil
+	}
+	if !isToolCallPath(params.Path) {
+		return nil
+	}
+	s.cache.mu.RLock()
+	anomalyMap := s.cache.anomalyByPolicy
+	s.cache.mu.RUnlock()
+	if len(anomalyMap) == 0 {
+		return nil
+	}
+	for _, p := range policies {
+		cfg, ok := anomalyMap[p.Info.Name]
+		s.logger.Info("checkToolCallAnomaly policies loop call - ",
+			zap.String("policyName", p.Info.Name),
+			zap.Bool("isFound", ok))
+
+		if !ok {
+			continue
+		}
+		event, breached := s.anomalyDetector.RecordToolCall(ctx, sessionID, cfg.PolicyName, cfg.ToolCallLimit)
+		if breached {
+			details := fmt.Sprintf("Tool call limit exceeded: %d calls per session (policy: %s)", cfg.ToolCallLimit, cfg.PolicyName)
+			s.logger.Warn("Anomaly detected: tool call limit exceeded",
+				zap.String("sessionID", sessionID),
+				zap.String("policy", cfg.PolicyName),
+				zap.String("behaviour", cfg.Behaviour),
+				zap.Bool("firstFire", event != nil),
+				zap.String("path", params.Path))
+			if event != nil {
+				go session.ReportAnomaly(event, params, cfg.PolicyName, cfg.Behaviour, p.Severity, s.logger)
+			}
+			if cfg.Behaviour == "block" {
+				return &mcp.ValidationResult{
+					Allowed:   false,
+					Reason:    details,
+					Behaviour: "block",
+					Metadata: types.ThreatMetadata{
+						PolicyName:   cfg.PolicyName,
+						RuleViolated: session.AnomalyTypeToolCallRate,
+						Severity:     p.Severity,
+						Reason:       details,
+					},
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// checkErrorAnomaly records an error for each filtered policy that
+// has anomaly detection enabled. Only fires for agentic tool-call paths with 4xx/5xx.
+// Returns a block result if any policy with behaviour "block" triggers an anomaly.
+func (s *Service) checkErrorAnomaly(ctx context.Context, params *models.ValidateRequestParams, sessionID string, policies []types.Policy, contextSource string) *mcp.ValidationResult {
+	if contextSource != string(types.ContextSourceAgentic) {
+		return nil
+	}
+	if !isToolCallPath(params.Path) || !isErrorStatusCode(params.StatusCode) {
+		return nil
+	}
+	s.cache.mu.RLock()
+	anomalyMap := s.cache.anomalyByPolicy
+	s.cache.mu.RUnlock()
+	if len(anomalyMap) == 0 {
+		return nil
+	}
+	for _, p := range policies {
+		cfg, ok := anomalyMap[p.Info.Name]
+		if !ok {
+			continue
+		}
+		event, breached := s.anomalyDetector.RecordError(ctx, sessionID, cfg.PolicyName, cfg.ErrorLimit)
+		if breached {
+			details := fmt.Sprintf("Error limit exceeded: %d errors per session (policy: %s)", cfg.ErrorLimit, cfg.PolicyName)
+			s.logger.Warn("Anomaly detected: error limit exceeded",
+				zap.String("sessionID", sessionID),
+				zap.String("policy", cfg.PolicyName),
+				zap.String("behaviour", cfg.Behaviour),
+				zap.Bool("firstFire", event != nil),
+				zap.String("path", params.Path),
+				zap.String("statusCode", params.StatusCode))
+			if event != nil {
+				go session.ReportAnomaly(event, params, cfg.PolicyName, cfg.Behaviour, p.Severity, s.logger)
+			}
+			if cfg.Behaviour == "block" {
+				return &mcp.ValidationResult{
+					Allowed:   false,
+					Reason:    details,
+					Behaviour: "block",
+					Metadata: types.ThreatMetadata{
+						PolicyName:   cfg.PolicyName,
+						RuleViolated: session.AnomalyTypeErrorRate,
+						Severity:     p.Severity,
+						Reason:       details,
+					},
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // fetchAndParsePolicies fetches policies from database abstractor and parses them
-func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, []mcp.BlockedHostRule, map[string]*ignorePhraseMatcher, error) {
-	rawGuardrailPolicies, err := s.dbClient.FetchGuardrailPolicies()
-	if err != nil {
-		return nil, nil, nil, false, nil, nil, fmt.Errorf("failed to fetch guardrail policies: %w", err)
+func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, []mcp.BlockedHostRule, map[string]*ignorePhraseMatcher, map[string]*anomalyCfg, error) {
+	var rawGuardrailPolicies, rawAuditPolicies []byte
+
+	g := new(errgroup.Group)
+	g.Go(func() error {
+		var err error
+		rawGuardrailPolicies, err = s.dbClient.FetchGuardrailPolicies()
+		if err != nil {
+			return fmt.Errorf("failed to fetch guardrail policies: %w", err)
+		}
+		return nil
+	})
+	g.Go(func() error {
+		var err error
+		rawAuditPolicies, err = s.dbClient.FetchMcpAuditInfo()
+		if err != nil {
+			s.logger.Warn("Failed to fetch MCP audit info", zap.Error(err))
+			rawAuditPolicies = []byte("{}")
+		}
+		return nil
+	})
+	if err := g.Wait(); err != nil {
+		return nil, nil, nil, false, nil, nil, nil, err
 	}
 
 	s.logger.Debug("Raw guardrail policies response",
@@ -745,7 +991,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		s.logger.Error("Failed to parse guardrail policies",
 			zap.Error(err),
 			zap.String("rawResponse", string(rawGuardrailPolicies)))
-		return nil, nil, nil, false, nil, nil, fmt.Errorf("failed to parse guardrail policies: %w", err)
+		return nil, nil, nil, false, nil, nil, nil, fmt.Errorf("failed to parse guardrail policies: %w", err)
 	}
 
 	s.logger.Info("Parsed guardrail policies",
@@ -757,6 +1003,31 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		if gp.Active { // Only include active policies
 			policy := mcp.ConvertGuardrailsToPolicy(gp)
 			policies = append(policies, policy)
+		}
+	}
+
+	// [GUARDRAIL_FLOW] 1/3 — fetched & parsed active policies from cyborg.
+	for _, p := range policies {
+		s.logger.Info("[GUARDRAIL_FLOW] fetched policy",
+			zap.String("name", p.Info.Name),
+			zap.String("behaviour", p.Behaviour),
+			zap.Bool("applyToAllServers", p.ApplyToAllServers),
+			zap.Int("approvedServersCount", len(p.ApprovedServers)))
+	}
+
+	// Build per-policy anomaly config map so validate-time checks respect scoping.
+	anomalyMap := make(map[string]*anomalyCfg)
+	for _, gp := range response.GuardrailPolicies {
+		s.logger.Info("checking anomaly config in policy",
+			zap.String("policyName", gp.Name))
+		if gp.Active && gp.AnomalyDetection != nil && gp.AnomalyDetection.Enabled {
+			ad := gp.AnomalyDetection
+			anomalyMap[gp.Name] = &anomalyCfg{
+				ToolCallLimit: ad.ToolCallLimit,
+				ErrorLimit:    ad.ErrorLimit,
+				PolicyName:    gp.Name,
+				Behaviour:     gp.Behaviour,
+			}
 		}
 	}
 
@@ -836,7 +1107,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		zap.Int("compiledRules", len(compiledRules)),
 		zap.Int("ignorePhrasePolicies", len(ignorePhraseMatchersByPolicy)))
 
-	return policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, ignorePhraseMatchersByPolicy, nil
+	return policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, ignorePhraseMatchersByPolicy, anomalyMap, nil
 }
 
 // validationContextFromParams builds mcp.ValidationContext from traffic params and explicit payload strings for the context.
@@ -998,6 +1269,15 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.String("aktoVxlanId", params.AktoVxlanID),
 		zap.Bool("skipThreat", params.EffectiveSkipThreat()))
 
+	if s.skipPaths.enabled() {
+		host := hostFromRequestHeaders(params.RequestHeaders)
+		if s.skipPaths.shouldSkip(host, params.Path) {
+			s.logger.Info("ValidateRequest - host+path in GUARDRAILS_SKIP_PATHS, skipping guardrails",
+				zap.String("host", host), zap.String("path", params.Path), zap.String("method", params.Method))
+			return &mcp.ValidationResult{Allowed: true, ModifiedPayload: payload}, nil
+		}
+	}
+
 	if result, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, requestID, payload); isMalicious {
 		s.logger.Info("ValidateRequest - session already malicious, blocking request",
 			zap.String("path", params.Path),
@@ -1065,6 +1345,15 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// rules that belong to policies applicable to this server.
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
 	policies = s.filterPoliciesByDeviceId(policies, valCtx.McpServerName)
+	// Bypass "approval" policies whose server is already approved (allow, no threat).
+	policies = s.filterApprovedServers(policies, valCtx.McpServerName)
+
+	// [GUARDRAIL_FLOW] 2/3 — policies that APPLY to this request after server/device/approval filtering.
+	s.logger.Info("[GUARDRAIL_FLOW] policies applied to request",
+		zap.String("mcpServerName", valCtx.McpServerName),
+		zap.String("sessionID", sessionID),
+		zap.Int("appliedCount", len(policies)),
+		zap.Strings("appliedPolicies", policyNames(policies)))
 
 	// Check account-type guardrail after server filtering so the policy's server
 	// selection is respected (a personal-account policy scoped to server A should
@@ -1084,13 +1373,19 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 				zap.String("accountType", accountType),
 				zap.String("policyName", policyName),
 				zap.String("sessionID", sessionID))
-			return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName), nil
+			return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName)), nil
 		}
 	}
 
 	// Host blocklist (block-only). Evaluated after server filtering so only rules from
 	// policies scoped to this server are considered.
 	if blockResult := s.checkBlockedHost(params, valCtx, payloadToValidate, sessionID, requestID, policies); blockResult != nil {
+		return blockResult, nil
+	}
+
+	// Anomaly detection: check each filtered policy's anomaly config.
+	// Tool calls and errors are recorded per-policy so scoped limits are respected.
+	if blockResult := s.checkToolCallAnomaly(ctx, params, sessionID, policies, contextSource); blockResult != nil {
 		return blockResult, nil
 	}
 
@@ -1112,7 +1407,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Redact any configured ignore-phrases before the enforcement library ever sees the
 	// text — see ValidateRequest's plan-doc note on the shared-payload trade-off. Shared
 	// with ValidateResponse via redactIgnorePhrasesForEvaluation/reconcileIgnorePhraseRedaction.
-	payloadForEvaluation, preRedactionPayload, restore := s.redactIgnorePhrasesForEvaluation(payloadToValidate, policies, "ValidateRequest", sessionID)
+	payloadForEvaluation, preRedactionPayload := s.redactIgnorePhrasesForEvaluation(payloadToValidate, policies, "ValidateRequest", sessionID)
 	payloadToValidate = payloadForEvaluation
 
 	// Use the default processor - skipThreat is passed via ValidationContext
@@ -1132,7 +1427,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	}
 
 	// Reconcile ignore-phrase redaction: the real origin must never see a placeholder.
-	finalPayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, payloadToValidate, preRedactionPayload, restore, "ValidateRequest", sessionID)
+	finalPayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, payloadToValidate, preRedactionPayload, "ValidateRequest", sessionID)
 
 	s.logger.Info("ValidateRequest - ProcessRequestParallel result",
 		zap.String("path", params.Path),
@@ -1221,6 +1516,15 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("aktoVxlanId", params.AktoVxlanID),
 		zap.Bool("skipThreat", params.EffectiveSkipThreat()))
 
+	if s.skipPaths.enabled() {
+		host := hostFromRequestHeaders(params.RequestHeaders)
+		if s.skipPaths.shouldSkip(host, params.Path) {
+			s.logger.Info("ValidateResponse - host+path in GUARDRAILS_SKIP_PATHS, skipping guardrails",
+				zap.String("host", host), zap.String("path", params.Path), zap.String("method", params.Method))
+			return &mcp.ValidationResult{Allowed: true, ModifiedPayload: responseBody}, nil
+		}
+	}
+
 	s.schemaFetcher.RefreshIfNeeded()
 
 	// Get cached policies (refreshes if stale)
@@ -1262,6 +1566,8 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	// Filter policies by MCP server name — policies with no server configured are skipped
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
 	policies = s.filterPoliciesByDeviceId(policies, valCtx.McpServerName)
+	// Bypass "approval" policies whose server is already approved (allow, no threat).
+	policies = s.filterApprovedServers(policies, valCtx.McpServerName)
 
 	s.logger.Info("ValidateResponse - calling ProcessResponse",
 		zap.String("path", params.Path),
@@ -1282,7 +1588,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 
 	// Redact any configured ignore-phrases before the enforcement library ever sees the
 	// text — see ValidateRequest for the full rationale and the shared-payload trade-off.
-	payloadForEvaluation, preRedactionPayload, restore := s.redactIgnorePhrasesForEvaluation(responseBodyForValidation, policies, "ValidateResponse", sessionID)
+	payloadForEvaluation, preRedactionPayload := s.redactIgnorePhrasesForEvaluation(responseBodyForValidation, policies, "ValidateResponse", sessionID)
 	responseBodyForValidation = payloadForEvaluation
 
 	// Use processor's ProcessResponse method with external policies
@@ -1302,7 +1608,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	}
 
 	// Reconcile ignore-phrase redaction: the real origin must never see a placeholder.
-	finalResponsePayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, responseBodyForValidation, preRedactionPayload, restore, "ValidateResponse", sessionID)
+	finalResponsePayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, responseBodyForValidation, preRedactionPayload, "ValidateResponse", sessionID)
 
 	s.logger.Info("ValidateResponse - ProcessResponseParallel result",
 		zap.String("path", params.Path),
@@ -1315,9 +1621,13 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	isMalicious := processResult.IsBlocked
 	session.TrackResponseAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, responseBody, isMalicious)
 
-	// Convert ProcessResult to ValidationResult for backward compatibility. finalResponsePayload
-	// is processResult.ModifiedPayload with any ignore-phrase placeholders reconciled back to
-	// real text (or discarded in favor of the untouched pre-redaction payload).
+	// Anomaly detection: record error if tool call returned error status (4xx/5xx).
+	// Uses the same filtered policies from the request path.
+	if blockResult := s.checkErrorAnomaly(ctx, params, sessionID, policies, contextSource); blockResult != nil {
+		return blockResult, nil
+	}
+
+	// Convert ProcessResult to ValidationResult for backward compatibility
 	result := &mcp.ValidationResult{
 		Allowed:         !processResult.IsBlocked,
 		Modified:        finalResponsePayload != "" && finalResponsePayload != responseBody,
@@ -1451,7 +1761,7 @@ func (s *Service) ValidateRequestWithPolicy(
 	// one-off provided policy that never goes through the policy cache, so matchers are
 	// compiled fresh for just this one policy rather than looked up from it.
 	matchersByPolicy := compileIgnorePhraseMatchersByPolicy(policies)
-	payloadForEvaluation, preRedactionPayload, restore := s.redactIgnorePhrasesForEvaluationWithMatchers(payloadToValidate, policies, matchersByPolicy, "ValidateRequestWithPolicy", sessionID)
+	payloadForEvaluation, preRedactionPayload := s.redactIgnorePhrasesForEvaluationWithMatchers(payloadToValidate, policies, matchersByPolicy, "ValidateRequestWithPolicy", sessionID)
 	payloadToValidate = payloadForEvaluation
 
 	// Use the default processor - skipThreat is passed via ValidationContext
@@ -1472,7 +1782,7 @@ func (s *Service) ValidateRequestWithPolicy(
 		zap.String("fullProcessResultJSON", string(processResultJSON)))
 
 	// Reconcile ignore-phrase redaction: the real origin must never see a placeholder.
-	finalPayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, payloadToValidate, preRedactionPayload, restore, "ValidateRequestWithPolicy", sessionID)
+	finalPayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, payloadToValidate, preRedactionPayload, "ValidateRequestWithPolicy", sessionID)
 
 	// Convert ProcessResult to ValidationResult
 	result := &mcp.ValidationResult{
@@ -1506,23 +1816,44 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 	s.schemaFetcher.RefreshIfNeeded()
 
-	policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies(string(contextSource))
-	if err != nil {
-		s.logger.Error("ValidateBatch - failed to load policies",
-			zap.String("contextSource", contextSource),
-			zap.Error(err))
-		return nil, fmt.Errorf("failed to load policies: %w", err)
+	type batchPolicyBundle struct {
+		policies        []types.Policy
+		auditPolicies   map[string]*types.AuditPolicy
+		compiledRules   map[string]*regexp.Regexp
+		hasAuditRules   bool
 	}
-
-	s.logger.Debug("ValidateBatch - loaded policies for contextSource",
-		zap.String("contextSource", contextSource),
-		zap.Int("policiesCount", len(policies)),
-		zap.Int("auditPoliciesCount", len(auditPolicies)),
-		zap.Strings("policyNames", policyNames(policies)))
+	policyByContext := make(map[string]batchPolicyBundle)
 
 	results := make([]ValidationBatchResult, 0, len(batchData))
 
 	for i, data := range batchData {
+		itemContextSource := ResolveIngestContextSource(data, contextSource)
+		bundle, ok := policyByContext[itemContextSource]
+		if !ok {
+			policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies(itemContextSource)
+			if err != nil {
+				s.logger.Error("ValidateBatch - failed to load policies",
+					zap.String("contextSource", itemContextSource),
+					zap.Error(err))
+				return nil, fmt.Errorf("failed to load policies: %w", err)
+			}
+			bundle = batchPolicyBundle{
+				policies:      policies,
+				auditPolicies: auditPolicies,
+				compiledRules: compiledRules,
+				hasAuditRules: hasAuditRules,
+			}
+			policyByContext[itemContextSource] = bundle
+			s.logger.Debug("ValidateBatch - loaded policies for contextSource",
+				zap.String("contextSource", itemContextSource),
+				zap.Int("policiesCount", len(policies)),
+				zap.Int("auditPoliciesCount", len(auditPolicies)),
+				zap.Strings("policyNames", policyNames(policies)))
+		}
+		policies := bundle.policies
+		auditPolicies := bundle.auditPolicies
+		compiledRules := bundle.compiledRules
+		hasAuditRules := bundle.hasAuditRules
 		result := ValidationBatchResult{
 			Index:  i,
 			Method: data.Method,
@@ -1564,7 +1895,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			StatusCode:         statusCode,
 			RequestPayload:     data.RequestPayload,
 			ResponsePayload:    data.ResponsePayload,
-			ContextSource:      types.ContextSource(contextSource),
+			ContextSource:      types.ContextSource(itemContextSource),
+			Tag:                data.Tag,
 			McpServerName:      mcpServerName,
 			AktoAccountID:      auth.AccountIDFromServiceToken(),
 			SkipThreat:         skipThreat, // Set skipThreat directly in context
@@ -1581,6 +1913,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 		// Filter policies by MCP server name for this specific batch item
 		itemPolicies := s.filterPoliciesByMcpServer(policies, mcpServerName)
 		itemPolicies = s.filterPoliciesByDeviceId(itemPolicies, mcpServerName)
+		// Bypass "approval" policies whose server is already approved (allow, no threat).
+		itemPolicies = s.filterApprovedServers(itemPolicies, mcpServerName)
 		s.logger.Debug("ValidateBatch - applicable policies for server",
 			zap.Int("index", i),
 			zap.String("mcpServerName", mcpServerName),

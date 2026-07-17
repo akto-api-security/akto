@@ -9,7 +9,7 @@ Public API:
 import json
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 from prompts import build_scan_prompt
 from providers import LLMProvider, Qwen3GuardProvider, parse_qwen3guard_result
@@ -43,10 +43,10 @@ def _clean_json(raw: str) -> str:
     return raw
 
 
-def parse_llm_result(scanner_name: str, raw: str) -> Dict[str, Any]:
+def parse_llm_result(scanner_name: str, raw: str) -> dict[str, Any]:
     parsed = json.loads(_clean_json(raw))
 
-    details: Dict[str, Any] = {}
+    details: dict[str, Any] = {}
     reason = parsed.get("reason", "")
     if reason:
         details["reason"] = reason
@@ -84,8 +84,7 @@ class LLMScanner:
     def __init__(self, provider: LLMProvider):
         self.provider = provider
 
-    async def scan(self, scanner_name: str, scanner_type: str, text: str,
-                   config: Dict[str, Any]) -> Dict[str, Any]:
+    async def scan(self, scanner_name: str, scanner_type: str, text: str, config: dict[str, Any]) -> dict[str, Any]:
         if scanner_name not in LLM_SUPPORTED_SCANNERS:
             raise ValueError(f"Scanner {scanner_name} not supported by LLM path")
 
@@ -94,8 +93,7 @@ class LLMScanner:
             raw, logprobs = await self.provider.complete_with_logprobs(text)
             result = parse_qwen3guard_result(scanner_name, raw, logprobs)
         else:
-            prompt = build_scan_prompt(scanner_name, scanner_type, config, text,
-                                       provider_name=self.provider.name)
+            prompt = build_scan_prompt(scanner_name, scanner_type, config, text, provider_name=self.provider.name)
             if prompt is None:
                 raise ValueError(f"Scanner {scanner_name} not supported by LLM path")
             raw = await self.provider.complete(prompt)
@@ -113,8 +111,12 @@ class LLMScanner:
 
 
 async def scan_with_model_map(
-    scanner_name: str, scanner_type: str, text: str,
-    config: Dict[str, Any], store_fn: Optional[Any] = None,
-) -> Dict[str, Any]:
+    scanner_name: str,
+    scanner_type: str,
+    text: str,
+    config: dict[str, Any],
+    store_fn: Any | None = None,
+) -> dict[str, Any]:
     from model_map import ModelMapScanner
+
     return await ModelMapScanner(scanner_name, scanner_type, text, config, store_fn).run()

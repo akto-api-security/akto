@@ -54,7 +54,7 @@ function computeAssetRiskFactors(asset) {
     return factors.filter(f => f.type !== "normal");
 }
 
-export default function OverviewTab({ asset, onTabChange, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], mcpComponentCount = 0 }) {
+export default function OverviewTab({ asset, onTabChange, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], mcpComponentCount = 0, inlineComponents = [] }) {
     const totalV = useMemo(() =>
         (asset.violations?.critical || 0) + (asset.violations?.high || 0) + (asset.violations?.medium || 0) + (asset.violations?.low || 0),
         [asset.violations]
@@ -70,11 +70,15 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
             ? getAgentLinkedComponents(asset, agenticTreeData, agenticFlatData)
             : [];
         const mcpCount = children.filter((c) => c.type === "MCP Server").length;
+        const inlineLlmCount = (inlineComponents || []).filter((c) => c.type === "LLM").length;
+        const inlineToolCount = (inlineComponents || []).filter((c) => c.type === "Tool").length;
 
         if (asset.type === "AI Agent") return [
             { label: devCount  === 1 ? "Device"     : "Devices",     value: devCount },
             { label: mcpCount  === 1 ? "MCP Server" : "MCP Servers", value: mcpCount },
             { label: (asset.skillCount || 0) === 1 ? "Skill" : "Skills", value: asset.skillCount || 0 },
+            ...(inlineLlmCount > 0 ? [{ label: inlineLlmCount === 1 ? "LLM" : "LLMs", value: inlineLlmCount }] : []),
+            ...(inlineToolCount > 0 ? [{ label: inlineToolCount === 1 ? "Tool" : "Tools", value: inlineToolCount }] : []),
             { label: totalV    === 1 ? "Violation"  : "Violations",  value: totalV },
         ];
         if (asset.type === "MCP Server") {
@@ -98,12 +102,12 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
             { label: devCount === 1 ? "Device"    : "Devices",    value: devCount },
             { label: totalV   === 1 ? "Violation" : "Violations", value: totalV },
         ];
-    }, [asset, totalV, assetDevices, agenticTreeData, agenticFlatData, mcpComponentCount]);
+    }, [asset, totalV, assetDevices, agenticTreeData, agenticFlatData, mcpComponentCount, inlineComponents]);
 
     const assetDetails = useMemo(() => [
         { label: "AI Interactions",   value: asset.aiInteractions != null ? Number(asset.aiInteractions).toLocaleString("en-US") : "-" },
         { label: "Last Traffic Seen", value: asset.lastSeen || "-" },
-        { label: "Group",             value: asset.groups?.[0]?.name || "-" },
+        { label: "Group",             value: asset.groups?.length ? asset.groups.map(g => g.name).join(", ") : "-" },
     ], [asset]);
 
     return (
@@ -118,7 +122,7 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
                     ))}
                 </HorizontalGrid>
 
-                <AssetTopologyGraph asset={asset} assetDevices={assetDevices} agenticTreeData={agenticTreeData} agenticFlatData={agenticFlatData} />
+                <AssetTopologyGraph asset={asset} assetDevices={assetDevices} agenticTreeData={agenticTreeData} agenticFlatData={agenticFlatData} inlineComponents={inlineComponents} />
 
                 {factors.length > 0 && (
                     <VerticalStack gap="3">

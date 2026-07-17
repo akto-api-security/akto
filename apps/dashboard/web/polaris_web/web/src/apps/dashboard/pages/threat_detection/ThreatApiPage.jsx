@@ -13,7 +13,15 @@ import ThreatApiSubcategoryCount from "./components/ThreatApiSubcategoryCount";
 import api from "./api";
 import { HorizontalGrid } from "@shopify/polaris";
 import threatDetectionFunc from "./transform";
-import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, getReportCategoryShortName, shortNameToCategory } from "../../../main/labelHelper";
+import PersistStore from "../../../main/PersistStore";
+
+// Opened in a fresh tab (e.g. "View All"), so apply ?category= before first render, same as ThreatReport.jsx.
+const categoryOverride = shortNameToCategory[getReportCategoryShortName()]
+if (categoryOverride) {
+  PersistStore.getState().setDashboardCategory(categoryOverride)
+}
+
 function ThreatApiPage() {
   const [loading, setLoading] = useState(false);
   const [categoryCount, setCategoryCount] = useState([]);
@@ -51,7 +59,7 @@ function ThreatApiPage() {
         <TopThreatTypeChart key={"top-threat-types"} data={categoryCount} />
         <ThreatApiSubcategoryCount
           key={"threat-categories"}
-          data={subCategoryCount}
+          data={categoryCount}
         />
       </HorizontalGrid>
     );

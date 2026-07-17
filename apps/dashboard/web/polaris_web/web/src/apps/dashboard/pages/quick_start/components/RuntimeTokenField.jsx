@@ -23,18 +23,31 @@ const getLabelFromValue = (value) => {
 function RuntimeTokenField({ id = "select-runtime-token-expiry", expiryStepText = "Select the expiry time of the token.", tokenStepText = "Copy the token below.", onTokenChange, codeStyle = false }) {
     const [apiToken, setApiToken] = useState("")
     const [selectedExpiryDuration, setSelectedExpiryDuration] = useState(6)
+    const [selectedScope, setSelectedScope] = useState([])
+    const [scopeOptions, setScopeOptions] = useState([])
     const ref = useRef(null)
 
-    const fetchToken = async (expiryDuration) => {
-        await api.fetchRuntimeHelmCommand(expiryDuration).then((resp) => {
+    const fetchToken = async (expiryDuration, scope) => {
+        await api.fetchRuntimeHelmCommand(expiryDuration, scope).then((resp) => {
             if (!resp) return
             setApiToken(resp?.apiToken)
             if (onTokenChange) onTokenChange(resp?.apiToken)
         })
     }
 
+    const fetchModuleTypes = async () => {
+        await api.fetchModuleTypes().then((resp) => {
+            const moduleTypes = resp?.moduleTypes || []
+            setScopeOptions(moduleTypes.map(value => ({
+                label: value.split('_').map(func.toSentenceCase).join(' '),
+                value
+            })))
+        })
+    }
+
     useEffect(() => {
-        fetchToken(selectedExpiryDuration)
+        fetchToken(selectedExpiryDuration, selectedScope)
+        fetchModuleTypes()
     }, [])
 
     return (
@@ -48,11 +61,23 @@ function RuntimeTokenField({ id = "select-runtime-token-expiry", expiryStepText 
                     menuItems={expiryDurationOptions}
                     value={getLabelFromValue(selectedExpiryDuration)}
                     initial={selectedExpiryDuration}
-                    selected={(type) => { setSelectedExpiryDuration(type); fetchToken(type) }}
+                    selected={(type) => { setSelectedExpiryDuration(type); fetchToken(type, selectedScope) }}
                 />
             </Box>
 
-            <span>2. {tokenStepText} </span>
+            <span>2. (Optional) Select the scope(s) this token should be restricted to. Leave empty to generate a legacy (unscoped) token. </span>
+            <Box maxWidth="280px" paddingInlineStart={"4"}>
+                <Dropdown
+                    id={`${id}-scope`}
+                    allowMultiple
+                    placeHolder="Select scope(s)"
+                    menuItems={scopeOptions}
+                    preSelected={selectedScope}
+                    selected={(scope) => { setSelectedScope(scope); fetchToken(selectedExpiryDuration, scope) }}
+                />
+            </Box>
+
+            <span>3. {tokenStepText} </span>
             <Box paddingInlineStart={"4"}>
                 {codeStyle ? (
                     <div className="connector-code-token">

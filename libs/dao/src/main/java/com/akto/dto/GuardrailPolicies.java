@@ -102,8 +102,17 @@ public class GuardrailPolicies {
     // Block personal / consumer accounts (non-enterprise email-type users).
     private boolean blockPersonalAccounts;
 
-    /** Policy-wide rule behaviour: {@code "block"}, {@code "warn"}, or {@code "alert"}. */
+    // Anomaly detection configuration (tool-call rate limiting, error storm detection).
+    private AnomalyDetection anomalyDetection;
+
+    /** Policy-wide rule behaviour: {@code "block"}, {@code "warn"}, {@code "alert"}, or {@code "approval"}. */
     private String behaviour;
+
+    // Servers explicitly approved to bypass this policy's "approval" behaviour.
+    // Keyed logically by serverId (the request Host the enforcement layer matches on).
+    // An approval violation is allowed through if the request's server has a valid
+    // (non-expired) entry here; otherwise it is blocked like behaviour "block".
+    private List<ApprovedServer> approvedServers;
 
     // Step 7: URL and Confidence Score
     private String url;
@@ -309,6 +318,52 @@ public class GuardrailPolicies {
         }
     }
 
+    /** How long an approved server is allowed to bypass an "approval" behaviour. */
+    public enum ApprovalMode {
+        ALWAYS,   // never expires
+        COUNT,    // allowed for a fixed number of future violations (expiredAfter); Phase 2
+        DURATION  // allowed until a wall-clock time (expiredAt)
+    }
+
+    /**
+     * A single server approved to bypass this policy's "approval" gate.
+     * {@code serverId} is the request Host the enforcement layer matches on, so it is the
+     * stable identity used both when the approval is granted (from threat activity) and when
+     * the guardrails-service checks it on the read path.
+     */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class ApprovedServer {
+        private String serverId;        // the request Host (matches enforcement-layer server matching)
+        private String serverName;      // display only
+        // Stored as the ApprovalMode name ("ALWAYS"/"DURATION"/"COUNT"). Kept as a String rather
+        // than the enum because the Mongo driver has no codec for the bare enum, and the
+        // guardrails-service consumes it as a string.
+        private String mode;
+
+        // COUNT mode (Phase 2): remaining allowed violations; <= 0 means expired.
+        private int expiredAfter;
+
+        // DURATION mode: epoch seconds; the entry is valid while now < expiredAt. 0 == n/a.
+        private long expiredAt;
+
+        // audit
+        private long approvedAt;
+        private String approvedBy;
+
+        public ApprovedServer(String serverId, String serverName, String mode,
+                              int expiredAfter, long expiredAt, long approvedAt, String approvedBy) {
+            this.serverId = serverId;
+            this.serverName = serverName;
+            this.mode = mode;
+            this.expiredAfter = expiredAfter;
+            this.expiredAt = expiredAt;
+            this.approvedAt = approvedAt;
+            this.approvedBy = approvedBy;
+        }
+    }
+
     /**
      * A single blocked host entry. This feature only ever blocks (no allow semantics).
      * Each entry is a glob pattern matched against the request's {@code host + path}, where
@@ -456,6 +511,16 @@ public class GuardrailPolicies {
         private ModelRole modelRole;
         private String attackType;
         private double safeDecisionThreshold;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AnomalyDetection {
+        private boolean enabled;
+        private int toolCallLimit;        // total tool calls per session before triggering
+        private int errorLimit;           // total errors per session before triggering
     }
 
 }

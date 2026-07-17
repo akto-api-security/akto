@@ -27,6 +27,7 @@ import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter
 import PersistStore from "@/apps/main/PersistStore";
 import LocalStore from "@/apps/main/LocalStorageStore";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
+import { isEndpointSecurityCategory } from "@/apps/main/labelHelper";
 
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "@/apps/dashboard/pages/observe/api_collections/endpointShieldHelper";
 import { formatDisplayName } from "@/apps/dashboard/pages/observe/agentic/mcpClientHelper";
@@ -370,7 +371,7 @@ function deriveAgenticType(url, method) {
     return METHOD_TO_TYPE[m] || "Prompt";
 }
 
-function transformEvent(event, policiesMap, collectionsMap, usernameMap) {
+function transformEvent(event, policiesMap, collectionsMap, usernameMap, policyIdByName = {}) {
     const meta = parseMetadata(event.metadata);
     const typeLabel = deriveAgenticType(event.url, event.method);
 
@@ -407,6 +408,14 @@ function transformEvent(event, policiesMap, collectionsMap, usernameMap) {
     const rawAsset = collectionsMap?.[event.apiCollectionId] || meta.agenticAsset || meta.agentName || event.host || null;
     const agenticAssetTag = rawAsset ? getAssetServiceName(rawAsset) : null;
 
+    const resolvedPolicyName = meta.policy_name || meta.policyName || meta.npolicy_name || policiesMap[event.filterId] || event.filterId || "-";
+
+    // Policy's CONFIGURED behaviour (metadata) — distinct from rawBehaviour above, which is the
+    // action actually taken. For an "approval" policy that blocked, metadata.behaviour is
+    // "approval" while the response payload's behaviour is "block". The approve-server action
+    // must key off the configured (metadata) behaviour.
+    const policyBehaviour = meta.behaviour || meta.nbehaviour || rawBehaviour || null;
+
     return {
         id: event.id,
         detected: event.timestamp,
@@ -420,7 +429,9 @@ function transformEvent(event, policiesMap, collectionsMap, usernameMap) {
         agenticAssetRaw: rawAsset,
         agenticAssetTag,
         action,
-        policyName: meta.policy_name || meta.npolicy_name || policiesMap[event.filterId] || event.filterId || "-",
+        behaviour: policyBehaviour,
+        policyName: resolvedPolicyName,
+        policyId: policyIdByName[resolvedPolicyName] || null,
         _status: event.status || "ACTIVE",
         payload: event.payload || null,
         sessionId: event.sessionId || null,
@@ -604,17 +615,19 @@ function Violations() {
     const newLayout = LocalStore((state) => state.guardrailViolationsNewLayout);
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
+    const legacyPath = isEndpointSecurityCategory() ? "/dashboard/protection/threat-activity" : "/dashboard/guardrails/activity";
+
     useEffect(() => {
         // New layout is only available to demo accounts; everyone else stays on the legacy page.
         if (!func.isDemoAccount() || !newLayout) {
-            navigate("/dashboard/guardrails/activity", { replace: true });
+            navigate(legacyPath, { replace: true });
         }
-    }, [navigate]);
+    }, [navigate, legacyPath]);
 
     const handleLayoutToggle = useCallback((checked) => {
         setGuardrailViolationsNewLayout(checked);
-        if (!checked) navigate("/dashboard/guardrails/activity");
-    }, [navigate, setGuardrailViolationsNewLayout]);
+        if (!checked) navigate(legacyPath);
+    }, [navigate, setGuardrailViolationsNewLayout, legacyPath]);
 
     const [rows, setRows] = useState([]);
     const [summary, setSummary] = useState(null);
@@ -652,10 +665,12 @@ function Violations() {
                     fetchEndpointShieldUsernameMap(),
                 ]);
 
-                // Build filterId → name map from policies
+                // Build filterId → name map from policies, plus name → hexId (for the approve-server flow)
                 const policiesMap = {};
+                const policyIdByName = {};
                 (policiesResp?.guardrailPolicies || []).forEach(p => {
                     if (p.hexId) policiesMap[p.hexId] = p.name;
+                    if (p.name) policyIdByName[p.name] = p.hexId;
                 });
 
                 let events = firstResp?.maliciousEvents || [];
@@ -669,7 +684,7 @@ function Violations() {
                     );
                     events = [...events, ...rest.flatMap(r => r?.maliciousEvents || [])];
                 }
-                const transformed = events.map(e => transformEvent(e, policiesMap, collectionsMap, usernameMap));
+                const transformed = events.map(e => transformEvent(e, policiesMap, collectionsMap, usernameMap, policyIdByName));
                 setRows(transformed);
                 setSummary(computeSummary(transformed));
             } catch (e) {

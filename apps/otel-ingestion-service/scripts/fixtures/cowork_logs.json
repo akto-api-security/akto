@@ -1,0 +1,56 @@
+{
+  "resourceLogs": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": { "stringValue": "cowork" }
+          },
+          {
+            "key": "service.version",
+            "value": { "stringValue": "1.1.4173" }
+          }
+        ]
+      },
+      "scopeLogs": [
+        {
+          "logRecords": [
+            {
+              "eventName": "user_prompt",
+              "timeUnixNano": "1700000000000000000",
+              "attributes": [
+                { "key": "prompt.id", "value": { "stringValue": "prompt-test-abc" } },
+                { "key": "session.id", "value": { "stringValue": "session-test-xyz" } },
+                { "key": "user.email", "value": { "stringValue": "user@example.com" } },
+                { "key": "prompt_length", "value": { "intValue": "12" } },
+                { "key": "prompt", "value": { "stringValue": "hello cowork" } }
+              ]
+            },
+            {
+              "eventName": "tool_result",
+              "timeUnixNano": "1700000001000000000",
+              "attributes": [
+                { "key": "prompt.id", "value": { "stringValue": "prompt-test-abc" } },
+                { "key": "session.id", "value": { "stringValue": "session-test-xyz" } },
+                { "key": "tool_name", "value": { "stringValue": "Read" } },
+                { "key": "success", "value": { "stringValue": "true" } },
+                { "key": "duration_ms", "value": { "intValue": "42" } }
+              ]
+            },
+            {
+              "eventName": "api_request",
+              "timeUnixNano": "1700000002000000000",
+              "attributes": [
+                { "key": "prompt.id", "value": { "stringValue": "prompt-test-abc" } },
+                { "key": "model", "value": { "stringValue": "claude-sonnet-4-6" } },
+                { "key": "cost_usd", "value": { "doubleValue": 0.002 } },
+                { "key": "duration_ms", "value": { "intValue": "1200" } }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

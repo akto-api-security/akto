@@ -108,6 +108,21 @@ set -a; source ../../.env; set +a
 AGW_LIVE=1 ./tests/run.sh tests/integration -v    # live Vertex (opt-in)
 ```
 
+## Lint / typecheck / pre-commit
+
+```bash
+make setup                                        # one-time: syncs deps + installs the pre-commit hook
+```
+
+```bash
+cd python-service/worker-py
+uv run ruff check .                               # lint (make lint from apps/agent-guard/)
+uv run ruff format .                              # format
+uv run mypy src                                   # typecheck (make typecheck from apps/agent-guard/)
+```
+
+After `make setup`, touching any file under `python-service/worker-py/` runs ruff, mypy, and pytest on `git commit` — everything else is untouched.
+
 ---
 
 ## Portable vs Cloudflare

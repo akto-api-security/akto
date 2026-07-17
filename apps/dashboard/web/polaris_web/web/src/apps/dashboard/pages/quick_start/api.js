@@ -130,11 +130,19 @@ const api = {
         })
     },
 
-    fetchRuntimeHelmCommand(expiryTimeInMonth) {
+    fetchRuntimeHelmCommand(expiryTimeInMonth, scope) {
         return request({
             url: '/api/fetchRuntimeHelmCommand',
             method: 'post',
-            data: {expiryTimeInMonth}
+            data: {expiryTimeInMonth, scope}
+        })
+    },
+
+    fetchModuleTypes() {
+        return request({
+            url: '/api/fetchModuleTypes',
+            method: 'post',
+            data: {}
         })
     },
 
@@ -208,11 +216,11 @@ const api = {
         })
     },
 
-    importFromUrl(url, testRoleId, requestBody, customHeaders, collectionName) {
+    importFromUrl(url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders) {
         return request({
             url: '/api/importFromUrl',
             method: 'post',
-            data: {url, testRoleId, requestBody, customHeaders, collectionName}
+            data: {url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders}
         })
     },
 

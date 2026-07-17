@@ -15,8 +15,9 @@ Verdict logic is identical to the container; only the executor changed
 import asyncio
 import logging
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
+import metrics_push
 from providers import build_provider_from_config
 
 logger = logging.getLogger(__name__)
@@ -34,10 +35,10 @@ _INCONCLUSIVE = "INCONCLUSIVE"
 _DEFAULT_TIER_TIMEOUT_MS = 5000
 _DEFAULT_ARBITER_TIMEOUT_MS = 10000
 
-ScannerEntry = Tuple[Any, Dict[str, Any]]
+ScannerEntry = tuple[Any, dict[str, Any]]
 
 
-def _classify(result: Dict[str, Any], entry: Dict[str, Any]) -> bool:
+def _classify(result: dict[str, Any], entry: dict[str, Any]) -> bool:
     """True if this result counts as unsafe."""
     if not result.get("is_valid", True):
         return True
@@ -46,7 +47,7 @@ def _classify(result: Dict[str, Any], entry: Dict[str, Any]) -> bool:
     return confidence < safe_threshold
 
 
-def _fire_store(store_fn: Optional[Any], completed: List[Dict[str, Any]], scanner_name: str) -> None:
+def _fire_store(store_fn: Any | None, completed: list[dict[str, Any]], scanner_name: str) -> None:
     if store_fn is None:
         return
     try:
@@ -62,18 +63,18 @@ class ModelMapScanner:
         self.text = text
         self.config = config
         self.store_fn = store_fn
-        self.completed_all: List[Dict[str, Any]] = []
+        self.completed_all: list[dict[str, Any]] = []
 
     # ── Public entry point ──────────────────────────────────────────────────
 
-    async def run(self) -> Dict[str, Any]:
+    async def run(self) -> dict[str, Any]:
         model_map: list = self.config.get("modelConfigs", [])
         if not model_map:
             raise ValueError("ModelMapScanner: empty modelConfigs")
 
         from llm_scanner import LLMScanner
 
-        scanners: List[ScannerEntry] = []
+        scanners: list[ScannerEntry] = []
         for entry in model_map:
             provider = build_provider_from_config(entry)
             if provider is not None:
@@ -93,7 +94,7 @@ class ModelMapScanner:
 
     # ── Pipeline core ───────────────────────────────────────────────────────
 
-    async def _run_pipeline(self, scanners: List[ScannerEntry]) -> Dict[str, Any]:
+    async def _run_pipeline(self, scanners: list[ScannerEntry]) -> dict[str, Any]:
         tier1 = [se for se in scanners if se[1].get("modelRole") == _ROLE_TIER1]
         tier2 = [se for se in scanners if se[1].get("modelRole") == _ROLE_TIER2]
         arbiters = [se for se in scanners if se[1].get("modelRole") == _ROLE_ARBITER]
@@ -108,7 +109,7 @@ class ModelMapScanner:
         winner = await self._cascade(t1, t2, arbiters, arb)
         return self._shape_result(winner)
 
-    async def _cascade(self, t1, t2, arbiters, arb) -> Dict[str, Any]:
+    async def _cascade(self, t1, t2, arbiters, arb) -> dict[str, Any]:
         res1 = await self._collect_majority(t1, _ROLE_TIER1)
         if res1["majority"] != _SAFE:
             logger.info(f"[ModelMap] {_ROLE_TIER1}={res1['majority']} → arbiter, skip {_ROLE_TIER2}")
@@ -123,7 +124,9 @@ class ModelMapScanner:
         completed_pool = res2["completed"] or res1["completed"]
         if not completed_pool:
             # Both tiers empty (no models assigned) means no real judgment was made — escalate, don't fabricate "safe".
-            logger.error(f"[ModelMap] {self.scanner_name}: {_ROLE_TIER1}/{_ROLE_TIER2} both empty, escalating to arbiter")
+            logger.error(
+                f"[ModelMap] {self.scanner_name}: {_ROLE_TIER1}/{_ROLE_TIER2} both empty, escalating to arbiter"
+            )
             return await self._run_arbiters(arbiters, arb)
 
         logger.info(f"[ModelMap] {_ROLE_TIER2}={res2['majority']} → SAFE")
@@ -134,8 +137,8 @@ class ModelMapScanner:
 
     # ── Task helpers ──────────────────────────────────────────────────────────
 
-    def _submit(self, pairs: List[ScannerEntry], default_timeout_ms: int) -> Dict[asyncio.Task, Dict[str, Any]]:
-        out: Dict[asyncio.Task, Dict[str, Any]] = {}
+    def _submit(self, pairs: list[ScannerEntry], default_timeout_ms: int) -> dict[asyncio.Task, dict[str, Any]]:
+        out: dict[asyncio.Task, dict[str, Any]] = {}
         for scanner, entry in pairs:
             timeout = (entry.get("timeoutMs") or default_timeout_ms) / 1000.0
             coro = scanner.scan(self.scanner_name, self.scanner_type, self.text, self.config)
@@ -143,7 +146,7 @@ class ModelMapScanner:
         return out
 
     @staticmethod
-    def _cancel(task_map: Optional[Dict[asyncio.Task, Dict[str, Any]]]) -> None:
+    def _cancel(task_map: dict[asyncio.Task, dict[str, Any]] | None) -> None:
         if not task_map:
             return
         for task in task_map:
@@ -157,16 +160,22 @@ class ModelMapScanner:
         results = await asyncio.gather(*tasks, return_exceptions=True)
         return list(zip(results, entries))
 
-    async def _collect_majority(self, task_map, label: str) -> Dict[str, Any]:
+    async def _collect_majority(self, task_map, label: str) -> dict[str, Any]:
         if not task_map:
             return {"majority": _SAFE, "completed": []}
-        completed: List[Dict[str, Any]] = []
+        completed: list[dict[str, Any]] = []
         safe = unsafe = 0
         for result, entry in await self._await_map(task_map):
+            provider_name = entry.get("provider") or "unknown"
             if isinstance(result, Exception):
+                reason = "timeout" if isinstance(result, TimeoutError) else type(result).__name__
+                metrics_push.COUNTS["provider_errors"].increment(f"{provider_name}:{reason}")
                 logger.error(f"[ModelMap] {label} '{entry.get('provider')}' failed: {result!r}")
                 unsafe += 1  # conservative: failures count as unsafe
                 continue
+            exec_ms = result.get("execution_time_ms")
+            if isinstance(exec_ms, (int, float)):
+                metrics_push.SAMPLES["provider"].record(provider_name, float(exec_ms))
             completed.append(result)
             if _classify(result, entry):
                 unsafe += 1
@@ -175,29 +184,34 @@ class ModelMapScanner:
 
         self.completed_all.extend(completed)
         total = len(task_map)
-        majority = (
-            _UNSAFE if unsafe >= total / 2
-            else _SAFE if safe > total / 2
-            else _INCONCLUSIVE
-        )
+        majority = _UNSAFE if unsafe >= total / 2 else _SAFE if safe > total / 2 else _INCONCLUSIVE
         logger.info(f"[ModelMap] {label} verdict={majority} safe={safe} unsafe={unsafe} total={total}")
         return {"majority": majority, "completed": completed}
 
-    async def _run_arbiters(self, arbiters, pre_submitted) -> Dict[str, Any]:
+    async def _run_arbiters(self, arbiters, pre_submitted) -> dict[str, Any]:
+        metrics_push.COUNTS["arbiter_escalations"].increment("cascade")
         if not arbiters:
+            metrics_push.COUNTS["arbiter_errors"].increment("no_arbiter_configured")
             logger.error(f"[ModelMap] no {_ROLE_ARBITER} configured for {self.scanner_name}")
             return self._error_result("no arbiter configured")
 
         task_map = pre_submitted if pre_submitted is not None else self._submit(arbiters, _DEFAULT_ARBITER_TIMEOUT_MS)
-        completed: List[Dict[str, Any]] = []
+        completed: list[dict[str, Any]] = []
         for result, entry in await self._await_map(task_map):
+            provider_name = entry.get("provider") or "unknown"
             if isinstance(result, Exception):
+                reason = "timeout" if isinstance(result, TimeoutError) else type(result).__name__
+                metrics_push.COUNTS["provider_errors"].increment(f"{provider_name}:{reason}")
                 logger.error(f"[ModelMap] {_ROLE_ARBITER} '{entry.get('provider')}' failed: {result!r}")
                 continue
+            exec_ms = result.get("execution_time_ms")
+            if isinstance(exec_ms, (int, float)):
+                metrics_push.SAMPLES["provider"].record(provider_name, float(exec_ms))
             completed.append(result)
 
         self.completed_all.extend(completed)
         if not completed:
+            metrics_push.COUNTS["arbiter_errors"].increment("all_arbiters_failed")
             return self._error_result("all arbiters failed")
 
         # Convict only on an affirmative flag; safeDecisionThreshold only gates the fast tiers, not the final call.
@@ -208,7 +222,7 @@ class ModelMapScanner:
         return winner
 
     @staticmethod
-    def _error_result(error: str) -> Dict[str, Any]:
+    def _error_result(error: str) -> dict[str, Any]:
         # Fail OPEN: an arbiter that never answered is an infrastructure failure,
         # not a security verdict. Blocking here turns every arbiter timeout burst
         # into false positives attributed to whichever scanner was in flight.
@@ -238,7 +252,7 @@ class ModelMapScanner:
     def _shape_result(self, winner: Dict[str, Any]) -> Dict[str, Any]:
         winner_details = winner.get("details") or {}
         winner_stem = self._stem(winner_details.get("llm_provider", ""))
-        details: Dict[str, Any] = {
+        details: dict[str, Any] = {
             "reason": winner_details.get("reason", ""),
             "llm_provider": winner_details.get("llm_provider", ""),
             "scanner_type": self.scanner_type,
@@ -264,8 +278,8 @@ class ModelMapScanner:
             "details": details,
         }
 
-    def _index_completed_by_stem(self) -> Dict[str, Dict[str, Any]]:
-        out: Dict[str, Dict[str, Any]] = {}
+    def _index_completed_by_stem(self) -> dict[str, dict[str, Any]]:
+        out: dict[str, dict[str, Any]] = {}
         for r in self.completed_all:
             stem = self._stem((r.get("details") or {}).get("llm_provider", ""))
             if stem:
@@ -273,7 +287,7 @@ class ModelMapScanner:
         return out
 
     @staticmethod
-    def _summarize(r: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _summarize(r: dict[str, Any] | None) -> dict[str, Any]:
         if r is None:
             return {"completed": False}
         return {

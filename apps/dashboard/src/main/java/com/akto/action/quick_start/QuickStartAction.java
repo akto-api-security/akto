@@ -40,6 +40,7 @@ import com.amazonaws.services.elasticloadbalancingv2.AmazonElasticLoadBalancingC
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancersRequest;
 import com.amazonaws.services.elasticloadbalancingv2.model.DescribeLoadBalancersResult;
 import com.amazonaws.services.elasticloadbalancingv2.model.LoadBalancer;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -48,6 +49,7 @@ import com.opensymphony.xwork2.Action;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
+import lombok.Getter;
 import lombok.Setter;
 
 public class QuickStartAction extends UserAction {
@@ -274,6 +276,26 @@ public class QuickStartAction extends UserAction {
     @Setter
     private int expiryTimeInMonth;
 
+    @Setter
+    private List<String> scope;
+
+    @Getter
+    private List<ModuleInfo.ModuleType> moduleTypes;
+
+    // Scopes currently supported for token generation; expand as more services onboard.
+    private static final List<ModuleInfo.ModuleType> SUPPORTED_SCOPE_MODULE_TYPES = Arrays.asList(
+        ModuleInfo.ModuleType.MINI_RUNTIME,
+        ModuleInfo.ModuleType.MINI_TESTING,
+        ModuleInfo.ModuleType.THREAT_DETECTION,
+        ModuleInfo.ModuleType.DAST,
+        ModuleInfo.ModuleType.GUARDRAIL
+    );
+
+    public String fetchModuleTypes() {
+        this.moduleTypes = SUPPORTED_SCOPE_MODULE_TYPES;
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchRuntimeHelmCommand() {
         if(this.expiryTimeInMonth == 0 || this.expiryTimeInMonth > 24 || this.expiryTimeInMonth < -1) {
             addActionError("Expiry time must be between 1 and 24 months");
@@ -282,6 +304,9 @@ public class QuickStartAction extends UserAction {
         try {
             Map<String,Object> claims = new HashMap<>();
             claims.put("accountId", Context.accountId.get());
+            if (this.scope != null && !this.scope.isEmpty()) {
+                claims.put("scope", this.scope);
+            }
             apiToken = JwtAuthenticator.createJWT(
                 claims,
                 "Akto",

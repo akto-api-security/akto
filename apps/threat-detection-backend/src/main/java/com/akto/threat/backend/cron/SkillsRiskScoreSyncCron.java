@@ -1,7 +1,6 @@
 package com.akto.threat.backend.cron;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -143,9 +142,15 @@ public class SkillsRiskScoreSyncCron {
 
                             loggerMaker.infoAndAddToDb("Skills malicious events count: " + apiInfoKeyToRiskScore.size());
 
-                            List<CollectionTags> maliciousTags = Collections.singletonList(
-                                new CollectionTags(Context.now(), "malicious-skill", "true", CollectionTags.TagSource.AKTO)
-                            );
+                            CollectionTags maliciousTag =
+                                new CollectionTags(Context.now(), "malicious-skill", "true", CollectionTags.TagSource.AKTO);
+
+                            // only-if-absent guard: matches docs that do NOT already carry the malicious-skill tag
+                            Bson tagNotPresent = Filters.not(Filters.elemMatch(ApiInfo.TAGS_LIST,
+                                Filters.and(
+                                    Filters.eq(CollectionTags.KEY_NAME, "malicious-skill"),
+                                    Filters.eq(CollectionTags.VALUE, "true")
+                                )));
 
                             List<WriteModel<ApiInfo>> updates = new ArrayList<>();
                             for (Map.Entry<ApiInfoKey, Float> entry : apiInfoKeyToRiskScore.entrySet()) {
@@ -157,10 +162,15 @@ public class SkillsRiskScoreSyncCron {
                                     Filters.eq("_id.method", key.getMethod().name()),
                                     Filters.eq("_id.apiCollectionId", key.getApiCollectionId())
                                 );
-                                updates.add(new UpdateManyModel<>(filter, Updates.combine(
-                                    Updates.set(ApiInfo.THREAT_SCORE, entry.getValue()),
-                                    Updates.set(ApiInfo.TAGS_LIST, maliciousTags)
-                                )));
+
+                                // always keep the threat score fresh
+                                updates.add(new UpdateManyModel<>(filter,
+                                    Updates.set(ApiInfo.THREAT_SCORE, entry.getValue())));
+
+                                // append the malicious tag only when it isn't already there (no-op otherwise),
+                                // preserving any other existing tags on the api
+                                updates.add(new UpdateManyModel<>(Filters.and(filter, tagNotPresent),
+                                    Updates.addToSet(ApiInfo.TAGS_LIST, maliciousTag)));
                             }
 
                             if (!updates.isEmpty()) {

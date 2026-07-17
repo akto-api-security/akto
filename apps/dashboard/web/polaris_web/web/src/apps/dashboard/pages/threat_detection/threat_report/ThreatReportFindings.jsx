@@ -11,9 +11,13 @@ const ComplianceCell = ({ complianceWithClauses, activeComplianceFilters }) => {
 
     // When a filter is active show only matching frameworks; otherwise show all
     const frameworksToShow = activeComplianceFilters?.length > 0
-        ? Object.entries(complianceWithClauses).filter(([name]) =>
-            activeComplianceFilters.some(f => f.toUpperCase() === name.toUpperCase())
-        )
+        ? Object.entries(complianceWithClauses).filter(([name]) => {
+            const nameUpper = name.toUpperCase()
+            return activeComplianceFilters.some(f => {
+                const fUpper = f.toUpperCase()
+                return fUpper === nameUpper || fUpper.includes(nameUpper) || nameUpper.includes(fUpper)
+            })
+        })
         : Object.entries(complianceWithClauses)
 
     if (frameworksToShow.length === 0) return <Text color="subdued">-</Text>
@@ -39,10 +43,14 @@ const ThreatReportFindings = ({ threatsTableData, severityCount, organizationNam
     const handleThreatClick = (threat) => {
         const params = new URLSearchParams({
             refId: threat.refId,
-            eventType: 'SINGLE',
+            eventType: threat.eventType || 'SINGLE',
             actor: threat.actor,
             filterId: threat.filterId || '',
-            eventStatus: 'ACTIVE'
+            eventStatus: 'ACTIVE',
+            url: threat.endpoint || '',
+            method: threat.method || '',
+            severity: threat.severity || '',
+            ruleViolated: threat.ruleViolated || '-'
         });
 
         const navigateUrl = `${window.location.origin}/dashboard/protection/threat-activity?${params.toString()}#active`;
@@ -94,7 +102,7 @@ const ThreatReportFindings = ({ threatsTableData, severityCount, organizationNam
                 <Text variant="headingLg">{sectionNumber}. {mapLabel("Threat", getDashboardCategory())} Detection Findings for {organizationName}</Text>
                 <VerticalStack gap="3">
                     <Text variant="bodyMd" color='subdued'>
-                        The following section details each {mapLabel("threat", getDashboardCategory()).toLowerCase()} detected during the assessment period. Each entry includes the {mapLabel("threat", getDashboardCategory()).toLowerCase()} actor, timestamp, attack category, targeted {mapLabel("API endpoint", getDashboardCategory())}, and severity level.
+                        The following section details each {mapLabel("Threat", getDashboardCategory()).toLowerCase()} detected during the assessment period. Each entry includes the {mapLabel("Threat", getDashboardCategory()).toLowerCase()} actor, timestamp, attack category, targeted {mapLabel("API endpoint", getDashboardCategory())}, and severity level.
                     </Text>
 
                     {['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(severity => {
@@ -130,7 +138,7 @@ const ThreatReportFindings = ({ threatsTableData, severityCount, organizationNam
                             <Box key={severity} id={`threat-severity-${severity.toLowerCase()}`}>
                                 <Box paddingBlockStart={3} paddingBlockEnd={2}>
                                     <Text variant="headingSm">
-                                        {severity.charAt(0) + severity.slice(1).toLowerCase()} Severity Threats ({severityCount[severity]})
+                                        {severity.charAt(0) + severity.slice(1).toLowerCase()} Severity {mapLabel("Threat", dashboardCategory)}s ({severityCount[severity]})
                                     </Text>
                                 </Box>
                                 <GithubSimpleTable

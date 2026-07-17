@@ -271,7 +271,7 @@ export function ChatSessionSection({ messages = [], highlights = [] }) {
 
     return (
         <Box padding="2">
-            <ConversationHistory conversations={conversations} highlights={highlights} />
+            <ConversationHistory conversations={conversations} highlights={highlights} enableBlockedStyling />
         </Box>
     );
 }

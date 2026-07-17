@@ -15,8 +15,15 @@ import { HorizontalGrid, VerticalStack, Button } from "@shopify/polaris";
 import { ThreatSummary } from "./components/ThreatSummary";
 import ThreatActivityTimeline from "./components/ThreatActivityTimeline";
 import React from "react";
-import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, getReportCategoryShortName, shortNameToCategory } from "../../../main/labelHelper";
+import PersistStore from "../../../main/PersistStore";
 import useThreatReportDownload from "../../hooks/useThreatReportDownload";
+
+// Opened in a fresh tab (e.g. "View All"), so apply ?category= before first render, same as ThreatReport.jsx.
+const categoryOverride = shortNameToCategory[getReportCategoryShortName()]
+if (categoryOverride) {
+  PersistStore.getState().setDashboardCategory(categoryOverride)
+}
 
 const ChartComponent = ({ onSubCategoryClick, currDateRange }) => {
     return (

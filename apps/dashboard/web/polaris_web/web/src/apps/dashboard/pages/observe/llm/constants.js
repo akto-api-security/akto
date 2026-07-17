@@ -165,12 +165,20 @@ export function truncate(str, len = 80) {
     return str.length > len ? str.substring(0, len) + "..." : str;
 }
 
-// Human-readable duration from a millisecond span.
+// Human-readable duration from a millisecond span, e.g. "1h 42m", "2m 18s", "1.7 s".
 export function formatDurationMs(ms) {
     const n = Number(ms) || 0;
     if (n <= 0) return "-";
-    if (n >= 3600000) return (n / 3600000).toFixed(1).replace(/\.0$/, "") + " h";
-    if (n >= 60000) return (n / 60000).toFixed(1).replace(/\.0$/, "") + " m";
+    if (n >= 3600000) {
+        const h = Math.floor(n / 3600000);
+        const m = Math.floor((n % 3600000) / 60000);
+        return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    }
+    if (n >= 60000) {
+        const m = Math.floor(n / 60000);
+        const s = Math.floor((n % 60000) / 1000);
+        return s > 0 ? `${m}m ${s}s` : `${m}m`;
+    }
     if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + " s";
     return n + " ms";
 }
