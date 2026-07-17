@@ -23,7 +23,7 @@ import {
   InteractionsCellRenderer,
   GroupCellRenderer,
 } from "./AgenticCellRenderers";
-import { cumulativeByMonth } from "./agenticPageBuilders";
+import { cumulativeByMonth, filterAssetsByLastSeen } from "./agenticPageBuilders";
 import SmoothAreaChart from "@/apps/dashboard/pages/dashboard/new_components/SmoothChart";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import "../../../components/layouts/style.css";
@@ -331,7 +331,7 @@ export default function AgenticAssetsPage() {
     }
   }, [navigate]);
 
-  // Date range — only data with real time fields is filtered (violations + last-seen)
+  // Date range — scopes inventory (last-seen), violations, and charts page-wide
   const [currDateRange, dispatchCurrDateRange] = useReducer(
     produce((draft, action) => func.dateRangeReducer(draft, action)),
     values.ranges[4],
@@ -404,8 +404,19 @@ export default function AgenticAssetsPage() {
           },
         );
 
-        setAgenticTreeData(pageData.agenticTreeData);
-        setAgenticFlatData(pageData.agenticFlatData);
+        const treeData = filterAssetsByLastSeen(
+          pageData.agenticTreeData,
+          startTimestamp,
+          endTimestamp,
+        );
+        const flatData = filterAssetsByLastSeen(
+          pageData.agenticFlatData,
+          startTimestamp,
+          endTimestamp,
+        );
+
+        setAgenticTreeData(treeData);
+        setAgenticFlatData(flatData);
         setAssetDevices(pageData.assetDevices);
         setAgenticViolationRows(violationRows);
         setCollections(collections);
@@ -639,11 +650,8 @@ export default function AgenticAssetsPage() {
   ], [violationTotals]);
 
   const assetSeries = useMemo(() =>
-    anchorSeriesToTotal(
-      cumulativeByMonth(agenticFlatData, r => r.lastSeenEpoch || 0, startTimestamp, endTimestamp),
-      totalAssets,
-    ),
-    [agenticFlatData, startTimestamp, endTimestamp, totalAssets, anchorSeriesToTotal],
+    cumulativeByMonth(agenticFlatData, r => r.lastSeenEpoch || 0, startTimestamp, endTimestamp),
+    [agenticFlatData, startTimestamp, endTimestamp],
   );
 
   const assetDelta = useMemo(() => windowDelta(assetSeries.counts), [assetSeries.counts, windowDelta]);

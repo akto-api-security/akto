@@ -1,7 +1,9 @@
-import { VerticalStack, Text, Checkbox, Box, RangeSlider } from "@shopify/polaris";
+import { VerticalStack, Text, Checkbox, Box, RangeSlider, HorizontalStack } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
+import ControlInfoIcon from "../ControlInfoIcon";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
+import { CODE_DETECTION_DESCRIPTIONS } from "../../guardrailDescriptions";
 
 export const CodeDetectionConfig = {
     number: 5,
@@ -20,6 +22,7 @@ export const CodeDetectionConfig = {
 };
 
 const CodeDetectionStep = ({
+    onTryPrompt,
     enableCodeFilter,
     setEnableCodeFilter,
     codeFilterLevel,
@@ -39,7 +42,15 @@ const CodeDetectionStep = ({
             <VerticalStack gap="4">
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Enable code detection filter" threats={RULE_OWASP_THREATS.codeFilter} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Enable code detection filter" threats={RULE_OWASP_THREATS.codeFilter} />
+                                <ControlInfoIcon
+                                    {...CODE_DETECTION_DESCRIPTIONS.codeFilter}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableCodeFilter}
                         onChange={setEnableCodeFilter}
                         helpText="Enable language-specific code detection that identifies and blocks code in specific programming languages (Python, Java, JavaScript, etc.). Provides granular control over which programming languages to allow or block."
@@ -47,7 +58,13 @@ const CodeDetectionStep = ({
                     {enableCodeFilter && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Code Detection Level</Text>
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text variant="bodyMd" fontWeight="medium">Code Detection Level</Text>
+                                    <ControlInfoIcon
+                                        {...CODE_DETECTION_DESCRIPTIONS.codeFilterLevel}
+                                        onTryPrompt={onTryPrompt}
+                                    />
+                                </HorizontalStack>
                                 <RangeSlider
                                     label=""
                                     value={codeFilterLevel === 'none' ? 0 : codeFilterLevel === 'low' ? 1 : codeFilterLevel === 'medium' ? 2 : 3}
@@ -67,7 +84,15 @@ const CodeDetectionStep = ({
 
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Enable ban code detection" threats={RULE_OWASP_THREATS.banCode} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Enable ban code detection" threats={RULE_OWASP_THREATS.banCode} />
+                                <ControlInfoIcon
+                                    {...CODE_DETECTION_DESCRIPTIONS.banCode}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableBanCode}
                         onChange={setEnableBanCode}
                         helpText="Enable binary code detection that blocks all code regardless of programming language. This is a simple, strict filter that treats any code as a violation without language-specific filtering."
@@ -75,7 +100,13 @@ const CodeDetectionStep = ({
                     {enableBanCode && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
+                                    <ControlInfoIcon
+                                        {...CODE_DETECTION_DESCRIPTIONS.banCodeConfidenceThreshold}
+                                        onTryPrompt={onTryPrompt}
+                                    />
+                                </HorizontalStack>
                                 <RangeSlider
                                     label=""
                                     value={banCodeConfidenceScore}

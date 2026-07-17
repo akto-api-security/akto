@@ -24,7 +24,6 @@ import threading
 import time
 from collections import deque
 from dataclasses import dataclass
-from typing import Deque, Dict, Optional, Tuple
 
 
 def _now() -> float:
@@ -84,7 +83,7 @@ class LatencyBreaker:
         self._lock = threading.Lock()
         # Each entry is (monotonic_timestamp_seconds, latency_ms). maxlen bounds
         # memory under bursts; the TTL bounds staleness so the breaker recovers.
-        self._samples: Deque[Tuple[float, float]] = deque(maxlen=defaults.window)
+        self._samples: deque[tuple[float, float]] = deque(maxlen=defaults.window)
 
     # -- config ---------------------------------------------------------------
     def configure_from_env(self) -> None:
@@ -123,7 +122,7 @@ class LatencyBreaker:
             self._samples.append((now, elapsed_ms))
             self._prune_locked(now)
 
-    def recent_avg_latency_ms(self) -> Optional[float]:
+    def recent_avg_latency_ms(self) -> float | None:
         """Rolling average of non-expired latencies, or None when empty."""
         with self._lock:
             self._prune_locked(_now())
@@ -150,7 +149,7 @@ class LatencyBreaker:
             avg = sum(lat for _, lat in self._samples) / count
         return avg >= cfg.threshold_ms
 
-    def skip_details(self) -> Dict[str, object]:
+    def skip_details(self) -> dict[str, object]:
         """Details dict for a fail-open / skip response."""
         cfg = self._config
         avg = self.recent_avg_latency_ms()
@@ -162,7 +161,7 @@ class LatencyBreaker:
             "threshold_ms": cfg.threshold_ms,
         }
 
-    def status_snapshot(self) -> Dict[str, object]:
+    def status_snapshot(self) -> dict[str, object]:
         """Current window for diagnostics (per uvicorn worker process)."""
         cfg = self._config
         with self._lock:
@@ -190,7 +189,8 @@ class LatencyBreaker:
 # The cascade breaker (per-process singleton).
 # --------------------------------------------------------------------------- #
 MODEL = LatencyBreaker(
-    "AGW_CASCADE_BACKPRESSURE", "cascade_backpressure",
+    "AGW_CASCADE_BACKPRESSURE",
+    "cascade_backpressure",
     BackpressureConfig(threshold_ms=8000.0),
 )
 
@@ -216,7 +216,7 @@ def record_cascade_latency(elapsed_ms: float) -> None:
     MODEL.record(elapsed_ms)
 
 
-def recent_avg_latency_ms() -> Optional[float]:
+def recent_avg_latency_ms() -> float | None:
     return MODEL.recent_avg_latency_ms()
 
 
@@ -228,9 +228,9 @@ def should_skip_cascade() -> bool:
     return MODEL.should_skip()
 
 
-def cascade_skip_details() -> Dict[str, object]:
+def cascade_skip_details() -> dict[str, object]:
     return MODEL.skip_details()
 
 
-def status_snapshot() -> Dict[str, object]:
+def status_snapshot() -> dict[str, object]:
     return MODEL.status_snapshot()

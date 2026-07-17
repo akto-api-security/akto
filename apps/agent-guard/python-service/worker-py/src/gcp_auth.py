@@ -14,12 +14,12 @@ Pyodide already decompresses, and httpx double-gunzips otherwise.
 import base64
 import json
 import time
-from typing import Dict, Tuple
 
 import rsa
 from pyasn1.codec.der import decoder as der_decoder
 
 import http_client
+import metrics_push
 
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
 _SCOPE = "https://www.googleapis.com/auth/cloud-platform"
@@ -27,7 +27,7 @@ _GRANT = "urn:ietf:params:oauth:grant-type:jwt-bearer"
 _IDENTITY = {"Accept-Encoding": "identity"}
 
 # client_email -> (access_token, absolute_expiry_epoch)
-_TOKEN_CACHE: Dict[str, Tuple[str, float]] = {}
+_TOKEN_CACHE: dict[str, tuple[str, float]] = {}
 
 
 def sa_info_from_b64(sa_key_b64: str) -> dict:
@@ -54,18 +54,24 @@ async def get_token(sa_info: dict) -> str:
     now = time.time()
     cached = _TOKEN_CACHE.get(email)
     if cached and cached[1] - 300 > now:
+        metrics_push.COUNTS["cache_hits"].increment("gcp_token")
         return cached[0]
+    metrics_push.COUNTS["cache_misses"].increment("gcp_token")
 
     privkey = _load_private_key(sa_info["private_key"])
     iat = int(now)
     header = _b64url(json.dumps({"alg": "RS256", "typ": "JWT"}).encode())
-    payload = _b64url(json.dumps({
-        "iss": email,
-        "scope": _SCOPE,
-        "aud": _TOKEN_URL,
-        "iat": iat,
-        "exp": iat + 3600,
-    }).encode())
+    payload = _b64url(
+        json.dumps(
+            {
+                "iss": email,
+                "scope": _SCOPE,
+                "aud": _TOKEN_URL,
+                "iat": iat,
+                "exp": iat + 3600,
+            }
+        ).encode()
+    )
     signing_input = (header + "." + payload).encode()
     signature = rsa.sign(signing_input, privkey, "SHA-256")
     assertion = header + "." + payload + "." + _b64url(signature)
@@ -82,4 +88,5 @@ async def get_token(sa_info: dict) -> str:
     token = body["access_token"]
     ttl = int(body.get("expires_in", 3600))
     _TOKEN_CACHE[email] = (token, now + ttl)
+    metrics_push.set_cache_size("gcp_token", len(_TOKEN_CACHE))
     return token

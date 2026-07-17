@@ -1,9 +1,11 @@
 import {
     extractEndpointId,
     extractServiceName,
+    deviceServiceKey,
 } from "./constants";
 import {
     formatDisplayName,
+    getFriendlyLlmName,
     getTypeFromTags,
     hasPersonalAccountTag,
     hasMisconfiguredConfigTag,
@@ -39,13 +41,6 @@ export function getRiskStatus(score) {
     return undefined;
 }
 
-function deviceServiceKey(hostName) {
-    if (!hostName) return null;
-    const parts = hostName.split(".");
-    if (parts.length < 2) return null;
-    return parts[0] + "\0" + parts[parts.length - 1];
-}
-
 // Human label derived from the bucket — no duplicated thresholds.
 export function getRiskLabel(score) {
     return `${func.toSentenceCase(getRiskLevel(score))} Risk`;
@@ -74,13 +69,44 @@ export function getAgentLinkedComponents(asset, agenticTreeData = [], agenticFla
     return linked;
 }
 
-export function inferOsFromDeviceId(deviceId) {
-    if (!deviceId) return null;
-    const upper = String(deviceId).toUpperCase();
-    if (upper.includes("WIN")) return "windows";
-    if (upper.includes("LIN") || upper.includes("LINUX")) return "linux";
-    if (upper.includes("MAC")) return "mac";
-    return null;
+// Tab badge count for AI Agent components — mirrors AgentComponentsView rows:
+// config row + builtin tools + connected MCP servers + skills.
+export function countAgentComponentsTab(asset, { inlineComponents = [], configViolations = null, skillCount } = {}) {
+    const mcpCount = new Set((asset?.mcpServers || []).map((s) => String(s).toLowerCase())).size;
+    const toolCount = (inlineComponents || []).filter((c) => c.type === "Tool").length;
+    const skills = skillCount ?? asset?.skillCount ?? 0;
+    const config = configViolations ? 1 : 0;
+    return mcpCount + toolCount + skills + config;
+}
+
+// LLM traffic on the agent host (/v1/messages) — Cowork, Claude CLI, etc.
+export function isAgentLlmMessagesUrl(url) {
+    const u = String(url || "");
+    return u === "/v1/messages" || u.startsWith("/v1/messages/");
+}
+
+// Observed tools + inline LLM on the agent collection for topology graphs.
+export function buildAgentInlineTopologyComponents(stiEndpoints = [], builtinTools = [], asset = {}) {
+    const items = [];
+    const hasLlm = (stiEndpoints || []).some((ep) => {
+        const url = ep?.url || ep?._id?.url;
+        return isAgentLlmMessagesUrl(url);
+    });
+    if (hasLlm) {
+        const tag = asset?.assetTagValue || asset?.name || "claude";
+        const label = tag.toLowerCase().includes("claude")
+            ? getFriendlyLlmName("claude.ai")
+            : formatDisplayName(tag);
+        items.push({ id: "inline-llm", cat: "ai-model", type: "LLM", label, edgeColor: "#ec4899" });
+    }
+    const seenTools = new Set();
+    (builtinTools || []).forEach((tool, i) => {
+        const name = tool?.name;
+        if (!name || seenTools.has(name)) return;
+        seenTools.add(name);
+        items.push({ id: `inline-tool-${i}`, cat: "mcp", type: "Tool", label: name, edgeColor: "#4cbebb" });
+    });
+    return items;
 }
 
 // Collections reaching this UI are already scoped to agentic context-source, so we only
@@ -180,6 +206,21 @@ function bucketFromUrl(url) {
     // MCP protocol paths (initialize, tools/list, ping) are server infrastructure, not user tools
     if (/^\/mcp\b/.test(u) || u === "initialize" || u === "ping") return "Server";
     return "Tool";
+}
+
+// Claude Cowork / shield built-in tools are ingested on the agent host as /tool/{name}.
+export function isAgentBuiltinToolUrl(url) {
+    const u = String(url || "");
+    return u.startsWith("/tool/") && u.length > "/tool/".length;
+}
+
+// Built-in agent tools from agent-host STI (/tool/*). MCP tools stay on MCP collections.
+export function buildAgentBuiltinToolsFromStis(stiEndpoints = [], apiInfoList = [], apiCollectionId, auditRows = []) {
+    const toolEndpoints = (stiEndpoints || []).filter((ep) => {
+        const url = ep?.url || ep?._id?.url;
+        return isAgentBuiltinToolUrl(url);
+    });
+    return buildMcpComponentsFromStis(toolEndpoints, apiInfoList, apiCollectionId, auditRows).tools;
 }
 
 // Build flyout component rows from the collection's STI endpoints (real url+method, used to fetch sample
@@ -320,6 +361,20 @@ function buildModuleDeviceMap(moduleInfos = []) {
 }
 
 /**
+ * Keep assets whose Last Seen falls in [startTimestamp, endTimestamp].
+ * When startTimestamp <= 0 (all-time), returns rows unchanged.
+ * Rows with missing/zero lastSeenEpoch are excluded when a range is active.
+ */
+export function filterAssetsByLastSeen(rows, startTimestamp, endTimestamp) {
+    if (!rows?.length || startTimestamp <= 0) return rows || [];
+    const end = endTimestamp > 0 ? endTimestamp : Math.floor(Date.now() / 1000);
+    return rows.filter((r) => {
+        const ts = r?.lastSeenEpoch || 0;
+        return ts >= startTimestamp && ts <= end;
+    });
+}
+
+/**
  * Bucket a list of items into 12 monthly slots covering the given time window.
  * Each slot counts how many items fall in that calendar month.
  * If startTimestamp is 0 (all-time), uses the earliest item's month as the window start.
@@ -446,7 +501,7 @@ export function buildDeviceEndpointsPageData(
     riskScoreMap = {},
     { moduleInfos = [], usernameMap = {}, violationsByCollectionId = {}, violationRows = [], startTimestamp = 0, endTimestamp = 0 } = {},
 ) {
-    const agenticCollections = collections.filter(isAgenticCollection);
+    const agenticCollections = collections.filter((c) => !c.deactivated);
     const deviceModules = buildModuleDeviceMap(moduleInfos);
     const deviceMap = {};
     const collectionIdToDevice = {};
@@ -471,7 +526,7 @@ export function buildDeviceEndpointsPageData(
             const username = resolvedUsername !== DEFAULT_VALUE ? resolvedUsername : (mod.username || "-");
             deviceMap[devId] = {
                 deviceId: devId,
-                os: mod.os || inferOsFromDeviceId(devId),
+                os: mod.os || null,
                 username,
                 team: mod.team || "",
                 role: mod.role || "",
@@ -531,7 +586,7 @@ export function buildDeviceEndpointsPageData(
         if (deviceMap[devId]) {
             const mod = deviceModules[devId];
             const device = deviceMap[devId];
-            if (!device.os) device.os = mod.os || inferOsFromDeviceId(devId);
+            if (!device.os) device.os = mod.os || null;
             if (!device.team) device.team = mod.team || "";
             if (!device.role) device.role = mod.role || "";
         }
@@ -589,10 +644,8 @@ export function buildDeviceEndpointsPageData(
     const users = new Set(Object.values(deviceMap).map((d) => d.username).filter((u) => u && u !== "-"));
     let agentChildCount = 0;
     const violationsBySeverity = emptyViolations();
-    const osCounts = { mac: 0, windows: 0, linux: 0 };
 
     Object.values(deviceMap).forEach((d) => {
-        osCounts[d.os] = (osCounts[d.os] || 0) + 1;
         mergeViolations(violationsBySeverity, d.violations);
         agentChildCount += Object.keys(d.children).length;
     });
@@ -616,7 +669,7 @@ export function buildDeviceEndpointsPageData(
         if (!devId) return;
         const ts = c.startTs || 0;
         if (!deviceFirstSeen[devId] || ts < deviceFirstSeen[devId].ts) {
-            deviceFirstSeen[devId] = { ts, os: deviceMap[devId]?.os || inferOsFromDeviceId(devId) };
+            deviceFirstSeen[devId] = { ts, os: deviceMap[devId]?.os || null };
         }
     });
     const deviceFirstSeenItems = Object.values(deviceFirstSeen);
@@ -638,10 +691,13 @@ export function buildDeviceEndpointsPageData(
     const userFirstSeenItems = Object.values(userFirstSeen).map((ts) => ({ ts }));
 
     // OS trend: count of newly-first-seen devices per OS per month.
-    // Use cumulativeSeriesByMonth so all 3 OS series share identical slot boundaries + labels.
+    // Use cumulativeSeriesByMonth so all series share identical slot boundaries + labels.
+    // Devices with no reported os (e.g. pre-update installers that didn't send it) fall into "unknown"
+    // so the trend total always reconciles with deviceCount.
     const macItems     = deviceFirstSeenItems.filter((d) => d.os === "mac");
     const windowsItems = deviceFirstSeenItems.filter((d) => d.os === "windows");
     const linuxItems   = deviceFirstSeenItems.filter((d) => d.os === "linux");
+    const unknownItems = deviceFirstSeenItems.filter((d) => d.os !== "mac" && d.os !== "windows" && d.os !== "linux");
 
     const getTs = (d) => d.ts;
     // OS trend: cumulative new-devices-per-OS over the selected window, shared slots/labels.
@@ -650,11 +706,12 @@ export function buildDeviceEndpointsPageData(
             { items: macItems,     getTs },
             { items: windowsItems, getTs },
             { items: linuxItems,   getTs },
+            { items: unknownItems, getTs },
         ],
         startTimestamp,
         endTimestamp,
     );
-    const [macCounts, windowsCounts, linuxCounts] = osTrendData;
+    const [macCounts, windowsCounts, linuxCounts, unknownCounts] = osTrendData;
 
     // Sparklines — cumulative, same window as the OS trend
     const endpointBucket  = cumulativeByMonth(deviceFirstSeenItems, getTs, startTimestamp, endTimestamp);
@@ -709,6 +766,7 @@ export function buildDeviceEndpointsPageData(
             mac:     macCounts,
             windows: windowsCounts,
             linux:   linuxCounts,
+            unknown: unknownCounts,
         },
         statSparklines: {
             endpoints:  endpointBucket.counts,

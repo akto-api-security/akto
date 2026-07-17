@@ -1,6 +1,8 @@
 const TYPE_TAG_KEYS = { MCP_SERVER: 'mcp-server', GEN_AI: 'gen-ai', BROWSER_LLM: 'browser-llm' };
 const ASSET_TAG_KEYS = { MCP_CLIENT: 'mcp-client', AI_AGENT: 'ai-agent', BROWSER_LLM_AGENT: 'browser-llm-agent' };
 const SKILL_TAG_KEY = 'skill';
+
+const NOT_ATTACHED_VALUE = 'not-attached';
 const CLIENT_TYPES = { LLM: 'LLM', AI_AGENT: 'AI Agent', MCP_SERVER: 'MCP Server', SKILL: 'Skill' };
 const ROW_TYPES = { AGENT: 'agent', SERVICE: 'service', SKILL: 'skill' };
 const TYPE_TAG_TO_DISPLAY = {
@@ -15,6 +17,7 @@ const KNOWN_CLIENTS = {
     claude: { displayName: 'Claude', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
     claude1: { displayName: 'Claude Desktop', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
     claude2: { displayName: 'Claude CLI', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
+    claude_cowork: { displayName: 'Claude Cowork', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
     chatgpt: { displayName: 'ChatGPT', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     openai: { displayName: 'OpenAI', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     gpt: { displayName: 'GPT', domain: 'openai.com', agentType: CLIENT_TYPES.LLM },
@@ -115,7 +118,7 @@ const getTypeFromTags = (envType) => {
     const tags = normalizeEnvType(envType);
     if (tags.length === 0) return CLIENT_TYPES.MCP_SERVER;
     const hasSkill = tags.some(tag => tag.keyName === SKILL_TAG_KEY);
-    const hasAiAgent = tags.some(tag => tag.keyName === ASSET_TAG_KEYS.AI_AGENT);
+    const hasAiAgent = tags.some(tag => tag.keyName === ASSET_TAG_KEYS.AI_AGENT && tag.value !== NOT_ATTACHED_VALUE);
     const hasMcpServer = tags.some(tag => tag.keyName === TYPE_TAG_KEYS.MCP_SERVER);
     if (hasSkill && !hasAiAgent && !hasMcpServer) return CLIENT_TYPES.SKILL;
     for (const tag of tags) {
@@ -128,7 +131,9 @@ const findAssetTag = (envType) => {
     if (!Array.isArray(envType)) return null;
     const keys = Object.values(ASSET_TAG_KEYS);
     for (const tag of envType) {
-        if (tag.keyName && keys.includes(tag.keyName)) return { keyName: tag.keyName, value: tag.value };
+        if (tag.keyName && keys.includes(tag.keyName) && tag.value !== NOT_ATTACHED_VALUE) {
+            return { keyName: tag.keyName, value: tag.value };
+        }
     }
     return null;
 };
@@ -141,6 +146,11 @@ const findTypeTag = (envType) => {
     }
     return null;
 };
+
+// True if the collection carries an explicit browser-llm tag, regardless of what other
+// type/asset tags (gen-ai, ai-agent, browser-llm-agent) are also present or their order.
+const hasBrowserLlmTag = (envType) =>
+    Array.isArray(envType) && envType.some((tag) => tag.keyName === TYPE_TAG_KEYS.BROWSER_LLM);
 
 // Get agent type from tag value using KNOWN_CLIENTS map (for agent rows)
 const getAgentTypeFromValue = (tagValue) => {
@@ -195,6 +205,8 @@ const hasMisconfiguredConfigTag = (envType) => {
     });
 };
 
+const isNotAttachedHostName = (hostName) => !!hostName && hostName.includes(NOT_ATTACHED_VALUE);
+
 export {
     formatDisplayName,
     getDomainForFavicon,
@@ -203,11 +215,14 @@ export {
     getTypeFromTags,
     findAssetTag,
     findTypeTag,
+    hasBrowserLlmTag,
     getAgentTypeFromValue,
     getAgenticCategoryLabel,
     hasPersonalAccountTag,
     hasLocalMcpServerTag,
     hasMisconfiguredConfigTag,
+    isNotAttachedHostName,
+    NOT_ATTACHED_VALUE,
     CLIENT_TYPES,
     TYPE_TAG_KEYS,
     ASSET_TAG_KEYS,

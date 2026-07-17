@@ -11,9 +11,13 @@ const ComplianceCell = ({ complianceWithClauses, activeComplianceFilters }) => {
 
     // When a filter is active show only matching frameworks; otherwise show all
     const frameworksToShow = activeComplianceFilters?.length > 0
-        ? Object.entries(complianceWithClauses).filter(([name]) =>
-            activeComplianceFilters.some(f => f.toUpperCase() === name.toUpperCase())
-        )
+        ? Object.entries(complianceWithClauses).filter(([name]) => {
+            const nameUpper = name.toUpperCase()
+            return activeComplianceFilters.some(f => {
+                const fUpper = f.toUpperCase()
+                return fUpper === nameUpper || fUpper.includes(nameUpper) || nameUpper.includes(fUpper)
+            })
+        })
         : Object.entries(complianceWithClauses)
 
     if (frameworksToShow.length === 0) return <Text color="subdued">-</Text>

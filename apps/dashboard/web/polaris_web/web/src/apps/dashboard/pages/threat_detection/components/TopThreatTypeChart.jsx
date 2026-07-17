@@ -3,7 +3,7 @@ import InfoCard from "../../dashboard/new_components/InfoCard";
 import BarGraph from "../../../components/charts/BarGraph";
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
-const TopThreatTypeChart = ({ data }) => {
+const TopThreatTypeChart = ({ data, onBarClick }) => {
   const [chartData, setChartData] = useState([]);
   useEffect(() => {
     const chartData = data
@@ -12,13 +12,15 @@ const TopThreatTypeChart = ({ data }) => {
         text: x.text.replaceAll("_", " "),
         value: x.value,
         color: x.color,
+        filterKey: x.filterKey,
       }));
     setChartData(chartData);
   }, [data]);
   return (
     <InfoCard
-      title={`Top ${mapLabel("Threat", getDashboardCategory())} Types`}
-      titleToolTip={`Top ${mapLabel("Threat", getDashboardCategory())} Types`}
+      title={mapLabel("Top Threat Violation Types", getDashboardCategory())}
+      titleToolTip={mapLabel("Number of detections for each threat category, from most to least common.", getDashboardCategory())}
+      fillHeight
       component={
         <BarGraph
           data={chartData}
@@ -34,6 +36,7 @@ const TopThreatTypeChart = ({ data }) => {
           barWidth={100 - (data.length * 6)}
           barGap={12}
           showGridLines={true}
+          onBarClick={onBarClick}
         />
       }
     />

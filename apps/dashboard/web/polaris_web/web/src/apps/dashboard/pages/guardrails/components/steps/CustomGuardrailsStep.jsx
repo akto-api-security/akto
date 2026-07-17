@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox } from "@shopify/polaris";
+import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox, HorizontalStack } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
+import ControlInfoIcon from "../ControlInfoIcon";
 import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
 import guardrailApi from "../../api";
+import { CUSTOM_GUARDRAILS_DESCRIPTIONS } from "../../guardrailDescriptions";
 
 // URL validation function
 const validateUrl = (url) => {
@@ -39,6 +41,7 @@ export const CustomGuardrailsConfig = {
 const PROMPT_MIN_LENGTH = 10;
 
 const CustomGuardrailsStep = ({
+    onTryPrompt,
     // LLM prompt based rule
     enableLlmPrompt,
     setEnableLlmPrompt,
@@ -149,7 +152,15 @@ const CustomGuardrailsStep = ({
                 {/* LLM Prompt Based Rule */}
                 <Box>
                     <Checkbox
-                        label="LLM prompt based rule"
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text as="span">LLM prompt based rule</Text>
+                                <ControlInfoIcon
+                                    {...CUSTOM_GUARDRAILS_DESCRIPTIONS.llmPromptRule}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableLlmPrompt}
                         onChange={setEnableLlmPrompt}
                         helpText="Create a custom rule using a prompt that is evaluated against user inputs or model responses."
@@ -167,7 +178,15 @@ const CustomGuardrailsStep = ({
                                 />
 
                                 <RangeSlider
-                                    label="Confidence score threshold"
+                                    label={
+                                        <HorizontalStack gap="1" blockAlign="center">
+                                            <Text as="span">Confidence score threshold</Text>
+                                            <ControlInfoIcon
+                                                {...CUSTOM_GUARDRAILS_DESCRIPTIONS.llmConfidenceThreshold}
+                                                onTryPrompt={onTryPrompt}
+                                            />
+                                        </HorizontalStack>
+                                    }
                                     value={llmConfidenceScore}
                                     onChange={setLlmConfidenceScore}
                                     min={0}
@@ -191,7 +210,15 @@ const CustomGuardrailsStep = ({
                 {/* External Model Based Evaluation */}
                 <Box>
                     <Checkbox
-                        label="External model based evaluation"
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text as="span">External model based evaluation</Text>
+                                <ControlInfoIcon
+                                    {...CUSTOM_GUARDRAILS_DESCRIPTIONS.externalModel}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableExternalModel}
                         onChange={setEnableExternalModel}
                         helpText="Configure an external model endpoint to evaluate content against custom criteria."
@@ -209,7 +236,15 @@ const CustomGuardrailsStep = ({
                                 />
 
                                 <RangeSlider
-                                    label="Confidence score threshold"
+                                    label={
+                                        <HorizontalStack gap="1" blockAlign="center">
+                                            <Text as="span">Confidence score threshold</Text>
+                                            <ControlInfoIcon
+                                                {...CUSTOM_GUARDRAILS_DESCRIPTIONS.externalConfidenceThreshold}
+                                                onTryPrompt={onTryPrompt}
+                                            />
+                                        </HorizontalStack>
+                                    }
                                     value={confidenceScore}
                                     onChange={setConfidenceScore}
                                     min={0}

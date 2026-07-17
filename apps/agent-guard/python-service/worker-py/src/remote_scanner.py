@@ -11,10 +11,12 @@ Wire (portable):
 
 import json
 import logging
-from typing import Any, Dict
+import time
+from typing import Any
 
 import httpx
 
+import metrics_push
 from settings import settings
 
 logger = logging.getLogger(__name__)
@@ -26,14 +28,14 @@ _FAIL_OPEN = {
 }
 
 
-def _build_payload(text: str, config: Dict[str, Any]) -> dict:
+def _build_payload(text: str, config: dict[str, Any]) -> dict:
     payload = {"text": text, "language": config.get("language", "en")}
     if config.get("entities"):
         payload["entities"] = config["entities"]
     return payload
 
 
-def _shape_success(parsed: dict, text: str) -> Dict[str, Any]:
+def _shape_success(parsed: dict, text: str) -> dict[str, Any]:
     return {
         "is_valid": True,
         "risk_score": 0.0,
@@ -42,32 +44,37 @@ def _shape_success(parsed: dict, text: str) -> Dict[str, Any]:
     }
 
 
-def _fail_open(text: str, error: str) -> Dict[str, Any]:
+def _fail_open(text: str, error: str) -> dict[str, Any]:
     return {**_FAIL_OPEN, "sanitized_text": text, "details": {"error": error}}
 
 
-async def _scan_anonymize_http(text: str, config: Dict[str, Any], base_url: str) -> Dict[str, Any]:
+async def _scan_anonymize_http(text: str, config: dict[str, Any], base_url: str) -> dict[str, Any]:
     payload = _build_payload(text, config)
     url = f"{base_url.rstrip('/')}/anonymize"
+    started = time.perf_counter()
     try:
         async with httpx.AsyncClient(timeout=_ANONYMIZE_TIMEOUT_S) as client:
             response = await client.post(url, json=payload)
     except Exception as exc:
+        metrics_push.COUNTS["anonymizer_errors"].increment(type(exc).__name__)
         logger.warning(f"[remote] anonymizer HTTP fetch failed: {exc}")
         return _fail_open(text, f"fetch_failed: {exc}")
+    metrics_push.SAMPLES["anonymizer"].record("anonymizer", (time.perf_counter() - started) * 1000.0)
 
     if response.status_code < 200 or response.status_code >= 300:
+        metrics_push.COUNTS["anonymizer_errors"].increment(f"status_{response.status_code}")
         logger.warning(f"[remote] anonymizer returned {response.status_code}")
         return _fail_open(text, f"status_{response.status_code}")
 
     try:
         return _shape_success(response.json(), text)
     except Exception as exc:
+        metrics_push.COUNTS["anonymizer_errors"].increment(type(exc).__name__)
         logger.warning(f"[remote] anonymizer response not JSON: {exc}")
         return _fail_open(text, "bad_response")
 
 
-async def _scan_anonymize_cf_binding(text: str, config: Dict[str, Any], binding) -> Dict[str, Any]:
+async def _scan_anonymize_cf_binding(text: str, config: dict[str, Any], binding) -> dict[str, Any]:
     from js import Object
     from pyodide.ffi import to_js
 
@@ -94,7 +101,7 @@ async def _scan_anonymize_cf_binding(text: str, config: Dict[str, Any], binding)
         return _fail_open(text, "bad_response")
 
 
-async def scan_anonymize(text: str, config: Dict[str, Any], env=None) -> Dict[str, Any]:
+async def scan_anonymize(text: str, config: dict[str, Any], env=None) -> dict[str, Any]:
     """POST text to the anonymizer and shape the response.
 
     is_valid is always True — Anonymize doesn't reject traffic, it rewrites it.

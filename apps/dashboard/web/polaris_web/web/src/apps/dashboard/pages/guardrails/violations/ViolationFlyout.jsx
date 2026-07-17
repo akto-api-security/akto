@@ -4,11 +4,15 @@ import {
     Badge,
     Box,
     Button,
+    ChoiceList,
     Divider,
     HorizontalStack,
+    Modal,
     Popover,
     Tabs,
     Text,
+    TextField,
+    VerticalStack,
 } from "@shopify/polaris";
 import { MobileCancelMajor } from "@shopify/polaris-icons";
 
@@ -19,6 +23,7 @@ import ActivityTracker from "@/apps/dashboard/pages/dashboard/components/Activit
 import JiraTicketCreationModal from "@/apps/dashboard/components/shared/JiraTicketCreationModal";
 import SampleDataList from "@/apps/dashboard/components/shared/SampleDataList";
 import func from "@/util/func";
+import guardrailsApi from "../api";
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import issuesApi from "@/apps/dashboard/pages/issues/api";
 import settingFunctions from "@/apps/dashboard/pages/settings/module";
@@ -248,6 +253,90 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
     );
 }
 
+// ─── Approve server button (for "approval" behaviour policies) ─────────────────
+
+function ApproveServerButton({ row }) {
+    const [modalActive, setModalActive] = useState(false);
+    const [mode, setMode]               = useState("ALWAYS"); // ALWAYS | DURATION
+    const [days, setDays]               = useState("7");
+    const [loading, setLoading]         = useState(false);
+
+    const serverId = row?.deviceId || null;                       // request Host = serverId
+    const serverName = row?.agenticAsset || row?.agenticAssetRaw || serverId || "";
+
+    const openModal = () => { setMode("ALWAYS"); setDays("7"); setModalActive(true); };
+
+    const handleApprove = async () => {
+        if (!row?.policyId) { func.setToast(true, true, "Could not resolve the policy for this violation"); return; }
+        if (!serverId)      { func.setToast(true, true, "Could not resolve the server for this violation"); return; }
+        let value = 0;
+        if (mode === "DURATION") {
+            value = parseInt(days, 10);
+            if (!Number.isInteger(value) || value <= 0) { func.setToast(true, true, "Enter a valid number of days"); return; }
+        }
+        setLoading(true);
+        try {
+            // request util rejects (and toasts the backend error) on non-2xx, so reaching here = success.
+            await guardrailsApi.approveServerForPolicy({
+                hexId: row.policyId,
+                policyName: row.policyName,
+                approvedServerId: serverId,
+                approvedServerName: serverName,
+                approvalMode: mode,
+                approvalValue: value,
+            });
+            const scope = mode === "DURATION" ? `for ${value} day(s)` : "always";
+            func.setToast(true, false, `Approved ${serverName} ${scope}`);
+            setModalActive(false);
+        } catch {
+            // Error toast already surfaced by the request interceptor; keep the modal open.
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <>
+            <Button size="slim" onClick={openModal}>Approve server</Button>
+            <Modal
+                open={modalActive}
+                onClose={() => setModalActive(false)}
+                title="Approve server"
+                primaryAction={{ content: "Approve", loading, onAction: handleApprove }}
+                secondaryActions={[{ content: "Cancel", onAction: () => setModalActive(false) }]}
+            >
+                <Modal.Section>
+                    <VerticalStack gap="4">
+                        <Text variant="bodyMd">
+                            Approving <Text as="span" fontWeight="semibold">{serverName || "this server"}</Text> will
+                            allow it to bypass the <Text as="span" fontWeight="semibold">{row?.policyName || "policy"}</Text> guardrail policy on future requests.
+                        </Text>
+                        <ChoiceList
+                            title="Approve for"
+                            choices={[
+                                { label: "Always", value: "ALWAYS" },
+                                { label: "Number of days", value: "DURATION" },
+                            ]}
+                            selected={[mode]}
+                            onChange={(v) => setMode(v[0])}
+                        />
+                        {mode === "DURATION" && (
+                            <TextField
+                                label="Number of days"
+                                type="number"
+                                min={1}
+                                value={days}
+                                onChange={setDays}
+                                autoComplete="off"
+                            />
+                        )}
+                    </VerticalStack>
+                </Modal.Section>
+            </Modal>
+        </>
+    );
+}
+
 // ─── Header ─────────────────────────────────────────────────────────────────────
 
 function FlyoutHeader({ row, onClose, onStatusUpdate }) {
@@ -271,6 +360,7 @@ function FlyoutHeader({ row, onClose, onStatusUpdate }) {
                             onStatusUpdate={onStatusUpdate}
                             row={row}
                         />
+                        {row.behaviour === "approval" && <ApproveServerButton row={row} />}
                         <Button plain icon={MobileCancelMajor} onClick={onClose} accessibilityLabel="Close" />
                     </HorizontalStack>
                 </HorizontalStack>

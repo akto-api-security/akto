@@ -15,8 +15,10 @@ import {
 import { PlusMinor, EditMinor, DeleteMinor, ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
+import ControlInfoIcon from "../ControlInfoIcon";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
 import { GENERAL_BLOCKS, GENERAL_BLOCK_GROUPS } from "../../generalBlocks";
+import { CONTENT_POLICY_DESCRIPTIONS, GENERAL_BLOCK_EXAMPLES, HARMFUL_CATEGORY_INFO } from "../../guardrailDescriptions";
 import func from "@/util/func";
 import guardrailApi from "../../api";
 import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
@@ -44,6 +46,7 @@ export const ContentPolicyConfig = {
 };
 
 const ContentPolicyStep = ({
+    onTryPrompt,
     // Prompt attacks
     enablePromptAttacks,
     setEnablePromptAttacks,
@@ -142,7 +145,9 @@ const ContentPolicyStep = ({
     const startEditing = (index) => {
         editStartRef.current = { topic: deniedTopics[index]?.topic || '', description: deniedTopics[index]?.description || '' };
         setEditingIndex(index);
-        setEditFormData({ ...deniedTopics[index] });
+        // Default any missing fields so topics from other sources (e.g. conversation-derived
+        // denied topics, which omit description) don't crash the edit form on .trim().
+        setEditFormData({ topic: "", description: "", samplePhrases: [], ...deniedTopics[index] });
         setNewPhraseInput("");
     };
 
@@ -484,7 +489,15 @@ const ContentPolicyStep = ({
                 {/* Prompt Injection Attacks */}
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Enable prompt injection attacks filter" threats={RULE_OWASP_THREATS.promptInjection} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Enable prompt injection attacks filter" threats={RULE_OWASP_THREATS.promptInjection} />
+                                <ControlInfoIcon
+                                    {...CONTENT_POLICY_DESCRIPTIONS.promptAttacks}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enablePromptAttacks}
                         onChange={setEnablePromptAttacks}
                         helpText="Detect and block user inputs attempting to override system instructions."
@@ -492,7 +505,13 @@ const ContentPolicyStep = ({
                     {enablePromptAttacks && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="3">
-                                <Text variant="bodyMd" fontWeight="medium">Prompt Attack Level</Text>
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text variant="bodyMd" fontWeight="medium">Prompt Attack Level</Text>
+                                    <ControlInfoIcon
+                                        {...CONTENT_POLICY_DESCRIPTIONS.promptAttackLevel}
+                                        onTryPrompt={onTryPrompt}
+                                    />
+                                </HorizontalStack>
                                 <RangeSlider
                                     label=""
                                     value={promptAttackLevel === 'none' ? 0 : promptAttackLevel === 'low' ? 1 : promptAttackLevel === 'medium' ? 2 : 3}
@@ -514,7 +533,15 @@ const ContentPolicyStep = ({
                 {func.isDemoAccount() && (
                     <Box>
                         <Checkbox
-                            label={<RuleLabelWithTag name="Enable context poisoning attacks" threats={RULE_OWASP_THREATS.contextPoisoning} />}
+                            label={
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <RuleLabelWithTag name="Enable context poisoning attacks" threats={RULE_OWASP_THREATS.contextPoisoning} />
+                                    <ControlInfoIcon
+                                        {...CONTENT_POLICY_DESCRIPTIONS.contextPoisoning}
+                                        onTryPrompt={onTryPrompt}
+                                    />
+                                </HorizontalStack>
+                            }
                             checked={enableContextPoisoning ?? false}
                             onChange={setEnableContextPoisoning}
                             helpText="Detect and block attempts to poison agent memory or context."
@@ -525,7 +552,15 @@ const ContentPolicyStep = ({
                 {/* Denied Topics */}
                 <Box>
                     <Checkbox
-                        label="Add denied topics"
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text as="span">Add denied topics</Text>
+                                <ControlInfoIcon
+                                    {...CONTENT_POLICY_DESCRIPTIONS.deniedTopics}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableDeniedTopics}
                         onChange={setEnableDeniedTopics}
                         helpText="Add up to 30 denied topics to block user inputs or model responses associated with the topic."
@@ -566,7 +601,16 @@ const ContentPolicyStep = ({
                                                     {GENERAL_BLOCKS.filter(b => b.group === group).map(block => (
                                                         <Checkbox
                                                             key={block.key}
-                                                            label={block.label}
+                                                            label={
+                                                                <HorizontalStack gap="1" blockAlign="center">
+                                                                    <Text as="span">{block.label}</Text>
+                                                                    <ControlInfoIcon
+                                                                        description={block.shortDescription}
+                                                                        examples={GENERAL_BLOCK_EXAMPLES[block.key] ? [{ text: GENERAL_BLOCK_EXAMPLES[block.key] }] : []}
+                                                                        onTryPrompt={onTryPrompt}
+                                                                    />
+                                                                </HorizontalStack>
+                                                            }
                                                             helpText={block.shortDescription}
                                                             checked={isBlockEnabled(block)}
                                                             onChange={(checked) => toggleGeneralBlock(block, checked)}
@@ -594,7 +638,15 @@ const ContentPolicyStep = ({
                 {/* Harmful Categories */}
                 <Box>
                     <Checkbox
-                        label="Enable harmful categories filters"
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text as="span">Enable harmful categories filters</Text>
+                                <ControlInfoIcon
+                                    {...CONTENT_POLICY_DESCRIPTIONS.harmfulCategories}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableHarmfulCategories}
                         onChange={setEnableHarmfulCategories}
                         helpText="Detect and block harmful user inputs and model responses."
@@ -616,7 +668,15 @@ const ContentPolicyStep = ({
                                     if (category === 'useForResponses') return null;
                                     return (
                                         <Box key={category}>
-                                            <Text variant="bodyMd" fontWeight="medium" textTransform="capitalize">{category}</Text>
+                                            <HorizontalStack gap="1" blockAlign="center">
+                                                <Text variant="bodyMd" fontWeight="medium" textTransform="capitalize">{category}</Text>
+                                                {HARMFUL_CATEGORY_INFO[category] && (
+                                                    <ControlInfoIcon
+                                                        {...HARMFUL_CATEGORY_INFO[category]}
+                                                        onTryPrompt={onTryPrompt}
+                                                    />
+                                                )}
+                                            </HorizontalStack>
                                             <Box paddingBlockStart="2">
                                                 <RangeSlider
                                                     label=""
@@ -647,7 +707,15 @@ const ContentPolicyStep = ({
                 {/* Intent Based Guardrails (Base Prompt) */}
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Enable agent intent verification" threats={RULE_OWASP_THREATS.intentVerification} />}
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <RuleLabelWithTag name="Enable agent intent verification" threats={RULE_OWASP_THREATS.intentVerification} />
+                                <ControlInfoIcon
+                                    {...CONTENT_POLICY_DESCRIPTIONS.intentVerification}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
                         checked={enableBasePromptRule}
                         onChange={setEnableBasePromptRule}
                         helpText="Verify if agent requests match the intent of the base prompt. The base prompt is automatically detected from traffic, and user inputs filling placeholders like {var} or {} are checked against this intent."
@@ -656,7 +724,15 @@ const ContentPolicyStep = ({
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <FormLayout>
                                 <RangeSlider
-                                    label="Confidence Threshold"
+                                    label={
+                                        <HorizontalStack gap="1" blockAlign="center">
+                                            <Text as="span">Confidence Threshold</Text>
+                                            <ControlInfoIcon
+                                                {...CONTENT_POLICY_DESCRIPTIONS.intentConfidenceThreshold}
+                                                onTryPrompt={onTryPrompt}
+                                            />
+                                        </HorizontalStack>
+                                    }
                                     value={basePromptConfidenceScore}
                                     min={0}
                                     max={1}

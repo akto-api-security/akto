@@ -57,7 +57,7 @@ const ThreatReportSummary = ({
     // Prepare summary items for info cards
     const summaryItems = [
         {
-            title: 'Threats Detected',
+            title: (isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? 'Guardrail Violations Detected' : 'Threats Detected',
             data: totalThreats,
             visible: true
         },
