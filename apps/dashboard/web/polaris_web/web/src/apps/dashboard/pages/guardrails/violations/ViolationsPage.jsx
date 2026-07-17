@@ -537,7 +537,7 @@ function Violations() {
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
     const legacyPath = isEndpointSecurityCategory() ? "/dashboard/protection/threat-activity" : "/dashboard/guardrails/activity";
-    const canUseNewLayout = true;
+    const canUseNewLayout = func.isDemoAccount() || window.ACTIVE_ACCOUNT === 1726615470;
 
     useEffect(() => {
         if (!canUseNewLayout || !newLayout) {
