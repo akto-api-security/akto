@@ -239,6 +239,7 @@ const SEVERITY_COLORS = {
 
 const STATUS_COLORS = {
     OPEN: "#9642FC",
+    UNDER_REVIEW: "#637381",
     IGNORED: "#F5C451",
 };
 
