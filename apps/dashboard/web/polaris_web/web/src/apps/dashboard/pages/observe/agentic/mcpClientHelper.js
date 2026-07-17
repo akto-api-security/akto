@@ -11,19 +11,31 @@ const TYPE_TAG_TO_DISPLAY = {
     [TYPE_TAG_KEYS.BROWSER_LLM]: CLIENT_TYPES.LLM,
 };
 
-// Known clients: keyword -> { displayName, domain, agentType }
-// agentType is used to infer the type for agent rows (not from tags)
+// Known clients: keyword -> { displayName, domain, agentType, variants }
+// agentType is used to infer the type for agent rows (not from tags).
+// variants (agent entries only) lists every raw ai-agent tag value that should collapse into this
+// entry — e.g. all Claude CLI installs report different tag values depending on config source.
 const KNOWN_CLIENTS = {
     claude: { displayName: 'Claude', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
-    claude1: { displayName: 'Claude Desktop', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
-    claude2: { displayName: 'Claude CLI', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
+    claude1: { displayName: 'Claude Desktop', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT, variants: ['claude-desktop'] },
+    claude2: {
+        displayName: 'Claude CLI', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT,
+        variants: ['claude', 'claudecli', 'claude-cli', 'claude-cli-user', 'claude-cli-project', 'claude-cli-local', 'claude-cli-enterprise', 'claude-plugin', 'claude-code'],
+    },
     claude_cowork: { displayName: 'Claude Cowork', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
+    // Tag as documented in the Tool Tags Mapping (Atlas) Notion doc — appears to be a typo for
+    // "anthropic.com" upstream; kept verbatim since matching must be exact against the raw tag.
+    claude3: { displayName: 'Claude Compliance', domain: 'anthropic.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['anthrophic.com'] },
     chatgpt: { displayName: 'ChatGPT', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     openai: { displayName: 'OpenAI', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     gpt: { displayName: 'GPT', domain: 'openai.com', agentType: CLIENT_TYPES.LLM },
     codex: { displayName: 'Codex', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
+    codex1: { displayName: 'Codex CLI', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['codex-cli', 'codexcli'] },
+    codex2: { displayName: 'Codex Desktop', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['codex-desktop'] },
     gemini: { displayName: 'Gemini', domain: 'gemini.google.com', agentType: CLIENT_TYPES.LLM },
     copilot: { displayName: 'Copilot', domain: 'copilot.microsoft.com', agentType: CLIENT_TYPES.AI_AGENT },
+    githubcopilot: { displayName: 'GitHub Copilot', domain: 'github.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['github-copilot'] },
+    vscopilot: { displayName: 'Visual Studio Copilot', domain: 'visualstudio.microsoft.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['visual-studio-copilot'] },
     cursor: { displayName: 'Cursor', domain: 'cursor.com', agentType: CLIENT_TYPES.AI_AGENT },
     grok: { displayName: 'Grok', domain: 'x.ai', agentType: CLIENT_TYPES.AI_AGENT },
     cody: { displayName: 'Cody', domain: 'sourcegraph.com', agentType: CLIENT_TYPES.AI_AGENT },
@@ -31,7 +43,10 @@ const KNOWN_CLIENTS = {
     codeium: { displayName: 'Codeium', domain: 'codeium.com', agentType: CLIENT_TYPES.AI_AGENT },
     tabnine: { displayName: 'Tabnine', domain: 'tabnine.com', agentType: CLIENT_TYPES.AI_AGENT },
     github: { displayName: 'GitHub', domain: 'github.com', agentType: CLIENT_TYPES.AI_AGENT },
+    githubcli: { displayName: 'GitHub CLI', domain: 'github.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['github-cli'] },
     vscode: { displayName: 'VS Code', domain: 'code.visualstudio.com', agentType: CLIENT_TYPES.AI_AGENT },
+    kirocli: { displayName: 'Kiro CLI', domain: 'kiro.dev', agentType: CLIENT_TYPES.AI_AGENT },
+    kiroide: { displayName: 'Kiro IDE', domain: 'kiro.dev', agentType: CLIENT_TYPES.AI_AGENT },
     slack: { displayName: 'Slack', domain: 'slack.com', agentType: CLIENT_TYPES.AI_AGENT },
     notion: { displayName: 'Notion', domain: 'notion.so', agentType: CLIENT_TYPES.AI_AGENT },
     figma: { displayName: 'Figma', domain: 'figma.com', agentType: CLIENT_TYPES.AI_AGENT },
@@ -49,6 +64,23 @@ const KNOWN_CLIENTS = {
     filesystem: { displayName: 'Filesystem', domain: 'filesystem', agentType: CLIENT_TYPES.MCP_SERVER },
     universal: { displayName: 'Universal', domain: 'universal', agentType: CLIENT_TYPES.MCP_SERVER },
 };
+
+// Raw wire-level ai-agent tag value -> canonical KNOWN_CLIENTS key, built from each entry's
+// `variants` list. Single source of truth: add a variant above and both display formatting
+// (findClientInfo/formatDisplayName) and grouping/enforcement callers pick it up automatically.
+const CLIENT_TAG_ALIASES = Object.entries(KNOWN_CLIENTS).reduce((acc, [key, info]) => {
+    (info.variants || []).forEach((variant) => { acc[variant] = key; });
+    return acc;
+}, {});
+
+// Every raw wire-level tag value a canonical agent key aliases (identity if it has no variants).
+const getClientTagVariants = (canonicalKey) => {
+    const variants = KNOWN_CLIENTS[canonicalKey]?.variants;
+    return variants?.length > 0 ? variants : [canonicalKey];
+};
+
+// Canonical KNOWN_CLIENTS key for a raw wire-level tag value (identity if not an aliased variant).
+const resolveClientKey = (rawValue) => CLIENT_TAG_ALIASES[rawValue] ?? rawValue;
 
 const findClientInfo = (tagValue) => {
     if (!tagValue) return null;
@@ -218,6 +250,9 @@ export {
     hasBrowserLlmTag,
     getAgentTypeFromValue,
     getAgenticCategoryLabel,
+    CLIENT_TAG_ALIASES,
+    getClientTagVariants,
+    resolveClientKey,
     hasPersonalAccountTag,
     hasLocalMcpServerTag,
     hasMisconfiguredConfigTag,

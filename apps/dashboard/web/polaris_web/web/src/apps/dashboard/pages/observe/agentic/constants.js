@@ -15,7 +15,11 @@ import {
     hasLocalMcpServerTag,
     hasMisconfiguredConfigTag,
     isNotAttachedHostName,
+    CLIENT_TAG_ALIASES,
+    getClientTagVariants,
+    resolveClientKey,
 } from "./mcpClientHelper";
+export { CLIENT_TAG_ALIASES, getClientTagVariants, resolveClientKey };
 import func from "@/util/func";
 import {
     getResolvedUsernameForCollection,
@@ -189,23 +193,6 @@ export const deviceServiceKey = (hostName) => {
     return parts[0] + " " + parts[parts.length - 1];
 };
 
-// Aliases: normalize variant agent tag values to a canonical key for grouping.
-// All Claude CLI variants collapse into claude2 (Claude CLI), Desktop into claude1 (Claude Desktop).
-const AGENT_KEY_ALIASES = {
-    // Claude CLI variants → claude2
-    'claude': 'claude2',
-    'claudecli': 'claude2',
-    'claude-cli': 'claude2',
-    'claude-cli-user': 'claude2',
-    'claude-cli-project': 'claude2',
-    'claude-cli-local': 'claude2',
-    'claude-cli-enterprise': 'claude2',
-    'claude-plugin': 'claude2',
-    'claude-code': 'claude2',
-    // Claude Desktop variants → claude1
-    'claude-desktop': 'claude1',
-};
-
 // Group collections by agent identification (mcp-client, ai-agent values)
 // These are the sources that discovered the services (cursor, litellm, etc.)
 // Note: browser-llm-agent is excluded from this grouping
@@ -221,7 +208,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
         if (!assetTag?.value) return; // Skip collections without agent tag
         if (assetTag.keyName === ASSET_TAG_KEYS.BROWSER_LLM_AGENT) return; // Skip browser-llm-agent rows
 
-        const key = AGENT_KEY_ALIASES[assetTag.value] ?? assetTag.value;
+        const key = CLIENT_TAG_ALIASES[assetTag.value] ?? assetTag.value;
         const endpointId = extractEndpointId(hostName);
         
         if (!agents[key]) {

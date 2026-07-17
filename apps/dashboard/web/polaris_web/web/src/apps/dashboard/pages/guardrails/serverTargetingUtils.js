@@ -1,5 +1,7 @@
-import { groupCollectionsByAgent, extractServiceName } from '../observe/agentic/constants';
+import { groupCollectionsByAgent, extractServiceName, getClientTagVariants, resolveClientKey } from '../observe/agentic/constants';
 import { isEndpointSecurityCategory } from '../../../main/labelHelper';
+
+export { getClientTagVariants, resolveClientKey };
 
 export const isVisibilityOnly = (collection) =>
     collection.envType?.some(tag =>

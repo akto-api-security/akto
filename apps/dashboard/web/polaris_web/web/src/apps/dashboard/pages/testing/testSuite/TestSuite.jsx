@@ -36,7 +36,7 @@ function TestSuite() {
             value: "name",
             textValue: "name",
             sortActive: true,
-            boxWidth: "465px",
+            boxWidth: "350px",
         },
         {
             title: "Total tests",
@@ -48,7 +48,7 @@ function TestSuite() {
             title: "Categories covered",
             text: "categoriesCovered",
             value: "categoriesCovered",
-            boxWidth: "320px",
+            boxWidth: "435px",
         },
         {
             title: "Author",
