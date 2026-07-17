@@ -139,7 +139,7 @@
 }
 .agentic-list-table .Polaris-DataTable__TableRow:has([data-active="true"]) .Polaris-Text--root {
     color: #202223 !important;
-    font-weight: 600 !important;
+    font-weight: 500 !important;
 }
 .agentic-list-table .Polaris-DataTable__Cell--header {
     color: var(--p-color-text-subdued, #6D7175);
