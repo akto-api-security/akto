@@ -11,6 +11,7 @@ function CrowdStrikeConnector() {
     const [clientSecret, setClientSecret] = useState('')
     const [baseUrl, setBaseUrl] = useState('')
     const [dataIngestionUrl, setDataIngestionUrl] = useState('')
+    const [aktoApiToken, setAktoApiToken] = useState('')
     const [recurringIntervalSeconds, setRecurringIntervalSeconds] = useState('3600')
     const [isSaved, setIsSaved] = useState(false)
 
@@ -78,9 +79,10 @@ function CrowdStrikeConnector() {
     const handleSave = () => {
         api.addCrowdStrikeIntegration(
             clientId, clientSecret || null, baseUrl || null,
-            dataIngestionUrl, parseInt(recurringIntervalSeconds) || 3600
+            dataIngestionUrl, aktoApiToken || null, parseInt(recurringIntervalSeconds) || 3600
         ).then(() => {
             setClientSecret('')
+            setAktoApiToken('')
             setIsSaved(true)
             func.setToast(true, false, 'CrowdStrike integration saved successfully')
         }).catch(() => func.setToast(true, true, 'Failed to save CrowdStrike integration'))
@@ -89,7 +91,7 @@ function CrowdStrikeConnector() {
     const handleRemove = () => {
         api.removeCrowdStrikeIntegration().then(() => {
             setClientId(''); setClientSecret(''); setBaseUrl('')
-            setDataIngestionUrl(''); setRecurringIntervalSeconds('3600'); setIsSaved(false)
+            setDataIngestionUrl(''); setAktoApiToken(''); setRecurringIntervalSeconds('3600'); setIsSaved(false)
             func.setToast(true, false, 'CrowdStrike integration removed successfully')
         }).catch(() => func.setToast(true, true, 'Failed to remove CrowdStrike integration'))
     }
@@ -112,7 +114,7 @@ function CrowdStrikeConnector() {
             return
         }
 
-        const guardrailEnvVars = { 'AKTO_DATA_INGESTION_URL': dataIngestionUrl, ...envVarValues }
+        const guardrailEnvVars = { ...envVarValues }
         const targetMode = runOnAllDevices ? 'all' : 'select'
         const deviceIds = runOnAllDevices ? [] : selectedDeviceIds
 
@@ -129,7 +131,7 @@ function CrowdStrikeConnector() {
             .finally(() => setExecutingGuardrails(false))
     }
 
-    const isSaveDisabled = !clientId || !dataIngestionUrl || (!clientSecret && !isSaved)
+    const isSaveDisabled = !clientId || !dataIngestionUrl || (!clientSecret && !isSaved) || (!aktoApiToken && !isSaved)
 
     return (
         <div className='card-items'>
@@ -158,6 +160,14 @@ function CrowdStrikeConnector() {
                     requiredIndicator
                     autoComplete="off"
                     helpText="Common URL for data ingestion and guardrails (AKTO_DATA_INGESTION_URL)"
+                />
+                <PasswordTextField
+                    label="Akto API Token"
+                    onFunc={true}
+                    setField={setAktoApiToken}
+                    field={aktoApiToken}
+                    requiredIndicator={!isSaved}
+                    helpText="Common token used by all guardrails hook installs (AKTO_API_TOKEN)"
                 />
                 <TextField label="Polling Interval (seconds)" value={recurringIntervalSeconds}
                     onChange={setRecurringIntervalSeconds} type="number" autoComplete="off" />

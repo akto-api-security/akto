@@ -33,7 +33,6 @@ import org.apache.http.entity.mime.MultipartEntityBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -53,11 +52,14 @@ public class CrowdStrikeIntegrationAction extends UserAction {
     private static final int DEFAULT_INTERVAL = 3600;
     private static final int CONNECT_TIMEOUT_MS = 30_000;
     private static final int SOCKET_TIMEOUT_MS  = 60_000;
+    private static final long GUARDRAIL_RTR_MAX_WAIT_MS = 60_000;
+    private static final long GUARDRAIL_RTR_POLL_INTERVAL_MS = 2_000;
 
     private String clientId;
     private String clientSecret;
     private String baseUrl;
     private String dataIngestionUrl;
+    private String aktoApiToken;
     private Integer recurringIntervalSeconds;
 
     // Guardrails fields
@@ -77,7 +79,7 @@ public class CrowdStrikeIntegrationAction extends UserAction {
     public String fetchCrowdStrikeIntegration() {
         crowdStrikeIntegration = CrowdStrikeIntegrationDao.instance.findOne(
             new BasicDBObject(),
-            Projections.exclude(CrowdStrikeIntegration.CLIENT_SECRET)
+            Projections.exclude(CrowdStrikeIntegration.CLIENT_SECRET, CrowdStrikeIntegration.AKTO_API_TOKEN)
         );
         return Action.SUCCESS.toUpperCase();
     }
@@ -116,11 +118,21 @@ public class CrowdStrikeIntegrationAction extends UserAction {
         if (resolvedBaseUrl.endsWith("/")) resolvedBaseUrl = resolvedBaseUrl.substring(0, resolvedBaseUrl.length() - 1);
         String normalizedIngestUrl = dataIngestionUrl.endsWith("/") ? dataIngestionUrl.substring(0, dataIngestionUrl.length() - 1) : dataIngestionUrl;
 
+        // Resolve the Akto API token: use provided value or fall back to stored one
+        String resolvedAktoApiToken;
+        if (aktoApiToken != null && !aktoApiToken.isEmpty()) {
+            resolvedAktoApiToken = aktoApiToken;
+        } else {
+            CrowdStrikeIntegration existingForToken = CrowdStrikeIntegrationDao.instance.findOne(new BasicDBObject());
+            resolvedAktoApiToken = existingForToken != null ? existingForToken.getAktoApiToken() : null;
+        }
+
         org.bson.conversions.Bson updates = Updates.combine(
             Updates.set(CrowdStrikeIntegration.CLIENT_ID, clientId),
             Updates.set(CrowdStrikeIntegration.CLIENT_SECRET, resolvedClientSecret),
             Updates.set(CrowdStrikeIntegration.BASE_URL, resolvedBaseUrl),
             Updates.set(CrowdStrikeIntegration.DATA_INGESTION_URL, normalizedIngestUrl),
+            Updates.set(CrowdStrikeIntegration.AKTO_API_TOKEN, resolvedAktoApiToken),
             Updates.set(CrowdStrikeIntegration.RECURRING_INTERVAL_SECONDS, interval),
             Updates.setOnInsert(CrowdStrikeIntegration.CREATED_TS, now),
             Updates.set(CrowdStrikeIntegration.UPDATED_TS, now)
@@ -347,6 +359,42 @@ public class CrowdStrikeIntegrationAction extends UserAction {
         claudeCliHooks.put("description", "Monitor and secure Claude AI CLI assistant");
         guardrailTypes.add(claudeCliHooks);
 
+        Map<String, Object> geminiHooks = new HashMap<>();
+        geminiHooks.put("type", "gemini-hooks");
+        geminiHooks.put("displayName", "Gemini CLI Hooks");
+        geminiHooks.put("description", "Monitor and secure Gemini CLI assistant");
+        guardrailTypes.add(geminiHooks);
+
+        Map<String, Object> codexHooks = new HashMap<>();
+        codexHooks.put("type", "codex-hooks");
+        codexHooks.put("displayName", "Codex CLI Hooks");
+        codexHooks.put("description", "Monitor and secure OpenAI Codex CLI assistant");
+        guardrailTypes.add(codexHooks);
+
+        Map<String, Object> githubCliHooks = new HashMap<>();
+        githubCliHooks.put("type", "github-cli-hooks");
+        githubCliHooks.put("displayName", "GitHub CLI Hooks");
+        githubCliHooks.put("description", "Monitor and secure GitHub CLI (gh) MCP usage");
+        guardrailTypes.add(githubCliHooks);
+
+        Map<String, Object> vscodeCopilotHooks = new HashMap<>();
+        vscodeCopilotHooks.put("type", "vscode-copilot-hooks");
+        vscodeCopilotHooks.put("displayName", "VS Code Copilot Hooks");
+        vscodeCopilotHooks.put("description", "Monitor and secure GitHub Copilot in VS Code");
+        guardrailTypes.add(vscodeCopilotHooks);
+
+        Map<String, Object> kiroCliHooks = new HashMap<>();
+        kiroCliHooks.put("type", "kiro-cli-hooks");
+        kiroCliHooks.put("displayName", "Kiro CLI/IDE Hooks");
+        kiroCliHooks.put("description", "Monitor and secure Kiro CLI and IDE");
+        guardrailTypes.add(kiroCliHooks);
+
+        Map<String, Object> opencodeHooks = new HashMap<>();
+        opencodeHooks.put("type", "opencode-hooks");
+        opencodeHooks.put("displayName", "OpenCode CLI Hooks");
+        opencodeHooks.put("description", "Monitor and secure OpenCode CLI assistant");
+        guardrailTypes.add(opencodeHooks);
+
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -385,9 +433,14 @@ public class CrowdStrikeIntegrationAction extends UserAction {
         try {
             String accessToken = fetchAccessToken(integration.getClientId(), integration.getClientSecret(), resolvedBase);
 
+            List<Map<String, Object>> allDevices = fetchDeviceList(accessToken, resolvedBase);
             List<String> targetDeviceIds;
+            Set<String> selectedDeviceIds = guardrailDeviceIds != null
+                ? new HashSet<>(guardrailDeviceIds)
+                : new HashSet<>();
+            List<String> unixDeviceIds = new ArrayList<>();
+            List<String> windowsDeviceIds = new ArrayList<>();
             if ("all".equals(guardrailTargetMode)) {
-                List<Map<String, Object>> allDevices = fetchDeviceList(accessToken, resolvedBase);
                 targetDeviceIds = new ArrayList<>();
                 for (Map<String, Object> d : allDevices) {
                     Object id = d.get("id");
@@ -401,31 +454,89 @@ public class CrowdStrikeIntegrationAction extends UserAction {
                 addActionError("No devices available for guardrails installation");
                 return Action.ERROR.toUpperCase();
             }
+            Set<String> targetDeviceIdSet = new HashSet<>(targetDeviceIds);
+            for (Map<String, Object> d : allDevices) {
+                Object idObj = d.get("id");
+                if (idObj == null) continue;
+                String id = idObj.toString();
+                if (!targetDeviceIdSet.contains(id)) continue;
+                String platform = d.get("platform") != null ? d.get("platform").toString().toLowerCase() : "";
+                if (platform.contains("windows")) {
+                    windowsDeviceIds.add(id);
+                } else {
+                    unixDeviceIds.add(id);
+                }
+            }
+            if (!"all".equals(guardrailTargetMode)) {
+                for (String id : selectedDeviceIds) {
+                    if (!targetDeviceIdSet.contains(id)) continue;
+                    if (!unixDeviceIds.contains(id) && !windowsDeviceIds.contains(id)) {
+                        unixDeviceIds.add(id);
+                    }
+                }
+            }
 
             Map<String, String> envVars = guardrailEnvVars != null ? guardrailEnvVars : new HashMap<>();
             if (integration.getDataIngestionUrl() != null && !integration.getDataIngestionUrl().isEmpty()) {
                 envVars.put("AKTO_DATA_INGESTION_URL", integration.getDataIngestionUrl());
             }
+            if (!isBlank(integration.getAktoApiToken())) {
+                envVars.put("AKTO_API_TOKEN", integration.getAktoApiToken());
+            }
+            if (isBlank(envVars.get("AKTO_API_TOKEN"))) {
+                addActionError("Akto API Token is required to install guardrails");
+                return Action.ERROR.toUpperCase();
+            }
+            StringBuilder paramsBuilder = new StringBuilder();
+            for (Map.Entry<String, String> e : envVars.entrySet()) {
+                paramsBuilder.append(e.getKey()).append("=").append(e.getValue()).append(" ");
+            }
+            String inputParams = paramsBuilder.toString().trim();
 
-            int totalSuccess = 0;
-            int totalFail = 0;
             uploadedGuardrailScripts.clear();
 
+            // Upload every requested guardrail's .sh + .ps1 once, up front — batch dispatch
+            // below covers all target devices per hook type in a single API call, regardless
+            // of how many devices there are.
+            Map<String, String> scriptBaseNames = new HashMap<>();
             for (String guardrailTypeItem : guardrailType) {
                 String scriptBaseName = getGuardrailScriptBaseName(guardrailTypeItem);
                 if (scriptBaseName == null) {
                     loggerMaker.error("Unknown guardrail type: " + guardrailTypeItem, LogDb.DASHBOARD);
                     continue;
                 }
-                for (String deviceId : targetDeviceIds) {
-                    try {
-                        boolean ok = executeGuardrailOnDevice(
-                            accessToken, resolvedBase, deviceId, scriptBaseName, envVars);
-                        if (ok) totalSuccess++; else totalFail++;
-                    } catch (Exception e) {
-                        loggerMaker.error("Failed guardrail " + guardrailTypeItem + " on device " + deviceId + ": " + e.getMessage(), LogDb.DASHBOARD);
-                        totalFail++;
-                    }
+                scriptBaseNames.put(guardrailTypeItem, scriptBaseName);
+                uploadGuardrailScriptIfNeeded(accessToken, resolvedBase, scriptBaseName + ".sh");
+                uploadGuardrailScriptIfNeeded(accessToken, resolvedBase, scriptBaseName + ".ps1");
+            }
+
+            // One batch session covers all target devices — queue_offline=true so devices
+            // that are offline right now still pick up the command once they reconnect.
+            String batchId = batchInitSessions(accessToken, resolvedBase, targetDeviceIds);
+            if (batchId == null) {
+                addActionError("Could not initialize RTR batch session");
+                return Action.ERROR.toUpperCase();
+            }
+
+            int totalSuccess = 0;
+            int totalFail = 0;
+
+            for (Map.Entry<String, String> entry : scriptBaseNames.entrySet()) {
+                String scriptBaseName = entry.getValue();
+                Map<String, Boolean> shResults = unixDeviceIds.isEmpty()
+                    ? new HashMap<>()
+                    : batchAdminCommand(accessToken, resolvedBase, batchId, unixDeviceIds,
+                        scriptBaseName + ".sh", inputParams);
+                Map<String, Boolean> ps1Results = windowsDeviceIds.isEmpty()
+                    ? new HashMap<>()
+                    : batchAdminCommand(accessToken, resolvedBase, batchId, windowsDeviceIds,
+                        scriptBaseName + ".ps1", inputParams);
+
+                for (String deviceId : unixDeviceIds) {
+                    if (Boolean.TRUE.equals(shResults.get(deviceId))) totalSuccess++; else totalFail++;
+                }
+                for (String deviceId : windowsDeviceIds) {
+                    if (Boolean.TRUE.equals(ps1Results.get(deviceId))) totalSuccess++; else totalFail++;
                 }
             }
 
@@ -433,7 +544,7 @@ public class CrowdStrikeIntegrationAction extends UserAction {
             guardrailExecution = new HashMap<>();
             guardrailExecution.put("successCount", totalSuccess);
             guardrailExecution.put("failCount", totalFail);
-            guardrailExecution.put("totalCount", targetDeviceIds.size() * guardrailType.size());
+            guardrailExecution.put("totalCount", targetDeviceIds.size() * scriptBaseNames.size());
             guardrailExecution.put("status", finalStatus);
             loggerMaker.info("CrowdStrike guardrails: " + totalSuccess + " success, " + totalFail + " failed", LogDb.DASHBOARD);
             return Action.SUCCESS.toUpperCase();
@@ -445,65 +556,210 @@ public class CrowdStrikeIntegrationAction extends UserAction {
         }
     }
 
-    private boolean executeGuardrailOnDevice(String accessToken, String baseUrl, String deviceId,
-            String scriptBaseName, Map<String, String> envVars) throws IOException {
-        // Upload both .sh and .ps1 (or fetch from RTR library if already uploaded)
-        String shScript = uploadGuardrailScriptIfNeeded(accessToken, baseUrl, scriptBaseName + ".sh");
-        String ps1Script = uploadGuardrailScriptIfNeeded(accessToken, baseUrl, scriptBaseName + ".ps1");
+    /**
+     * Initializes one RTR batch session covering every target device. queue_offline=true
+     * means devices that are offline right now still pick up the dispatched command once
+     * they reconnect, instead of silently being skipped.
+     */
+    private String batchInitSessions(String accessToken, String baseUrl, List<String> deviceIds) throws IOException {
+        RequestConfig cfg = buildRequestConfig();
+        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+            Map<String, Object> body = new HashMap<>();
+            body.put("host_ids", deviceIds);
+            body.put("queue_offline", true);
 
-        // Determine device OS to pick the right script
-        String platform = getDevicePlatform(accessToken, baseUrl, deviceId);
-        boolean isWindows = platform != null && platform.toLowerCase().contains("windows");
-        String scriptName = isWindows ? (ps1Script != null ? scriptBaseName + ".ps1" : null)
-                                      : (shScript != null ? scriptBaseName + ".sh" : null);
-        if (scriptName == null) {
-            loggerMaker.error("Script not available for device " + deviceId + " (platform=" + platform + ")", LogDb.DASHBOARD);
-            return false;
+            HttpPost post = new HttpPost(baseUrl + "/real-time-response/combined/batch-init-session/v1");
+            post.setHeader("Authorization", "Bearer " + accessToken);
+            post.setHeader("Content-Type", "application/json");
+            post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(body), ContentType.APPLICATION_JSON));
+
+            try (CloseableHttpResponse resp = client.execute(post)) {
+                String respBody = EntityUtils.toString(resp.getEntity());
+                JsonNode json = OBJECT_MAPPER.readTree(respBody);
+                String batchId = json.path("batch_id").asText(null);
+                if (batchId == null || batchId.isEmpty()) {
+                    loggerMaker.error("BatchInitSessions returned no batch_id: " + respBody, LogDb.DASHBOARD);
+                    return null;
+                }
+                return batchId;
+            }
         }
-
-        // Build input params string
-        StringBuilder params = new StringBuilder();
-        for (Map.Entry<String, String> e : envVars.entrySet()) {
-            params.append(e.getKey()).append("=").append(e.getValue()).append(" ");
-        }
-
-        return runGuardrailScript(accessToken, baseUrl, deviceId, scriptName, params.toString().trim());
     }
 
-    private String getDevicePlatform(String accessToken, String baseUrl, String deviceId) {
-        try {
-            Map<String, Object> reqBody = new HashMap<>();
-            reqBody.put("ids", Arrays.asList(deviceId));
-            RequestConfig cfg = buildRequestConfig();
-            try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-                HttpPost post = new HttpPost(baseUrl + "/devices/entities/devices/v2");
-                post.setHeader("Authorization", "Bearer " + accessToken);
-                post.setHeader("Content-Type", "application/json");
-                post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(reqBody), ContentType.APPLICATION_JSON));
-                try (CloseableHttpResponse resp = client.execute(post)) {
-                    JsonNode json = OBJECT_MAPPER.readTree(EntityUtils.toString(resp.getEntity()));
-                    JsonNode resources = json.path("resources");
-                    if (resources.isArray() && resources.size() > 0) {
-                        return resources.get(0).path("platform_name").asText(null);
+    /**
+     * Dispatches a runscript command for the given script to every device in the batch,
+     * in one API call — this is what lets a fleet-wide guardrail install stay inside a
+     * single synchronous dashboard request instead of one RTR session per device.
+     * Returns a map of deviceId -> whether that device's command completed without error.
+     * Devices that are still incomplete in the initial response are polled via
+     * BatchGetCmdStatus until done or the timeout elapses.
+     */
+    private Map<String, Boolean> batchAdminCommand(String accessToken, String baseUrl, String batchId,
+            List<String> optionalHostIds,
+            String scriptName, String inputParams) throws IOException {
+        Map<String, Boolean> results = new HashMap<>();
+        RequestConfig cfg = buildRequestConfig();
+
+        // CrowdStrike's RTR command parser rejects single-quoted args — use double quotes.
+        String command = "-CloudFile=\"" + scriptName + "\"";
+        String commandLine = buildGuardrailCommandLine(scriptName, inputParams);
+        if (commandLine != null && !commandLine.isEmpty()) {
+            command += " -CommandLine=\"" + commandLine + "\"";
+        }
+
+        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+            Map<String, Object> body = new HashMap<>();
+            body.put("batch_id", batchId);
+            body.put("base_command", "runscript");
+            body.put("command_string", "runscript " + command);
+            body.put("persist_all", true);
+            if (optionalHostIds != null && !optionalHostIds.isEmpty()) {
+                body.put("optional_hosts", optionalHostIds);
+            }
+
+            HttpPost post = new HttpPost(baseUrl + "/real-time-response/combined/batch-admin-command/v1");
+            post.setHeader("Authorization", "Bearer " + accessToken);
+            post.setHeader("Content-Type", "application/json");
+            post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(body), ContentType.APPLICATION_JSON));
+
+            try (CloseableHttpResponse resp = client.execute(post)) {
+                String respBody = EntityUtils.toString(resp.getEntity());
+                JsonNode json = OBJECT_MAPPER.readTree(respBody);
+
+                java.util.Iterator<Map.Entry<String, JsonNode>> fields = json.path("combined").path("resources").fields();
+                while (fields.hasNext()) {
+                    Map.Entry<String, JsonNode> entry = fields.next();
+                    String deviceId = entry.getKey();
+                    JsonNode deviceResult = entry.getValue();
+                    JsonNode errors = deviceResult.path("errors");
+                    boolean hasErrors = errors.isArray() && errors.size() > 0;
+                    boolean complete = deviceResult.path("complete").asBoolean(false);
+                    if (hasErrors) {
+                        loggerMaker.error("Guardrail " + scriptName + " on device " + deviceId
+                            + " error: " + errors.toString(), LogDb.DASHBOARD);
+                        results.put(deviceId, false);
+                    } else if (complete) {
+                        String stderr = deviceResult.path("stderr").asText("");
+                        results.put(deviceId, stderr.isEmpty());
+                        if (!stderr.isEmpty()) {
+                            loggerMaker.error("Guardrail " + scriptName + " on device " + deviceId + " stderr=" + stderr, LogDb.DASHBOARD);
+                        }
+                    } else {
+                        // Not finished yet — poll for this specific device below.
+                        results.put(deviceId, null);
                     }
                 }
             }
-        } catch (Exception e) {
-            loggerMaker.error("Could not fetch platform for device " + deviceId + ": " + e.getMessage(), LogDb.DASHBOARD);
         }
-        return null;
+
+        // Poll any devices still pending (e.g. queued offline, or slow to complete).
+        List<String> pendingDeviceIds = new ArrayList<>();
+        for (Map.Entry<String, Boolean> e : results.entrySet()) {
+            if (e.getValue() == null) pendingDeviceIds.add(e.getKey());
+        }
+        if (!pendingDeviceIds.isEmpty()) {
+            Map<String, Boolean> polled = batchPollPendingDevices(accessToken, baseUrl, batchId, pendingDeviceIds, command);
+            results.putAll(polled);
+        }
+
+        return results;
+    }
+
+    private String buildGuardrailCommandLine(String scriptName, String inputParams) {
+        if (inputParams == null || inputParams.isEmpty()) return "";
+        if (!scriptName.endsWith(".ps1")) return inputParams;
+
+        Map<String, String> params = new HashMap<>();
+        for (String part : inputParams.split("\\s+")) {
+            int idx = part.indexOf('=');
+            if (idx <= 0) continue;
+            params.put(part.substring(0, idx), part.substring(idx + 1));
+        }
+
+        StringBuilder psParams = new StringBuilder();
+        appendPowerShellParam(psParams, "TargetUserHome", params.get("TARGET_USER_HOME"));
+        appendPowerShellParam(psParams, "AktoDataIngestionUrl", params.get("AKTO_DATA_INGESTION_URL"));
+        appendPowerShellParam(psParams, "AktoApiToken", params.get("AKTO_API_TOKEN"));
+        return psParams.toString().trim();
+    }
+
+    private void appendPowerShellParam(StringBuilder builder, String name, String value) {
+        if (value == null || value.isEmpty()) return;
+        if (builder.length() > 0) builder.append(" ");
+        builder.append("-").append(name).append(" ").append(escapePowerShellArg(value));
+    }
+
+    private String escapePowerShellArg(String value) {
+        return "'" + value.replace("'", "''") + "'";
+    }
+
+    /**
+     * For devices whose batch-admin-command result wasn't complete inline (e.g. offline at
+     * dispatch time), re-issues the batch command scoped to just those devices and polls
+     * until each completes or the overall timeout elapses. CrowdStrike's BatchAdminCmd is
+     * idempotent per-device for the same command — it returns the existing task's result
+     * once complete rather than re-running.
+     */
+    private Map<String, Boolean> batchPollPendingDevices(String accessToken, String baseUrl, String batchId,
+            List<String> pendingDeviceIds, String command) throws IOException {
+        Map<String, Boolean> results = new HashMap<>();
+        for (String id : pendingDeviceIds) results.put(id, false);
+
+        long deadline = System.currentTimeMillis() + GUARDRAIL_RTR_MAX_WAIT_MS;
+        RequestConfig cfg = buildRequestConfig();
+
+        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+            while (System.currentTimeMillis() < deadline && !pendingDeviceIds.isEmpty()) {
+                try { Thread.sleep(GUARDRAIL_RTR_POLL_INTERVAL_MS); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); break; }
+
+                Map<String, Object> body = new HashMap<>();
+                body.put("batch_id", batchId);
+                body.put("base_command", "runscript");
+                body.put("optional_hosts", pendingDeviceIds);
+                body.put("command_string", "runscript " + command);
+                body.put("persist_all", true);
+
+                HttpPost post = new HttpPost(baseUrl + "/real-time-response/combined/batch-admin-command/v1");
+                post.setHeader("Authorization", "Bearer " + accessToken);
+                post.setHeader("Content-Type", "application/json");
+                post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(body), ContentType.APPLICATION_JSON));
+
+                try (CloseableHttpResponse resp = client.execute(post)) {
+                    JsonNode json = OBJECT_MAPPER.readTree(EntityUtils.toString(resp.getEntity()));
+                    java.util.Iterator<Map.Entry<String, JsonNode>> fields = json.path("combined").path("resources").fields();
+                    while (fields.hasNext()) {
+                        Map.Entry<String, JsonNode> entry = fields.next();
+                        JsonNode deviceResult = entry.getValue();
+                        if (deviceResult.path("complete").asBoolean(false)) {
+                            String stderr = deviceResult.path("stderr").asText("");
+                            results.put(entry.getKey(), stderr.isEmpty());
+                            pendingDeviceIds.remove(entry.getKey());
+                        }
+                    }
+                } catch (Exception e) {
+                    loggerMaker.error("Batch poll error: " + e.getMessage(), LogDb.DASHBOARD);
+                    break;
+                }
+            }
+        }
+
+        for (String stillPending : pendingDeviceIds) {
+            loggerMaker.error("Guardrail command timed out on device " + stillPending, LogDb.DASHBOARD);
+        }
+        return results;
     }
 
     private String uploadGuardrailScriptIfNeeded(String accessToken, String baseUrl, String scriptFileName) {
         if (uploadedGuardrailScripts.contains(scriptFileName)) return scriptFileName;
 
-        // Check if already in RTR library
+        // Check if already in RTR library.
         try {
             RequestConfig cfg = buildRequestConfig();
             try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
                 HttpGet check = new HttpGet(baseUrl + "/real-time-response/queries/falcon-scripts/v1?filter=name%3A%27"
                     + encode(scriptFileName) + "%27");
                 check.setHeader("Authorization", "Bearer " + accessToken);
+
                 try (CloseableHttpResponse resp = client.execute(check)) {
                     JsonNode json = OBJECT_MAPPER.readTree(EntityUtils.toString(resp.getEntity()));
                     JsonNode resources = json.path("resources");
@@ -528,16 +784,9 @@ public class CrowdStrikeIntegrationAction extends UserAction {
 
             RequestConfig cfg = buildRequestConfig();
             try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-                MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-                builder.addTextBody("name", scriptFileName);
-                builder.addTextBody("permission_type", "private");
-                builder.addTextBody("content_type", scriptFileName.endsWith(".ps1") ? "text/x-powershell" : "text/x-shellscript");
-                builder.addTextBody("description", "Akto guardrail installer");
-                builder.addBinaryBody("file", scriptBytes, ContentType.APPLICATION_OCTET_STREAM, scriptFileName);
-
                 HttpPost post = new HttpPost(baseUrl + "/real-time-response/entities/scripts/v1");
                 post.setHeader("Authorization", "Bearer " + accessToken);
-                post.setEntity(builder.build());
+                post.setEntity(buildGuardrailScriptUploadEntity(scriptFileName, scriptBytes));
 
                 try (CloseableHttpResponse resp = client.execute(post)) {
                     int status = resp.getStatusLine().getStatusCode();
@@ -557,76 +806,37 @@ public class CrowdStrikeIntegrationAction extends UserAction {
         }
     }
 
-    private boolean runGuardrailScript(String accessToken, String baseUrl,
-            String deviceId, String scriptName, String inputParams) throws IOException {
-        String sessionId = null;
-        RequestConfig cfg = buildRequestConfig();
-        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-            // Init RTR session
-            Map<String, Object> sessionBody = new HashMap<>();
-            sessionBody.put("device_id", deviceId);
-            sessionBody.put("timeout", 600);
-            HttpPost initPost = new HttpPost(baseUrl + "/real-time-response/entities/sessions/v1");
-            initPost.setHeader("Authorization", "Bearer " + accessToken);
-            initPost.setHeader("Content-Type", "application/json");
-            initPost.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(sessionBody), ContentType.APPLICATION_JSON));
-            try (CloseableHttpResponse resp = client.execute(initPost)) {
-                JsonNode json = OBJECT_MAPPER.readTree(EntityUtils.toString(resp.getEntity()));
-                sessionId = json.path("resources").path(0).path("session_id").asText(null);
-                if (sessionId == null || sessionId.isEmpty()) {
-                    loggerMaker.error("Could not init RTR session for device " + deviceId, LogDb.DASHBOARD);
-                    return false;
-                }
-            }
-
-            // Run script
-            String command = "-CloudFile='" + scriptName + "'";
-            if (inputParams != null && !inputParams.isEmpty()) {
-                command += " -CommandLine='" + inputParams + "'";
-            }
-            Map<String, Object> cmdBody = new HashMap<>();
-            cmdBody.put("session_id", sessionId);
-            cmdBody.put("base_command", "runscript");
-            cmdBody.put("command_string", "runscript " + command);
-            HttpPost cmdPost = new HttpPost(baseUrl + "/real-time-response/entities/admin-command/v1");
-            cmdPost.setHeader("Authorization", "Bearer " + accessToken);
-            cmdPost.setHeader("Content-Type", "application/json");
-            cmdPost.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(cmdBody), ContentType.APPLICATION_JSON));
-            try (CloseableHttpResponse resp = client.execute(cmdPost)) {
-                int status = resp.getStatusLine().getStatusCode();
-                if (status != 201 && status != 200) {
-                    loggerMaker.error("RTR runscript failed for device " + deviceId + ": HTTP " + status, LogDb.DASHBOARD);
-                    return false;
-                }
-                loggerMaker.info("Guardrail script dispatched via RTR to device " + deviceId, LogDb.DASHBOARD);
-                return true;
-            }
-        } finally {
-            if (sessionId != null) {
-                try {
-                    deleteRtrSession(accessToken, baseUrl, sessionId);
-                } catch (Exception ignored) {}
-            }
+    private org.apache.http.HttpEntity buildGuardrailScriptUploadEntity(String scriptFileName, byte[] scriptBytes) {
+        MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+        builder.addTextBody("name", scriptFileName);
+        builder.addTextBody("permission_type", "private");
+        builder.addTextBody("content_type", scriptFileName.endsWith(".ps1") ? "text/x-powershell" : "text/x-shellscript");
+        builder.addTextBody("description", "Akto guardrail installer");
+        if (scriptFileName.endsWith(".ps1")) {
+            builder.addTextBody("platform", "windows");
+        } else {
+            builder.addTextBody("platform", "linux");
+            builder.addTextBody("platform", "mac");
         }
+        builder.addBinaryBody("file", scriptBytes, ContentType.APPLICATION_OCTET_STREAM, scriptFileName);
+        return builder.build();
     }
 
-    private void deleteRtrSession(String accessToken, String baseUrl, String sessionId) throws IOException {
-        RequestConfig cfg = buildRequestConfig();
-        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-            org.apache.http.client.methods.HttpDelete del = new org.apache.http.client.methods.HttpDelete(
-                baseUrl + "/real-time-response/entities/sessions/v1?session_id=" + encode(sessionId));
-            del.setHeader("Authorization", "Bearer " + accessToken);
-            try (CloseableHttpResponse resp = client.execute(del)) {
-                EntityUtils.consumeQuietly(resp.getEntity());
-            }
-        }
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private static String getGuardrailScriptBaseName(String type) {
         switch (type) {
-            case "cursor-hooks":       return "install_cursor_hooks_sentinelone";
-            case "openclaw-guardrails": return "install_openclaw_guardrails_sentinelone";
-            case "claude-cli-hooks":   return "install_claude_cli_hooks_sentinelone";
+            case "cursor-hooks":         return "install_cursor_hooks_sentinelone";
+            case "openclaw-guardrails":  return "install_openclaw_guardrails_sentinelone";
+            case "claude-cli-hooks":     return "install_claude_cli_hooks_sentinelone";
+            case "gemini-hooks":         return "install_gemini_hooks";
+            case "codex-hooks":         return "install_codex_hooks";
+            case "github-cli-hooks":    return "install_github_cli_hooks";
+            case "vscode-copilot-hooks": return "install_vscode_copilot_hooks";
+            case "kiro-cli-hooks":      return "install_kiro_cli_hooks";
+            case "opencode-hooks":      return "install_opencode_hooks";
             default: return null;
         }
     }

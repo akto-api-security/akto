@@ -218,7 +218,10 @@ foreach ($userProfile in $userProfiles) {
         Add-File -Path "$appData\Antigravity\mcp_config.json" -ClientType "antigravity"
         Find-Files -BasePath "$appData\Antigravity\User\globalStorage" -Pattern "mcp_config.json" -ClientType "antigravity" -MaxDepth 3
     }
-    
+
+    # 11. Kiro (IDE + CLI share the same config)
+    Add-File -Path "$userProfile\.kiro\settings\mcp.json" -ClientType "kiro"
+
     Write-Log "Completed scanning profile: $userProfile"
     } catch {
         Write-Log "ERROR: Failed to scan profile $userProfile : $_"

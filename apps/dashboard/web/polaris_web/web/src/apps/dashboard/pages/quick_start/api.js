@@ -454,11 +454,11 @@ const api = {
         })
     },
 
-    addCrowdStrikeIntegration(clientId, clientSecret, baseUrl, dataIngestionUrl, recurringIntervalSeconds) {
+    addCrowdStrikeIntegration(clientId, clientSecret, baseUrl, dataIngestionUrl, aktoApiToken, recurringIntervalSeconds) {
         return request({
             url: '/api/addCrowdStrikeIntegration',
             method: 'post',
-            data: { clientId, clientSecret, baseUrl, dataIngestionUrl, recurringIntervalSeconds }
+            data: { clientId, clientSecret, baseUrl, dataIngestionUrl, aktoApiToken, recurringIntervalSeconds }
         })
     },
 

@@ -35,17 +35,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-/**
- * Executor for CrowdStrike Falcon integration.
- *
- * Three phases:
- *   1. Installed software inventory (Falcon Discover API)
- *   2. Process events (Event Streams / RTR ps command)
- *   3. MCP config + skills discovery via Real-Time Response (RTR)
- *
- * Authentication: OAuth2 client-credentials — POST /oauth2/token
- * Script execution: RTR admin runscript with -CloudFile flag (same bash/ps1 scripts as SentinelOne/Defender)
- */
+// CrowdStrike Falcon integration: installed-app, MCP config, and skill discovery via RTR.
 public class CrowdStrikeExecutor extends AccountJobExecutor {
 
     public static final CrowdStrikeExecutor INSTANCE = new CrowdStrikeExecutor();
@@ -66,16 +56,16 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
     // Deduplicate MCP collections created within a single job run
     private final Set<String> createdCollectionIds = ConcurrentHashMap.newKeySet();
 
-    public static final List<String> APPS_TOOL_LIST = Arrays.asList(
-        "Claude", "Cursor", "Copilot", "Windsurf", "Antigravity", "Codex", "Ollama", "VSCode"
-    );
-
-    // CLI tool names to match against process command lines (mirrors SentinelOne DV_TOOL_LIST)
-    public static final List<String> PROCESS_TOOL_LIST = Arrays.asList(
-        "openclaw", "clawdbot", "moltbot", "gateway", "claude", "gemini", "ollama", "cursor"
-    );
-
-    private static final int PROCESS_LOOKBACK_HOURS = 6;
+    // Recognized agent names — mirrors mcp-endpoint-shield/mcp/skill_detector.go's skillAgentToClientTypes keys.
+    // A skill whose derived "agent" isn't on this list is routed to the shared orphan collection instead of
+    // getting its own bogus per-skill collection (this happens when a skill file lives outside a known agent
+    // directory, e.g. a project-local .claude/skills/<name>/SKILL.md — the parent-dir-name fallback then
+    // picks up the skill's own folder name instead of a real agent).
+    private static final Set<String> KNOWN_SKILL_AGENTS = new HashSet<>(Arrays.asList(
+        "cursor", "claude", "windsurf", "antigravity", "github-copilot", "copilot",
+        "vscode", "codex", "kiro", "microsoft-visual-studio", "jetbrains", "vscode-insiders"
+    ));
+    private static final String ORPHAN_SKILL_AGENT = "not-attached";
 
     private CrowdStrikeExecutor() {}
 
@@ -108,149 +98,41 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         String ingestUrl  = normalizeUrl(integration.getDataIngestionUrl());
         String accessToken = fetchAccessToken(integration.getClientId(), integration.getClientSecret(), baseUrl);
 
-        // Phase 1: Installed software via Falcon Discover
-        try {
-            runSoftwareInventoryPhase(accessToken, baseUrl, ingestUrl, job);
-        } catch (Exception e) {
-            loggerMaker.error("CrowdStrike software inventory phase failed for jobId=" + job.getId() + ": " + e.getMessage(), LogDb.DASHBOARD);
-        }
-
-        // Phase 2: Process events via Falcon Event Streams
-        try {
-            runProcessEventsPhase(accessToken, baseUrl, ingestUrl, job);
-        } catch (Exception e) {
-            loggerMaker.error("CrowdStrike process events phase failed for jobId=" + job.getId() + ": " + e.getMessage(), LogDb.DASHBOARD);
-        }
-
-        // Phase 3: MCP config + skills discovery via RTR
-        try {
-            discoverMCPConfigsAndSkills(accessToken, baseUrl, ingestUrl, job);
-        } catch (Exception e) {
-            loggerMaker.error("CrowdStrike MCP discovery phase failed for jobId=" + job.getId() + ": " + e.getMessage(), LogDb.DASHBOARD);
-        }
-
-        loggerMaker.info("CrowdStrike job completed: jobId=" + job.getId(), LogDb.DASHBOARD);
-    }
-
-    // ── Phase 1: Installed software inventory ────────────────────────────────
-
-    private void runSoftwareInventoryPhase(String accessToken, String baseUrl, String ingestUrl, AccountJob job) throws IOException {
-        loggerMaker.info("CrowdStrike: starting software inventory phase for jobId=" + job.getId(), LogDb.DASHBOARD);
-
-        for (String tool : APPS_TOOL_LIST) {
-            try {
-                List<Map<String, Object>> apps = fetchApplicationsForTool(tool, accessToken, baseUrl);
-                if (apps.isEmpty()) {
-                    loggerMaker.info("CrowdStrike: no apps found for tool: " + tool, LogDb.DASHBOARD);
-                    continue;
-                }
-                List<Map<String, Object>> batch = new ArrayList<>();
-                for (Map<String, Object> app : apps) {
-                    batch.add(toSoftwareIngestionRecord(app, tool, job.getAccountId()));
-                }
-                sendBatch(batch, ingestUrl);
-                loggerMaker.info("CrowdStrike: ingested " + batch.size() + " app record(s) for " + tool, LogDb.DASHBOARD);
-            } catch (Exception e) {
-                loggerMaker.error("CrowdStrike: software inventory error for " + tool + ": " + e.getMessage(), LogDb.DASHBOARD);
+        // AccountJobsCron.MAX_HEARTBEAT_THRESHOLD_SECONDS is 5s — any phase of this job (token
+        // fetch, device listing, script upload, per-file skill processing, etc.) that runs longer
+        // than 5s without hitting the RTR poll loop's own heartbeat call makes Cyborg consider the
+        // job abandoned, so it gets re-claimed and re-run while the original run is still in
+        // flight (confirmed: same jobId claimed 12+ times within a single hour-long window).
+        // Run a background heartbeat for the job's entire duration instead of relying on manually
+        // placed calls at each phase boundary, which silently stops covering new phases added later.
+        final Thread heartbeatThread = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    CyborgApiClient.updateJobHeartbeat(job.getId());
+                    Thread.sleep(2_000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                } catch (Exception ignored) {}
             }
+        }, "crowdstrike-heartbeat-" + job.getId());
+        heartbeatThread.setDaemon(true);
+        heartbeatThread.start();
+
+        try {
+            // MCP config + skills discovery via RTR
+            try {
+                discoverMCPConfigsAndSkills(accessToken, baseUrl, ingestUrl, job);
+            } catch (Exception e) {
+                loggerMaker.error("CrowdStrike MCP discovery phase failed for jobId=" + job.getId() + ": " + e.getMessage(), LogDb.DASHBOARD);
+            }
+
+            loggerMaker.info("CrowdStrike job completed: jobId=" + job.getId(), LogDb.DASHBOARD);
+        } finally {
+            heartbeatThread.interrupt();
         }
     }
 
-    /**
-     * Uses Falcon Discover /discover/combined/applications/v1 with an FQL name filter.
-     * Returns all matching application records across all hosts (cursor-paginated).
-     */
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> fetchApplicationsForTool(String tool, String accessToken, String baseUrl) throws IOException {
-        List<Map<String, Object>> result = new ArrayList<>();
-        RequestConfig cfg = buildRequestConfig();
-        String after = null;
-
-        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-            do {
-                StringBuilder url = new StringBuilder(baseUrl)
-                    .append("/discover/combined/applications/v1?limit=500")
-                    .append("&filter=name%3A%22*").append(urlEncode(tool)).append("*%22");
-                if (after != null) {
-                    url.append("&after=").append(urlEncode(after));
-                }
-
-                HttpGet get = new HttpGet(url.toString());
-                get.setHeader("Authorization", "Bearer " + accessToken);
-                get.setHeader("Content-Type", "application/json");
-
-                try (CloseableHttpResponse resp = client.execute(get)) {
-                    int status = resp.getStatusLine().getStatusCode();
-                    String body = EntityUtils.toString(resp.getEntity());
-                    if (status != 200) {
-                        loggerMaker.error("CrowdStrike Discover API error for tool " + tool + ": HTTP " + status, LogDb.DASHBOARD);
-                        break;
-                    }
-                    JsonNode json = OBJECT_MAPPER.readTree(body);
-                    JsonNode resources = json.path("resources");
-                    if (resources.isArray()) {
-                        for (JsonNode node : resources) {
-                            result.add(OBJECT_MAPPER.convertValue(node, Map.class));
-                        }
-                    }
-                    after = json.path("meta").path("pagination").path("after").asText(null);
-                    if (after != null && after.isEmpty()) after = null;
-                }
-            } while (after != null);
-        }
-        return result;
-    }
-
-    private Map<String, Object> toSoftwareIngestionRecord(Map<String, Object> app, String tool, int accountId) throws IOException {
-        Map<String, Object> record = new HashMap<>();
-
-        String deviceName = "unknown-device";
-        JsonNode hostNode = OBJECT_MAPPER.convertValue(app.get("host"), JsonNode.class);
-        if (hostNode != null) {
-            deviceName = hostNode.path("hostname").asText("unknown-device");
-        }
-        String appName = getStringOrDefault(app, "name", "unknown");
-        String slug = toolSlug(tool);
-        String host = deviceName + ".ai-agent." + slug;
-
-        record.put("path", "/crowdstrike/software-inventory/" + appName + "/" + deviceName);
-        record.put("method", "GET");
-        record.put("statusCode", "200");
-        record.put("type", "HTTP/1.1");
-        record.put("status", "OK");
-        record.put("requestPayload", "{}");
-        record.put("responsePayload", OBJECT_MAPPER.writeValueAsString(app));
-
-        Map<String, String> reqHeaders = new HashMap<>();
-        reqHeaders.put("host", host);
-        reqHeaders.put("content-type", "application/json");
-        record.put("requestHeaders", OBJECT_MAPPER.writeValueAsString(reqHeaders));
-        record.put("responseHeaders", "{\"content-type\":\"application/json\"}");
-
-        record.put("time", String.valueOf(System.currentTimeMillis()));
-        record.put("source", "MIRRORING");
-        record.put("akto_account_id", String.valueOf(accountId));
-        record.put("akto_vxlan_id", "");
-        record.put("is_pending", "false");
-        record.put("ip", "");
-        record.put("destIp", "");
-        record.put("direction", "");
-        record.put("process_id", "");
-        record.put("socket_id", "");
-        record.put("daemonset_id", "");
-        record.put("enabled_graph", "false");
-
-        Map<String, String> tagMap = new HashMap<>();
-        tagMap.put("gen-ai", "Gen AI");
-        tagMap.put("source", "ENDPOINT");
-        tagMap.put("connector", "CROWDSTRIKE");
-        tagMap.put("ai-agent", slug);
-        record.put("tag", OBJECT_MAPPER.writeValueAsString(tagMap));
-
-        return record;
-    }
-
-    // ── Phase 2: MCP config + skills discovery via RTR ───────────────────────
+    // ── MCP config + skills discovery via RTR ─────────────────────────────────
 
     private void discoverMCPConfigsAndSkills(String accessToken, String baseUrl, String ingestUrl, AccountJob job) throws Exception {
         List<Map<String, Object>> devices = fetchDeviceList(accessToken, baseUrl);
@@ -265,7 +147,7 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
 
         for (Map<String, Object> device : devices) {
             String deviceId   = getStringOrDefault(device, "device_id", "");
-            String deviceName = getStringOrDefault(device, "hostname", "unknown");
+            String deviceName = toShortHostname(getStringOrDefault(device, "hostname", "unknown"));
             String platform   = getStringOrDefault(device, "platform_name", "").toLowerCase();
             if (deviceId.isEmpty()) continue;
             deviceNames.put(deviceId, deviceName);
@@ -279,35 +161,71 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         loggerMaker.info("CrowdStrike MCP discovery: " + unixDeviceIds.size() + " Unix, "
             + windowsDeviceIds.size() + " Windows devices, jobId=" + job.getId(), LogDb.DASHBOARD);
 
-        // Upload scripts once — CrowdStrike script library persists across sessions
-        final String mcpShId  = uploadScriptIfNeeded("scan_mcp_configs.sh",  accessToken, baseUrl);
+        // Upload scripts once — CrowdStrike script library persists across sessions.
+        // Installed-apps (AI agent discovery) uploaded first so it's prioritized ahead of MCP/skills.
+        final String appsShId  = uploadScriptIfNeeded("scan_installed_apps.sh",  accessToken, baseUrl);
+        final String appsPs1Id = uploadScriptIfNeeded("scan_installed_apps.ps1", accessToken, baseUrl);
+        // scan_mcp_configs_cs.sh (not scan_mcp_configs.sh) for Unix — same CrowdStrike-specific
+        // python3-first/pure-bash-fallback treatment as scan_skills_cs.sh, and for the same
+        // confirmed reason (python3 unreliable inside this script's find-fed loops on CrowdStrike's
+        // sandbox). scan_mcp_configs.sh (plain python3) is kept as-is for Microsoft Defender.
+        final String mcpShId  = uploadScriptIfNeeded("scan_mcp_configs_cs.sh",  accessToken, baseUrl);
         final String mcpPs1Id = uploadScriptIfNeeded("scan_mcp_configs.ps1", accessToken, baseUrl);
-        final String sklShId  = uploadScriptIfNeeded("scan_skills.sh",       accessToken, baseUrl);
+        // scan_skills_cs.sh (not scan_skills.sh) for Unix — CrowdStrike-specific variant. Confirmed
+        // via direct RTR POC testing that plain python3 calls are unreliable inside this script's
+        // find-fed loops on CrowdStrike's execution sandbox (resolves and succeeds most of the
+        // time, but unpredictably fails "not available" with no code difference between runs).
+        // scan_skills_cs.sh tries python3 first (fast) and falls back to a slower but always-
+        // correct pure-bash read+escape when python3 doesn't come through. scan_skills.sh (plain
+        // python3, no fallback) is kept as-is for Microsoft Defender's executor, whose environment
+        // has not shown this same flakiness.
+        final String sklShId  = uploadScriptIfNeeded("scan_skills_cs.sh",    accessToken, baseUrl);
         final String sklPs1Id = uploadScriptIfNeeded("scan_skills.ps1",      accessToken, baseUrl);
 
-        // Run all 4 sub-phases concurrently
-        ExecutorService pool = Executors.newFixedThreadPool(4);
+        // Wave 1: installed-apps (AI agent discovery) — must fully complete on all devices
+        // before MCP/skills scans start, so agent discovery is guaranteed to land first.
+        ExecutorService pool = Executors.newFixedThreadPool(6);
+        List<Future<?>> appsFutures = new ArrayList<>();
+
+        if (appsShId != null && !unixDeviceIds.isEmpty()) {
+            appsFutures.add(pool.submit(() ->
+                runScriptOnDevices(accessToken, baseUrl, appsShId, "scan_installed_apps.sh",
+                    unixDeviceIds, deviceNames, "Installed Apps (Unix)", ingestUrl, SCAN_KIND_INSTALLED_APPS, job)));
+        }
+        if (appsPs1Id != null && !windowsDeviceIds.isEmpty()) {
+            appsFutures.add(pool.submit(() ->
+                runScriptOnDevices(accessToken, baseUrl, appsPs1Id, "scan_installed_apps.ps1",
+                    windowsDeviceIds, deviceNames, "Installed Apps (Windows)", ingestUrl, SCAN_KIND_INSTALLED_APPS, job)));
+        }
+        for (Future<?> f : appsFutures) {
+            try { f.get(); } catch (Exception e) {
+                loggerMaker.error("CrowdStrike: installed-apps phase future error: " + e.getMessage(), LogDb.DASHBOARD);
+            }
+        }
+        loggerMaker.info("CrowdStrike: installed-apps discovery complete, jobId=" + job.getId(), LogDb.DASHBOARD);
+
+        // Wave 2: MCP config + skills discovery, run concurrently with each other (but only after Wave 1).
         List<Future<?>> futures = new ArrayList<>();
 
         if (mcpShId != null && !unixDeviceIds.isEmpty()) {
             futures.add(pool.submit(() ->
-                runScriptOnDevices(accessToken, baseUrl, mcpShId, "scan_mcp_configs.sh",
-                    unixDeviceIds, deviceNames, "MCP Config (Unix)", ingestUrl, true, job)));
+                runScriptOnDevices(accessToken, baseUrl, mcpShId, "scan_mcp_configs_cs.sh",
+                    unixDeviceIds, deviceNames, "MCP Config (Unix)", ingestUrl, SCAN_KIND_MCP_CONFIG, job)));
         }
         if (mcpPs1Id != null && !windowsDeviceIds.isEmpty()) {
             futures.add(pool.submit(() ->
                 runScriptOnDevices(accessToken, baseUrl, mcpPs1Id, "scan_mcp_configs.ps1",
-                    windowsDeviceIds, deviceNames, "MCP Config (Windows)", ingestUrl, true, job)));
+                    windowsDeviceIds, deviceNames, "MCP Config (Windows)", ingestUrl, SCAN_KIND_MCP_CONFIG, job)));
         }
         if (sklShId != null && !unixDeviceIds.isEmpty()) {
             futures.add(pool.submit(() ->
-                runScriptOnDevices(accessToken, baseUrl, sklShId, "scan_skills.sh",
-                    unixDeviceIds, deviceNames, "Skills (Unix)", ingestUrl, false, job)));
+                runScriptOnDevices(accessToken, baseUrl, sklShId, "scan_skills_cs.sh",
+                    unixDeviceIds, deviceNames, "Skills (Unix)", ingestUrl, SCAN_KIND_SKILLS, job)));
         }
         if (sklPs1Id != null && !windowsDeviceIds.isEmpty()) {
             futures.add(pool.submit(() ->
                 runScriptOnDevices(accessToken, baseUrl, sklPs1Id, "scan_skills.ps1",
-                    windowsDeviceIds, deviceNames, "Skills (Windows)", ingestUrl, false, job)));
+                    windowsDeviceIds, deviceNames, "Skills (Windows)", ingestUrl, SCAN_KIND_SKILLS, job)));
         }
 
         for (Future<?> f : futures) {
@@ -320,9 +238,13 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         loggerMaker.info("CrowdStrike: MCP discovery complete, jobId=" + job.getId(), LogDb.DASHBOARD);
     }
 
+    private static final int SCAN_KIND_MCP_CONFIG   = 0;
+    private static final int SCAN_KIND_SKILLS       = 1;
+    private static final int SCAN_KIND_INSTALLED_APPS = 2;
+
     private void runScriptOnDevices(String accessToken, String baseUrl, String scriptId, String scriptName,
             List<String> deviceIds, Map<String, String> deviceNames, String description,
-            String ingestUrl, boolean isMcpConfig, AccountJob job) {
+            String ingestUrl, int scanKind, AccountJob job) {
         for (String deviceId : deviceIds) {
             String deviceName = deviceNames.getOrDefault(deviceId, deviceId);
             try {
@@ -336,10 +258,15 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                 singleDevice.put(deviceId, output);
                 Map<String, String> singleName = new HashMap<>();
                 singleName.put(deviceId, deviceName);
-                if (isMcpConfig) {
-                    ingestMCPDiscoveries(singleDevice, ingestUrl, singleName);
-                } else {
-                    ingestSkillDiscoveries(singleDevice, ingestUrl, singleName);
+                switch (scanKind) {
+                    case SCAN_KIND_MCP_CONFIG:
+                        ingestMCPDiscoveries(singleDevice, ingestUrl, singleName, job.getAccountId());
+                        break;
+                    case SCAN_KIND_INSTALLED_APPS:
+                        ingestInstalledAppsDiscoveries(singleDevice, ingestUrl, singleName, job.getAccountId());
+                        break;
+                    default:
+                        ingestSkillDiscoveries(singleDevice, ingestUrl, singleName, job.getAccountId());
                 }
             } catch (Exception e) {
                 loggerMaker.error(description + ": error on device " + deviceName + ": " + e.getMessage(), LogDb.DASHBOARD);
@@ -347,14 +274,7 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         }
     }
 
-    /**
-     * Runs a script on a single device via CrowdStrike RTR:
-     *  1. Init RTR session
-     *  2. runscript -CloudFile='<name>'
-     *  3. Poll until complete
-     *  4. Parse stdout JSON
-     *  5. Delete session
-     */
+    // Runs a script on a single device via CrowdStrike RTR: init session, runscript -CloudFile, poll, parse stdout, delete session.
     private JsonNode runScriptOnDevice(String accessToken, String baseUrl, String deviceId, String scriptName, AccountJob job) {
         String sessionId = null;
         try {
@@ -379,6 +299,23 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
 
             String stdout = getStringOrDefault(commandResult, "stdout", "");
             String stderr = getStringOrDefault(commandResult, "stderr", "");
+
+            // RTR chunks large command output across sequence_id values (CrowdStrike RTR admin-command
+            // docs: "Command responses are chunked across sequences"). pollCommandUntilDone only ever reads
+            // sequence_id=0, so scripts with large output (e.g. many skills' full content, verbose MCP configs)
+            // were silently truncated. Page through subsequent sequence_ids and concatenate until a chunk
+            // comes back empty. NOTE: the exact stop condition isn't documented publicly; this follows the
+            // common client pattern (increment sequence_id while stdout keeps returning non-empty) and is
+            // unverified against a real multi-chunk response — validate against an actual large-output device.
+            stdout = fetchAdditionalStdoutChunks(accessToken, baseUrl, cloudRequestId, stdout);
+
+            // TEMP DIAGNOSTIC: log stderr even when stdout is non-empty, so log_debug trace from the
+            // scan scripts (normally discarded once stdout succeeds) is visible while investigating the
+            // empty-skill_content / zero-MCP-servers reports. Remove once root-caused.
+            if (!stderr.isEmpty()) {
+                loggerMaker.info("CrowdStrike: script stderr (diagnostic) for device " + deviceId + " script=" + scriptName
+                    + ": " + stderr, LogDb.DASHBOARD);
+            }
 
             if (stdout.isEmpty()) {
                 if (!stderr.isEmpty()) {
@@ -406,224 +343,6 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         }
     }
 
-    // ── Phase 2: Process events via Falcon Event Streams ─────────────────────
-
-    /**
-     * Uses Falcon Event Streams API to get a short-lived stream URL, then fetches
-     * ProcessRollup2 events and filters for AI CLI tool executions.
-     * Falls back gracefully if Event Streams is not licensed.
-     */
-    @SuppressWarnings("unchecked")
-    private void runProcessEventsPhase(String accessToken, String baseUrl, String ingestUrl, AccountJob job) throws IOException {
-        loggerMaker.info("CrowdStrike: starting process events phase for jobId=" + job.getId(), LogDb.DASHBOARD);
-
-        List<Map<String, Object>> events = fetchProcessEvents(accessToken, baseUrl);
-        if (events.isEmpty()) {
-            loggerMaker.info("CrowdStrike: no process events returned", LogDb.DASHBOARD);
-            return;
-        }
-
-        Map<String, List<Map<String, Object>>> eventsByTool = groupProcessEventsByTool(events, PROCESS_TOOL_LIST);
-        for (Map.Entry<String, List<Map<String, Object>>> entry : eventsByTool.entrySet()) {
-            String tool = entry.getKey();
-            List<Map<String, Object>> toolEvents = entry.getValue();
-            if (!toolEvents.isEmpty()) {
-                ingestProcessEvents(toolEvents, tool, ingestUrl);
-            }
-        }
-    }
-
-    /**
-     * Opens a Falcon Event Streams feed, reads up to PROCESS_LOOKBACK_HOURS worth of
-     * ProcessRollup2 events, then closes the partition. Returns raw event maps.
-     */
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> fetchProcessEvents(String accessToken, String baseUrl) throws IOException {
-        RequestConfig cfg = buildRequestConfig();
-        List<Map<String, Object>> results = new ArrayList<>();
-
-        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-            // Step 1: discover available partitions
-            HttpGet discover = new HttpGet(baseUrl + "/sensors/entities/datafeed/v2?appId=akto-process-scan");
-            discover.setHeader("Authorization", "Bearer " + accessToken);
-            discover.setHeader("Accept", "application/json");
-
-            String feedUrl;
-            String sessionToken;
-            try (CloseableHttpResponse resp = client.execute(discover)) {
-                int status = resp.getStatusLine().getStatusCode();
-                String body = EntityUtils.toString(resp.getEntity());
-                if (status == 404 || status == 403) {
-                    loggerMaker.info("CrowdStrike: Event Streams not available (HTTP " + status + ") — skipping process events phase", LogDb.DASHBOARD);
-                    return results;
-                }
-                if (status != 200) {
-                    loggerMaker.error("CrowdStrike: Event Streams discover failed HTTP " + status + ": " + body, LogDb.DASHBOARD);
-                    return results;
-                }
-                JsonNode json = OBJECT_MAPPER.readTree(body);
-                JsonNode resources = json.path("resources");
-                if (!resources.isArray() || resources.size() == 0) {
-                    loggerMaker.info("CrowdStrike: no Event Stream partitions available", LogDb.DASHBOARD);
-                    return results;
-                }
-                JsonNode partition = resources.get(0);
-                feedUrl = partition.path("dataFeedURL").asText(null);
-                sessionToken = partition.path("sessionToken").path("token").asText(null);
-                if (feedUrl == null || feedUrl.isEmpty()) {
-                    loggerMaker.info("CrowdStrike: no dataFeedURL in Event Streams response", LogDb.DASHBOARD);
-                    return results;
-                }
-            }
-
-            // Step 2: read events from the stream (bounded by time window)
-            long cutoffMs = System.currentTimeMillis() - (PROCESS_LOOKBACK_HOURS * 3600L * 1000L);
-            HttpGet streamGet = new HttpGet(feedUrl);
-            streamGet.setHeader("Authorization", "Bearer " + accessToken);
-            if (sessionToken != null && !sessionToken.isEmpty()) {
-                streamGet.setHeader("X-CS-Session-Token", sessionToken);
-            }
-            streamGet.setHeader("Accept", "application/json");
-
-            try (CloseableHttpResponse resp = client.execute(streamGet)) {
-                int status = resp.getStatusLine().getStatusCode();
-                if (status != 200) {
-                    loggerMaker.error("CrowdStrike: Event Stream read failed HTTP " + status, LogDb.DASHBOARD);
-                    return results;
-                }
-                java.io.BufferedReader reader = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(resp.getEntity().getContent(), java.nio.charset.StandardCharsets.UTF_8));
-                String line;
-                int linesRead = 0;
-                while ((line = reader.readLine()) != null && linesRead < 10000) {
-                    line = line.trim();
-                    if (line.isEmpty()) continue;
-                    try {
-                        JsonNode event = OBJECT_MAPPER.readTree(line);
-                        // Only keep ProcessRollup2 events
-                        String eventType = event.path("metadata").path("eventType").asText(
-                            event.path("event_type").asText(""));
-                        if (!"ProcessRollup2".equals(eventType)) { linesRead++; continue; }
-                        // Drop events outside our lookback window
-                        long eventTs = event.path("metadata").path("eventCreationTime").asLong(0);
-                        if (eventTs == 0) eventTs = event.path("timestamp").asLong(0);
-                        if (eventTs > 0 && eventTs < cutoffMs) { linesRead++; continue; }
-                        results.add(OBJECT_MAPPER.convertValue(event, Map.class));
-                    } catch (Exception ignored) {}
-                    linesRead++;
-                }
-            }
-        }
-
-        loggerMaker.info("CrowdStrike: fetched " + results.size() + " ProcessRollup2 event(s) from Event Streams", LogDb.DASHBOARD);
-        return results;
-    }
-
-    private static Map<String, List<Map<String, Object>>> groupProcessEventsByTool(
-            List<Map<String, Object>> events, List<String> tools) {
-        Map<String, List<Map<String, Object>>> result = new HashMap<>();
-        for (String tool : tools) result.put(tool, new ArrayList<>());
-
-        for (Map<String, Object> event : events) {
-            // CrowdStrike ProcessRollup2 fields
-            Object cmdObj = event.get("CommandLine");
-            if (cmdObj == null) {
-                // nested under event.event
-                Object nested = event.get("event");
-                if (nested instanceof Map) {
-                    cmdObj = ((Map<?, ?>) nested).get("CommandLine");
-                }
-            }
-            String cmdLine = cmdObj != null ? cmdObj.toString().toLowerCase() : "";
-
-            Object nameObj = event.get("FileName");
-            if (nameObj == null) {
-                Object nested = event.get("event");
-                if (nested instanceof Map) nameObj = ((Map<?, ?>) nested).get("FileName");
-            }
-            String fileName = nameObj != null ? nameObj.toString().toLowerCase() : "";
-
-            for (String tool : tools) {
-                String t = tool.toLowerCase();
-                if (cmdLine.contains(t) || fileName.contains(t)) {
-                    result.get(tool).add(event);
-                    break;
-                }
-            }
-        }
-        return result;
-    }
-
-    private void ingestProcessEvents(List<Map<String, Object>> events, String tool, String ingestUrl) throws IOException {
-        List<Map<String, Object>> batch = new ArrayList<>();
-        for (Map<String, Object> event : events) {
-            batch.add(toProcessEventIngestionRecord(event, tool));
-        }
-        if (!batch.isEmpty()) {
-            sendBatch(batch, ingestUrl);
-            loggerMaker.info("CrowdStrike: ingested " + batch.size() + " process event(s) for tool=" + tool, LogDb.DASHBOARD);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> toProcessEventIngestionRecord(Map<String, Object> event, String tool) throws IOException {
-        // Unwrap nested event object if present (Event Streams wraps payload under "event")
-        Map<String, Object> payload = event;
-        Object nested = event.get("event");
-        if (nested instanceof Map) {
-            payload = (Map<String, Object>) nested;
-        }
-
-        String deviceName = getStringOrDefault(payload, "ComputerName", null);
-        if (deviceName == null) deviceName = getStringOrDefault(event, "ComputerName", null);
-        if (deviceName == null) deviceName = getStringOrDefault(payload, "HostName", "unknown-device");
-        String pathSeg = deviceName.replaceAll("[^a-zA-Z0-9_\\-]+", "-");
-        String hostName = deviceName + "." + tool;
-
-        Map<String, Object> record = new HashMap<>();
-        record.put("path", "/crowdstrike/process-events/" + pathSeg);
-        record.put("method", "GET");
-        record.put("statusCode", "200");
-        record.put("type", "HTTP/1.1");
-        record.put("status", "OK");
-        record.put("requestPayload", "{}");
-        record.put("responsePayload", OBJECT_MAPPER.writeValueAsString(event));
-
-        Map<String, String> reqH = new HashMap<>();
-        reqH.put("host", hostName);
-        reqH.put("content-type", "application/json");
-        record.put("requestHeaders", OBJECT_MAPPER.writeValueAsString(reqH));
-        record.put("responseHeaders", OBJECT_MAPPER.writeValueAsString(new HashMap<String, String>()));
-
-        Object ts = event.get("timestamp");
-        if (ts == null) {
-            Object meta = event.get("metadata");
-            if (meta instanceof Map) ts = ((Map<?, ?>) meta).get("eventCreationTime");
-        }
-        record.put("time", ts != null ? ts.toString() : String.valueOf(System.currentTimeMillis()));
-
-        record.put("source", "MIRRORING");
-        record.put("akto_account_id", String.valueOf(com.akto.dao.context.Context.accountId.get()));
-        record.put("akto_vxlan_id", "");
-        record.put("is_pending", "false");
-        record.put("ip", "");
-        record.put("destIp", "");
-        record.put("direction", "");
-        record.put("process_id", "");
-        record.put("socket_id", "");
-        record.put("daemonset_id", "");
-        record.put("enabled_graph", "false");
-
-        Map<String, String> tags = new HashMap<>();
-        tags.put("gen-ai", "Gen AI");
-        tags.put("source", "ENDPOINT");
-        tags.put("connector", "CROWDSTRIKE");
-        tags.put("ai-agent", tool);
-        tags.put("bot-name", deviceName);
-        record.put("tag", OBJECT_MAPPER.writeValueAsString(tags));
-
-        return record;
-    }
 
     // ── RTR helpers ───────────────────────────────────────────────────────────
 
@@ -658,10 +377,7 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         }
     }
 
-    /**
-     * Submits runscript -CloudFile='<scriptName>' via the admin-command endpoint.
-     * Returns cloud_request_id for polling.
-     */
+    // Submits runscript -CloudFile='<scriptName>' via the admin-command endpoint, returns cloud_request_id for polling.
     private String submitRunScript(String accessToken, String baseUrl, String sessionId, String deviceId, String scriptName) throws IOException {
         RequestConfig cfg = buildRequestConfig();
         try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
@@ -695,10 +411,7 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         }
     }
 
-    /**
-     * Polls GET /real-time-response/entities/admin-command/v1?cloud_request_id=<id>&sequence_id=0
-     * until complete=true or timeout.
-     */
+    // Polls GET /real-time-response/entities/admin-command/v1?cloud_request_id=<id>&sequence_id=0 until complete=true or timeout.
     @SuppressWarnings("unchecked")
     private Map<String, Object> pollCommandUntilDone(String accessToken, String baseUrl, String cloudRequestId, AccountJob job) {
         long deadline = System.currentTimeMillis() + RTR_MAX_WAIT_MS;
@@ -707,7 +420,10 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
 
         try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
             while (System.currentTimeMillis() < deadline) {
-                if (job != null && pollCount % 10 == 0) {
+                // AccountJobsCron.MAX_HEARTBEAT_THRESHOLD_SECONDS is 5s — heartbeating every 10th
+                // poll (every 50s at RTR_POLL_INTERVAL_MS=5s) left this job looking abandoned and
+                // re-claimable for most of its run. Heartbeat on every poll instead.
+                if (job != null) {
                     try { CyborgApiClient.updateJobHeartbeat(job.getId()); } catch (Exception ignored) {}
                 }
 
@@ -755,6 +471,50 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         return null;
     }
 
+    // Safety cap on chunk count — bounds worst-case pagination if CrowdStrike's chunking behaves
+    // unexpectedly (e.g. never signals completion the way we assume). Large enough for realistic
+    // script output (each chunk is typically several KB), small enough to not hang indefinitely.
+    private static final int RTR_MAX_STDOUT_CHUNKS = 50;
+
+    // Pages through sequence_id=1,2,3,... after the initial (sequence_id=0) response already captured by
+    // pollCommandUntilDone, concatenating stdout until a chunk comes back empty/absent. See caller comment
+    // for why this exists and the caveat that CrowdStrike's exact multi-chunk stop signal isn't verified.
+    private String fetchAdditionalStdoutChunks(String accessToken, String baseUrl, String cloudRequestId, String firstChunk) {
+        StringBuilder combined = new StringBuilder(firstChunk);
+        RequestConfig cfg = buildRequestConfig();
+
+        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+            for (int seq = 1; seq <= RTR_MAX_STDOUT_CHUNKS; seq++) {
+                String url = baseUrl + "/real-time-response/entities/admin-command/v1"
+                    + "?cloud_request_id=" + urlEncode(cloudRequestId) + "&sequence_id=" + seq;
+                HttpGet get = new HttpGet(url);
+                get.setHeader("Authorization", "Bearer " + accessToken);
+
+                try (CloseableHttpResponse resp = client.execute(get)) {
+                    int status = resp.getStatusLine().getStatusCode();
+                    String body = EntityUtils.toString(resp.getEntity());
+                    if (status != 200) break;
+
+                    JsonNode json = OBJECT_MAPPER.readTree(body);
+                    JsonNode resources = json.path("resources");
+                    if (!resources.isArray() || resources.size() == 0) break;
+
+                    String chunk = resources.get(0).path("stdout").asText("");
+                    if (chunk.isEmpty()) break;
+                    combined.append(chunk);
+                } catch (Exception e) {
+                    loggerMaker.error("CrowdStrike: error fetching stdout chunk seq=" + seq
+                        + " for cloudRequestId=" + cloudRequestId + ": " + e.getMessage(), LogDb.DASHBOARD);
+                    break;
+                }
+            }
+        } catch (IOException e) {
+            loggerMaker.error("CrowdStrike: could not create HTTP client for chunk fetch: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+
+        return combined.toString();
+    }
+
     private void deleteRtrSession(String accessToken, String baseUrl, String sessionId) {
         RequestConfig cfg = buildRequestConfig();
         try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
@@ -770,13 +530,7 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
 
     // ── Script management ─────────────────────────────────────────────────────
 
-    /**
-     * Uploads the script from classpath resources to the CrowdStrike RTR script library
-     * if not already uploaded. Returns the script name (used as -CloudFile reference).
-     *
-     * CrowdStrike uses script names as the reference identifier (not a numeric ID).
-     * If the script already exists in the library, we reuse it by name.
-     */
+    // Uploads the script from classpath to the CrowdStrike RTR script library if not already uploaded; returns the script name (used as -CloudFile reference).
     private String uploadScriptIfNeeded(String scriptResourceName, String accessToken, String baseUrl) {
         // Check in-memory cache first
         if (uploadedScripts.containsKey(scriptResourceName)) {
@@ -791,37 +545,49 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
             }
             byte[] scriptBytes = readAllBytes(scriptStream);
 
-            // Check if script already exists in CrowdStrike library to avoid duplicates
-            String existingName = findExistingScript(scriptResourceName, accessToken, baseUrl);
-            if (existingName != null) {
-                loggerMaker.info("CrowdStrike: reusing existing script: " + scriptResourceName, LogDb.DASHBOARD);
-                uploadedScripts.put(scriptResourceName, scriptResourceName);
-                return scriptResourceName;
-            }
-
             // Determine platform from file extension
             String[] platform = scriptResourceName.endsWith(".ps1")
                 ? new String[]{"windows"}
                 : new String[]{"linux", "mac"};
 
+            // If a script with this exact name already exists, always push our current local content
+            // via updateScript (PATCH by id) rather than skipping — otherwise CrowdStrike keeps
+            // running whatever was uploaded first, silently ignoring any local edits made since.
+            JsonNode existingMeta = findExistingScriptMeta(scriptResourceName, accessToken, baseUrl);
+            if (existingMeta != null) {
+                String scriptId = existingMeta.path("id").asText("");
+                if (!scriptId.isEmpty() && updateScript(scriptId, scriptResourceName, scriptBytes, platform, accessToken, baseUrl)) {
+                    loggerMaker.info("CrowdStrike: updated existing script with current content: " + scriptResourceName, LogDb.DASHBOARD);
+                    uploadedScripts.put(scriptResourceName, scriptResourceName);
+                    return scriptResourceName;
+                }
+                // Update failed — fall through to reusing the existing script rather than attempting
+                // a fresh upload, which would just 409 against the name that still exists.
+                loggerMaker.error("CrowdStrike: failed to update script " + scriptResourceName + " — reusing existing (possibly outdated) version", LogDb.DASHBOARD);
+                uploadedScripts.put(scriptResourceName, scriptResourceName);
+                return scriptResourceName;
+            }
+
             RequestConfig cfg = buildRequestConfig();
             try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-                MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-                builder.addTextBody("name", scriptResourceName);
-                builder.addTextBody("description", "Akto MCP/Skill discovery script");
-                builder.addTextBody("permission_type", "private");
-                for (String p : platform) {
-                    builder.addTextBody("platform", p);
-                }
-                builder.addBinaryBody("file", scriptBytes, ContentType.APPLICATION_OCTET_STREAM, scriptResourceName);
-
                 HttpPost post = new HttpPost(baseUrl + "/real-time-response/entities/scripts/v1");
                 post.setHeader("Authorization", "Bearer " + accessToken);
-                post.setEntity(builder.build());
+                post.setEntity(buildDiscoveryScriptUploadEntity(scriptResourceName, scriptBytes, platform));
 
                 try (CloseableHttpResponse resp = client.execute(post)) {
                     int status = resp.getStatusLine().getStatusCode();
                     String body = EntityUtils.toString(resp.getEntity());
+                    if (status == 409) {
+                        // "file with given name already exists" — a concurrent executor run raced
+                        // findExistingScriptMeta's check above and won the upload first. The script is
+                        // present under this name either way, so treat this exactly like the
+                        // existingMeta != null branch: reuse it. Returning null here (as any other
+                        // non-2xx does) would make the caller skip this scan entirely for the whole
+                        // job run, since callers guard on `scriptId != null` before submitting work.
+                        loggerMaker.info("CrowdStrike: script " + scriptResourceName + " already exists (409, concurrent upload race) — reusing", LogDb.DASHBOARD);
+                        uploadedScripts.put(scriptResourceName, scriptResourceName);
+                        return scriptResourceName;
+                    }
                     if (status != 200 && status != 201) {
                         loggerMaker.error("CrowdStrike: script upload failed HTTP " + status + " for " + scriptResourceName + ": " + body, LogDb.DASHBOARD);
                         return null;
@@ -837,15 +603,29 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         }
     }
 
-    /**
-     * Searches the CrowdStrike RTR script library for a script with a matching name.
-     * Returns the script name if found, null otherwise.
-     */
-    private String findExistingScript(String scriptName, String accessToken, String baseUrl) {
+    private org.apache.http.HttpEntity buildDiscoveryScriptUploadEntity(String scriptResourceName, byte[] scriptBytes, String[] platform) {
+        MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+        builder.addTextBody("name", scriptResourceName);
+        builder.addTextBody("description", "Akto MCP/Skill discovery script");
+        builder.addTextBody("permission_type", "private");
+        for (String p : platform) {
+            builder.addTextBody("platform", p);
+        }
+        builder.addBinaryBody("file", scriptBytes, ContentType.APPLICATION_OCTET_STREAM, scriptResourceName);
+        return builder.build();
+    }
+
+    // Looks up an uploaded script BY EXACT NAME and returns its full metadata (id, sha256, etc.),
+    // or null if no script with that exact name exists. Scoped strictly to exact-name match — this
+    // is what makes the always-update-on-existing logic in uploadScriptIfNeeded safe to use in a
+    // shared CrowdStrike account: it can only ever touch a script whose name is one of our own
+    // (scan_skills_cs.sh, scan_mcp_configs_cs.sh, scan_installed_apps.sh/.ps1, etc.), never anything
+    // else the org has uploaded to the same RTR script library.
+    private JsonNode findExistingScriptMeta(String scriptName, String accessToken, String baseUrl) {
         RequestConfig cfg = buildRequestConfig();
         try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-            HttpGet get = new HttpGet(baseUrl + "/real-time-response/queries/falcon-scripts/v1"
-                + "?filter=name%3A%22" + urlEncode(scriptName) + "%22&limit=1");
+            HttpGet get = new HttpGet(baseUrl + "/real-time-response/entities/scripts/v1"
+                + "?filter=name%3A%22" + urlEncode(scriptName) + "%22");
             get.setHeader("Authorization", "Bearer " + accessToken);
 
             try (CloseableHttpResponse resp = client.execute(get)) {
@@ -855,8 +635,14 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
 
                 JsonNode json = OBJECT_MAPPER.readTree(body);
                 JsonNode resources = json.path("resources");
-                if (resources.isArray() && resources.size() > 0) {
-                    return scriptName; // script exists
+                if (resources.isArray()) {
+                    for (JsonNode r : resources) {
+                        // Defense in depth: the API filter should already be exact, but never trust
+                        // a substring/fuzzy match here — only act on a byte-exact name match.
+                        if (scriptName.equals(r.path("name").asText(""))) {
+                            return r;
+                        }
+                    }
                 }
             }
         } catch (Exception e) {
@@ -865,13 +651,50 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         return null;
     }
 
+    // Replaces an existing script's content in place via RTR_UpdateScripts (PATCH by id — never a
+    // name-based lookup here, so this can only touch the exact resource findExistingScriptMeta just
+    // matched by exact name). Verified directly against the real CrowdStrike API: the response
+    // script's sha256 matches the new content immediately after this call.
+    private boolean updateScript(String scriptId, String scriptResourceName, byte[] scriptBytes, String[] platform,
+            String accessToken, String baseUrl) {
+        RequestConfig cfg = buildRequestConfig();
+        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+            MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+            builder.addTextBody("id", scriptId);
+            builder.addTextBody("name", scriptResourceName);
+            builder.addTextBody("description", "Akto MCP/Skill discovery script");
+            builder.addTextBody("permission_type", "private");
+            for (String p : platform) {
+                builder.addTextBody("platform", p);
+            }
+            builder.addBinaryBody("file", scriptBytes, ContentType.APPLICATION_OCTET_STREAM, scriptResourceName);
+
+            org.apache.http.client.methods.HttpPatch patch =
+                new org.apache.http.client.methods.HttpPatch(baseUrl + "/real-time-response/entities/scripts/v1");
+            patch.setHeader("Authorization", "Bearer " + accessToken);
+            patch.setEntity(builder.build());
+
+            try (CloseableHttpResponse resp = client.execute(patch)) {
+                int status = resp.getStatusLine().getStatusCode();
+                String body = EntityUtils.toString(resp.getEntity());
+                // 202 confirmed as this endpoint's real success status (async processing) —
+                // "resources_affected": 1 in the response body verified directly against the
+                // live API, not just a guess at REST convention.
+                if (status != 200 && status != 201 && status != 202) {
+                    loggerMaker.error("CrowdStrike: script update failed HTTP " + status + " for " + scriptResourceName + ": " + body, LogDb.DASHBOARD);
+                    return false;
+                }
+                return true;
+            }
+        } catch (Exception e) {
+            loggerMaker.error("CrowdStrike: failed to update script id=" + scriptId + ": " + e.getMessage(), LogDb.DASHBOARD);
+            return false;
+        }
+    }
+
     // ── Device listing ────────────────────────────────────────────────────────
 
-    /**
-     * Fetches all active/online devices using the Hosts API:
-     *   GET /devices/queries/devices-scroll/v1 (cursor-paginated IDs)
-     *   POST /devices/entities/devices/v2       (bulk details)
-     */
+    // Fetches all active/online devices: GET devices-scroll/v1 (cursor-paginated IDs) + POST devices/v2 (bulk details).
     private List<Map<String, Object>> fetchDeviceList(String accessToken, String baseUrl) throws IOException {
         List<String> deviceIds = new ArrayList<>();
         String offset = null;
@@ -948,7 +771,7 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
     // ── MCP ingestion ─────────────────────────────────────────────────────────
 
     private void ingestMCPDiscoveries(Map<String, JsonNode> discoveriesByDevice, String ingestUrl,
-            Map<String, String> deviceNames) {
+            Map<String, String> deviceNames, int accountId) {
         List<Map<String, Object>> batchData = new ArrayList<>();
         Map<String, ServerCollectionInfo> serverCollections = new HashMap<>();
 
@@ -960,12 +783,20 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
             String os   = discovery.path("os").asText("unknown");
             String user = discovery.path("user").asText("unknown");
             JsonNode configsFound = discovery.path("configs_found");
+            // TEMP DIAGNOSTIC: remove once root-caused.
+            loggerMaker.info("CrowdStrike: MCP diagnostic — configs_found isArray=" + configsFound.isArray()
+                + " size=" + (configsFound.isArray() ? configsFound.size() : -1)
+                + " device=" + deviceName, LogDb.DASHBOARD);
             if (!configsFound.isArray()) continue;
 
             for (JsonNode config : configsFound) {
                 String configPath = config.path("path").asText("");
                 String client = config.path("client").asText("unknown");
                 long size     = config.path("size").asLong(0);
+                JsonNode diagServers = config.path("servers");
+                loggerMaker.info("CrowdStrike: MCP diagnostic — config path=" + configPath + " client=" + client
+                    + " servers.isArray=" + diagServers.isArray()
+                    + " servers.size=" + (diagServers.isArray() ? diagServers.size() : -1), LogDb.DASHBOARD);
                 long modified = config.path("modified").asLong(0);
                 JsonNode servers = config.path("servers");
 
@@ -1046,7 +877,7 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                         batch.put("time", String.valueOf(modified > 0 ? modified : System.currentTimeMillis()));
                         batch.put("statusCode", "200");
                         batch.put("status", "OK");
-                        batch.put("akto_account_id", String.valueOf(com.akto.dao.context.Context.accountId.get()));
+                        batch.put("akto_account_id", String.valueOf(accountId));
                         batch.put("akto_vxlan_id", "");
                         batch.put("is_pending", "false");
                         batch.put("source", "MIRRORING");
@@ -1075,7 +906,7 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
     // ── Skills ingestion ──────────────────────────────────────────────────────
 
     private void ingestSkillDiscoveries(Map<String, JsonNode> discoveriesByDevice, String ingestUrl,
-            Map<String, String> deviceNames) {
+            Map<String, String> deviceNames, int accountId) {
         List<Map<String, Object>> batchData = new ArrayList<>();
         Map<String, Set<String>> skillsByCollection = new HashMap<>();
         Map<String, String> agentByCollection = new HashMap<>();
@@ -1089,9 +920,19 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
 
             for (JsonNode skill : skillsFound) {
                 String path   = skill.path("path").asText("");
-                String agent  = skill.path("agent").asText("unknown");
+                String rawAgent = skill.path("agent").asText("unknown");
                 String rawContent = skill.path("skill_content").asText("");
+                // TEMP DIAGNOSTIC: remove once root-caused.
+                loggerMaker.info("CrowdStrike: skill diagnostic — path=" + path + " agent=" + rawAgent
+                    + " rawContent.length=" + rawContent.length()
+                    + " skill_content field present=" + skill.has("skill_content"), LogDb.DASHBOARD);
                 if (path.isEmpty()) continue;
+
+                // Only trust rawAgent as a real agent identity if it's on the known-agent
+                // allowlist — a skill file found outside a recognized agent directory (e.g.
+                // a project-local .claude/skills/<name>/SKILL.md) derives "agent" from its
+                // own parent folder name, which is the skill's own slug, not an agent.
+                String agent = KNOWN_SKILL_AGENTS.contains(rawAgent) ? rawAgent : ORPHAN_SKILL_AGENT;
 
                 SkillMetadata meta = extractSkillMetadata(rawContent);
                 String skillNameFromScript = skill.path("skill_name").asText("");
@@ -1099,7 +940,7 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                     ? normalizeSlug(skillNameFromScript)
                     : deriveSkillName(meta, path);
 
-                String syntheticHost = deviceName + ".ai-agent." + agent;
+                String syntheticHost = (deviceName + ".ai-agent." + agent).toLowerCase();
 
                 Map<String, String> reqHeaders = new HashMap<>();
                 reqHeaders.put("content-type", "application/json");
@@ -1112,7 +953,7 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                 tagMap.put("source", "ENDPOINT");
                 tagMap.put("connector", "CROWDSTRIKE");
                 tagMap.put("skill", skillName);
-                if (!"unknown".equals(agent)) {
+                if (!ORPHAN_SKILL_AGENT.equals(agent)) {
                     tagMap.put("mcp-client", agent);
                     tagMap.put("ai-agent", agent);
                 }
@@ -1143,7 +984,7 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                     batch.put("time", String.valueOf(System.currentTimeMillis()));
                     batch.put("statusCode", "200");
                     batch.put("status", "OK");
-                    batch.put("akto_account_id", String.valueOf(com.akto.dao.context.Context.accountId.get()));
+                    batch.put("akto_account_id", String.valueOf(accountId));
                     batch.put("akto_vxlan_id", "");
                     batch.put("is_pending", "false");
                     batch.put("source", "MIRRORING");
@@ -1170,6 +1011,107 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
 
         for (Map.Entry<String, Set<String>> e : skillsByCollection.entrySet()) {
             createAgentSkillCollection(e.getKey(), agentByCollection.get(e.getKey()), e.getValue(), ingestUrl);
+        }
+    }
+
+    // Ingests scan_installed_apps.sh/.ps1 output as software-inventory records — fallback for when Discover API scope isn't available.
+    private void ingestInstalledAppsDiscoveries(Map<String, JsonNode> discoveriesByDevice, String ingestUrl,
+            Map<String, String> deviceNames, int accountId) {
+        List<Map<String, Object>> batchData = new ArrayList<>();
+        // host -> agent, deduped so each collection only gets tagged once per call even if the
+        // same agent/device pair appears multiple times in appsFound.
+        Map<String, String> agentByHost = new HashMap<>();
+
+        for (Map.Entry<String, JsonNode> entry : discoveriesByDevice.entrySet()) {
+            String deviceId   = entry.getKey();
+            String deviceName = deviceNames.getOrDefault(deviceId, deviceId);
+            JsonNode discovery = entry.getValue();
+            JsonNode appsFound = discovery.path("apps_found");
+            if (!appsFound.isArray()) continue;
+
+            for (JsonNode app : appsFound) {
+                String agent = app.path("agent").asText("unknown");
+                String path  = app.path("path").asText("");
+                String method = app.path("detection_method").asText("");
+                if (agent.isEmpty() || "unknown".equals(agent)) continue;
+
+                String host = (deviceName + ".ai-agent." + agent).toLowerCase();
+                agentByHost.put(host, agent);
+
+                Map<String, Object> record = new HashMap<>();
+                record.put("path", "/crowdstrike/software-inventory/" + agent + "/" + deviceName);
+                record.put("method", "GET");
+                record.put("statusCode", "200");
+                record.put("type", "HTTP/1.1");
+                record.put("status", "OK");
+                record.put("requestPayload", "{}");
+                try {
+                    Map<String, Object> respPayload = new HashMap<>();
+                    respPayload.put("agent", agent);
+                    respPayload.put("path", path);
+                    respPayload.put("detection_method", method);
+                    record.put("responsePayload", OBJECT_MAPPER.writeValueAsString(respPayload));
+                } catch (Exception e) {
+                    record.put("responsePayload", "{}");
+                }
+
+                Map<String, String> reqHeaders = new HashMap<>();
+                reqHeaders.put("host", host);
+                reqHeaders.put("content-type", "application/json");
+                try {
+                    record.put("requestHeaders", OBJECT_MAPPER.writeValueAsString(reqHeaders));
+                } catch (Exception e) {
+                    record.put("requestHeaders", "{}");
+                }
+                record.put("responseHeaders", "{\"content-type\":\"application/json\"}");
+
+                record.put("time", String.valueOf(System.currentTimeMillis()));
+                record.put("source", "MIRRORING");
+                record.put("akto_account_id", String.valueOf(accountId));
+                record.put("akto_vxlan_id", "");
+                record.put("is_pending", "false");
+                record.put("ip", "");
+                record.put("destIp", "");
+                record.put("direction", "");
+                record.put("process_id", "");
+                record.put("socket_id", "");
+                record.put("daemonset_id", "");
+                record.put("enabled_graph", "false");
+
+                Map<String, String> tagMap = new HashMap<>();
+                tagMap.put("gen-ai", "Gen AI");
+                tagMap.put("source", "ENDPOINT");
+                tagMap.put("connector", "CROWDSTRIKE");
+                tagMap.put("ai-agent", agent);
+                tagMap.put("mcp-client", agent);
+                try {
+                    record.put("tag", OBJECT_MAPPER.writeValueAsString(tagMap));
+                } catch (Exception e) {
+                    record.put("tag", "{}");
+                }
+
+                batchData.add(record);
+            }
+        }
+
+        if (!batchData.isEmpty()) {
+            try {
+                sendBatch(batchData, ingestUrl);
+                loggerMaker.info("CrowdStrike: ingested " + batchData.size() + " installed-app discoveries", LogDb.DASHBOARD);
+            } catch (IOException e) {
+                loggerMaker.error("CrowdStrike: failed to ingest installed-app discoveries: " + e.getMessage(), LogDb.DASHBOARD);
+            }
+        }
+
+        // Tag each collection with persistent ai-agent/mcp-client tagsList entries — sendBatch above
+        // only sets a per-request "tag" field on individual mirrored traffic records, which does NOT
+        // persist onto the collection document itself. Without this, the collection's tagsList stays
+        // empty and the dashboard's AI Agents grouping (Endpoints.jsx groupCollectionsByAgent, which
+        // reads collection-level tags) can't find it — confirmed by inspecting Mongo directly: every
+        // installed-apps collection had an empty tagsList before this call existed, while collections
+        // that separately went through createAgentSkillCollection (skills path) did get tagged.
+        for (Map.Entry<String, String> e : agentByHost.entrySet()) {
+            tagCollectionWithAgent(e.getKey(), e.getValue(), ingestUrl);
         }
     }
 
@@ -1273,6 +1215,52 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         }
     }
 
+    // Persists ai-agent/mcp-client tagsList entries directly onto a collection document via
+    // /api/createCollectionForHostAndVpc. Needed because sendBatch's per-request "tag" field only
+    // tags individual mirrored traffic records, not the collection itself — without this, the
+    // dashboard's AI Agents grouping (which reads collection-level tagsList) can't find the
+    // collection at all. Mirrors createAgentSkillCollection's tagging shape minus the skills list.
+    private void tagCollectionWithAgent(String collectionHost, String agent, String ingestUrl) {
+        if (agent == null || agent.isEmpty() || "unknown".equals(agent)) return;
+        String dbUrl = buildDbAbstractorUrl(ingestUrl);
+        long ts = System.currentTimeMillis() / 1000;
+
+        try {
+            int colId = generateCollectionId(collectionHost, ts);
+            List<Map<String, Object>> tagsList = new ArrayList<>();
+            addTag(tagsList, "source", "ENDPOINT", ts);
+            addTag(tagsList, "gen-ai", "Gen AI", ts);
+            addTag(tagsList, "connector", "CROWDSTRIKE", ts);
+            addTag(tagsList, "mcp-client", agent, ts);
+            addTag(tagsList, "ai-agent", agent, ts);
+
+            Map<String, Object> request = new HashMap<>();
+            request.put("colId", colId);
+            request.put("host", collectionHost);
+            request.put("tagsList", tagsList);
+
+            RequestConfig cfg = buildRequestConfig();
+            try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+                HttpPost post = new HttpPost(dbUrl);
+                post.setHeader("Content-Type", "application/json");
+                addDbAbstractorAuth(post);
+                post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(request), ContentType.APPLICATION_JSON));
+
+                try (CloseableHttpResponse resp = client.execute(post)) {
+                    int status = resp.getStatusLine().getStatusCode();
+                    EntityUtils.consumeQuietly(resp.getEntity());
+                    if (status == 200) {
+                        loggerMaker.info("CrowdStrike: tagged collection " + collectionHost + " with agent=" + agent, LogDb.DASHBOARD);
+                    } else {
+                        loggerMaker.error("CrowdStrike: failed to tag collection " + collectionHost + ": HTTP " + status, LogDb.DASHBOARD);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.error("CrowdStrike: error tagging collection " + collectionHost + ": " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
     // ── Transport ─────────────────────────────────────────────────────────────
 
     private void sendBatch(List<Map<String, Object>> batch, String ingestUrl) throws IOException {
@@ -1336,6 +1324,15 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         return val != null ? val.toString() : defaultValue;
     }
 
+    // Truncates at the first dot (drops domain/mDNS suffixes like ".local"/FQDN), then strips any remaining
+    // dots defensively so the result can never collide with the "." separators in "{device}.ai-agent.{agent}".
+    private static String toShortHostname(String hostname) {
+        if (hostname == null) return null;
+        int dot = hostname.indexOf('.');
+        String shortName = dot >= 0 ? hostname.substring(0, dot) : hostname;
+        return shortName.replace(".", "");
+    }
+
     private static RequestConfig buildRequestConfig() {
         return RequestConfig.custom()
             .setConnectTimeout(CONNECT_TIMEOUT_MS)
@@ -1363,8 +1360,9 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         return baos.toByteArray();
     }
 
+    // Backend uses hostName.hashCode() (signed, unmodified) as the MongoDB _id — don't wrap in Math.abs.
     private static int generateCollectionId(String name, long ts) {
-        return Math.abs((name + ts).hashCode());
+        return name.hashCode();
     }
 
     private static void addTag(List<Map<String, Object>> tagsList, String key, String value, long ts) {
@@ -1391,20 +1389,6 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         }
         if (token != null && !token.isEmpty()) {
             post.setHeader("Authorization", token);
-        }
-    }
-
-    private static String toolSlug(String tool) {
-        if (tool == null) return "unknown";
-        switch (tool.toLowerCase()) {
-            case "claude":    return "claude-cli";
-            case "cursor":    return "cursor";
-            case "copilot":   return "copilot";
-            case "windsurf":  return "windsurf";
-            case "antigravity": return "antigravity";
-            case "codex":     return "codex";
-            case "ollama":    return "ollama";
-            default: return tool.toLowerCase().replaceAll("[^a-z0-9-]", "-");
         }
     }
 

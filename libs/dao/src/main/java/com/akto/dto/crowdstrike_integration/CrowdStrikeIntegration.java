@@ -19,6 +19,9 @@ public class CrowdStrikeIntegration {
     public static final String DATA_INGESTION_URL = "dataIngestionUrl";
     private String dataIngestionUrl;
 
+    public static final String AKTO_API_TOKEN = "aktoApiToken";
+    private String aktoApiToken;
+
     public static final String RECURRING_INTERVAL_SECONDS = "recurringIntervalSeconds";
     private int recurringIntervalSeconds = 3600;
 
