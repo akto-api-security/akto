@@ -360,7 +360,7 @@ function transformEvent(event, collectionsMap, usernameMap) {
 
 // ─── Dashboard summary section ───────────────────────────────────────────────────
 
-function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue }) {
+function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue }) {
     if (summaryLoading) return <SpinnerCentered />;
     if (!summaryData) return null;
 
@@ -391,6 +391,7 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
         name: item.name,
         count: item.count,
         os: detectOs(item.host),
+        onClick: () => onHostClick?.(item.host),
         renderValue: () => <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>,
     }));
 
@@ -430,8 +431,8 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
                     columns={[{ label: "User" }, { label: "Violations" }]}
                     rows={hostRows}
                     renderIcon={(row) => <OsIcon os={row.os} size={20} />}
-                    activeRows={new Set()}
-                    onClearSelection={() => {}}
+                    activeRows={activeHostFilter}
+                    onClearSelection={onClearHostSelection}
                 />
                 <AgenticTopListCard
                     title="Top Policies Triggered"
@@ -604,6 +605,22 @@ function Violations() {
     const handleClearPolicySelection = useCallback(() => {
         setActivePolicyFilter(new Set());
         applyGridFilter("policyName", []);
+    }, [applyGridFilter]);
+
+    const [activeHostFilter, setActiveHostFilter] = useState(new Set());
+
+    const handleHostClick = useCallback((host) => {
+        setActiveHostFilter(prev => {
+            const next = new Set(prev);
+            if (next.has(host)) next.delete(host); else next.add(host);
+            applyGridFilter("user", [...next]);
+            return next;
+        });
+    }, [applyGridFilter]);
+
+    const handleClearHostSelection = useCallback(() => {
+        setActiveHostFilter(new Set());
+        applyGridFilter("user", []);
     }, [applyGridFilter]);
 
     const handleTypeClick = useCallback((typeName) => {
@@ -916,6 +933,9 @@ function Violations() {
             onPolicyClick={handlePolicyClick}
             activePolicyFilter={activePolicyFilter}
             onClearPolicySelection={handleClearPolicySelection}
+            onHostClick={handleHostClick}
+            activeHostFilter={activeHostFilter}
+            onClearHostSelection={handleClearHostSelection}
             onTypeClick={handleTypeClick}
             activeTypeFilter={activeTypeFilter}
             selectedCard={selectedCard}
