@@ -294,7 +294,7 @@ public class TestExecutor {
 
         Set<Integer> collectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
         Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
-        ApiCollectionsDao.instance.findAll(Filters.in(Constants.ID, collectionIds), Projections.include(ApiCollection.ID, ApiCollection.DESCRIPTION, ApiCollection.TAGS_STRING))
+        ApiCollectionsDao.instance.findAll(Filters.in(Constants.ID, collectionIds), Projections.include(ApiCollection.ID, ApiCollection.DESCRIPTION, ApiCollection.TAGS_STRING, ApiCollection.IS_OUT_OF_TESTING_SCOPE))
                 .forEach(col -> apiCollectionMap.put(col.getId(), col));
         TestingConfigurations.getInstance().setApiCollectionMap(apiCollectionMap);
 
@@ -1195,8 +1195,7 @@ public class TestExecutor {
                     TestResult.TestError.SKIPPING_COPILOT_INTERNAL_ENDPOINT.getMessage());
         }
 
-        Set<Integer> outOfScopteTests = UsageMetricCalculator.getOutOfTestingScope();
-        if (outOfScopteTests.contains(apiInfoKey.getApiCollectionId())) {
+        if (apiCollection != null && apiCollection.getIsOutOfTestingScope()) {
             loggerMaker.infoAndAddToDb("Skipping test for out of scope collection: " + apiInfoKey);
             return Utils.generateFailedRunResultForMessage(testRunId, apiInfoKey, testSuperType, testSubType,
                     testRunResultSummaryId, Collections.singletonList(rawApi.getOriginalMessage()),
