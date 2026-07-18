@@ -70,9 +70,11 @@
 .agentic-chip:focus {
     outline: none;
 }
-/* Selected chip — full border around dot + label. */
-.agentic-chip--active {
-    border-color: #8c9196;
+/* Violations card — selectable with highlight. */
+.violations-card-wrap {
+    border-radius: 8px;
+    transition: outline-color 0.15s, background 0.15s;
+    cursor: pointer;
 }
 
 /* Legend dot — colour via --dot-color custom property. */
@@ -131,9 +133,13 @@
 .agentic-list-table .Polaris-DataTable__TableRow:hover .Polaris-DataTable__Cell {
     background-color: var(--p-color-bg-hover, #f6f6f7);
 }
-/* Selected row — applied via data-active="true" on the inner cell div. */
+/* Selected row — flat purple fill, no border/box. */
 .agentic-list-table .Polaris-DataTable__TableRow:has([data-active="true"]) .Polaris-DataTable__Cell {
-    background-color: var(--p-color-bg-surface-selected, #f3f0ff);
+    background: #F3F0FF;
+}
+.agentic-list-table .Polaris-DataTable__TableRow:has([data-active="true"]) .Polaris-Text--root {
+    color: #202223 !important;
+    font-weight: 500 !important;
 }
 .agentic-list-table .Polaris-DataTable__Cell--header {
     color: var(--p-color-text-subdued, #6D7175);
@@ -155,10 +161,16 @@
 
 /* Violation flyout evidence block — pink-tinted card (Blocked Prompt /
    Suspicious Skill / Suspicious Config). No Polaris token for this tint. */
-/* The message/code body inside the evidence block — quote-style left accent bar. */
+/* The message/code body inside the evidence block — quote-style left accent bar.
+   min-width: 0 overrides the flex-item default of min-width: auto, which otherwise lets an
+   unbreakable string (a file path, URL, long token) force this box — and the whole flyout —
+   wider than its container instead of wrapping. */
 .violation-evidence-quote {
     border-left: 2px solid #E0431F;
     padding-left: 12px;
+    min-width: 0;
+    overflow-wrap: break-word;
+    word-break: break-word;
 }
 /* Avatar + quote row — force top-alignment regardless of content height.
    HorizontalStack blockAlign="start" relies on a CSS custom property pipeline that
@@ -198,9 +210,11 @@
     min-height: 480px;
 }
 
+/* #9642FC matches the app's standard AG Grid purple accent (see agTableTheme.accentColor
+   elsewhere) — Polaris's own --p-color-border-interactive token resolves to blue, not purple. */
 .violations-row-selected.ag-row {
-    background-color: var(--p-color-bg-surface-selected, #f3f0ff) !important;
-    border-left: 3px solid var(--p-color-border-interactive, #6d52c9) !important;
+    background-color: #F3F0FF !important;
+    border-left: 3px solid #9642FC !important;
 }
 
 /* Chat message outer row — icon | divider | content, top-aligned.
