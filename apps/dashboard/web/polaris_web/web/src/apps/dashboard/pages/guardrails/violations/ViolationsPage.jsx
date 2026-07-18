@@ -541,9 +541,10 @@ function Violations() {
 
     useEffect(() => {
         if (!canUseNewLayout || !newLayout) {
+            if (newLayout) setGuardrailViolationsNewLayout(false);
             navigate(legacyPath, { replace: true });
         }
-    }, [navigate, legacyPath, canUseNewLayout, newLayout]);
+    }, [navigate, legacyPath, canUseNewLayout, newLayout, setGuardrailViolationsNewLayout]);
 
     const handleLayoutToggle = useCallback((checked) => {
         setGuardrailViolationsNewLayout(checked);
