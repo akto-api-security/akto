@@ -79,8 +79,9 @@ public class AutomatedAgenticTestExecutor {
                     result.setVulnerable(node.has("vulnerable") && node.get("vulnerable").asBoolean());
                     result.setPercentageMatch(node.has("percentageMatch") ? node.get("percentageMatch").asDouble() : 0.0);
                     TestResult.Confidence confidence = TestResult.Confidence.HIGH;
-                    if (node.has("confidence")) {
-                        try { confidence = TestResult.Confidence.valueOf(node.get("confidence").asText().toUpperCase()); } catch (Exception ignored) {}
+                    // get it from severity field
+                    if (node.has("severity")) {
+                        try { confidence = TestResult.Confidence.valueOf(node.get("severity").asText().toUpperCase());} catch (Exception ignored) {}
                     }
                     result.setConfidence(confidence);
                     List<String> errors = new ArrayList<>();
