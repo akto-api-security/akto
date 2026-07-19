@@ -6,3 +6,4 @@ tiktoken
 fastapi
 uvicorn[standard]
 pydantic
+psutil
