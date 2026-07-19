@@ -39,6 +39,31 @@ _FIELDS = (
     "DEFAULT_MODEL_CONFIG_JSON",
     # Portable anonymizer service URL (e.g. http://anonymizer:8093).
     "ANONYMIZER_URL",
+    # --- Per-scanner semantic cache (Redis vector store + embedder service) ---
+    # CACHE_MODE: off | observe | decide (default observe; see cache.py).
+    # CACHE_SHADOW_ENABLED is a back-compat alias: true/1 → observe.
+    "CACHE_MODE",
+    "CACHE_SHADOW_ENABLED",
+    # CACHE_DISTANCE_THRESHOLD: safe (is_valid=True) match tolerance (default 0.15).
+    # CACHE_BLOCK_DISTANCE_THRESHOLD: blocked (is_valid=False) match tolerance
+    #   (default 0.0 = blocks never served). COSINE distance of identical text is
+    #   ~1e-7, so use a small epsilon like 1e-4 to serve blocks only on exact repeat.
+    "CACHE_DISTANCE_THRESHOLD",
+    "CACHE_BLOCK_DISTANCE_THRESHOLD",
+    "CACHE_TTL_SECONDS",
+    # Portable embedder service URL (e.g. http://embedder:8094).
+    "EMBEDDER_URL",
+    # Redis with the RediSearch module (e.g. redis://redis:6379, rediss://... on Azure).
+    "REDIS_URL",
+    "CACHE_REDIS_INDEX",
+    # Separate webhook for cache shadow/served alerts (keeps SLACK_WEBHOOK_URL clean).
+    "CACHE_SHADOW_SLACK_WEBHOOK_URL",
+    # INTENT_SCOPE_DISTANCE: still used by the semantic verdict cache's
+    # cache-neighbour check (cache.py) — unrelated to the multi-class classifier.
+    "INTENT_SCOPE_DISTANCE",
+    # Max chunks used by payload.normalize() for the semantic cache's canonical
+    # text (cache.py only — unrelated to intent/segmenter.py's unit extraction).
+    "INTENT_MAX_CHUNKS",
     "DATABASE_ABSTRACTOR_SERVICE_TOKEN",
     # Seconds between metric pushes to database-abstractor. Default 60s.
     "METRICS_PUSH_INTERVAL_SEC",

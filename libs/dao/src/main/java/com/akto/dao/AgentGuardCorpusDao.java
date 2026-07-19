@@ -7,6 +7,7 @@ import com.mongodb.client.model.Sorts;
 import org.bson.conversions.Bson;
 
 import java.util.List;
+import java.util.Set;
 
 public class AgentGuardCorpusDao extends AccountsContextDao<AgentGuardCorpusEntry> {
 
@@ -37,5 +38,10 @@ public class AgentGuardCorpusDao extends AccountsContextDao<AgentGuardCorpusEntr
     public List<AgentGuardCorpusEntry> findByAgentHost(String agentHost) {
         Bson filter = Filters.eq(AgentGuardCorpusEntry.AGENT_HOST, agentHost);
         return findAll(filter, 0, 0, Sorts.descending(AgentGuardCorpusEntry.CREATED_AT), null);
+    }
+    
+    public Set<String> findDistinctTaskIntents(String agentHost) {
+        Bson filter = Filters.eq(AgentGuardCorpusEntry.AGENT_HOST, agentHost);
+        return findDistinctFields(AgentGuardCorpusEntry.TASK_INTENT, String.class, filter);
     }
 }

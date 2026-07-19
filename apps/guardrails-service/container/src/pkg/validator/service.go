@@ -1404,10 +1404,6 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
 		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
 
-	// Use the default processor - skipThreat is passed via ValidationContext.
-	// Scan backpressure lives inside the mcp processor at the remote-scanner
-	// boundary (executeSingleScannerTask), so only the agent-guard /scan fan-out
-	// is shed when degraded — local PII/regex/token-limit filters always run.
 	// Redact any configured ignore-phrases before the enforcement library ever sees the
 	// text — see ValidateRequest's plan-doc note on the shared-payload trade-off. Shared
 	// with ValidateResponse via redactIgnorePhrasesForEvaluation/reconcileIgnorePhraseRedaction.
@@ -1590,9 +1586,6 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("method", params.Method),
 		zap.String("payloadToValidate", responseBodyForValidation))
 
-	// Use processor's ProcessResponse method with external policies. Scan
-	// backpressure is applied inside the mcp processor at the remote-scanner
-	// boundary, so only the agent-guard /scan call is shed when degraded.
 	// Redact any configured ignore-phrases before the enforcement library ever sees the
 	// text — see ValidateRequest for the full rationale and the shared-payload trade-off.
 	payloadForEvaluation, preRedactionPayload := s.redactIgnorePhrasesForEvaluation(responseBodyForValidation, policies, "ValidateResponse", sessionID)

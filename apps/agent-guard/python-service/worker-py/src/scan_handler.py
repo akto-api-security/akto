@@ -105,8 +105,8 @@ async def scan_payload(
         if config.get("storeAllResults"):
             store_fn = lambda completed, name: schedule(alerts.store_results(completed, name))
 
-        # Backpressure fail-open to avoid paying for the slow cascade while Vertex
-        # latency is elevated.
+        # Backpressure fail-open to avoid paying for the slow cascade while
+        # Vertex latency is elevated.
         if cascade_backpressure.should_skip_cascade():
             scan_diag.log_backpressure_skip(scanner_name)
             metrics_push.COUNTS["backpressure_trips"].increment("cascade")
