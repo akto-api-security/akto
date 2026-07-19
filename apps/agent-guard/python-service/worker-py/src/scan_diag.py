@@ -12,7 +12,8 @@ import logging
 import os
 import sys
 import time
-from typing import Any, Dict, Iterator, Optional
+from collections.abc import Iterator
+from typing import Any
 
 import cascade_backpressure
 
@@ -130,7 +131,7 @@ class StageTimer:
     __slots__ = ("stages",)
 
     def __init__(self) -> None:
-        self.stages: Dict[str, float] = {}
+        self.stages: dict[str, float] = {}
 
     def record(self, name: str, ms: float) -> None:
         self.stages[name] = self.stages.get(name, 0.0) + ms
@@ -146,7 +147,7 @@ class StageTimer:
     def total_ms(self) -> float:
         return round(sum(self.stages.values()), 2)
 
-    def bottleneck(self) -> Optional[str]:
+    def bottleneck(self) -> str | None:
         return max(self.stages, key=self.stages.get) if self.stages else None
 
     def as_fields(self) -> str:
@@ -158,9 +159,9 @@ def log_intent_decision(
     agent: str,
     scanner_name: str,
     decision: str,
-    timer: Optional[StageTimer] = None,
+    timer: StageTimer | None = None,
     *,
-    extra: Optional[Dict[str, Any]] = None,
+    extra: dict[str, Any] | None = None,
     always: bool = False,
 ) -> None:
     """Print one intent-prefilter outcome with per-stage timings + bottleneck.

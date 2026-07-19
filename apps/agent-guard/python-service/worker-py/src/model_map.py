@@ -246,10 +246,16 @@ class ModelMapScanner:
     # need to derive a specific intent label. Without forwarding these, Qwen3Guard's
     # "categories" and "safety" fields are silently dropped and _extract_task_category
     # always falls back to the reason-keyword scan.
-    _ENRICHMENT_FIELDS = ("safety", "categories", "matchedTopic", "prob_distribution",
-                          "confidence_source", "decision_confidence")
+    _ENRICHMENT_FIELDS = (
+        "safety",
+        "categories",
+        "matchedTopic",
+        "prob_distribution",
+        "confidence_source",
+        "decision_confidence",
+    )
 
-    def _shape_result(self, winner: Dict[str, Any]) -> Dict[str, Any]:
+    def _shape_result(self, winner: dict[str, Any]) -> dict[str, Any]:
         winner_details = winner.get("details") or {}
         winner_stem = self._stem(winner_details.get("llm_provider", ""))
         details: dict[str, Any] = {

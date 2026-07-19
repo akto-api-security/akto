@@ -85,6 +85,7 @@ class AnthropicProvider(LLMProvider):
 
     async def complete(self, prompt: str) -> str:
         logger.info(f"[Anthropic] prompt: {prompt}")
+        client = http_client.get_client()
         resp = await client.post(
             "https://api.anthropic.com/v1/messages",
             headers=dict(
