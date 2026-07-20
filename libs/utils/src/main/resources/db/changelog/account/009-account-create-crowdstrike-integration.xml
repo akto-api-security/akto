@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Collection for CrowdStrikeIntegrationDao (Falcon OAuth client id/secret, base URL,
+        data ingestion URL, Akto API token, recurring job interval). Singleton-per-account
+        document, read/written via findOne/updateOne/deleteAll with an empty filter
+        (CrowdStrikeIntegrationAction), so only the default _id index is needed — no
+        secondary indexes.
+    -->
+
+    <changeSet id="009-account-create-crowdstrike-integration" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="crowdstrike_integration"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="crowdstrike_integration"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="crowdstrike_integration"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
