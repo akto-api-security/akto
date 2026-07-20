@@ -2979,16 +2979,48 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    /** Default test library branch for agentic (Argus) probes; must match a branch on akto-api-security/tests-library. */
+    public static final String AKTO_TESTS_LIBRARY_AGENTIC = "akto-api-security/tests-library:agentic-pro";
+
     public static Set<String> getAktoDefaultTestLibs() {
         return new HashSet<>(Arrays.asList("akto-api-security/tests-library:standard", "akto-api-security/tests-library:pro"));
     }
 
+    /** Agentic test library zip when Stigg {@link UsageMetricUtils#FEATURE_SECURITY_TYPE_AGENTIC} is granted for the org. */
+    private static boolean includeAgenticTestLibForAccount(int accountId) {
+        return UsageMetricUtils.isSecurityTypeAgenticGranted(accountId);
+    }
+
+    /** Standard + pro, and agentic when {@link #includeAgenticTestLibForAccount} is true. */
+    public static Set<String> getAktoDefaultTestLibs(int accountId) {
+        Set<String> libs = getAktoDefaultTestLibs();
+        if (includeAgenticTestLibForAccount(accountId)) {
+            libs = new HashSet<>(libs);
+            libs.add(AKTO_TESTS_LIBRARY_AGENTIC);
+        }
+        return libs;
+    }
+
     /**
-     * Registered per-account (gated on the Argus/agentic feature flag) by the code that writes
-     * AccountSettings.TEST_LIBRARIES, but this branch's bulk template-fetch step below doesn't know
-     * about it yet - include it explicitly so already-registered accounts actually get it synced.
+     * Repos to download for the test-editor scheduler. Agentic is one global zip — include it if any active account
+     * would get it from {@link #getAktoDefaultTestLibs(int)} (same rule as {@link #insertAktoTestLibraries}).
      */
-    public static final String AKTO_TESTS_LIBRARY_AGENTIC = "akto-api-security/tests-library:agentic-pro";
+    public static Set<String> getAktoTestLibraryReposForZipFetch() {
+        Set<String> repos = new HashSet<>(getAktoDefaultTestLibs());
+        for (Account account : AccountsDao.instance.findAll(
+                Filters.or(
+                        Filters.exists(Account.INACTIVE_STR, false),
+                        Filters.eq(Account.INACTIVE_STR, false)))) {
+            if (AccountTask.inactiveAccountsSet.contains(account.getId())) {
+                continue;
+            }
+            if (includeAgenticTestLibForAccount(account.getId())) {
+                repos.add(AKTO_TESTS_LIBRARY_AGENTIC);
+                break;
+            }
+        }
+        return repos;
+    }
 
     public static Set<String> getAktoDefaultThreatPolicies() {
         return new HashSet<>(Arrays.asList("akto-api-security/tests-library:threat_policies_pro"));
@@ -3013,7 +3045,8 @@ public class InitializerListener implements ServletContextListener {
 
     private static void insertAktoTestLibraries(AccountSettings accountSettings) {
         List<TestLibrary> testLibraries = accountSettings == null ? new ArrayList<>() : accountSettings.getTestLibraries();
-        Set<String> aktoTestLibraries = getAktoDefaultTestLibs();
+        int accountId = accountSettings != null ? accountSettings.getId() : 0;
+        Set<String> aktoTestLibraries = new HashSet<>(getAktoDefaultTestLibs(accountId));
 
         if (testLibraries != null) {
             for (TestLibrary testLibrary: testLibraries) {
@@ -3840,9 +3873,7 @@ public class InitializerListener implements ServletContextListener {
                 }
                 Map<String, ComplianceInfo> complianceCommonMap = getFromCommonDb();
                 Map<String, ThreatComplianceInfo> threatComplianceCommonMap = getThreatComplianceFromCommonDb();
-                Set<String> testLibsForZipFetch = new HashSet<>(getAktoDefaultTestLibs());
-                testLibsForZipFetch.add(AKTO_TESTS_LIBRARY_AGENTIC);
-                Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(testLibsForZipFetch);
+                Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(getAktoTestLibraryReposForZipFetch());
                 AccountTask.instance.executeTask((account) -> {
                     try {
                         logger.infoAndAddToDb("Updating Test Editor Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
