@@ -2983,6 +2983,13 @@ public class InitializerListener implements ServletContextListener {
         return new HashSet<>(Arrays.asList("akto-api-security/tests-library:standard", "akto-api-security/tests-library:pro"));
     }
 
+    /**
+     * Registered per-account (gated on the Argus/agentic feature flag) by the code that writes
+     * AccountSettings.TEST_LIBRARIES, but this branch's bulk template-fetch step below doesn't know
+     * about it yet - include it explicitly so already-registered accounts actually get it synced.
+     */
+    public static final String AKTO_TESTS_LIBRARY_AGENTIC = "akto-api-security/tests-library:agentic-pro";
+
     public static Set<String> getAktoDefaultThreatPolicies() {
         return new HashSet<>(Arrays.asList("akto-api-security/tests-library:threat_policies_pro"));
     }
@@ -3833,7 +3840,9 @@ public class InitializerListener implements ServletContextListener {
                 }
                 Map<String, ComplianceInfo> complianceCommonMap = getFromCommonDb();
                 Map<String, ThreatComplianceInfo> threatComplianceCommonMap = getThreatComplianceFromCommonDb();
-                Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(getAktoDefaultTestLibs());
+                Set<String> testLibsForZipFetch = new HashSet<>(getAktoDefaultTestLibs());
+                testLibsForZipFetch.add(AKTO_TESTS_LIBRARY_AGENTIC);
+                Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(testLibsForZipFetch);
                 AccountTask.instance.executeTask((account) -> {
                     try {
                         logger.infoAndAddToDb("Updating Test Editor Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
