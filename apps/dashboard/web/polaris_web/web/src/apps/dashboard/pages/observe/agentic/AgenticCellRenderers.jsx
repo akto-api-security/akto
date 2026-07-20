@@ -120,7 +120,7 @@ export function ViolationsCellRenderer({ value }) {
     const parts = ["critical", "high", "medium", "low"].filter((k) => value[k] > 0);
     if (!parts.length) return dash;
     return (
-        <HorizontalStack gap="1" blockAlign="center">
+        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
             {parts.map((k) => <SeverityBadge key={k} severity={k}>{value[k]}</SeverityBadge>)}
         </HorizontalStack>
     );

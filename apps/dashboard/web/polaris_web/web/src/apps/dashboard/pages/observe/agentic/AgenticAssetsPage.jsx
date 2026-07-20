@@ -109,7 +109,7 @@ const COL_DEFS = [
   {
     field: "violations",
     headerName: "Violations",
-    width: 160,
+    width: 200,
     sortable: true,
     filter: false,
     cellRenderer: ViolationsCellRenderer,
