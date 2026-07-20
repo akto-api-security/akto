@@ -148,7 +148,7 @@ class StageTimer:
         return round(sum(self.stages.values()), 2)
 
     def bottleneck(self) -> str | None:
-        return max(self.stages, key=self.stages.get) if self.stages else None
+        return max(self.stages, key=self.stages.__getitem__) if self.stages else None
 
     def as_fields(self) -> str:
         return " ".join(f"{k}_ms={round(v, 2)}" for k, v in self.stages.items())

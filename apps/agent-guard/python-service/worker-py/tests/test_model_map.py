@@ -153,6 +153,21 @@ async def test_foundry_providers_share_stems_with_vertex():
     assert r["details"]["gemma"]["completed"] is True
 
 
+async def test_winner_values_forwarded_for_password_redaction():
+    # details.values carries the exact secret substrings the gateway redacts;
+    # dropping it silently disables Password redaction (regressed once in a merge).
+    unsafe_with_values = {
+        "is_valid": False,
+        "risk_score": 0.95,
+        "decision_confidence": 0.95,
+        "details": {"values": ["Hunter2024#"]},
+    }
+    cfg = [_entry("gemma_vertexai", "FINAL_ARBITER")]
+    r = await _run(cfg, {"gemma_vertexai": unsafe_with_values})
+    assert r["is_valid"] is False
+    assert r["details"]["values"] == ["Hunter2024#"]
+
+
 async def test_no_arbiter_configured_fails_open_with_error():
     cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER")]
     r = await _run(cfg, {"qwen3guard": UNSAFE})
