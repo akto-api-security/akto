@@ -354,7 +354,7 @@ function ThreatDetectionPage() {
     const [pendingRowContext, setPendingRowContext] = useState(null);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
-    const showNewLayoutToggle = func.isDemoAccount() && isEndpointSecurityCategory();
+    const showNewLayoutToggle = (func.isDemoAccount() || window.ACTIVE_ACCOUNT === 1726615470) && isEndpointSecurityCategory();
     const newLayout = LocalStore((state) => state.guardrailViolationsNewLayout);
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
