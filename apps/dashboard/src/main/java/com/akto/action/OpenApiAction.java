@@ -61,8 +61,10 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -620,6 +622,161 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
     public String getOpenApiSchema() {
         return openApiSchema;
+    }
+
+    private Map<String, Object> schemaCoverageData;
+    private int skip;
+    private int limit;
+
+    public Map<String, Object> getSchemaCoverageData() {
+        return schemaCoverageData;
+    }
+
+    public void setSchemaCoverageData(Map<String, Object> schemaCoverageData) {
+        this.schemaCoverageData = schemaCoverageData;
+    }
+
+    public int getSkip() {
+        return skip;
+    }
+
+    public void setSkip(int skip) {
+        this.skip = skip;
+    }
+
+    public int getLimit() {
+        return limit;
+    }
+
+    public void setLimit(int limit) {
+        this.limit = limit;
+    }
+
+    private String validationSchema;
+    private boolean updateSuccess;
+
+    public String getValidationSchema() {
+        return validationSchema;
+    }
+
+    public void setValidationSchema(String validationSchema) {
+        this.validationSchema = validationSchema;
+    }
+
+    public boolean isUpdateSuccess() {
+        return updateSuccess;
+    }
+
+    public void setUpdateSuccess(boolean updateSuccess) {
+        this.updateSuccess = updateSuccess;
+    }
+
+    public String fetchSchemaCoverage() {
+        try {
+            List<SwaggerFileUpload> succeededUploads = FileUploadsDao.instance.getSwaggerMCollection()
+                .find(Filters.eq("uploadStatus", FileUpload.UploadStatus.SUCCEEDED.toString()))
+                .sort(Sorts.descending("uploadTs"))
+                .into(new ArrayList<>());
+
+            Set<Integer> uniqueCollectionIds = new HashSet<>();
+            for (SwaggerFileUpload upload : succeededUploads) {
+                uniqueCollectionIds.add(upload.getCollectionId());
+            }
+
+            Bson collectionFilter = Filters.and(
+                Filters.eq(ApiCollection._DEACTIVATED, false),
+                Filters.eq(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, false)
+            );
+
+            long totalCollections = ApiCollectionsDao.instance.getMCollection()
+                .countDocuments(collectionFilter);
+
+            int collectionsCovered = uniqueCollectionIds.size();
+            double schemaCoverage = totalCollections > 0 ? 
+                (double) collectionsCovered / totalCollections * 100 : 0;
+
+            int skipVal = skip > 0 ? skip : 0;
+            int limitVal = limit > 0 ? limit : 50;
+
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            List<Map<String, Object>> dataList = succeededUploads
+                .stream()
+                .skip(skipVal)
+                .limit(limitVal)
+                .map(upload -> mapper.convertValue(upload, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}))
+                .collect(Collectors.toList());
+
+            this.schemaCoverageData = new HashMap<>();
+            this.schemaCoverageData.put("data", dataList);
+            this.schemaCoverageData.put("totalCollections", totalCollections);
+            this.schemaCoverageData.put("collectionsCovered", collectionsCovered);
+            this.schemaCoverageData.put("schemaCoverage", Math.round(schemaCoverage * 100.0) / 100.0);
+            this.schemaCoverageData.put("total", collectionsCovered);
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "ERROR while fetching schema coverage " + e);
+            addActionError("Error fetching schema coverage: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String addValidationSchema() {
+        try {
+            if (validationSchema == null || validationSchema.isEmpty()) {
+                addActionError("Validation schema is empty");
+                return ERROR.toUpperCase();
+            }
+
+            if (apiCollectionId <= 0) {
+                addActionError("Invalid API collection ID");
+                return ERROR.toUpperCase();
+            }
+
+            List<SwaggerFileUpload> fileUploads = FileUploadsDao.instance.getSwaggerMCollection()
+                .find(Filters.eq("collectionId", apiCollectionId))
+                .sort(Sorts.descending("uploadTs"))
+                .into(new ArrayList<>());
+
+            if (fileUploads.isEmpty()) {
+                addActionError("No file uploads found for collection ID: " + apiCollectionId);
+                return ERROR.toUpperCase();
+            }
+
+            SwaggerFileUpload latestUpload = fileUploads.get(0);
+            String swaggerFileId = latestUpload.getSwaggerFileId();
+
+            if (swaggerFileId == null || swaggerFileId.isEmpty()) {
+                addActionError("Invalid swagger file ID in file upload");
+                return ERROR.toUpperCase();
+            }
+
+            String compressedContent = GzipUtils.zipString(validationSchema);
+            int currentTimestamp = Context.now();
+
+            com.mongodb.client.result.UpdateResult updateResult = FilesDao.instance.getMCollection()
+                .updateOne(
+                    Filters.eq("_id", new org.bson.types.ObjectId(swaggerFileId)),
+                    Updates.combine(
+                        Updates.set("compressedContent", compressedContent),
+                        Updates.set("updatedAt", currentTimestamp)
+                    )
+                );
+
+            if (updateResult.getModifiedCount() > 0) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                this.schemaCoverageData = response;
+                return SUCCESS.toUpperCase();
+            } else {
+                addActionError("File not found for ID: " + swaggerFileId);
+                return ERROR.toUpperCase();
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "ERROR while adding validation schema " + e);
+            addActionError("Error adding validation schema: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
     }
 
 }

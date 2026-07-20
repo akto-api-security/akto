@@ -14,6 +14,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.TimeRangeFilter;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -85,6 +86,9 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter List<String> hosts;
   @Getter @Setter String latestApiOrigRegex;
   @Getter @Setter Boolean sortBySeverity;
+  @Getter @Setter String filterId;
+  @Getter @Setter Map<String, Object> aggregatedData;
+  @Getter @Setter Map<String, Object> violationsOverTimeData;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -243,6 +247,99 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     }
 
     return SUCCESS.toUpperCase();
+  }
+
+  public String fetchAggregData() {
+    HttpPost post = new HttpPost(
+        String.format("%s/api/dashboard/aggregate_by_api_endpoint", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("filterId", filterId);
+        put("skip", skip);
+        put("limit", limit > 0 ? limit : LIMIT);
+        put("startTs", startTimestamp);
+        put("endTs", endTimestamp);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+      
+      if (resp.getStatusLine().getStatusCode() == 200) {
+        this.aggregatedData = objectMapper.readValue(responseBody, Map.class);
+        return SUCCESS.toUpperCase();
+      } else {
+        return ERROR.toUpperCase();
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+  }
+
+  public String fetchSchemaViolationsOverTime() {
+    HttpPost post = new HttpPost(
+        String.format("%s/api/dashboard/schema_violations_over_time", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("filterId", filterId);
+        put("skip", skip);
+        put("limit", limit > 0 ? limit : LIMIT);
+        put("startTs", startTimestamp);
+        put("endTs", endTimestamp);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+      
+      if (resp.getStatusLine().getStatusCode() == 200) {
+        Map<String, Object> backendResponse = objectMapper.readValue(responseBody, Map.class);
+        
+        List<Map<String, Object>> eventsData = (List<Map<String, Object>>) backendResponse.get("data");
+        long daysBetween = ((Number) backendResponse.getOrDefault("daysBetween", 0)).longValue();
+        
+        Map<String, Long> bucketCounts = new HashMap<>();
+        List<Integer> timestamps = new ArrayList<>();
+        
+        if (eventsData != null) {
+          for (Map<String, Object> event : eventsData) {
+            long detectedAt = ((Number) event.get("detectedAt")).longValue();
+            timestamps.add((int) detectedAt);
+          }
+        }
+        
+        bucketCounts = com.akto.util.TimePeriodUtils.groupByTimePeriod(timestamps, daysBetween);
+        List<List<Object>> timeSeries = com.akto.util.TimePeriodUtils.convertTimePeriodMapToTimeSeriesData(bucketCounts, daysBetween);
+        
+        this.violationsOverTimeData = new HashMap<>();
+        this.violationsOverTimeData.put("data", timeSeries);
+        this.violationsOverTimeData.put("total", backendResponse.get("total"));
+        
+        return SUCCESS.toUpperCase();
+      } else {
+        return ERROR.toUpperCase();
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
   }
 
   public String fetchFilters() {

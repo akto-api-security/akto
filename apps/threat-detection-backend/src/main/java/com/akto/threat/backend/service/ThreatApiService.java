@@ -10,6 +10,7 @@ import com.akto.threat.backend.cache.DashboardFilterCache;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.utils.ThreatUtils;
 import com.mongodb.client.MongoCursor;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 
 import java.util.ArrayList;
@@ -256,6 +257,224 @@ public class ThreatApiService {
     return ThreatSeverityWiseCountResponse.newBuilder()
         .addAllCategoryWiseCounts(categoryWiseCounts)
         .build();
+  }
+
+  public String aggregateEventsByApiEndpoint(
+      String accountId,
+      String filterId,
+      long startTs,
+      long endTs,
+      int skip,
+      int limit,
+      String contextSource) {
+
+    Document match = new Document();
+    match.append("filterId", filterId);
+
+    if (startTs > 0 || endTs > 0) {
+      Document timeRange = new Document();
+      if (startTs > 0) {
+        timeRange.append("$gte", startTs);
+      }
+      if (endTs > 0) {
+        timeRange.append("$lte", endTs);
+      }
+      match.append("detectedAt", timeRange);
+    }
+
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
+    if (!contextFilter.isEmpty()) {
+      match.putAll(contextFilter);
+    }
+
+    List<Document> baseMatch = new ArrayList<>();
+    if (!match.isEmpty()) {
+      baseMatch.add(new Document("$match", match));
+    }
+
+    List<Document> countPipeline = new ArrayList<>(baseMatch);
+    countPipeline.add(new Document("$count", "total"));
+
+    Document countResult = maliciousEventDao.aggregateRaw(accountId, countPipeline).first();
+    long total = countResult != null ? countResult.getInteger("total", 0) : 0;
+
+    List<Document> dataPipeline = new ArrayList<>(baseMatch);
+    dataPipeline.add(new Document("$sort", new Document("detectedAt", -1)));
+    
+    dataPipeline.add(
+        new Document(
+            "$group",
+            new Document("_id", "$latestApiEndpoint")
+                .append("count", new Document("$sum", 1))
+                .append("events", new Document("$push", new Document()
+                    .append("id", "$_id")
+                    .append("actor", "$actor")
+                    .append("host", "$host")
+                    .append("apiCollectionId", "$apiCollectionId")
+                    .append("method", "$latestApiMethod")
+                    .append("severity", "$severity")
+                    .append("filterId", "$filterId")
+                    .append("detectedAt", "$detectedAt")
+                    .append("type", "$type")
+                    .append("category", "$category")
+                    .append("subCategory", "$subCategory")
+                    .append("successfulExploit", "$successfulExploit")
+                    .append("status", "$status")
+                    .append("label", "$label")
+                    .append("country", "$country")
+                    .append("payload", "$payload")
+                    .append("metadata", "$metadata")
+                    .append("owaspCategories", "$owaspCategories")
+                    .append("refId", "$refId")
+                    .append("jiraTicketUrl", "$jiraTicketUrl")))));
+    
+    dataPipeline.add(new Document("$skip", skip));
+    dataPipeline.add(new Document("$limit", limit));
+    
+    dataPipeline.add(new Document("$addFields", 
+        new Document("events", new Document("$slice", Arrays.asList("$events", 10)))));
+
+    List<Map<String, Object>> apis = new ArrayList<>();
+
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, dataPipeline).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        String endpoint = (String) doc.get("_id");
+        long count = ((Number) doc.get("count")).longValue();
+        List<Document> events = (List<Document>) doc.get("events");
+
+        Map<String, Object> apiData = new HashMap<>();
+        apiData.put("endpoint", endpoint);
+        apiData.put("count", count);
+
+        List<Map<String, Object>> eventsList = new ArrayList<>();
+        if (events != null) {
+          for (Document eventDoc : events) {
+            Map<String, Object> eventMap = new HashMap<>(eventDoc);
+            eventsList.add(eventMap);
+          }
+        }
+        apiData.put("events", eventsList);
+        apis.add(apiData);
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+
+    Map<String, Object> response = new HashMap<>();
+    
+    List<Map<String, Object>> dataArray = new ArrayList<>();
+    for (Map<String, Object> api : apis) {
+      Map<String, Object> item = new HashMap<>();
+      item.put("api", api.get("endpoint"));
+      item.put("events", api.get("events"));
+      item.put("count", api.get("count"));
+      dataArray.add(item);
+    }
+    
+    response.put("data", dataArray);
+    response.put("totalEndpoints", apis.size());
+    response.put("total", total);
+
+    try {
+      ObjectMapper mapper = new ObjectMapper();
+      return mapper.writeValueAsString(response);
+    } catch (Exception e) {
+      e.printStackTrace();
+      return "{\"error\": \"Failed to serialize response\"}";
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  public String getSchemaViolationsOverTime(
+      String accountId,
+      String filterId,
+      long startTs,
+      long endTs,
+      int skip,
+      int limit,
+      String contextSource) {
+
+    Document match = new Document();
+    match.append("filterId", filterId);
+    match.append("category", "SchemaConform");
+
+    if (startTs > 0 || endTs > 0) {
+      Document timeRange = new Document();
+      if (startTs > 0) {
+        timeRange.append("$gte", startTs);
+      }
+      if (endTs > 0) {
+        timeRange.append("$lte", endTs);
+      }
+      match.append("detectedAt", timeRange);
+    }
+
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
+    if (!contextFilter.isEmpty()) {
+      match.putAll(contextFilter);
+    }
+
+    List<Document> baseMatch = new ArrayList<>();
+    if (!match.isEmpty()) {
+      baseMatch.add(new Document("$match", match));
+    }
+
+    List<Document> countPipeline = new ArrayList<>(baseMatch);
+    countPipeline.add(new Document("$count", "total"));
+
+    Document countResult = maliciousEventDao.aggregateRaw(accountId, countPipeline).first();
+    long totalViolations = countResult != null ? countResult.getInteger("total", 0) : 0;
+
+    if (totalViolations == 0) {
+      Map<String, Object> response = new HashMap<>();
+      response.put("data", new ArrayList<>());
+      response.put("total", 0);
+
+      try {
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.writeValueAsString(response);
+      } catch (Exception e) {
+        return "{\"error\": \"Failed to serialize response\"}";
+      }
+    }
+
+    long daysBetween = 0;
+    if (startTs > 0 && endTs > 0) {
+      daysBetween = (endTs - startTs) / 86400;
+    }
+
+    List<Document> dataPipeline = new ArrayList<>(baseMatch);
+    dataPipeline.add(new Document("$sort", new Document("detectedAt", 1)));
+    dataPipeline.add(new Document("$skip", skip));
+    dataPipeline.add(new Document("$limit", limit));
+
+    List<Map<String, Object>> eventsData = new ArrayList<>();
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, dataPipeline).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        long detectedAt = ((Number) doc.get("detectedAt")).longValue();
+
+        Map<String, Object> item = new HashMap<>();
+        item.put("detectedAt", detectedAt);
+        eventsData.add(item);
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+
+    Map<String, Object> response = new HashMap<>();
+    response.put("data", eventsData);
+    response.put("total", totalViolations);
+    response.put("daysBetween", daysBetween);
+
+    try {
+      ObjectMapper mapper = new ObjectMapper();
+      return mapper.writeValueAsString(response);
+    } catch (Exception e) {
+      e.printStackTrace();
+      return "{\"error\": \"Failed to serialize response\"}";
+    }
   }
 
 }
