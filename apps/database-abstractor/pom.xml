@@ -9,7 +9,7 @@
     </parent>
 
 
-    <groupId>com.akto.apps.databaseabstractor</groupId>
+    <groupId>com.akto.apps.databaseabstractor</groupId> 
     <artifactId>database-abstractor</artifactId>
     <packaging>war</packaging>
     <dependencyManagement>
@@ -29,7 +29,7 @@
         <dependency>
             <groupId>org.apache.struts</groupId>
             <artifactId>struts2-core</artifactId>
-            <version>2.5.33</version>
+            <version>6.10.0</version>
         </dependency>
 
         <dependency>
@@ -64,7 +64,7 @@
         <dependency>
             <groupId>org.apache.struts</groupId>
             <artifactId>struts2-json-plugin</artifactId>
-            <version>2.5.33</version>
+            <version>6.10.0</version>
         </dependency>
 
         <dependency>
@@ -101,8 +101,11 @@
         </resources>
         <plugins>
             <plugin>
+                <!-- 3.x required: war-plugin 2.3 can't run on the JDK 17 build JVM
+                     (old xstream/plexus reflection blocked by JPMS). Config unchanged;
+                     failOnMissingWebXml=false already set (db-abstractor has no web.xml). -->
                 <artifactId>maven-war-plugin</artifactId>
-                <version>2.3</version>
+                <version>3.4.0</version>
                 <configuration>
                     <attachClasses>true</attachClasses>
                     <warSourceDirectory>web</warSourceDirectory>
@@ -112,7 +115,10 @@
             <plugin>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-maven-plugin</artifactId>
-                <version>9.4.36.v20210114</version>
+                <!-- 9.4.58 bundles ASM 9.x (reads Java 17 bytecode); 9.4.36's ASM can't,
+                     so jetty:run's annotation scan crashes on v61 classes. Runtime image
+                     is already 9.4.58. This only affects local jetty:run, not the WAR. -->
+                <version>9.4.58.v20250814</version>
                 <configuration>
                     <webAppSourceDirectory>web</webAppSourceDirectory>
                     <webApp>
@@ -124,10 +130,33 @@
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <groupId>org.apache.maven.plugins</groupId>
+                <!-- 3.6.0+ required for <release>; the inherited default (3.1) ignores it
+                     and would silently produce Java 8 bytecode. -->
+                <version>3.13.0</version>
                 <configuration>
-                    <source>8</source>
-                    <target>8</target>
+                    <!-- Compile to Java 17 bytecode (class file v61). A JVM < 17 cannot
+                         load these classes and fails with UnsupportedClassVersionError. -->
+                    <release>17</release>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.4.1</version>
+                <executions>
+                    <execution>
+                        <id>enforce-java-17</id>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[17,)</version>
+                                    <message>database-abstractor requires Java 17+ to build.</message>
+                                </requireJavaVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
         <finalName>${project.artifactId}</finalName>
