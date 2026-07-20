@@ -309,12 +309,11 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
             // unverified against a real multi-chunk response — validate against an actual large-output device.
             stdout = fetchAdditionalStdoutChunks(accessToken, baseUrl, cloudRequestId, stdout);
 
-            // TEMP DIAGNOSTIC: log stderr even when stdout is non-empty, so log_debug trace from the
-            // scan scripts (normally discarded once stdout succeeds) is visible while investigating the
-            // empty-skill_content / zero-MCP-servers reports. Remove once root-caused.
+            // Script-side log_debug trace is normally discarded once stdout succeeds; surface it at
+            // debug level so it's available when investigating empty-skill_content / zero-MCP-server reports.
             if (!stderr.isEmpty()) {
-                loggerMaker.info("CrowdStrike: script stderr (diagnostic) for device " + deviceId + " script=" + scriptName
-                    + ": " + stderr, LogDb.DASHBOARD);
+                loggerMaker.debug("CrowdStrike: script stderr for device " + deviceId + " script=" + scriptName
+                    + ": " + stderr);
             }
 
             if (stdout.isEmpty()) {
@@ -783,22 +782,20 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
             String os   = discovery.path("os").asText("unknown");
             String user = discovery.path("user").asText("unknown");
             JsonNode configsFound = discovery.path("configs_found");
-            // TEMP DIAGNOSTIC: remove once root-caused.
-            loggerMaker.info("CrowdStrike: MCP diagnostic — configs_found isArray=" + configsFound.isArray()
+            loggerMaker.debug("CrowdStrike: configs_found isArray=" + configsFound.isArray()
                 + " size=" + (configsFound.isArray() ? configsFound.size() : -1)
-                + " device=" + deviceName, LogDb.DASHBOARD);
+                + " device=" + deviceName);
             if (!configsFound.isArray()) continue;
 
             for (JsonNode config : configsFound) {
                 String configPath = config.path("path").asText("");
                 String client = config.path("client").asText("unknown");
                 long size     = config.path("size").asLong(0);
-                JsonNode diagServers = config.path("servers");
-                loggerMaker.info("CrowdStrike: MCP diagnostic — config path=" + configPath + " client=" + client
-                    + " servers.isArray=" + diagServers.isArray()
-                    + " servers.size=" + (diagServers.isArray() ? diagServers.size() : -1), LogDb.DASHBOARD);
-                long modified = config.path("modified").asLong(0);
                 JsonNode servers = config.path("servers");
+                loggerMaker.debug("CrowdStrike: config path=" + configPath + " client=" + client
+                    + " servers.isArray=" + servers.isArray()
+                    + " servers.size=" + (servers.isArray() ? servers.size() : -1));
+                long modified = config.path("modified").asLong(0);
 
                 if (configPath.isEmpty()) continue;
                 String clientSlug = clientTypeSlug(client);
@@ -922,10 +919,9 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                 String path   = skill.path("path").asText("");
                 String rawAgent = skill.path("agent").asText("unknown");
                 String rawContent = skill.path("skill_content").asText("");
-                // TEMP DIAGNOSTIC: remove once root-caused.
-                loggerMaker.info("CrowdStrike: skill diagnostic — path=" + path + " agent=" + rawAgent
+                loggerMaker.debug("CrowdStrike: skill path=" + path + " agent=" + rawAgent
                     + " rawContent.length=" + rawContent.length()
-                    + " skill_content field present=" + skill.has("skill_content"), LogDb.DASHBOARD);
+                    + " skill_content field present=" + skill.has("skill_content"));
                 if (path.isEmpty()) continue;
 
                 // Only trust rawAgent as a real agent identity if it's on the known-agent
