@@ -38,9 +38,10 @@ public class SettingsScanAction extends ActionSupport {
         "No issues? Return: []\n" +
         "\n" +
         "Each finding: {\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"|\"CRITICAL\", \"category\":\"risky\"|\"malicious\", \"fieldPath\":\"...\", \"title\":\"...\", \"message\":\"...\", \"evidence\":\"...\", \"overview\":\"...\", \"remediation\":\"...\"}\n" +
-        "evidence MUST be the full \"key\":value pair as it appears in the input (e.g. \"disableAllHooks\":true), never just the bare value.\n" +
-        "overview: markdown with two \"## \" headed sections, \"What is this?\" (what the field/value controls) and \"Why is it dangerous?\" (concrete attack scenario it enables) — 2-4 sentences each.\n" +
-        "remediation: markdown with two \"### \" headed sections: \"1. Steps to Remediate\" (the exact field to change and what to set it to or remove, plus how to enforce it org-wide via managed-settings.json if applicable) and \"2. Custom Guardrails\" (a fenced text block with a ready-to-paste guardrail prompt that blocks prompts/tool calls exploiting this specific misconfiguration).\n" +
+        "message: one concise sentence naming the specific field and the concrete risk it creates — no generic filler, and do not restate the whole config.\n" +
+        "evidence MUST be the single offending \"key\":value pair exactly as it appears in the input (e.g. \"disableAllHooks\":true or \"Bash(rm -rf *)\") — never the bare value, and never a whole array or section; cite only the one entry that triggered this finding.\n" +
+        "overview: markdown, exactly two \"## \" sections. \"## What is this?\" — name the setting and what it controls in the tool's permission/sandbox model, then what THIS value enables (explain the field, don't just restate its value); 2-3 sentences. \"## Why is it dangerous?\" — a concrete AGENTIC attack chain: how untrusted input (prompt injection, a malicious MCP tool/skill, a poisoned repo file) makes the agent exploit this on its own, bypassing the exact guardrail this value removes, ending with the concrete impact; 2-3 sentences.\n" +
+        "remediation: markdown, exactly two \"### \" sections. \"### 1. Steps to Remediate\" — numbered steps naming the exact field and safe value, INCLUDING a fenced code block showing the corrected config, plus how to enforce it org-wide via managed-settings.json. \"### 2. Custom Guardrails\" — a fenced code block containing an actual paste-ready guardrail rule that blocks the specific prompt or tool-call pattern this misconfiguration enables (a deployable rule, not a description of one).\n" +
         "\n" +
         "GROUNDING RULE — DO NOT HALLUCINATE: every fieldPath and evidence you report MUST be a key/value\n" +
         "that is literally present in the JSON below. Never report a field from the checklist just\n" +
@@ -128,9 +129,10 @@ public class SettingsScanAction extends ActionSupport {
         "No issues? Return: []\n" +
         "\n" +
         "Each finding: {\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"|\"CRITICAL\", \"category\":\"risky\"|\"malicious\", \"fieldPath\":\"...\", \"title\":\"...\", \"message\":\"...\", \"evidence\":\"...\", \"overview\":\"...\", \"remediation\":\"...\"}\n" +
-        "evidence MUST be the full \"key\":value pair as it appears in the input (e.g. \"disableAllHooks\":true), never just the bare value.\n" +
-        "overview: markdown with two \"## \" headed sections, \"What is this?\" (what the field/value controls) and \"Why is it dangerous?\" (concrete attack scenario it enables) — 2-4 sentences each.\n" +
-        "remediation: markdown with two \"### \" headed sections: \"1. Steps to Remediate\" (the exact field to change and what to set it to or remove) and \"2. Custom Guardrails\" (a fenced text block with a ready-to-paste guardrail prompt that blocks prompts/tool calls exploiting this specific misconfiguration).\n" +
+        "message: one concise sentence naming the specific field and the concrete risk it creates — no generic filler, and do not restate the whole config.\n" +
+        "evidence MUST be the single offending \"key\":value pair exactly as it appears in the input (e.g. \"disableAllHooks\":true or \"Bash(rm -rf *)\") — never the bare value, and never a whole array or section; cite only the one entry that triggered this finding.\n" +
+        "overview: markdown, exactly two \"## \" sections. \"## What is this?\" — name the setting and what it controls in the tool's permission/sandbox model, then what THIS value enables (explain the field, don't just restate its value); 2-3 sentences. \"## Why is it dangerous?\" — a concrete AGENTIC attack chain: how untrusted input (prompt injection, a malicious MCP tool/skill, a poisoned repo file) makes the agent exploit this on its own, bypassing the exact guardrail this value removes, ending with the concrete impact; 2-3 sentences.\n" +
+        "remediation: markdown, exactly two \"### \" sections. \"### 1. Steps to Remediate\" — numbered steps naming the exact field and safe value, INCLUDING a fenced code block showing the corrected config. \"### 2. Custom Guardrails\" — a fenced code block containing an actual paste-ready guardrail rule that blocks the specific prompt or tool-call pattern this misconfiguration enables (a deployable rule, not a description of one).\n" +
         "\n" +
         "GROUNDING RULE — DO NOT HALLUCINATE: every fieldPath and evidence you report MUST be a key/value\n" +
         "that is literally present in the JSON below. Never report a field from the checklist just\n" +
@@ -252,9 +254,10 @@ public class SettingsScanAction extends ActionSupport {
         "No issues? Return: []\n" +
         "\n" +
         "Each finding: {\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"|\"CRITICAL\", \"category\":\"risky\"|\"malicious\", \"fieldPath\":\"...\", \"title\":\"...\", \"message\":\"...\", \"evidence\":\"...\", \"overview\":\"...\", \"remediation\":\"...\"}\n" +
-        "evidence MUST be the full \"key\":value pair as it appears in the input (e.g. \"disableAllHooks\":true), never just the bare value.\n" +
-        "overview: markdown with two \"## \" headed sections, \"What is this?\" (what the restriction controls) and \"Why is it dangerous?\" (concrete attack scenario the missing/loose restriction enables) — 2-4 sentences each.\n" +
-        "remediation: markdown with two \"### \" headed sections: \"1. Steps to Remediate\" (the exact field to add/tighten in requirements.toml, with a fenced code block showing the corrected value) and \"2. Custom Guardrails\" (a fenced text block with a ready-to-paste guardrail prompt that blocks prompts/tool calls exploiting this specific gap).\n" +
+        "message: one concise sentence naming the specific field and the concrete risk it creates — no generic filler, and do not restate the whole config.\n" +
+        "evidence MUST be the single offending \"key\":value pair exactly as it appears in the input (e.g. \"disableAllHooks\":true or \"Bash(rm -rf *)\") — never the bare value, and never a whole array or section; cite only the one entry that triggered this finding.\n" +
+        "overview: markdown, exactly two \"## \" sections. \"## What is this?\" — name the restriction and what it is meant to constrain in the admin-managed model, and what its absence or looseness permits; 2-3 sentences. \"## Why is it dangerous?\" — a concrete AGENTIC attack chain: how the missing restriction lets untrusted input (prompt injection, a malicious MCP tool, a poisoned file) drive the agent past a control that should have been enforced, ending with the concrete impact; 2-3 sentences.\n" +
+        "remediation: markdown, exactly two \"### \" sections. \"### 1. Steps to Remediate\" — numbered steps naming the exact field to add or tighten in requirements.toml, INCLUDING a fenced code block showing the corrected value. \"### 2. Custom Guardrails\" — a fenced code block containing an actual paste-ready guardrail rule that blocks the specific prompt or tool-call pattern this gap enables (a deployable rule, not a description of one).\n" +
         "\n" +
         "GROUNDING RULE — DO NOT HALLUCINATE: when a rule below is about a PRESENT-but-too-permissive\n" +
         "value (e.g. \"allowed_sandbox_modes includes danger-full-access\"), you must point to that value's\n" +
@@ -321,9 +324,10 @@ public class SettingsScanAction extends ActionSupport {
         "No issues? Return: []\n" +
         "\n" +
         "Each finding: {\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"|\"CRITICAL\", \"category\":\"risky\"|\"malicious\", \"fieldPath\":\"...\", \"title\":\"...\", \"message\":\"...\", \"evidence\":\"...\", \"overview\":\"...\", \"remediation\":\"...\"}\n" +
-        "evidence MUST be the full \"key\":value pair as it appears in the input (e.g. \"disableAllHooks\":true), never just the bare value.\n" +
-        "overview: markdown with two \"## \" headed sections, \"What is this?\" (what the field/value controls) and \"Why is it dangerous?\" (concrete attack scenario it enables) — 2-4 sentences each.\n" +
-        "remediation: markdown with two \"### \" headed sections: \"1. Steps to Remediate\" (the exact field to change and what to set it to or remove) and \"2. Custom Guardrails\" (a fenced text block with a ready-to-paste guardrail prompt that blocks prompts/tool calls exploiting this specific misconfiguration).\n" +
+        "message: one concise sentence naming the specific field and the concrete risk it creates — no generic filler, and do not restate the whole config.\n" +
+        "evidence MUST be the single offending \"key\":value pair exactly as it appears in the input (e.g. \"disableAllHooks\":true or \"Bash(rm -rf *)\") — never the bare value, and never a whole array or section; cite only the one entry that triggered this finding.\n" +
+        "overview: markdown, exactly two \"## \" sections. \"## What is this?\" — name the setting and what it controls in the tool's permission/sandbox model, then what THIS value enables (explain the field, don't just restate its value); 2-3 sentences. \"## Why is it dangerous?\" — a concrete AGENTIC attack chain: how untrusted input (prompt injection, a malicious MCP tool/skill, a poisoned repo file) makes the agent exploit this on its own, bypassing the exact guardrail this value removes, ending with the concrete impact; 2-3 sentences.\n" +
+        "remediation: markdown, exactly two \"### \" sections. \"### 1. Steps to Remediate\" — numbered steps naming the exact field and safe value, INCLUDING a fenced code block showing the corrected config. \"### 2. Custom Guardrails\" — a fenced code block containing an actual paste-ready guardrail rule that blocks the specific prompt or tool-call pattern this misconfiguration enables (a deployable rule, not a description of one).\n" +
         "\n" +
         "GROUNDING RULE — DO NOT HALLUCINATE: every fieldPath and evidence you report MUST be a key/value\n" +
         "that is literally present in the JSON below, EXCEPT for the one rule below that is explicitly\n" +
