@@ -16,6 +16,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.password_reset.PasswordResetUtils;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Pair;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -328,11 +329,27 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
 
     public String updateUserScopeRoleMapping() {
         int accId = Context.accountId.get();
+
+        // Guard against a missing session — everything downstream depends on the caller identity.
+        User currentUser = getSUser();
+        if (currentUser == null) {
+            addActionError("Session not found");
+            loggerMaker.errorAndAddToDb("[updateUserScopeRoleMapping] Missing session user for account " + accId);
+            return Action.ERROR.toUpperCase();
+        }
+        int currUserId = currentUser.getId();
+
         Bson findQ = Filters.eq(User.LOGIN, email);
         User userDetails = UsersDao.instance.findOne(findQ);
 
         if (userDetails == null) {
             addActionError("User not found");
+            return Action.ERROR.toUpperCase();
+        }
+
+        // a caller must not be able to modify their own scope-role mapping via this API.
+        if (userDetails.getId() == currUserId) {
+            addActionError("You cannot perform this action on yourself");
             return Action.ERROR.toUpperCase();
         }
 
@@ -386,6 +403,76 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                     }
                 }
             }
+        }
+
+        // Per-scope role hierarchy check — replicates the isValidUpdateRole && shouldChangeRole
+        // gate from performAction's UPDATE_USER_ROLE case, but evaluated for each scope
+        // independently using the caller's role in that scope.
+        //
+        // The scopes checked are the union of (incoming request scopes) and (target's currently
+        // stored scopes).
+        //
+        // Any unexpected failure inside this block fails CLOSED: we log the exception and
+        // reject the update. Passing through would let the write happen unauthorized.
+        try {
+            RBAC callerRbac = RBACDao.getCurrentRBACForUser(currUserId, accId);
+            RBAC targetRbac = RBACDao.getCurrentRBACForUser(userDetails.getId(), accId);
+            Map<String, String> targetExistingMapping = targetRbac != null ? targetRbac.getScopeRoleMapping() : null;
+
+            Set<String> scopesToCheck = new HashSet<>();
+            if (scopeRoleMapping != null) scopesToCheck.addAll(scopeRoleMapping.keySet());
+            if (targetExistingMapping != null) scopesToCheck.addAll(targetExistingMapping.keySet());
+
+            for (String scope : scopesToCheck) {
+                if (scope == null || scope.isEmpty()) continue;
+
+                CONTEXT_SOURCE ctxScope;
+                try {
+                    ctxScope = CONTEXT_SOURCE.valueOf(scope);
+                } catch (IllegalArgumentException e) {
+                    // Scope key is not a CONTEXT_SOURCE enum value (legacy/unknown). Skip
+                    // hierarchy check — scope-validity is already enforced in the loop above
+                    // for incoming entries.
+                    continue;
+                }
+
+                Role callerRoleInScope = callerRbac != null ? callerRbac.getRoleForScope(ctxScope) : null;
+                if (callerRoleInScope == null || callerRoleInScope == Role.NO_ACCESS) {
+                    addActionError("You do not have access to modify roles for scope: " + scope);
+                    loggerMaker.errorAndAddToDb("[updateUserScopeRoleMapping] Caller " + currUserId
+                            + " has no access to scope " + scope + " while updating user " + email);
+                    return Action.ERROR.toUpperCase();
+                }
+
+                Role currentRoleInScope = targetRbac != null ? targetRbac.getRoleForScope(ctxScope) : Role.NO_ACCESS;
+                String requestedRoleStr = scopeRoleMapping != null ? scopeRoleMapping.get(scope) : null;
+                Role requestedRoleInScope = requestedRoleStr != null
+                        ? resolveRoleFromString(requestedRoleStr)
+                        : Role.NO_ACCESS;
+
+                // No-op transitions are always allowed.
+                if (currentRoleInScope == requestedRoleInScope) continue;
+
+                Role[] callerHierarchy = callerRoleInScope.getRoleHierarchy();
+                boolean isValidUpdateRole = isRoleInCallerHierarchy(currentRoleInScope, callerHierarchy);
+                boolean shouldChangeRole = isRoleInCallerHierarchy(requestedRoleInScope, callerHierarchy);
+
+                if (!isValidUpdateRole || !shouldChangeRole) {
+                    addActionError("You do not have access to modify roles for scope: " + scope);
+                    loggerMaker.errorAndAddToDb("[updateUserScopeRoleMapping] Hierarchy check failed for scope "
+                            + scope + ": callerRole=" + callerRoleInScope
+                            + ", targetCurrent=" + currentRoleInScope
+                            + ", requested=" + requestedRoleInScope
+                            + " (isValidUpdateRole=" + isValidUpdateRole
+                            + ", shouldChangeRole=" + shouldChangeRole + ")");
+                    return Action.ERROR.toUpperCase();
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "[updateUserScopeRoleMapping] Unexpected error during hierarchy check for user "
+                    + email + ": " + e.getMessage());
+            addActionError("Failed to verify permissions for scope-role update");
+            return Action.ERROR.toUpperCase();
         }
 
         try {
@@ -558,5 +645,45 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
     @Override
     public void setServletRequest(HttpServletRequest httpServletRequest) {
         this.servletRequest = httpServletRequest;
+    }
+
+    /**
+     * Resolves a role name (either a standard {@link Role} enum name or a {@link CustomRole} name)
+     * to its base {@link Role}. Returns null if the string cannot be resolved.
+     */
+    private static Role resolveRoleFromString(String roleStr) {
+        if (roleStr == null || roleStr.isEmpty()) return null;
+        try {
+            return Role.valueOf(roleStr);
+        } catch (IllegalArgumentException e) {
+            // Not a standard Role — try resolving via CustomRole. The DB lookup can
+            // fail (Mongo down, driver error); swallow so we don't tear down the caller,
+            // which is only using this for a comparison. The scope-role validation loop
+            // earlier already errors out on unresolvable request roles, so returning
+            // null here only matters for target-side values, where null falls through
+            // to isRoleInCallerHierarchy's null-allowed branch.
+            try {
+                CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
+                if (customRole != null && customRole.getBaseRole() != null) {
+                    return Role.valueOf(customRole.getBaseRole());
+                }
+            } catch (Exception ex) {
+                loggerMaker.errorAndAddToDb(ex,
+                        "[resolveRoleFromString] Failed to resolve custom role: " + roleStr);
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Hierarchy predicate used by the scope-role check.
+     */
+    private static boolean isRoleInCallerHierarchy(Role role, Role[] callerHierarchy) {
+        if (role == null || role == Role.NO_ACCESS) return true;
+        if (callerHierarchy == null) return false;
+        for (Role r : callerHierarchy) {
+            if (r != null && r.equals(role)) return true;
+        }
+        return false;
     }
 }
