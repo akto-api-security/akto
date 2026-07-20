@@ -24,15 +24,18 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-java@v2
         with:
-          distribution: 'adopt'
-          java-version: '8'
+          distribution: 'temurin'
+          java-version: '17'
           architecture: x64
       - uses: actions/setup-node@v2
         with:
           node-version: '17'
 
       - name: mvn package command
-        run: mvn package
+        # Scope to db-abstractor + its dependency modules only. This avoids building
+        # dashboard/billing/internal (maven-war-plugin 2.3, which breaks on JDK 17).
+        # Root surefire 3.2.5 + jacoco 0.8.12 let the shared modules' tests run on JDK 17.
+        run: mvn package -pl apps/database-abstractor -am
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1

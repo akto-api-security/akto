@@ -9,7 +9,7 @@
     </parent>
 
 
-    <groupId>com.akto.apps.databaseabstractor</groupId> 
+    <groupId>com.akto.apps.databaseabstractor</groupId>
     <artifactId>database-abstractor</artifactId>
     <packaging>war</packaging>
     <dependencyManagement>

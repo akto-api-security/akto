@@ -16,7 +16,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <sonar.organization>akto-api-security</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-        <jacoco.version>0.8.5</jacoco.version>     
+        <jacoco.version>0.8.12</jacoco.version>
         <jacoco.reportPath>${project.basedir}/../../target/jacoco.exec</jacoco.reportPath>
     </properties>
 
@@ -148,6 +148,13 @@
                     <append>true</append>
 				</configuration>
             </plugin>                 
+            <plugin>
+                <!-- Modern surefire so shared-module tests run on JDK 17.
+                     The default (2.12.4) crashes on JDK 9+ (broken forked classpath). -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
         </plugins>
     </build>
 
