@@ -46,7 +46,7 @@ public class SettingsScanAction extends ActionSupport {
         "that is literally present in the JSON below. Never report a field from the checklist just\n" +
         "because it's a known risky field name — only report it if you can point to its actual key\n" +
         "and value in the input JSON. If a checklist field is absent from the input, say nothing about it.\n" +
-        "For example, do NOT report disableAllHooks unless the literal key \"disableAllHooks\" appears in the JSON.\n" +
+        "For example, do NOT report disableAllHooks unless the literal text \"disableAllHooks\":true appears in the JSON. An empty \"hooks\" object, or hook events mapped to empty arrays, is NOT disableAllHooks — never infer disableAllHooks from empty or unused hooks.\n" +
         "\n" +
         "A configured value is NOT automatically a risk. A default value or an expected setting is not a\n" +
         "finding — flag only a value that is genuinely dangerous per a rule below, report the specific\n" +
@@ -61,7 +61,8 @@ public class SettingsScanAction extends ActionSupport {
         "  \"dontAsk\" | \"auto\" | \"acceptEdits\"  ->  HIGH / risky\n" +
         "\n" +
         "--- permissions.allow ---\n" +
-        "  ONLY flag an entry scoped with a wildcard or glob: Bash(*), Read(*), Write(*), Edit(*), WebFetch(*)  ->  HIGH / risky\n" +
+        "  Flag ONLY an unrestricted whole-tool wildcard whose entire scope is \"*\": Bash(*), Read(*), Write(*), Edit(*), WebFetch(*)  ->  HIGH / risky\n" +
+        "  A command-scoped rule that locks the command prefix — e.g. Bash(go test *), Bash(git log *), Bash(npm run *) — is SAFE and must NOT be flagged even though it contains a '*'; the '*' only wildcards the arguments of an already-restricted command.\n" +
         "  Entry pointing at a credential path: .ssh, .aws, .kube, .gnupg, .npmrc, .pypirc, .netrc  ->  HIGH / malicious\n" +
         "  DO NOT flag bare tool-name grants (\"Read\", \"Write\", \"Edit\", \"Bash\", \"WebFetch\", \"Glob\", \"Grep\", \"Agent\", \"Skill\", MCP tool names, etc.) — an explicit allowlist of tool names is normal, expected Claude Code config, not a risk. Report only the specific offending entry, never permissions.allow as a whole.\n" +
         "\n" +
@@ -104,7 +105,9 @@ public class SettingsScanAction extends ActionSupport {
         "NOW SCAN THE JSON BELOW. CHECK EVERY FIELD THAT EXISTS. Report ONLY fields that are actually\n" +
         "present in this JSON — do not report a checklist field that this JSON does not contain.";
 
-    private static final String CODEX_SCAN_PROMPT = "You are a security analyst auditing an OpenAI Codex CLI config.toml file. Find EVERY security risk — do not skip any present field.\n" +
+    private static final String CODEX_SCAN_PROMPT = "You are a security analyst auditing an OpenAI Codex CLI config.toml file. Report genuine security risks with high precision — a default, vendor-shipped, or benign-plumbing value is NOT a risk and must not be reported.\n" +
+        "\n" +
+        "HARD RULE — HIGHEST PRIORITY, overrides every rule below: NEVER report a command, args entry, notify target, or env value whose value is a path INSIDE an application bundle (the value contains \".app/\"). Those are the tool's own vendor-shipped binaries — e.g. Codex's node_repl at /Applications/Codex.app/..., or the Codex Computer Use notifier under a \"...Codex Computer Use.app/...\" path. Being located inside the app bundle is PROOF it is first-party and SAFE — it is NEVER, by itself, a reason to flag.\n" +
         "\n" +
         "DO NOT FLAG (ignore these completely — cosmetic/benign fields):\n" +
         "- All tui.* fields (theme, keymap, animations, notifications, status_line, terminal_title, etc.) — purely cosmetic\n" +
