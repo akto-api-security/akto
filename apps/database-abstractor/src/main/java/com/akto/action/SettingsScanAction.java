@@ -61,8 +61,9 @@ public class SettingsScanAction extends ActionSupport {
         "  \"dontAsk\" | \"auto\" | \"acceptEdits\"  ->  HIGH / risky\n" +
         "\n" +
         "--- permissions.allow ---\n" +
-        "  Flag ONLY an unrestricted whole-tool wildcard whose entire scope is \"*\": Bash(*), Read(*), Write(*), Edit(*), WebFetch(*)  ->  HIGH / risky\n" +
-        "  A command-scoped rule that locks the command prefix — e.g. Bash(go test *), Bash(git log *), Bash(npm run *) — is SAFE and must NOT be flagged even though it contains a '*'; the '*' only wildcards the arguments of an already-restricted command.\n" +
+        "  A bare whole-tool wildcard whose entire scope is \"*\": Bash(*), Read(*), Write(*), Edit(*), WebFetch(*)  ->  HIGH / risky\n" +
+        "  A command-scoped rule locks the command prefix and only wildcards its arguments — e.g. Bash(go test *), Bash(go build *), Bash(git log *), Bash(git checkout *), Bash(npm run *), Bash(make *). These are normal dev allowlists and MUST NOT be flagged. This holds for any ordinary build/test/VCS/package command (go, git, npm, yarn, pnpm, make, cargo, mvn, gradle, docker, kubectl, etc.).\n" +
+        "  Exception — a command-scoped rule IS risky only when the locked command is itself destructive or exfil-capable: Bash(rm *), Bash(sudo *), Bash(curl *), Bash(wget *), Bash(chmod *), Bash(dd *), Bash(eval *)  ->  HIGH / risky\n" +
         "  Entry pointing at a credential path: .ssh, .aws, .kube, .gnupg, .npmrc, .pypirc, .netrc  ->  HIGH / malicious\n" +
         "  DO NOT flag bare tool-name grants (\"Read\", \"Write\", \"Edit\", \"Bash\", \"WebFetch\", \"Glob\", \"Grep\", \"Agent\", \"Skill\", MCP tool names, etc.) — an explicit allowlist of tool names is normal, expected Claude Code config, not a risk. Report only the specific offending entry, never permissions.allow as a whole.\n" +
         "\n" +
