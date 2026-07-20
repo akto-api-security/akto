@@ -1390,11 +1390,18 @@ public class TestExecutor {
             testResults.setTestResults(res);
         }
         int endTime = Context.now();
+        boolean templateAllowsAutomated = varMap.containsKey("agenticTestingAllowed") && Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
+        boolean runAutomatedPentest = TestingConfigurations.getInstance().isRunAutomatedTests() && templateAllowsAutomated;
 
         boolean vulnerable = false;
         for (GenericTestResult testResult: testResults.getTestResults()) {
             if (testResult == null) continue;
             vulnerable = vulnerable || testResult.isVulnerable();
+
+            // Do not override for smart testing
+            if (runAutomatedPentest) {
+                continue;
+            }
             try {
                 testResult.setConfidence(Confidence.valueOf(severity));
             } catch (Exception e){
