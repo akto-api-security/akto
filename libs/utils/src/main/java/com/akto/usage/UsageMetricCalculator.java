@@ -156,7 +156,7 @@ public class UsageMetricCalculator {
 
         return deactivatedIds;
     }
-
+    
     public static Bson excludeDemosAndDeactivated(String key){
         List<Integer> demos = new ArrayList<>(getDemos());
         List<Integer> deactivated = new ArrayList<>(getDeactivatedLatest());

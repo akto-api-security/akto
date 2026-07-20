@@ -633,7 +633,7 @@ public class Utils {
     public static TestingRunResult generateFailedRunResultForMessage(ObjectId testingRunId,ApiInfoKey apiInfoKey, String testSuperType, 
         String testSubType, ObjectId testRunResultSummaryId, List<String> messages, String errorMessage) {
 
-        TestingRunResult testingRunResult = null;
+        TestingRunResult testingRunResult = null;       
         Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
         List<GenericTestResult> testResults = new ArrayList<>();
         String failMessage = errorMessage;
