@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
 import {
@@ -7,6 +7,7 @@ import {
     Card,
     HorizontalGrid,
     HorizontalStack,
+    Modal,
     Text,
     VerticalStack,
 } from "@shopify/polaris";
@@ -15,7 +16,7 @@ import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithM
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import DonutChart from "@/apps/dashboard/components/shared/DonutChart";
-import SmoothAreaChart from "@/apps/dashboard/pages/dashboard/new_components/SmoothChart";
+import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
 import AgenticStatsCard from "@/apps/dashboard/pages/observe/agentic/AgenticStatsCard";
 import AgenticTopListCard from "@/apps/dashboard/pages/observe/agentic/AgenticTopListCard";
 import AssetIcon from "@/apps/dashboard/pages/observe/agentic/AssetIcon";
@@ -34,9 +35,11 @@ import { formatDisplayName } from "@/apps/dashboard/pages/observe/agentic/mcpCli
 import { extractServiceName } from "@/apps/dashboard/pages/observe/agentic/constants";
 
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
-import guardrailsApi from "../api";
+import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph";
+import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
+import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
-import { SPARKLINE_LABELS } from "./violationsData";
+import { normalizeReasonPunctuation, coerceToText, sanitizeDisplayText } from "./violationsData";
 
 // ─── Method → display type mapping ──────────────────────────────────────────────
 
@@ -68,14 +71,8 @@ function detectOs(host) {
     return null;
 }
 
-// Strip leading 32-char hex device UUID and return a readable name for the asset.
-// "841e96caaafa4b088571496c7472eb2a.claude-cli-project.filesystem" → "Claude CLI Project"
-// "vulnerable-agent-kong.akto.io" (no UUID prefix) → returned as-is
-// Returns the service/agent name from a hostname regardless of how many dot-segments it has.
-// Handles: device.agent.service (3 parts), device.service (2 parts), and hex-prefixed formats.
 function getAssetServiceName(raw) {
     if (!raw) return null;
-    // hex-prefixed legacy: <32hexchars>.<rest>
     const hex = raw.match(/^[0-9a-f]{32}\.(.+)$/i);
     if (hex) return hex[1].split('.')[0];
     const parts = raw.split('.');
@@ -83,7 +80,7 @@ function getAssetServiceName(raw) {
         const svc = extractServiceName(raw);
         return (svc && svc !== raw) ? svc : parts[parts.length - 1];
     }
-    if (parts.length === 2) return parts[1]; // device.service format
+    if (parts.length === 2) return parts[1];
     return raw;
 }
 
@@ -150,83 +147,84 @@ function StatusCellRenderer({ value }) {
 
 // ─── Column definitions ─────────────────────────────────────────────────────────
 
-const SEVERITY_RANK = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-const severityComparator = (a, b) => (SEVERITY_RANK[a] ?? 99) - (SEVERITY_RANK[b] ?? 99);
-
 const DEFAULT_COL_DEF = {
     sortable: true,
     resizable: true,
-    filter: true,
+    filter: false,
     cellStyle: { display: "flex", alignItems: "center" },
 };
 
-const COL_DEFS = [
-    {
-        field: "detected",
-        headerName: "Detected",
-        minWidth: 150,
-        filter: false,
-        valueFormatter: p => p.value != null ? func.epochToDateTime(p.value) : "",
-    },
-    {
-        field: "type",
-        headerName: "Type",
-        minWidth: 100,
-        filter: "agSetColumnFilter",
-        cellRenderer: TypeCellRenderer,
-    },
-    {
-        field: "evidenceText",
-        headerName: "Evidence",
-        width: 200,
-        minWidth: 200,
-        suppressAutoSize: true,
-        sortable: false,
-        filter: false,
-        cellRenderer: EvidenceCellRenderer,
-    },
-    {
-        field: "severity",
-        headerName: "Severity",
-        minWidth: 110,
-        sort: "asc",
-        comparator: severityComparator,
-        filter: "agSetColumnFilter",
-        cellRenderer: SeverityCellRenderer,
-    },
-    {
-        field: "user",
-        headerName: "User",
-        minWidth: 140,
-        cellRenderer: UserCellRenderer,
-    },
-    {
-        field: "agenticAsset",
-        headerName: "Agentic Asset",
-        minWidth: 160,
-        cellRenderer: AssetCellRenderer,
-    },
-    {
-        field: "action",
-        headerName: "Actions",
-        minWidth: 110,
-        filter: "agSetColumnFilter",
-        cellRenderer: ActionCellRenderer,
-    },
-    {
-        field: "policyName",
-        headerName: "Policy Triggered",
-        minWidth: 160,
-        filter: "agSetColumnFilter",
-    },
-    {
-        field: "_status",
-        headerName: "Status",
-        minWidth: 110,
-        filter: "agSetColumnFilter",
-        cellRenderer: StatusCellRenderer,
-    },
-];
+// Column defs are built dynamically so we can inject backend filter values.
+function buildColDefs(filterValues) {
+    return [
+        {
+            field: "detected",
+            headerName: "Detected",
+            minWidth: 150,
+            valueFormatter: p => p.value != null ? func.epochToDateTime(p.value) : "",
+        },
+        {
+            field: "type",
+            headerName: "Type",
+            minWidth: 100,
+            sortable: false,
+            cellRenderer: TypeCellRenderer,
+        },
+        {
+            field: "evidenceText",
+            headerName: "Evidence",
+            width: 200,
+            minWidth: 200,
+            suppressAutoSize: true,
+            sortable: false,
+            cellRenderer: EvidenceCellRenderer,
+        },
+        {
+            field: "severity",
+            headerName: "Severity",
+            minWidth: 110,
+            filter: "agSetColumnFilter",
+            filterParams: { values: ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
+            cellRenderer: SeverityCellRenderer,
+        },
+        {
+            field: "user",
+            headerName: "User",
+            minWidth: 140,
+            filter: "agSetColumnFilter",
+            filterParams: { values: filterValues.hosts || [] },
+            cellRenderer: UserCellRenderer,
+        },
+        {
+            field: "agenticAsset",
+            headerName: "Agentic Asset",
+            minWidth: 160,
+            sortable: false,
+            cellRenderer: AssetCellRenderer,
+        },
+        {
+            field: "action",
+            headerName: "Actions",
+            minWidth: 110,
+            sortable: false,
+            cellRenderer: ActionCellRenderer,
+        },
+        {
+            field: "policyName",
+            headerName: "Policy Triggered",
+            minWidth: 160,
+            filter: "agSetColumnFilter",
+            filterParams: { values: filterValues.subCategory || [] },
+        },
+        {
+            field: "_status",
+            headerName: "Status",
+            minWidth: 110,
+            sortable: false,
+            cellRenderer: StatusCellRenderer,
+        },
+    ];
+}
 
 const AUTO_SIZE_STRATEGY = { type: "fitCellContents" };
 
@@ -241,7 +239,7 @@ const SEVERITY_COLORS = {
 
 const STATUS_COLORS = {
     OPEN: "#9642FC",
-    FIXED: "#5BC0DE",
+    UNDER_REVIEW: "#637381",
     IGNORED: "#F5C451",
 };
 
@@ -259,7 +257,6 @@ function parseMetadata(raw) {
     if (!raw) return {};
     if (typeof raw === "object") return raw;
     try { return JSON.parse(raw); } catch {}
-    // Fallback: parse YAML-like format — key: "value" one per line
     const result = {};
     for (const line of raw.split('\n')) {
         const trimmed = line.trim();
@@ -279,7 +276,6 @@ function parseAktoPayload(payloadStr) {
     try {
         const outer = JSON.parse(payloadStr);
         const safeJson = s => { try { return JSON.parse(s); } catch { return null; } };
-        // Support both camelCase (Akto format) and snake_case (session-manager format)
         const reqStr = outer.requestPayload || outer.request_body;
         const respStr = outer.responsePayload || outer.response_body;
         const req = reqStr ? safeJson(reqStr) : null;
@@ -288,95 +284,37 @@ function parseAktoPayload(payloadStr) {
     } catch { return {}; }
 }
 
-// Extract the user-visible text from a messages array ({role, content} objects).
-// Handles: plain string, JSON-stringified array, Anthropic content-block arrays.
-function extractUserMessageContent(messages) {
-    if (!messages) return null;
-
-    let arr = messages;
-    if (typeof messages === "string") {
-        try { arr = JSON.parse(messages); } catch { return messages.trim() || null; }
-    }
-
-    if (!Array.isArray(arr) || arr.length === 0) return null;
-
-    // Prefer the last user-role message; fall back to the last message of any role
-    const userMsgs = arr.filter(m => !m.role || m.role === "user");
-    const target = userMsgs[userMsgs.length - 1] || arr[arr.length - 1];
-    if (!target) return null;
-
-    const c = target.content;
-    if (typeof c === "string") return c.trim() || null;
-    // Anthropic content-block array: [{type:"text", text:"..."}]
-    if (Array.isArray(c)) {
-        const textBlock = c.find(b => b.type === "text");
-        return textBlock?.text?.trim() || null;
-    }
-    return null;
-}
-
-function extractGuardrailEvidence(payloadStr) {
-    const { req, raw } = parseAktoPayload(payloadStr);
-
-    // 1. Request messages array (LLM API body — OpenAI / Anthropic / direct payload format)
-    // raw?.messages handles direct LLM request bodies not wrapped in requestPayload
-    // req?.body?.messages handles nested body format
-    const messages = req?.messages || req?.body?.messages || raw?.messages;
-    if (messages) {
-        const content = extractUserMessageContent(messages);
-        if (content) return content;
-    }
-
-    // 2. Request prompt (non-chat LLM APIs and skill file chunks).
-    // Skill validation wraps each chunk as {"prompt": content} with no outer requestPayload key,
-    // so req is null and the content lives on raw.
-    if (req?.prompt) return String(req.prompt).trim() || null;
-    if (raw?.prompt) return String(raw.prompt).trim() || null;
-
-    // 3. Request input (tool-call arguments: {"input": {...}} or {"arguments": {...}}).
-    // Tool violations store the tool call body directly, so req is null and input is on raw.
-    if (req?.input) return typeof req.input === "string" ? req.input.trim() || null : JSON.stringify(req.input);
-    if (raw?.input) return typeof raw.input === "string" ? raw.input.trim() || null : JSON.stringify(raw.input);
-    if (raw?.arguments) return typeof raw.arguments === "string" ? raw.arguments.trim() || null : JSON.stringify(raw.arguments);
-
-    // 4. Schema-extracted content ({"text": "extracted field value"})
-    if (raw?.text) return String(raw.text).trim() || null;
-
-    // 5. Skill/Tool metadata payloads ({"skill_description": "...", "skill_name": "..."})
-    if (req?.skill_description) return String(req.skill_description).trim() || null;
-    if (raw?.skill_description) return String(raw.skill_description).trim() || null;
-
-    // 6. Request message / title (config-scan events)
-    if (req?.message) return String(req.message);
-    if (req?.title) return String(req.title);
-
-    // Response error reason is intentionally excluded — it is the block message,
-    // not the user's sent content. It appears as triggerReason instead.
+function deriveSkillOrToolName(url) {
+    if (!url) return null;
+    const skillMatch = url.match(/\/skills\/([^/?#]+)/i);
+    if (skillMatch) return skillMatch[1];
+    const toolMatch = url.match(/\/tools\/([^/?#]+)/i);
+    if (toolMatch) return toolMatch[1];
+    const mcpToolMatch = url.match(/\/mcp\/([^/?#]+)/i);
+    if (mcpToolMatch) return mcpToolMatch[1];
     return null;
 }
 
 function deriveAgenticType(url, method) {
     const lower = (url || "").toLowerCase();
-    // match by URL path segments (no leading slash required)
     if (lower.includes("tool"))                                        return "Tool";
     if (lower.includes("skill"))                                       return "Skill";
     if (lower.includes("resource"))                                    return "Resource";
     if (lower.includes("prompt"))                                      return "Prompt";
     if (lower.includes("config") || lower.includes("setting"))        return "Config";
     if (lower.includes("mcp") || lower.includes("server"))            return "Tool";
-    // LLM-style API endpoints → Prompt
     if (lower.includes("message") || lower.includes("completion") || lower.includes("chat")) return "Prompt";
-    // fall back to HTTP method, then default to Prompt for unknown agentic violations
     const m = method ? String(method).toUpperCase() : null;
     return METHOD_TO_TYPE[m] || "Prompt";
 }
 
-function transformEvent(event, policiesMap, collectionsMap, usernameMap, policyIdByName = {}) {
+// Transform a single backend event into a table row.
+// Kept lightweight — runs only on the current page of results (not all data).
+function transformEvent(event, collectionsMap, usernameMap) {
     const meta = parseMetadata(event.metadata);
     const typeLabel = deriveAgenticType(event.url, event.method);
 
-    // Extract behaviour from response payload then metadata; default to "Flagged"
-    const { resp: respPayload } = parseAktoPayload(event.payload);
+    const { req: reqPayload, resp: respPayload } = parseAktoPayload(event.payload);
     const rawBehaviour = respPayload?.error?.data?.behaviour || meta.behaviour || meta.nbehaviour || null;
     const action = rawBehaviour === "block" ? "Blocked"
         : (rawBehaviour === "warn" || rawBehaviour === "flag") ? "Flagged"
@@ -387,216 +325,199 @@ function transformEvent(event, policiesMap, collectionsMap, usernameMap, policyI
     const resolvedUser = getUsernameForCollection({ displayName: rawHost }, usernameMap || {});
     const userDisplay = (resolvedUser && resolvedUser !== "-") ? resolvedUser : (rawHost ? rawHost.split('.')[0] : "-");
 
-    // Evidence priority: actual request content first, then metadata fields, then the
-    // guardrail trigger reason from the response (mirrors what buildFallbackDetail shows
-    // in the flyout — ensures the table column is never blank when the flyout has content).
-    const rawGuardrailReason = respPayload?.error?.data?.reason
-        || respPayload?.error?.message
-        || respPayload?.message
-        || respPayload?.reason
-        || null;
-    const evidenceText = extractUserMessageContent(meta.messages || meta.nmessages)
-        || extractGuardrailEvidence(event.payload)
-        || meta.evidenceText || meta.evidence
-        || (meta.prompt ? String(meta.prompt) : null)
-        || (meta.nprompt ? String(meta.nprompt) : null)
-        || (meta.phrase ? String(meta.phrase) : null)
-        || (meta.message ? String(meta.message) : null)
-        || rawGuardrailReason
-        || null;
-
     const rawAsset = collectionsMap?.[event.apiCollectionId] || meta.agenticAsset || meta.agentName || event.host || null;
     const agenticAssetTag = rawAsset ? getAssetServiceName(rawAsset) : null;
+    const skillOrToolName = deriveSkillOrToolName(event.url);
 
-    const resolvedPolicyName = meta.policy_name || meta.policyName || meta.npolicy_name || policiesMap[event.filterId] || event.filterId || "-";
-
-    // Policy's CONFIGURED behaviour (metadata) — distinct from rawBehaviour above, which is the
-    // action actually taken. For an "approval" policy that blocked, metadata.behaviour is
-    // "approval" while the response payload's behaviour is "block". The approve-server action
-    // must key off the configured (metadata) behaviour.
-    const policyBehaviour = meta.behaviour || meta.nbehaviour || rawBehaviour || null;
+    const isPromptOrTool = typeLabel === "Prompt" || typeLabel === "Tool";
+    const primaryValue = sanitizeDisplayText(coerceToText(isPromptOrTool
+        ? (reqPayload?.body || null)
+        : typeLabel === "Skill" ? (respPayload?.evidence || null) : (reqPayload?.evidence || null)), 300);
 
     return {
         id: event.id,
+        apiCollectionId: event.apiCollectionId,
         detected: event.timestamp,
         type: typeLabel,
         violation: meta.rule_violated || meta.nrule_violated || meta.nruleViolated || event.subCategory || event.filterId || "-",
         severity: (event.severity || "HIGH").toUpperCase(),
-        evidenceText,
+        evidenceText: primaryValue || normalizeReasonPunctuation(meta.reason) || "-",
         user: userDisplay,
         userHost: rawHost,
-        agenticAsset: formatAssetDisplayName(rawAsset),
+        agenticAsset: skillOrToolName || formatAssetDisplayName(rawAsset),
         agenticAssetRaw: rawAsset,
-        agenticAssetTag,
+        agenticAssetTag: skillOrToolName ? (typeLabel === "Skill" ? "skill" : typeLabel === "Tool" ? "tool" : agenticAssetTag) : agenticAssetTag,
         action,
-        behaviour: policyBehaviour,
-        policyName: resolvedPolicyName,
-        policyId: policyIdByName[resolvedPolicyName] || null,
+        policyName: meta.policy_name || meta.npolicy_name || event.filterId || "-",
         _status: event.status || "ACTIVE",
         payload: event.payload || null,
+        metadata: event.metadata || null,
         sessionId: event.sessionId || null,
         deviceId: rawHost,
     };
 }
 
-function computeSummary(rows) {
-    const total = rows.length;
+// ─── Dashboard summary section ───────────────────────────────────────────────────
 
-    // severity breakdown
-    const sevCounts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
-    rows.forEach(r => { if (sevCounts[r.severity] !== undefined) sevCounts[r.severity]++; });
+function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, latencyData, startTimestamp, endTimestamp }) {
+    if (summaryLoading) return <SpinnerCentered />;
+    if (!summaryData) return null;
+
+    const { severityDistribution, categoryTotal, statusCounts, topPolicies, topHosts, byType } = summaryData;
+
     const totalBreakdown = ["CRITICAL", "HIGH", "MEDIUM", "LOW"].map(k => ({
         label: k.charAt(0) + k.slice(1).toLowerCase(),
-        count: sevCounts[k],
+        count: severityDistribution[k] || 0,
         color: SEVERITY_COLORS[k],
         key: k,
     }));
 
-    // open count
-    const statusCounts = { ACTIVE: 0, IGNORED: 0, FIXED: 0 };
-    rows.forEach(r => { const s = r._status?.toUpperCase(); if (s in statusCounts) statusCounts[s]++; });
-
-    const openBreakdown = [
-        { label: "Open",    count: statusCounts.ACTIVE,  color: STATUS_COLORS.OPEN,    key: "OPEN" },
-        { label: "Fixed",   count: statusCounts.FIXED,   color: STATUS_COLORS.FIXED,   key: "FIXED" },
-        { label: "Ignored", count: statusCounts.IGNORED, color: STATUS_COLORS.IGNORED, key: "IGNORED" },
+    const otherBreakdown = [
+        { label: "Under Review", count: statusCounts.UNDER_REVIEW || 0, color: STATUS_COLORS.UNDER_REVIEW || "#F5A623", key: "UNDER_REVIEW" },
+        { label: "Ignored",      count: statusCounts.IGNORED || 0,      color: STATUS_COLORS.IGNORED, key: "IGNORED" },
     ];
 
-    // top users
-    const userMap = {};
-    rows.forEach(r => { if (r.user && r.user !== "-") userMap[r.user] = (userMap[r.user] || 0) + 1; });
-    const topUsers = Object.entries(userMap)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([name, count], i) => ({
-            id: `u${i}`, name, count, os: null,
-            sparkline: [0, 0, 0, 0, 0, 0, count],
-        }));
-
-    // top policies
-    const policyMap = {};
-    rows.forEach(r => { if (r.policyName && r.policyName !== "-") policyMap[r.policyName] = (policyMap[r.policyName] || 0) + 1; });
-    const topPolicies = Object.entries(policyMap)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([name, count], i) => ({
-            id: `p${i}`, name, count,
-            sparkline: [0, 0, 0, 0, 0, 0, count],
-        }));
-
-    // violations by type
-    const typeMap = {};
-    rows.forEach(r => { if (r.type) typeMap[r.type] = (typeMap[r.type] || 0) + 1; });
-    const byType = {};
-    Object.entries(typeMap).forEach(([t, c]) => {
-        byType[t] = { text: c, color: TYPE_COLORS[t] || "#999", filterKey: t };
-    });
-
-    return {
-        totalSummary: { total, delta: 0, sparkline: [0, 0, 0, 0, 0, 0, total], breakdown: totalBreakdown },
-        openSummary: { total: statusCounts.ACTIVE, delta: 0, sparkline: [0, 0, 0, 0, 0, 0, statusCounts.ACTIVE], breakdown: openBreakdown },
-        topUsers,
-        topPolicies,
-        byType,
-    };
-}
-
-// ─── Leaderboard rows → AgenticTopListCard format ────────────────────────────────
-
-function buildTopListRows(items) {
-    return items.map((item) => ({
-        id: item.id,
+    const policyRows = topPolicies.map((item, i) => ({
+        id: `p${i}`,
         name: item.name,
-        type: item.type,
-        os: item.os,
-        renderValue: () => (
-            <HorizontalStack gap="3" blockAlign="center" align="end" wrap={false}>
-                <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>
-                <SmoothAreaChart tickPositions={item.sparkline} color="#EF4444" height={28} width={90} labels={SPARKLINE_LABELS} enableHover />
-            </HorizontalStack>
-        ),
-    }));
-}
-
-// ─── Dashboard summary section ───────────────────────────────────────────────────
-
-function ViolationsDashboard({ totalSummary, openSummary, topUsers, topPolicies, byType, severityFilter, onSeverityFilter, statusFilter, onStatusFilter, policyFilter, onPolicyFilter, userFilter, onUserFilter }) {
-    const policyRows = buildTopListRows(topPolicies).map((row) => ({
-        ...row,
-        onClick: (r) => onPolicyFilter?.(r.name),
+        count: item.count,
+        onClick: () => onPolicyClick?.(item.name),
+        renderValue: () => <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>,
     }));
 
-    const userRows = buildTopListRows(topUsers).map((row) => ({
-        ...row,
-        onClick: (r) => onUserFilter?.(r.name),
+    const hostRows = (topHosts || []).slice(0, 5).map((item, i) => ({
+        id: `h${i}`,
+        name: item.name,
+        count: item.count,
+        os: detectOs(item.host),
+        onClick: () => onHostClick?.(item.host),
+        renderValue: () => <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>,
     }));
+
+    // Latency graph is Akto-internal only (matches the same gate on ThreatDetectionPage.jsx).
+    // Everyone else gets Open/Other Violations side by side instead of stacked, since there's
+    // no third column to fill the space next to them.
+    // TEMP: forced off to preview the non-Akto layout — revert before shipping.
+    // const isAktoUser = window.USER_NAME?.includes('@akto.io');
+    const isAktoUser = false;
+
+    const openCard = (
+        <Box
+            className="violations-card-wrap"
+            style={selectedCard === "open" ? { outline: "1px solid var(--p-color-border-critical)" } : undefined}
+            onClick={onOpenCardClick}
+        >
+            <AgenticStatsCard
+                title="Open Violations"
+                titleTooltip="Active violations that need attention, broken down by severity. Click a severity to filter the table below."
+                total={statusCounts.ACTIVE || 0}
+                delta={0}
+                deltaColor="subdued"
+                breakdown={totalBreakdown}
+                onFilterClick={onSeverityClick}
+                activeFilter={activeSeverityFilter}
+                bodyGap="4"
+            />
+        </Box>
+    );
+
+    const otherCard = (
+        <Box
+            className="violations-card-wrap"
+            style={selectedCard === "other" ? { outline: "1px solid var(--p-color-border-critical)" } : undefined}
+            onClick={onOtherCardClick}
+        >
+            <AgenticStatsCard
+                title="Other Violations"
+                titleTooltip="Violations that are under review or ignored. Click a status to filter the table."
+                total={(statusCounts.UNDER_REVIEW || 0) + (statusCounts.IGNORED || 0)}
+                delta={0}
+                deltaColor="subdued"
+                breakdown={otherBreakdown}
+                onFilterClick={onOtherBreakdownClick}
+                activeFilter={selectedCard === "other" ? new Set([activeStatusValue]) : undefined}
+                bodyGap="4"
+            />
+        </Box>
+    );
 
     return (
         <VerticalStack gap="4">
-            <HorizontalGrid columns={2} gap="4">
-                <AgenticStatsCard
-                    title="Total Violations"
-                    total={totalSummary.total}
-                    delta={totalSummary.delta}
-                    deltaColor="subdued"
-                    sparklineCounts={totalSummary.sparkline}
-                    sparklineColor="#EF4444"
-                    sparklineLabels={SPARKLINE_LABELS}
-                    breakdown={totalSummary.breakdown}
-                    onFilterClick={onSeverityFilter}
-                    activeFilter={severityFilter}
-                />
-                <AgenticStatsCard
-                    title="Open Violations"
-                    total={openSummary.total}
-                    delta={openSummary.delta}
-                    deltaColor="subdued"
-                    sparklineCounts={openSummary.sparkline}
-                    sparklineColor="#EF4444"
-                    sparklineLabels={SPARKLINE_LABELS}
-                    breakdown={openSummary.breakdown}
-                    onFilterClick={onStatusFilter}
-                    activeFilter={statusFilter}
-                />
-            </HorizontalGrid>
+            {isAktoUser ? (
+                <HorizontalGrid columns={2} gap="4" alignItems="start">
+                    <VerticalStack gap="4">
+                        {openCard}
+                        {otherCard}
+                    </VerticalStack>
+                    <P95LatencyGraph
+                        title={`${mapLabel("Guardrail", getDashboardCategory())} Detection Latency`}
+                        subtitle="95th percentile latency metrics for guardrail detection"
+                        dataType="threat-security"
+                        startTimestamp={startTimestamp}
+                        endTimestamp={endTimestamp}
+                        latencyData={latencyData}
+                        height={230}
+                    />
+                </HorizontalGrid>
+            ) : (
+                <HorizontalGrid columns={2} gap="4" alignItems="center">
+                    {openCard}
+                    {otherCard}
+                </HorizontalGrid>
+            )}
 
             <HorizontalGrid columns={3} gap="4">
                 <AgenticTopListCard
                     title="Violations by Top Users"
+                    titleTooltip="Top 5 users by number of violations. Click a user to filter the table below."
                     columns={[{ label: "User" }, { label: "Violations" }]}
-                    rows={userRows}
+                    rows={hostRows}
                     renderIcon={(row) => <OsIcon os={row.os} size={20} />}
-                    activeRows={userFilter}
+                    activeRows={activeHostFilter}
+                    onClearSelection={onClearHostSelection}
                 />
                 <AgenticTopListCard
                     title="Top Policies Triggered"
+                    titleTooltip="Top 5 guardrail policies by number of active violations. Click a policy to filter the table below."
                     columns={[{ label: "Policy" }, { label: "Count" }]}
                     rows={policyRows}
                     renderIcon={() => null}
-                    activeRows={policyFilter}
+                    activeRows={activePolicyFilter}
+                    onClearSelection={onClearPolicySelection}
                 />
                 <Card padding="0">
                     <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="4" paddingBlockEnd="3">
-                        <Text variant="headingSm">Violations by Type</Text>
+                        <HorizontalStack gap="1" blockAlign="center">
+                            <Text variant="headingSm">Violations by Type</Text>
+                            <InfoTooltipIcon content="Active violations grouped by type. Click a segment or label to filter the table below." />
+                        </HorizontalStack>
                     </Box>
                     <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockEnd="4">
                         <VerticalStack gap="2">
                             <HorizontalStack align="center">
                                 <DonutChart
                                     data={byType}
-                                    title={totalSummary.total}
+                                    title={categoryTotal}
                                     subtitle="Violations"
                                     size={180}
                                     pieInnerSize="55%"
+                                    onSegmentClick={onTypeClick}
                                 />
                             </HorizontalStack>
                             {Object.keys(byType).length > 0 && (
-                                <HorizontalStack gap="3" wrap align="center">
+                                <HorizontalStack gap="2" wrap align="center">
                                     {Object.entries(byType).map(([label, seg]) => (
-                                        <HorizontalStack key={label} gap="1" blockAlign="center">
-                                            <Box className="agentic-dot" style={{ "--dot-color": seg.color }} />
-                                            <Text variant="bodySm" color="subdued">{label} ({seg.text})</Text>
-                                        </HorizontalStack>
+                                        <Box
+                                            key={label}
+                                            className="agentic-chip"
+                                            style={activeTypeFilter === label ? { borderColor: "var(--p-color-border)", background: "var(--p-color-bg-subdued)" } : undefined}
+                                            onClick={() => onTypeClick?.(label)}
+                                        >
+                                            <HorizontalStack gap="1" blockAlign="center">
+                                                <Box className="agentic-dot" style={{ "--dot-color": seg.color }} />
+                                                <Text variant="bodySm" color={activeTypeFilter === label ? undefined : "subdued"} fontWeight={activeTypeFilter === label ? "semibold" : undefined}>{label} ({seg.text})</Text>
+                                            </HorizontalStack>
+                                        </Box>
                                     ))}
                                 </HorizontalStack>
                             )}
@@ -616,13 +537,14 @@ function Violations() {
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
     const legacyPath = isEndpointSecurityCategory() ? "/dashboard/protection/threat-activity" : "/dashboard/guardrails/activity";
+    const canUseNewLayout = func.isDemoAccount() || window.ACTIVE_ACCOUNT === 1726615470;
 
     useEffect(() => {
-        // New layout is only available to demo accounts; everyone else stays on the legacy page.
-        if (!func.isDemoAccount() || !newLayout) {
+        if (!canUseNewLayout || !newLayout) {
+            if (newLayout) setGuardrailViolationsNewLayout(false);
             navigate(legacyPath, { replace: true });
         }
-    }, [navigate, legacyPath]);
+    }, [navigate, legacyPath, canUseNewLayout, newLayout, setGuardrailViolationsNewLayout]);
 
     const handleLayoutToggle = useCallback((checked) => {
         setGuardrailViolationsNewLayout(checked);
@@ -630,116 +552,384 @@ function Violations() {
     }, [navigate, setGuardrailViolationsNewLayout, legacyPath]);
 
     const [rows, setRows] = useState([]);
-    const [summary, setSummary] = useState(null);
-    const [loading, setLoading] = useState(false);
+    const [summaryData, setSummaryData] = useState(null);
+    const [summaryLoading, setSummaryLoading] = useState(true);
     const [selectedViolation, setSelectedViolation] = useState(null);
+    const [bulkSelectedCount, setBulkSelectedCount] = useState(0);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [filterValues, setFilterValues] = useState({ hosts: [], subCategory: [] });
+    const [latencyData, setLatencyData] = useState([]);
+    const [activeSeverityFilter, setActiveSeverityFilter] = useState(new Set());
+    const [activePolicyFilter, setActivePolicyFilter] = useState(new Set());
+    const [activeTypeFilter, setActiveTypeFilter] = useState(null);
+    const [selectedCard, setSelectedCard] = useState("open");          // "open" or "other"
+    const [activeStatusValue, setActiveStatusValue] = useState("ACTIVE"); // drives backend statusFilter
     const gridRef = useRef(null);
     const prevSelectedIdRef = useRef(null);
-    const [severityFilter, setSeverityFilter] = useState(new Set());
-    const [statusFilter, setStatusFilter] = useState(new Set());
-    const [policyFilter, setPolicyFilter] = useState(new Set());
-    const [userFilter, setUserFilter] = useState(new Set());
+    const gridFilterKey = useRef(`violations-${Date.now()}`);
     const collectionsMap = PersistStore((state) => state.collectionsMap);
+    const usernameMapRef = useRef({});
+
+    useEffect(() => {
+        const key = gridFilterKey.current;
+        const oldKey = window.location.pathname + "/ag-grid";
+        const { filtersMap: fm, setFiltersMap: sfm } = PersistStore.getState();
+        if (fm[oldKey]) {
+            const cleaned = { ...fm };
+            delete cleaned[oldKey];
+            sfm(cleaned);
+        }
+        return () => {
+            const { filtersMap, setFiltersMap } = PersistStore.getState();
+            if (filtersMap[key]) {
+                const next = { ...filtersMap };
+                delete next[key];
+                setFiltersMap(next);
+            }
+        };
+    }, []);
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
         values.ranges[4],
     );
 
-    useEffect(() => {
-        async function load() {
-            setLoading(true);
-            try {
-                const startTimestamp = currDateRange?.period?.since
-                    ? Math.floor(Date.parse(currDateRange.period.since) / 1000)
-                    : null;
-                const endTimestamp = currDateRange?.period?.until
-                    ? Math.floor(Date.parse(currDateRange.period.until) / 1000)
-                    : null;
-
-                const PAGE_SIZE = 1000;
-
-                const [firstResp, policiesResp, usernameMap] = await Promise.all([
-                    guardrailsApi.fetchViolations(startTimestamp, endTimestamp, 0, PAGE_SIZE),
-                    guardrailsApi.fetchGuardrailPolicies(),
-                    fetchEndpointShieldUsernameMap(),
-                ]);
-
-                // Build filterId → name map from policies, plus name → hexId (for the approve-server flow)
-                const policiesMap = {};
-                const policyIdByName = {};
-                (policiesResp?.guardrailPolicies || []).forEach(p => {
-                    if (p.hexId) policiesMap[p.hexId] = p.name;
-                    if (p.name) policyIdByName[p.name] = p.hexId;
-                });
-
-                let events = firstResp?.maliciousEvents || [];
-                const total = firstResp?.total ?? events.length;
-                if (total > PAGE_SIZE) {
-                    const extraPages = Math.ceil((total - PAGE_SIZE) / PAGE_SIZE);
-                    const rest = await Promise.all(
-                        Array.from({ length: extraPages }, (_, i) =>
-                            guardrailsApi.fetchViolations(startTimestamp, endTimestamp, (i + 1) * PAGE_SIZE, PAGE_SIZE)
-                        )
-                    );
-                    events = [...events, ...rest.flatMap(r => r?.maliciousEvents || [])];
-                }
-                const transformed = events.map(e => transformEvent(e, policiesMap, collectionsMap, usernameMap, policyIdByName));
-                setRows(transformed);
-                setSummary(computeSummary(transformed));
-            } catch (e) {
-                setRows([]);
-                setSummary(computeSummary([]));
-            } finally {
-                setLoading(false);
-            }
-        }
-        load();
+    const getTimeEpoch = useCallback((key) => {
+        return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
     }, [currDateRange]);
 
-    const handleSeverityFilter = useCallback((key) => {
-        setSeverityFilter((prev) => {
-            const next = new Set(prev);
-            next.has(key) ? next.delete(key) : next.add(key);
-            return next;
+    const startTimestamp = getTimeEpoch("since");
+    const endTimestamp = getTimeEpoch("until");
+
+    // ─── Load username map once ──────────────────────────────────────────────
+    useEffect(() => {
+        fetchEndpointShieldUsernameMap().then(map => {
+            usernameMapRef.current = map;
         });
     }, []);
 
-    const handleStatusFilter = useCallback((key) => {
-        setStatusFilter((prev) => {
-            const next = new Set(prev);
-            next.has(key) ? next.delete(key) : next.add(key);
-            return next;
+    // ─── Fetch filter values from backend ────────────────────────────────────
+    useEffect(() => {
+        threatDetectionApi.fetchFiltersThreatTable(startTimestamp, endTimestamp).then(res => {
+            setFilterValues({
+                hosts: (res?.hosts || []).filter(h => h && h.trim() !== '' && h !== '-'),
+                subCategory: res?.subCategory || [],
+            });
         });
+    }, [startTimestamp, endTimestamp]);
+
+    const colDefs = useMemo(() => buildColDefs(filterValues), [filterValues]);
+
+    // ─── Card click → AG Grid column filter ─────────────────────────────────
+    const applyGridFilter = useCallback((colId, values) => {
+        const api = gridRef.current?.api;
+        if (!api) return;
+        const model = values.length > 0 ? { filterType: "set", values } : null;
+        api.setColumnFilterModel(colId, model).then(() => api.onFilterChanged());
     }, []);
 
-    const handlePolicyFilter = useCallback((name) => {
-        setPolicyFilter((prev) => {
+    const handleSeverityClick = useCallback((key) => {
+        setActiveSeverityFilter(prev => {
             const next = new Set(prev);
-            next.has(name) ? next.delete(name) : next.add(name);
+            if (next.has(key)) next.delete(key); else next.add(key);
+            applyGridFilter("severity", [...next]);
             return next;
         });
-    }, []);
+    }, [applyGridFilter]);
 
-    const handleUserFilter = useCallback((name) => {
-        setUserFilter((prev) => {
+    const handlePolicyClick = useCallback((name) => {
+        setActivePolicyFilter(prev => {
             const next = new Set(prev);
-            next.has(name) ? next.delete(name) : next.add(name);
+            if (next.has(name)) next.delete(name); else next.add(name);
+            applyGridFilter("policyName", [...next]);
             return next;
         });
-    }, []);
+    }, [applyGridFilter]);
 
-    const STATUS_KEY_TO_ROW = { OPEN: "ACTIVE", FIXED: "FIXED", IGNORED: "IGNORED" };
-    const filteredRows = rows.filter((r) => {
-        if (severityFilter.size > 0 && !severityFilter.has(r.severity)) return false;
-        if (statusFilter.size > 0) {
-            const rowStatus = [...statusFilter].map(k => STATUS_KEY_TO_ROW[k] || k);
-            if (!rowStatus.includes(r._status)) return false;
+    const handleClearPolicySelection = useCallback(() => {
+        setActivePolicyFilter(new Set());
+        applyGridFilter("policyName", []);
+    }, [applyGridFilter]);
+
+    const [activeHostFilter, setActiveHostFilter] = useState(new Set());
+
+    const handleHostClick = useCallback((host) => {
+        setActiveHostFilter(prev => {
+            const next = new Set(prev);
+            if (next.has(host)) next.delete(host); else next.add(host);
+            applyGridFilter("user", [...next]);
+            return next;
+        });
+    }, [applyGridFilter]);
+
+    const handleClearHostSelection = useCallback(() => {
+        setActiveHostFilter(new Set());
+        applyGridFilter("user", []);
+    }, [applyGridFilter]);
+
+    const handleTypeClick = useCallback((typeName) => {
+        const mapping = summaryData?.typeToSubCategories || {};
+        const subCategories = mapping[typeName] || [];
+        if (activeTypeFilter === typeName) {
+            setActiveTypeFilter(null);
+            applyGridFilter("policyName", []);
+        } else {
+            setActiveTypeFilter(typeName);
+            applyGridFilter("policyName", subCategories);
         }
-        if (policyFilter.size > 0 && !policyFilter.has(r.policyName)) return false;
-        if (userFilter.size > 0 && !userFilter.has(r.user)) return false;
-        return true;
-    });
+    }, [applyGridFilter, summaryData, activeTypeFilter]);
+
+    // ─── Card selection (Open vs Other) ─────────────────────────────────────
+    const [tableKey, setTableKey] = useState(0);
+    const triggerTableRefresh = useCallback(() => setTableKey(k => k + 1), []);
+
+    const handleOpenCardClick = useCallback(() => {
+        if (selectedCard === "open") return;
+        setSelectedCard("open");
+        setActiveStatusValue("ACTIVE");
+        triggerTableRefresh();
+    }, [selectedCard, triggerTableRefresh]);
+
+    const handleOtherCardClick = useCallback(() => {
+        if (selectedCard === "other") return;
+        setSelectedCard("other");
+        setActiveStatusValue("UNDER_REVIEW");
+        triggerTableRefresh();
+    }, [selectedCard, triggerTableRefresh]);
+
+    const handleOtherBreakdownClick = useCallback((key) => {
+        setSelectedCard("other");
+        setActiveStatusValue(prev => prev === key ? "UNDER_REVIEW" : key);
+        triggerTableRefresh();
+    }, [triggerTableRefresh]);
+
+    // ─── Fetch summary stats from existing backend APIs ─────────────────────
+    // Replaces the old client-side computeSummary() that required all data loaded.
+    // Uses the same APIs as ThreatDashboardPage: fetchCountBySeverity, fetchThreatCategoryCount, getDailyThreatActorsCount.
+    // Context-source header is auto-added by the request interceptor — no special handling needed.
+    useEffect(() => {
+        async function loadSummary() {
+            setSummaryLoading(true);
+            try {
+                const results = await Promise.allSettled([
+                    threatDetectionApi.fetchCountBySeverity(startTimestamp, endTimestamp, "ACTIVE"),
+                    threatDetectionApi.fetchThreatCategoryCount(startTimestamp, endTimestamp, activeStatusValue),
+                    threatDetectionApi.getDailyThreatActorsCount(startTimestamp, endTimestamp, []),
+                    threatDetectionApi.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5),
+                ]);
+
+                const severityResp = results[0].status === 'fulfilled' ? results[0].value : {};
+                const categoryResp = results[1].status === 'fulfilled' ? results[1].value : {};
+                const dailyResp    = results[2].status === 'fulfilled' ? results[2].value : {};
+                const topNResp     = results[3].status === 'fulfilled' ? results[3].value : {};
+
+                // Severity counts
+                const severityDistribution = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+                let totalCount = 0;
+                (severityResp?.categoryCounts || []).forEach(item => {
+                    const sev = String(item.subCategory || item.severity || '').toUpperCase();
+                    if (severityDistribution[sev] !== undefined) {
+                        severityDistribution[sev] = item.count || 0;
+                        totalCount += item.count || 0;
+                    }
+                });
+
+                // Status counts from daily actors response
+                const statusCounts = {
+                    ACTIVE: dailyResp?.totalActiveStatus || 0,
+                    IGNORED: dailyResp?.totalIgnoredStatus || 0,
+                    UNDER_REVIEW: dailyResp?.totalUnderReviewStatus || 0,
+                    FIXED: 0,
+                };
+
+                // Top policies from category counts
+                const subcategoryMap = {};
+                (categoryResp?.categoryCounts || []).forEach(item => {
+                    const sub = item.subCategory || item.category || "Unknown";
+                    subcategoryMap[sub] = (subcategoryMap[sub] || 0) + (item.count || 0);
+                });
+                const topPolicies = Object.entries(subcategoryMap)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 5)
+                    .map(([name, count]) => ({ name, count }));
+
+                // By type — derive from category data, also build reverse map for filtering
+                const byType = {};
+                const typeToSubCategories = {};
+                Object.entries(subcategoryMap).forEach(([name, count]) => {
+                    const lower = name.toLowerCase();
+                    let type = "Other";
+                    if (lower.includes("prompt") || lower.includes("injection")) type = "Prompt";
+                    else if (lower.includes("skill") || lower.includes("malicious_skill")) type = "Skill";
+                    else if (lower.includes("config") || lower.includes("setting")) type = "Config";
+                    else if (lower.includes("tool") || lower.includes("mcp")) type = "Tool";
+                    else if (lower.includes("llm")) type = "LLM";
+
+                    if (!byType[type]) byType[type] = { text: 0, color: TYPE_COLORS[type] || "#999", filterKey: type };
+                    byType[type].text += count;
+                    if (!typeToSubCategories[type]) typeToSubCategories[type] = [];
+                    typeToSubCategories[type].push(name);
+                });
+                const categoryTotal = Object.values(byType).reduce((sum, v) => sum + v.text, 0);
+
+                // Top hosts from topN response
+                const topHosts = (topNResp?.topHosts || []).map(h => ({
+                    name: h.host || "-",
+                    count: h.attacks || 0,
+                    host: h.host || "",
+                }));
+
+                setSummaryData({ severityDistribution, totalCount, categoryTotal, statusCounts, topPolicies, topHosts, byType, typeToSubCategories });
+            } catch {
+                setSummaryData(null);
+            } finally {
+                setSummaryLoading(false);
+            }
+        }
+        loadSummary();
+    }, [startTimestamp, endTimestamp, activeStatusValue]);
+
+    // ─── Fetch latency data ──────────────────────────────────────────────────
+    useEffect(() => {
+        threatDetectionApi.fetchGuardrailLatency(startTimestamp, endTimestamp)
+            .then(res => {
+                const metrics = res?.result?.metrics || [];
+                const byTimestamp = {};
+                metrics.forEach(m => {
+                    if (!byTimestamp[m.timestamp]) byTimestamp[m.timestamp] = {};
+                    byTimestamp[m.timestamp][m.metricId] = m.value;
+                });
+                const raw = Object.entries(byTimestamp)
+                    .map(([ts, vals]) => {
+                        const req = vals.GUARDRAIL_REQUEST_LATENCY || 0;
+                        const resp = vals.GUARDRAIL_RESPONSE_LATENCY || 0;
+                        return { timestamp: parseInt(ts), incomingRequestP95: req, outputResultP95: resp, totalP95: req + resp };
+                    })
+                    .sort((a, b) => a.timestamp - b.timestamp);
+                const MAX_POINTS = 100;
+                if (raw.length <= MAX_POINTS) {
+                    setLatencyData(raw);
+                } else {
+                    const bucketSize = Math.ceil(raw.length / MAX_POINTS);
+                    const downsampled = [];
+                    for (let i = 0; i < raw.length; i += bucketSize) {
+                        const bucket = raw.slice(i, i + bucketSize);
+                        const avgOf = field => bucket.reduce((sum, x) => sum + x[field], 0) / bucket.length;
+                        downsampled.push({
+                            timestamp: bucket[Math.floor(bucket.length / 2)].timestamp,
+                            incomingRequestP95: avgOf('incomingRequestP95'),
+                            outputResultP95: avgOf('outputResultP95'),
+                            totalP95: avgOf('totalP95'),
+                        });
+                    }
+                    setLatencyData(downsampled);
+                }
+            })
+            .catch(() => setLatencyData([]));
+    }, [startTimestamp, endTimestamp]);
+
+    // ─── Server-side data fetch for AG Grid (replaces fetch-all-then-filter) ──
+    // Uses the existing fetchSuspectSampleData API that SusDataTable also uses.
+    // AgGridTable's onServerFetch mode handles pagination, sort, and search automatically.
+    const onServerFetch = useCallback(({ filters, sortKey, sortOrder, skip, limit, searchString }) => {
+        const pageSize = limit || 50;
+        const severityFilter = filters?.severity || [];
+        const hostFilter = filters?.user || [];
+        const policyFilter = filters?.policyName || [];
+        const statusFilter = activeStatusValue;
+
+        // AgGridTable sends sortOrder: -1 for asc, 1 for desc (opposite of MongoDB convention)
+        const mongoSort = sortOrder ? -sortOrder : -1;
+        const isSeveritySort = sortKey === "severity";
+        const SORT_FIELD_MAP = { detected: "detectedAt", severity: "severity" };
+        const sort = sortKey ? { [SORT_FIELD_MAP[sortKey] || sortKey]: mongoSort } : { detectedAt: -1 };
+
+        return threatDetectionApi.fetchSuspectSampleData(
+            skip,
+            [],             // ips
+            [],             // apiCollectionIds
+            [],             // urls
+            [],             // types
+            sort,
+            startTimestamp,
+            endTimestamp,
+            policyFilter.length > 0 ? policyFilter : [],  // latestAttack (filters by filterId/subCategory)
+            pageSize,
+            statusFilter,   // statusFilter — defaults to "ACTIVE", can be changed via Status column filter
+            undefined,      // successfulExploit
+            undefined,      // label
+            hostFilter.length > 0 ? hostFilter : undefined, // hosts
+            searchString && searchString.length >= 3 ? searchString : undefined,
+            undefined,      // method
+            isSeveritySort, // sortBySeverity — triggers aggregation-based rank sort in backend
+            severityFilter.length > 0 ? severityFilter : undefined,
+        ).then(result => {
+            const events = result?.maliciousEvents || [];
+            const transformed = events.map(e => transformEvent(e, collectionsMap, usernameMapRef.current));
+            setRows(transformed);
+            return { value: transformed, total: result?.total || 0 };
+        });
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue]);
+
+    // ─── Bulk actions ──────────────────────────────────────────────────────────
+    // Under Server-Side Row Model, "select all" tracks selection as an abstract
+    // {selectAll: true, toggledNodes} flag rather than concrete node references, which
+    // leaves api.getSelectedRows() empty the instant select-all is used (it only reads a
+    // separate map that select-all never populates). node.isSelected() correctly reflects
+    // the select-all state per row though, so walk loaded nodes ourselves instead.
+    const getSelectedIds = useCallback(() => {
+        const ids = [];
+        gridRef.current?.api?.forEachNode(node => {
+            if (!node.stub && node.isSelected() && node.data?.id) ids.push(node.data.id);
+        });
+        return ids;
+    }, []);
+
+    const clearBulkSelection = useCallback(() => {
+        gridRef.current?.api?.deselectAll();
+        setBulkSelectedCount(0);
+    }, []);
+
+    const handleBulkStatusUpdate = useCallback(async (status, pastTenseLabel) => {
+        const ids = getSelectedIds();
+        if (!ids.length) return;
+        try {
+            const response = await threatDetectionApi.updateMaliciousEventStatus({ eventIds: ids, status });
+            if (response?.updateSuccess) {
+                func.setToast(true, false, `${ids.length} event${ids.length === 1 ? "" : "s"} ${pastTenseLabel} successfully`);
+                clearBulkSelection();
+                triggerTableRefresh();
+            } else {
+                func.setToast(true, true, "Failed to update selected events");
+            }
+        } catch {
+            func.setToast(true, true, "Failed to update selected events");
+        }
+    }, [getSelectedIds, clearBulkSelection, triggerTableRefresh]);
+
+    const handleBulkDelete = useCallback(async () => {
+        const ids = getSelectedIds();
+        setDeleteConfirmOpen(false);
+        if (!ids.length) return;
+        try {
+            const response = await threatDetectionApi.deleteMaliciousEvents({ eventIds: ids });
+            if (response?.deleteSuccess) {
+                func.setToast(true, false, `${ids.length} event${ids.length === 1 ? "" : "s"} deleted successfully`);
+                clearBulkSelection();
+                triggerTableRefresh();
+            } else {
+                func.setToast(true, true, "Failed to delete selected events");
+            }
+        } catch {
+            func.setToast(true, true, "Failed to delete selected events");
+        }
+    }, [getSelectedIds, clearBulkSelection, triggerTableRefresh]);
+
+    const bulkActions = useMemo(() => [
+        { label: "Mark for Review", onAction: () => handleBulkStatusUpdate("UNDER_REVIEW", "marked for review") },
+        { label: "Ignore", onAction: () => handleBulkStatusUpdate("IGNORED", "ignored") },
+        { label: "Delete", destructive: true, onAction: () => setDeleteConfirmOpen(true) },
+    ], [handleBulkStatusUpdate]);
 
     const handleRowClick = (e) => {
         if (e?.data) setSelectedViolation(e.data);
@@ -748,8 +938,6 @@ function Violations() {
     useEffect(() => {
         const api = gridRef.current?.api;
         if (!api) return;
-        // Redraw only the previously-selected and newly-selected rows so the
-        // grid viewport doesn't jump (full redrawRows() resets scroll position).
         const ids = new Set([prevSelectedIdRef.current, selectedViolation?.id].filter(Boolean));
         if (ids.size > 0) {
             const nodes = [];
@@ -763,69 +951,109 @@ function Violations() {
         return params.data?.id === selectedViolation?.id ? "violations-row-selected" : undefined;
     }, [selectedViolation]);
 
-    const emptyState = !loading && rows.length === 0 && (
-        <Box padding="8">
-            <HorizontalStack align="center">
-                <Text color="subdued">No violations found for the selected time range.</Text>
-            </HorizontalStack>
-        </Box>
-    );
+    const tableHeading = selectedCard === "open"
+        ? "All Open Violations"
+        : activeStatusValue === "IGNORED"
+            ? "All Ignored Violations"
+            : "All Under Review Violations";
 
     const tableComponent = (
         <Box key="table" className="violations-table-wrap">
-            {emptyState || (
-                <AgGridTable
-                    rowData={filteredRows}
-                    columnDefs={COL_DEFS}
-                    defaultColDef={DEFAULT_COL_DEF}
-                    autoSizeStrategy={AUTO_SIZE_STRATEGY}
-                    searchPlaceholder="Search violations"
-                    onRowClicked={handleRowClick}
-                    suppressRowClickSelection
-                    getRowStyle={() => ({ cursor: "pointer" })}
-                    getRowClass={getRowClass}
-                    gridRef={gridRef}
-                    pagination
-                    paginationPageSize={20}
-                    paginationPageSizeSelector={[20, 50, 100]}
-                    height={500}
-                    domLayout="normal"
-                />
-            )}
+            <Box paddingBlockEnd="3">
+                <Text variant="headingSm">{tableHeading}</Text>
+            </Box>
+            <AgGridTable
+                key={`violations-grid-${tableKey}-${startTimestamp}-${endTimestamp}`}
+                rowData={rows}
+                columnDefs={colDefs}
+                defaultColDef={DEFAULT_COL_DEF}
+                autoSizeStrategy={AUTO_SIZE_STRATEGY}
+                searchPlaceholder="Search violations"
+                onRowClicked={handleRowClick}
+                suppressRowClickSelection
+                getRowStyle={() => ({ cursor: "pointer" })}
+                getRowClass={getRowClass}
+                gridRef={gridRef}
+                rowSelection={{
+                    mode: "multiRow",
+                    // Dedicated checkbox column (colDef-level checkboxSelection is deprecated in
+                    // AG Grid v32+ and, combined with rowModelType="serverSide", stopped rendering
+                    // altogether — this is the supported replacement).
+                    checkboxes: true,
+                    headerCheckbox: true,
+                    // selectAll: "currentPage"/"filtered" only work for rowModelType="clientSide"
+                    // (AG Grid warns and ignores it otherwise) — SSRM's header checkbox always
+                    // does the abstract "select all" below, regardless of this setting. We handle
+                    // reading the actual selection ourselves (see getSelectedIds/onSelectionChanged)
+                    // instead of fighting that, so this is left at the SSRM-only default.
+                    enableClickSelection: false,
+                }}
+                onSelectionChanged={(e) => {
+                    let count = 0;
+                    e.api.forEachNode(node => { if (!node.stub && node.isSelected()) count++; });
+                    setBulkSelectedCount(count);
+                }}
+                bulkActionCount={bulkSelectedCount}
+                bulkActions={bulkActions}
+                onClearBulk={clearBulkSelection}
+                paginationPageSize={50}
+                paginationPageSizeSelector={[20, 50, 100]}
+                height={500}
+                domLayout="normal"
+                onServerFetch={onServerFetch}
+                filterStateUrl={gridFilterKey.current}
+                serverSideRowModel
+                getRowId={(params) => params.data.id}
+            />
         </Box>
     );
 
-    const defaultSummary = computeSummary([]);
-    const activeSummary = summary || defaultSummary;
-
-    const components = loading
-        ? [<SpinnerCentered key="loading" />]
-        : [
-            <ViolationsDashboard
-                key="dashboard"
-                totalSummary={activeSummary.totalSummary}
-                openSummary={activeSummary.openSummary}
-                topUsers={activeSummary.topUsers}
-                topPolicies={activeSummary.topPolicies}
-                byType={activeSummary.byType}
-                severityFilter={severityFilter}
-                onSeverityFilter={handleSeverityFilter}
-                statusFilter={statusFilter}
-                onStatusFilter={handleStatusFilter}
-                policyFilter={policyFilter}
-                onPolicyFilter={handlePolicyFilter}
-                userFilter={userFilter}
-                onUserFilter={handleUserFilter}
-            />,
-            tableComponent,
-            <ViolationFlyout
-                key="flyout"
-                violation={selectedViolation}
-                show={selectedViolation !== null}
-                onClose={() => setSelectedViolation(null)}
-                allRows={rows}
-            />,
-        ];
+    const components = [
+        <ViolationsDashboard
+            key="dashboard"
+            summaryData={summaryData}
+            loading={summaryLoading}
+            onSeverityClick={handleSeverityClick}
+            activeSeverityFilter={activeSeverityFilter}
+            onPolicyClick={handlePolicyClick}
+            activePolicyFilter={activePolicyFilter}
+            onClearPolicySelection={handleClearPolicySelection}
+            onHostClick={handleHostClick}
+            activeHostFilter={activeHostFilter}
+            onClearHostSelection={handleClearHostSelection}
+            onTypeClick={handleTypeClick}
+            activeTypeFilter={activeTypeFilter}
+            selectedCard={selectedCard}
+            onOpenCardClick={handleOpenCardClick}
+            onOtherCardClick={handleOtherCardClick}
+            onOtherBreakdownClick={handleOtherBreakdownClick}
+            activeStatusValue={activeStatusValue}
+            latencyData={latencyData}
+            startTimestamp={startTimestamp}
+            endTimestamp={endTimestamp}
+        />,
+        tableComponent,
+        <ViolationFlyout
+            key="flyout"
+            violation={selectedViolation}
+            show={selectedViolation !== null}
+            onClose={() => setSelectedViolation(null)}
+        />,
+        <Modal
+            key="delete-confirm"
+            open={deleteConfirmOpen}
+            onClose={() => setDeleteConfirmOpen(false)}
+            title="Delete selected events"
+            primaryAction={{ content: "Delete", destructive: true, onAction: handleBulkDelete }}
+            secondaryActions={[{ content: "Cancel", onAction: () => setDeleteConfirmOpen(false) }]}
+        >
+            <Modal.Section>
+                <Text variant="bodyMd" color="subdued">
+                    {`This will permanently delete ${bulkSelectedCount} selected event${bulkSelectedCount === 1 ? "" : "s"}. This action cannot be undone.`}
+                </Text>
+            </Modal.Section>
+        </Modal>,
+    ];
 
     return (
         <PageWithMultipleCards
@@ -836,7 +1064,7 @@ function Violations() {
                 />
             }
             isFirstPage
-            secondaryActions={func.isDemoAccount() && <NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />}
+            secondaryActions={canUseNewLayout && <NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />}
             primaryAction={
                 <DateRangeFilter
                     initialDispatch={currDateRange}

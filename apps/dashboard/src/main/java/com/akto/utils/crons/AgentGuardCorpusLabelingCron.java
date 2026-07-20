@@ -18,9 +18,11 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
-
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -33,6 +35,8 @@ public class AgentGuardCorpusLabelingCron {
     private static final int CRON_INTERVAL_MINUTES = 10;
     private static final int SLACK_SECONDS = 60;
     private static final int MAX_ROWS_PER_ACCOUNT_PER_TICK = 1000;
+    private static final double MIN_LABEL_CONFIDENCE = 0.5;
+    private static final int INSERT_BATCH_SIZE = 5;
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
@@ -87,43 +91,64 @@ public class AgentGuardCorpusLabelingCron {
 
     private void labelAndPersist(List<AgentGuardCorpusQueueEntry> rows) {
         AgentGuardIntentClassifier classifier = new AgentGuardIntentClassifier();
-
-        List<BasicDBObject> inputs = new ArrayList<>();
+        Map<String, List<AgentGuardCorpusQueueEntry>> rowsByAgent = new LinkedHashMap<>();
         for (AgentGuardCorpusQueueEntry entry : rows) {
-            inputs.add(new BasicDBObject()
-                .append(AgentGuardIntentClassifier.AGENT_HOST, entry.getAgentHost())
-                .append(AgentGuardIntentClassifier.UNIT_TEXT, entry.getUnitText()));
+            rowsByAgent.computeIfAbsent(entry.getAgentHost(), k -> new ArrayList<>()).add(entry);
         }
-
-        // One LLM call per row internally (see AgentGuardIntentClassifier);
-        // resultsPerRow[j] is every atomic instruction extracted from rows.get(j).
-        List<List<BasicDBObject>> resultsPerRow;
-        try {
-            resultsPerRow = classifier.handleBatch(inputs);
-        } catch (Exception e) {
-            loggerMaker.error("AgentGuardCorpusLabelingCron: handleBatch error: " + e.getMessage());
-            return;
-        }
-        if (resultsPerRow == null) return;
 
         List<AgentGuardCorpusEntry> toInsert = new ArrayList<>();
-        for (int j = 0; j < rows.size() && j < resultsPerRow.size(); j++) {
-            AgentGuardCorpusQueueEntry sourceRow = rows.get(j);
-            for (BasicDBObject result : resultsPerRow.get(j)) {
-                if (result == null || result.containsKey("error")) continue;
-                String taskIntent = result.getString("taskIntent", "");
-                if (taskIntent.isEmpty()) continue;
-                toInsert.add(buildLabeledEntry(sourceRow, result));
+        for (Map.Entry<String, List<AgentGuardCorpusQueueEntry>> group : rowsByAgent.entrySet()) {
+            String agentHost = group.getKey();
+            List<AgentGuardCorpusQueueEntry> agentRows = group.getValue();
+
+            List<String> knownIntents = new ArrayList<>(AgentGuardCorpusDao.instance.findDistinctTaskIntents(agentHost));
+            if (knownIntents.size() > AgentGuardIntentClassifier.MAX_KNOWN_INTENTS_IN_PROMPT) {
+                knownIntents = knownIntents.subList(0, AgentGuardIntentClassifier.MAX_KNOWN_INTENTS_IN_PROMPT);
+            }
+
+            List<BasicDBObject> inputs = new ArrayList<>();
+            for (AgentGuardCorpusQueueEntry entry : agentRows) {
+                inputs.add(new BasicDBObject()
+                    .append(AgentGuardIntentClassifier.AGENT_HOST, entry.getAgentHost())
+                    .append(AgentGuardIntentClassifier.UNIT_TEXT, entry.getUnitText()));
+            }
+
+            Iterator<AgentGuardCorpusQueueEntry> sourceRows = agentRows.iterator();
+            try {
+                classifier.handleBatch(inputs, knownIntents, results -> {
+                    AgentGuardCorpusQueueEntry sourceRow = sourceRows.next();
+                    for (BasicDBObject result : results) {
+                        if (result == null || result.containsKey("error")) continue;
+                        String taskIntent = result.getString("taskIntent", "");
+                        if (taskIntent.isEmpty()) continue;
+                        double confidence = result.getDouble("confidence", AgentGuardIntentClassifier.DEFAULT_CONFIDENCE);
+                        loggerMaker.info("Found confidence: " + confidence + " taskIntent: " + taskIntent + " for agentHost: " + sourceRow.getAgentHost());
+                        if (confidence < MIN_LABEL_CONFIDENCE) continue;
+                        toInsert.add(buildLabeledEntry(sourceRow, result));
+                        if (toInsert.size() >= INSERT_BATCH_SIZE) {
+                            loggerMaker.info("Calling flush to insert in batch");
+                            flushBatch(toInsert);
+                        }
+                    }
+                });
+            } catch (Exception e) {
+                loggerMaker.error("AgentGuardCorpusLabelingCron: handleBatch error for agent "
+                    + agentHost + ": " + e.getMessage());
+                continue;
             }
         }
 
-        if (!toInsert.isEmpty()) {
-            try {
-                AgentGuardCorpusDao.instance.insertMany(toInsert);
-            } catch (Exception e) {
-                loggerMaker.error("AgentGuardCorpusLabelingCron: insertMany failed: " + e.getMessage());
-            }
+        flushBatch(toInsert);
+    }
+
+    private void flushBatch(List<AgentGuardCorpusEntry> toInsert) {
+        if (toInsert.isEmpty()) return;
+        try {
+            AgentGuardCorpusDao.instance.insertMany(toInsert);
+        } catch (Exception e) {
+            loggerMaker.error("AgentGuardCorpusLabelingCron: insertMany failed: " + e.getMessage());
         }
+        toInsert.clear();
     }
 
     private static AgentGuardCorpusEntry buildLabeledEntry(AgentGuardCorpusQueueEntry queued, BasicDBObject result) {
@@ -139,6 +164,8 @@ public class AgentGuardCorpusLabelingCron {
         breakdown.setGroundTruthSourceKey(result.getString("groundTruthSourceKey", ""));
         breakdown.setGroundTruthInstructionText(result.getString("groundTruthInstructionText", ""));
         entry.setBreakdown(breakdown);
+
+        loggerMaker.info("Final built labeled entry: " + entry.toString());
 
         return entry;
     }

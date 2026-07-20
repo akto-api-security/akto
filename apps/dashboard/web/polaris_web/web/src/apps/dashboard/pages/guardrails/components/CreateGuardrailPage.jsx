@@ -29,8 +29,9 @@ import {
 import { getDefaultGeneralBlockTopics, GENERAL_BLOCKS, isGeneralBlockTopic, toDeniedTopic } from '../generalBlocks';
 import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from './enterpriseLicenseComplianceCatalog';
 import { groupCollectionsByAgent, groupCollectionsByService, extractServiceName } from '../../observe/agentic/constants';
+import { findAssetTag } from '../../observe/agentic/mcpClientHelper';
 import { isEndpointSecurityCategory } from '../../../../main/labelHelper';
-import { isVisibilityOnly, buildAgentFilterOptions } from '../serverTargetingUtils';
+import { isVisibilityOnly, buildAgentFilterOptions, getClientTagVariants, resolveClientKey } from '../serverTargetingUtils';
 import func from "@/util/func";
 import {
     PolicyDetailsStep,
@@ -66,8 +67,16 @@ import "./createGuardrailPage.css";
 const expandGroupsToV2 = (selectedKeys) =>
     (selectedKeys || []).filter(key => key).map(key => ({ id: key, name: key }));
 
+// Agents: expand each selected canonical group key (e.g. 'claude2') into every raw wire-level
+// tag value it aliases. The guardrails-service matches on the raw client-type segment the client
+// sends — it never sees this dashboard's canonical grouping key — so we must store the raw values.
+const expandAgentGroupsToV2 = (selectedKeys) =>
+    (selectedKeys || []).filter(Boolean).flatMap(key =>
+        getClientTagVariants(key).map(rawValue => ({ id: rawValue, name: rawValue }))
+    );
+
 const groupToOption = (g) => ({
-    label: g.groupKey,
+    label: g.groupName,
     value: g.groupKey,
     isInline: g.collections.some(c => !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe'))
 });
@@ -81,6 +90,25 @@ const reverseToServiceKeys = (v2Servers, allCollections) => {
         // Argus stores full hostnames as option keys — don't extract service name
         if (!isEndpointSecurityCategory()) return rawName;
         return extractServiceName(rawName) || rawName;
+    });
+    return [...new Set(keys)];
+};
+
+// Agent entries store raw wire-level tag values (see expandAgentGroupsToV2), so resolve each back
+// to its canonical dropdown key before deduping — collapses all Claude CLI variants back to the
+// single 'claude2' option when editing. Falls back to collection lookup for legacy stored formats
+// (pre-fix canonical-key entries, or old numeric-collection-id entries) where the stored value
+// itself isn't a recognizable raw tag value. Argus dropdown values are full hostnames, not
+// canonical keys — delegate to the unmodified hostname-based resolution for that case.
+const reverseAgentKeys = (v2Servers, allCollections) => {
+    if (!isEndpointSecurityCategory()) return reverseToServiceKeys(v2Servers, allCollections);
+    const keys = (v2Servers || []).map(s => {
+        const col = (allCollections || []).find(c => c.id?.toString() === s.id?.toString());
+        if (col) {
+            const assetTag = findAssetTag(col.envType);
+            if (assetTag?.value) return resolveClientKey(assetTag.value);
+        }
+        return resolveClientKey(s.name || String(s.id || ''));
     });
     return [...new Set(keys)];
 };
@@ -534,7 +562,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 setMcpServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'mcp-server')).map(toOption)));
                 setAgentServers(buildAgentFilterOptions(allCollections).map(opt => ({
                     ...opt,
-                    isInline: !genAiCollections.some(c =>
+                    isInline: genAiCollections.some(c =>
                         (c.hostName || c.displayName || c.name || '') === opt.value
                         && !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe')
                     )
@@ -773,7 +801,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             else rawAgentEntries.push(s);
         });
 
-        setSelectedAgentServers(reverseToServiceKeys(rawAgentEntries, allCollections));
+        setSelectedAgentServers(reverseAgentKeys(rawAgentEntries, allCollections));
         setSelectedBrowserLlms(reverseToServiceKeys(rawLlmEntries, allCollections));
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
@@ -821,7 +849,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         try {
             const transformedMcpServers = expandGroupsToV2(selectedMcpServers);
             const transformedAgentServers = [
-                ...expandGroupsToV2(selectedAgentServers),
+                ...expandAgentGroupsToV2(selectedAgentServers),
                 ...expandGroupsToV2(selectedBrowserLlms)
             ];
 

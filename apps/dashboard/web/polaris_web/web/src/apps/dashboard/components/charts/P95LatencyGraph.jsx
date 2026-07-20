@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { Box, Card, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import { HighchartsReact } from "highcharts-react-official";
 import Highcharts from "highcharts";
-import InfoCard from "../../pages/dashboard/new_components/InfoCard";
+import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
 import dayjs from 'dayjs';
 
 const COLORMAP = {
@@ -10,7 +11,7 @@ const COLORMAP = {
     total: 'rgb(69, 183, 209)',
 };
 
-const P95LatencyGraph = ({ title, subtitle, dataType = 'mcp-security', startTimestamp, endTimestamp, onLatencyClick, latencyData }) => {
+const P95LatencyGraph = ({ title, subtitle, dataType = 'mcp-security', startTimestamp, endTimestamp, onLatencyClick, latencyData, height = 350 }) => {
     const [seriesData, setSeriesData] = useState([]);
     const [sortedTimelines, setSortedTimelines] = useState([]);
 
@@ -50,7 +51,7 @@ const P95LatencyGraph = ({ title, subtitle, dataType = 'mcp-security', startTime
     const chartOptions = {
         chart: {
             type: "spline",
-            height: 350
+            height
         },
         credits: {
             enabled: false
@@ -111,12 +112,24 @@ const P95LatencyGraph = ({ title, subtitle, dataType = 'mcp-security', startTime
         series: seriesData,
     }
 
+    const hasData = latencyData && latencyData.length > 0;
+
     return (
-        <InfoCard
-            title={title || "P95 Latency Metrics"}
-            titleToolTip={subtitle || "95th percentile latency measurements over time"}
-            component={<HighchartsReact highcharts={Highcharts} options={chartOptions} />}
-        />
+        <Card padding="5">
+            <VerticalStack gap="4">
+                <HorizontalStack gap="1" blockAlign="center">
+                    <Text variant="headingMd">{title || "P95 Latency Metrics"}</Text>
+                    <InfoTooltipIcon content={subtitle || "95th percentile latency measurements over time"} />
+                </HorizontalStack>
+                {hasData ? (
+                    <HighchartsReact highcharts={Highcharts} options={chartOptions} />
+                ) : (
+                    <Box padding="8" minHeight={`${height}px`}>
+                        <Text variant="bodySm" color="subdued" alignment="center">No latency data available for the selected time period.</Text>
+                    </Box>
+                )}
+            </VerticalStack>
+        </Card>
     )
 };
 

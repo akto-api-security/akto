@@ -21,6 +21,7 @@ import AiChatSection from "@/apps/dashboard/pages/observe/agentic/AiChatSection"
 import { SeverityBadge } from "@/apps/dashboard/pages/observe/agentic/AgenticCellRenderers";
 import ActivityTracker from "@/apps/dashboard/pages/dashboard/components/ActivityTracker";
 import JiraTicketCreationModal from "@/apps/dashboard/components/shared/JiraTicketCreationModal";
+import SampleDataList from "@/apps/dashboard/components/shared/SampleDataList";
 import func from "@/util/func";
 import guardrailsApi from "../api";
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
@@ -38,6 +39,25 @@ import { buildFallbackDetail } from "./violationsData";
 import "../../../components/layouts/style.css";
 
 // ─── Event Actions dropdown ───────────────────────────────────────────────────
+
+// Shared by the Jira and Azure Boards ticket-creation handlers below — same fields, same order.
+function buildViolationDescription(row) {
+    return [
+        "Guardrail Violation Alert",
+        "",
+        `Policy: ${row?.policyName || "N/A"}`,
+        `Severity: ${row?.severity || "N/A"}`,
+        `Type: ${row?.type || "N/A"}`,
+        `Agentic Asset: ${row?.agenticAsset || "N/A"}`,
+        `User: ${row?.user || "N/A"}`,
+        `Detected: ${row?.detected ? func.epochToDateTime(row.detected) : "N/A"}`,
+        "",
+        "Evidence:",
+        row?.evidenceText || "N/A",
+        "",
+        `Reference URL: ${window.location.href}`,
+    ].join("\n");
+}
 
 function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row }) {
     const [open, setOpen] = useState(false);
@@ -108,21 +128,7 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
         }
         try {
             const title = `${row?.violation || "Guardrail Violation"} - ${row?.agenticAsset || row?.user || "Unknown"}`;
-            const description = [
-                "Guardrail Violation Alert",
-                "",
-                `Policy: ${row?.policyName || "—"}`,
-                `Severity: ${row?.severity || "—"}`,
-                `Type: ${row?.type || "—"}`,
-                `Agentic Asset: ${row?.agenticAsset || "—"}`,
-                `User: ${row?.user || "—"}`,
-                `Detected: ${row?.detected ? func.epochToDateTime(row.detected) : "—"}`,
-                "",
-                "Evidence:",
-                row?.evidenceText || "—",
-                "",
-                `Reference URL: ${window.location.href}`,
-            ].join("\n");
+            const description = buildViolationDescription(row);
             func.setToast(true, false, "Creating Jira Ticket");
             const response = await issuesApi.createGeneralJiraTicket({ title, description, projId, issueType, threatEventId: violationId });
             if (response?.errorMessage) { func.setToast(true, true, response.errorMessage); return; }
@@ -165,21 +171,7 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
             catch { func.setToast(true, true, "Please fill all required fields before creating an Azure Boards work item."); return; }
 
             const title = `${row?.violation || "Guardrail Violation"} - ${row?.agenticAsset || row?.user || "Unknown"}`;
-            const description = [
-                "Guardrail Violation Alert",
-                "",
-                `Policy: ${row?.policyName || "—"}`,
-                `Severity: ${row?.severity || "—"}`,
-                `Type: ${row?.type || "—"}`,
-                `Agentic Asset: ${row?.agenticAsset || "—"}`,
-                `User: ${row?.user || "—"}`,
-                `Detected: ${row?.detected ? func.epochToDateTime(row.detected) : "—"}`,
-                "",
-                "Evidence:",
-                row?.evidenceText || "—",
-                "",
-                `Reference URL: ${window.location.href}`,
-            ].join("\n");
+            const description = buildViolationDescription(row);
             func.setToast(true, false, "Creating Azure Boards Work Item");
             const response = await issuesApi.createGeneralAzureBoardsWorkItem({
                 title, description,
@@ -345,32 +337,6 @@ function ApproveServerButton({ row }) {
     );
 }
 
-// ─── Block IPs button ─────────────────────────────────────────────────────────
-
-function BlockIpsButton({ ip }) {
-    const [showModal, setShowModal] = useState(false);
-
-    return (
-        <>
-            <Button destructive size="slim" onClick={() => setShowModal(true)}>Block IPs</Button>
-            <Modal
-                open={showModal}
-                onClose={() => setShowModal(false)}
-                title="Block IP ranges"
-                primaryAction={{ content: "Block", destructive: true, onAction: () => { setShowModal(false); func.setToast(true, false, "IP block coming soon"); } }}
-                secondaryActions={[{ content: "Cancel", onAction: () => setShowModal(false) }]}
-            >
-                <Modal.Section>
-                    <Text variant="bodyMd" color="subdued">
-                        By blocking these IP ranges, no user will be able to access your application from {ip || "this source"}.
-                        Are you sure you want to block these IPs?
-                    </Text>
-                </Modal.Section>
-            </Modal>
-        </>
-    );
-}
-
 // ─── Header ─────────────────────────────────────────────────────────────────────
 
 function FlyoutHeader({ row, onClose, onStatusUpdate }) {
@@ -395,7 +361,6 @@ function FlyoutHeader({ row, onClose, onStatusUpdate }) {
                             row={row}
                         />
                         {row.behaviour === "approval" && <ApproveServerButton row={row} />}
-                        <BlockIpsButton ip={row.ip || row.user} />
                         <Button plain icon={MobileCancelMajor} onClick={onClose} accessibilityLabel="Close" />
                     </HorizontalStack>
                 </HorizontalStack>
@@ -407,7 +372,7 @@ function FlyoutHeader({ row, onClose, onStatusUpdate }) {
 
 // ─── Flyout ─────────────────────────────────────────────────────────────────────
 
-export default function ViolationFlyout({ violation, show, onClose, onStatusUpdate, allRows = [] }) {
+export default function ViolationFlyout({ violation, show, onClose, onStatusUpdate }) {
     const [selectedTab, setSelectedTab] = useState(0);
 
     useEffect(() => { setSelectedTab(0); }, [violation?.id]);
@@ -417,47 +382,29 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
         return buildFallbackDetail(violation);
     }, [violation]);
 
-    // Build timeline: occurrences of THIS specific violation (same actor + rule + evidence).
-    // When multiple distinct skills/prompts trigger the same rule, narrow to just the
-    // selected row's evidence so the timeline shows "this skill was flagged at these times"
-    // rather than an interleaved list of all different skills.
+    // Timeline for the selected violation — shows just this event.
+    // Previously iterated allRows (the entire dataset) client-side; now the flyout
+    // only has the current page's data so we show a single-entry timeline.
     const timelineActivity = useMemo(() => {
         if (!violation) return [];
-        const sameRuleRows = allRows.filter(
-            r => r.user === violation.user && r.violation === violation.violation
-        );
-        const source = sameRuleRows.length > 0 ? sameRuleRows : [violation];
-        const sorted = [...source].sort((a, b) => a.detected - b.detected);
-
-        const uniqueEvidence = new Set(sorted.map(r => r.evidenceText || ""));
-
-        // If there are multiple distinct evidences (e.g. different skills all triggering
-        // malicious_skill_detected), scope the timeline to only this violation's specific
-        // evidence so entries don't interleave unrelated violations.
-        const relevantRows = uniqueEvidence.size > 1 && violation.evidenceText
-            ? sorted.filter(r => r.evidenceText === violation.evidenceText)
-            : sorted;
-
-        return relevantRows
-            .slice(-50)
-            .map(r => ({
-                description: r.violation || "Violation detected",
-                timestamp: r.detected,
-            }));
-    }, [violation, allRows]);
+        return [{
+            description: (violation.violation || "Violation detected") + " (this event)",
+            timestamp: violation.detected,
+        }];
+    }, [violation]);
 
     // Tabs: Overview · (type-specific middle tab) · Remediation · Timeline.
     const tabModel = useMemo(() => {
         const tabs = [{ id: "overview", content: "Overview" }];
         let middle = null;
         if (detail?.chatSession?.length) middle = "chat";
-        else if (detail?.fileContent) middle = "file";
+        else if (detail?.fileContent && violation?.type !== "Skill") middle = "file";
         if (middle === "chat") tabs.push({ id: "chat", content: "Chat Session" });
         if (middle === "file") tabs.push({ id: "file", content: detail.fileTabLabel || "File" });
         tabs.push({ id: "remediation", content: "Remediation" });
         tabs.push({ id: "timeline", content: "Timeline" });
         return { tabs, middle };
-    }, [detail]);
+    }, [detail, violation]);
 
     const handleTabSelect = useCallback((idx) => setSelectedTab(idx), []);
 
@@ -469,7 +416,20 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
         switch (id) {
             case "overview":    return <OverviewSection row={violation} detail={detail} />;
             case "chat":        return <ChatSessionSection messages={detail?.chatSession} highlights={detail?.evidence?.highlights || []} />;
-            case "file":        return <FileSection detail={detail} />;
+            case "file":
+                if (violation.type === "Tool") {
+                    return (
+                        <Box paddingBlockStart="3" paddingInlineEnd="4" paddingInlineStart="4">
+                            <SampleDataList
+                                heading="Attempt"
+                                minHeight="30vh"
+                                vertical
+                                sampleData={[{ message: violation.payload, highlightPaths: [], metadata: violation.metadata || null }]}
+                            />
+                        </Box>
+                    );
+                }
+                return <FileSection detail={detail} />;
             case "remediation": return <RemediationSection markdown={detail?.remediation} />;
             case "timeline":    return <ActivityTracker latestActivity={timelineActivity} />;
             default:            return null;

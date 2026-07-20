@@ -7,6 +7,11 @@ It exists so the worker (Pyodide on Cloudflare, or the FastAPI container) does
 not have to host an ONNX/torch runtime and a model. The worker owns the cache
 logic (Redis vector store, rule hashing, comparison/alerting) and calls
 POST /embed here whenever it needs a vector.
+
+Stateless and shared across every customer — this is the only kind of
+computation safe to centralize into one multi-tenant fleet (see
+intent-classifier-container for the per-agent classifier, which is stateful
+and therefore deployed per customer instead).
 """
 
 import os
