@@ -28,8 +28,10 @@ public class GuardrailPoliciesAction extends ActionSupport {
 
 
             // Resolve targetTeams/targetRoles → device IDs fresh on every fetch.
-            // Empty applyToDeviceIds = no targeting → apply to all devices.
-            // Non-empty = apply only to listed device labels.
+            // applyToDeviceIds stays null when there's no targeting → apply to all devices.
+            // When targeting is configured, applyToDeviceIds is always set to a (possibly empty) list →
+            // apply ONLY to those ids; empty means 0 matches right now, i.e. apply to none.
+            // Consumers must check for null vs. non-null, NOT list.isEmpty() alone.
             for (GuardrailPolicies p : this.guardrailPolicies) {
                 EnterpriseLicenseComplianceCatalog.applyToPolicy(p);
                 boolean hasTargeting = (p.getTargetTeams() != null && !p.getTargetTeams().isEmpty())
