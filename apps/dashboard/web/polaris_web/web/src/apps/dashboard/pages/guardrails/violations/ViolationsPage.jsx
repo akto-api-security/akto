@@ -397,7 +397,9 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
     // Latency graph is Akto-internal only (matches the same gate on ThreatDetectionPage.jsx).
     // Everyone else gets Open/Other Violations side by side instead of stacked, since there's
     // no third column to fill the space next to them.
-    const isAktoUser = window.USER_NAME?.includes('@akto.io');
+    // TEMP: forced off to preview the non-Akto layout — revert before shipping.
+    // const isAktoUser = window.USER_NAME?.includes('@akto.io');
+    const isAktoUser = false;
 
     const openCard = (
         <Box
