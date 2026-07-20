@@ -6,14 +6,16 @@
 # Automatically installs Akto guardrails hooks for Cursor IDE if detected
 # Downloads latest hooks from GitHub and configures Cursor hooks.json
 # Compatible with macOS and Linux
+# Mirrors: mcp-endpoint-shield/misc/macos/install_cursor_hooks.sh (master branch, full hook set)
 # ========================================================================================
 
-# Ensure common binary paths are available (SentinelOne remote execution uses minimal PATH)
+# Ensure common binary paths are available (RTR/remote execution uses minimal PATH)
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
 set -e
 
-GITHUB_RAW_BASE="https://raw.githubusercontent.com/akto-api-security/akto/agent-hooks/apps/mcp-endpoint-shield/cursor-hooks"
+GITHUB_RAW_BASE="https://raw.githubusercontent.com/akto-api-security/akto/master/apps/mcp-endpoint-shield/cursor-hooks"
+GITHUB_SHARED_BASE="https://raw.githubusercontent.com/akto-api-security/akto/master/apps/mcp-endpoint-shield/shared"
 
 # Detect OS
 OS_TYPE="$(uname -s)"
@@ -27,14 +29,17 @@ esac
 
 TARGET_USER_HOME="${TARGET_USER_HOME:-}"
 AKTO_DATA_INGESTION_URL="${AKTO_DATA_INGESTION_URL:-}"
+AKTO_API_TOKEN="${AKTO_API_TOKEN:-}"
 for a in "$@"; do
     case "$a" in
         TARGET_USER_HOME=*) TARGET_USER_HOME="${a#TARGET_USER_HOME=}" ;;
         AKTO_DATA_INGESTION_URL=*) AKTO_DATA_INGESTION_URL="${a#AKTO_DATA_INGESTION_URL=}" ;;
+        AKTO_API_TOKEN=*) AKTO_API_TOKEN="${a#AKTO_API_TOKEN=}" ;;
     esac
 done
 
 [ -n "$AKTO_DATA_INGESTION_URL" ] && export AKTO_DATA_INGESTION_URL
+[ -n "$AKTO_API_TOKEN" ] && export AKTO_API_TOKEN
 
 log() {
     echo "[Cursor Hooks] $1"
@@ -51,7 +56,6 @@ install_for_user() {
     TARGET_USER_HOME="$user_home"
     CURSOR_HOOKS_DIR="$user_home/.cursor/hooks/akto"
     CURSOR_HOOKS_FILE="$user_home/.cursor/hooks.json"
-    CONFIG_FILE="$user_home/.akto-mcp-endpoint-shield/config/config.env"
     CURSOR_CONNECTOR="cursor"
 
     if main; then
@@ -105,17 +109,11 @@ get_ingestion_url() {
         echo "$AKTO_DATA_INGESTION_URL"
         return 0
     fi
-
-    if [ -f "$CONFIG_FILE" ]; then
-        local url
-        url=$(grep "^AKTO_DATA_INGESTION_URL=" "$CONFIG_FILE" 2>/dev/null | cut -d= -f2-)
-        if [ -n "$url" ]; then
-            echo "$url"
-            return 0
-        fi
-    fi
-
     echo "https://guardrails.akto.io"
+}
+
+get_api_token() {
+    echo "${AKTO_API_TOKEN:-}"
 }
 
 generate_device_id() {
@@ -176,8 +174,9 @@ download_file() {
     fi
 }
 
-create_wrapper() {
-    local hook_type="$1"
+# Download and configure wrapper script for prompt chat hook
+create_prompt_wrapper() {
+    local hook_type="$1"  # "prompt" or "response"
     local ingestion_url="$2"
     local device_id="$3"
 
@@ -187,22 +186,20 @@ create_wrapper() {
 
     if ! download_file "$template_url" "$wrapper_file.tmp"; then
         log_error "Failed to download wrapper template for $hook_type, creating locally..."
-        log "Creating wrapper with URL: $ingestion_url"
 
         cat > "$wrapper_file" <<EOF
 #!/bin/bash
 # Auto-generated wrapper for Akto guardrails hook
-# Guardrails URL: $ingestion_url
 
 export MODE="atlas"
 export AKTO_DATA_INGESTION_URL="$ingestion_url"
+export AKTO_API_TOKEN="$API_TOKEN"
 export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="$CURSOR_CONNECTOR"
 export CONTEXT_SOURCE="ENDPOINT"
 export DEVICE_ID="$device_id"
 
-# Log configuration for debugging
 echo "[Cursor Hook] Data Ingestion URL: \$AKTO_DATA_INGESTION_URL" >&2
 echo "[Cursor Hook] Device ID: \$DEVICE_ID" >&2
 
@@ -212,41 +209,172 @@ EOF
         return 0
     fi
 
-    # Replace placeholder
     sed -e "s|{{AKTO_DATA_INGESTION_URL}}|$ingestion_url|g" \
+        -e "s|{{AKTO_API_TOKEN}}|$API_TOKEN|g" \
         -e "s|{{DEVICE_ID (optional)}}|$device_id|g" \
         "$wrapper_file.tmp" > "$wrapper_file"
 
     rm -f "$wrapper_file.tmp"
     chmod +x "$wrapper_file"
-    
+
     log "Wrapper configured with URL: $ingestion_url"
 }
 
+# Download and configure wrapper script for MCP hook
+create_mcp_wrapper() {
+    local hook_type="$1"  # "mcp-request" or "mcp-response"
+    local ingestion_url="$2"
+    local device_id="$3"
+
+    local wrapper_file="$CURSOR_HOOKS_DIR/akto-validate-${hook_type}-wrapper.sh"
+    local template_url="$GITHUB_RAW_BASE/akto-validate-${hook_type}-wrapper.sh"
+
+    if ! download_file "$template_url" "$wrapper_file.tmp"; then
+        log_error "Failed to download MCP wrapper template for $hook_type"
+        return 1
+    fi
+
+    sed -e "s|{{AKTO_DATA_INGESTION_URL}}|$ingestion_url|g" \
+        -e "s|{{AKTO_API_TOKEN}}|$API_TOKEN|g" \
+        -e "s|{{DEVICE_ID (optional)}}|$device_id|g" \
+        "$wrapper_file.tmp" > "$wrapper_file"
+
+    rm -f "$wrapper_file.tmp"
+    chmod +x "$wrapper_file"
+}
+
+# Download akto-hook-wrapper.sh and substitute placeholders (drives the general observability hooks)
+create_hook_wrapper() {
+    local ingestion_url="$1"
+    local device_id="$2"
+    local wrapper_file="$CURSOR_HOOKS_DIR/akto-hook-wrapper.sh"
+
+    if ! download_file "$GITHUB_RAW_BASE/akto-hook-wrapper.sh" "$wrapper_file.tmp"; then
+        log_error "Failed to download akto-hook-wrapper.sh, creating locally"
+        cat > "$wrapper_file" <<EOF
+#!/bin/bash
+# Auto-generated wrapper for Akto observability hooks
+
+export MODE="atlas"
+export AKTO_DATA_INGESTION_URL="$ingestion_url"
+export AKTO_API_TOKEN="$API_TOKEN"
+export AKTO_SYNC_MODE="true"
+export AKTO_TIMEOUT="5"
+export AKTO_CONNECTOR="$CURSOR_CONNECTOR"
+export CONTEXT_SOURCE="ENDPOINT"
+export DEVICE_ID="$device_id"
+
+SCRIPT_DIR="$CURSOR_HOOKS_DIR"
+exec python3 "\$SCRIPT_DIR/\$1" "\${@:2}"
+EOF
+        chmod +x "$wrapper_file"
+        log "Created akto-hook-wrapper.sh"
+        return 0
+    fi
+
+    sed -e "s|{{AKTO_DATA_INGESTION_URL}}|$ingestion_url|g" \
+        -e "s|{{AKTO_API_TOKEN}}|$API_TOKEN|g" \
+        -e "s|{{DEVICE_ID (optional)}}|$device_id|g" \
+        "$wrapper_file.tmp" > "$wrapper_file"
+
+    rm -f "$wrapper_file.tmp"
+    chmod +x "$wrapper_file"
+    log "Created akto-hook-wrapper.sh"
+}
+
+install_mcp_hooks() {
+    local ingestion_url="$1"
+    local device_id="$2"
+
+    log "Installing MCP hooks (beforeMCPExecution/afterMCPExecution)..."
+
+    for script in akto-validate-mcp-request.py akto-validate-mcp-response.py; do
+        if ! download_file "$GITHUB_RAW_BASE/$script" "$CURSOR_HOOKS_DIR/$script"; then
+            log_error "Failed to download $script"
+            return 1
+        fi
+        chmod +x "$CURSOR_HOOKS_DIR/$script"
+        log "Downloaded $script"
+    done
+
+    create_mcp_wrapper "mcp-request" "$ingestion_url" "$device_id"
+    log "Created akto-validate-mcp-request-wrapper.sh"
+
+    create_mcp_wrapper "mcp-response" "$ingestion_url" "$device_id"
+    log "Created akto-validate-mcp-response-wrapper.sh"
+}
+
+# Update or create Cursor hooks.json with the full hook set
 update_cursor_hooks() {
-    local chat_prompt_wrapper="$TARGET_USER_HOME/.cursor/hooks/akto/akto-validate-chat-prompt-wrapper.sh"
-    local chat_response_wrapper="$TARGET_USER_HOME/.cursor/hooks/akto/akto-validate-chat-response-wrapper.sh"
+    local hooks_dir="$CURSOR_HOOKS_DIR"
+    local wrapper="bash $hooks_dir/akto-hook-wrapper.sh"
 
     local new_hooks_config
     new_hooks_config=$(cat <<EOF
 {
-    "version": 1,
-    "hooks": {
-        "beforeSubmitPrompt": [
-            {
-                "command": "$chat_prompt_wrapper",
-                "type": "command",
-                "timeout": 10
-            }
-        ],
-        "afterAgentResponse": [
-            {
-                "command": "$chat_response_wrapper",
-                "type": "command",
-                "timeout": 10
-            }
-        ]
-    }
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      { "command": "bash $hooks_dir/akto-validate-chat-prompt-wrapper.sh", "type": "command", "timeout": 10 }
+    ],
+    "afterAgentResponse": [
+      { "command": "bash $hooks_dir/akto-validate-chat-response-wrapper.sh", "type": "command", "timeout": 10 }
+    ],
+    "beforeMCPExecution": [
+      { "command": "bash $hooks_dir/akto-validate-mcp-request-wrapper.sh", "type": "command", "timeout": 10 }
+    ],
+    "afterMCPExecution": [
+      { "command": "bash $hooks_dir/akto-validate-mcp-response-wrapper.sh", "type": "command", "timeout": 10 }
+    ],
+    "sessionStart": [
+      { "command": "$wrapper akto-hooks.py sessionStart", "type": "command", "timeout": 10 }
+    ],
+    "sessionEnd": [
+      { "command": "$wrapper akto-hooks.py sessionEnd", "type": "command", "timeout": 10 }
+    ],
+    "preToolUse": [
+      { "command": "$wrapper akto-hooks.py preToolUse", "type": "command", "timeout": 10 }
+    ],
+    "postToolUse": [
+      { "command": "$wrapper akto-hooks.py postToolUse", "type": "command", "timeout": 10 }
+    ],
+    "postToolUseFailure": [
+      { "command": "$wrapper akto-hooks.py postToolUseFailure", "type": "command", "timeout": 10 }
+    ],
+    "subagentStart": [
+      { "command": "$wrapper akto-hooks.py subagentStart", "type": "command", "timeout": 10 }
+    ],
+    "subagentStop": [
+      { "command": "$wrapper akto-hooks.py subagentStop", "type": "command", "timeout": 10 }
+    ],
+    "beforeShellExecution": [
+      { "command": "$wrapper akto-hooks.py beforeShellExecution", "type": "command", "timeout": 10 }
+    ],
+    "afterShellExecution": [
+      { "command": "$wrapper akto-hooks.py afterShellExecution", "type": "command", "timeout": 10 }
+    ],
+    "beforeReadFile": [
+      { "command": "$wrapper akto-hooks.py beforeReadFile", "type": "command", "timeout": 10 }
+    ],
+    "afterFileEdit": [
+      { "command": "$wrapper akto-hooks.py afterFileEdit", "type": "command", "timeout": 10 }
+    ],
+    "afterAgentThought": [
+      { "command": "$wrapper akto-hooks.py afterAgentThought", "type": "command", "timeout": 10 }
+    ],
+    "stop": [
+      { "command": "$wrapper akto-hooks.py stop", "type": "command", "timeout": 10 }
+    ],
+    "preCompact": [
+      { "command": "$wrapper akto-hooks.py preCompact", "type": "command", "timeout": 10 }
+    ],
+    "beforeTabFileRead": [
+      { "command": "$wrapper akto-hooks.py beforeTabFileRead", "type": "command", "timeout": 10 }
+    ],
+    "afterTabFileEdit": [
+      { "command": "$wrapper akto-hooks.py afterTabFileEdit", "type": "command", "timeout": 10 }
+    ]
+  }
 }
 EOF
 )
@@ -256,23 +384,8 @@ EOF
         cp "$CURSOR_HOOKS_FILE" "$CURSOR_HOOKS_FILE.backup"
 
         if command -v jq >/dev/null 2>&1; then
-            local existing_config
-            existing_config=$(cat "$CURSOR_HOOKS_FILE")
-
-            local merged_config
-            merged_config=$(echo "$existing_config" | jq --argjson newhooks "$new_hooks_config" '
-                .version = $newhooks.version |
-                .hooks.beforeSubmitPrompt = (
-                    [(.hooks.beforeSubmitPrompt // [])[] | select(.command | contains("/akto/") | not)] +
-                    $newhooks.hooks.beforeSubmitPrompt
-                ) |
-                .hooks.afterAgentResponse = (
-                    [(.hooks.afterAgentResponse // [])[] | select(.command | contains("/akto/") | not)] +
-                    $newhooks.hooks.afterAgentResponse
-                )
-            ')
-
-            echo "$merged_config" > "$CURSOR_HOOKS_FILE"
+            jq --argjson newhooks "$new_hooks_config" '.version = $newhooks.version | .hooks = $newhooks.hooks' "$CURSOR_HOOKS_FILE" > "$CURSOR_HOOKS_FILE.tmp"
+            mv "$CURSOR_HOOKS_FILE.tmp" "$CURSOR_HOOKS_FILE"
             log "Merged hooks into existing hooks.json"
         else
             echo "$new_hooks_config" > "$CURSOR_HOOKS_FILE"
@@ -297,9 +410,11 @@ main() {
 
     INGESTION_URL=$(get_ingestion_url)
     if [ -z "$INGESTION_URL" ]; then
-        log "Warning: AKTO_DATA_INGESTION_URL not configured"
+        log "Warning: ingestion URL not configured"
         INGESTION_URL="https://your-ingestion-url.akto.io"
     fi
+
+    API_TOKEN=$(get_api_token)
 
     DEVICE_ID=$(generate_device_id)
     if [ -z "$DEVICE_ID" ]; then
@@ -327,35 +442,47 @@ main() {
 
     log "Downloading hook scripts from GitHub..."
 
-    if ! download_file "$GITHUB_RAW_BASE/akto-validate-chat-prompt.py" "$CURSOR_HOOKS_DIR/akto-validate-chat-prompt.py"; then
-        log_error "Failed to download akto-validate-chat-prompt.py"
+    if ! download_file "$GITHUB_SHARED_BASE/akto_ingestion_utility.py" "$CURSOR_HOOKS_DIR/akto_ingestion_utility.py"; then
+        log_error "Failed to download akto_ingestion_utility.py"
         return 1
     fi
-    log "Downloaded akto-validate-chat-prompt.py"
-
-    if ! download_file "$GITHUB_RAW_BASE/akto-validate-chat-response.py" "$CURSOR_HOOKS_DIR/akto-validate-chat-response.py"; then
-        log_error "Failed to download akto-validate-chat-response.py"
-        return 1
-    fi
-    log "Downloaded akto-validate-chat-response.py"
+    chmod +x "$CURSOR_HOOKS_DIR/akto_ingestion_utility.py"
+    log "Downloaded akto_ingestion_utility.py"
 
     if ! download_file "$GITHUB_RAW_BASE/akto_machine_id.py" "$CURSOR_HOOKS_DIR/akto_machine_id.py"; then
         log_error "Failed to download akto_machine_id.py"
         return 1
     fi
+    chmod +x "$CURSOR_HOOKS_DIR/akto_machine_id.py"
     log "Downloaded akto_machine_id.py"
 
-    chmod +x "$CURSOR_HOOKS_DIR/akto-validate-chat-prompt.py"
-    chmod +x "$CURSOR_HOOKS_DIR/akto-validate-chat-response.py"
-    chmod +x "$CURSOR_HOOKS_DIR/akto_machine_id.py"
+    HOOK_PY_FILES=(
+        "akto-validate-chat-prompt.py"
+        "akto-validate-chat-response.py"
+        "akto-validate-mcp-request.py"
+        "akto-validate-mcp-response.py"
+        "akto-hooks.py"
+    )
 
-    log "Creating wrapper scripts with environment variables..."
+    for f in "${HOOK_PY_FILES[@]}"; do
+        if ! download_file "$GITHUB_RAW_BASE/$f" "$CURSOR_HOOKS_DIR/$f"; then
+            log_error "Failed to download $f"
+            return 1
+        fi
+        chmod +x "$CURSOR_HOOKS_DIR/$f"
+        log "Downloaded $f"
+    done
 
-    create_wrapper "prompt" "$INGESTION_URL" "$DEVICE_ID"
+    create_hook_wrapper "$INGESTION_URL" "$DEVICE_ID"
+
+    log "Installing prompt hooks (beforeSubmitPrompt/afterAgentResponse)..."
+    create_prompt_wrapper "prompt" "$INGESTION_URL" "$DEVICE_ID"
     log "Created akto-validate-chat-prompt-wrapper.sh"
-
-    create_wrapper "response" "$INGESTION_URL" "$DEVICE_ID"
+    create_prompt_wrapper "response" "$INGESTION_URL" "$DEVICE_ID"
     log "Created akto-validate-chat-response-wrapper.sh"
+
+    install_mcp_hooks "$INGESTION_URL" "$DEVICE_ID"
+    log "MCP hooks installed"
 
     log "Updating Cursor IDE hooks.json..."
     update_cursor_hooks
@@ -386,14 +513,18 @@ if [ -n "$TARGET_USER_HOME" ]; then
 else
     EXIT_CODE=0
 
-    # Determine user home directories based on OS
+    # Glob directly in the for-clause (not through an unquoted variable) so this expands
+    # correctly under both bash and zsh — CrowdStrike RTR executes -CloudFile scripts under
+    # zsh regardless of the #!/bin/bash shebang, and zsh does not glob unquoted variable
+    # expansion by default (no GLOB_SUBST), so `for u in $USER_DIRS` would silently iterate
+    # once over the literal pattern string instead of real directories.
     if [ "$IS_MACOS" = true ]; then
-        USER_DIRS="/Users/*"
+        GLOB_BASE="/Users"
     else
-        USER_DIRS="/home/*"
+        GLOB_BASE="/home"
     fi
 
-    for u in $USER_DIRS; do
+    for u in "$GLOB_BASE"/*; do
         u="${u%/}"
         base="$(basename "$u")"
         [ "$base" = "Shared" ] && continue
