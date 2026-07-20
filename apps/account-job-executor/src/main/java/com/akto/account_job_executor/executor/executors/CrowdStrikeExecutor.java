@@ -56,6 +56,10 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
     // Deduplicate MCP collections created within a single job run
     private final Set<String> createdCollectionIds = ConcurrentHashMap.newKeySet();
 
+    // Track running jobs to prevent duplicate execution (e.g. Cyborg re-claiming a job
+    // whose heartbeat lagged behind AccountJobsCron.MAX_HEARTBEAT_THRESHOLD_SECONDS)
+    private static final Set<String> runningJobs = new HashSet<>();
+
     // Recognized agent names — mirrors mcp-endpoint-shield/mcp/skill_detector.go's skillAgentToClientTypes keys.
     // A skill whose derived "agent" isn't on this list is routed to the shared orphan collection instead of
     // getting its own bogus per-skill collection (this happens when a skill file lives outside a known agent
@@ -87,6 +91,28 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
             throw new IllegalStateException("CrowdStrike clientSecret not configured");
         }
 
+        String jobIdStr = job.getId() != null ? job.getId().toString() : "unknown";
+
+        // Prevent duplicate execution (e.g. a re-claimed job running concurrently with the
+        // original still in flight)
+        synchronized (runningJobs) {
+            if (runningJobs.contains(jobIdStr)) {
+                loggerMaker.info("CrowdStrike job already running, skipping duplicate execution: jobId=" + jobIdStr, LogDb.DASHBOARD);
+                return;
+            }
+            runningJobs.add(jobIdStr);
+        }
+
+        try {
+            runJobInternal(job, integration);
+        } finally {
+            synchronized (runningJobs) {
+                runningJobs.remove(jobIdStr);
+            }
+        }
+    }
+
+    private void runJobInternal(AccountJob job, CrowdStrikeIntegration integration) throws Exception {
         // Reset per-job deduplication state
         createdCollectionIds.clear();
 
