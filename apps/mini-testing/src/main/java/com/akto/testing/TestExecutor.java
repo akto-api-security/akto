@@ -1245,6 +1245,13 @@ public class TestExecutor {
                     TestError.SKIPPING_COPILOT_INTERNAL_ENDPOINT.getMessage());
         }
 
+        if (apiCollection != null && apiCollection.getIsOutOfTestingScope()) {
+            loggerMaker.infoAndAddToDb("Skipping test for out of scope collection: " + apiInfoKey);
+            return generateFailedRunResultForMessage(testRunId, apiInfoKey, testSuperType, testSubType,
+                    testRunResultSummaryId, Collections.singletonList(rawApi.getOriginalMessage()),
+                    TestError.OUT_OF_TESTING_SCOPE_COLLECTION.getMessage());
+        }
+
         if(shouldCallClientLayerForSampleData){
             try {
                 long start = System.currentTimeMillis();
