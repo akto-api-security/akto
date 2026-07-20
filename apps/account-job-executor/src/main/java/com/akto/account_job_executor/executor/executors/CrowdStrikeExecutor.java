@@ -102,7 +102,7 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         // fetch, device listing, script upload, per-file skill processing, etc.) that runs longer
         // than 5s without hitting the RTR poll loop's own heartbeat call makes Cyborg consider the
         // job abandoned, so it gets re-claimed and re-run while the original run is still in
-        // flight (confirmed: same jobId claimed 12+ times within a single hour-long window).
+        // flight.
         // Run a background heartbeat for the job's entire duration instead of relying on manually
         // placed calls at each phase boundary, which silently stops covering new phases added later.
         final Thread heartbeatThread = new Thread(() -> {
@@ -165,20 +165,12 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         // Installed-apps (AI agent discovery) uploaded first so it's prioritized ahead of MCP/skills.
         final String appsShId  = uploadScriptIfNeeded("scan_installed_apps.sh",  accessToken, baseUrl);
         final String appsPs1Id = uploadScriptIfNeeded("scan_installed_apps.ps1", accessToken, baseUrl);
-        // scan_mcp_configs_cs.sh (not scan_mcp_configs.sh) for Unix — same CrowdStrike-specific
-        // python3-first/pure-bash-fallback treatment as scan_skills_cs.sh, and for the same
-        // confirmed reason (python3 unreliable inside this script's find-fed loops on CrowdStrike's
-        // sandbox). scan_mcp_configs.sh (plain python3) is kept as-is for Microsoft Defender.
+        
+        // MCP config discovery
         final String mcpShId  = uploadScriptIfNeeded("scan_mcp_configs_cs.sh",  accessToken, baseUrl);
         final String mcpPs1Id = uploadScriptIfNeeded("scan_mcp_configs.ps1", accessToken, baseUrl);
-        // scan_skills_cs.sh (not scan_skills.sh) for Unix — CrowdStrike-specific variant. Confirmed
-        // via direct RTR POC testing that plain python3 calls are unreliable inside this script's
-        // find-fed loops on CrowdStrike's execution sandbox (resolves and succeeds most of the
-        // time, but unpredictably fails "not available" with no code difference between runs).
-        // scan_skills_cs.sh tries python3 first (fast) and falls back to a slower but always-
-        // correct pure-bash read+escape when python3 doesn't come through. scan_skills.sh (plain
-        // python3, no fallback) is kept as-is for Microsoft Defender's executor, whose environment
-        // has not shown this same flakiness.
+       
+        // Skills discovery
         final String sklShId  = uploadScriptIfNeeded("scan_skills_cs.sh",    accessToken, baseUrl);
         final String sklPs1Id = uploadScriptIfNeeded("scan_skills.ps1",      accessToken, baseUrl);
 
@@ -1401,7 +1393,7 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
             case "cursor":          return "cursor";
             case "windsurf":        return "windsurf";
             case "vscode":          return "vscode";
-            case "github-cli":      return "github-copilot";
+            case "github-cli":      return "github-copilot";    
             case "antigravity":     return "antigravity";
             case "container":       return "container";
             default: return clientType.toLowerCase().replaceAll("[^a-z0-9-]", "-");
