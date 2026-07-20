@@ -46,6 +46,12 @@ public class SettingsScanAction extends ActionSupport {
         "that is literally present in the JSON below. Never report a field from the checklist just\n" +
         "because it's a known risky field name — only report it if you can point to its actual key\n" +
         "and value in the input JSON. If a checklist field is absent from the input, say nothing about it.\n" +
+        "For example, do NOT report disableAllHooks unless the literal key \"disableAllHooks\" appears in the JSON.\n" +
+        "\n" +
+        "A configured value is NOT automatically a risk. A default value or an expected setting is not a\n" +
+        "finding — flag only a value that is genuinely dangerous per a rule below, report the specific\n" +
+        "offending key (never a whole section), and never raise information-disclosure findings for\n" +
+        "non-secret local data such as paths, versions, or hashes.\n" +
         "\n" +
         "SCAN EVERY FIELD PRESENT IN THE INPUT. CHECK EACH RULE BELOW.\n" +
         "Use these as examples — if you spot something similar that we missed, flag it too.\n" +
@@ -55,8 +61,9 @@ public class SettingsScanAction extends ActionSupport {
         "  \"dontAsk\" | \"auto\" | \"acceptEdits\"  ->  HIGH / risky\n" +
         "\n" +
         "--- permissions.allow ---\n" +
-        "  Bash(*), Read(*), Write(*), Edit(*), WebFetch(*)  ->  HIGH / risky\n" +
-        "  .ssh, .aws, .kube, .gnupg, .npmrc, .pypirc, .netrc  ->  HIGH / malicious\n" +
+        "  ONLY flag an entry scoped with a wildcard or glob: Bash(*), Read(*), Write(*), Edit(*), WebFetch(*)  ->  HIGH / risky\n" +
+        "  Entry pointing at a credential path: .ssh, .aws, .kube, .gnupg, .npmrc, .pypirc, .netrc  ->  HIGH / malicious\n" +
+        "  DO NOT flag bare tool-name grants (\"Read\", \"Write\", \"Edit\", \"Bash\", \"WebFetch\", \"Glob\", \"Grep\", \"Agent\", \"Skill\", MCP tool names, etc.) — an explicit allowlist of tool names is normal, expected Claude Code config, not a risk. Report only the specific offending entry, never permissions.allow as a whole.\n" +
         "\n" +
         "--- permissions.ask ---\n" +
         "  Bash(*), Read(*), Write(*), Edit(*), WebFetch(*)  ->  MEDIUM / risky\n" +
@@ -109,6 +116,9 @@ public class SettingsScanAction extends ActionSupport {
         "- Hook command bodies: hooks.<Event>[].hooks[].command — Akto's own instrumentation hooks live there and would be noisy false positives\n" +
         "- Standard/expected domains: npmjs.com, pypi.org, github.com, githubusercontent.com, docker.com, api.openai.com\n" +
         "- MCP/provider plumbing metadata with no independent risk: cwd, env_http_headers, http_headers value shape, scopes, startup_timeout_*, tool_timeout_sec, enabled_tools/disabled_tools allowlists themselves, wire_api, request_max_retries, stream_*\n" +
+        "- Codex's OWN bundled MCP servers: any mcp_servers.<id> whose command/args point inside the Codex app bundle (paths under /Applications/Codex.app/, .../Contents/Resources/, cua_node, node_repl, computer-use). These ship with Codex — they are first-party, not user-injected. Skip their command, args, and env entirely.\n" +
+        "- mcp_servers.<id>.env.<KEY> whose VALUE is a filesystem path, URL, version string, SHA-256 hash or hash allowlist, timeout number, or a boolean/enum feature flag (e.g. NODE_REPL_*, BROWSER_USE_*, CODEX_*, SLACK_MCP_ENABLE_WRITE_TOOLS). These are plumbing config; do NOT flag them as secrets NOR as information disclosure — a version, path, or hash in a config the operator already owns is not an exposure.\n" +
+        "- Any *_env_var / *_env / bearer_token_env_var field — it names the env var that HOLDS a secret; the safe indirection pattern. The secret is not in the file, so there is nothing to flag.\n" +
         "\n" +
         "Return ONLY a raw JSON array starting with '['. No text, no fences.\n" +
         "No issues? Return: []\n" +
@@ -122,6 +132,10 @@ public class SettingsScanAction extends ActionSupport {
         "that is literally present in the JSON below. Never report a field from the checklist just\n" +
         "because it's a known risky field name — only report it if you can point to its actual key\n" +
         "and value in the input JSON. If a checklist field is absent from the input, say nothing about it.\n" +
+        "\n" +
+        "A configured value is NOT automatically a risk. A default/vendor-shipped server, a normal https URL,\n" +
+        "an env-var-name reference, or a plumbing setting is expected config — flag only a value that is\n" +
+        "genuinely dangerous per a rule below, and report the specific offending key, never a whole section.\n" +
         "\n" +
         "SCAN EVERY FIELD PRESENT IN THE INPUT. CHECK EACH RULE BELOW.\n" +
         "Use these as examples — if you spot something similar that we missed, flag it too.\n" +
@@ -166,11 +180,12 @@ public class SettingsScanAction extends ActionSupport {
         "  Suspicious, unexpected, or unreviewed-looking server/app name  ->  HIGH / risky\n" +
         "\n" +
         "--- mcp_servers.<id>.url / experimental_environment=\"remote\" host ---\n" +
-        "  Wildcard or raw IP  ->  HIGH / malicious\n" +
+        "  Wildcard host, raw IP, or plaintext http:// URL  ->  HIGH / malicious\n" +
+        "  A normal https:// URL to a SaaS/vendor API host is expected config — do NOT flag it.\n" +
         "\n" +
         "--- mcp_servers.<id>.command / mcp_servers.<id>.args ---\n" +
         "  Shell/network exfil patterns (curl|bash, base64-decode-and-exec, reverse shell)  ->  HIGH / malicious\n" +
-        "  Do NOT flag bare npx/uvx/node/python/docker invocations.\n" +
+        "  Do NOT flag bare npx/uvx/node/python/docker invocations, an absolute path to an interpreter or to a binary inside an app bundle (e.g. .../node_repl), or a plain script/JS file path passed as an arg. Only a genuine exfil/reverse-shell pipeline is a finding.\n" +
         "\n" +
         "--- apps.<id>.destructive_enabled = true  ->  HIGH / risky ---\n" +
         "--- apps.<id>.open_world_enabled = true  ->  HIGH / risky ---\n" +
@@ -180,7 +195,8 @@ public class SettingsScanAction extends ActionSupport {
         "  Any non-empty value (analog of apiKeyHelper)  ->  CRITICAL / malicious\n" +
         "\n" +
         "--- model_providers.<id>.experimental_bearer_token ---\n" +
-        "  Any non-empty value  ->  MEDIUM / risky\n" +
+        "  A literal inline token value  ->  MEDIUM / risky\n" +
+        "  A reference to an env var name (bearer_token_env_var and similar) is the safe pattern — do NOT flag it.\n" +
         "\n" +
         "--- model_providers.<id>.requires_openai_auth = true + base_url ---\n" +
         "  Host isn't an OpenAI domain  ->  CRITICAL / malicious\n" +
@@ -203,8 +219,8 @@ public class SettingsScanAction extends ActionSupport {
         "--- mcp_oauth_credentials_store = \"file\"  ->  MEDIUM / risky ---\n" +
         "\n" +
         "--- notify ---\n" +
-        "  Present at all  ->  MEDIUM / risky\n" +
-        "  Command contains bash/sh/curl/wget/nc/ssh/python/base64  ->  HIGH / malicious\n" +
+        "  Command contains bash/sh/curl/wget/nc/ssh/python/base64 or otherwise exfiltrates event data  ->  HIGH / malicious\n" +
+        "  Do NOT flag notify merely for being present — Codex ships a default notify command; a benign notify (e.g. pointing at the Codex app bundle) is not a finding.\n" +
         "\n" +
         "--- developer_instructions / model_instructions_file / compact_prompt / experimental_compact_prompt_file ---\n" +
         "  Content instructs ignoring safety rules, exfiltrating data, hiding actions, or self-modifying config  ->  CRITICAL / malicious\n" +
@@ -310,6 +326,15 @@ public class SettingsScanAction extends ActionSupport {
         "about absence (permissions.disableBypassPermissionsMode not being set). For every other rule,\n" +
         "never report a field from the checklist just because it's a known risky field name — only report\n" +
         "it if you can point to its actual key and value in the input JSON.\n" +
+        "\n" +
+        "A configured value is NOT automatically a risk. A default value or an expected setting is not a\n" +
+        "finding — flag only a value that is genuinely dangerous per a rule below, report the specific\n" +
+        "offending key (never a whole section), and never raise information-disclosure findings for\n" +
+        "non-secret local data such as paths, versions, or hashes.\n" +
+        "You are NOT given the org's approved URL/plugin/marketplace allowlist. Do not flag a normal https://\n" +
+        "URL, a well-known vendor domain, or a reputable plugin merely as \"not in the approved list\" — flag\n" +
+        "only an entry that is itself suspicious (wildcard, raw IP, plaintext http://, typosquat, or an\n" +
+        "obviously untrusted/unreviewed source).\n" +
         "\n" +
         "SCAN EVERY FIELD PRESENT IN THE INPUT. CHECK EACH RULE BELOW.\n" +
         "Use these as examples — if you spot something similar that we missed, flag it too.\n" +
