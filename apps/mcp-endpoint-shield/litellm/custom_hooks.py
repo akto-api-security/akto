@@ -7,6 +7,7 @@ import json
 import os
 import re
 import logging
+import time
 from datetime import datetime, timezone
 from urllib.parse import urlparse, quote
 
@@ -41,9 +42,13 @@ HTTP_PROXY_PATH = "/api/http-proxy"
 # Mirrored path: /mcp matches JsonRpcUtils.isMcpPath; non-MCP uses /{prefix}/{normalized-tool-name}
 MCP_INGEST_PATH = os.getenv("MCP_INGEST_PATH", "/mcp")
 NON_MCP_TOOL_PATH_PREFIX = os.getenv("NON_MCP_TOOL_PATH_PREFIX", "/tool")
+CALL_HEADERS_CACHE_TTL_SECONDS = float(os.getenv("CALL_HEADERS_CACHE_TTL_SECONDS", str(15 * 60)))
 
 INVALID_AGENT_CHARS = re.compile(r"[^a-z0-9\-._]")
 INVALID_TOOL_NAME_CHARS = re.compile(r"[^a-zA-Z0-9._~-]+")
+# Never mirror credentials/session cookies to the ingestion service; host/content-type
+# are always overridden below to reflect the mirrored envelope, not the original request.
+EXCLUDED_FORWARD_HEADERS = {"authorization", "cookie", "host", "content-type", "content-length"}
 
 
 class GuardrailsHandler(CustomLogger):
@@ -54,7 +59,35 @@ class GuardrailsHandler(CustomLogger):
             limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
             headers={"Authorization": AKTO_API_TOKEN} if AKTO_API_TOKEN else {},
         )
+        # litellm_call_id -> (request headers, expiry epoch seconds). async_pre_call_hook
+        # is the only hook that reliably sees proxy_server_request.headers - litellm
+        # doesn't pass it to async_should_run_agentic_loop - so we stash it here for the
+        # tool-call hook to pick back up by the same call_id.
+        self._call_headers_cache: dict = {}
         logger.info(f"GuardrailsHandler initialized | sync_mode={SYNC_MODE}")
+
+    def _cache_call_headers(self, litellm_call_id: Optional[str], headers: dict) -> None:
+        if not litellm_call_id or not headers:
+            return
+        now = time.monotonic()
+        # Opportunistic sweep, so entries for calls that never trigger a tool call
+        # (and are therefore never read back) don't linger past their TTL.
+        expired = [cid for cid, (_, expiry) in self._call_headers_cache.items() if expiry <= now]
+        for cid in expired:
+            del self._call_headers_cache[cid]
+        self._call_headers_cache[litellm_call_id] = (headers, now + CALL_HEADERS_CACHE_TTL_SECONDS)
+
+    def _get_cached_call_headers(self, litellm_call_id: Optional[str]) -> dict:
+        if not litellm_call_id:
+            return {}
+        entry = self._call_headers_cache.get(litellm_call_id)
+        if not entry:
+            return {}
+        headers, expiry = entry
+        if expiry <= time.monotonic():
+            del self._call_headers_cache[litellm_call_id]
+            return {}
+        return headers
 
     def build_http_proxy_params(self, *, guardrails: bool, ingest_data: bool) -> dict:
         params = {"akto_connector": AKTO_CONNECTOR_NAME}
@@ -169,7 +202,15 @@ class GuardrailsHandler(CustomLogger):
         call_type: Literal["completion", "text_completion", "embeddings", "image_generation", "moderation", "audio_transcription"],
         **kwargs,
     ) -> dict:
+        self._cache_request_headers_from_data(data)
         return await self.handle_validation_hook(data, call_type, user_api_key_dict, kwargs)
+
+    def _cache_request_headers_from_data(self, data: dict) -> None:
+        litellm_call_id = data.get("litellm_call_id")
+        proxy_server_request = data.get("proxy_server_request") or (data.get("litellm_params") or {}).get("proxy_server_request") or {}
+        headers = proxy_server_request.get("headers")
+        if headers:
+            self._cache_call_headers(litellm_call_id, headers)
 
     async def async_moderation_hook(
         self,
@@ -212,6 +253,7 @@ class GuardrailsHandler(CustomLogger):
             for tc in getattr(message, "tool_calls", None) or []:
                 fn = getattr(tc, "function", None)
                 calls.append({
+                    "id": getattr(tc, "id", None),
                     "name": getattr(fn, "name", None) or "unknown",
                     "arguments": self._parse_tool_arguments(getattr(fn, "arguments", None)),
                 })
@@ -219,6 +261,7 @@ class GuardrailsHandler(CustomLogger):
         for block in getattr(response, "content", None) or []:
             if isinstance(block, dict) and block.get("type") == "tool_use":
                 calls.append({
+                    "id": block.get("id"),
                     "name": block.get("name") or "unknown",
                     "arguments": self._parse_tool_arguments(block.get("input")),
                 })
@@ -238,13 +281,35 @@ class GuardrailsHandler(CustomLogger):
             if self._get_attr(block, "type") != "server_tool_use":
                 continue
             calls.append({
+                "id": self._get_attr(block, "id"),
                 "name": self._get_attr(block, "name") or "unknown",
                 "arguments": self._parse_tool_arguments(self._get_attr(block, "input", {})),
             })
         return calls
 
+    def _extract_server_tool_results(self, response: Any) -> dict:
+        """tool_use_id -> result block, for Anthropic server-executed tools (web_search,
+        code_execution). litellm surfaces these on
+        choices[].message.provider_specific_fields["<tool>_results"] - a sibling of
+        tool_calls on the message, not attached to the tool_calls entry itself - so this
+        has to be matched back to a call by tool_use_id after the fact."""
+        results = {}
+        for choice in self._get_attr(response, "choices", None) or []:
+            message = self._get_attr(choice, "message", None)
+            provider_specific_fields = self._get_attr(message, "provider_specific_fields", None) or {}
+            for key, value in provider_specific_fields.items():
+                if not key.endswith("_results") or not isinstance(value, list):
+                    continue
+                for block in value:
+                    tool_use_id = self._get_attr(block, "tool_use_id")
+                    if tool_use_id:
+                        results[tool_use_id] = block
+        return results
+
     def _extract_tool_calls(self, response: Any) -> list:
-        """Extracts {name, arguments (dict)} per tool call. Prefers litellm's own
+        """Extracts {id, name, arguments (dict)} per tool call. The id is the
+        tool_use_id needed to pair a server-executed tool call with its result via
+        _extract_server_tool_results(). Prefers litellm's own
         get_tool_calls_from_response - the same normalizer litellm's first-party
         guardrail hooks (Headroom, Lasso, Cato Networks) use, covering chat
         completions, the Responses API, and Anthropic Messages "tool_use" blocks -
@@ -253,7 +318,7 @@ class GuardrailsHandler(CustomLogger):
         tools aren't covered by either path, so those are always added separately."""
         if LITELLM_GET_TOOL_CALLS_FROM_RESPONSE is not None:
             calls = [
-                {"name": c.get("name") or "unknown", "arguments": c.get("arguments") or {}}
+                {"id": c.get("id"), "name": c.get("name") or "unknown", "arguments": c.get("arguments") or {}}
                 for c in LITELLM_GET_TOOL_CALLS_FROM_RESPONSE(response)
             ]
         else:
@@ -347,6 +412,7 @@ class GuardrailsHandler(CustomLogger):
         custom_llm_provider: Optional[str] = None,
         available_tools: Optional[list] = None,
         kwargs: Optional[dict] = None,
+        tool_result: Optional[Any] = None,
     ) -> dict:
         """Builds the mirrored-request payload for a single tool call, using the same
         path convention (/mcp vs /tool/<name>) the Go backend uses to classify tool-call
@@ -362,14 +428,14 @@ class GuardrailsHandler(CustomLogger):
         litellm_params = (kwargs or {}).get("litellm_params", {})
         litellm_call_id = (kwargs or {}).get("litellm_call_id")
         proxy_server_request = litellm_params.get("proxy_server_request") or {}
-        request_headers_raw = proxy_server_request.get("headers", {})
+        # litellm doesn't pass proxy_server_request.headers into this hook's kwargs at
+        # all, so fall back to what async_pre_call_hook cached for this same call_id.
+        request_headers_raw = proxy_server_request.get("headers") or self._get_cached_call_headers(litellm_call_id)
         client_ip = (
             request_headers_raw.get("x-forwarded-for", "").split(",")[0].strip()
             or request_headers_raw.get("x-real-ip", "")
             or "0.0.0.0"
         )
-        session_id = request_headers_raw.get("x-session-id", "")
-
         tags = self.build_tool_call_tags(
             is_mcp=is_mcp,
             tool_name=tool_name,
@@ -382,17 +448,19 @@ class GuardrailsHandler(CustomLogger):
         )
 
         host = self._resolve_host({"metadata": metadata or {}}, user_api_key_dict)
-        request_headers_out = {"host": host, "content-type": "application/json"}
-        if session_id:
-            request_headers_out["x-session-id"] = session_id
+        request_headers_out = self.build_forwarded_headers(request_headers_raw, host)
+        # Only server-executed tools (web_search, code_execution) have a result at this
+        # point - it's already in the same response this hook fired on. Client-executed
+        # tools (the caller runs them after receiving the response) genuinely have no
+        # result yet; tool_result stays None for those.
+        response_payload = json.dumps({"body": tool_result}) if tool_result is not None else None
 
         return self.build_http_proxy_envelope(
             path=path,
             request_headers=request_headers_out,
             response_headers={"content-type": "application/json"},
             request_payload=request_payload,
-            # No tool result is known yet - this hook fires before the caller executes the tool.
-            response_payload=None,
+            response_payload=response_payload,
             ip=client_ip,
             status_code=200,
             tags=tags,
@@ -426,6 +494,7 @@ class GuardrailsHandler(CustomLogger):
                 logger.warning("[tool-call-hook] Fired with stream=True - response parsing assumes non-streaming, verify output")
 
             available_tools = self._extract_available_tool_names(tools)
+            tool_results_by_id = self._extract_server_tool_results(response)
 
             litellm_params = kwargs.get("litellm_params", {}) if kwargs else {}
             metadata = litellm_params.get("metadata", {})
@@ -434,11 +503,13 @@ class GuardrailsHandler(CustomLogger):
             for call in tool_calls:
                 tool_name = call["name"]
                 tool_args = call["arguments"]
+                tool_result = tool_results_by_id.get(call.get("id"))
                 is_mcp, mcp_server_name, mcp_tool_name = self.parse_mcp_tool_name(tool_name)
                 logger.info(
                     f"[tool-call-hook] Detected tool_call: name={tool_name} is_mcp={is_mcp} "
                     f"mcp_server={mcp_server_name or None} provider={custom_llm_provider} "
-                    f"available_tools={available_tools} arguments={tool_args}"
+                    f"available_tools={available_tools} arguments={tool_args} "
+                    f"has_result={tool_result is not None}"
                 )
 
                 http_proxy_payload = self.build_tool_call_ingest_payload(
@@ -450,6 +521,7 @@ class GuardrailsHandler(CustomLogger):
                     custom_llm_provider=custom_llm_provider,
                     available_tools=available_tools,
                     kwargs=kwargs,
+                    tool_result=tool_result,
                 )
                 logger.info(
                     f"[tool-call-hook] Ingesting | path={http_proxy_payload.get('path')} "
@@ -596,13 +668,17 @@ class GuardrailsHandler(CustomLogger):
             kwargs,
         )
 
-    def build_tags(self, call_type: str, data: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None) -> dict:
+    def build_tags(self, call_type: str, data: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None, litellm_call_id: Optional[str] = None) -> dict:
         tags = {"gen-ai": "Gen AI", "litellm": "LiteLLM"}
         if call_type:
             tags["call_type"] = call_type
         model = data.get("model", "")
         if model:
             tags["model"] = model
+        # Same litellm_call_id build_tool_call_tags() stamps on every tool-call event
+        # fired from this request - lets the dashboard join a completion to its tool calls.
+        if litellm_call_id:
+            tags["litellm_call_id"] = litellm_call_id
         if user_api_key_dict:
             try:
                 key_alias = getattr(user_api_key_dict, "key_alias", None)
@@ -617,6 +693,18 @@ class GuardrailsHandler(CustomLogger):
             except Exception as e:
                 logger.error(f"Failed to enrich tags: {e}")
         return tags
+
+    def build_forwarded_headers(self, request_headers_raw: dict, host: str) -> dict:
+        """Mirrors all original client request headers (e.g. x-akto-* passthrough
+        headers) to the ingested request, except credentials/cookies (never forwarded)
+        and host/content-type (overridden to reflect the mirrored envelope)."""
+        headers_out = {
+            k: v for k, v in (request_headers_raw or {}).items()
+            if k.lower() not in EXCLUDED_FORWARD_HEADERS
+        }
+        headers_out["host"] = host
+        headers_out["content-type"] = "application/json"
+        return headers_out
 
     def _resolve_host(self, data: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> str:
         agent_name = self.extract_agent_name(data, user_api_key_dict, kwargs)
@@ -677,7 +765,8 @@ class GuardrailsHandler(CustomLogger):
         }
 
         request_path = self.extract_request_path(kwargs)
-        tags = self.build_tags(call_type, data, user_api_key_dict)
+        litellm_call_id = (kwargs or {}).get("litellm_call_id")
+        tags = self.build_tags(call_type, data, user_api_key_dict, litellm_call_id)
         host = self._resolve_host(data, user_api_key_dict, kwargs)
 
         proxy_server_request = (
@@ -692,13 +781,7 @@ class GuardrailsHandler(CustomLogger):
             or "0.0.0.0"
         )
 
-        headers_out = {
-            "host": host,
-            "content-type": "application/json",
-        }
-        session_id = request_headers_raw.get("x-session-id", "")
-        if session_id:
-            headers_out["x-session-id"] = session_id
+        headers_out = self.build_forwarded_headers(request_headers_raw, host)
 
         request_payload = json.dumps({
             "body": request_body,
