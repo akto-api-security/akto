@@ -32,38 +32,38 @@ public class AuthFilter implements Filter {
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain chain) throws IOException, ServletException {
         HttpServletRequest httpServletRequest= (HttpServletRequest) servletRequest;
         HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
-        // String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
-        // String requestURI = httpServletRequest.getRequestURI();
+        String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
+        String requestURI = httpServletRequest.getRequestURI();
 
-        // if (TokenBlocklistCron.isTokenBlocked(accessTokenFromRequest)) {
-        //     httpServletResponse.sendError(401);
-        //     return;
-        // }
+        if (TokenBlocklistCron.isTokenBlocked(accessTokenFromRequest)) {
+            httpServletResponse.sendError(401);
+            return;
+        }
 
         try {
-            //Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
-            //Claims body = claims.getBody();
-            Context.accountId.set(1000000);
+            Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
+            Claims body = claims.getBody();
+            Context.accountId.set((int) body.get(ACCOUNT_ID));
 
-            // List<String> scope = extractScope(body);
-            // if (scope != null) {
-            //     Context.tokenScope.set(scope);
-            //     Context.tokenExpiry.set(body.getExpiration());
-            //     boolean alreadyExchanged = body.get(MODULE_TYPE) != null;
-            //     if (!alreadyExchanged && !isExchangeEndpoint(requestURI)) {
-            //         // Raw/bootstrap token: only usable to call the exchange endpoint
-            //         // until it's traded in for a token carrying both scope + moduleType.
-            //         httpServletResponse.sendError(403);
-            //         return;
-            //     }
-            // }
+            List<String> scope = extractScope(body);
+            if (scope != null) {
+                Context.tokenScope.set(scope);
+                Context.tokenExpiry.set(body.getExpiration());
+                boolean alreadyExchanged = body.get(MODULE_TYPE) != null;
+                if (!alreadyExchanged && !isExchangeEndpoint(requestURI)) {
+                    // Raw/bootstrap token: only usable to call the exchange endpoint
+                    // until it's traded in for a token carrying both scope + moduleType.
+                    httpServletResponse.sendError(403);
+                    return;
+                }
+            }
         } catch (Exception e) {
-            // if (shouldSkipAuth(e, requestURI)) {
-            //     chain.doFilter(servletRequest, servletResponse);
-            //     return;
-            // }
-            // System.out.println(e.getMessage());
-            // httpServletResponse.sendError(401);
+            if (shouldSkipAuth(e, requestURI)) {
+                chain.doFilter(servletRequest, servletResponse);
+                return;
+            }
+            System.out.println(e.getMessage());
+            httpServletResponse.sendError(401);
             return;
         }
 
