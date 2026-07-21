@@ -2987,6 +2987,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String markTestingRunFailed() {
+        try {
+            DbLayer.markTestingRunFailed(testingRunId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in markTestingRunFailed " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String updateTestingRunAndMarkCompleted() {
         try {
             DbLayer.updateTestingRunAndMarkCompleted(testingRunId, scheduleTs);
