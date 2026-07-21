@@ -33,13 +33,10 @@ const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 
 export default function ViolationsTab({ asset, collections = [], startTimestamp, endTimestamp, onViolationClick }) {
     const [violations, setViolations] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    // Reset immediately when the asset changes so stale rows from the previous asset
-    // are never visible while the new fetch is in flight.
-    useEffect(() => { setViolations([]); setLoading(true); }, [asset?.id]);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
+        setLoading(true);
         const isClaudeAsset = asset?.assetTagValue?.toLowerCase() === "claude";
         if (!asset?.collectionIds?.length || !collections.length) {
             if (!isClaudeAsset) { setViolations([]); setLoading(false); return; }
