@@ -1037,34 +1037,23 @@ Reference URL: ${window.location.href}`.trim();
         );
         return(
             <Box padding={"4"} paddingBlockStart={"0"} maxWidth="100%">
+                <VerticalStack gap={"2"}>
                 <HorizontalStack wrap={false} align="space-between" gap={"6"}>
-                    <Box maxWidth="50%">
-                        <VerticalStack gap={"2"}>
-                            <HorizontalStack gap={"2"} align="start">
+                    <Box minWidth="0" overflowX="hidden" style={{ flex: 1 }}>
+                        <HorizontalStack gap={"2"} align="start" wrap={false}>
+                            <Box minWidth="0" overflowX="hidden">
                                 {isTitleClickable ? (
                                     <Button onClick={() => openTest(templateId)} removeUnderline plain monochrome>
                                         {titleText}
                                     </Button>
                                 ) : titleText}
-                                <div className={`badge-wrapper-${severity}`}>
-                                    <Badge size="small">{func.toSentenceCase(severity)}</Badge>
-                                </div>
-                            </HorizontalStack>
-                            <HorizontalStack gap={"1"} wrap={false}>
-                                <Tooltip content={moreInfoData?.url}>
-                                    <Text color="subdued" variant="bodySm" truncate>{moreInfoData?.url}</Text>
-                                </Tooltip>
-                                {
-                                    currentTemplateObj?.category?.name && (
-                                        <>
-                                            <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
-                                            <Text color="subdued" variant="bodySm">{currentTemplateObj?.category?.name || "-"}</Text>
-                                        </>
-                                    )
-                                }
-                            </HorizontalStack>
-                        </VerticalStack>
+                            </Box>
+                            <div className={`badge-wrapper-${severity}`} style={{ flexShrink: 0 }}>
+                                <Badge size="small">{func.toSentenceCase(severity)}</Badge>
+                            </div>
+                        </HorizontalStack>
                     </Box>
+                    <Box style={{ flexShrink: 0 }}>
                     <HorizontalStack gap={"2"} wrap={false}>
                         <Popover
                             active={actionPopoverActive}
@@ -1180,7 +1169,24 @@ Reference URL: ${window.location.href}`.trim();
                             />
                         )}
                     </HorizontalStack>
+                    </Box>
                 </HorizontalStack>
+                <HorizontalStack gap={"1"} wrap={false}>
+                    <Box minWidth="0" style={{ flex: 1 }}>
+                        <Tooltip content={moreInfoData?.url}>
+                            <Text color="subdued" variant="bodySm" truncate>{moreInfoData?.url}</Text>
+                        </Tooltip>
+                    </Box>
+                    {
+                        currentTemplateObj?.category?.name && (
+                            <>
+                                <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
+                                <Text color="subdued" variant="bodySm">{currentTemplateObj?.category?.name || "-"}</Text>
+                            </>
+                        )
+                    }
+                </HorizontalStack>
+                </VerticalStack>
             </Box>
         )
     }
