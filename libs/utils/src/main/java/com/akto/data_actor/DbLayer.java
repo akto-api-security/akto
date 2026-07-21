@@ -47,7 +47,10 @@ import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.settings.DataControlSettings;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.InsertManyResult;
+
 import org.apache.commons.lang3.StringUtils;
+import org.bson.BsonValue;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -3142,8 +3145,25 @@ public class DbLayer {
         }
     }
 
-    public static void storeConversationResults(List<AgentConversationResult> conversationResults) {
-        AgentConversationResultDao.instance.insertMany(conversationResults);
+    public static List<String> storeConversationResults(List<AgentConversationResult> conversationResults) {
+        InsertManyResult result = AgentConversationResultDao.instance.insertMany(conversationResults);
+        String[] docIds = new String[conversationResults.size()];
+        for (Map.Entry<Integer, BsonValue> entry : result.getInsertedIds().entrySet()) {
+            docIds[entry.getKey()] = entry.getValue().asObjectId().getValue().toHexString();
+        }
+        return Arrays.asList(docIds);
+    }
+
+    public static void updateAgentConversationToolsMetadata(String docId, Map<String, Object> toolsMetadata){
+        try {
+            ObjectId objectId = new ObjectId(docId);
+            AgentConversationResultDao.instance.updateOneNoUpsert(
+                Filters.eq(Constants.ID, objectId),
+                Updates.set("toolsMetaData", toolsMetadata)
+            );
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public static void bulkWriteAgentTrafficLogs(List<AgentTrafficLog> agentTrafficLogs) {

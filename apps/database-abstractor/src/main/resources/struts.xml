@@ -2492,6 +2492,17 @@
             </result>
         </action>
 
+        <action name="api/updateAgentConversationToolsMetadata" class="com.akto.action.DbAction" method="updateAgentConversationToolsMetadata">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/bulkWriteAgentTrafficLogs" class="com.akto.action.DbAction" method="bulkWriteAgentTrafficLogs">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2706,11 +2717,24 @@
             </result>
         </action>
 
-        <action name="api/storeAgentQueryData" class="com.akto.action.DbAction" method="storeAgentQueryRecords">
+        <action name="api/storeAgentQueryData" class="com.akto.action.ESClientAction" method="storeAgentQueryRecords">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/getAgentTracesForMessageId" class="com.akto.action.ESClientAction" method="getAgentTracesForMessageId">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">recordsForTraceId</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

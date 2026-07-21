@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.akto.action.DbAction;
+import com.akto.action.ESClientAction;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.LogsEndpointShield;
@@ -211,6 +212,7 @@ public class KafkaUtils {
 
     public static void parseAndTriggerWrites(String message, Map<Integer, List<LogsEndpointShield>> shieldLogBuffer) throws Exception {
         DbAction dbAction = new DbAction();
+        ESClientAction esClientAction = new ESClientAction();
         Map<String, Object> json = gson.fromJson(message, Map.class);
         String triggerMethod = (String) json.get("triggerMethod");
         String payload = (String) json.get("payload");
@@ -235,8 +237,8 @@ public class KafkaUtils {
 
         if ("storeAgentQueryRecords".equals(triggerMethod)) {
             List<AgentQueryRecord> agentQueryRecords = mapper.readValue(payload, new TypeReference<List<AgentQueryRecord>>(){});
-            dbAction.setAgentQueryRecords(agentQueryRecords);
-            dbAction.storeAgentQueryRecords();
+            esClientAction.setAgentQueryRecords(agentQueryRecords);
+            esClientAction.storeAgentQueryRecords();
             return;
         }
 
