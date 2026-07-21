@@ -1261,7 +1261,7 @@ function ApiEndpoints(props) {
             label: 'Display graph view',
             state: showSequencesFlow,
             setState: setShowSequencesFlow,
-            condition: true
+            condition: !isEndpointSecurityCategory()
         },
         {
             key: 'dependencies',
@@ -1275,7 +1275,7 @@ function ApiEndpoints(props) {
             label: 'View Schema',
             state: showSchemaView,
             setState: setShowSchemaView,
-            condition: true
+            condition: !isEndpointSecurityCategory()
         },
         {
             key: 'graphqlTree',
@@ -1289,10 +1289,7 @@ function ApiEndpoints(props) {
             label: 'Display REST tree view',
             state: treeViewMode === 'rest',
             setState: (on) => setTreeViewMode(prev => on ? 'rest' : (prev === 'rest' ? null : prev)),
-            // isGraphQLCollection checks if any endpoint has apiType === "GRAPHQL".
-            // Pure REST collections show this; mixed collections show the GraphQL tree
-            // (REST endpoints in a mixed collection are silently excluded from that view).
-            condition: !isGraphQLCollection
+            condition: !isEndpointSecurityCategory() && !isGraphQLCollection
         }
     ];
 
@@ -1331,12 +1328,12 @@ function ApiEndpoints(props) {
                 <div className="inventory-list">
                 <ActionList
                     sections={[
-                        {
-                            title: 'Switch view',
-                            items: viewConfigs
+                        ...(() => {
+                            const switchViewItems = viewConfigs
                                 .map(config => createViewToggleItem(config))
                                 .filter(Boolean)
-                        },
+                            return switchViewItems.length > 0 ? [{ title: 'Switch view', items: switchViewItems }] : []
+                        })(),
                         ...(showSequencesFlow || showSwaggerDependenciesFlow || showSchemaView ? [] : [
                             {
                                 title:'Re-Compute',
