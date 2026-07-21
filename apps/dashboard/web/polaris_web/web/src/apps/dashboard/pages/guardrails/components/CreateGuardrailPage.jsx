@@ -28,7 +28,7 @@ import {
 } from '../utils';
 import { getDefaultGeneralBlockTopics, GENERAL_BLOCKS, isGeneralBlockTopic, toDeniedTopic } from '../generalBlocks';
 import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from './enterpriseLicenseComplianceCatalog';
-import { groupCollectionsByAgent, groupCollectionsByService, extractServiceName } from '../../observe/agentic/constants';
+import { groupCollectionsByAgent, groupCollectionsByService, groupCollectionsByLLM, extractServiceName } from '../../observe/agentic/constants';
 import { findAssetTag } from '../../observe/agentic/mcpClientHelper';
 import { isEndpointSecurityCategory } from '../../../../main/labelHelper';
 import { isVisibilityOnly, buildAgentFilterOptions, getClientTagVariants, resolveClientKey } from '../serverTargetingUtils';
@@ -544,9 +544,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 // Atlas: group by service/platform key — one entry covers all devices running that service
                 const serviceGroups = groupCollectionsByService(nonVisibility);
                 const agentGroups = groupCollectionsByAgent(nonVisibility);
+                const llmGroups = groupCollectionsByLLM(nonVisibility);
                 setMcpServers(serviceGroups.filter(g => g.clientType === 'MCP Server').map(groupToOption));
                 setAgentServers(agentGroups.map(groupToOption));
-                setBrowserLlmServers(serviceGroups.filter(g => g.clientType === 'LLM').map(groupToOption));
+                setBrowserLlmServers(llmGroups.map(groupToOption));
             } else {
                 // Argus: each device+service is a distinct target — use full hostname as the option value
                 const toOption = (c) => {
