@@ -81,18 +81,22 @@ public class ConsumerUtil {
         Context.accountId.set(singleTestPayload.getAccountId());
         ObjectId summaryId = singleTestPayload.getTestingRunResultSummaryId();
         TestExecutor.setTestRunActivityContext(summaryId);
+        ApiInfoKey apiInfoKey = singleTestPayload.getApiInfoKey();
+        String subCategory = singleTestPayload.getSubcategory();
         try {
             TestExecutor executor = new TestExecutor();
 
             TestingConfigurations instance = TestingConfigurations.getInstance();
-            String subCategory = singleTestPayload.getSubcategory();
             TestConfig testConfig = instance.getTestConfigMap().get(subCategory);
-            ApiInfoKey apiInfoKey = singleTestPayload.getApiInfoKey();
 
             List<String> messagesList = instance.getTestingUtil().getSampleMessages().get(apiInfoKey);
             int timeNow = Context.now();
-            if(messagesList == null || messagesList.isEmpty()){}
-            else{
+            if (messagesList == null || messagesList.isEmpty()) {
+                String skipMsg = "Skipping test: no sample messages for apiInfoKey=" + apiInfoKey
+                        + " subcategory=" + subCategory + " summaryId=" + summaryId;
+                loggerMaker.errorAndAddToDb(skipMsg);
+                debugLogToDb(singleTestPayload.getAccountId(), skipMsg);
+            } else {
                 String sample = messagesList.get(messagesList.size() - 1);
                 loggerMaker.infoAndAddToDb("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
                 TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
@@ -103,16 +107,26 @@ public class ConsumerUtil {
 
                 loggerMaker.insertImportantTestingLog("Test completed for: " + apiInfoKey + " with subcategory: " + subCategory + " in " + (Context.now() - timeNow) + " seconds");
             }
+        } catch (Exception e) {
+            String errMsg = "runTestFromMessage failed apiInfoKey=" + apiInfoKey
+                    + " subcategory=" + subCategory + " summaryId=" + summaryId;
+            loggerMaker.errorAndAddToDb(e, errMsg);
+            debugLogToDb(singleTestPayload.getAccountId(), errMsg + " cause=" + e.getMessage());
+            if (e instanceof RuntimeException) {
+                throw (RuntimeException) e;
+            }
+            throw new RuntimeException(errMsg, e);
         } finally {
             TestExecutor.clearActivityContext();
         }
     }
 
     private void createTimedOutResultFromMessage(String message){
-        SingleTestPayload singleTestPayload = parseTestMessage(message);
-        Context.accountId.set(singleTestPayload.getAccountId());
-        TestExecutor.setTestRunActivityContext(singleTestPayload.getTestingRunResultSummaryId());
+        SingleTestPayload singleTestPayload = null;
         try {
+            singleTestPayload = parseTestMessage(message);
+            Context.accountId.set(singleTestPayload.getAccountId());
+            TestExecutor.setTestRunActivityContext(singleTestPayload.getTestingRunResultSummaryId());
             TestExecutor testExecutor = new TestExecutor();
 
             String subCategory = singleTestPayload.getSubcategory();
@@ -123,6 +137,16 @@ public class ConsumerUtil {
 
             TestingRunResult runResult = Utils.generateFailedRunResultForMessage(singleTestPayload.getTestingRunId(), singleTestPayload.getApiInfoKey(), testSuperType, testSubType, singleTestPayload.getTestingRunResultSummaryId(), new ArrayList<>(),  TestError.TEST_TIMED_OUT.getMessage());
             testExecutor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+        } catch (Exception e) {
+            String errMsg = "createTimedOutResultFromMessage failed"
+                    + (singleTestPayload != null
+                    ? (" apiInfoKey=" + singleTestPayload.getApiInfoKey()
+                    + " subcategory=" + singleTestPayload.getSubcategory())
+                    : "");
+            loggerMaker.errorAndAddToDb(e, errMsg);
+            if (singleTestPayload != null) {
+                debugLogToDb(singleTestPayload.getAccountId(), errMsg + " cause=" + e.getMessage());
+            }
         } finally {
             TestExecutor.clearActivityContext();
         }
@@ -229,21 +253,42 @@ public class ConsumerUtil {
                         firstRecordRead.set(true);
                         try {
                             future.get(maxRunTimeForTests, TimeUnit.SECONDS); 
-                        } catch (InterruptedException | TimeoutException e) {
-                            loggerMaker.errorAndAddToDb("Task timed out");
+                        } catch (TimeoutException e) {
+                            String errMsg = "Task timed out recordId=" + recordId
+                                    + " after " + maxRunTimeForTests + "s";
+                            loggerMaker.errorAndAddToDb(e, errMsg);
+                            debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
+                            future.cancel(true);
+                            createTimedOutResultFromMessage(message);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            String errMsg = "Task interrupted recordId=" + recordId;
+                            loggerMaker.errorAndAddToDb(e, errMsg);
+                            debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
                             future.cancel(true);
                             createTimedOutResultFromMessage(message);
                         } catch(RejectedExecutionException e){
+                            String errMsg = "Task rejected recordId=" + recordId
+                                    + " (executor shutdown or saturated)";
+                            loggerMaker.errorAndAddToDb(e, errMsg);
+                            debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
                             future.cancel(true);
                         } catch (Exception e) {
                             future.cancel(true);
-                            loggerMaker.errorAndAddToDb(e, "Error in task execution: " + message);
+                            String errMsg = "Error in task execution recordId=" + recordId;
+                            loggerMaker.errorAndAddToDb(e, errMsg);
+                            debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
                         }
                     }
                     
+                } catch (Exception err) {
+                    String errMsg = "Thread [" + threadName + "] error executing recordId=" + recordId;
+                    loggerMaker.errorAndAddToDb(err, errMsg);
+                    debugLogToDb(accountId, errMsg + " cause=" + err.getMessage());
                 } finally {
                     processedRecords.incrementAndGet();
                     loggerMaker.infoAndAddToDb("Thread [" + threadName + "] finished processing record recordId=" + recordId);
+                    debugLogToDb(accountId, "finished recordId=" + recordId + " executed=" + processedRecords.get());
                 }
             });
         }
@@ -317,7 +362,12 @@ public class ConsumerUtil {
             }
 
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in polling records");
+            String errMsg = "Error in polling records summaryId=" + summaryIdForTest
+                    + " polled=" + polledRecords.get()
+                    + " executed=" + processedRecords.get()
+                    + " expected=" + expectedRecords;
+            loggerMaker.errorAndAddToDb(e, errMsg);
+            debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
         }finally{
             int finalPolled = polledRecords.get();
             int finalExecuted = processedRecords.get();
