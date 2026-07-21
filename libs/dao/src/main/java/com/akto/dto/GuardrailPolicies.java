@@ -101,6 +101,10 @@ public class GuardrailPolicies {
     private boolean applyToAllServers;
 
     // applyToDeviceIds is resolved at fetch time (not stored) by the dashboard before serving to the enforcement layer.
+    // null  => no team/role targeting configured => apply to all devices.
+    // list (even empty) => targeting configured; apply ONLY to these device ids.
+    //          An empty list here means 0 devices currently match the selected teams/roles
+    //          (or resolution failed) => apply to none, NOT apply to all.
     private List<String> targetTeams;
     private List<String> targetRoles;
     @BsonIgnore
