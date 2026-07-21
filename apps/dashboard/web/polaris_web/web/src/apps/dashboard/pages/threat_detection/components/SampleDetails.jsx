@@ -1,4 +1,4 @@
-import { Badge, Box, Button, ChoiceList, Divider, HorizontalStack, Modal, Text, TextField, Tooltip, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
+import { Badge, Box, Button, ChoiceList, Divider, HorizontalStack, Modal, Text, TextField, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -1039,21 +1039,18 @@ Reference URL: ${window.location.href}`.trim();
             <Box padding={"4"} paddingBlockStart={"0"} maxWidth="100%">
                 <VerticalStack gap={"2"}>
                 <HorizontalStack wrap={false} align="space-between" gap={"6"}>
-                    <Box minWidth="0" overflowX="hidden" style={{ flex: 1 }}>
-                        <HorizontalStack gap={"2"} align="start" wrap={false}>
-                            <Box minWidth="0" overflowX="hidden">
-                                {isTitleClickable ? (
-                                    <Button onClick={() => openTest(templateId)} removeUnderline plain monochrome>
-                                        {titleText}
-                                    </Button>
-                                ) : titleText}
-                            </Box>
-                            <div className={`badge-wrapper-${severity}`} style={{ flexShrink: 0 }}>
+                    <Box maxWidth="50%">
+                        <HorizontalStack gap={"2"} align="start">
+                            {isTitleClickable ? (
+                                <Button onClick={() => openTest(templateId)} removeUnderline plain monochrome>
+                                    {titleText}
+                                </Button>
+                            ) : titleText}
+                            <div className={`badge-wrapper-${severity}`}>
                                 <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                             </div>
                         </HorizontalStack>
                     </Box>
-                    <Box style={{ flexShrink: 0 }}>
                     <HorizontalStack gap={"2"} wrap={false}>
                         <Popover
                             active={actionPopoverActive}
@@ -1169,13 +1166,14 @@ Reference URL: ${window.location.href}`.trim();
                             />
                         )}
                     </HorizontalStack>
-                    </Box>
                 </HorizontalStack>
-                <HorizontalStack gap={"1"} wrap={false}>
-                    <Box minWidth="0" style={{ flex: 1 }}>
-                        <Tooltip content={moreInfoData?.url}>
-                            <Text color="subdued" variant="bodySm" truncate>{moreInfoData?.url}</Text>
-                        </Tooltip>
+                <HorizontalStack gap={"1"} wrap={false} align="start">
+                    <Box maxWidth="90%">
+                        <TooltipText
+                            tooltip={moreInfoData?.url}
+                            text={moreInfoData?.url}
+                            textProps={{ color: "subdued", variant: "bodySm" }}
+                        />
                     </Box>
                     {
                         currentTemplateObj?.category?.name && (
