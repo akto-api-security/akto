@@ -398,6 +398,19 @@ public class UsageMetricUtils {
         return featureAccess;
     }
 
+    /**
+     * Stigg / billing feature key for Agentic (Argus) security type; matches UI {@code SECURITY_TYPE_AGENTIC}.
+     */
+    public static final String FEATURE_SECURITY_TYPE_AGENTIC = "SECURITY_TYPE_AGENTIC";
+
+    /** True when the org’s feature map grants {@link #FEATURE_SECURITY_TYPE_AGENTIC} (same signal as Polaris Stigg). */
+    public static boolean isSecurityTypeAgenticGranted(int accountId) {
+        if (accountId <= 0) {
+            return false;
+        }
+        return getFeatureAccessSaas(accountId, FEATURE_SECURITY_TYPE_AGENTIC).getIsGranted();
+    }
+
     public static FeatureAccess getFeatureAccess(Organization organization, MetricTypes metricType) {
         FeatureAccess featureAccess = FeatureAccess.fullAccess;
         try {
