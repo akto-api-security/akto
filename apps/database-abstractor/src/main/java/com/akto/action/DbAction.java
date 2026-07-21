@@ -94,6 +94,8 @@ import com.akto.utils.GemmaVertexStructuredCallUtil;
 import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
 import com.akto.utils.StiCountAlert;
+import com.akto.utils.elasticsearch.AgentQueryRecord;
+import com.akto.utils.elasticsearch.ElasticSearchClient;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -3885,11 +3887,29 @@ public class DbAction extends ActionSupport {
         this.conversationResults = conversationResults;
     }
 
+    @Getter
+    List<String> docIds;
+
     public String storeConversationResults() {
         try {
-            DbLayer.storeConversationResults(conversationResults);
+            this.docIds = DbLayer.storeConversationResults(conversationResults);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in storeConversationResults " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    @Setter
+    Map<String, Object> toolsMetadata;
+    @Setter
+    String docId;
+
+    public String updateAgentConversationToolsMetadata(){
+        try {
+            DbLayer.updateAgentConversationToolsMetadata(docId, toolsMetadata);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateAgentConversationToolsMetadata " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -4114,23 +4134,7 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    @Getter @Setter
-    private List<com.akto.utils.elasticsearch.AgentQueryRecord> agentQueryRecords;
-
-    public String storeAgentQueryRecords() {
-        int accId = Context.accountId.get();
-        if (kafkaUtils.isWriteEnabled()) {
-            kafkaUtils.insertDataSecondary(agentQueryRecords, "storeAgentQueryRecords", accId);
-        } else {
-            try {
-                com.akto.utils.elasticsearch.ElasticSearchClient.instance().bulkIndexAgentQueryRecords(agentQueryRecords);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error in storeAgentQueryRecords " + e.toString());
-                return Action.ERROR.toUpperCase();
-            }
-        }
-        return Action.SUCCESS.toUpperCase();
-    }
+    
 
     @Getter @Setter
     private Map<String, String> deviceUserMap;

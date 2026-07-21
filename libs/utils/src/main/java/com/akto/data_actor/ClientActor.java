@@ -93,6 +93,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 public class ClientActor extends DataActor {
 
@@ -4416,21 +4417,26 @@ public class ClientActor extends DataActor {
     }
 
     @Override
-    public void storeConversationResults(List<AgentConversationResult> conversationResults) {
+    public List<String> storeConversationResults(List<AgentConversationResult> conversationResults) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("conversationResults", conversationResults);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeConversationResults", "", "POST", obj.toString(), headers, "");
+        String jsonBody = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeConversationResults", "", "POST", jsonBody, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in storeConversationResults", LoggerMaker.LogDb.RUNTIME);
-                return;
+                return new ArrayList<>();
             }
+            BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+            Object docIdsArr = payloadObj.get("docIds");
+            List<String> docIds = gson.fromJson(gson.toJson(docIdsArr), new TypeToken<List<String>>(){}.getType());
+            return docIds != null ? docIds : new ArrayList<>();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in storeConversationResults" + e, LoggerMaker.LogDb.RUNTIME);
-            return;
+            return new ArrayList<>();
         }
     }
 

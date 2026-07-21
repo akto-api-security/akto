@@ -14,9 +14,9 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 /**
  * ES REST client for agentic query records.
@@ -31,7 +31,7 @@ public class ElasticSearchClient {
     private static final String ES_API_KEY = System.getenv("ES_API_KEY");
     private static final String ES_INDEX = System.getenv("ES_INDEX_AGENT_QUERY");
 
-    private static final String SCROLL_KEEP_ALIVE = "2m";
+    private static final int MAX_QUERY_RESULTS = 500;
     private static final MediaType JSON_MEDIA = MediaType.parse("application/json");
     private static final MediaType NDJSON_MEDIA = MediaType.parse("application/x-ndjson");
 
@@ -124,67 +124,41 @@ public class ElasticSearchClient {
         }
     }
 
-    /**
-     * Scrolls ES for agentic query records in [startTsMs, endTsMs) for the given accountId.
-     * Invokes handler for each hit up to maxRecords. Always releases the scroll cursor on exit.
-     */
-    public void scrollQueryData(int accountId, long startTsMs, long endTsMs, int pageSize,
-                                int maxRecords, Consumer<AgentQueryRecord> handler) {
-        if (!isConfigured()) return;
+    public List<AgentQueryRecord> scrollQueryData(int accountId, String spanId) {
+        List<AgentQueryRecord> res = new ArrayList<>();
+        if (!isConfigured() || spanId == null || spanId.isEmpty()) return res;
 
-        String scrollId = null;
-        int delivered = 0;
         try {
-            String initialBody = buildInitialQuery(accountId, startTsMs, endTsMs, pageSize).toString();
-            String url = trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_search?scroll=" + SCROLL_KEEP_ALIVE;
-            JSONObject response = httpPost(url, initialBody);
-            if (response == null) return;
+            String body = buildQuery(accountId, spanId).toString();
+            String url = trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_search";
+            JSONObject response = httpPost(url, body);
+            if (response == null) return res;
 
-            scrollId = response.optString("_scroll_id", null);
             JSONArray hits = extractHits(response);
+            if (hits == null) return res;
 
-            while (hits != null && hits.length() > 0 && delivered < maxRecords) {
-                for (int i = 0; i < hits.length() && delivered < maxRecords; i++) {
-                    AgentQueryRecord rec = parseHit(hits.getJSONObject(i));
-                    if (rec != null) {
-                        handler.accept(rec);
-                        delivered++;
-                    }
+            for (int i = 0; i < hits.length(); i++) {
+                AgentQueryRecord rec = parseHit(hits.getJSONObject(i));
+                if (rec != null) {
+                    res.add(rec);
                 }
-                if (delivered >= maxRecords || scrollId == null) break;
-
-                JSONObject scrollBody = new JSONObject()
-                    .put("scroll", SCROLL_KEEP_ALIVE)
-                    .put("scroll_id", scrollId);
-                String scrollUrl = trimTrailingSlash(ES_HOST) + "/_search/scroll";
-                response = httpPost(scrollUrl, scrollBody.toString());
-                if (response == null) break;
-                scrollId = response.optString("_scroll_id", scrollId);
-                hits = extractHits(response);
             }
         } catch (Exception e) {
-            logger.error("Error scrolling ES for accountId " + accountId + ": " + e.getMessage());
-        } finally {
-            if (scrollId != null) {
-                releaseScroll(scrollId);
-            }
+            logger.error("Error querying ES for accountId " + accountId + ", spanId " + spanId + ": " + e.getMessage());
         }
+        return res;
     }
 
-    private JSONObject buildInitialQuery(int accountId, long startTsMs, long endTsMs, int pageSize) throws JSONException {
-        JSONObject range = new JSONObject()
-            .put("timestamp", new JSONObject().put("gte", startTsMs).put("lt", endTsMs));
-        JSONObject term = new JSONObject().put("accountId", accountId);
-
+    private JSONObject buildQuery(int accountId, String spanId) throws JSONException {
         JSONArray must = new JSONArray()
-            .put(new JSONObject().put("range", range))
-            .put(new JSONObject().put("term", term));
+            .put(new JSONObject().put("term", new JSONObject().put("accountId", accountId)))
+            .put(new JSONObject().put("term", new JSONObject().put("spanId", spanId)));
 
         JSONObject query = new JSONObject().put("bool", new JSONObject().put("must", must));
 
         return new JSONObject()
-            .put("size", pageSize)
-            .put("sort", new JSONArray().put(new JSONObject().put("timestamp", new JSONObject().put("order", "asc"))))
+            .put("size", MAX_QUERY_RESULTS)
+            .put("sort", new JSONArray().put(new JSONObject().put("timestamp", new JSONObject().put("order", "desc"))))
             .put("query", query);
     }
 
@@ -239,22 +213,6 @@ public class ElasticSearchClient {
         } catch (Exception e) {
             logger.error("ES request error for " + url + ": " + e.getMessage());
             return null;
-        }
-    }
-
-    private void releaseScroll(String scrollId) {
-        try {
-            String url = trimTrailingSlash(ES_HOST) + "/_search/scroll";
-            JSONObject body = new JSONObject().put("scroll_id", scrollId);
-            Request.Builder rb = new Request.Builder()
-                .url(url)
-                .method("DELETE", RequestBody.create(body.toString(), JSON_MEDIA))
-                .addHeader("Content-Type", "application/json");
-            addAuthHeader(rb);
-            try (Response resp = http.newCall(rb.build()).execute()) {
-                // best-effort cleanup; ignore status
-            }
-        } catch (Exception ignored) {
         }
     }
 

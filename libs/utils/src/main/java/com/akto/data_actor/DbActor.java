@@ -737,8 +737,8 @@ public class DbActor extends DataActor {
     }
     
     @Override
-    public void storeConversationResults(List<AgentConversationResult> conversationResults) {
-        DbLayer.storeConversationResults(conversationResults);
+    public List<String> storeConversationResults(List<AgentConversationResult> conversationResults) {
+        return DbLayer.storeConversationResults(conversationResults);
     }
 
     public void storeTrace(Trace trace) {

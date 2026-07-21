@@ -400,7 +400,7 @@ public abstract class DataActor {
 
     public abstract void updateMcpAuditInfo(String type, String resourceName, String mcpHost, ComponentRiskAnalysis componentRiskAnalysis);
 
-    public abstract void storeConversationResults(List<AgentConversationResult> conversationResults);
+    public abstract List<String> storeConversationResults(List<AgentConversationResult> conversationResults);
 
     public abstract void storeTrace(Trace trace);
 
