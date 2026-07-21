@@ -71,7 +71,8 @@ public class Main {
 
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
-    
+    private static final String TEST_RUNS_OVERAGE_ERROR = "Test runs overage detected";
+    private static final String OUT_OF_TESTING_SCOPE_ERROR = "All target collections are marked as out of testing scope";
     private static final String customMiniTestingServiceName;
     static {
         customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME") == null? "Default_" + UUID.randomUUID().toString().substring(0, 4) : System.getenv("MINI_TESTING_NAME");
@@ -659,22 +660,20 @@ public class Main {
             boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
 
             if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
-                if (isTestingRunResultRerunCase) {
-                    // For TRR-rerun case, delete the rerun summary and clean up configurations
-                    dataActor.deleteTestRunResultSummary(trrs.getId().toHexString());
-                    config.setTestingRunResultList(null);
-                    config.setRerunTestingRunResultSummary(null);
-                    loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + trrs.getId());
-                } else {
-                    int lastSent = logSentMap.getOrDefault(accountId, 0);
-                    if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
-                        logSentMap.put(accountId, start);
-                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
-                                + " . Failing test run : " + start, LogDb.TESTING);
-                    }
-                    dataActor.updateTestingRun(testingRun.getId().toHexString());
-                    dataActor.updateTestRunResultSummary(summaryId.toHexString());
+                String errorMessage = TEST_RUNS_OVERAGE_ERROR;
+                int lastSent = logSentMap.getOrDefault(accountId, 0);
+                if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
+                    logSentMap.put(accountId, start);
+                    loggerMaker.infoAndAddToDb(errorMessage + " . Failing test run : " + start, LogDb.TESTING);
                 }
+                failTestingRun(testingRun, summaryId, trrs, isTestingRunResultRerunCase, config, start, errorMessage);
+                continue;
+            }
+
+            if (isEntirelyOutOfTestingScope(testingRun.getTestingEndpoints())) {
+                String errorMessage = OUT_OF_TESTING_SCOPE_ERROR;
+                loggerMaker.infoAndAddToDb(errorMessage + " for testing run: " + testingRun.getId(), LogDb.TESTING);
+                failTestingRun(testingRun, summaryId, trrs, isTestingRunResultRerunCase, config, start, errorMessage);
                 continue;
             }
 
@@ -828,6 +827,51 @@ public class Main {
             testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId, startDetailed);
 
             Thread.sleep(1000);
+        }
+    }
+
+    private static boolean isEntirelyOutOfTestingScope(TestingEndpoints testingEndpoints) {
+        Set<Integer> collectionIds = extractCollectionIds(testingEndpoints);
+        if (collectionIds.isEmpty()) return false;
+        List<ApiCollection> collections = dataActor.fetchApiCollectionsByIds(new ArrayList<>(collectionIds), LogDb.TESTING);
+        if (collections == null || collections.size() != collectionIds.size()) return false; // missing/deleted -> don't block
+        return collections.stream().allMatch(ApiCollection::getIsOutOfTestingScope);
+    }
+
+    private static Set<Integer> extractCollectionIds(TestingEndpoints testingEndpoints) {
+        Set<Integer> ids = new HashSet<>();
+        if (testingEndpoints instanceof CollectionWiseTestingEndpoints) {
+            ids.add(((CollectionWiseTestingEndpoints) testingEndpoints).getApiCollectionId());
+        } else if (testingEndpoints instanceof CustomTestingEndpoints) {
+            List<ApiInfo.ApiInfoKey> apisList = ((CustomTestingEndpoints) testingEndpoints).getApisList();
+            if (apisList != null) {
+                for (ApiInfo.ApiInfoKey key : apisList) ids.add(key.getApiCollectionId());
+            }
+        }
+        // WORKFLOW / unknown types: no collection id to check, returns empty set, gate never fires
+        return ids;
+    }
+
+    private static void failTestingRun(TestingRun testingRun, ObjectId summaryId, TestingRunResultSummary trrs,
+            boolean isTestingRunResultRerunCase, TestingConfigurations config, int start, String errorMessage) {
+        if (summaryId == null) {
+            // Fresh run, first pickup - no TestingRunResultSummary created yet, same fallback used elsewhere in this loop.
+            trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start);
+            summaryId = trrs.getId();
+        }
+
+        dataActor.markTestingRunFailed(testingRun.getId().toHexString());
+
+        if (isTestingRunResultRerunCase) {
+            dataActor.deleteTestRunResultSummary(trrs.getId().toHexString());
+            config.setTestingRunResultList(null);
+            config.setRerunTestingRunResultSummary(null);
+            loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + trrs.getId());
+        } else {
+            Map<String, String> metadata = new HashMap<>();
+            metadata.put("error", errorMessage);
+            dataActor.markTestRunResultSummaryFailed(summaryId.toHexString());
+            dataActor.updateMetadataInSummary(summaryId.toHexString(), metadata);
         }
     }
 
