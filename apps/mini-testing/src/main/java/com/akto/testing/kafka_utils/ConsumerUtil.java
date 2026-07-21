@@ -47,9 +47,11 @@ public class ConsumerUtil {
 
     public static final String EXPECTED_RECORDS_KEY = "expectedRecords";
 
+    private static final int DEBUG_ACCOUNT_ID = 1764738582;
     private static final int MAX_POLL_INTERVAL_MS = 10000;
     /** If queue stays empty with no processed progress this long, treat remaining expected records as lost. */
     private static final long DRAIN_IDLE_GRACE_MS = 5L * 60L * 1000L;
+    private static final long DEBUG_PROGRESS_LOG_INTERVAL_MS = 60_000L;
 
     static Properties properties = com.akto.runtime.utils.Utils.configProperties(Constants.LOCAL_KAFKA_BROKER_URL, Constants.AKTO_KAFKA_GROUP_ID_CONFIG, Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
     static{
@@ -126,6 +128,13 @@ public class ConsumerUtil {
         }
     }
 
+    private static void debugLogToDb(int accountId, String message) {
+        if (accountId != DEBUG_ACCOUNT_ID) {
+            return;
+        }
+        loggerMaker.insertImportantTestingLog("[DEBUG-CONSUMER-" + DEBUG_ACCOUNT_ID + "] " + message);
+    }
+
     /**
      * Performs bulk update of lastTested field for all APIs that were tested
      */
@@ -160,8 +169,15 @@ public class ConsumerUtil {
         final int expectedRecords = currentTestInfo.containsField(EXPECTED_RECORDS_KEY)
                 ? currentTestInfo.getInt(EXPECTED_RECORDS_KEY)
                 : -1;
+        final int accountId = currentTestInfo.containsField("accountId")
+                ? currentTestInfo.getInt("accountId")
+                : (Context.accountId.get() != null ? Context.accountId.get() : -1);
+        if (accountId > 0) {
+            Context.accountId.set(accountId);
+        }
         AtomicBoolean firstRecordRead = new AtomicBoolean(false);
         AtomicInteger processedRecords = new AtomicInteger(0);
+        AtomicInteger polledRecords = new AtomicInteger(0);
 
         boolean isConsumerRunning = false;
         if(currentTestInfo != null){
@@ -191,7 +207,10 @@ public class ConsumerUtil {
                 .build();
 
             parallelConsumer = ParallelStreamProcessor.createEosStreamProcessor(options);
-            parallelConsumer.subscribe(Arrays.asList(topicName)); 
+            parallelConsumer.subscribe(Arrays.asList(topicName));
+            debugLogToDb(accountId, "consumer started summaryId=" + summaryIdForTest
+                    + " expectedRecords=" + expectedRecords
+                    + " maxConcurrency=" + instance.getMaxConcurrentRequest());
         }
 
         try {
@@ -201,7 +220,9 @@ public class ConsumerUtil {
                 String message = record.value();
                 // Stable id per Kafka record: same record redelivered (e.g. after rebalance/restart) will log the same id again.
                 String recordId = record.getSingleConsumerRecord().topic() + "-p" + record.getSingleConsumerRecord().partition() + "-o" + record.offset();
+                polledRecords.incrementAndGet();
                 loggerMaker.infoAndAddToDb("Thread [" + threadName + "] picked up record recordId=" + recordId + " " + message);
+                debugLogToDb(accountId, "picked up recordId=" + recordId + " polled=" + polledRecords.get());
                 try {
                     if(!executor.isShutdown()){
                         Future<?> future = executor.submit(() -> runTestFromMessage(message));
@@ -229,6 +250,9 @@ public class ConsumerUtil {
 
             long drainIdleSinceMs = -1L;
             int lastProcessedSeen = -1;
+            long lastDebugLogMs = 0L;
+            int lastLoggedProcessed = -1;
+            int lastLoggedPolled = -1;
             while (parallelConsumer != null) {
                 if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId)){
                     loggerMaker.infoAndAddToDb("Tests have been marked stopped.");
@@ -247,7 +271,22 @@ public class ConsumerUtil {
                     drainIdleSinceMs = -1L;
                 }
 
-                boolean locallyEmpty = firstRecordRead.get() && parallelConsumer.workRemaining() == 0;
+                long workRemaining = parallelConsumer.workRemaining();
+                long nowMs = System.currentTimeMillis();
+                int polled = polledRecords.get();
+                // Periodic progress only when counts moved (avoids duplicate spam while idle)
+                if (nowMs - lastDebugLogMs >= DEBUG_PROGRESS_LOG_INTERVAL_MS
+                        && (polled != lastLoggedPolled || processed != lastLoggedProcessed)) {
+                    int left = expectedRecords > 0 ? Math.max(0, expectedRecords - processed) : -1;
+                    debugLogToDb(accountId, "polled=" + polled + " executed=" + processed
+                            + " expected=" + expectedRecords + " left=" + left
+                            + " workRemaining=" + workRemaining);
+                    lastDebugLogMs = nowMs;
+                    lastLoggedPolled = polled;
+                    lastLoggedProcessed = processed;
+                }
+
+                boolean locallyEmpty = firstRecordRead.get() && workRemaining == 0;
                 if (locallyEmpty) {
                     if (expectedRecords > 0 && processed >= expectedRecords) {
                         int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
@@ -259,7 +298,6 @@ public class ConsumerUtil {
                         break;
                     }
 
-                    long nowMs = System.currentTimeMillis();
                     if (drainIdleSinceMs < 0) {
                         drainIdleSinceMs = nowMs;
                     } else if (nowMs - drainIdleSinceMs >= DRAIN_IDLE_GRACE_MS) {
@@ -281,6 +319,11 @@ public class ConsumerUtil {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in polling records");
         }finally{
+            int finalPolled = polledRecords.get();
+            int finalExecuted = processedRecords.get();
+            int finalLeft = expectedRecords > 0 ? Math.max(0, expectedRecords - finalExecuted) : -1;
+            debugLogToDb(accountId, "consumer closing polled=" + finalPolled
+                    + " executed=" + finalExecuted + " expected=" + expectedRecords + " left=" + finalLeft);
             loggerMaker.infoAndAddToDb("Closing consumer as all results have been executed.");
 
             flushLastTestedUpdates();
