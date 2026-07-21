@@ -578,6 +578,10 @@ public class DbActor extends DataActor {
         DbLayer.updateTestingRun(testingRunId);
     }
 
+    public void markTestingRunFailed(String testingRunId) {
+        DbLayer.markTestingRunFailed(testingRunId);
+    }
+
     public void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTs) {
         DbLayer.updateTestingRunAndMarkCompleted(testingRunId, scheduleTs);
     }
