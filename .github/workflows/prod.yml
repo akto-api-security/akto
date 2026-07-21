@@ -46,7 +46,7 @@ on:
       account_jobs_executor:
         type: boolean
         default: false
-        description: Account Jobs Executor Service (uses Release version above)
+        description: Account Jobs Executor Service
       release_version_agent_guard:
         description: 'Release version for the Agent Guard deployment'
         required: false
