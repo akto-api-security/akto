@@ -110,6 +110,7 @@
                     <attachClasses>true</attachClasses>
                     <warSourceDirectory>web</warSourceDirectory>
                     <failOnMissingWebXml>false</failOnMissingWebXml>
+                    <packagingExcludes>WEB-INF/lib/spring-*.jar</packagingExcludes>
                 </configuration>
             </plugin>
             <plugin>
