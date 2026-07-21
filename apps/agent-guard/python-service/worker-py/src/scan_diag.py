@@ -101,8 +101,15 @@ def log_scan_outcome(
     *,
     extra: dict[str, Any] | None = None,
     always: bool = False,
+    level: int = logging.INFO,
 ) -> None:
-    """Log a completed scan path. Skips and errors use always=True."""
+    """Log a completed scan path. Skips and errors use always=True.
+
+    `level` lets genuine failures (cascade_error) log at ERROR instead of the
+    default INFO, so they aren't invisible to log pipelines that filter/alert
+    on WARNING+ — `always=True` only controls whether AGW_SCAN_DIAGNOSTICS
+    being off suppresses the line, not its severity.
+    """
     if not always and not enabled():
         return
     parts = [
@@ -114,7 +121,7 @@ def log_scan_outcome(
     if extra:
         for key, value in extra.items():
             parts.append(f"{key}={value}")
-    logger.info("[scan-diag] %s", " ".join(parts))
+    logger.log(level, "[scan-diag] %s", " ".join(parts))
 
 
 class StageTimer:

@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 import cascade_backpressure
 import metrics_push
+import providers
 import scan_diag
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
@@ -19,6 +20,10 @@ from settings import settings
 logger = logging.getLogger(__name__)
 
 _scan_inflight = 0
+
+
+def _startup_self_check_enabled() -> bool:
+    return os.environ.get("AGW_STARTUP_SELF_CHECK", "true").strip().lower() in ("1", "true", "yes", "on")
 
 
 class ScanRequest(BaseModel):
@@ -41,10 +46,17 @@ async def lifespan(_: FastAPI):
     cascade_backpressure.configure_from_env()
     scan_diag.log_startup_banner()
     push_task = asyncio.create_task(metrics_push.run_forever())
+    # Non-blocking: readiness/health checks aren't held up by a slow endpoint,
+    # and one bad model can't stall the whole process from booting. Set
+    # AGW_STARTUP_SELF_CHECK=false to disable (e.g. if this gets noisy/costly
+    # across many uvicorn workers restarting).
+    check_task = asyncio.create_task(providers.startup_self_check()) if _startup_self_check_enabled() else None
     try:
         yield
     finally:
         push_task.cancel()
+        if check_task is not None:
+            check_task.cancel()
 
 
 app = FastAPI(title="Akto Agent Guard Executor", version="1.0.0", lifespan=lifespan)

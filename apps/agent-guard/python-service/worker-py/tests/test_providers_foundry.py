@@ -192,3 +192,22 @@ def test_build_from_config_missing_required_vars_skips(monkeypatch):
     monkeypatch.setattr(providers.settings, "AZURE_FOUNDRY_BASE_URL", f"{_HOST}/v1")
     monkeypatch.setattr(providers.settings, "AZURE_FOUNDRY_API_KEY", "")
     assert build_provider_from_config({"provider": "azure_foundry"}) is None
+
+
+def test_two_gemma_foundry_entries_can_target_different_deployments(monkeypatch):
+    # Same shared endpoint/key (one GEMMA_FOUNDRY_BASE_URL/API_KEY), but two
+    # modelConfigs entries for two different roles (e.g. FAST_FALLBACK_SAFE_FILTER
+    # on a small Gemma deployment, FINAL_ARBITER on a bigger one) — per-entry
+    # "deployment" must resolve to two DISTINCT provider instances, not collide
+    # in the process-wide cache or silently share one deployment.
+    monkeypatch.setattr(providers.settings, "GEMMA_FOUNDRY_BASE_URL", f"{_HOST}/v1")
+    monkeypatch.setattr(providers.settings, "GEMMA_FOUNDRY_API_KEY", "shared-key")
+    small = build_provider_from_config({"provider": "gemma_foundry", "deployment": "gemma-4-e2b-it-dep"})
+    big = build_provider_from_config({"provider": "gemma_foundry", "deployment": "gemma-4-32b-it-dep"})
+    assert small is not big
+    assert small.deployment == "gemma-4-e2b-it-dep"
+    assert big.deployment == "gemma-4-32b-it-dep"
+    assert small.base_url == big.base_url == f"{_HOST}/v1"
+    # same call again with the same deployment must hit the cache, not rebuild
+    small_again = build_provider_from_config({"provider": "gemma_foundry", "deployment": "gemma-4-e2b-it-dep"})
+    assert small_again is small

@@ -6,11 +6,15 @@ Differences from the container version:
   - Vertex auth uses gcp_auth.get_token() instead of google-auth credentials
 """
 
+import asyncio
 import logging
 import math
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any, Optional
+
+import httpx
 
 import gcp_auth
 import http_client
@@ -23,12 +27,31 @@ DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 
 _IDENTITY = {"Accept-Encoding": "identity"}
 
-# Process-wide cache of built providers, keyed by (provider, model, base_url).
-_PROVIDER_CACHE: dict[tuple[str, str, str], "LLMProvider"] = {}
+# Process-wide cache of built providers, keyed by (provider, model, base_url, deployment).
+_PROVIDER_CACHE: dict[tuple[str, str, str, str], "LLMProvider"] = {}
+
+
+def _redact_secret(secret: str, keep: int = 4) -> str:
+    """First/last `keep` chars + length, middle redacted — enough to eyeball
+    "is this even the right key" / "did whitespace sneak into the env var"
+    without a debugger, never enough to reconstruct the secret. Deliberately
+    does NOT strip before measuring length, so leading/trailing whitespace
+    (a common .env copy-paste mistake) shows up as a mismatched length."""
+    if not secret:
+        return "<empty>"
+    stripped = secret.strip()
+    if len(stripped) <= keep * 2:
+        redacted = "*" * len(stripped)
+    else:
+        redacted = f"{stripped[:keep]}...{stripped[-keep:]}"
+    note = f" len={len(secret)}"
+    if secret != stripped:
+        note += " (has leading/trailing whitespace!)"
+    return f"{redacted}{note}"
 
 
 def _cached_provider(
-    cache_key: tuple[str, str, str], builder: Callable[[], Optional["LLMProvider"]]
+    cache_key: tuple[str, str, str, str], builder: Callable[[], Optional["LLMProvider"]]
 ) -> Optional["LLMProvider"]:
     cached = _PROVIDER_CACHE.get(cache_key)
     if cached is not None:
@@ -37,6 +60,41 @@ def _cached_provider(
     if built is not None:
         _PROVIDER_CACHE[cache_key] = built
     return built
+
+
+async def _post_json_logged(
+    client: httpx.AsyncClient, url: str, headers: dict, json_body: dict, log_tag: str, extra: str = ""
+) -> dict:
+    """POST + parse JSON, logging enough on failure to diagnose without a debugger.
+
+    Every branch that can raise logs first: network-level failures (DNS,
+    connection refused, timeout), HTTP error status (with the response body —
+    this is where providers put the actual reason: auth failure, wrong
+    deployment, quota exceeded), and non-JSON/malformed bodies. Callers still
+    see the same exceptions as before (nothing swallowed), just with a log
+    line alongside so a client-only failure doesn't require a repro to debug.
+    """
+    ctx = f" ({extra})" if extra else ""
+    try:
+        resp = await client.post(url, headers=headers, json=json_body)
+    except httpx.RequestError as exc:
+        logger.error(f"{log_tag} request to {url} failed{ctx}: {exc!r}")
+        raise
+    try:
+        resp.raise_for_status()
+    except httpx.HTTPStatusError:
+        body = getattr(resp, "text", "")
+        resp_headers = dict(getattr(resp, "headers", {}) or {})
+        logger.error(
+            f"{log_tag} HTTP {resp.status_code} from {url}{ctx}: {body[:1000]!r} response_headers={resp_headers}"
+        )
+        raise
+    try:
+        return resp.json()
+    except ValueError as exc:
+        body = getattr(resp, "text", "")
+        logger.error(f"{log_tag} non-JSON response from {url}{ctx}: {body[:500]!r}")
+        raise ValueError(f"{log_tag} non-JSON response from {url}: {body[:200]!r}") from exc
 
 
 class LLMProvider(ABC):
@@ -54,7 +112,7 @@ class OpenAIProvider(LLMProvider):
         self.model = model or DEFAULT_OPENAI_MODEL
         self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
         self.name = "openai" if "openai.com" in self.base_url else "openai_compatible"
-        logger.info(f"[OpenAI] model={self.model} base_url={self.base_url}")
+        logger.info(f"[OpenAI] model={self.model} base_url={self.base_url} api_key={_redact_secret(self.api_key)}")
 
     async def complete(self, prompt: str) -> str:
         headers = dict(_IDENTITY, **{"Content-Type": "application/json"})
@@ -81,10 +139,12 @@ class AnthropicProvider(LLMProvider):
     def __init__(self, api_key: str, model: str):
         self.api_key = api_key
         self.model = model or DEFAULT_ANTHROPIC_MODEL
-        logger.info(f"[Anthropic] model={self.model}")
+        logger.info(f"[Anthropic] model={self.model} api_key={_redact_secret(self.api_key)}")
 
     async def complete(self, prompt: str) -> str:
-        logger.info(f"[Anthropic] prompt: {prompt}")
+        # Deliberately not logging `prompt` here (pre-existing full-prompt log
+        # removed) — this is the customer's scanned text, not our own config;
+        # for the Password scanner it IS the secret the scan exists to catch.
         client = http_client.get_client()
         resp = await client.post(
             "https://api.anthropic.com/v1/messages",
@@ -118,7 +178,10 @@ class VertexAIProvider(LLMProvider):
         self.location = location
         self.endpoint_id = endpoint_id
         self.dedicated_dns = (dedicated_dns or "").strip()
-        logger.info(f"{self._log_tag} project={project} location={location} endpoint={endpoint_id}")
+        logger.info(
+            f"{self._log_tag} project={project} location={location} endpoint={endpoint_id} "
+            f"sa_key={_redact_secret(sa_key_json_b64)}"
+        )
 
     def _predict_url(self) -> str:
         host = self.dedicated_dns or f"{self.location}-aiplatform.googleapis.com"
@@ -129,19 +192,16 @@ class VertexAIProvider(LLMProvider):
     async def _post(self, instance: dict[str, Any]) -> dict:
         token = await gcp_auth.get_token(self.sa_info)
         client = http_client.get_client()
-        resp = await client.post(
-            self._predict_url(),
-            headers=dict(
-                _IDENTITY,
-                **{
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {token}",
-                },
-            ),
-            json={"instances": [instance]},
+        url = self._predict_url()
+        headers = dict(
+            _IDENTITY,
+            **{
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {token}",
+            },
         )
-        resp.raise_for_status()
-        return resp.json()
+        extra = f"project={self.project} location={self.location} endpoint={self.endpoint_id}"
+        return await _post_json_logged(client, url, headers, {"instances": [instance]}, self._log_tag, extra)
 
     async def complete(self, prompt: str) -> str:
         body = await self._post(
@@ -174,9 +234,21 @@ def _qwen3guard_params(text: str, top_logprobs: int, temperature: float) -> dict
 
 
 def _choice_content_and_logprobs(chat_completion: dict) -> tuple[str, list | None]:
-    """Extract (content, logprobs.content) from an OpenAI-shaped chat completion."""
-    choice = chat_completion["choices"][0]
-    return choice["message"]["content"], (choice.get("logprobs") or {}).get("content")
+    """Extract (content, logprobs.content) from an OpenAI-shaped chat completion.
+
+    Raises a descriptive ValueError (with the actual body attached) instead of
+    a bare KeyError/IndexError — a deployment that doesn't speak the expected
+    OpenAI shape (wrong route, custom scoring format, empty choices on a
+    content-filtered response) needs to be diagnosable straight from the log
+    line, since this is untested against the real endpoints.
+    """
+    choices = chat_completion.get("choices") or []
+    if not choices:
+        raise ValueError(f"chat completion response has no 'choices': {chat_completion!r}"[:500])
+    message = choices[0].get("message") or {}
+    if "content" not in message:
+        raise ValueError(f"chat completion choice has no message.content: {choices[0]!r}"[:500])
+    return message["content"], (choices[0].get("logprobs") or {}).get("content")
 
 
 class Qwen3GuardOutput:
@@ -239,7 +311,23 @@ class AzureFoundryProvider(LLMProvider):
         self.api_key = api_key
         self.deployment = (deployment or "").strip()
         self.model = (model or "").strip()
-        logger.info(f"{self._log_tag} base_url={self.base_url} deployment={self.deployment} model={self.model}")
+        logger.info(
+            f"{self._log_tag} base_url={self.base_url} deployment={self.deployment} model={self.model} "
+            f"api_key={_redact_secret(self.api_key)}"
+        )
+        if self.deployment and not self.model:
+            # Deployment selection is sent via the azureml-model-deployment header
+            # (classic AML managed-online-endpoint convention). Nextgen Foundry's
+            # unified endpoint (*.services.ai.azure.com) instead routes by the
+            # request body's "model" field — if this Foundry resource hosts more
+            # than one deployment behind one base_url, the header alone may not
+            # land on the right one. Set *_FOUNDRY_MODEL to the deployment name
+            # too if requests seem to hit the wrong model.
+            logger.warning(
+                f"{self._log_tag} deployment={self.deployment!r} set without model — if this endpoint hosts "
+                f"multiple deployments, routing may not work via the azureml-model-deployment header alone; "
+                f"set the matching *_FOUNDRY_MODEL to the deployment name as well."
+            )
 
     async def _chat(self, params: dict[str, Any]) -> dict:
         headers = dict(
@@ -254,9 +342,9 @@ class AzureFoundryProvider(LLMProvider):
             headers["azureml-model-deployment"] = self.deployment
         body = {"model": self.model, **params} if self.model else params
         client = http_client.get_client()
-        resp = await client.post(f"{self.base_url}/chat/completions", headers=headers, json=body)
-        resp.raise_for_status()
-        return resp.json()
+        url = f"{self.base_url}/chat/completions"
+        extra = f"deployment={self.deployment}" if self.deployment else ""
+        return await _post_json_logged(client, url, headers, body, self._log_tag, extra)
 
     async def complete(self, prompt: str) -> str:
         body = await self._chat(
@@ -368,6 +456,14 @@ def parse_qwen3guard_result(scanner_name: str, raw: str, logprobs_content: list 
         raise ValueError(f"unknown Safety value: {safety!r}")
 
     conf, dist, source = _confidence_from_logprobs(logprobs_content, s)
+    if source != "logprobs":
+        # LLMScanner always requests top_logprobs>0 for a real scan, so landing
+        # here means the deployment didn't return a usable logprobs distribution
+        # (untested against the real Qwen3Guard-Gen-8B Foundry deployment) —
+        # risk_score/decision_confidence fall back to a flat per-label constant
+        # instead of the calibrated distribution. Worth knowing if this fires
+        # on every request rather than only on genuine anomalies.
+        logger.warning(f"[Qwen3Guard] confidence fallback (source={source!r}) for scanner={scanner_name}")
     if dist is not None:
         risk_score = round(dist["unsafe"] + dist["controversial"], 4)
         decision_confidence = float(conf) if conf is not None else (1.0 - risk_score if is_valid else risk_score)
@@ -486,7 +582,7 @@ _FOUNDRY_PROVIDERS: dict[str, tuple[type[AzureFoundryProvider], str]] = {
 }
 
 
-def _build_foundry(provider_name: str, model: str, base_url: str) -> LLMProvider | None:
+def _build_foundry(provider_name: str, model: str, base_url: str, deployment: str = "") -> LLMProvider | None:
     cls, prefix = _FOUNDRY_PROVIDERS[provider_name]
     env = _require(
         {
@@ -500,30 +596,32 @@ def _build_foundry(provider_name: str, model: str, base_url: str) -> LLMProvider
     return cls(
         base_url=env[f"{prefix}_BASE_URL"],
         api_key=env[f"{prefix}_API_KEY"],
-        deployment=getattr(settings, f"{prefix}_DEPLOYMENT"),
+        deployment=deployment or getattr(settings, f"{prefix}_DEPLOYMENT"),
         model=model or getattr(settings, f"{prefix}_MODEL"),
     )
 
 
-_BUILDERS: dict[str, Callable[[str, str], LLMProvider | None]] = {
-    "openai": lambda model, _: _build_openai_compatible(model, base_url=""),
-    "openai_compatible": _build_openai_compatible,
-    "anthropic": lambda model, _: _build_anthropic(model),
-    "vertexai": lambda _m, _b: _build_vertexai(),
-    "gemma_vertexai": lambda _m, _b: _build_gemma_vertexai(),
-    "qwen3guard": lambda _m, _b: _build_qwen3guard(),
-    "azure_foundry": lambda model, base_url: _build_foundry("azure_foundry", model, base_url),
-    "gemma_foundry": lambda model, base_url: _build_foundry("gemma_foundry", model, base_url),
-    "qwen3guard_foundry": lambda model, base_url: _build_foundry("qwen3guard_foundry", model, base_url),
+_BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
+    "openai": lambda model, _b, _d: _build_openai_compatible(model, base_url=""),
+    "openai_compatible": lambda model, base_url, _d: _build_openai_compatible(model, base_url),
+    "anthropic": lambda model, _b, _d: _build_anthropic(model),
+    "vertexai": lambda _m, _b, _d: _build_vertexai(),
+    "gemma_vertexai": lambda _m, _b, _d: _build_gemma_vertexai(),
+    "qwen3guard": lambda _m, _b, _d: _build_qwen3guard(),
+    "azure_foundry": lambda model, base_url, deployment: _build_foundry("azure_foundry", model, base_url, deployment),
+    "gemma_foundry": lambda model, base_url, deployment: _build_foundry("gemma_foundry", model, base_url, deployment),
+    "qwen3guard_foundry": lambda model, base_url, deployment: _build_foundry(
+        "qwen3guard_foundry", model, base_url, deployment
+    ),
 }
 
 
-def _dispatch(provider_name: str, model: str, base_url: str) -> LLMProvider | None:
+def _dispatch(provider_name: str, model: str, base_url: str, deployment: str = "") -> LLMProvider | None:
     builder = _BUILDERS.get(provider_name)
     if builder is None:
         logger.warning(f"[Providers] Unknown provider '{provider_name}'; skipping")
         return None
-    return _cached_provider((provider_name, model, base_url), lambda: builder(model, base_url))
+    return _cached_provider((provider_name, model, base_url, deployment), lambda: builder(model, base_url, deployment))
 
 
 def build_provider_from_env(provider_name: str, model: str = "") -> LLMProvider | None:
@@ -542,5 +640,60 @@ def build_provider_from_config(entry: dict[str, Any]) -> LLMProvider | None:
         base_url = (entry.get("baseUrl") or "").strip() or settings.OPENAI_COMPATIBLE_BASE_URL
         return _dispatch("openai_compatible", model, base_url)
     if name in _FOUNDRY_PROVIDERS:
-        return _dispatch(name, model, (entry.get("baseUrl") or "").strip())
+        # deployment (azureml-model-deployment header) is a routing label, not a
+        # secret — safe to allow per-entry, unlike apiKey. This lets two
+        # modelConfigs entries use the same provider (e.g. two "gemma_foundry"
+        # roles) against two different deployments on the same Foundry
+        # resource/endpoint, without needing separate env-var prefixes.
+        return _dispatch(name, model, (entry.get("baseUrl") or "").strip(), (entry.get("deployment") or "").strip())
     return _dispatch(name, model, "")
+
+
+# ── Startup self-check ───────────────────────────────────────────────────────
+# Fires one real, minimal request at each configured cascade provider right
+# after process boot and logs PASS/FAIL immediately — a signal within seconds
+# of deploy, not whenever the first real scan happens to hit that exact role.
+# This matters specifically because the Azure Foundry providers are shipping
+# without an end-to-end test against the real endpoints: waiting for organic
+# traffic to discover a bad deployment name/auth/routing config here would
+# mean live scans silently fail-open in the meantime. Uses the SAME provider
+# cache key as real traffic (bare {"provider": name} — no model/baseUrl
+# override), so this warms the exact instance real requests will reuse.
+_STARTUP_CHECK_PROVIDERS = (
+    "azure_foundry",
+    "gemma_foundry",
+    "qwen3guard_foundry",
+    "vertexai",
+    "gemma_vertexai",
+    "qwen3guard",
+)
+_STARTUP_CHECK_TIMEOUT_S = 15.0
+_STARTUP_CHECK_PROMPT = "Respond with the single word: ok"
+
+
+async def _startup_check_one(provider_name: str) -> None:
+    provider = build_provider_from_config({"provider": provider_name})
+    if provider is None:
+        # Not configured (missing env vars) — build_provider_from_config already
+        # logged which var via the "[Providers] ... skipping" warning; nothing
+        # extra to say here, and staying silent avoids false-alarming on
+        # providers this deployment was never meant to use.
+        return
+    logger.info(f"[StartupCheck] {provider_name}: pinging real endpoint...")
+    t0 = time.time()
+    try:
+        await asyncio.wait_for(provider.complete(_STARTUP_CHECK_PROMPT), timeout=_STARTUP_CHECK_TIMEOUT_S)
+    except Exception as exc:
+        elapsed_ms = (time.time() - t0) * 1000
+        logger.error(f"[StartupCheck] {provider_name}: FAILED after {elapsed_ms:.0f}ms: {exc!r}")
+    else:
+        elapsed_ms = (time.time() - t0) * 1000
+        logger.info(f"[StartupCheck] {provider_name}: OK ({elapsed_ms:.0f}ms)")
+
+
+async def startup_self_check() -> None:
+    """Run all configured providers' checks concurrently; never raises —
+    failures are logged, not propagated, so a bad model never blocks boot."""
+    logger.info(f"[StartupCheck] checking configured providers: {_STARTUP_CHECK_PROVIDERS}")
+    await asyncio.gather(*(_startup_check_one(name) for name in _STARTUP_CHECK_PROVIDERS), return_exceptions=True)
+    logger.info("[StartupCheck] done")
