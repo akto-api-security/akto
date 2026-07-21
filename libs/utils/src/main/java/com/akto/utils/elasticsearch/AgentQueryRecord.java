@@ -136,7 +136,10 @@ public class AgentQueryRecord {
         }
 
         String traceId           = getFirstHeader(headers, HEADER_PREFIX + HEADER_TRACE_ID);
-        String spanId = "span_" + UUID.randomUUID().toString();
+        String messageIdHeader   = getFirstHeader(headers, Constants.AKTO_MESSAGE_ID_HEADER);
+        String spanId = (messageIdHeader != null && !messageIdHeader.isEmpty())
+                ? messageIdHeader
+                : "span_" + UUID.randomUUID().toString();
 
         String requestPayload  = p.getRequestParams().getPayload();
         String responsePayload = p.getPayload() != null ? p.getPayload() : "";

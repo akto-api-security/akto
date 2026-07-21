@@ -27,6 +27,8 @@ import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.testing.config.TestSuites;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.InsertManyResult;
+import org.bson.BsonValue;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -1471,8 +1473,20 @@ public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<
         McpReconResultDao.instance.insertMany(serverDataList);
     }
 
-    public static void storeConversationResults(List<AgentConversationResult> conversationResults) {
-        AgentConversationResultDao.instance.insertMany(conversationResults);
+    public static List<String> storeConversationResults(List<AgentConversationResult> conversationResults) {
+        InsertManyResult result = AgentConversationResultDao.instance.insertMany(conversationResults);
+        String[] docIds = new String[conversationResults.size()];
+        for (Map.Entry<Integer, BsonValue> entry : result.getInsertedIds().entrySet()) {
+            docIds[entry.getKey()] = entry.getValue().asObjectId().getValue().toHexString();
+        }
+        return Arrays.asList(docIds);
+    }
+
+    public static void updateAgentConversationToolsMetadata(String docId, Map<String, Object> toolsMetadata) {
+        AgentConversationResultDao.instance.updateOneNoUpsert(
+                Filters.eq(ID, new ObjectId(docId)),
+                Updates.set(AgentConversationResult.TOOLS_METADATA, toolsMetadata)
+        );
     }
 
     public static void bulkWriteAgentTrafficLogs(List<AgentTrafficLog> agentTrafficLogs) {
