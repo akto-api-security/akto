@@ -10,6 +10,7 @@ import {
     hasPersonalAccountTag,
     hasMisconfiguredConfigTag,
 } from "./mcpClientHelper";
+import { skillNameFromUrl } from "./agenticUrlHelpers";
 import func from "@/util/func";
 import { getResolvedUsernameForCollection, DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
 
@@ -296,14 +297,6 @@ export function buildSkillsFlyoutData(collection, apiInfoList = [], stiEndpoints
     const urlBySkill = {};
     const methodBySkill = {};
     const descriptionBySkill = {};
-
-    const skillNameFromUrl = (url) => {
-        if (!url) return null;
-        const idx = url.indexOf("skills/");
-        if (idx < 0) return null;
-        const name = url.substring(idx + "skills/".length);
-        return name || null;
-    };
 
     apiInfoList.forEach((info) => {
         const url = info?.id?.url;

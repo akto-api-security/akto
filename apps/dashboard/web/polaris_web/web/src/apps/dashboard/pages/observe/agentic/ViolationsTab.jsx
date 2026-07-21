@@ -3,7 +3,13 @@ import { Box, VerticalStack, Text } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import { SeverityBadge } from "./AgenticCellRenderers";
-import { fetchAgenticViolations, openViolationInThreatActivity, deviceServiceKey, isClaudeConfigHost } from "./agenticObserveApi";
+import {
+    fetchAgenticViolations,
+    openViolationInThreatActivity,
+    deviceServiceKey,
+    isClaudeConfigHost,
+    selectSkillViolationRows,
+} from "./agenticObserveApi";
 import func from "@/util/func";
 
 function ViolSeverityCellRenderer({ data }) {
@@ -37,19 +43,19 @@ export default function ViolationsTab({ asset, collections = [], startTimestamp,
 
     useEffect(() => {
         setLoading(true);
+        const isSkillAsset = asset?.type === "Skill";
         const isClaudeAsset = asset?.assetTagValue?.toLowerCase() === "claude";
         if (!asset?.collectionIds?.length || !collections.length) {
-            if (!isClaudeAsset) { setViolations([]); setLoading(false); return; }
+            if (!isClaudeAsset && !isSkillAsset) { setViolations([]); setLoading(false); return; }
         }
-
         const ids = new Set((asset.collectionIds || []).map(Number));
         const hostNames = collections.filter(c => ids.has(Number(c.id)) && c.hostName).map(c => c.hostName);
 
-        if (!hostNames.length && !isClaudeAsset) { setViolations([]); setLoading(false); return; }
+        if (!isSkillAsset && !hostNames.length && !isClaudeAsset) { setViolations([]); setLoading(false); return; }
 
         // Collect device IDs that have a claude-type collection among this asset's collections.
-        // This covers both direct Claude AI Agent assets and Skills/MCPs whose collections
-        // include a claude collection (and thus receive attributed claude-settings events).
+        // Used for AI Agent / MCP assets that receive attributed claude-settings events.
+        // Skills scope by /skills/<name> URL identity instead — not by host.
         const claudeDeviceIds = new Set(
             hostNames
                 .filter(h => { const parts = h.split("."); return parts[parts.length - 1]?.toLowerCase() === "claude"; })
@@ -60,17 +66,20 @@ export default function ViolationsTab({ asset, collections = [], startTimestamp,
         let cancelled = false;
         const hostSet = new Set(hostNames);
         const looseHostSet = new Set(hostNames.map(h => deviceServiceKey(h)).filter(Boolean));
+        const skillName = asset?.name;
         fetchAgenticViolations({ startTimestamp, endTimestamp })
             .then((rows) => {
                 if (cancelled) return;
-                const filtered = rows.filter(r =>
-                    hostSet.has(r.host) ||
-                    looseHostSet.has(deviceServiceKey(r.host)) ||
-                    (isClaudeConfigHost(r.host) && (
-                        isClaudeAsset ||
-                        claudeDeviceIds.has(r.host.split(".")[0])
-                    ))
-                );
+                const filtered = isSkillAsset
+                    ? selectSkillViolationRows(rows, skillName)
+                    : rows.filter(r =>
+                        hostSet.has(r.host) ||
+                        looseHostSet.has(deviceServiceKey(r.host)) ||
+                        (isClaudeConfigHost(r.host) && (
+                            isClaudeAsset ||
+                            claudeDeviceIds.has(r.host.split(".")[0])
+                        ))
+                    );
                 setViolations(filtered.map((r) => ({
                     ...r,
                     time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
@@ -82,7 +91,7 @@ export default function ViolationsTab({ asset, collections = [], startTimestamp,
                 if (!cancelled) { setViolations([]); setLoading(false); }
             });
         return () => { cancelled = true; };
-    }, [asset?.id, asset?.assetTagValue, asset?.collectionIds, collections, startTimestamp, endTimestamp]);
+    }, [asset?.id, asset?.type, asset?.name, asset?.assetTagValue, asset?.collectionIds, collections, startTimestamp, endTimestamp]);
 
     const handleViolationClick = useCallback((e) => {
         if (!e.data) return;

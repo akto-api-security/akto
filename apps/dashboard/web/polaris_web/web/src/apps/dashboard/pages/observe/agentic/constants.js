@@ -25,6 +25,7 @@ import {
     getResolvedUsernameForCollection,
     DEFAULT_VALUE,
 } from "../api_collections/endpointShieldHelper";
+import { skillNameFromUrl } from "./agenticUrlHelpers";
 
 // Table constants
 export const PAGE_LIMIT = 100;
@@ -895,6 +896,7 @@ export function buildAgenticAssetsPageData(
         usernameMap = {},
         userMetadataMap = {},
         violationsByCollectionId = {},
+        violationsBySkillName = {},
         analysisByKey = new Map(),
         userAnalysisKeysByDeviceId = new Map(),
     } = {},
@@ -914,15 +916,27 @@ export function buildAgenticAssetsPageData(
 
     allGroups.forEach((group) => {
         const collectionIds = (group.collections || []).map((c) => c.id);
-        // Skills are capability manifest entries — violations belong to the agent/service collection
-        // that declares them, not to the skill itself. Suppress to avoid double-counting.
-        const violations = violationsForCollections(collectionIds, violationsByCollectionId);
+        const isSkill = group.rowType === ROW_TYPES.SKILL || group.clientType === CLIENT_TYPES.SKILL;
+        // Skills: only events whose URL is /skills/<skillName>. Host-level collection totals
+        // incorrectly attach agent/config findings (e.g. claude_settings_risk) to every skill.
+        const skillViolations = isSkill ? violationsBySkillName[group.groupName] : null;
+        const skillTotal = skillViolations
+            ? (skillViolations.critical || 0) + (skillViolations.high || 0) + (skillViolations.medium || 0) + (skillViolations.low || 0)
+            : 0;
+        const violations = isSkill
+            ? (skillTotal > 0 ? skillViolations : null)
+            : violationsForCollections(collectionIds, violationsByCollectionId);
         const groups = buildTeamGroupsForAsset(group, usernameMap, userMetadataMap);
         const devices = buildDevicesForGroup(group, usernameMap, riskScoreMap, trafficMap);
         const skillNames = uniqueSkillNamesForGroup(group);
         const riskScore = group.riskScore ?? group.maxRiskScore ?? null;
         const lastSeen = group.detectedTimestamp || 0;
         const aiInteractions = aggregateAiInteractionsForGroup(group, analysisByKey, userAnalysisKeysByDeviceId);
+        // Agent-level env flags (personal account, local MCP, misconfigured config) belong on
+        // AI Agent / MCP rows — not on Skill capability rows (matches old Endpoints badges).
+        const hasPersonalAccount = isSkill ? false : (group.hasPersonalAccount || false);
+        const hasLocalMcpServer = isSkill ? false : (group.hasLocalMcpServer || false);
+        const hasMisconfiguredConfig = isSkill ? false : (group.hasMisconfiguredConfig || false);
 
         const treeRow = {
             path: [group.id],
@@ -934,9 +948,9 @@ export function buildAgenticAssetsPageData(
             deviceCount: group.endpointsCount,
             lastSeen: lastSeen > 0 ? func.prettifyEpoch(lastSeen) : "",
             lastSeenEpoch: lastSeen,
-            hasPersonalAccount: group.hasPersonalAccount || false,
-            hasLocalMcpServer: group.hasLocalMcpServer || false,
-            hasMisconfiguredConfig: group.hasMisconfiguredConfig || false,
+            hasPersonalAccount,
+            hasLocalMcpServer,
+            hasMisconfiguredConfig,
         };
         if (aiInteractions) {
             treeRow.aiInteractions = aiInteractions.total;
@@ -962,9 +976,9 @@ export function buildAgenticAssetsPageData(
             skillCount: skillNames.size,
             skillNames: skillNames.size ? [...skillNames] : undefined,
             toolCount: 0,
-            hasPersonalAccount: group.hasPersonalAccount || false,
-            hasLocalMcpServer: group.hasLocalMcpServer || false,
-            hasMisconfiguredConfig: group.hasMisconfiguredConfig || false,
+            hasPersonalAccount,
+            hasLocalMcpServer,
+            hasMisconfiguredConfig,
         };
         if (violations) flatRow.violations = violations;
         if (groups.length) flatRow.groups = groups;
@@ -1031,8 +1045,7 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
     results.forEach(({ id: collectionId, infos }) => {
         infos.forEach((info) => {
             const url = info?.id?.url || "";
-            const splits = url.split("skills/");
-            const skillName = splits?.[1];
+            const skillName = skillNameFromUrl(url);
             if (skillName) {
                 skillScoreMap[skillName] = info.riskScore || 0;
                 const isMalicious = (info.tagsList || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true");
