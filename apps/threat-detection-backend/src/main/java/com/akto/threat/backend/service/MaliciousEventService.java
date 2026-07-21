@@ -528,7 +528,7 @@ public class MaliciousEventService {
         + "|" + DashboardFilterCache.bucketDay(startTs)
         + "|" + DashboardFilterCache.bucketDay(endTs);
 
-    long total = countCache.get(countCacheKey, () -> maliciousEventDao.countDocuments(accountId, query));
+    long total = maliciousEventDao.countDocuments(accountId, query);
 
     MongoCursor<MaliciousEventDto> cursor;
     if (sortBySeverity) {
@@ -547,7 +547,7 @@ public class MaliciousEventService {
                       .append("default", 5)
                   )
               )),
-              new Document("$sort", new Document("severityRank", 1)),
+              new Document("$sort", new Document("severityRank", sort.getOrDefault("severity", 1))),
               new Document("$skip", skip),
               new Document("$limit", limit)
           ))

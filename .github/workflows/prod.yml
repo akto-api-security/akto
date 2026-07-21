@@ -43,6 +43,10 @@ on:
         type: boolean
         default: false
         description: OTel Ingestion Service
+      account_jobs_executor:
+        type: boolean
+        default: false
+        description: Account Jobs Executor Service
       release_version_agent_guard:
         description: 'Release version for the Agent Guard deployment'
         required: false
@@ -54,10 +58,6 @@ on:
         type: boolean
         default: false
         description: Deploy Agent Guard to Azure Container Apps (requires Agent Guard build)
-      account_jobs_executor:
-        type: boolean
-        default: false
-        description: Account Jobs Executor Service
       release_version_threat:
         description: 'Release version for the Threat Detection deployment'
         required: false

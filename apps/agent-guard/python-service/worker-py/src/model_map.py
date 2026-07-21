@@ -79,6 +79,14 @@ class ModelMapScanner:
             provider = build_provider_from_config(entry)
             if provider is not None:
                 scanners.append((LLMScanner(provider), entry))
+            else:
+                # build_provider_from_config already logged which env var was
+                # missing (see the "[Providers] ... skipping" warning); this
+                # line closes the loop to which cascade role that leaves empty.
+                logger.warning(
+                    f"[ModelMap] {self.scanner_name}: provider '{entry.get('provider')}' for role "
+                    f"{entry.get('modelRole', '-')} unavailable, dropped from this cascade"
+                )
         if not scanners:
             raise ValueError("ModelMapScanner: no usable providers in modelConfigs")
 
@@ -170,7 +178,11 @@ class ModelMapScanner:
             if isinstance(result, Exception):
                 reason = "timeout" if isinstance(result, TimeoutError) else type(result).__name__
                 metrics_push.COUNTS["provider_errors"].increment(f"{provider_name}:{reason}")
-                logger.error(f"[ModelMap] {label} '{entry.get('provider')}' failed: {result!r}")
+                logger.error(
+                    f"[ModelMap] {label} '{entry.get('provider')}' failed "
+                    f"(model={entry.get('model') or '-'} baseUrl={entry.get('baseUrl') or '-'} "
+                    f"timeoutMs={entry.get('timeoutMs') or '-'}): {result!r}"
+                )
                 unsafe += 1  # conservative: failures count as unsafe
                 continue
             exec_ms = result.get("execution_time_ms")
@@ -202,7 +214,11 @@ class ModelMapScanner:
             if isinstance(result, Exception):
                 reason = "timeout" if isinstance(result, TimeoutError) else type(result).__name__
                 metrics_push.COUNTS["provider_errors"].increment(f"{provider_name}:{reason}")
-                logger.error(f"[ModelMap] {_ROLE_ARBITER} '{entry.get('provider')}' failed: {result!r}")
+                logger.error(
+                    f"[ModelMap] {_ROLE_ARBITER} '{entry.get('provider')}' failed "
+                    f"(model={entry.get('model') or '-'} baseUrl={entry.get('baseUrl') or '-'} "
+                    f"timeoutMs={entry.get('timeoutMs') or '-'}): {result!r}"
+                )
                 continue
             exec_ms = result.get("execution_time_ms")
             if isinstance(exec_ms, (int, float)):
@@ -242,6 +258,19 @@ class ModelMapScanner:
             return "qwen"
         return n.split("_")[0]
 
+    # Fields from the winning provider that enrich_result / _extract_task_category
+    # need to derive a specific intent label. Without forwarding these, Qwen3Guard's
+    # "categories" and "safety" fields are silently dropped and _extract_task_category
+    # always falls back to the reason-keyword scan.
+    _ENRICHMENT_FIELDS = (
+        "safety",
+        "categories",
+        "matchedTopic",
+        "prob_distribution",
+        "confidence_source",
+        "decision_confidence",
+    )
+
     def _shape_result(self, winner: dict[str, Any]) -> dict[str, Any]:
         winner_details = winner.get("details") or {}
         winner_stem = self._stem(winner_details.get("llm_provider", ""))
@@ -251,10 +280,19 @@ class ModelMapScanner:
             "scanner_type": self.scanner_type,
             "cascade_decision": f"{winner_stem}_authority" if winner_stem else "no_authority",
         }
-        if "error" in winner_details:
+        # Forward provider-specific enrichment fields from the winner so that
+        # downstream intent labelling sees the full structured verdict.
+        for key in self._ENRICHMENT_FIELDS:
+            if key in winner_details:
+                details[key] = winner_details[key]
+        if "error" in winner_details:  # fail-open marker: callers must not cache degraded verdicts
             details["error"] = winner_details["error"]
         if winner_details.get("values"):  # Password: exact secret substrings to redact
             details["values"] = winner_details["values"]
+        # Also carry decision_confidence from the top-level winner result if not
+        # already set by the details (Qwen3Guard puts it at the top level).
+        if "decision_confidence" not in details and winner.get("decision_confidence") is not None:
+            details["decision_confidence"] = winner["decision_confidence"]
         completed_by_stem = self._index_completed_by_stem()
         for entry in self.config.get("modelConfigs", []):
             stem = self._stem(entry.get("provider", ""))

@@ -133,9 +133,11 @@ public class ThreatApiService {
       return computeSubCategoryWiseCount(accountId, req, contextSource);
     }
 
+    String statusKey = (req.getStatus() != null && !req.getStatus().isEmpty()) ? req.getStatus() : "ALL";
     String cacheKey = "subCategoryCount|get_subcategory_wise_count|" + accountId + "|" + contextSource
         + "|" + DashboardFilterCache.bucketDay(req.getStartTs())
-        + "|" + DashboardFilterCache.bucketDay(req.getEndTs());
+        + "|" + DashboardFilterCache.bucketDay(req.getEndTs())
+        + "|" + statusKey;
 
     return subCategoryCountCache.get(cacheKey,
         () -> computeSubCategoryWiseCount(accountId, req, contextSource));
@@ -149,6 +151,10 @@ public class ThreatApiService {
 
     if(!req.getLatestAttackList().isEmpty()) {
       match.append("filterId", new Document("$in", req.getLatestAttackList()));
+    }
+
+    if (req.getStatus() != null && !req.getStatus().isEmpty()) {
+      match.append("status", req.getStatus());
     }
 
     // 1. Match on time range
@@ -211,6 +217,10 @@ public class ThreatApiService {
 
     if (!req.getLatestAttackList().isEmpty()) {
         match.append("filterId", new Document("$in", req.getLatestAttackList()));
+    }
+
+    if (req.getStatus() != null && !req.getStatus().isEmpty()) {
+        match.append("status", req.getStatus());
     }
 
       // Apply simple context filter (only for ENDPOINT and AGENTIC)

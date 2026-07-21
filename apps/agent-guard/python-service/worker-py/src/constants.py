@@ -10,6 +10,8 @@ import json
 import logging
 from typing import Any
 
+from settings import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -69,7 +71,13 @@ GEMMA_ONLY_SCANNERS = {"BanCode", "Password"}
 # it holds regardless of caller (policy modelConfigs, DEFAULT_MODEL_CONFIG_JSON,
 # or a direct /scan hit with no config at all), not just the Go gateway's own hardcode.
 FORCE_GEMMA_ONLY_SCANNERS = {"Password"}
-_HARDCODED_GEMMA_ONLY_CONFIG = [{"provider": "gemma_vertexai", "modelRole": "FINAL_ARBITER", "timeoutMs": 30000}]
+
+
+def _gemma_arbiter_provider() -> str:
+    """Pick the configured Gemma backend: Vertex when set, else Azure Foundry."""
+    if not settings.GEMMA_VERTEX_ENDPOINT_ID and settings.GEMMA_FOUNDRY_BASE_URL:
+        return "gemma_foundry"
+    return "gemma_vertexai"
 
 
 def strip_qwen_tier(model_configs):
@@ -83,7 +91,7 @@ def strip_qwen_tier(model_configs):
 
 def force_gemma_only(_model_configs):
     """Replace whatever modelConfigs was supplied with the fixed Gemma-only map."""
-    return list(_HARDCODED_GEMMA_ONLY_CONFIG)
+    return [{"provider": _gemma_arbiter_provider(), "modelRole": "FINAL_ARBITER", "timeoutMs": 30000}]
 
 
 # Scanners that proxy to a sibling Worker which in turn owns a Cloudflare

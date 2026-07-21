@@ -101,5 +101,6 @@ def build(config: dict[str, Any], provider_name: str, text: str) -> str:
         config.get("topicDescriptions", {}),
         config.get("topicSamplePhrases", {}),
     )
-    template = GEMMA if provider_name == "gemma_vertexai" else DEFAULT
+    # Any Gemma backend (gemma_vertexai, gemma_foundry) gets the Gemma-tuned prompt.
+    template = GEMMA if provider_name.startswith("gemma") else DEFAULT
     return template % (topics_str, text)

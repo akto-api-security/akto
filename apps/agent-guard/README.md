@@ -1,6 +1,6 @@
 # Agent Guard
 
-LLM guardrail scanning: cascade models (Vertex) + local scanners + Presidio anonymization.
+LLM guardrail scanning: cascade models (Vertex or Azure AI Foundry) + local scanners + Presidio anonymization.
 
 | Doc | Contents |
 |-----|----------|
@@ -45,7 +45,9 @@ curl -s -X POST localhost:8090/scan \
   -d '{"scanner_name":"Anonymize","text":"email john@example.com"}'
 ```
 
-**Scanners:** `BanSubstrings`, `Secrets`, `TokenLimit` (local); `PromptInjection`, `BanTopics`, `Toxicity`, `Gibberish`, `BanCode` (cascade, needs Vertex); `Anonymize` (proxies to anonymizer).
+**Scanners:** `BanSubstrings`, `Secrets`, `TokenLimit` (local); `PromptInjection`, `BanTopics`, `Toxicity`, `Gibberish`, `BanCode` (cascade, needs Vertex or Azure Foundry creds); `Anonymize` (proxies to anonymizer).
+
+**Cascade model providers** (used in `modelConfigs` / `DEFAULT_MODEL_CONFIG_JSON`): `qwen3guard`, `gemma_vertexai`, `vertexai` (GCP Vertex dedicated endpoints); `qwen3guard_foundry`, `gemma_foundry`, `azure_foundry` (Azure AI Foundry managed-compute endpoints, OpenAI-compatible); `anthropic`, `openai`, `openai_compatible`. Foundry needs `*_FOUNDRY_BASE_URL` + `*_FOUNDRY_API_KEY` per provider (see [ENV.md](ENV.md)).
 
 **Anonymizer direct** (`:8093` if port exposed):
 

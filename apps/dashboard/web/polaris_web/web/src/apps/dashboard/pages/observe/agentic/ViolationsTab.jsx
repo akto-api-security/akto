@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Box, VerticalStack, Text } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
+import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import { SeverityBadge } from "./AgenticCellRenderers";
 import {
     fetchAgenticViolations,
@@ -38,27 +39,19 @@ const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 
 export default function ViolationsTab({ asset, collections = [], startTimestamp, endTimestamp, onViolationClick }) {
     const [violations, setViolations] = useState([]);
-
-    // Reset immediately when the asset changes so stale rows from the previous asset
-    // are never visible while the new fetch is in flight.
-    useEffect(() => { setViolations([]); }, [asset?.id]);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
+        setLoading(true);
         const isSkillAsset = asset?.type === "Skill";
         const isClaudeAsset = asset?.assetTagValue?.toLowerCase() === "claude";
-        if (!isSkillAsset && !asset?.collectionIds?.length && !isClaudeAsset) {
-            setViolations([]);
-            return;
+        if (!asset?.collectionIds?.length || !collections.length) {
+            if (!isClaudeAsset && !isSkillAsset) { setViolations([]); setLoading(false); return; }
         }
-        if (!isSkillAsset && !collections.length && !isClaudeAsset) {
-            setViolations([]);
-            return;
-        }
-
         const ids = new Set((asset.collectionIds || []).map(Number));
         const hostNames = collections.filter(c => ids.has(Number(c.id)) && c.hostName).map(c => c.hostName);
 
-        if (!isSkillAsset && !hostNames.length && !isClaudeAsset) { setViolations([]); return; }
+        if (!isSkillAsset && !hostNames.length && !isClaudeAsset) { setViolations([]); setLoading(false); return; }
 
         // Collect device IDs that have a claude-type collection among this asset's collections.
         // Used for AI Agent / MCP assets that receive attributed claude-settings events.
@@ -92,9 +85,10 @@ export default function ViolationsTab({ asset, collections = [], startTimestamp,
                     time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
                     deviceId: r.host ? r.host.split(".")[0] : "",
                 })));
+                setLoading(false);
             })
             .catch(() => {
-                if (!cancelled) setViolations([]);
+                if (!cancelled) { setViolations([]); setLoading(false); }
             });
         return () => { cancelled = true; };
     }, [asset?.id, asset?.type, asset?.name, asset?.assetTagValue, asset?.collectionIds, collections, startTimestamp, endTimestamp]);
@@ -107,6 +101,10 @@ export default function ViolationsTab({ asset, collections = [], startTimestamp,
             openViolationInThreatActivity(e.data);
         }
     }, [onViolationClick]);
+
+    if (loading) {
+        return <SpinnerCentered height="200px" />;
+    }
 
     if (violations.length === 0) {
         return (
