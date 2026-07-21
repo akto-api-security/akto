@@ -25,6 +25,7 @@ import {
     getResolvedUsernameForCollection,
     DEFAULT_VALUE,
 } from "../api_collections/endpointShieldHelper";
+import { skillNameFromUrl } from "./agenticUrlHelpers";
 
 // Table constants
 export const PAGE_LIMIT = 100;
@@ -1044,8 +1045,7 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
     results.forEach(({ id: collectionId, infos }) => {
         infos.forEach((info) => {
             const url = info?.id?.url || "";
-            const splits = url.split("skills/");
-            const skillName = splits?.[1];
+            const skillName = skillNameFromUrl(url);
             if (skillName) {
                 skillScoreMap[skillName] = info.riskScore || 0;
                 const isMalicious = (info.tagsList || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true");

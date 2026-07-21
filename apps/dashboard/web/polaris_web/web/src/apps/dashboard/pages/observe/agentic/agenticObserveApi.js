@@ -2,8 +2,10 @@ import request from "@/util/request";
 import observeApi from "../api";
 import { buildMcpComponentsFromStis, buildAgentBuiltinToolsFromStis, buildSkillsFlyoutData, normalizeSeverity } from "./agenticPageBuilders";
 import { deviceServiceKey } from "./constants";
+import { skillNameFromUrl } from "./agenticUrlHelpers";
 
 export { deviceServiceKey };
+export { skillNameFromUrl, deriveSkillOrToolName } from "./agenticUrlHelpers";
 
 function extractRuleViolated(metadata) {
     if (!metadata) return "-";
@@ -182,14 +184,7 @@ export function summarizeViolations(rows = []) {
 // Skill identity lives on the event URL as /skills/<skillName> (not on host).
 // Host-level aggregation must not be used for Skill assets — it pulls in
 // agent/config findings (e.g. claude_settings_risk) from every parent collection.
-
-export function skillNameFromUrl(url) {
-    if (!url) return null;
-    const idx = url.indexOf("skills/");
-    if (idx < 0) return null;
-    const name = url.substring(idx + "skills/".length).split(/[?#]/)[0];
-    return name || null;
-}
+// skillNameFromUrl reuses the Violations-page URL parser (agenticUrlHelpers).
 
 export function eventMatchesSkill(row, skillName) {
     if (!skillName || !row) return false;
