@@ -1834,6 +1834,13 @@ public class DbLayer {
         }
     }
 
+    public static void markTestingRunFailed(String testingRunId) {
+        ObjectId testingRunObjId = new ObjectId(testingRunId);
+        TestingRunDao.instance.updateOneNoUpsert(
+                Filters.eq(Constants.ID, testingRunObjId),
+                Updates.set(TestingRun.STATE, State.FAILED));
+    }
+
     public static Map<ObjectId, TestingRunResultSummary> fetchTestingRunResultSummaryMap(String testingRunId) {
         ObjectId testingRunObjId = new ObjectId(testingRunId);
         return TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRunObjId));
