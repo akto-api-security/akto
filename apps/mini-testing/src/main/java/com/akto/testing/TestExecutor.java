@@ -577,6 +577,10 @@ public class TestExecutor {
                         dbObject.put("CONSUMER_RUNNING", true);
                         dbObject.put(TestingRun.PICKED_UP_TIMESTAMP, runPickedUp);
                         dbObject.put("testRunMaxTimeSeconds", runMaxSec);
+                        // Successfully sent = total - still-throttled/unacked. Consumer waits for this many.
+                        int expectedRecords = Math.max(0, totalRecords.get() - unsentRecords);
+                        dbObject.put(com.akto.testing.kafka_utils.ConsumerUtil.EXPECTED_RECORDS_KEY, expectedRecords);
+                        loggerMaker.insertImportantTestingLog("Writing expectedRecords=" + expectedRecords + " for consumer completion check");
                         writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
                     }
                 }
