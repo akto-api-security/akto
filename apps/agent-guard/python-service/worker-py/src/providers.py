@@ -650,50 +650,54 @@ def build_provider_from_config(entry: dict[str, Any]) -> LLMProvider | None:
 
 
 # ── Startup self-check ───────────────────────────────────────────────────────
-# Fires one real, minimal request at each configured cascade provider right
-# after process boot and logs PASS/FAIL immediately — a signal within seconds
-# of deploy, not whenever the first real scan happens to hit that exact role.
-# This matters specifically because the Azure Foundry providers are shipping
-# without an end-to-end test against the real endpoints: waiting for organic
-# traffic to discover a bad deployment name/auth/routing config here would
-# mean live scans silently fail-open in the meantime. Uses the SAME provider
-# cache key as real traffic (bare {"provider": name} — no model/baseUrl
-# override), so this warms the exact instance real requests will reuse.
-_STARTUP_CHECK_PROVIDERS = (
-    "azure_foundry",
-    "gemma_foundry",
-    "qwen3guard_foundry",
-    "vertexai",
-    "gemma_vertexai",
-    "qwen3guard",
-)
+# Fires one real, minimal request at each provider ACTUALLY configured in the
+# cascade (DEFAULT_MODEL_CONFIG_JSON, falling back to the same built-in
+# default a real request would use) right after process boot and logs
+# PASS/FAIL immediately — a signal within seconds of deploy, not whenever the
+# first real scan happens to hit that exact role.
+#
+# Pings each modelConfigs entry with ITS OWN per-entry model/baseUrl/deployment
+# overrides — not a generic one-ping-per-provider-name check. That generic
+# version was tried first and produced false failures against a real
+# multi-deployment Foundry resource: two modelConfigs entries both used
+# "gemma_foundry" (one Gemma 4 E2B-it, one Gemma 4 31B-it) distinguished only
+# by a per-entry "model" field, with no usable env-var-level default model —
+# a bare {"provider": "gemma_foundry"} ping has no model to send and the real
+# endpoint rejects it with "Missed model deployment", even though the actual
+# cascade entries (each carrying their own model) work fine.
 _STARTUP_CHECK_TIMEOUT_S = 15.0
 _STARTUP_CHECK_PROMPT = "Respond with the single word: ok"
 
 
-async def _startup_check_one(provider_name: str) -> None:
-    provider = build_provider_from_config({"provider": provider_name})
+async def _startup_check_entry(entry: dict[str, Any]) -> None:
+    name = (entry.get("provider") or "").strip().lower()
+    label = f"{name}[{entry.get('modelRole', '-')}]"
+    provider = build_provider_from_config(entry)
     if provider is None:
         # Not configured (missing env vars) — build_provider_from_config already
         # logged which var via the "[Providers] ... skipping" warning; nothing
         # extra to say here, and staying silent avoids false-alarming on
         # providers this deployment was never meant to use.
         return
-    logger.info(f"[StartupCheck] {provider_name}: pinging real endpoint...")
+    logger.info(f"[StartupCheck] {label}: pinging real endpoint...")
     t0 = time.time()
     try:
         await asyncio.wait_for(provider.complete(_STARTUP_CHECK_PROMPT), timeout=_STARTUP_CHECK_TIMEOUT_S)
     except Exception as exc:
         elapsed_ms = (time.time() - t0) * 1000
-        logger.error(f"[StartupCheck] {provider_name}: FAILED after {elapsed_ms:.0f}ms: {exc!r}")
+        logger.error(f"[StartupCheck] {label}: FAILED after {elapsed_ms:.0f}ms: {exc!r}")
     else:
         elapsed_ms = (time.time() - t0) * 1000
-        logger.info(f"[StartupCheck] {provider_name}: OK ({elapsed_ms:.0f}ms)")
+        logger.info(f"[StartupCheck] {label}: OK ({elapsed_ms:.0f}ms)")
 
 
 async def startup_self_check() -> None:
-    """Run all configured providers' checks concurrently; never raises —
-    failures are logged, not propagated, so a bad model never blocks boot."""
-    logger.info(f"[StartupCheck] checking configured providers: {_STARTUP_CHECK_PROVIDERS}")
-    await asyncio.gather(*(_startup_check_one(name) for name in _STARTUP_CHECK_PROVIDERS), return_exceptions=True)
+    """Run a check for every entry in the actually-configured cascade
+    concurrently; never raises — failures are logged, not propagated, so a
+    bad model never blocks boot."""
+    from constants import get_default_config
+
+    entries = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON).get("modelConfigs", [])
+    logger.info(f"[StartupCheck] checking {len(entries)} configured cascade entries")
+    await asyncio.gather(*(_startup_check_entry(e) for e in entries), return_exceptions=True)
     logger.info("[StartupCheck] done")
