@@ -1979,6 +1979,24 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void markTestingRunFailed(String testingRunId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunId", testingRunId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/markTestingRunFailed", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in markTestingRunFailed", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in markTestingRunFailed" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
+
     public Map<ObjectId, TestingRunResultSummary> fetchTestingRunResultSummaryMap(String testingRunId) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();

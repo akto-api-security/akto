@@ -680,6 +680,13 @@ public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<
             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
     }
 
+    public static void markTestingRunFailed(String testingRunId) {
+        ObjectId testingRunObjId = new ObjectId(testingRunId);
+        TestingRunDao.instance.getMCollection().findOneAndUpdate(
+            Filters.eq(Constants.ID, testingRunObjId),
+            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+    }
+
     public static Map<ObjectId, TestingRunResultSummary> fetchTestingRunResultSummaryMap(String testingRunId) {
         ObjectId testingRunObjId = new ObjectId(testingRunId);
         return TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRunObjId));

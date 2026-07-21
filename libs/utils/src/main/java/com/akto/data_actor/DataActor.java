@@ -144,6 +144,8 @@ public abstract class DataActor {
 
     public abstract void updateTestingRun(String testingRunId);
 
+    public abstract void markTestingRunFailed(String testingRunId);
+
     public abstract void updateTestRunResultSummary(String summaryId);
     public abstract void deleteTestRunResultSummary(String summaryId);
     public abstract void deleteTestingRunResults(String testingRunResultId);
