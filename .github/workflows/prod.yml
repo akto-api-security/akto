@@ -131,8 +131,8 @@ jobs:
 
       - uses: actions/setup-java@v5
         with:
-          distribution: "adopt"
-          java-version: "8"
+          distribution: "temurin"
+          java-version: "17"
           architecture: x64
       - uses: actions/setup-node@v6
         with:

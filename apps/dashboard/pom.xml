@@ -22,6 +22,31 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- Force the transitive commons-io to a patched version (GHSA-78wr, High). -->
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>2.14.0</version>
+            </dependency>
+            <!-- Pin all transitive io.netty:* to a single patched version (multiple Critical/High). -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>4.1.135.Final</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Patched kafka-clients (GHSA-5qcv, High) and its transitive lz4 (GHSA-vqf4/cmp6, High). -->
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-clients</artifactId>
+                <version>3.9.2</version>
+            </dependency>
+            <dependency>
+                <groupId>org.lz4</groupId>
+                <artifactId>lz4-java</artifactId>
+                <version>1.8.1</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -60,12 +85,31 @@
         <dependency>
             <groupId>org.apache.struts</groupId>
             <artifactId>struts2-core</artifactId>
-            <version>2.5.33</version>
+            <!-- Struts 6.x (javax line, runs on Java 8+): clears the 2.5.33 Critical/High CVEs.
+                 Struts 7 is the jakarta line and is intentionally not used here. -->
+            <version>6.10.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
             <version>3.18.0</version>
+        </dependency>
+        <!-- Override the inherited jackson 2.16.1 (root pom) with a patched version for this
+             module only (GHSA-rmj7 / GHSA-j3rv, High). Direct declaration wins over inherited. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.18.9</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>2.18.9</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>2.18.9</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.kohsuke/github-api -->
         <dependency>
@@ -146,7 +190,8 @@
         <dependency>
             <groupId>org.apache.struts</groupId>
             <artifactId>struts2-json-plugin</artifactId>
-            <version>2.5.30</version>
+            <!-- Must match struts2-core version. -->
+            <version>6.10.0</version>
         </dependency>
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
@@ -261,9 +306,20 @@
             </resource>
         </resources>
         <plugins>
+            <!-- mockito-inline 3.4.0's bundled ByteBuddy can't redefine classes on Java 17
+                 (class file v61) -> "Could not modify all classes". The experimental flag lets
+                 ByteBuddy proceed; add-opens covers the inline mock-maker's reflection. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>-Dnet.bytebuddy.experimental=true --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED</argLine>
+                </configuration>
+            </plugin>
             <plugin>
                 <artifactId>maven-war-plugin</artifactId>
-                <version>2.3</version>
+                <!-- 3.4.0: war-plugin 2.3 fails on JDK 17 (reflective TreeMap access). -->
+                <version>3.4.0</version>
                 <configuration>
                     <warSourceDirectory>web</warSourceDirectory>
                     <failOnMissingWebXml>false</failOnMissingWebXml>
@@ -284,10 +340,32 @@
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <groupId>org.apache.maven.plugins</groupId>
+                <!-- 3.13.0: 3.1 predates and silently ignores <release>. -->
+                <version>3.13.0</version>
                 <configuration>
-                    <source>8</source>
-                    <target>8</target>
+                    <release>17</release>
                 </configuration>
+            </plugin>
+            <!-- Require JDK 17+ to build/run this module (fail fast on older JDKs). -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>enforce-java-17</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[17,)</version>
+                                </requireJavaVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
         <finalName>${project.artifactId}</finalName>

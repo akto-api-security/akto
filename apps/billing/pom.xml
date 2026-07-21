@@ -93,7 +93,9 @@
         <plugins>
             <plugin>
                 <artifactId>maven-war-plugin</artifactId>
-                <version>2.3</version>
+                <!-- 3.4.0: war-plugin 2.3 fails to run on JDK 17 (xstream/TreeMap reflection).
+                     Build-only change; module stays source/target 8 -> Java 8 bytecode/runtime. -->
+                <version>3.4.0</version>
                 <configuration>
                     <attachClasses>true</attachClasses>
                     <warSourceDirectory>web</warSourceDirectory>

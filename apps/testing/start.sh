@@ -30,8 +30,14 @@ XMX_MEM=$((MEM_LIMIT_MB * 80 / 100))
 echo "Calculated -Xmx value: ${XMX_MEM} MB"
 
 # 5. Run Java with the dynamically calculated -Xmx
+#    --add-opens: Java 17 strong-encapsulation opens needed by reflective libraries
+#    (MongoDB POJO codec, etc.). Single-token "=" form.
 exec java \
   -XX:+ExitOnOutOfMemoryError \
   -Xmx${XMX_MEM}m \
+  --add-opens=java.base/java.lang=ALL-UNNAMED \
+  --add-opens=java.base/java.util=ALL-UNNAMED \
+  --add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
+  --add-opens=java.base/java.time=ALL-UNNAMED \
   -jar /app/testing-1.0-SNAPSHOT-jar-with-dependencies.jar
 
