@@ -2222,8 +2222,7 @@ const quickStartFunc = {
         const aiAgentConnectors = [
             awsBedrockObj, awsAgentCoreObj, amazonQuickObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
             n8nImportObj, langchainImportObj, copilotStudioImportObj, snowflakeObj,
-            vertexAICustomDeployedModelImportObj, salesforceImportObj,
-            anthropicImportObj, openaiImportObj
+            vertexAICustomDeployedModelImportObj, salesforceImportObj
         ]
 
         const aiMcpGatewayConnectors = [
