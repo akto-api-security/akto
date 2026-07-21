@@ -15,6 +15,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -44,9 +45,15 @@ import io.confluent.parallelconsumer.ParallelStreamProcessor;
 
 public class ConsumerUtil {
 
+    public static final String EXPECTED_RECORDS_KEY = "expectedRecords";
+
+    private static final int MAX_POLL_INTERVAL_MS = 10000;
+    /** If queue stays empty with no processed progress this long, treat remaining expected records as lost. */
+    private static final long DRAIN_IDLE_GRACE_MS = 5L * 60L * 1000L;
+
     static Properties properties = com.akto.runtime.utils.Utils.configProperties(Constants.LOCAL_KAFKA_BROKER_URL, Constants.AKTO_KAFKA_GROUP_ID_CONFIG, Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
     static{
-        properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 10000); 
+        properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, MAX_POLL_INTERVAL_MS);
     }
     private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null;
     private static final LoggerMaker loggerMaker = new LoggerMaker(ConsumerUtil.class, LogDb.TESTING);
@@ -150,7 +157,11 @@ public class ConsumerUtil {
         if (currentTestInfo.containsField("testRunMaxTimeSeconds")) {
             effectiveMaxRunTime = currentTestInfo.getInt("testRunMaxTimeSeconds", maxRunTimeInSeconds);
         }
+        final int expectedRecords = currentTestInfo.containsField(EXPECTED_RECORDS_KEY)
+                ? currentTestInfo.getInt(EXPECTED_RECORDS_KEY)
+                : -1;
         AtomicBoolean firstRecordRead = new AtomicBoolean(false);
+        AtomicInteger processedRecords = new AtomicInteger(0);
 
         boolean isConsumerRunning = false;
         if(currentTestInfo != null){
@@ -210,11 +221,14 @@ public class ConsumerUtil {
                     }
                     
                 } finally {
+                    processedRecords.incrementAndGet();
                     loggerMaker.infoAndAddToDb("Thread [" + threadName + "] finished processing record recordId=" + recordId);
                 }
             });
         }
 
+            long drainIdleSinceMs = -1L;
+            int lastProcessedSeen = -1;
             while (parallelConsumer != null) {
                 if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId)){
                     loggerMaker.infoAndAddToDb("Tests have been marked stopped.");
@@ -225,12 +239,41 @@ public class ConsumerUtil {
                     loggerMaker.infoAndAddToDb("Max run time reached. Stopping consumer.");
                     executor.shutdownNow();
                     break;
-                }else if(firstRecordRead.get() && parallelConsumer.workRemaining() == 0){
-                    int remainingTime = Math.min( Math.max(0,effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
-                    loggerMaker.infoAndAddToDb("Records are empty now, thus executing final tests");
-                    executor.shutdown();
-                    executor.awaitTermination(remainingTime, TimeUnit.SECONDS);
-                    break;
+                }
+
+                int processed = processedRecords.get();
+                if (processed > lastProcessedSeen) {
+                    lastProcessedSeen = processed;
+                    drainIdleSinceMs = -1L;
+                }
+
+                boolean locallyEmpty = firstRecordRead.get() && parallelConsumer.workRemaining() == 0;
+                if (locallyEmpty) {
+                    if (expectedRecords > 0 && processed >= expectedRecords) {
+                        int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
+                        loggerMaker.insertImportantTestingLog(
+                                "All expected records processed: " + processed + "/" + expectedRecords
+                                        + " (workRemaining=0)");
+                        executor.shutdown();
+                        executor.awaitTermination(remainingTime, TimeUnit.SECONDS);
+                        break;
+                    }
+
+                    long nowMs = System.currentTimeMillis();
+                    if (drainIdleSinceMs < 0) {
+                        drainIdleSinceMs = nowMs;
+                    } else if (nowMs - drainIdleSinceMs >= DRAIN_IDLE_GRACE_MS) {
+                        int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
+                        loggerMaker.insertImportantTestingLog(
+                                "No progress for " + DRAIN_IDLE_GRACE_MS + "ms with incomplete records: "
+                                        + processed + "/" + expectedRecords
+                                        + " (workRemaining=0). Completing consumer.");
+                        executor.shutdown();
+                        executor.awaitTermination(remainingTime, TimeUnit.SECONDS);
+                        break;
+                    }
+                } else {
+                    drainIdleSinceMs = -1L;
                 }
                 Thread.sleep(100);
             }
