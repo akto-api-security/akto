@@ -1502,8 +1502,9 @@ public class TestExecutor {
                                             loggerMaker.infoAndAddToDb("cleanUpTestArtifacts fetching samples for cleanup endpoint");
                                             List<ApiInfoKey> keyList = new ArrayList<>();
                                             keyList.add(cleanUpApiInfoKey);
-                                            sampleMessageStore.fetchSampleMessages(keyList);
-                                            samples = sampleMessageStore.getSampleDataMap().get(cleanUpApiInfoKey);
+                                            Map<ApiInfoKey, List<String>> cleanupSampleMap =
+                                                    sampleMessageStore.fetchSampleMessagesIntoNewMap(keyList);
+                                            samples = cleanupSampleMap.get(cleanUpApiInfoKey);
                                         }
 
                                         loggerMaker.infoAndAddToDb("cleanUpTestArtifacts samples count: " + (samples != null ? samples.size() : 0));
