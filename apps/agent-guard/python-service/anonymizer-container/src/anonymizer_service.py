@@ -24,6 +24,9 @@ SPACY_MODEL = os.environ.get("SPACY_MODEL", "en_core_web_sm")
 
 REDACTION_PLACEHOLDER = "[REDACTED]"
 
+# Noisy spaCy/keyword recognizers (no format validation) that misfire on ordinary text.
+EXCLUDED_ENTITY_TYPES = {"DATE_TIME", "NRP", "LOCATION"}
+
 
 def _build_analyzer() -> AnalyzerEngine:
     if not spacy.util.is_package(SPACY_MODEL):
@@ -105,6 +108,9 @@ def anonymize(req: AnonymizeRequest, request: Request):
         language=req.language,
         entities=req.entities,
     )
+    # Drop noisy types unless the caller explicitly asked for specific entities.
+    if not req.entities:
+        results = [r for r in results if r.entity_type not in EXCLUDED_ENTITY_TYPES]
     analyze_ms = (time.perf_counter() - analyze_start) * 1000
 
     anonymize_start = time.perf_counter()
