@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Box, VerticalStack, Text } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
+import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import { SeverityBadge } from "./AgenticCellRenderers";
 import { fetchAgenticViolations, openViolationInThreatActivity, deviceServiceKey, isClaudeConfigHost } from "./agenticObserveApi";
 import func from "@/util/func";
@@ -32,21 +33,19 @@ const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 
 export default function ViolationsTab({ asset, collections = [], startTimestamp, endTimestamp, onViolationClick }) {
     const [violations, setViolations] = useState([]);
-
-    // Reset immediately when the asset changes so stale rows from the previous asset
-    // are never visible while the new fetch is in flight.
-    useEffect(() => { setViolations([]); }, [asset?.id]);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
+        setLoading(true);
         const isClaudeAsset = asset?.assetTagValue?.toLowerCase() === "claude";
         if (!asset?.collectionIds?.length || !collections.length) {
-            if (!isClaudeAsset) { setViolations([]); return; }
+            if (!isClaudeAsset) { setViolations([]); setLoading(false); return; }
         }
 
         const ids = new Set((asset.collectionIds || []).map(Number));
         const hostNames = collections.filter(c => ids.has(Number(c.id)) && c.hostName).map(c => c.hostName);
 
-        if (!hostNames.length && !isClaudeAsset) { setViolations([]); return; }
+        if (!hostNames.length && !isClaudeAsset) { setViolations([]); setLoading(false); return; }
 
         // Collect device IDs that have a claude-type collection among this asset's collections.
         // This covers both direct Claude AI Agent assets and Skills/MCPs whose collections
@@ -77,9 +76,10 @@ export default function ViolationsTab({ asset, collections = [], startTimestamp,
                     time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
                     deviceId: r.host ? r.host.split(".")[0] : "",
                 })));
+                setLoading(false);
             })
             .catch(() => {
-                if (!cancelled) setViolations([]);
+                if (!cancelled) { setViolations([]); setLoading(false); }
             });
         return () => { cancelled = true; };
     }, [asset?.id, asset?.assetTagValue, asset?.collectionIds, collections, startTimestamp, endTimestamp]);
@@ -92,6 +92,10 @@ export default function ViolationsTab({ asset, collections = [], startTimestamp,
             openViolationInThreatActivity(e.data);
         }
     }, [onViolationClick]);
+
+    if (loading) {
+        return <SpinnerCentered height="200px" />;
+    }
 
     if (violations.length === 0) {
         return (

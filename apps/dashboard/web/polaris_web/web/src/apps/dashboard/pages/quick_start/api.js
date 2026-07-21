@@ -216,11 +216,11 @@ const api = {
         })
     },
 
-    importFromUrl(url, testRoleId, requestBody, customHeaders, collectionName) {
+    importFromUrl(url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders) {
         return request({
             url: '/api/importFromUrl',
             method: 'post',
-            data: {url, testRoleId, requestBody, customHeaders, collectionName}
+            data: {url, testRoleId, requestBody, customHeaders, collectionName, customResponseBody, customResponseStatusCode, customResponseHeaders}
         })
     },
 
@@ -443,6 +443,62 @@ const api = {
             url: '/api/removeWizTrafficSource',
             method: 'post',
             data: {}
+        })
+    },
+
+    fetchCrowdStrikeIntegration() {
+        return request({
+            url: '/api/fetchCrowdStrikeIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addCrowdStrikeIntegration(clientId, clientSecret, baseUrl, dataIngestionUrl, aktoApiToken, recurringIntervalSeconds) {
+        return request({
+            url: '/api/addCrowdStrikeIntegration',
+            method: 'post',
+            data: { clientId, clientSecret, baseUrl, dataIngestionUrl, aktoApiToken, recurringIntervalSeconds }
+        })
+    },
+
+    removeCrowdStrikeIntegration() {
+        return request({
+            url: '/api/removeCrowdStrikeIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchCrowdStrikeDevices() {
+        return request({
+            url: '/api/fetchCrowdStrikeDevices',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchCrowdStrikeGuardrailTypes() {
+        return request({
+            url: '/api/fetchCrowdStrikeGuardrailTypes',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    saveCrowdStrikeGuardrailsConfig(guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailDeviceIds) {
+        return request({
+            url: '/api/saveCrowdStrikeGuardrailsConfig',
+            method: 'post',
+            data: { guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailDeviceIds }
+        })
+    },
+
+    executeCrowdStrikeGuardrails(guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailDeviceIds) {
+        return request({
+            url: '/api/executeCrowdStrikeGuardrails',
+            method: 'post',
+            data: { guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailDeviceIds }
         })
     },
 

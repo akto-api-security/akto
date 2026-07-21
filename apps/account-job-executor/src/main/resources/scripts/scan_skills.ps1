@@ -91,6 +91,8 @@ foreach ($userProfile in $userProfiles) {
     Scan-AgentDir "$userProfile\.gemini\antigravity" "antigravity"
     Scan-AgentDir "$userProfile\.copilot" "copilot"
     Scan-AgentDir "$userProfile\.vscode" "vscode"
+    Scan-AgentDir "$userProfile\.codex" "codex"
+    Scan-AgentDir "$userProfile\.kiro" "kiro"
 }
 
 Write-Log "Scan complete. Found $($results.skills_found.Count) skill file(s)"

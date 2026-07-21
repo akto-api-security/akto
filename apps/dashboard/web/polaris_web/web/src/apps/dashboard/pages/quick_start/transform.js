@@ -89,6 +89,7 @@ import MicrosoftDefenderConnector from "./components/MicrosoftDefenderConnector"
 import MicrosoftDefenderRunQueriesConnector from "./components/MicrosoftDefenderRunQueriesConnector"
 import SentinelOneConnector from "./components/SentinelOneConnector"
 import WizSource from "./components/WizSource"
+import CrowdStrikeConnector from "./components/CrowdStrikeConnector"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -633,6 +634,15 @@ const microsoftDefenderObj = {
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-microsoft-defender',
     key: "MICROSOFT_DEFENDER",
     component: <MicrosoftDefenderConnector/>
+}
+
+const crowdStrikeObj = {
+    icon: '/public/crowdstrike.svg',
+    label: "CrowdStrike",
+    text: "Connect CrowdStrike to Akto to detect AI coding tools (Claude, Cursor, Copilot) running on managed endpoints.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-crowdstrike',
+    key: "CROWDSTRIKE",
+    component: <CrowdStrikeConnector/>
 }
 
 const microsoftDefenderRunQueriesObj = {
@@ -1533,6 +1543,18 @@ const arcadeImportObj = {
     />
 }
 
+const portkeyImportObj = {
+    icon: '/public/portkey.png',
+    label: "Portkey",
+    text: "Import your Portkey gateway traffic, seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/portkey',
+    key: "PORTKEY",
+    component: <BannerComponent
+        content="Import your Portkey gateway traffic, seamlessly in AKTO."
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/portkey'
+    />
+}
+
 const wizObj = {
     icon: '/public/wiz_logo.svg',
     label: 'Wiz',
@@ -2200,12 +2222,11 @@ const quickStartFunc = {
         const aiAgentConnectors = [
             awsBedrockObj, awsAgentCoreObj, amazonQuickObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
             n8nImportObj, langchainImportObj, copilotStudioImportObj, snowflakeObj,
-            vertexAICustomDeployedModelImportObj, salesforceImportObj,
-            anthropicImportObj, openaiImportObj
+            vertexAICustomDeployedModelImportObj, salesforceImportObj
         ]
 
         const aiMcpGatewayConnectors = [
-            litellmImportObj, difyImportObj, trueFoundryImportObj, arcadeImportObj
+            litellmImportObj, difyImportObj, trueFoundryImportObj, arcadeImportObj, portkeyImportObj
         ]
 
         // MCP Scan
@@ -2237,7 +2258,7 @@ const quickStartFunc = {
         ]
 
         const endpointManagement = [
-            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj, crowdStrikeObj
         ]
 
         const mdmTools = [
@@ -2324,25 +2345,25 @@ const quickStartFunc = {
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, neovimHookObj, openCodeHookObj,hermesHookObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, portkeyImportObj, vertexAICustomDeployedModelImportObj, neovimHookObj, openCodeHookObj,hermesHookObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, authenticationTokenObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
             cloudflareWarpObj, zscalerObj, snowflakeObj,
             intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
             jamfEndpointObj, kandjiEndpointObj, customEndpointObj,
-            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj, crowdStrikeObj
         ]
 
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj,
                 awsBedrockObj, amazonQuickObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
-                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, anthropicImportObj, openaiImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj, neovimHookObj, openCodeHookObj,hermesHookObj,
+                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, portkeyImportObj, salesforceImportObj, anthropicImportObj, openaiImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj, neovimHookObj, openCodeHookObj,hermesHookObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj,
                 intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
                 jamfEndpointObj, kandjiEndpointObj, customEndpointObj,
-                microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
+                microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj, crowdStrikeObj
             ])
         }
 

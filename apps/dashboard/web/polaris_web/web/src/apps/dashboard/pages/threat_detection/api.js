@@ -128,11 +128,13 @@ const threatDetectionRequests = {
             data: { enabled: enabled }
         })
     },
-    fetchThreatCategoryCount(startTs, endTs) {
+    fetchThreatCategoryCount(startTs, endTs, severityStatusFilter) {
+        const data = { startTs, endTs };
+        if (severityStatusFilter) data.severityStatusFilter = severityStatusFilter;
         return request({
             url: '/api/fetchThreatCategoryCount',
             method: 'post',
-            data: {startTs, endTs}
+            data,
         })
     },
     fetchMaliciousRequest(refId, eventType, actor, filterId) {
@@ -142,11 +144,13 @@ const threatDetectionRequests = {
             data: {refId, eventType, actor, filterId}
         })
     },
-    fetchCountBySeverity(startTs, endTs) {
+    fetchCountBySeverity(startTs, endTs, severityStatusFilter) {
+        const data = { startTs, endTs };
+        if (severityStatusFilter) data.severityStatusFilter = severityStatusFilter;
         return request({
             url: '/api/fetchCountBySeverity',
             method: 'post',
-            data: {startTs, endTs}
+            data,
         })
     },
     getThreatActivityTimeline(startTs, endTs) {

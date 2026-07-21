@@ -6,7 +6,7 @@ import CreateGuardrailPage from "./components/CreateGuardrailPage";
 import SpinnerCentered from "../../components/progress/SpinnerCentered";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func";
-import { getDashboardCategory, mapLabel, isEndpointSecurityCategory } from "../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isEndpointSecurityCategory, getReportCategoryShortName, shortNameToCategory } from "../../../main/labelHelper";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
@@ -21,7 +21,19 @@ import {
     getApplicableAgentKeys,
     applyAgentFilterToRows,
     splitAgentServersV2,
+    resolveClientKey,
 } from "./serverTargetingUtils";
+
+// Apply ?category= override synchronously before first render — mirrors ThreatReport.jsx/
+// VulnerabilityReport.jsx. A deep-link opened in a fresh tab (e.g. from a violation's
+// "Triggered by the <policy>" link) has no PersistStore session, so dashboardCategory
+// defaults to API_SECURITY and every request here (fetchGuardrailPolicies etc.) goes out
+// with the wrong x-context-source header, leaving the page stuck on "Loading...".
+const categoryShortName = getReportCategoryShortName();
+const categoryOverride = shortNameToCategory[categoryShortName];
+if (categoryOverride) {
+    PersistStore.getState().setDashboardCategory(categoryOverride);
+}
 
 const resourceName = {
   singular: "policy",
@@ -328,9 +340,14 @@ function GuardrailPolicies() {
             ? policy.selectedAgentServersV2
             : (policy.selectedAgentServers || []).map(id => ({ id, name: id }));
         const { agents, llms } = splitPolicyAgentServers(raw);
+        // Atlas stores every raw wire-level tag value an agent group aliases (e.g. 9 Claude CLI
+        // variants) — collapse back to canonical keys so counts show "1 Agent", not "9 Agents".
+        const dedupedAgents = isEndpointSecurityCategory()
+            ? [...new Set(agents.map(a => resolveClientKey(a.name || a.id)))]
+            : agents;
         return {
             mcp: getEffectiveSelectedMcpServers(policy),
-            agents,
+            agents: dedupedAgents,
             llms
         };
     };

@@ -295,7 +295,9 @@ func (s *Service) filterPoliciesByMcpServer(policies []types.Policy, mcpServerNa
 
 // filterPoliciesByDeviceId filters policies by the device label embedded in the MCP server name.
 // The device label is the first dot-delimited segment of "{deviceLabel}.{clientType}.{host}".
-// Policies with an empty ApplyToDeviceIds list apply to all devices and always pass through.
+// ApplyToDeviceIds == nil means no team/role targeting is configured, so the policy applies to
+// all devices. A non-nil (possibly empty) ApplyToDeviceIds means targeting is configured, so the
+// policy applies only to the listed device labels — a non-nil empty list matches no device.
 // If mcpServerName is empty or has no device prefix, all policies are returned unchanged.
 func (s *Service) filterPoliciesByDeviceId(policies []types.Policy, mcpServerName string) []types.Policy {
 	if mcpServerName == "" {
@@ -310,7 +312,7 @@ func (s *Service) filterPoliciesByDeviceId(policies []types.Policy, mcpServerNam
 	}
 	filtered := make([]types.Policy, 0, len(policies))
 	for _, p := range policies {
-		if len(p.ApplyToDeviceIds) == 0 {
+		if p.ApplyToDeviceIds == nil {
 			filtered = append(filtered, p)
 			continue
 		}
@@ -1404,10 +1406,6 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
 		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
 
-	// Use the default processor - skipThreat is passed via ValidationContext.
-	// Scan backpressure lives inside the mcp processor at the remote-scanner
-	// boundary (executeSingleScannerTask), so only the agent-guard /scan fan-out
-	// is shed when degraded — local PII/regex/token-limit filters always run.
 	// Redact any configured ignore-phrases before the enforcement library ever sees the
 	// text — see ValidateRequest's plan-doc note on the shared-payload trade-off. Shared
 	// with ValidateResponse via redactIgnorePhrasesForEvaluation/reconcileIgnorePhraseRedaction.
@@ -1590,9 +1588,6 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("method", params.Method),
 		zap.String("payloadToValidate", responseBodyForValidation))
 
-	// Use processor's ProcessResponse method with external policies. Scan
-	// backpressure is applied inside the mcp processor at the remote-scanner
-	// boundary, so only the agent-guard /scan call is shed when degraded.
 	// Redact any configured ignore-phrases before the enforcement library ever sees the
 	// text — see ValidateRequest for the full rationale and the shared-payload trade-off.
 	payloadForEvaluation, preRedactionPayload := s.redactIgnorePhrasesForEvaluation(responseBodyForValidation, policies, "ValidateResponse", sessionID)

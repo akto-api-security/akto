@@ -1,8 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect, useReducer } from "react";
 import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
-import Highcharts from "highcharts";
-import HighchartsReact from "highcharts-react-official";
 import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Badge, Tooltip } from "@shopify/polaris";
 import MisconfiguredConfigIcon from "@/assets/MisconfiguredConfigIcon.svg";
 import PersonLockIcon from "@/assets/PersonLockIcon.svg";
@@ -18,6 +16,7 @@ import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentere
 import { SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import DonutChart from "../../../components/shared/DonutChart";
 import AgenticStatsCard from "./AgenticStatsCard";
+import { EndpointBrowserTrendChart } from "./TrendCharts";
 import { aggregateViolationsByCollectionId, fetchAgenticViolations } from "./agenticObserveApi";
 import { buildDeviceEndpointsPageData } from "./agenticPageBuilders";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
@@ -32,47 +31,10 @@ import { fetchGuardrailPolicyNamesCached } from "../../guardrails/topicGuardrail
 
 ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
-// ─── Chart config helpers ─────────────────────────────────────────────────────
-
-function makeOsTrendConfig(osTrend, monthLabels) {
-    const categories = monthLabels || [];
-    const n = categories.length;
-    // Spread x labels for long windows so they don't overlap (all-time can be 12+ months)
-    const tickInterval = n > 14 ? Math.ceil(n / 12) : 1;
-    const series = [
-        {name:"Mac",     data:osTrend.mac     || new Array(n).fill(0), color:"#7C3AED"},
-        {name:"Windows", data:osTrend.windows || new Array(n).fill(0), color:"#10B981"},
-        {name:"Linux",   data:osTrend.linux   || new Array(n).fill(0), color:"#F59E0B"},
-    ];
-    return {
-        chart:{
-            type:"areaspline", height:240, backgroundColor:"transparent",
-            style:{fontFamily:"Inter, -apple-system, sans-serif"},
-            margin:[8,8,88,44],
-        },
-        title:null, credits:{enabled:false}, exporting:{enabled:false},
-        xAxis:{
-            categories,
-            labels:{ style:{fontSize:"11px",color:"#8C9196"}, step: tickInterval },
-            lineColor:"#DFE3E8", tickColor:"transparent",
-        },
-        yAxis:{title:null,labels:{style:{fontSize:"11px",color:"#8C9196"}},gridLineColor:"#F1F2F3",allowDecimals:false,min:0},
-        legend:{enabled:true,align:"left",verticalAlign:"bottom",layout:"horizontal",itemStyle:{fontSize:"12px",fontWeight:"400",color:"#6D7175"},symbolRadius:4,margin:8,y:8},
-        tooltip:{shared:true,backgroundColor:"white",borderColor:"#DFE3E8",borderRadius:8,style:{fontSize:"12px"}},
-        plotOptions:{ areaspline:{ marker:{enabled:false}, lineWidth:2, fillOpacity:0.08 }, series:{ connectNulls:true } },
-        series,
-    };
-}
-
 // ─── Stat + chart cards ───────────────────────────────────────────────────────
 
 function TopSection({ summary }) {
     const sparklines = summary?.statSparklines || {};
-    const osTrend = summary?.osTrend || {};
-    const osTrendOpts = useMemo(
-        () => makeOsTrendConfig(osTrend, summary?.monthLabels),
-        [summary?.osTrend, summary?.monthLabels]
-    );
     const violationsChartData = useMemo(() => {
         const arr = summary?.violationsBySeverity || [];
         const obj = {};
@@ -89,7 +51,7 @@ function TopSection({ summary }) {
     }, [violationsChartData]);
 
     return (
-        <HorizontalGrid columns="320px 1fr 298px" gap="4">
+        <HorizontalGrid columns="280px 1fr 260px" gap="4">
             <Card padding="0">
                 <VerticalStack>
                     <AgenticStatsCard
@@ -98,6 +60,16 @@ function TopSection({ summary }) {
                         delta={summary?.deltaEndpoints ?? 0}
                         sparklineCounts={sparklines.endpoints}
                         sparklineColor="#7C3AED"
+                        sparklineLabels={summary?.monthLabels}
+                        noCard
+                    />
+                    <Divider />
+                    <AgenticStatsCard
+                        title="Browsers"
+                        total={summary?.browserDeviceCount ?? 0}
+                        delta={summary?.deltaBrowsers ?? 0}
+                        sparklineCounts={sparklines.browsers}
+                        sparklineColor="#4285F4"
                         sparklineLabels={summary?.monthLabels}
                         noCard
                     />
@@ -125,42 +97,39 @@ function TopSection({ summary }) {
                 </VerticalStack>
             </Card>
             <Card padding="0">
-                <Box padding="4">
-                    <VerticalStack gap="2">
-                        <Text variant="headingMd" fontWeight="semibold">Endpoints Over Time by OS Type</Text>
-                        <HighchartsReact highcharts={Highcharts} options={osTrendOpts} />
-                    </VerticalStack>
-                </Box>
+                <EndpointBrowserTrendChart
+                    osTrend={summary?.osTrend || {}}
+                    browserTrend={summary?.browserTrend || {}}
+                    monthLabels={summary?.monthLabels || []}
+                />
             </Card>
-            <Card padding="0">
-                <Box padding="4">
-                    <VerticalStack gap="2">
-                        <Text variant="headingMd" fontWeight="semibold" alignment="center">Violations by Severity</Text>
-                        <HorizontalStack align="center">
-                            <DonutChart
-                                data={violationsChartData}
-                                title={summary?.totalViolations ?? 0}
-                                subtitle="Violations"
-                                size={180}
-                                pieInnerSize="55%"
-                                titleColor={violationsTitleColor}
-                            />
+            <Card padding="4">
+                <VerticalStack gap="2">
+                    <Text variant="headingMd" fontWeight="semibold" alignment="center">Violations by Severity</Text>
+                    <HorizontalStack align="center">
+                        <DonutChart
+                            data={violationsChartData}
+                            title={summary?.totalViolations ?? 0}
+                            subtitle="Violations"
+                            size={180}
+                            pieInnerSize="55%"
+                            titleColor={violationsTitleColor}
+                        />
+                    </HorizontalStack>
+                    {Object.keys(violationsChartData).length > 0 && (
+                        <HorizontalStack gap="3" wrap align="center">
+                            {Object.entries(violationsChartData).map(([key, { text, color }]) => (
+                                <HorizontalStack key={key} gap="1" blockAlign="center">
+                                    <Box
+                                        className="agentic-dot"
+                                        style={{ "--dot-color": color }}
+                                    />
+                                    <Text variant="bodySm" color="subdued">{key} ({text})</Text>
+                                </HorizontalStack>
+                            ))}
                         </HorizontalStack>
-                        {Object.keys(violationsChartData).length > 0 && (
-                            <HorizontalStack gap="3" wrap align="center">
-                                {Object.entries(violationsChartData).map(([key, { text, color }]) => (
-                                    <HorizontalStack key={key} gap="1" blockAlign="center">
-                                        <Box
-                                            className="agentic-dot"
-                                            style={{ "--dot-color": color }}
-                                        />
-                                        <Text variant="bodySm" color="subdued">{key} ({text})</Text>
-                                    </HorizontalStack>
-                                ))}
-                            </HorizontalStack>
-                        )}
-                    </VerticalStack>
-                </Box>
+                    )}
+                </VerticalStack>
             </Card>
         </HorizontalGrid>
     );
@@ -200,7 +169,7 @@ function ViolationsCellRenderer({ value }) {
     const parts = ["critical", "high", "medium", "low"].filter(k => value[k] > 0);
     if (!parts.length) return null;
     return (
-        <HorizontalStack gap="1" blockAlign="center">
+        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
             {parts.map(k => <SeverityBadge key={k} severity={k}>{value[k]}</SeverityBadge>)}
         </HorizontalStack>
     );
@@ -313,7 +282,7 @@ function buildDeviceColDefs(agentRiskData) {
     {
         field: "violations",
         headerName: "Violations",
-        width: 160,
+        width: 200,
         sortable: true,
         filter: false,
         cellRenderer: ViolationsCellRenderer,

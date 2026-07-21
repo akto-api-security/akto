@@ -18,6 +18,10 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
     const [testRole, setTestRole] = useState('')
     const [testRolesArr, setTestRolesArr] = useState([])
     const [headers, setHeaders] = useState([])
+    const [useCustomResponse, setUseCustomResponse] = useState(false)
+    const [customResponseBody, setCustomResponseBody] = useState('')
+    const [customResponseStatusCode, setCustomResponseStatusCode] = useState('200')
+    const [responseHeaders, setResponseHeaders] = useState([])
 
     const fetchTestRoles = async () => {
         try {
@@ -40,27 +44,27 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
         fetchTestRoles()
     }, [])
 
-    function updateHeader(index, field, val) {
-        setHeaders(prev => {
+    function updateHeaderRow(setList, index, field, val) {
+        setList(prev => {
             const updated = [...prev]
             updated[index] = { ...updated[index], [field]: val }
             return updated
         })
     }
 
-    function addHeaderRow() {
-        if (headers.length < MAX_HEADERS) {
-            setHeaders(prev => [...prev, { key: '', value: '' }])
+    function addHeaderRow(list, setList) {
+        if (list.length < MAX_HEADERS) {
+            setList(prev => [...prev, { key: '', value: '' }])
         }
     }
 
-    function removeHeaderRow(index) {
-        setHeaders(prev => prev.filter((_, i) => i !== index))
+    function removeHeaderRow(setList, index) {
+        setList(prev => prev.filter((_, i) => i !== index))
     }
 
-    function headersArrayToObject() {
+    function headersArrayToObject(list) {
         const obj = {}
-        for (const h of headers) {
+        for (const h of list) {
             if (h.key && h.key.trim()) {
                 obj[h.key.trim()] = h.value || ''
             }
@@ -81,9 +85,17 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
         setLoading(true)
         try {
             const testRoleToSend = useTestRole ? testRole : null
-            const customHeaders = headersArrayToObject()
+            const customHeaders = headersArrayToObject(headers)
             const collectionNameToSend = collectionName.trim() || null
-            await api.importFromUrl(url, testRoleToSend, requestBodyToSend || null, customHeaders, collectionNameToSend)
+            const customResponseBodyToSend = useCustomResponse ? (customResponseBody || null) : null
+            const customResponseStatusCodeToSend = useCustomResponse && customResponseStatusCode
+                ? parseInt(customResponseStatusCode, 10)
+                : null
+            const customResponseHeadersToSend = useCustomResponse ? headersArrayToObject(responseHeaders) : null
+            await api.importFromUrl(
+                url, testRoleToSend, requestBodyToSend || null, customHeaders, collectionNameToSend,
+                customResponseBodyToSend, customResponseStatusCodeToSend, customResponseHeadersToSend
+            )
             func.setToast(true, false, "AI agent imported successfully.")
             setUrl('')
             setCollectionName('')
@@ -92,6 +104,10 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
             setUseTestRole(false)
             setTestRole(testRolesArr[0]?.value || '')
             setHeaders([])
+            setUseCustomResponse(false)
+            setCustomResponseBody('')
+            setCustomResponseStatusCode('200')
+            setResponseHeaders([])
         } finally {
             setLoading(false)
         }
@@ -169,7 +185,7 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
                                     labelHidden
                                     placeholder="Header key"
                                     value={header.key}
-                                    onChange={(val) => updateHeader(index, 'key', val)}
+                                    onChange={(val) => updateHeaderRow(setHeaders, index, 'key', val)}
                                 />
                             </Box>
                             <Box minWidth="200px">
@@ -178,23 +194,88 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
                                     labelHidden
                                     placeholder="Header value"
                                     value={header.value}
-                                    onChange={(val) => updateHeader(index, 'value', val)}
+                                    onChange={(val) => updateHeaderRow(setHeaders, index, 'value', val)}
                                 />
                             </Box>
                             <Button
                                 plain
                                 icon={DeleteMinor}
-                                onClick={() => removeHeaderRow(index)}
+                                onClick={() => removeHeaderRow(setHeaders, index)}
                                 accessibilityLabel="Remove header"
                             />
                         </HorizontalStack>
                     ))}
                     {headers.length < MAX_HEADERS && (
                         <Box>
-                            <Button plain onClick={addHeaderRow}>+ Add header</Button>
+                            <Button plain onClick={() => addHeaderRow(headers, setHeaders)}>+ Add header</Button>
                         </Box>
                     )}
                 </VerticalStack>
+
+                <Checkbox
+                    label="Use custom response (skip live call)"
+                    checked={useCustomResponse}
+                    onChange={setUseCustomResponse}
+                    helpText="Provide the response yourself instead of Akto calling the URL — useful when the endpoint isn't reachable from the dashboard."
+                />
+
+                {useCustomResponse && (
+                    <VerticalStack gap="4">
+                        <TextField
+                            label="Custom Response Status Code"
+                            type="number"
+                            value={customResponseStatusCode}
+                            onChange={setCustomResponseStatusCode}
+                            placeholder="200"
+                        />
+
+                        <TextField
+                            label="Custom Response Body"
+                            value={customResponseBody}
+                            onChange={setCustomResponseBody}
+                            placeholder='{"key": "value"}'
+                            multiline={4}
+                            helpText="This response will be saved as-is instead of calling the URL"
+                        />
+
+                        <VerticalStack gap="2">
+                            <Text variant="bodyMd" fontWeight="medium">Custom Response Headers</Text>
+                            {responseHeaders.map((header, index) => (
+                                <HorizontalStack key={index} gap="2" blockAlign="center">
+                                    <Box minWidth="200px">
+                                        <TextField
+                                            label=""
+                                            labelHidden
+                                            placeholder="Header key"
+                                            value={header.key}
+                                            onChange={(val) => updateHeaderRow(setResponseHeaders, index, 'key', val)}
+                                        />
+                                    </Box>
+                                    <Box minWidth="200px">
+                                        <TextField
+                                            label=""
+                                            labelHidden
+                                            placeholder="Header value"
+                                            value={header.value}
+                                            onChange={(val) => updateHeaderRow(setResponseHeaders, index, 'value', val)}
+                                        />
+                                    </Box>
+                                    <Button
+                                        plain
+                                        icon={DeleteMinor}
+                                        onClick={() => removeHeaderRow(setResponseHeaders, index)}
+                                        accessibilityLabel="Remove header"
+                                    />
+                                </HorizontalStack>
+                            ))}
+                            {responseHeaders.length < MAX_HEADERS && (
+                                <Box>
+                                    <Button plain onClick={() => addHeaderRow(responseHeaders, setResponseHeaders)}>+ Add header</Button>
+                                </Box>
+                            )}
+                        </VerticalStack>
+                    </VerticalStack>
+                )}
 
                 <Box paddingBlockStart={2}>
                     <ButtonGroup>

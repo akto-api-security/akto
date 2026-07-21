@@ -36,19 +36,20 @@ function TestSuite() {
             value: "name",
             textValue: "name",
             sortActive: true,
-            boxWidth: "465px",
+            boxWidth: "350px",
         },
         {
             title: "Total tests",
             text: "testCount",
             value: "testCount",
             textValue: "testCount",
+            sortActive: true,
         },
         {
             title: "Categories covered",
             text: "categoriesCovered",
             value: "categoriesCovered",
-            boxWidth: "320px",
+            boxWidth: "435px",
         },
         {
             title: "Author",
@@ -61,6 +62,18 @@ function TestSuite() {
             title: '',
             type: CellType.ACTION,
         }
+    ]
+
+    // The first entry per column must be the "asc"-suffixed value and the second the "desc"-suffixed
+    // value — GithubServerTable's handleSort picks entries positionally (1st = ascending click,
+    // 2nd = descending click). Note the "asc" token produces the highest/newest-first result in
+    // this table's sort convention (see GuardrailPolicies.jsx's "createdTs asc" -> "Newest"), so
+    // directionLabel is matched to actual behavior, not the literal word "ascending".
+    const sortOptions = [
+        { label: "Total tests", value: "testCount asc", directionLabel: "Highest first", sortKey: "testCount", columnIndex: 2 },
+        { label: "Total tests", value: "testCount desc", directionLabel: "Lowest first", sortKey: "testCount", columnIndex: 2 },
+        { label: "Template name", value: "name asc", directionLabel: "Z-A", sortKey: "testSuiteName", columnIndex: 1 },
+        { label: "Template name", value: "name desc", directionLabel: "A-Z", sortKey: "testSuiteName", columnIndex: 1 },
     ]
 
     const resourceName = {
@@ -195,6 +208,7 @@ function TestSuite() {
             useNewRow={true}
             headers={headings}
             headings={headings}
+            sortOptions={sortOptions}
             data={data[selectedTab]}
             getActions={getActions}
             hasRowActions={true}

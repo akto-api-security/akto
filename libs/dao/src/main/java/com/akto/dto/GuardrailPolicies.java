@@ -84,6 +84,11 @@ public class GuardrailPolicies {
     // applyToDeviceIds is resolved at fetch time (not stored) by the dashboard before serving to the enforcement layer.
     private List<String> targetTeams;
     private List<String> targetRoles;
+    // null (never set) = targetTeams/targetRoles both empty, no targeting configured → apply to all devices.
+    // Non-null (possibly empty) List = targeting configured → apply only to these device labels;
+    // an empty List means targeting resolved to zero matching devices, so apply to none.
+    // null and an empty List are NOT interchangeable — consumers must not use a collapsed
+    // falsy/empty check (e.g. !arr || arr.length === 0) that would treat them the same.
     @BsonIgnore
     private List<String> applyToDeviceIds;
 
