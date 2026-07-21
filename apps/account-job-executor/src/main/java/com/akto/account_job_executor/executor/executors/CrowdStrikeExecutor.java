@@ -1003,7 +1003,6 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                     batch.put("is_pending", "false");
                     batch.put("source", "MIRRORING");
                     batch.put("tag", OBJECT_MAPPER.writeValueAsString(tagMap));
-                    batch.put("publishToGuardrails", true);
                     batchData.add(batch);
 
                     skillsByCollection.computeIfAbsent(syntheticHost, k -> new HashSet<>()).add(skillName);
