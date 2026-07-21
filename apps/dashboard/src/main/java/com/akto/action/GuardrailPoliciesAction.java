@@ -104,8 +104,10 @@ public class GuardrailPoliciesAction extends UserAction {
             this.total = GuardrailPoliciesDao.instance.getTotalCount();
 
             // Resolve targetTeams/targetRoles → device IDs fresh on every fetch.
-            // Empty applyToDeviceIds = no targeting → apply to all devices.
-            // Non-empty = apply only to listed device labels.
+            // applyToDeviceIds left null (never set below) = no targeting configured → apply to all devices.
+            // applyToDeviceIds set to a List (possibly empty, when targeting matches zero devices)
+            // = targeting configured → apply only to the listed device labels; empty means apply to none.
+            // null vs. an empty List must stay distinguishable on the wire — do not collapse them.
             for (GuardrailPolicies p : this.guardrailPolicies) {
                 boolean hasTargeting = (p.getTargetTeams() != null && !p.getTargetTeams().isEmpty())
                         || (p.getTargetRoles() != null && !p.getTargetRoles().isEmpty());

@@ -682,19 +682,18 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
         return obj !== null ? obj : {label: ''}
     }
 
-    function getCurrentStatus() {
+    // Same predicate as `filteredTests` above — "select all" must only ever act on what's
+    // actually visible under the current search/filter, not the whole category's test list.
+    function getVisibleTestsOfCategory() {
         if (!testRun || testRun?.tests === undefined || testRun?.selectedCategory === undefined || testRun.tests[testRun.selectedCategory] === undefined)
-            return false;
+            return [];
+        return testRun.tests[testRun.selectedCategory].filter(x => (x.label.toLowerCase().includes(searchValue.toLowerCase()) && filterFunc(x)));
+    }
 
-        let res = true;
-        const tests = testRun.tests[testRun.selectedCategory];
-        for (let i = 0; i < tests.length; i++) {
-            if (tests[i].selected === false) {
-                res = false;
-                break;
-            }
-        }
-        return res;
+    function getCurrentStatus() {
+        const tests = getVisibleTestsOfCategory();
+        if (tests.length === 0) return false;
+        return tests.every(test => test.selected === true);
     }
 
     const allTestsSelectedOfCategory = getCurrentStatus()
@@ -727,9 +726,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
     const estimatedTotalTokens = computeTokenEstimation();
 
     function toggleTestsSelection(val) {
+        // Selecting is scoped to what's visible under the current search, so a narrow search
+        // can't silently select hidden tests. Deselecting always clears the whole category —
+        // otherwise tests selected under a since-changed search become invisible, unremovable
+        // leftovers once the search no longer matches them.
+        const visibleValues = new Set(getVisibleTestsOfCategory().map(t => t.value))
         let copyTestRun = testRun
         copyTestRun.tests[testRun.selectedCategory].forEach((test) => {
-            test.selected = val
+            if (!val || visibleValues.has(test.value)) {
+                test.selected = val
+            }
         })
         setTestRun(prev => {
             return { ...prev, tests: copyTestRun.tests, testName: createTestName(apiCollectionName, copyTestRun.tests, activeFromTesting, testRun.testName) }

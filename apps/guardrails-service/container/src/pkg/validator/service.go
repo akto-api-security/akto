@@ -295,7 +295,9 @@ func (s *Service) filterPoliciesByMcpServer(policies []types.Policy, mcpServerNa
 
 // filterPoliciesByDeviceId filters policies by the device label embedded in the MCP server name.
 // The device label is the first dot-delimited segment of "{deviceLabel}.{clientType}.{host}".
-// Policies with an empty ApplyToDeviceIds list apply to all devices and always pass through.
+// ApplyToDeviceIds == nil means no team/role targeting is configured, so the policy applies to
+// all devices. A non-nil (possibly empty) ApplyToDeviceIds means targeting is configured, so the
+// policy applies only to the listed device labels — a non-nil empty list matches no device.
 // If mcpServerName is empty or has no device prefix, all policies are returned unchanged.
 func (s *Service) filterPoliciesByDeviceId(policies []types.Policy, mcpServerName string) []types.Policy {
 	if mcpServerName == "" {
@@ -310,7 +312,7 @@ func (s *Service) filterPoliciesByDeviceId(policies []types.Policy, mcpServerNam
 	}
 	filtered := make([]types.Policy, 0, len(policies))
 	for _, p := range policies {
-		if len(p.ApplyToDeviceIds) == 0 {
+		if p.ApplyToDeviceIds == nil {
 			filtered = append(filtered, p)
 			continue
 		}
