@@ -754,7 +754,7 @@ function buildTeamGroupsForAsset(group, usernameMap, userMetadataMap) {
     return Object.entries(teamCounts).map(([name, count]) => ({ name, count }));
 }
 
-function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}) {
+function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}, trafficMap = {}) {
     const byDevice = new Map();
     (group.collections || []).forEach((c) => {
         const hostName = c.hostName || c.displayName || c.name;
@@ -762,24 +762,25 @@ function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}) {
         if (!deviceId) return;
         const serviceName = extractServiceName(hostName);
         const collRisk = riskScoreMap[c.id] || 0;
+        const collTraffic = trafficMap[c.id] || 0;
         if (!byDevice.has(deviceId)) {
             const resolved = getResolvedUsernameForCollection(c, usernameMap);
             const username = (resolved && resolved !== DEFAULT_VALUE) ? resolved : "";
-            const maxTraffic = group.detectedTimestamp || 0;
             byDevice.set(deviceId, {
                 deviceId,
                 endpoint: deviceId,
                 username,
                 os: null,
                 riskScore: collRisk,
-                lastSeen: maxTraffic > 0 ? func.prettifyEpoch(maxTraffic) : "-",
-                lastSeenEpoch: maxTraffic,
+                lastSeenEpoch: collTraffic,
                 services: [],
             });
         }
         const entry = byDevice.get(deviceId);
         // accumulate max risk across all collections this device appears in
         if (collRisk > (entry.riskScore || 0)) entry.riskScore = collRisk;
+        // accumulate max traffic timestamp across all collections this device appears in
+        if (collTraffic > (entry.lastSeenEpoch || 0)) entry.lastSeenEpoch = collTraffic;
         if (serviceName && !entry.services.includes(serviceName)) {
             entry.services.push(serviceName);
         }
@@ -788,6 +789,7 @@ function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}) {
     return [...byDevice.values()].map(d => ({
         ...d,
         riskScore: d.riskScore > 0 ? Math.round(d.riskScore * 10) / 10 : null,
+        lastSeen: d.lastSeenEpoch > 0 ? func.formatChatTimestamp(d.lastSeenEpoch) : "-",
     }));
 }
 
@@ -916,7 +918,7 @@ export function buildAgenticAssetsPageData(
         // that declares them, not to the skill itself. Suppress to avoid double-counting.
         const violations = violationsForCollections(collectionIds, violationsByCollectionId);
         const groups = buildTeamGroupsForAsset(group, usernameMap, userMetadataMap);
-        const devices = buildDevicesForGroup(group, usernameMap, riskScoreMap);
+        const devices = buildDevicesForGroup(group, usernameMap, riskScoreMap, trafficMap);
         const skillNames = uniqueSkillNamesForGroup(group);
         const riskScore = group.riskScore ?? group.maxRiskScore ?? null;
         const lastSeen = group.detectedTimestamp || 0;

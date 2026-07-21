@@ -200,7 +200,7 @@ function ViolationsCellRenderer({ value }) {
     const parts = ["critical", "high", "medium", "low"].filter(k => value[k] > 0);
     if (!parts.length) return null;
     return (
-        <HorizontalStack gap="1" blockAlign="center">
+        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
             {parts.map(k => <SeverityBadge key={k} severity={k}>{value[k]}</SeverityBadge>)}
         </HorizontalStack>
     );
@@ -313,7 +313,7 @@ function buildDeviceColDefs(agentRiskData) {
     {
         field: "violations",
         headerName: "Violations",
-        width: 160,
+        width: 200,
         sortable: true,
         filter: false,
         cellRenderer: ViolationsCellRenderer,
