@@ -31,6 +31,7 @@ import NewLayoutTooltip from "./NewLayoutTooltip";
 import api from "../api";
 import agenticObserveApi, {
   aggregateViolationsByCollectionId,
+  collectMaliciousSkillNames,
   fetchAgenticViolations,
   deviceServiceKey,
 } from "./agenticObserveApi";
@@ -388,6 +389,7 @@ export default function AgenticAssetsPage() {
         } = shieldResult || {};
         const violationsByCollectionId =
           aggregateViolationsByCollectionId(violationRows, collections);
+        const maliciousSkillNames = collectMaliciousSkillNames(violationRows);
         const analysisByKey = buildUserAnalysisLookup(userAnalysisList);
 
         const pageData = buildAgenticAssetsPageData(
@@ -399,6 +401,7 @@ export default function AgenticAssetsPage() {
             usernameMap,
             userMetadataMap,
             violationsByCollectionId,
+            maliciousSkillNames,
             analysisByKey,
             userAnalysisKeysByDeviceId,
           },
@@ -421,7 +424,7 @@ export default function AgenticAssetsPage() {
         setAgenticViolationRows(violationRows);
         setCollections(collections);
 
-        // Enrich Skill rows with malicious flag (same source as old UI) — async, non-blocking
+        // Enrich Skill rows with malicious flag from ApiInfo tags (backup for cron-tagged skills)
         const skillCollectionIds = [];
         collections.forEach((c) => {
           if (!skillCollectionIds.includes(c.id)) skillCollectionIds.push(c.id);
@@ -430,9 +433,12 @@ export default function AgenticAssetsPage() {
           fetchAndCacheSkillApiData(skillCollectionIds, { api, PersistStore })
             .then(({ maliciousSkills }) => {
               if (!isMountedRef.current || !maliciousSkills?.size) return;
+              const maliciousLower = new Set(
+                [...maliciousSkills].map((n) => String(n || "").toLowerCase()),
+              );
               const markMalicious = (rows) =>
                 rows.map((r) =>
-                  r.type === "Skill" && maliciousSkills.has(r.name)
+                  r.type === "Skill" && maliciousLower.has(String(r.name || "").toLowerCase())
                     ? { ...r, isMalicious: true }
                     : r,
                 );

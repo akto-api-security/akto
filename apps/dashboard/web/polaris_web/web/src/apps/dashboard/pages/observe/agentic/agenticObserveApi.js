@@ -113,6 +113,26 @@ export function aggregateViolationsByCollectionId(violationRows = [], collection
     return byCollection;
 }
 
+// Skill identity lives on the event URL as /skills/<skillName> (not on host).
+export function skillNameFromUrl(url) {
+    if (!url) return null;
+    const idx = url.indexOf("skills/");
+    if (idx < 0) return null;
+    const name = url.substring(idx + "skills/".length).split(/[?#]/)[0];
+    return name || null;
+}
+
+/** Skill names (lowercase) that have malicious_skill_detected violation events. */
+export function collectMaliciousSkillNames(violationRows = []) {
+    const names = new Set();
+    for (const row of violationRows) {
+        if (!String(row.filterId || "").startsWith("malicious_skill_detected")) continue;
+        const skillName = skillNameFromUrl(row.url);
+        if (skillName) names.add(skillName.toLowerCase());
+    }
+    return names;
+}
+
 // Open the guardrail activity page deep-linked to a single violation event.
 // Mirrors the URL shape the page expects: event keys as query params, #active hash.
 export function openViolationInThreatActivity(row = {}) {
