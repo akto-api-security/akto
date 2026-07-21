@@ -24,6 +24,8 @@ public class SampleMessageStore {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(SampleMessageStore.class, LogDb.TESTING);
     private Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
+    // Separate from sampleDataMap so cleanup fetches never wipe the main map.
+    private final Map<ApiInfo.ApiInfoKey, List<String>> cleanupSampleDataMap = new HashMap<>();
     private Map<String, SingleTypeInfo> singleTypeInfos = new HashMap<>();
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
     private static final ClientLayer clientLayer = new ClientLayer();
@@ -162,6 +164,60 @@ public class SampleMessageStore {
 
     public Map<ApiInfoKey, List<String>> getSampleDataMap() {
         return this.sampleDataMap;
+    }
+
+    private static Map<ApiInfo.ApiInfoKey, List<String>> buildSampleDataMapFromList(List<SampleData> sampleDataList) {
+        Map<ApiInfo.ApiInfoKey, List<String>> tempSampleDataMap = new HashMap<>();
+        if (sampleDataList == null) {
+            return tempSampleDataMap;
+        }
+        for (SampleData sampleData: sampleDataList) {
+            if (sampleData.getSamples() == null) continue;
+            Key key = sampleData.getId();
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(key.getApiCollectionId(), key.getUrl(), key.getMethod());
+            if (tempSampleDataMap.containsKey(apiInfoKey)) {
+                tempSampleDataMap.get(apiInfoKey).addAll(sampleData.getSamples());
+            } else {
+                tempSampleDataMap.put(apiInfoKey, sampleData.getSamples());
+            }
+        }
+        return tempSampleDataMap;
+    }
+
+    public Map<ApiInfo.ApiInfoKey, List<String>> fetchSampleMessagesIntoNewMap(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
+        Map<ApiInfo.ApiInfoKey, List<String>> result = new HashMap<>();
+        if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) {
+            return result;
+        }
+
+        List<ApiInfo.ApiInfoKey> keysToFetch = new ArrayList<>();
+        for (ApiInfo.ApiInfoKey key : apiInfoKeyList) {
+            if (cleanupSampleDataMap.containsKey(key)) {
+                result.put(key, cleanupSampleDataMap.get(key));
+            } else {
+                keysToFetch.add(key);
+            }
+        }
+
+        if (!keysToFetch.isEmpty()) {
+            List<SampleData> sampleDataList = new ArrayList<>();
+            for (int i = 0; i < keysToFetch.size(); i += DbLayer.SAMPLE_DATA_LIMIT) {
+                List<ApiInfoKey> subList = new ArrayList<>(keysToFetch.subList(i, Math.min(i + DbLayer.SAMPLE_DATA_LIMIT, keysToFetch.size())));
+                List<SampleData> sampleDataBatch = dataActor.fetchSampleDataForEndpoints(subList);
+                if (sampleDataBatch == null || sampleDataBatch.isEmpty()) {
+                    break;
+                }
+                sampleDataList.addAll(sampleDataBatch);
+            }
+            Map<ApiInfo.ApiInfoKey, List<String>> fetched = buildSampleDataMapFromList(sampleDataList);
+            for (ApiInfo.ApiInfoKey key : keysToFetch) {
+                List<String> samples = fetched.getOrDefault(key, new ArrayList<>());
+                cleanupSampleDataMap.put(key, samples);
+                result.put(key, samples);
+            }
+        }
+
+        return result;
     }
 
 }
