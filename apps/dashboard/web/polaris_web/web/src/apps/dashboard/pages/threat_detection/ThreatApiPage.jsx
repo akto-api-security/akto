@@ -59,7 +59,7 @@ function ThreatApiPage() {
         <TopThreatTypeChart key={"top-threat-types"} data={categoryCount} />
         <ThreatApiSubcategoryCount
           key={"threat-categories"}
-          data={subCategoryCount}
+          data={categoryCount}
         />
       </HorizontalGrid>
     );

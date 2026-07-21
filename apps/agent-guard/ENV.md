@@ -37,6 +37,7 @@ cp .env.example .env   # edit once — never commit .env
 | `VERTEX_AI_*` | legacy ONNX (generic Vertex provider) | rarely |
 | `ANONYMIZER_URL` | set in compose | leave empty |
 | Vertex / Slack / model map keys | yes | yes |
+| `*_FOUNDRY_*` (Azure AI Foundry providers) | yes | yes |
 
 > The per-scanner semantic cache has moved out of agent-guard to
 > guardrails-service (which now owns the Redis vector store + embedder in front of

@@ -9,17 +9,22 @@ import {
     getTypeFromTags,
     findAssetTag,
     findTypeTag,
+    hasBrowserLlmTag,
     getAgentTypeFromValue,
     hasPersonalAccountTag,
     hasLocalMcpServerTag,
     hasMisconfiguredConfigTag,
+    isNotAttachedHostName,
+    CLIENT_TAG_ALIASES,
+    getClientTagVariants,
+    resolveClientKey,
 } from "./mcpClientHelper";
+export { CLIENT_TAG_ALIASES, getClientTagVariants, resolveClientKey };
 import func from "@/util/func";
 import {
     getResolvedUsernameForCollection,
     DEFAULT_VALUE,
 } from "../api_collections/endpointShieldHelper";
-import { inferOsFromDeviceId } from "./agenticPageBuilders";
 
 // Table constants
 export const PAGE_LIMIT = 100;
@@ -44,7 +49,7 @@ export const AGENTIC_OBSERVE_BACK_PATHS = [
 export const ASSET_TAG_KEY_VALUES = Object.values(ASSET_TAG_KEYS);
 
 // Row ID prefixes for grouped data
-const ROW_ID_PREFIX = { AGENT: 'agent', SERVICE: 'service', SKILL: 'skill' };
+const ROW_ID_PREFIX = { AGENT: 'agent', SERVICE: 'service', SKILL: 'skill', LLM: 'llm' };
 
 // Table headers with all columns
 export const getHeaders = (options = {}) => {
@@ -188,23 +193,6 @@ export const deviceServiceKey = (hostName) => {
     return parts[0] + " " + parts[parts.length - 1];
 };
 
-// Aliases: normalize variant agent tag values to a canonical key for grouping.
-// All Claude CLI variants collapse into claude2 (Claude CLI), Desktop into claude1 (Claude Desktop).
-const AGENT_KEY_ALIASES = {
-    // Claude CLI variants → claude2
-    'claude': 'claude2',
-    'claudecli': 'claude2',
-    'claude-cli': 'claude2',
-    'claude-cli-user': 'claude2',
-    'claude-cli-project': 'claude2',
-    'claude-cli-local': 'claude2',
-    'claude-cli-enterprise': 'claude2',
-    'claude-plugin': 'claude2',
-    'claude-code': 'claude2',
-    // Claude Desktop variants → claude1
-    'claude-desktop': 'claude1',
-};
-
 // Group collections by agent identification (mcp-client, ai-agent values)
 // These are the sources that discovered the services (cursor, litellm, etc.)
 // Note: browser-llm-agent is excluded from this grouping
@@ -213,12 +201,14 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
 
     collections.forEach((c) => {
         if (c.deactivated) return;
+        const hostName = c.hostName || c.displayName || c.name;
+        if (isNotAttachedHostName(hostName)) return; // Orphan skill bucket — not a real agent
+        if (hasBrowserLlmTag(c.envType)) return; // Captured under groupCollectionsByLLM instead
         const assetTag = findAssetTag(c.envType);
         if (!assetTag?.value) return; // Skip collections without agent tag
         if (assetTag.keyName === ASSET_TAG_KEYS.BROWSER_LLM_AGENT) return; // Skip browser-llm-agent rows
 
-        const key = AGENT_KEY_ALIASES[assetTag.value] ?? assetTag.value;
-        const hostName = c.hostName || c.displayName || c.name;
+        const key = CLIENT_TAG_ALIASES[assetTag.value] ?? assetTag.value;
         const endpointId = extractEndpointId(hostName);
         
         if (!agents[key]) {
@@ -287,20 +277,26 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
 // Group collections by service name (extracted from hostname)
 // Hostname format: <endpoint-id>.<source-id>.<service-name>
 // Service name can contain dots (e.g., "mcp.razorpay.com" from "123.456.mcp.razorpay.com")
-const ASSET_TAG_KEYS_SET = new Set(Object.values(ASSET_TAG_KEYS));
+
+// Tag keys whose presence means the collection already gets its own row in agentGroups.
+// browser-llm-agent is deliberately excluded — those rows never appear in agentGroups
+// (see the hasBrowserLlmTag skip in groupCollectionsByAgent above), so treating it as an
+// "owner" tag here would drop the collection from every group with nothing else to show it.
+const AGENT_OWNER_TAG_KEYS = new Set([ASSET_TAG_KEYS.MCP_CLIENT, ASSET_TAG_KEYS.AI_AGENT]);
 
 // Returns true if the collection has an asset-owner tag (Atlas ai-agent/mcp-client)
 // or the older connector agent-name tag. Used to exclude agent-owned gen-ai collections
 // from service groups and from Argus source-id groups.
 const hasAgentOwnerTag = (envType) =>
-    (envType || []).some(t => ASSET_TAG_KEYS_SET.has(t.keyName) || t.keyName === "agent-name");
+    (envType || []).some(t => AGENT_OWNER_TAG_KEYS.has(t.keyName) || t.keyName === "agent-name");
 
 export const groupCollectionsByService = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}) => {
     const services = {};
-    
+
     collections.forEach((c) => {
         if (c.deactivated) return;
-        if ((c.hostName || c.displayName || c.name || '').includes('not-attached')) return;
+        if (isNotAttachedHostName(c.hostName || c.displayName || c.name)) return;
+        if (hasBrowserLlmTag(c.envType)) return; // Captured under groupCollectionsByLLM instead
         const typeTag = findTypeTag(c.envType);
         if (!typeTag) return; // Skip collections without type tag
         // gen-ai collections that also have an asset tag (ai-agent/mcp-client) or a connector
@@ -375,6 +371,85 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
     return Object.values(services).map(g => ({
         ...g,
         id: `${ROW_ID_PREFIX.SERVICE}-${g.groupKey}`,
+        endpointsCount: g.endpointIds.size,
+        sensitiveInRespTypes: Array.from(g.sensitiveTypes),
+        sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
+        detectedTimestamp: g.maxTrafficTimestamp,
+        lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
+        riskScore: g.maxRiskScore,
+    }));
+};
+
+// Group collections carrying an explicit browser-llm tag (the browser extension detected an
+// LLM chat page). Grouped by service name extracted from hostname, same as service groups, but
+// membership is decided solely by the browser-llm tag's presence — not by tag order or by
+// whichever other type/asset tags (gen-ai, ai-agent, browser-llm-agent) are also attached.
+export const groupCollectionsByLLM = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}) => {
+    const llms = {};
+
+    collections.forEach((c) => {
+        if (c.deactivated) return;
+        const hostName = c.hostName || c.displayName || c.name;
+        if (isNotAttachedHostName(hostName)) return;
+        if (!hasBrowserLlmTag(c.envType)) return;
+        if (!hostName) return;
+
+        const serviceName = extractServiceName(hostName);
+        if (!serviceName) return;
+
+        const endpointId = extractEndpointId(hostName);
+        const key = serviceName;
+
+        if (!llms[key]) {
+            llms[key] = {
+                rowType: ROW_TYPES.SERVICE,
+                groupName: serviceName,
+                groupKey: key,
+                serviceName: serviceName,
+                hostNames: [],
+                clientType: CLIENT_TYPES.LLM,
+                collections: [],
+                firstCollection: null,
+                endpointIds: new Set(),
+                sensitiveTypes: new Set(),
+                maxTrafficTimestamp: 0,
+                maxRiskScore: 0,
+                hasPersonalAccount: false,
+                hasLocalMcpServer: false,
+                hasMisconfiguredConfig: false,
+            };
+        }
+
+        llms[key].collections.push(c);
+        if (!llms[key].hostNames.includes(hostName)) {
+            llms[key].hostNames.push(hostName);
+        }
+        if (!llms[key].firstCollection) llms[key].firstCollection = c;
+        if (hasPersonalAccountTag(c.envType)) llms[key].hasPersonalAccount = true;
+        if (hasLocalMcpServerTag(c.envType)) llms[key].hasLocalMcpServer = true;
+        if (hasMisconfiguredConfigTag(c.envType)) llms[key].hasMisconfiguredConfig = true;
+
+        if (endpointId) {
+            llms[key].endpointIds.add(endpointId);
+        }
+
+        const sensitive = sensitiveMap[c.id] || [];
+        sensitive.forEach(s => llms[key].sensitiveTypes.add(s));
+
+        const traffic = trafficMap[c.id] || 0;
+        if (traffic > llms[key].maxTrafficTimestamp) {
+            llms[key].maxTrafficTimestamp = traffic;
+        }
+
+        const riskScore = riskScoreMap[c.id] || 0;
+        if (riskScore > llms[key].maxRiskScore) {
+            llms[key].maxRiskScore = riskScore;
+        }
+    });
+
+    return Object.values(llms).map(g => ({
+        ...g,
+        id: `${ROW_ID_PREFIX.LLM}-${g.groupKey}`,
         endpointsCount: g.endpointIds.size,
         sensitiveInRespTypes: Array.from(g.sensitiveTypes),
         sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
@@ -679,7 +754,7 @@ function buildTeamGroupsForAsset(group, usernameMap, userMetadataMap) {
     return Object.entries(teamCounts).map(([name, count]) => ({ name, count }));
 }
 
-function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}) {
+function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}, trafficMap = {}) {
     const byDevice = new Map();
     (group.collections || []).forEach((c) => {
         const hostName = c.hostName || c.displayName || c.name;
@@ -687,24 +762,25 @@ function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}) {
         if (!deviceId) return;
         const serviceName = extractServiceName(hostName);
         const collRisk = riskScoreMap[c.id] || 0;
+        const collTraffic = trafficMap[c.id] || 0;
         if (!byDevice.has(deviceId)) {
             const resolved = getResolvedUsernameForCollection(c, usernameMap);
             const username = (resolved && resolved !== DEFAULT_VALUE) ? resolved : "";
-            const maxTraffic = group.detectedTimestamp || 0;
             byDevice.set(deviceId, {
                 deviceId,
                 endpoint: deviceId,
                 username,
-                os: inferOsFromDeviceId(deviceId),
+                os: null,
                 riskScore: collRisk,
-                lastSeen: maxTraffic > 0 ? func.prettifyEpoch(maxTraffic) : "-",
-                lastSeenEpoch: maxTraffic,
+                lastSeenEpoch: collTraffic,
                 services: [],
             });
         }
         const entry = byDevice.get(deviceId);
         // accumulate max risk across all collections this device appears in
         if (collRisk > (entry.riskScore || 0)) entry.riskScore = collRisk;
+        // accumulate max traffic timestamp across all collections this device appears in
+        if (collTraffic > (entry.lastSeenEpoch || 0)) entry.lastSeenEpoch = collTraffic;
         if (serviceName && !entry.services.includes(serviceName)) {
             entry.services.push(serviceName);
         }
@@ -713,6 +789,7 @@ function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}) {
     return [...byDevice.values()].map(d => ({
         ...d,
         riskScore: d.riskScore > 0 ? Math.round(d.riskScore * 10) / 10 : null,
+        lastSeen: d.lastSeenEpoch > 0 ? func.formatChatTimestamp(d.lastSeenEpoch) : "-",
     }));
 }
 
@@ -824,11 +901,12 @@ export function buildAgenticAssetsPageData(
 ) {
     const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap, riskScoreMap);
     const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);
+    const llmGroups = groupCollectionsByLLM(collections, trafficMap, sensitiveMap, riskScoreMap);
     const skillGroups = groupCollectionsBySkill(collections, trafficMap, sensitiveMap, riskScoreMap);
 
     const agentGroupKeys = new Set(agentGroups.map((a) => a.groupKey));
     const servicesToShow = serviceGroups.filter((s) => !agentGroupKeys.has(s.groupKey));
-    const allGroups = [...agentGroups, ...servicesToShow, ...skillGroups];
+    const allGroups = [...agentGroups, ...servicesToShow, ...llmGroups, ...skillGroups];
 
     const agenticTreeData = [];
     const agenticFlatData = [];
@@ -840,7 +918,7 @@ export function buildAgenticAssetsPageData(
         // that declares them, not to the skill itself. Suppress to avoid double-counting.
         const violations = violationsForCollections(collectionIds, violationsByCollectionId);
         const groups = buildTeamGroupsForAsset(group, usernameMap, userMetadataMap);
-        const devices = buildDevicesForGroup(group, usernameMap, riskScoreMap);
+        const devices = buildDevicesForGroup(group, usernameMap, riskScoreMap, trafficMap);
         const skillNames = uniqueSkillNamesForGroup(group);
         const riskScore = group.riskScore ?? group.maxRiskScore ?? null;
         const lastSeen = group.detectedTimestamp || 0;
@@ -889,6 +967,7 @@ export function buildAgenticAssetsPageData(
             hasMisconfiguredConfig: group.hasMisconfiguredConfig || false,
         };
         if (violations) flatRow.violations = violations;
+        if (groups.length) flatRow.groups = groups;
         if (aiInteractions) {
             flatRow.aiInteractions = aiInteractions.total;
             flatRow.aiInteractionsDetail = {

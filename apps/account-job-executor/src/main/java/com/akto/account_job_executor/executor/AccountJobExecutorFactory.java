@@ -2,6 +2,7 @@ package com.akto.account_job_executor.executor;
 
 import com.akto.account_job_executor.executor.executors.AIAgentConnectorExecutor;
 import com.akto.account_job_executor.executor.executors.BigQueryExecutor;
+import com.akto.account_job_executor.executor.executors.CrowdStrikeExecutor;
 import com.akto.account_job_executor.executor.executors.MicrosoftDefenderExecutor;
 import com.akto.account_job_executor.executor.executors.SentinelOneExecutor;
 
@@ -30,6 +31,7 @@ public class AccountJobExecutorFactory {
         map.put("VERTEX_AI_CUSTOM_DEPLOYED_MODEL_CONNECTOR", BigQueryExecutor.INSTANCE);
         map.put("MICROSOFT_DEFENDER_AH", MicrosoftDefenderExecutor.INSTANCE);
         map.put("SENTINELONE_AH", SentinelOneExecutor.INSTANCE);
+        map.put("CROWDSTRIKE_AH", CrowdStrikeExecutor.INSTANCE);
 
         registry = Collections.unmodifiableMap(map);
     }

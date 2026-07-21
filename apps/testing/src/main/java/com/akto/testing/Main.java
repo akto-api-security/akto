@@ -161,6 +161,43 @@ public class Main {
         );
     }
 
+    private static void failTestingRun(TestingRun testingRun, ObjectId summaryId, TestingRunResultSummary trrs,
+            boolean isTestingRunResultRerunCase, TestingConfigurations config, WriteConcern writeConcern,
+            int accountId, int start, String errorMessage) {
+        if (summaryId == null) {
+            // Fresh run, first pickup - no TestingRunResultSummary created yet, same as the fallback used later
+            // for the normal execution path.
+            trrs = createTRRSummaryIfAbsent(testingRun, start);
+            summaryId = trrs.getId();
+        }
+
+        loggerMaker.debugAndAddToDb(errorMessage + " for testing run: " + testingRun.getId() + ". accountId: " + accountId);
+
+        TestingRunDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
+                Filters.eq(Constants.ID, testingRun.getId()),
+                Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+
+        sendSlackAlertForFailedTest(accountId, errorMessage + ", TRR_ID: " + testingRun.getHexId() + " TRRS_ID: " + summaryId.toHexString());
+
+        if (isTestingRunResultRerunCase) {
+            // For TRR-rerun case, delete the rerun summary and clean up configurations
+            TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummariesDao.ID, trrs.getId()));
+            config.setTestingRunResultList(null);
+            config.setRerunTestingRunResultSummary(null);
+            loggerMaker.debugAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + trrs.getId() + ". accountId: " + accountId);
+        } else {
+            Map<String, String> metadata = new HashMap<>();
+            metadata.put("error", errorMessage);
+            TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                    Filters.eq(Constants.ID, summaryId),
+                    Updates.combine(
+                            Updates.set(TestingRunResultSummary.STATE, State.FAILED),
+                            Updates.set(TestingRunResultSummary.METADATA_STRING, metadata)
+                    )
+            );
+        }
+    }
+
 
     private static void setupRateLimitWatcher () {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -207,6 +244,37 @@ public class Main {
 
         return ret;
     }
+
+    private static final String TEST_RUNS_OVERAGE_ERROR = "Test runs overage detected";
+    private static final String OUT_OF_TESTING_SCOPE_ERROR = "All target collections are marked as out of testing scope";
+
+    private static boolean isEntirelyOutOfTestingScope(TestingEndpoints testingEndpoints) {
+        Set<Integer> collectionIds = extractCollectionIds(testingEndpoints);
+        if (collectionIds.isEmpty()) return false; // nothing to check (e.g. WORKFLOW) -> don't block
+        List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
+                Filters.in(Constants.ID, collectionIds),
+                Projections.include(ApiCollection.ID, ApiCollection.IS_OUT_OF_TESTING_SCOPE));
+        if (collections.size() != collectionIds.size()) return false; // a collection missing/deleted -> don't block
+        return collections.stream().allMatch(ApiCollection::getIsOutOfTestingScope);
+    }
+
+    private static Set<Integer> extractCollectionIds(TestingEndpoints testingEndpoints) {
+        Set<Integer> ids = new HashSet<>();
+        if (testingEndpoints instanceof CollectionWiseTestingEndpoints) {
+            ids.add(((CollectionWiseTestingEndpoints) testingEndpoints).getApiCollectionId());
+        } else if (testingEndpoints instanceof MultiCollectionTestingEndpoints) {
+            List<Integer> multiIds = ((MultiCollectionTestingEndpoints) testingEndpoints).getApiCollectionIds();
+            if (multiIds != null) ids.addAll(multiIds);
+        } else if (testingEndpoints instanceof CustomTestingEndpoints) {
+            List<ApiInfo.ApiInfoKey> apisList = ((CustomTestingEndpoints) testingEndpoints).getApisList();
+            if (apisList != null) {
+                for (ApiInfo.ApiInfoKey key : apisList) ids.add(key.getApiCollectionId());
+            }
+        }
+        // WORKFLOW / unknown types: no collection id to check, returns empty set, gate never fires
+        return ids;
+    }
+
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 10 * 60;
     private static final int DEFAULT_DELTA_IGNORE_TIME = TestingRunResultSummariesDao.DEFAULT_DELTA_IGNORE_TIME_SECONDS;
     private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
@@ -612,24 +680,14 @@ public class Main {
                 boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
 
                 if (featureAccess.checkInvalidAccess()) {
-                    loggerMaker.debugAndAddToDb("Test runs overage detected for account: " + accountId + ". Failing test run at " + start, LogDb.TESTING);
-                    TestingRunDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
-                            Filters.eq(Constants.ID, testingRun.getId()),
-                            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+                    failTestingRun(testingRun, summaryId, trrs, isTestingRunResultRerunCase, config, writeConcern,
+                            accountId, start, TEST_RUNS_OVERAGE_ERROR);
+                    return;
+                }
 
-                    sendSlackAlertForFailedTest(accountId, "Overrage detected, TRR_ID: " + testingRun.getHexId() + " TRRS_ID: " + summaryId.toHexString());
-
-                    if (isTestingRunResultRerunCase) {
-                        // For TRR-rerun case, delete the rerun summary and clean up configurations
-                        TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummariesDao.ID, trrs.getId()));
-                        config.setTestingRunResultList(null);
-                        config.setRerunTestingRunResultSummary(null);
-                        loggerMaker.debugAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + trrs.getId());
-                    } else {
-                        TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(writeConcern).findOneAndUpdate(
-                                Filters.eq(Constants.ID, summaryId),
-                                Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
-                    }
+                if (isEntirelyOutOfTestingScope(testingRun.getTestingEndpoints())) {
+                    failTestingRun(testingRun, summaryId, trrs, isTestingRunResultRerunCase, config, writeConcern,
+                            accountId, start, OUT_OF_TESTING_SCOPE_ERROR);
                     return;
                 }
 

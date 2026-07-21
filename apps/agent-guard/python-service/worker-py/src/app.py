@@ -11,6 +11,8 @@ from fastapi import FastAPI, Request
 from pydantic import BaseModel, Field
 
 import cascade_backpressure
+import metrics_push
+import providers
 import scan_diag
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
@@ -20,11 +22,21 @@ logger = logging.getLogger(__name__)
 _scan_inflight = 0
 
 
+def _startup_self_check_enabled() -> bool:
+    return os.environ.get("AGW_STARTUP_SELF_CHECK", "true").strip().lower() in ("1", "true", "yes", "on")
+
+
 class ScanRequest(BaseModel):
     scanner_name: str
     scanner_type: str = "prompt"
     text: str = ""
     config: dict[str, Any] = Field(default_factory=dict)
+    agent_host: str = ""
+    # Optional separate system prompt. When given, the intent prefilter uses it
+    # only to build/retrieve a cached per-agent capability profile — it is
+    # never part of the instruction/data split run over `text` (the user
+    # prompt). Omitted requests fall back to segmenting `text` alone.
+    system_prompt: str = ""
 
 
 @asynccontextmanager
@@ -33,7 +45,18 @@ async def lifespan(_: FastAPI):
     settings.init_from_env()
     cascade_backpressure.configure_from_env()
     scan_diag.log_startup_banner()
-    yield
+    push_task = asyncio.create_task(metrics_push.run_forever())
+    # Non-blocking: readiness/health checks aren't held up by a slow endpoint,
+    # and one bad model can't stall the whole process from booting. Set
+    # AGW_STARTUP_SELF_CHECK=false to disable (e.g. if this gets noisy/costly
+    # across many uvicorn workers restarting).
+    check_task = asyncio.create_task(providers.startup_self_check()) if _startup_self_check_enabled() else None
+    try:
+        yield
+    finally:
+        push_task.cancel()
+        if check_task is not None:
+            check_task.cancel()
 
 
 app = FastAPI(title="Akto Agent Guard Executor", version="1.0.0", lifespan=lifespan)
@@ -49,6 +72,7 @@ async def scan_inflight_middleware(request: Request, call_next):
     wall_start = time.perf_counter()
     _scan_inflight += 1
     inflight = _scan_inflight
+    metrics_push.set_queue_size(inflight)
     scan_diag.log_inflight(inflight, entering=True)
     try:
         response = await call_next(request)
@@ -64,6 +88,7 @@ async def scan_inflight_middleware(request: Request, call_next):
         return response
     finally:
         _scan_inflight -= 1
+        metrics_push.set_queue_size(_scan_inflight)
         scan_diag.log_inflight(_scan_inflight, entering=False)
 
 

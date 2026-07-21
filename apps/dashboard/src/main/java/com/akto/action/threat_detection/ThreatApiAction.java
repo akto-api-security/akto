@@ -47,6 +47,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   List<String> latestAttack;
   int startTs;
   int endTs;
+  String severityStatusFilter;
 
   @Getter int totalAnalysed;
   @Getter int totalAttacks;
@@ -118,6 +119,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         put("start_ts", startTs);
         put("end_ts", endTs);
         put("latestAttack", latestAttack);
+        if (severityStatusFilter != null && !severityStatusFilter.isEmpty()) {
+          put("status", severityStatusFilter);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -163,6 +167,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         put("start_ts", startTs);
         put("end_ts", endTs);
         put("latestAttack", latestAttack);
+        if (severityStatusFilter != null && !severityStatusFilter.isEmpty()) {
+          put("status", severityStatusFilter);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -453,6 +460,10 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
 
   public void setLatestAttack(List<String> latestAttack) {
     this.latestAttack = latestAttack;
+  }
+
+  public void setSeverityStatusFilter(String severityStatusFilter) {
+    this.severityStatusFilter = severityStatusFilter;
   }
 
   public String fetchDashboardTopData() {

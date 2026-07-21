@@ -295,7 +295,9 @@ func (s *Service) filterPoliciesByMcpServer(policies []types.Policy, mcpServerNa
 
 // filterPoliciesByDeviceId filters policies by the device label embedded in the MCP server name.
 // The device label is the first dot-delimited segment of "{deviceLabel}.{clientType}.{host}".
-// Policies with an empty ApplyToDeviceIds list apply to all devices and always pass through.
+// ApplyToDeviceIds == nil means no team/role targeting is configured, so the policy applies to
+// all devices. A non-nil (possibly empty) ApplyToDeviceIds means targeting is configured, so the
+// policy applies only to the listed device labels — a non-nil empty list matches no device.
 // If mcpServerName is empty or has no device prefix, all policies are returned unchanged.
 func (s *Service) filterPoliciesByDeviceId(policies []types.Policy, mcpServerName string) []types.Policy {
 	if mcpServerName == "" {
@@ -310,7 +312,7 @@ func (s *Service) filterPoliciesByDeviceId(policies []types.Policy, mcpServerNam
 	}
 	filtered := make([]types.Policy, 0, len(policies))
 	for _, p := range policies {
-		if len(p.ApplyToDeviceIds) == 0 {
+		if p.ApplyToDeviceIds == nil {
 			filtered = append(filtered, p)
 			continue
 		}
@@ -322,6 +324,55 @@ func (s *Service) filterPoliciesByDeviceId(policies []types.Policy, mcpServerNam
 		}
 	}
 	return filtered
+}
+
+// filterApprovedServers drops "approval"-behaviour policies whose target server already has a
+// valid (non-expired) entry in the policy's ApprovedServers list. Bypassing the policy here
+// means its detectors never run in ProcessRequestParallel — so an approved server is allowed
+// through with no block and no threat report. Only "approval" policies are affected; block/
+// warn/alert policies always pass through unchanged.
+func (s *Service) filterApprovedServers(policies []types.Policy, mcpServerName string) []types.Policy {
+	if mcpServerName == "" {
+		return policies
+	}
+	now := time.Now().Unix()
+	filtered := make([]types.Policy, 0, len(policies))
+	for _, p := range policies {
+		if strings.EqualFold(p.Behaviour, "approval") && isServerApproved(p.ApprovedServers, mcpServerName, now) {
+			s.logger.Info("filterApprovedServers - bypassing policy for approved server",
+				zap.String("policy", p.Info.Name),
+				zap.String("mcpServerName", mcpServerName))
+			continue
+		}
+		filtered = append(filtered, p)
+	}
+	return filtered
+}
+
+// isServerApproved reports whether mcpServerName has a currently-valid approval entry.
+// serverId is matched exactly (case-insensitive) — it is stored as the same device-prefixed
+// host the threat event uses, which is exactly valCtx.McpServerName. Mode ALWAYS is always
+// valid; DURATION is valid while now < expiredAt (epoch seconds); COUNT while expiredAfter > 0
+// (Phase 2: decrement handled elsewhere).
+func isServerApproved(approved []types.ApprovedServer, mcpServerName string, now int64) bool {
+	for _, a := range approved {
+		if !strings.EqualFold(a.ServerId, mcpServerName) {
+			continue
+		}
+		switch strings.ToUpper(a.Mode) {
+		case "ALWAYS":
+			return true
+		case "DURATION":
+			if a.ExpiredAt > now {
+				return true
+			}
+		case "COUNT":
+			if a.ExpiredAfter > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (s *Service) getMcpAllowedHostList() ([]types.McpAllowedList, error) {
@@ -586,7 +637,7 @@ func (s *Service) getLoginUserEmailType(reqHeaders map[string]string) string {
 
 // TODO: move reportAndBlockPersonalAccount to mcp library so threat reporting
 // and validation live in one place alongside other policy enforcement.
-func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID, policyName string) *mcp.ValidationResult {
+func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID, policyName, behaviour string) *mcp.ValidationResult {
 	blockReason := "Blocked: personal accounts are not permitted by guardrail policy"
 
 	if s.sessionMgr != nil && sessionID != "" {
@@ -623,7 +674,7 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 				types.ContextSource(params.ContextSource),
 				extractHostHeader(reqHeaders),
 				sessionID,
-				"block",
+				behaviour,
 			); err != nil {
 				s.logger.Warn("Failed to report threat for personal account block", zap.String("policyName", policyName), zap.Error(err))
 			}
@@ -633,7 +684,7 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 	return &mcp.ValidationResult{
 		Allowed:   false,
 		Reason:    blockReason,
-		Behaviour: "block",
+		Behaviour: behaviour,
 		Metadata: types.ThreatMetadata{
 			PolicyName:   policyName,
 			RuleViolated: "BlockPersonalAccounts",
@@ -690,10 +741,26 @@ func (s *Service) checkBlockedHost(params *models.ValidateRequestParams, valCtx 
 		zap.String("policy", policyName),
 		zap.String("sessionID", sessionID),
 		zap.String("requestID", requestID))
-	return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, policyName, matchedPattern)
+	return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, policyName, matchedPattern, behaviourForPolicy(policies, policyName))
 }
 
-func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID, policyName, matchedPattern string) *mcp.ValidationResult {
+// behaviourForPolicy returns the configured behaviour (lowercased) for the named policy,
+// defaulting to "block" when the policy is missing or has no behaviour set. Mirrors the
+// mcp library's effectiveViolationBehaviour so the guardrails-service's own reporters send
+// the policy's behaviour (e.g. "approval") instead of a hardcoded "block".
+func behaviourForPolicy(policies []types.Policy, policyName string) string {
+	for _, p := range policies {
+		if p.Info.Name == policyName {
+			if b := strings.TrimSpace(p.Behaviour); b != "" {
+				return strings.ToLower(b)
+			}
+			break
+		}
+	}
+	return "block"
+}
+
+func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID, policyName, matchedPattern, behaviour string) *mcp.ValidationResult {
 	reason := "Request blocked by guardrail policy (blocked host pattern: " + matchedPattern + ")"
 	metadata := types.ThreatMetadata{
 		PolicyName:   policyName,
@@ -723,7 +790,7 @@ func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCt
 				types.ContextSource(params.ContextSource),
 				extractHostHeader(valCtx.RequestHeaders),
 				sessionID,
-				"block",
+				behaviour,
 			); err != nil {
 				s.logger.Warn("Failed to report threat for blocked host", zap.Error(err))
 			}
@@ -736,7 +803,7 @@ func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCt
 		ModifiedPayload: payloadToValidate,
 		Reason:          reason,
 		Metadata:        metadata,
-		Behaviour:       "block",
+		Behaviour:       behaviour,
 	}
 }
 
@@ -939,6 +1006,15 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 			policy := mcp.ConvertGuardrailsToPolicy(gp)
 			policies = append(policies, policy)
 		}
+	}
+
+	// [GUARDRAIL_FLOW] 1/3 — fetched & parsed active policies from cyborg.
+	for _, p := range policies {
+		s.logger.Info("[GUARDRAIL_FLOW] fetched policy",
+			zap.String("name", p.Info.Name),
+			zap.String("behaviour", p.Behaviour),
+			zap.Bool("applyToAllServers", p.ApplyToAllServers),
+			zap.Int("approvedServersCount", len(p.ApprovedServers)))
 	}
 
 	// Build per-policy anomaly config map so validate-time checks respect scoping.
@@ -1271,6 +1347,15 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// rules that belong to policies applicable to this server.
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
 	policies = s.filterPoliciesByDeviceId(policies, valCtx.McpServerName)
+	// Bypass "approval" policies whose server is already approved (allow, no threat).
+	policies = s.filterApprovedServers(policies, valCtx.McpServerName)
+
+	// [GUARDRAIL_FLOW] 2/3 — policies that APPLY to this request after server/device/approval filtering.
+	s.logger.Info("[GUARDRAIL_FLOW] policies applied to request",
+		zap.String("mcpServerName", valCtx.McpServerName),
+		zap.String("sessionID", sessionID),
+		zap.Int("appliedCount", len(policies)),
+		zap.Strings("appliedPolicies", policyNames(policies)))
 
 	// Check account-type guardrail after server filtering so the policy's server
 	// selection is respected (a personal-account policy scoped to server A should
@@ -1290,7 +1375,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 				zap.String("accountType", accountType),
 				zap.String("policyName", policyName),
 				zap.String("sessionID", sessionID))
-			return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName), nil
+			return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName)), nil
 		}
 	}
 
@@ -1321,10 +1406,6 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
 		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
 
-	// Use the default processor - skipThreat is passed via ValidationContext.
-	// Scan backpressure lives inside the mcp processor at the remote-scanner
-	// boundary (executeSingleScannerTask), so only the agent-guard /scan fan-out
-	// is shed when degraded — local PII/regex/token-limit filters always run.
 	// Redact any configured ignore-phrases before the enforcement library ever sees the
 	// text — see ValidateRequest's plan-doc note on the shared-payload trade-off. Shared
 	// with ValidateResponse via redactIgnorePhrasesForEvaluation/reconcileIgnorePhraseRedaction.
@@ -1487,6 +1568,8 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	// Filter policies by MCP server name — policies with no server configured are skipped
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
 	policies = s.filterPoliciesByDeviceId(policies, valCtx.McpServerName)
+	// Bypass "approval" policies whose server is already approved (allow, no threat).
+	policies = s.filterApprovedServers(policies, valCtx.McpServerName)
 
 	s.logger.Info("ValidateResponse - calling ProcessResponse",
 		zap.String("path", params.Path),
@@ -1505,9 +1588,6 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("method", params.Method),
 		zap.String("payloadToValidate", responseBodyForValidation))
 
-	// Use processor's ProcessResponse method with external policies. Scan
-	// backpressure is applied inside the mcp processor at the remote-scanner
-	// boundary, so only the agent-guard /scan call is shed when degraded.
 	// Redact any configured ignore-phrases before the enforcement library ever sees the
 	// text — see ValidateRequest for the full rationale and the shared-payload trade-off.
 	payloadForEvaluation, preRedactionPayload := s.redactIgnorePhrasesForEvaluation(responseBodyForValidation, policies, "ValidateResponse", sessionID)
@@ -1835,6 +1915,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 		// Filter policies by MCP server name for this specific batch item
 		itemPolicies := s.filterPoliciesByMcpServer(policies, mcpServerName)
 		itemPolicies = s.filterPoliciesByDeviceId(itemPolicies, mcpServerName)
+		// Bypass "approval" policies whose server is already approved (allow, no threat).
+		itemPolicies = s.filterApprovedServers(itemPolicies, mcpServerName)
 		s.logger.Debug("ValidateBatch - applicable policies for server",
 			zap.Int("index", i),
 			zap.String("mcpServerName", mcpServerName),

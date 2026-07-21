@@ -712,11 +712,11 @@ public class SentinelOneIntegrationAction extends UserAction {
         // Return relative path from dashboard/scripts/guardrails/
         switch (guardrailType) {
             case "cursor-hooks":
-                return "install_cursor_hooks_sentinelone";
+                return "install_cursor_hooks";
             case "openclaw-guardrails":
                 return "install_openclaw_guardrails_sentinelone";
             case "claude-cli-hooks":
-                return "install_claude_cli_hooks_sentinelone";
+                return "install_claude_cli_hooks";
             default:
                 return null;
         }

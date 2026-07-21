@@ -109,15 +109,6 @@ export function buildAgentInlineTopologyComponents(stiEndpoints = [], builtinToo
     return items;
 }
 
-export function inferOsFromDeviceId(deviceId) {
-    if (!deviceId) return null;
-    const upper = String(deviceId).toUpperCase();
-    if (upper.includes("WIN")) return "windows";
-    if (upper.includes("LIN") || upper.includes("LINUX")) return "linux";
-    if (upper.includes("MAC")) return "mac";
-    return null;
-}
-
 // Collections reaching this UI are already scoped to agentic context-source, so we only
 // guard against deactivated ones and confirm the agentic <endpoint>.<source>.<service>
 // hostname shape — no env-tag re-check needed.
@@ -364,9 +355,24 @@ function buildModuleDeviceMap(moduleInfos = []) {
             team: ad.team || "",
             role: ad.userRole || "",
             os: ad.os || null,
+            browserName: ad.browserName || null,
         };
     });
     return map;
+}
+
+/**
+ * Keep assets whose Last Seen falls in [startTimestamp, endTimestamp].
+ * When startTimestamp <= 0 (all-time), returns rows unchanged.
+ * Rows with missing/zero lastSeenEpoch are excluded when a range is active.
+ */
+export function filterAssetsByLastSeen(rows, startTimestamp, endTimestamp) {
+    if (!rows?.length || startTimestamp <= 0) return rows || [];
+    const end = endTimestamp > 0 ? endTimestamp : Math.floor(Date.now() / 1000);
+    return rows.filter((r) => {
+        const ts = r?.lastSeenEpoch || 0;
+        return ts >= startTimestamp && ts <= end;
+    });
 }
 
 /**
@@ -496,7 +502,7 @@ export function buildDeviceEndpointsPageData(
     riskScoreMap = {},
     { moduleInfos = [], usernameMap = {}, violationsByCollectionId = {}, violationRows = [], startTimestamp = 0, endTimestamp = 0 } = {},
 ) {
-    const agenticCollections = collections.filter(isAgenticCollection);
+    const agenticCollections = collections.filter((c) => !c.deactivated);
     const deviceModules = buildModuleDeviceMap(moduleInfos);
     const deviceMap = {};
     const collectionIdToDevice = {};
@@ -521,7 +527,9 @@ export function buildDeviceEndpointsPageData(
             const username = resolvedUsername !== DEFAULT_VALUE ? resolvedUsername : (mod.username || "-");
             deviceMap[devId] = {
                 deviceId: devId,
-                os: mod.os || inferOsFromDeviceId(devId),
+                os: mod.os || null,
+                // Reported directly by the browser extension itself (module_info.additionalData.browserName).
+                browserName: mod.browserName || null,
                 username,
                 team: mod.team || "",
                 role: mod.role || "",
@@ -581,7 +589,7 @@ export function buildDeviceEndpointsPageData(
         if (deviceMap[devId]) {
             const mod = deviceModules[devId];
             const device = deviceMap[devId];
-            if (!device.os) device.os = mod.os || inferOsFromDeviceId(devId);
+            if (!device.os) device.os = mod.os || null;
             if (!device.team) device.team = mod.team || "";
             if (!device.role) device.role = mod.role || "";
         }
@@ -635,14 +643,20 @@ export function buildDeviceEndpointsPageData(
         });
     });
 
-    const deviceCount = Object.keys(deviceMap).length;
-    const users = new Set(Object.values(deviceMap).map((d) => d.username).filter((u) => u && u !== "-"));
+    // A device is "browser-only" when the endpoint-shield module itself reported a browserName
+    // (module_info.additionalData.browserName) — set directly by the browser extension.
+    const isBrowserOnlyDevice = (d) => !!d.browserName;
+    const deviceEntries = Object.values(deviceMap);
+    const browserDeviceEntries = deviceEntries.filter(isBrowserOnlyDevice);
+    const nonBrowserDeviceEntries = deviceEntries.filter((d) => !isBrowserOnlyDevice(d));
+
+    const deviceCount = nonBrowserDeviceEntries.length;
+    const browserDeviceCount = browserDeviceEntries.length;
+    const users = new Set(deviceEntries.map((d) => d.username).filter((u) => u && u !== "-"));
     let agentChildCount = 0;
     const violationsBySeverity = emptyViolations();
-    const osCounts = { mac: 0, windows: 0, linux: 0 };
 
-    Object.values(deviceMap).forEach((d) => {
-        osCounts[d.os] = (osCounts[d.os] || 0) + 1;
+    deviceEntries.forEach((d) => {
         mergeViolations(violationsBySeverity, d.violations);
         agentChildCount += Object.keys(d.children).length;
     });
@@ -666,10 +680,21 @@ export function buildDeviceEndpointsPageData(
         if (!devId) return;
         const ts = c.startTs || 0;
         if (!deviceFirstSeen[devId] || ts < deviceFirstSeen[devId].ts) {
-            deviceFirstSeen[devId] = { ts, os: deviceMap[devId]?.os || inferOsFromDeviceId(devId) };
+            const dev = deviceMap[devId];
+            const isBrowserOnly = dev ? isBrowserOnlyDevice(dev) : false;
+            deviceFirstSeen[devId] = {
+                ts,
+                os: dev?.os || null,
+                isBrowserOnly,
+                browser: isBrowserOnly ? dev.browserName.toLowerCase() : null,
+            };
         }
     });
     const deviceFirstSeenItems = Object.values(deviceFirstSeen);
+    // Endpoints stat/sparkline should track installed-agent devices only — browser-only
+    // devices are a distinct asset class, counted separately (see browserFirstSeenItems).
+    const endpointFirstSeenItems = deviceFirstSeenItems.filter((d) => !d.isBrowserOnly);
+    const browserFirstSeenItems  = deviceFirstSeenItems.filter((d) => d.isBrowserOnly);
 
     // Unique-user first-seen: use the earliest collection startTs per username
     const userFirstSeen = {}; // username → earliest startTs
@@ -688,10 +713,13 @@ export function buildDeviceEndpointsPageData(
     const userFirstSeenItems = Object.values(userFirstSeen).map((ts) => ({ ts }));
 
     // OS trend: count of newly-first-seen devices per OS per month.
-    // Use cumulativeSeriesByMonth so all 3 OS series share identical slot boundaries + labels.
-    const macItems     = deviceFirstSeenItems.filter((d) => d.os === "mac");
-    const windowsItems = deviceFirstSeenItems.filter((d) => d.os === "windows");
-    const linuxItems   = deviceFirstSeenItems.filter((d) => d.os === "linux");
+    // Use cumulativeSeriesByMonth so all series share identical slot boundaries + labels.
+    // Devices with no reported os (e.g. pre-update installers that didn't send it) fall into "unknown"
+    // so the trend total always reconciles with deviceCount.
+    const macItems     = endpointFirstSeenItems.filter((d) => d.os === "mac");
+    const windowsItems = endpointFirstSeenItems.filter((d) => d.os === "windows");
+    const linuxItems   = endpointFirstSeenItems.filter((d) => d.os === "linux");
+    const unknownItems = endpointFirstSeenItems.filter((d) => d.os !== "mac" && d.os !== "windows" && d.os !== "linux");
 
     const getTs = (d) => d.ts;
     // OS trend: cumulative new-devices-per-OS over the selected window, shared slots/labels.
@@ -700,14 +728,33 @@ export function buildDeviceEndpointsPageData(
             { items: macItems,     getTs },
             { items: windowsItems, getTs },
             { items: linuxItems,   getTs },
+            { items: unknownItems, getTs },
         ],
         startTimestamp,
         endTimestamp,
     );
-    const [macCounts, windowsCounts, linuxCounts] = osTrendData;
+    const [macCounts, windowsCounts, linuxCounts, unknownCounts] = osTrendData;
+
+    // Browser trend: count of newly-first-seen browser-only devices per browser per month.
+    const chromeItems  = browserFirstSeenItems.filter((d) => d.browser === "chrome");
+    const firefoxItems = browserFirstSeenItems.filter((d) => d.browser === "firefox");
+    const edgeItems    = browserFirstSeenItems.filter((d) => d.browser === "edge");
+    const safariItems  = browserFirstSeenItems.filter((d) => d.browser === "safari");
+    const { data: browserTrendData } = cumulativeSeriesByMonth(
+        [
+            { items: chromeItems,  getTs },
+            { items: firefoxItems, getTs },
+            { items: edgeItems,    getTs },
+            { items: safariItems,  getTs },
+        ],
+        startTimestamp,
+        endTimestamp,
+    );
+    const [chromeCounts, firefoxCounts, edgeCounts, safariCounts] = browserTrendData;
 
     // Sparklines — cumulative, same window as the OS trend
-    const endpointBucket  = cumulativeByMonth(deviceFirstSeenItems, getTs, startTimestamp, endTimestamp);
+    const endpointBucket  = cumulativeByMonth(endpointFirstSeenItems, getTs, startTimestamp, endTimestamp);
+    const browserBucket   = cumulativeByMonth(browserFirstSeenItems,  getTs, startTimestamp, endTimestamp);
     const userBucket      = cumulativeByMonth(userFirstSeenItems,   (d) => d.ts, startTimestamp, endTimestamp);
     const violationBucket = (() => {
         const agenticHosts = new Set();
@@ -745,8 +792,10 @@ export function buildDeviceEndpointsPageData(
         totalUsers: users.size,
         totalViolations,
         deviceCount,
+        browserDeviceCount,
         monthLabels,
         deltaEndpoints:  Math.max(0, windowDelta(endpointBucket.counts)),
+        deltaBrowsers:   Math.max(0, windowDelta(browserBucket.counts)),
         deltaUsers:      Math.max(0, windowDelta(userBucket.counts)),
         deltaViolations: windowDelta(violCounts),
         violationsBySeverity: [
@@ -759,9 +808,17 @@ export function buildDeviceEndpointsPageData(
             mac:     macCounts,
             windows: windowsCounts,
             linux:   linuxCounts,
+            unknown: unknownCounts,
+        },
+        browserTrend: {
+            chrome:  chromeCounts,
+            firefox: firefoxCounts,
+            edge:    edgeCounts,
+            safari:  safariCounts,
         },
         statSparklines: {
             endpoints:  endpointBucket.counts,
+            browsers:   browserBucket.counts,
             users:      userBucket.counts,
             violations: violCounts,
         },

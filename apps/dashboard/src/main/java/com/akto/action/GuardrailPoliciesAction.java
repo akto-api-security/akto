@@ -18,6 +18,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.UpdateResult;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -57,6 +58,19 @@ public class GuardrailPoliciesAction extends UserAction {
     @Setter
     private String hexId;
 
+    // For approving a server to bypass an "approval" behaviour (from threat activity).
+    @Setter
+    private String approvedServerId;   // the request Host that triggered the violation
+    @Setter
+    private String approvedServerName; // display name (optional)
+    @Setter
+    private String approvalMode;       // ALWAYS | DURATION | COUNT
+    @Setter
+    private int approvalValue;         // DURATION: number of days; COUNT: number of times
+    // Target policy: either hexId (preferred) or policyName (the threat event's filterId).
+    @Setter
+    private String policyName;
+
     @Getter
     private List<GuardrailPolicies> guardrailPolicies;
 
@@ -90,8 +104,10 @@ public class GuardrailPoliciesAction extends UserAction {
             this.total = GuardrailPoliciesDao.instance.getTotalCount();
 
             // Resolve targetTeams/targetRoles → device IDs fresh on every fetch.
-            // Empty applyToDeviceIds = no targeting → apply to all devices.
-            // Non-empty = apply only to listed device labels.
+            // applyToDeviceIds left null (never set below) = no targeting configured → apply to all devices.
+            // applyToDeviceIds set to a List (possibly empty, when targeting matches zero devices)
+            // = targeting configured → apply only to the listed device labels; empty means apply to none.
+            // null vs. an empty List must stay distinguishable on the wire — do not collapse them.
             for (GuardrailPolicies p : this.guardrailPolicies) {
                 boolean hasTargeting = (p.getTargetTeams() != null && !p.getTargetTeams().isEmpty())
                         || (p.getTargetRoles() != null && !p.getTargetRoles().isEmpty());
@@ -342,6 +358,9 @@ public class GuardrailPoliciesAction extends UserAction {
         if (StringUtils.isNotBlank(p.getBehaviour())) {
             updates.add(Updates.set("behaviour", p.getBehaviour()));
         }
+        if (p.getApprovedServers() != null) {
+            updates.add(Updates.set("approvedServers", p.getApprovedServers()));
+        }
         if (StringUtils.isNotBlank(p.getUrl())) {
             updates.add(Updates.set("url", p.getUrl()));
         }
@@ -382,6 +401,118 @@ public class GuardrailPoliciesAction extends UserAction {
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error deleting guardrail policies: " + e.getMessage(), LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+    }
+
+    private static final int MAX_APPROVAL_DAYS = 365;
+    private static final int MAX_APPROVAL_COUNT = 100000;
+
+    /**
+     * Approve a single server to bypass this policy's "approval" behaviour.
+     * Called from the threat-activity "Approve" action. Upserts one entry into the policy's
+     * approvedServers list keyed by serverId (the request Host): updates it in place if the
+     * server is already approved, otherwise appends a new entry.
+     */
+    public String approveServerForPolicy() {
+        try {
+            if (StringUtils.isBlank(approvedServerId)) {
+                addActionError("Server id is required");
+                return ERROR.toUpperCase();
+            }
+
+            // Resolve the target policy by hexId (preferred) or by name (the threat event's filterId).
+            ObjectId policyObjId;
+            if (StringUtils.isNotBlank(hexId)) {
+                policyObjId = new ObjectId(hexId);
+            } else if (StringUtils.isNotBlank(policyName)) {
+                GuardrailPolicies existing = GuardrailPoliciesDao.instance.findOne(Filters.eq("name", policyName));
+                if (existing == null || existing.getId() == null) {
+                    addActionError("No guardrail policy found with name: " + policyName);
+                    return ERROR.toUpperCase();
+                }
+                policyObjId = existing.getId();
+            } else {
+                addActionError("Policy id or policy name is required");
+                return ERROR.toUpperCase();
+            }
+
+            GuardrailPolicies.ApprovalMode mode;
+            try {
+                mode = GuardrailPolicies.ApprovalMode.valueOf(
+                        StringUtils.upperCase(StringUtils.trimToEmpty(approvalMode)));
+            } catch (IllegalArgumentException e) {
+                addActionError("Invalid approval mode: " + approvalMode);
+                return ERROR.toUpperCase();
+            }
+
+            int now = Context.now();
+            long expiredAt = 0;
+            int expiredAfter = 0;
+            switch (mode) {
+                case DURATION:
+                    if (approvalValue <= 0 || approvalValue > MAX_APPROVAL_DAYS) {
+                        addActionError("Number of days must be between 1 and " + MAX_APPROVAL_DAYS);
+                        return ERROR.toUpperCase();
+                    }
+                    expiredAt = now + (long) approvalValue * 86400L;
+                    break;
+                case COUNT:
+                    if (approvalValue <= 0 || approvalValue > MAX_APPROVAL_COUNT) {
+                        addActionError("Number of times must be between 1 and " + MAX_APPROVAL_COUNT);
+                        return ERROR.toUpperCase();
+                    }
+                    expiredAfter = approvalValue;
+                    break;
+                case ALWAYS:
+                default:
+                    break;
+            }
+
+            String login = getSUser().getLogin();
+
+            // Persist mode as its String name — the Mongo driver has no codec for the bare
+            // ApprovalMode enum, and the guardrails-service reads it as a string anyway.
+            String modeName = mode.name();
+
+            // 1) Update the entry in place if this server is already approved (positional operator).
+            UpdateResult res = GuardrailPoliciesDao.instance.getMCollection().updateOne(
+                Filters.and(
+                    Filters.eq(Constants.ID, policyObjId),
+                    Filters.eq("approvedServers.serverId", approvedServerId)
+                ),
+                Updates.combine(
+                    Updates.set("approvedServers.$.mode", modeName),
+                    Updates.set("approvedServers.$.expiredAfter", expiredAfter),
+                    Updates.set("approvedServers.$.expiredAt", expiredAt),
+                    Updates.set("approvedServers.$.serverName", approvedServerName),
+                    Updates.set("approvedServers.$.approvedAt", (long) now),
+                    Updates.set("approvedServers.$.approvedBy", login)
+                )
+            );
+
+            // 2) Not present yet -> append a new entry. Use a BasicDBObject (always has a codec)
+            // rather than the POJO to avoid enum/POJO codec resolution issues.
+            if (res.getMatchedCount() == 0) {
+                BasicDBObject approvedServerDoc = new BasicDBObject()
+                        .append("serverId", approvedServerId)
+                        .append("serverName", approvedServerName)
+                        .append("mode", modeName)
+                        .append("expiredAfter", expiredAfter)
+                        .append("expiredAt", expiredAt)
+                        .append("approvedAt", (long) now)
+                        .append("approvedBy", login);
+                GuardrailPoliciesDao.instance.getMCollection().updateOne(
+                    Filters.eq(Constants.ID, policyObjId),
+                    Updates.push("approvedServers", approvedServerDoc)
+                );
+            }
+
+            loggerMaker.info("Approved server " + approvedServerId + " (mode=" + mode
+                    + ") for policy " + hexId + " by user: " + login);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error approving server for guardrail policy: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
     }

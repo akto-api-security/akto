@@ -1,6 +1,8 @@
 const TYPE_TAG_KEYS = { MCP_SERVER: 'mcp-server', GEN_AI: 'gen-ai', BROWSER_LLM: 'browser-llm' };
 const ASSET_TAG_KEYS = { MCP_CLIENT: 'mcp-client', AI_AGENT: 'ai-agent', BROWSER_LLM_AGENT: 'browser-llm-agent' };
 const SKILL_TAG_KEY = 'skill';
+
+const NOT_ATTACHED_VALUE = 'not-attached';
 const CLIENT_TYPES = { LLM: 'LLM', AI_AGENT: 'AI Agent', MCP_SERVER: 'MCP Server', SKILL: 'Skill' };
 const ROW_TYPES = { AGENT: 'agent', SERVICE: 'service', SKILL: 'skill' };
 const TYPE_TAG_TO_DISPLAY = {
@@ -9,19 +11,31 @@ const TYPE_TAG_TO_DISPLAY = {
     [TYPE_TAG_KEYS.BROWSER_LLM]: CLIENT_TYPES.LLM,
 };
 
-// Known clients: keyword -> { displayName, domain, agentType }
-// agentType is used to infer the type for agent rows (not from tags)
+// Known clients: keyword -> { displayName, domain, agentType, variants }
+// agentType is used to infer the type for agent rows (not from tags).
+// variants (agent entries only) lists every raw ai-agent tag value that should collapse into this
+// entry — e.g. all Claude CLI installs report different tag values depending on config source.
 const KNOWN_CLIENTS = {
     claude: { displayName: 'Claude', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
-    claude1: { displayName: 'Claude Desktop', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
-    claude2: { displayName: 'Claude CLI', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
+    claude1: { displayName: 'Claude Desktop', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT, variants: ['claude-desktop'] },
+    claude2: {
+        displayName: 'Claude CLI', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT,
+        variants: ['claude', 'claudecli', 'claude-cli', 'claude-cli-user', 'claude-cli-project', 'claude-cli-local', 'claude-cli-enterprise', 'claude-plugin', 'claude-code'],
+    },
     claude_cowork: { displayName: 'Claude Cowork', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
+    // Tag as documented in the Tool Tags Mapping (Atlas) Notion doc — appears to be a typo for
+    // "anthropic.com" upstream; kept verbatim since matching must be exact against the raw tag.
+    claude3: { displayName: 'Claude Compliance', domain: 'anthropic.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['anthrophic.com'] },
     chatgpt: { displayName: 'ChatGPT', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     openai: { displayName: 'OpenAI', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     gpt: { displayName: 'GPT', domain: 'openai.com', agentType: CLIENT_TYPES.LLM },
     codex: { displayName: 'Codex', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
+    codex1: { displayName: 'Codex CLI', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['codex-cli', 'codexcli'] },
+    codex2: { displayName: 'Codex Desktop', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['codex-desktop'] },
     gemini: { displayName: 'Gemini', domain: 'gemini.google.com', agentType: CLIENT_TYPES.LLM },
     copilot: { displayName: 'Copilot', domain: 'copilot.microsoft.com', agentType: CLIENT_TYPES.AI_AGENT },
+    githubcopilot: { displayName: 'GitHub Copilot', domain: 'github.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['github-copilot'] },
+    vscopilot: { displayName: 'Visual Studio Copilot', domain: 'visualstudio.microsoft.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['visual-studio-copilot'] },
     cursor: { displayName: 'Cursor', domain: 'cursor.com', agentType: CLIENT_TYPES.AI_AGENT },
     grok: { displayName: 'Grok', domain: 'x.ai', agentType: CLIENT_TYPES.AI_AGENT },
     cody: { displayName: 'Cody', domain: 'sourcegraph.com', agentType: CLIENT_TYPES.AI_AGENT },
@@ -29,7 +43,10 @@ const KNOWN_CLIENTS = {
     codeium: { displayName: 'Codeium', domain: 'codeium.com', agentType: CLIENT_TYPES.AI_AGENT },
     tabnine: { displayName: 'Tabnine', domain: 'tabnine.com', agentType: CLIENT_TYPES.AI_AGENT },
     github: { displayName: 'GitHub', domain: 'github.com', agentType: CLIENT_TYPES.AI_AGENT },
+    githubcli: { displayName: 'GitHub CLI', domain: 'github.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['github-cli'] },
     vscode: { displayName: 'VS Code', domain: 'code.visualstudio.com', agentType: CLIENT_TYPES.AI_AGENT },
+    kirocli: { displayName: 'Kiro CLI', domain: 'kiro.dev', agentType: CLIENT_TYPES.AI_AGENT },
+    kiroide: { displayName: 'Kiro IDE', domain: 'kiro.dev', agentType: CLIENT_TYPES.AI_AGENT },
     slack: { displayName: 'Slack', domain: 'slack.com', agentType: CLIENT_TYPES.AI_AGENT },
     notion: { displayName: 'Notion', domain: 'notion.so', agentType: CLIENT_TYPES.AI_AGENT },
     figma: { displayName: 'Figma', domain: 'figma.com', agentType: CLIENT_TYPES.AI_AGENT },
@@ -47,6 +64,23 @@ const KNOWN_CLIENTS = {
     filesystem: { displayName: 'Filesystem', domain: 'filesystem', agentType: CLIENT_TYPES.MCP_SERVER },
     universal: { displayName: 'Universal', domain: 'universal', agentType: CLIENT_TYPES.MCP_SERVER },
 };
+
+// Raw wire-level ai-agent tag value -> canonical KNOWN_CLIENTS key, built from each entry's
+// `variants` list. Single source of truth: add a variant above and both display formatting
+// (findClientInfo/formatDisplayName) and grouping/enforcement callers pick it up automatically.
+const CLIENT_TAG_ALIASES = Object.entries(KNOWN_CLIENTS).reduce((acc, [key, info]) => {
+    (info.variants || []).forEach((variant) => { acc[variant] = key; });
+    return acc;
+}, {});
+
+// Every raw wire-level tag value a canonical agent key aliases (identity if it has no variants).
+const getClientTagVariants = (canonicalKey) => {
+    const variants = KNOWN_CLIENTS[canonicalKey]?.variants;
+    return variants?.length > 0 ? variants : [canonicalKey];
+};
+
+// Canonical KNOWN_CLIENTS key for a raw wire-level tag value (identity if not an aliased variant).
+const resolveClientKey = (rawValue) => CLIENT_TAG_ALIASES[rawValue] ?? rawValue;
 
 const findClientInfo = (tagValue) => {
     if (!tagValue) return null;
@@ -116,7 +150,7 @@ const getTypeFromTags = (envType) => {
     const tags = normalizeEnvType(envType);
     if (tags.length === 0) return CLIENT_TYPES.MCP_SERVER;
     const hasSkill = tags.some(tag => tag.keyName === SKILL_TAG_KEY);
-    const hasAiAgent = tags.some(tag => tag.keyName === ASSET_TAG_KEYS.AI_AGENT);
+    const hasAiAgent = tags.some(tag => tag.keyName === ASSET_TAG_KEYS.AI_AGENT && tag.value !== NOT_ATTACHED_VALUE);
     const hasMcpServer = tags.some(tag => tag.keyName === TYPE_TAG_KEYS.MCP_SERVER);
     if (hasSkill && !hasAiAgent && !hasMcpServer) return CLIENT_TYPES.SKILL;
     for (const tag of tags) {
@@ -129,7 +163,9 @@ const findAssetTag = (envType) => {
     if (!Array.isArray(envType)) return null;
     const keys = Object.values(ASSET_TAG_KEYS);
     for (const tag of envType) {
-        if (tag.keyName && keys.includes(tag.keyName)) return { keyName: tag.keyName, value: tag.value };
+        if (tag.keyName && keys.includes(tag.keyName) && tag.value !== NOT_ATTACHED_VALUE) {
+            return { keyName: tag.keyName, value: tag.value };
+        }
     }
     return null;
 };
@@ -142,6 +178,11 @@ const findTypeTag = (envType) => {
     }
     return null;
 };
+
+// True if the collection carries an explicit browser-llm tag, regardless of what other
+// type/asset tags (gen-ai, ai-agent, browser-llm-agent) are also present or their order.
+const hasBrowserLlmTag = (envType) =>
+    Array.isArray(envType) && envType.some((tag) => tag.keyName === TYPE_TAG_KEYS.BROWSER_LLM);
 
 // Get agent type from tag value using KNOWN_CLIENTS map (for agent rows)
 const getAgentTypeFromValue = (tagValue) => {
@@ -196,6 +237,8 @@ const hasMisconfiguredConfigTag = (envType) => {
     });
 };
 
+const isNotAttachedHostName = (hostName) => !!hostName && hostName.includes(NOT_ATTACHED_VALUE);
+
 export {
     formatDisplayName,
     getDomainForFavicon,
@@ -204,11 +247,17 @@ export {
     getTypeFromTags,
     findAssetTag,
     findTypeTag,
+    hasBrowserLlmTag,
     getAgentTypeFromValue,
     getAgenticCategoryLabel,
+    CLIENT_TAG_ALIASES,
+    getClientTagVariants,
+    resolveClientKey,
     hasPersonalAccountTag,
     hasLocalMcpServerTag,
     hasMisconfiguredConfigTag,
+    isNotAttachedHostName,
+    NOT_ATTACHED_VALUE,
     CLIENT_TYPES,
     TYPE_TAG_KEYS,
     ASSET_TAG_KEYS,

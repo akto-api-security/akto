@@ -283,7 +283,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_changes",
                     }] : []),
-                    {
+                    ...((activeAccount === 1669322524 || (dashboardCategory !== CATEGORY_AGENTIC_SECURITY && dashboardCategory !== CATEGORY_ENDPOINT_SECURITY)) ? [{
                         label: "Sensitive Data",
                         onClick: () => {
                             navigate("/dashboard/observe/sensitive");
@@ -291,7 +291,7 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_sensitive",
-                    },
+                    }] : []),
                     ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AKTO_DAST?.isGranted && dashboardCategory === CATEGORY_DAST ? [{
                         label: "DAST scans",
                         onClick: () => {
@@ -301,7 +301,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_dast_progress"
                     }] : []),
-                    ...((dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") ? [{
+                    ...((dashboardCategory === "MCP Security" || dashboardCategory === "Endpoint Security") ? [{
                         label: "Audit Data",
                         onClick: () => {
                             navigate("/dashboard/observe/audit");

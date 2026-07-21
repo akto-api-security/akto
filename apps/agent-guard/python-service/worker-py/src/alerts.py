@@ -10,10 +10,12 @@ response. None ever raises into the caller.
 """
 
 import logging
+import time
 from typing import Any
 
 import httpx
 
+import metrics_push
 from settings import settings
 
 logger = logging.getLogger(__name__)
@@ -34,7 +36,17 @@ def _fmt_num(v: Any) -> str:
 def _build_blocks(scanner_name: str, scanner_type: str, text: str, result: dict[str, Any]) -> list[dict[str, Any]]:
     details = result.get("details") or {}
     is_valid = bool(result.get("is_valid", True))
-    verdict = "✅ ALLOWED" if is_valid else "🚫 BLOCKED"
+    error = details.get("error", "")
+    # A fail-open verdict (no arbiter reachable, cascade infra broke) also has
+    # is_valid=True — indistinguishable from a genuinely clean scan unless we
+    # check details.error specifically. Without this, a fully-broken Foundry
+    # cascade would post "✅ ALLOWED" to Slack for every single request, with
+    # nothing to tell a human watching the channel that nothing was actually
+    # scanned at all.
+    if error:
+        verdict = "⚠️ DEGRADED (fail-open — not actually scanned)"
+    else:
+        verdict = "✅ ALLOWED" if is_valid else "🚫 BLOCKED"
     risk = _fmt_num(result.get("risk_score", 0.0))
     cascade = details.get("cascade_decision", "—")
     reason = details.get("reason", "")
@@ -68,6 +80,8 @@ def _build_blocks(scanner_name: str, scanner_type: str, text: str, result: dict[
         },
         {"type": "section", "text": {"type": "mrkdwn", "text": f"*Input:*\n```{preview}```"}},
     ]
+    if error:
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*Fail-open reason:* `{error}`"}})
     if reason:
         blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*Reason:* {reason}"}})
     if model_rows:
@@ -95,11 +109,15 @@ async def store_results(completed: list[dict[str, Any]], scanner_name: str) -> N
     base = (settings.DATABASE_ABSTRACTOR_SERVICE_URL or "").strip().rstrip("/")
     if not base:
         return
+    started = time.perf_counter()
     try:
         payload = {"scannerName": scanner_name, "modelResults": completed}
         async with httpx.AsyncClient(timeout=_STORE_TIMEOUT_S) as client:
             resp = await client.post(f"{base}/api/storeGuardrailModelResults", headers=_IDENTITY, json=payload)
+        metrics_push.SAMPLES["alert"].record("store_results", (time.perf_counter() - started) * 1000.0)
         if resp.status_code >= 400:
+            metrics_push.COUNTS["alert_errors"].increment(f"store_results:status_{resp.status_code}")
             logger.warning(f"[Store] returned {resp.status_code} for scanner={scanner_name}")
     except Exception as exc:
+        metrics_push.COUNTS["alert_errors"].increment(f"store_results:{type(exc).__name__}")
         logger.warning(f"[Store] failed for scanner={scanner_name}: {exc}")

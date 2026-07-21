@@ -113,7 +113,8 @@ public class ModuleInfo {
         DAST,
         AGENTIC_TESTING,
         GUARDRAIL, // guardrails-service,
-        ACCOUNT_JOB_EXECUTOR
+        ACCOUNT_JOB_EXECUTOR,
+        SMART_TESTING
     }
 
 }

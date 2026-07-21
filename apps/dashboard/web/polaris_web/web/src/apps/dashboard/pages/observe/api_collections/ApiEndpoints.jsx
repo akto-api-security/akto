@@ -2,6 +2,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon, TextField } from "@shopify/polaris"
 import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import api from "../api"
+import collectionApi from "./api"
 import { useEffect, useMemo, useState, isValidElement } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
@@ -1260,7 +1261,7 @@ function ApiEndpoints(props) {
             label: 'Display graph view',
             state: showSequencesFlow,
             setState: setShowSequencesFlow,
-            condition: true
+            condition: !isEndpointSecurityCategory()
         },
         {
             key: 'dependencies',
@@ -1274,7 +1275,7 @@ function ApiEndpoints(props) {
             label: 'View Schema',
             state: showSchemaView,
             setState: setShowSchemaView,
-            condition: true
+            condition: !isEndpointSecurityCategory()
         },
         {
             key: 'graphqlTree',
@@ -1288,10 +1289,7 @@ function ApiEndpoints(props) {
             label: 'Display REST tree view',
             state: treeViewMode === 'rest',
             setState: (on) => setTreeViewMode(prev => on ? 'rest' : (prev === 'rest' ? null : prev)),
-            // isGraphQLCollection checks if any endpoint has apiType === "GRAPHQL".
-            // Pure REST collections show this; mixed collections show the GraphQL tree
-            // (REST endpoints in a mixed collection are silently excluded from that view).
-            condition: !isGraphQLCollection
+            condition: !isEndpointSecurityCategory() && !isGraphQLCollection
         }
     ];
 
@@ -1330,12 +1328,12 @@ function ApiEndpoints(props) {
                 <div className="inventory-list">
                 <ActionList
                     sections={[
-                        {
-                            title: 'Switch view',
-                            items: viewConfigs
+                        ...(() => {
+                            const switchViewItems = viewConfigs
                                 .map(config => createViewToggleItem(config))
                                 .filter(Boolean)
-                        },
+                            return switchViewItems.length > 0 ? [{ title: 'Switch view', items: switchViewItems }] : []
+                        })(),
                         ...(showSequencesFlow || showSwaggerDependenciesFlow || showSchemaView ? [] : [
                             {
                                 title:'Re-Compute',
@@ -1679,7 +1677,7 @@ function ApiEndpoints(props) {
         try {
             await Promise.all(selectedSkillEndpoints.map(endpoint => {
                 const skillName = endpoint.endpoint.replace('/skills/', '')
-                return api.updateSkillBlockStatus([Number(apiCollectionId)], skillName, block)
+                return collectionApi.updateSkillBlockStatus([Number(apiCollectionId)], skillName, block)
             }))
             const skillUrls = new Set(selectedSkillEndpoints.map(e => e.endpoint))
             setApiInfoList(prev => prev.map(info =>

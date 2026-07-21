@@ -37,6 +37,8 @@ Deploy order: **anonymizer → executor-v2 → executor**.
 |----------------------------------|-----------|
 | `QWEN3GUARD_SA_KEY_JSON`, `GEMMA_VERTEX_SA_KEY_JSON`, `ANTHROPIC_API_KEY` | `QWEN3GUARD_PROJECT`, `QWEN3GUARD_LOCATION`, `QWEN3GUARD_ENDPOINT_ID`, `GEMMA_VERTEX_*`, `ANTHROPIC_MODEL`, `ANONYMIZER_URL`, `DEFAULT_MODEL_CONFIG_JSON` (executor), `SLACK_WEBHOOK_URL` |
 
+Models on Azure AI Foundry instead of Vertex: secrets `QWEN3GUARD_FOUNDRY_API_KEY` / `GEMMA_FOUNDRY_API_KEY` / `AZURE_FOUNDRY_API_KEY`; plain env `*_FOUNDRY_BASE_URL` (endpoint URL from the Foundry portal) and optional `*_FOUNDRY_DEPLOYMENT` / `*_FOUNDRY_MODEL`, with a `DEFAULT_MODEL_CONFIG_JSON` referencing the `qwen3guard_foundry` / `gemma_foundry` providers (see [.env.example](../.env.example)).
+
 Env dropdown empty? Add **Application → Secrets** first, then env **Reference a secret** (not Key Vault directly).
 
 No `docker-compose.yml` upload in Portal — one Container App per service.

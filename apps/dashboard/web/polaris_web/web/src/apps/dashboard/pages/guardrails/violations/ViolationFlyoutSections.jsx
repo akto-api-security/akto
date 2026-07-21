@@ -18,6 +18,7 @@ import MarkdownViewer from "@/apps/dashboard/components/shared/MarkdownViewer";
 import { HighlightedText } from "@/apps/dashboard/components/shared/MarkdownComponents";
 import ConversationHistory from "@/apps/dashboard/pages/testing/TestRunResultPage/components/ConversationHistory";
 import func from "@/util/func";
+import { getDashboardCategory, categoryToShortName } from "@/apps/main/labelHelper";
 import { GUARDRAIL_SECTIONS } from "@/apps/dashboard/pages/threat_detection/constants/guardrailDescriptions";
 import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "@/apps/dashboard/pages/guardrails/components/owaspConfig";
@@ -29,10 +30,23 @@ import ComplianceTags from "@/apps/dashboard/pages/guardrails/components/Complia
 export function EvidenceBlock({ evidence }) {
     if (!evidence) return null;
     const name = evidence.author || evidence.heading;
+    const assetUrl = evidence.apiCollectionId
+        ? `/dashboard/observe/inventory/${evidence.apiCollectionId}?agentic_view=skills`
+        : null;
     return (
         <Box borderRadius="2">
             <VerticalStack gap="3">
-                <Text variant="headingXs" color="subdued">{evidence.title}</Text>
+                <HorizontalStack gap="1" blockAlign="center">
+                    <Text variant="headingXs" color="subdued">{evidence.title}</Text>
+                    {assetUrl && (
+                        <>
+                            <Text variant="headingXs" color="subdued">/</Text>
+                            <Link url={assetUrl} target="_blank">
+                                <Text variant="headingXs">{evidence.assetName}</Text>
+                            </Link>
+                        </>
+                    )}
+                </HorizontalStack>
                 <Box className="violation-evidence-author-row">
                     {evidence.author
                         ? <Avatar size="small" name={evidence.author} initials={func.initials(evidence.author)} />
@@ -61,10 +75,16 @@ function TriggerReason({ reason, policyName }) {
     if (!reason) return null;
     if (policyName && reason.includes(policyName)) {
         const [before, after] = reason.split(policyName);
+        // Include the current category (AGENTIC/ENDPOINT) so a fresh tab — which has no
+        // PersistStore session and would otherwise default to API_SECURITY — lands in the
+        // right module instead of hanging on "Loading guardrail policies...".
+        const categoryShort = categoryToShortName[getDashboardCategory()];
+        const policyUrl = `/dashboard/guardrails/policies?policy=${encodeURIComponent(policyName)}`
+            + (categoryShort ? `&category=${categoryShort}` : "");
         return (
             <Text variant="bodyMd" as="span">
                 {before}
-                <Link url="#" onClick={(e) => e.preventDefault()}>{policyName}</Link>
+                <Link url={policyUrl} external>{policyName}</Link>
                 {after}
             </Text>
         );
@@ -154,8 +174,8 @@ export function OverviewSection({ row, detail }) {
 
     const gridItems = [
         { label: "Detected", value: func.epochToDateTime(row.detected) },
-        { label: "Device ID", value: detail?.deviceId || "—" },
-        { label: "Session ID", value: detail?.sessionId || "—", tooltip: detail?.sessionId || undefined },
+        { label: "Device ID", value: detail?.deviceId || "N/A" },
+        { label: "Session ID", value: detail?.sessionId || "N/A" },
     ];
 
     const hasCompliance = row.complianceMap && Object.keys(row.complianceMap).length > 0;
@@ -175,7 +195,14 @@ export function OverviewSection({ row, detail }) {
 
             <Divider />
 
-            {/* 2. Numbered guardrail sections */}
+            {/* 2. Detected / Device ID / Session ID */}
+            <Box padding="4">
+                <DetailGrid items={gridItems} columns={3} />
+            </Box>
+
+            <Divider />
+
+            {/* 3. Numbered guardrail sections */}
             <Box padding="4">
                 <VerticalStack gap="5">
                     {guardrailSections.map((section, sectionIdx) => (
@@ -219,17 +246,18 @@ export function OverviewSection({ row, detail }) {
                 </VerticalStack>
             </Box>
 
-            <Divider />
+            {topo && (
+                <>
+                    <Divider />
 
-            {/* 3. Other details — topology + device/session grid */}
-            <Box padding="4">
-                <VerticalStack gap="4">
-                    {topo && <AssetTopologyGraph nodes={topo.nodes} edges={topo.edges} />}
-                    <DetailGrid items={gridItems} columns={3} />
-                </VerticalStack>
-            </Box>
+                    {/* 4. Asset topology */}
+                    <Box padding="4">
+                        <AssetTopologyGraph nodes={topo.nodes} edges={topo.edges} />
+                    </Box>
+                </>
+            )}
 
-            {/* 4. OWASP + Compliance — only when data exists */}
+            {/* 5. OWASP + Compliance — only when data exists */}
             {hasBottomSection && (
                 <>
                     <Divider />

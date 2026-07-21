@@ -138,6 +138,15 @@
             <version>12.25.1</version>
         </dependency>
 
+        <!-- Azure Data Explorer (ADX/Kusto) client for the SearchClient AZURE_ADX backend.
+             Pinned to the 7.0.x line: 8.0.0+ raises the minimum JDK to 11, this repo targets
+             Java 8. -->
+        <dependency>
+            <groupId>com.microsoft.azure.kusto</groupId>
+            <artifactId>kusto-data</artifactId>
+            <version>7.0.8</version>
+        </dependency>
+
         <!-- Liquibase -->
         <dependency>
             <groupId>org.liquibase</groupId>

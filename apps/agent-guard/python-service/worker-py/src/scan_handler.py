@@ -1,11 +1,13 @@
 """Cloud-agnostic scan routing shared by the Cloudflare Worker and FastAPI app."""
 
+import logging
 import time
 from collections.abc import Callable, Coroutine
 from typing import Any
 
 import alerts
 import cascade_backpressure
+import metrics_push
 import scan_diag
 from constants import (
     CASCADE_SCANNERS,
@@ -71,6 +73,11 @@ async def scan_payload(
     def _elapsed_ms() -> float:
         return (time.perf_counter() - started) * 1000.0
 
+    def _record(status: str) -> None:
+        elapsed_ms = _elapsed_ms()
+        metrics_push.COUNTS["scan"].increment(f"{scanner_name}:{status}")
+        metrics_push.SAMPLES["scan"].record(scanner_name, elapsed_ms)
+
     if scanner_name not in SUPPORTED_SCANNERS:
         scan_diag.log_scan_outcome(
             "unsupported_scanner",
@@ -78,11 +85,13 @@ async def scan_payload(
             _elapsed_ms(),
             always=True,
         )
+        _record("error")
         return shape_response(scanner_name, True, 0.0, text, {"error": f"unsupported scanner: {scanner_name}"})
 
     if scanner_name in REMOTE_SCANNERS:
         if scanner_name == "Anonymize":
             r = await scan_anonymize(text, config, env)
+            _record("success" if r["is_valid"] else "blocked")
             return shape_response(scanner_name, r["is_valid"], r["risk_score"], r["sanitized_text"], r["details"])
 
     if scanner_name in CASCADE_SCANNERS:
@@ -97,10 +106,12 @@ async def scan_payload(
         if config.get("storeAllResults"):
             store_fn = lambda completed, name: schedule(alerts.store_results(completed, name))
 
-        # Backpressure fail-open to avoid paying for the slow cascade while Vertex
-        # latency is elevated.
+        # Backpressure fail-open to avoid paying for the slow cascade while
+        # Vertex latency is elevated.
         if cascade_backpressure.should_skip_cascade():
             scan_diag.log_backpressure_skip(scanner_name)
+            metrics_push.COUNTS["backpressure_trips"].increment("cascade")
+            _record("skipped")
             return shape_response(
                 scanner_name,
                 True,
@@ -124,6 +135,7 @@ async def scan_payload(
                     "cascade_ms": elapsed,
                 },
             )
+            _record("success" if result["is_valid"] else "blocked")
             return shape_response(
                 scanner_name,
                 result["is_valid"],
@@ -132,20 +144,35 @@ async def scan_payload(
                 result.get("details", {}),
             )
         except Exception as exc:
+            providers_in_play = [entry.get("provider") for entry in config.get("modelConfigs", [])]
             scan_diag.log_scan_outcome(
                 "cascade_error",
                 scanner_name,
                 _elapsed_ms(),
-                extra={"error": str(exc)},
+                extra={
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                    "providers": providers_in_play,
+                },
                 always=True,
+                level=logging.ERROR,
             )
-            return shape_response(
+            _record("error")
+            error_result = shape_response(
                 scanner_name,
                 True,
                 0.0,
                 text,
                 {"scanner_type": scanner_type, "error": f"cascade failed: {exc}"},
             )
+            # Unlike the graceful _error_result path (arbiter unreachable),
+            # a hard exception here previously had NO visibility outside raw
+            # container logs — post_slack was only ever scheduled on the
+            # success path above. Schedule it here too so a broken cascade
+            # (bad config, unexpected bug, not just "arbiter timed out") shows
+            # up in the same channel people actually watch, not just logs.
+            schedule(alerts.post_slack(scanner_name, scanner_type, text, error_result))
+            return error_result
 
     if scanner_name in LOCAL_SCANNERS:
         try:
@@ -156,8 +183,10 @@ async def scan_payload(
                 _elapsed_ms(),
                 extra={"is_valid": r["is_valid"]},
             )
+            _record("success" if r["is_valid"] else "blocked")
             return shape_response(scanner_name, r["is_valid"], r["risk_score"], r["sanitized_text"], r["details"])
         except ValueError:
+            _record("not_implemented")
             return shape_response(
                 scanner_name,
                 True,
@@ -170,4 +199,5 @@ async def scan_payload(
                 },
             )
 
+    _record("error")
     return shape_response(scanner_name, True, 0.0, text, {"error": "unroutable"})

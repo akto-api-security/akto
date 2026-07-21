@@ -194,6 +194,7 @@ message ThreatCategoryWiseCountRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
+  string status = 4;
 }
 
 message ThreatActorFilterRequest {
@@ -220,6 +221,7 @@ message ThreatSeverityWiseCountRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
+  string status = 4;
 }
 
 message ThreatSeverityWiseCountResponse {

@@ -4,6 +4,9 @@ import { devtools, persist, createJSONStorage } from "zustand/middleware"
 const initialState = {
     threatFiltersMap: {},
     guardrailComplianceMap: {},
+    // policyName -> array of currently-approved (non-expired) server ids; used to hide
+    // already-approved servers from the guardrail "Needs Approval" view.
+    guardrailApprovedByPolicy: {},
     accessToken: null,
     currentAgentConversationId: '',
     agentConversation: {},
@@ -30,6 +33,13 @@ let sessionStore = (set) => ({
             set({ guardrailComplianceMap });
         } catch (error) {
             console.error("Error setting guardrailComplianceMap:", error);
+        }
+    },
+    setGuardrailApprovedByPolicy: (guardrailApprovedByPolicy) => {
+        try {
+            set({ guardrailApprovedByPolicy });
+        } catch (error) {
+            console.error("Error setting guardrailApprovedByPolicy:", error);
         }
     },
     setCurrentAgentConversationId: (currentAgentConversationId) => {
