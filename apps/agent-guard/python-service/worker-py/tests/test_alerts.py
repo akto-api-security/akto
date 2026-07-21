@@ -33,6 +33,23 @@ def test_slack_blocks_truncate_long_input():
     assert "x" * 5000 not in flat
 
 
+def test_slack_blocks_flags_fail_open_instead_of_allowed():
+    # is_valid=True here (fail-open convention), but details.error means this
+    # was NEVER ACTUALLY SCANNED — a plain "✅ ALLOWED" would be indistinguishable
+    # from a genuinely clean verdict and hide a fully-broken cascade from anyone
+    # watching Slack.
+    result = {
+        "is_valid": True,
+        "risk_score": 0.0,
+        "details": {"error": "no arbiter configured", "cascade_decision": "no_authority"},
+    }
+    blocks = alerts._build_blocks("PromptInjection", "prompt", "some prompt", result)
+    flat = str(blocks)
+    assert "✅ ALLOWED" not in flat
+    assert "DEGRADED" in flat
+    assert "no arbiter configured" in flat
+
+
 async def test_post_slack_noop_when_unset(monkeypatch):
     monkeypatch.setattr(alerts.settings, "SLACK_WEBHOOK_URL", "")
     called = {"n": 0}

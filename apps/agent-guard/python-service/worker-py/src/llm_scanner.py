@@ -12,7 +12,7 @@ import time
 from typing import Any
 
 from prompts import build_scan_prompt
-from providers import LLMProvider, Qwen3GuardProvider, parse_qwen3guard_result
+from providers import LLMProvider, Qwen3GuardOutput, parse_qwen3guard_result
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ class LLMScanner:
             raise ValueError(f"Scanner {scanner_name} not supported by LLM path")
 
         start = time.time()
-        if isinstance(self.provider, Qwen3GuardProvider):
+        if isinstance(self.provider, Qwen3GuardOutput):
             raw, logprobs = await self.provider.complete_with_logprobs(text)
             result = parse_qwen3guard_result(scanner_name, raw, logprobs)
         else:

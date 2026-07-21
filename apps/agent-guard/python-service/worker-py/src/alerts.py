@@ -36,7 +36,17 @@ def _fmt_num(v: Any) -> str:
 def _build_blocks(scanner_name: str, scanner_type: str, text: str, result: dict[str, Any]) -> list[dict[str, Any]]:
     details = result.get("details") or {}
     is_valid = bool(result.get("is_valid", True))
-    verdict = "✅ ALLOWED" if is_valid else "🚫 BLOCKED"
+    error = details.get("error", "")
+    # A fail-open verdict (no arbiter reachable, cascade infra broke) also has
+    # is_valid=True — indistinguishable from a genuinely clean scan unless we
+    # check details.error specifically. Without this, a fully-broken Foundry
+    # cascade would post "✅ ALLOWED" to Slack for every single request, with
+    # nothing to tell a human watching the channel that nothing was actually
+    # scanned at all.
+    if error:
+        verdict = "⚠️ DEGRADED (fail-open — not actually scanned)"
+    else:
+        verdict = "✅ ALLOWED" if is_valid else "🚫 BLOCKED"
     risk = _fmt_num(result.get("risk_score", 0.0))
     cascade = details.get("cascade_decision", "—")
     reason = details.get("reason", "")
@@ -70,6 +80,8 @@ def _build_blocks(scanner_name: str, scanner_type: str, text: str, result: dict[
         },
         {"type": "section", "text": {"type": "mrkdwn", "text": f"*Input:*\n```{preview}```"}},
     ]
+    if error:
+        blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*Fail-open reason:* `{error}`"}})
     if reason:
         blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*Reason:* {reason}"}})
     if model_rows:
