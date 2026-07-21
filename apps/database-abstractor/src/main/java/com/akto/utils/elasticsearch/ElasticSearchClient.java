@@ -59,7 +59,13 @@ public class ElasticSearchClient {
      */
     public void bulkIndexAgentQueryRecords(List<AgentQueryRecord> records) {
         logger.info("Bulk indexing agent query records: " + records.size());
-        if (!isConfigured() || records == null || records.isEmpty()) return;
+        if (!isConfigured()) {
+            logger.error("ElasticSearchClient not configured, skipping bulk index. ES_HOST set: "
+                + (ES_HOST != null && !ES_HOST.isEmpty()) + ", ES_INDEX_AGENT_QUERY set: "
+                + (ES_INDEX != null && !ES_INDEX.isEmpty()));
+            return;
+        }
+        if (records == null || records.isEmpty()) return;
 
         StringBuilder ndjson = new StringBuilder();
         for (AgentQueryRecord r : records) {
@@ -87,6 +93,7 @@ public class ElasticSearchClient {
         }
 
         String url = trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_bulk";
+        logger.info("ES bulk index request: url=" + url + ", docs=" + records.size());
         Request.Builder rb = new Request.Builder()
             .url(url)
             .method("POST", RequestBody.create(ndjson.toString(), NDJSON_MEDIA))
@@ -94,12 +101,26 @@ public class ElasticSearchClient {
         addAuthHeader(rb);
 
         try (Response resp = http.newCall(rb.build()).execute()) {
+            ResponseBody respBody = resp.body();
+            String bodyText = respBody != null ? respBody.string() : "";
+
             if (!resp.isSuccessful()) {
-                logger.error("ES bulk index failed (" + resp.code() + ") for " + url);
+                logger.error("ES bulk index failed (" + resp.code() + ") for " + url + ": " + bodyText);
+                return;
             }
-            logger.info("ES bulk index successful for " + url);
+
+            try {
+                JSONObject bulkResponse = new JSONObject(bodyText);
+                if (bulkResponse.optBoolean("errors", false)) {
+                    logger.error("ES bulk index had per-item errors for " + url + ": " + bodyText);
+                } else {
+                    logger.info("ES bulk index successful for " + url + ", took=" + bulkResponse.optInt("took", -1) + "ms");
+                }
+            } catch (JSONException e) {
+                logger.error("ES bulk index response was not valid JSON for " + url + ": " + bodyText);
+            }
         } catch (Exception e) {
-            logger.error("ES bulk index error: " + e.getMessage());
+            logger.error("ES bulk index error for " + url + ": " + e, e);
         }
     }
 
