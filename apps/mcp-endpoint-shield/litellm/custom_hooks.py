@@ -170,12 +170,24 @@ class GuardrailsHandler(CustomLogger):
     def extract_agent_name(self, data: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> Optional[str]:
         metadata = data.get("metadata") or (kwargs.get("litellm_params", {}) if kwargs else {}).get("metadata") or {}
 
-        # 1. metadata.agent_name
+        # 1. metadata.agent_name - explicit per-request override, if the application sends one.
         agent = metadata.get("agent_name")
         if agent:
             return self.sanitize_agent_name(str(agent))
 
-        # 2. user_api_key_alias / user_api_key_team_alias
+        # 2. Application identity stamped server-side onto the virtual key. LiteLLM looks the
+        #    key up in its own store and injects the key's metadata into
+        #    litellm_params.metadata.user_api_key_metadata, so application keys carry a stable
+        #    identity (key_type/app_name/app_slug) with no application-side change. Prefer the
+        #    human-readable app_name, then the app_slug.
+        key_metadata = metadata.get("user_api_key_metadata") or {}
+        if key_metadata.get("key_type") == "application":
+            for field in ("app_name", "app_slug"):
+                value = key_metadata.get(field)
+                if value:
+                    return self.sanitize_agent_name(str(value))
+
+        # 3. Fall back to the key alias, then the team alias.
         for key in ("user_api_key_alias", "user_api_key_team_alias"):
             value = metadata.get(key)
             if value:
