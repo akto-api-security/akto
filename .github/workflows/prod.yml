@@ -131,8 +131,8 @@ jobs:
 
       - uses: actions/setup-java@v5
         with:
-          distribution: "adopt"
-          java-version: "8"
+          distribution: "temurin"
+          java-version: "17"
           architecture: x64
       - uses: actions/setup-node@v6
         with:
@@ -605,8 +605,8 @@ jobs:
 
       - uses: actions/setup-java@v5
         with:
-          distribution: "adopt"
-          java-version: "8"
+          distribution: "temurin"
+          java-version: "17"
           architecture: x64
 
       - name: Setup Protoc
@@ -695,8 +695,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
         with:
-          distribution: "adopt"
-          java-version: "8"
+          distribution: "temurin"
+          java-version: "17"
           architecture: x64
       - uses: actions/setup-node@v6
         with:
@@ -798,8 +798,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
         with:
-          distribution: "adopt"
-          java-version: "8"
+          distribution: "temurin"
+          java-version: "17"
           architecture: x64
       - name: Setup Protoc
         uses: arduino/setup-protoc@v3
