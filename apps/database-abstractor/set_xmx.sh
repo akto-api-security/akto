@@ -30,7 +30,9 @@ XMX_MEM=$((MEM_LIMIT_MB * 80 / 100))
 echo "Calculated -Xmx value: ${XMX_MEM} MB"
 
 # Export JAVA_OPTIONS so Jetty picks it up
-export JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m"
+# --add-opens: OGNL (Struts) needs deep reflection into java.lang on Java 17+.
+# (Predicted; confirm/extend via the Java 17 boot — each InaccessibleObjectException names any others.)
+export JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m --add-opens=java.base/java.lang=ALL-UNNAMED"
 
 # Log the final JAVA_OPTIONS value
 echo "JAVA_OPTIONS set to: $JAVA_OPTIONS"

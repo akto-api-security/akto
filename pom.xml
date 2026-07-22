@@ -14,9 +14,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <sonar.organization>akto-api-security</sonar.organization>
-        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-        <jacoco.version>0.8.5</jacoco.version>     
+        <jacoco.version>0.8.12</jacoco.version>
         <jacoco.reportPath>${project.basedir}/../../target/jacoco.exec</jacoco.reportPath>
     </properties>
 
@@ -24,6 +22,56 @@
         <module>apps</module>
         <module>libs</module>
     </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Pin all transitive io.netty:* artifacts to a single fixed version.
+                 Converges the 4.1.101 line and clears multiple High CVEs. -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>4.1.135.Final</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Pin transitive libs to fixed versions to clear Grype Critical/High
+                 CVEs across all modules/images (leaked in via shared libs & SDKs). -->
+            <dependency>
+                <groupId>commons-fileupload</groupId>
+                <artifactId>commons-fileupload</artifactId>
+                <version>1.6.0</version>
+            </dependency>
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>2.14.0</version>
+            </dependency>
+            <dependency>
+                <groupId>commons-beanutils</groupId>
+                <artifactId>commons-beanutils</artifactId>
+                <version>1.11.0</version>
+            </dependency>
+            <dependency>
+                <groupId>com.google.oauth-client</groupId>
+                <artifactId>google-oauth-client</artifactId>
+                <version>1.34.1</version>
+            </dependency>
+            <!-- NOTE: do NOT pin google-oauth-client-jetty / -java6. The old 1.23.0
+                 versions transitively provide org.mortbay.jetty:jetty-util (6.1.26),
+                 which apps/testing imports (org.mortbay.util.ajax.JSON). Bumping the
+                 wrappers drops that jar and breaks the testing compile. Only the base
+                 google-oauth-client had the Grype CVE, so pinning it alone suffices. -->
+
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>42.7.11</version>
+            </dependency>
+            <!-- NOTE: spring-security-crypto High (CVE-2025-22228) has no 5.8.x fix
+                 (5.8.16 is the latest 5.8 release); requires Spring Security 6.x.
+                 Deferred to the Spring 6 migration. -->
+        </dependencies>
+    </dependencyManagement>
 
     <build>
         <plugins>
@@ -98,6 +146,13 @@
                     <append>true</append>
 				</configuration>
             </plugin>                 
+            <plugin>
+                <!-- Modern surefire so shared-module tests run on JDK 17.
+                     The default (2.12.4) crashes on JDK 9+ (broken forked classpath). -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
         </plugins>
     </build>
 
@@ -111,18 +166,18 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.16.1</version>
+            <version>2.18.9</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
-            <version>2.16.1</version>
+            <version>2.18.9</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
-            <version>2.16.1</version>
+            <version>2.18.9</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>

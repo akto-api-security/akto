@@ -24,7 +24,8 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.7.7</version>
+            <!-- version inherited from root <dependencyManagement> (42.7.11, CVE fix).
+                 A hardcoded version here would override the pin and re-introduce the CVE. -->
         </dependency>
         <dependency>
             <groupId>org.mongodb</groupId>
