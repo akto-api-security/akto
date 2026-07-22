@@ -1,5 +1,6 @@
 """Cloud-agnostic scan routing shared by the Cloudflare Worker and FastAPI app."""
 
+import logging
 import time
 from collections.abc import Callable, Coroutine
 from typing import Any
@@ -143,21 +144,35 @@ async def scan_payload(
                 result.get("details", {}),
             )
         except Exception as exc:
+            providers_in_play = [entry.get("provider") for entry in config.get("modelConfigs", [])]
             scan_diag.log_scan_outcome(
                 "cascade_error",
                 scanner_name,
                 _elapsed_ms(),
-                extra={"error": str(exc)},
+                extra={
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                    "providers": providers_in_play,
+                },
                 always=True,
+                level=logging.ERROR,
             )
             _record("error")
-            return shape_response(
+            error_result = shape_response(
                 scanner_name,
                 True,
                 0.0,
                 text,
                 {"scanner_type": scanner_type, "error": f"cascade failed: {exc}"},
             )
+            # Unlike the graceful _error_result path (arbiter unreachable),
+            # a hard exception here previously had NO visibility outside raw
+            # container logs — post_slack was only ever scheduled on the
+            # success path above. Schedule it here too so a broken cascade
+            # (bad config, unexpected bug, not just "arbiter timed out") shows
+            # up in the same channel people actually watch, not just logs.
+            schedule(alerts.post_slack(scanner_name, scanner_type, text, error_result))
+            return error_result
 
     if scanner_name in LOCAL_SCANNERS:
         try:

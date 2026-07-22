@@ -72,3 +72,25 @@ async def test_password_ignores_caller_models_and_runs_foundry_gemma(monkeypatch
     r = await _scan_password()
     assert FakeScanner.calls == ["gemma_foundry"]
     assert r["is_valid"] is False
+
+
+async def test_cascade_exception_still_schedules_slack_alert(monkeypatch):
+    # A hard exception escaping scan_with_model_map (bad config, unexpected
+    # bug — not the graceful "arbiter unreachable" _error_result path) must
+    # still reach alerts.post_slack. Before this fix, only the success path
+    # scheduled it, so a genuinely broken cascade was invisible outside logs.
+    async def _boom(*_a, **_kw):
+        raise RuntimeError("boom: unexpected cascade failure")
+
+    monkeypatch.setattr(scan_handler, "scan_with_model_map", _boom)
+
+    scheduled = []
+    result = await scan_handler.scan_payload(
+        {"scanner_name": "PromptInjection", "scanner_type": "prompt", "text": "hi", "config": HOSTILE_CONFIG},
+        schedule_fn=scheduled.append,
+    )
+
+    assert result["is_valid"] is True
+    assert "cascade failed" in result["details"]["error"]
+    assert len(scheduled) == 1
+    await scheduled[0]  # SLACK_WEBHOOK_URL unset in tests -> no-op, just avoids "never awaited"
