@@ -1,4 +1,4 @@
-import { Badge, Box, Button, ChoiceList, Divider, HorizontalStack, Modal, Text, TextField, Tooltip, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
+import { Badge, Box, Button, ChoiceList, Divider, HorizontalStack, Modal, Text, TextField, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -1037,33 +1037,19 @@ Reference URL: ${window.location.href}`.trim();
         );
         return(
             <Box padding={"4"} paddingBlockStart={"0"} maxWidth="100%">
+                <VerticalStack gap={"2"}>
                 <HorizontalStack wrap={false} align="space-between" gap={"6"}>
                     <Box maxWidth="50%">
-                        <VerticalStack gap={"2"}>
-                            <HorizontalStack gap={"2"} align="start">
-                                {isTitleClickable ? (
-                                    <Button onClick={() => openTest(templateId)} removeUnderline plain monochrome>
-                                        {titleText}
-                                    </Button>
-                                ) : titleText}
-                                <div className={`badge-wrapper-${severity}`}>
-                                    <Badge size="small">{func.toSentenceCase(severity)}</Badge>
-                                </div>
-                            </HorizontalStack>
-                            <HorizontalStack gap={"1"} wrap={false}>
-                                <Tooltip content={moreInfoData?.url}>
-                                    <Text color="subdued" variant="bodySm" truncate>{moreInfoData?.url}</Text>
-                                </Tooltip>
-                                {
-                                    currentTemplateObj?.category?.name && (
-                                        <>
-                                            <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
-                                            <Text color="subdued" variant="bodySm">{currentTemplateObj?.category?.name || "-"}</Text>
-                                        </>
-                                    )
-                                }
-                            </HorizontalStack>
-                        </VerticalStack>
+                        <HorizontalStack gap={"2"} align="start">
+                            {isTitleClickable ? (
+                                <Button onClick={() => openTest(templateId)} removeUnderline plain monochrome>
+                                    {titleText}
+                                </Button>
+                            ) : titleText}
+                            <div className={`badge-wrapper-${severity}`}>
+                                <Badge size="small">{func.toSentenceCase(severity)}</Badge>
+                            </div>
+                        </HorizontalStack>
                     </Box>
                     <HorizontalStack gap={"2"} wrap={false}>
                         <Popover
@@ -1181,6 +1167,24 @@ Reference URL: ${window.location.href}`.trim();
                         )}
                     </HorizontalStack>
                 </HorizontalStack>
+                <HorizontalStack gap={"1"} wrap={false} align="start">
+                    <Box maxWidth="90%">
+                        <TooltipText
+                            tooltip={moreInfoData?.url}
+                            text={moreInfoData?.url}
+                            textProps={{ color: "subdued", variant: "bodySm" }}
+                        />
+                    </Box>
+                    {
+                        currentTemplateObj?.category?.name && (
+                            <>
+                                <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
+                                <Text color="subdued" variant="bodySm">{currentTemplateObj?.category?.name || "-"}</Text>
+                            </>
+                        )
+                    }
+                </HorizontalStack>
+                </VerticalStack>
             </Box>
         )
     }
