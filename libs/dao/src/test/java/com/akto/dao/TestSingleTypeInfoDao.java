@@ -96,8 +96,12 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
 
     private WriteModel<SingleTypeInfo> createSingleTypeInfoUpdate(String url, String method, SingleTypeInfo.SubType subType, int apiCollectionId, int responseCode) {
         SingleTypeInfoDao.instance.getMCollection().drop();
+        return createSingleTypeInfoUpdate(url, method, subType, apiCollectionId, responseCode, "param", false);
+    }
+
+    private WriteModel<SingleTypeInfo> createSingleTypeInfoUpdate(String url, String method, SingleTypeInfo.SubType subType, int apiCollectionId, int responseCode, String param, boolean isHeader) {
         SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(
-                url, method,responseCode, false, "param", subType, apiCollectionId, false
+                url, method,responseCode, isHeader, param, subType, apiCollectionId, false
         );
         SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 100,0,0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
         UpdateOptions updateOptions = new UpdateOptions();
@@ -201,6 +205,15 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.EMAIL, 1,200));
         bulkWrites.add(createSingleTypeInfoUpdate("C", "GET", SingleTypeInfo.EMAIL, 1,200));
         bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.EMAIL, -1000,200));
+
+        // fetchEndpointsInCollection now requires a "host" header STI record per API
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.GENERIC, 0, -1, "host", true));
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "POST", SingleTypeInfo.GENERIC, 0, -1, "host", true));
+        bulkWrites.add(createSingleTypeInfoUpdate("B", "POST", SingleTypeInfo.GENERIC, 0, -1, "host", true));
+        bulkWrites.add(createSingleTypeInfoUpdate("B", "GET", SingleTypeInfo.GENERIC, 0, -1, "host", true));
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.GENERIC, 1, -1, "host", true));
+        bulkWrites.add(createSingleTypeInfoUpdate("C", "GET", SingleTypeInfo.GENERIC, 1, -1, "host", true));
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.GENERIC, -1000, -1, "host", true));
         SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkWrites);
 
         List<ApiInfo.ApiInfoKey> apiInfoKeyList0 = SingleTypeInfoDao.instance.fetchEndpointsInCollection(0);
@@ -213,6 +226,28 @@ public class TestSingleTypeInfoDao extends MongoBasedTest {
         assertEquals(apiInfoKeyList2.size(), 7);
         assertEquals(apiInfoKeyList3.size(), 1);
 
+    }
+
+    @Test
+    public void testFetchEndpointsInCollectionDedupesMultiParamApi() {
+        SingleTypeInfoDao.instance.getMCollection().drop();
+
+        List<WriteModel<SingleTypeInfo>> bulkWrites = new ArrayList<>();
+        // API "A" GET has a host header record plus several other param/header STI records,
+        // mimicking a real API that has many headers/params captured as separate STI docs.
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.GENERIC, 0, -1, "host", true));
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.EMAIL, 0, 200, "email", false));
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.GENERIC, 0, 200, "authorization", true));
+        bulkWrites.add(createSingleTypeInfoUpdate("A", "GET", SingleTypeInfo.GENERIC, 0, 200, "user-agent", true));
+
+        // API "B" POST also has a host header plus one other param
+        bulkWrites.add(createSingleTypeInfoUpdate("B", "POST", SingleTypeInfo.GENERIC, 0, -1, "host", true));
+        bulkWrites.add(createSingleTypeInfoUpdate("B", "POST", SingleTypeInfo.EMAIL, 0, 200, "email", false));
+
+        SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkWrites);
+
+        List<ApiInfo.ApiInfoKey> apiInfoKeyList = SingleTypeInfoDao.instance.fetchEndpointsInCollection(0);
+        assertEquals(2, apiInfoKeyList.size());
     }
 
     @Test
