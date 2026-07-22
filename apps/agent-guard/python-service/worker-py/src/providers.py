@@ -39,6 +39,20 @@ def _cached_provider(
     return built
 
 
+def _raise_for_status(resp: Any, log_tag: str) -> None:
+    """resp.raise_for_status(), but log the response body first.
+
+    Provider APIs (Azure Foundry especially) put the actual failure reason in
+    the 4xx/5xx body — e.g. a missing/unknown `model` — which httpx's
+    HTTPStatusError message drops entirely, leaving an undebuggable bare status.
+    getattr keeps unit-test fake responses (no `is_error`) working unchanged.
+    """
+    if getattr(resp, "is_error", False):
+        body = (getattr(resp, "text", "") or "")[:1000]
+        logger.error(f"{log_tag} HTTP {resp.status_code}: {body}")
+    resp.raise_for_status()
+
+
 class LLMProvider(ABC):
     name: str = ""
 
@@ -71,39 +85,104 @@ class OpenAIProvider(LLMProvider):
                 "messages": [{"role": "user", "content": prompt}],
             },
         )
-        resp.raise_for_status()
+        _raise_for_status(resp, "[OpenAI]")
         return resp.json()["choices"][0]["message"]["content"]
 
 
 class AnthropicProvider(LLMProvider):
-    name = "anthropic"
+    """Anthropic Messages API — direct api.anthropic.com by default.
 
-    def __init__(self, api_key: str, model: str):
+    URL and auth headers are factored into overridable helpers so hosted
+    variants (e.g. Azure Foundry's native Anthropic route) can reuse the
+    identical request body and response parsing."""
+
+    name = "anthropic"
+    _log_tag = "[Anthropic]"
+    _DEFAULT_BASE_URL = "https://api.anthropic.com"
+
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
         self.api_key = api_key
         self.model = model or DEFAULT_ANTHROPIC_MODEL
-        logger.info(f"[Anthropic] model={self.model}")
+        self.base_url = (base_url or self._DEFAULT_BASE_URL).rstrip("/")
+        logger.info(f"{self._log_tag} model={self.model} base_url={self.base_url}")
+
+    def _messages_url(self) -> str:
+        return f"{self.base_url}/v1/messages"
+
+    def _headers(self) -> dict[str, str]:
+        return dict(
+            _IDENTITY,
+            **{
+                "Content-Type": "application/json",
+                "x-api-key": self.api_key,
+                "anthropic-version": "2023-06-01",
+            },
+        )
 
     async def complete(self, prompt: str) -> str:
-        logger.info(f"[Anthropic] prompt: {prompt}")
+        logger.info(f"{self._log_tag} prompt: {prompt}")
         client = http_client.get_client()
         resp = await client.post(
-            "https://api.anthropic.com/v1/messages",
-            headers=dict(
-                _IDENTITY,
-                **{
-                    "Content-Type": "application/json",
-                    "x-api-key": self.api_key,
-                    "anthropic-version": "2023-06-01",
-                },
-            ),
+            self._messages_url(),
+            headers=self._headers(),
             json={
                 "model": self.model,
                 "max_tokens": 256,
                 "messages": [{"role": "user", "content": prompt}],
             },
         )
-        resp.raise_for_status()
+        _raise_for_status(resp, self._log_tag)
         return resp.json()["content"][0]["text"]
+
+
+def _normalize_anthropic_foundry_base_url(base_url: str) -> str:
+    """Reduce an Azure Foundry Anthropic-route URL to its host+/anthropic base.
+
+    The portal/docs show this route in several shapes (bare ".../anthropic",
+    ".../anthropic/v1", the full ".../anthropic/v1/messages" path, or a
+    managed-compute ".../score"); the Messages API always lives at
+    "{base}/v1/messages", so peel those suffixes back to the base.
+    """
+    url = (base_url or "").strip().rstrip("/")
+    for suffix in ("/score", "/messages", "/v1"):
+        if url.endswith(suffix):
+            url = url[: -len(suffix)].rstrip("/")
+    return url
+
+
+class AnthropicFoundryProvider(AnthropicProvider):
+    """Anthropic (Claude) served through Azure AI Foundry's native Anthropic
+    route (host *.services.ai.azure.com/anthropic).
+
+    Same Messages API schema as direct Anthropic — only host, base path, and
+    auth differ: Azure authenticates with the endpoint key as `api-key` (and
+    Bearer), and the deployment is selected by the body `model` field (also
+    mirrored to the azureml-model-deployment header for managed compute)."""
+
+    name = "anthropic_foundry"
+    _log_tag = "[AnthropicFoundry]"
+
+    def __init__(self, base_url: str, api_key: str, deployment: str = "", model: str = ""):
+        self.deployment = (deployment or "").strip()
+        super().__init__(
+            api_key=api_key,
+            model=model or self.deployment,
+            base_url=_normalize_anthropic_foundry_base_url(base_url),
+        )
+
+    def _headers(self) -> dict[str, str]:
+        headers = dict(
+            _IDENTITY,
+            **{
+                "Content-Type": "application/json",
+                "api-key": self.api_key,
+                "Authorization": f"Bearer {self.api_key}",
+                "anthropic-version": "2023-06-01",
+            },
+        )
+        if self.deployment:
+            headers["azureml-model-deployment"] = self.deployment
+        return headers
 
 
 class VertexAIProvider(LLMProvider):
@@ -140,7 +219,7 @@ class VertexAIProvider(LLMProvider):
             ),
             json={"instances": [instance]},
         )
-        resp.raise_for_status()
+        _raise_for_status(resp, self._log_tag)
         return resp.json()
 
     async def complete(self, prompt: str) -> str:
@@ -255,7 +334,7 @@ class AzureFoundryProvider(LLMProvider):
         body = {"model": self.model, **params} if self.model else params
         client = http_client.get_client()
         resp = await client.post(f"{self.base_url}/chat/completions", headers=headers, json=body)
-        resp.raise_for_status()
+        _raise_for_status(resp, self._log_tag)
         return resp.json()
 
     async def complete(self, prompt: str) -> str:
@@ -479,10 +558,16 @@ def _build_qwen3guard() -> LLMProvider | None:
 
 # Foundry provider name → (class, settings-var prefix). BASE_URL/API_KEY are
 # required (entry baseUrl overrides the env); DEPLOYMENT/MODEL are optional.
-_FOUNDRY_PROVIDERS: dict[str, tuple[type[AzureFoundryProvider], str]] = {
+# All classes take the same (base_url, api_key, deployment, model) constructor:
+# the azure_* family speaks OpenAI /chat/completions, anthropic_foundry speaks
+# the native Anthropic /v1/messages route.
+# Every class shares the (base_url, api_key, deployment="", model="") constructor
+# — Callable[..., LLMProvider] captures that across the two response families.
+_FOUNDRY_PROVIDERS: dict[str, tuple[Callable[..., LLMProvider], str]] = {
     "azure_foundry": (AzureFoundryProvider, "AZURE_FOUNDRY"),
     "gemma_foundry": (GemmaFoundryProvider, "GEMMA_FOUNDRY"),
     "qwen3guard_foundry": (Qwen3GuardFoundryProvider, "QWEN3GUARD_FOUNDRY"),
+    "anthropic_foundry": (AnthropicFoundryProvider, "ANTHROPIC_FOUNDRY"),
 }
 
 
@@ -515,6 +600,7 @@ _BUILDERS: dict[str, Callable[[str, str], LLMProvider | None]] = {
     "azure_foundry": lambda model, base_url: _build_foundry("azure_foundry", model, base_url),
     "gemma_foundry": lambda model, base_url: _build_foundry("gemma_foundry", model, base_url),
     "qwen3guard_foundry": lambda model, base_url: _build_foundry("qwen3guard_foundry", model, base_url),
+    "anthropic_foundry": lambda model, base_url: _build_foundry("anthropic_foundry", model, base_url),
 }
 
 

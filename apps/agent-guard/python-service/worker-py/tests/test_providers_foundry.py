@@ -11,11 +11,13 @@ import providers
 from llm_scanner import LLMScanner
 from prompts import ban_topics
 from providers import (
+    AnthropicFoundryProvider,
     AzureFoundryProvider,
     GemmaFoundryProvider,
     Qwen3GuardFoundryProvider,
     Qwen3GuardOutput,
     Qwen3GuardProvider,
+    _normalize_anthropic_foundry_base_url,
     _normalize_foundry_base_url,
     build_provider_from_config,
 )
@@ -192,3 +194,79 @@ def test_build_from_config_missing_required_vars_skips(monkeypatch):
     monkeypatch.setattr(providers.settings, "AZURE_FOUNDRY_BASE_URL", f"{_HOST}/v1")
     monkeypatch.setattr(providers.settings, "AZURE_FOUNDRY_API_KEY", "")
     assert build_provider_from_config({"provider": "azure_foundry"}) is None
+
+
+# ── anthropic_foundry: native Anthropic Messages route on Foundry ─────────────
+#
+# Unlike the azure_*/gemma_*/qwen_* Foundry providers (OpenAI /chat/completions),
+# Claude on Foundry speaks the Anthropic Messages API at {base}/v1/messages.
+
+_ANTHROPIC_HOST = "https://res.services.ai.azure.com/anthropic"
+
+
+def test_anthropic_foundry_base_url_reduces_to_anthropic_base():
+    # Every shape the portal/docs show collapses to the ".../anthropic" base;
+    # the Messages API is then reached at "{base}/v1/messages".
+    assert _normalize_anthropic_foundry_base_url(_ANTHROPIC_HOST) == _ANTHROPIC_HOST
+    assert _normalize_anthropic_foundry_base_url(f"{_ANTHROPIC_HOST}/") == _ANTHROPIC_HOST
+    assert _normalize_anthropic_foundry_base_url(f"{_ANTHROPIC_HOST}/v1") == _ANTHROPIC_HOST
+    assert _normalize_anthropic_foundry_base_url(f"{_ANTHROPIC_HOST}/v1/messages") == _ANTHROPIC_HOST
+
+
+async def test_anthropic_foundry_posts_messages_payload_with_azure_auth():
+    _FakeClient.payload = {"content": [{"text": "blocked"}]}
+    p = AnthropicFoundryProvider(f"{_ANTHROPIC_HOST}/v1", "key-123", deployment="claude-haiku-4-5")
+    out = await p.complete("hello")
+    assert out == "blocked"
+
+    post = _FakeClient.posts[0]
+    assert post["url"] == f"{_ANTHROPIC_HOST}/v1/messages"
+    # Azure auth: api-key + Bearer, plus the Anthropic version header.
+    assert post["headers"]["api-key"] == "key-123"
+    assert post["headers"]["Authorization"] == "Bearer key-123"
+    assert post["headers"]["anthropic-version"] == "2023-06-01"
+    assert "x-api-key" not in post["headers"]
+    assert post["headers"]["azureml-model-deployment"] == "claude-haiku-4-5"
+    # Anthropic Messages body — deployment name used as the model when unset.
+    assert post["json"] == {
+        "model": "claude-haiku-4-5",
+        "max_tokens": 256,
+        "messages": [{"role": "user", "content": "hello"}],
+    }
+
+
+async def test_anthropic_foundry_model_overrides_deployment():
+    _FakeClient.payload = {"content": [{"text": "ok"}]}
+    p = AnthropicFoundryProvider(_ANTHROPIC_HOST, "k", deployment="dep-1", model="claude-sonnet-4-5")
+    await p.complete("hi")
+    assert _FakeClient.posts[0]["json"]["model"] == "claude-sonnet-4-5"
+
+
+async def test_anthropic_foundry_omits_deployment_header_when_unset():
+    _FakeClient.payload = {"content": [{"text": "ok"}]}
+    p = AnthropicFoundryProvider(_ANTHROPIC_HOST, "k", model="claude-haiku-4-5")
+    await p.complete("hi")
+    assert "azureml-model-deployment" not in _FakeClient.posts[0]["headers"]
+
+
+def test_build_anthropic_foundry_from_config(monkeypatch):
+    monkeypatch.setattr(providers.settings, "ANTHROPIC_FOUNDRY_BASE_URL", f"{_ANTHROPIC_HOST}/v1/messages")
+    monkeypatch.setattr(providers.settings, "ANTHROPIC_FOUNDRY_API_KEY", "key-123")
+    monkeypatch.setattr(providers.settings, "ANTHROPIC_FOUNDRY_DEPLOYMENT", "claude-haiku-4-5")
+    monkeypatch.setattr(providers.settings, "ANTHROPIC_FOUNDRY_MODEL", "")
+    p = build_provider_from_config({"provider": "anthropic_foundry"})
+    assert isinstance(p, AnthropicFoundryProvider)
+    assert p.base_url == _ANTHROPIC_HOST
+    assert p.deployment == "claude-haiku-4-5"
+    assert p.model == "claude-haiku-4-5"
+
+
+def test_build_anthropic_foundry_entry_baseurl_overrides_settings(monkeypatch):
+    monkeypatch.setattr(providers.settings, "ANTHROPIC_FOUNDRY_BASE_URL", "https://env-host/anthropic")
+    monkeypatch.setattr(providers.settings, "ANTHROPIC_FOUNDRY_API_KEY", "key-123")
+    p = build_provider_from_config(
+        {"provider": "anthropic_foundry", "baseUrl": _ANTHROPIC_HOST, "model": "claude-haiku-4-5"}
+    )
+    assert isinstance(p, AnthropicFoundryProvider)
+    assert p.base_url == _ANTHROPIC_HOST
+    assert p.model == "claude-haiku-4-5"
