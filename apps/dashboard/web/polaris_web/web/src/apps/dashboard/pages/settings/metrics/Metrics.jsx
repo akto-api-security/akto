@@ -344,7 +344,8 @@ function Metrics() {
                                     { label: "All", value: "ALL" },
                                     { label: "Traffic Collectors", value: "TRAFFIC_COLLECTORS" },
                                     { label: "Threat Detection", value: "THREAT_DETECTION" },
-                                    { label: "Mini Runtime", value: "MINI_RUNTIME" }
+                                    { label: "Mini Runtime", value: "MINI_RUNTIME" },
+                                    { label: "Account Job Executor", value: "ACCOUNT_JOB_EXECUTOR" }
                                 ]}
                                 initial="ALL"
                                 selected={(val) => {
@@ -356,6 +357,9 @@ function Metrics() {
                                     }
                                     if (val === "MINI_RUNTIME") {
                                         navigate("/dashboard/settings/mini-runtime-metrics");
+                                    }
+                                    if (val === "ACCOUNT_JOB_EXECUTOR") {
+                                        navigate("/dashboard/settings/account-job-executor-metrics");
                                     }
                                 }}
                             />
