@@ -458,6 +458,9 @@ class GuardrailsHandler(CustomLogger):
             litellm_call_id=litellm_call_id,
             available_tools=available_tools,
         )
+        # Surface all virtual-key metadata as tags too, without clobbering the tags above.
+        for k, v in self.key_metadata_tags({"metadata": metadata or {}}).items():
+            tags.setdefault(k, v)
 
         host = self._resolve_host({"metadata": metadata or {}}, user_api_key_dict)
         request_headers_out = self.build_forwarded_headers(request_headers_raw, host)
@@ -680,7 +683,25 @@ class GuardrailsHandler(CustomLogger):
             kwargs,
         )
 
-    def build_tags(self, call_type: str, data: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None, litellm_call_id: Optional[str] = None) -> dict:
+    def _tag_value(self, value: Any) -> str:
+        """Tag maps are string-valued; stringify scalars, JSON-encode anything nested."""
+        if isinstance(value, str):
+            return value
+        if isinstance(value, (int, float, bool)):
+            return str(value)
+        return json.dumps(value)
+
+    def key_metadata_tags(self, data: dict, kwargs: Optional[dict] = None) -> dict:
+        """Every key/value LiteLLM injected onto the virtual key
+        (litellm_params.metadata.user_api_key_metadata) surfaced as tags, so the key's
+        server-side identity (key_type/app_name/app_slug/... for application keys, or any
+        custom metadata an admin stamped on the key) is queryable in Akto alongside the
+        traffic - no application-side change required."""
+        metadata = data.get("metadata") or (kwargs.get("litellm_params", {}) if kwargs else {}).get("metadata") or {}
+        key_metadata = metadata.get("user_api_key_metadata") or {}
+        return {str(k): self._tag_value(v) for k, v in key_metadata.items() if v is not None}
+
+    def build_tags(self, call_type: str, data: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None, litellm_call_id: Optional[str] = None, kwargs: Optional[dict] = None) -> dict:
         tags = {"gen-ai": "Gen AI", "litellm": "LiteLLM"}
         if call_type:
             tags["call_type"] = call_type
@@ -704,6 +725,9 @@ class GuardrailsHandler(CustomLogger):
                     tags["user_id"] = user_id
             except Exception as e:
                 logger.error(f"Failed to enrich tags: {e}")
+        # Surface all virtual-key metadata as tags, without clobbering the core tags above.
+        for k, v in self.key_metadata_tags(data, kwargs).items():
+            tags.setdefault(k, v)
         return tags
 
     def build_forwarded_headers(self, request_headers_raw: dict, host: str) -> dict:
@@ -778,7 +802,7 @@ class GuardrailsHandler(CustomLogger):
 
         request_path = self.extract_request_path(kwargs)
         litellm_call_id = (kwargs or {}).get("litellm_call_id")
-        tags = self.build_tags(call_type, data, user_api_key_dict, litellm_call_id)
+        tags = self.build_tags(call_type, data, user_api_key_dict, litellm_call_id, kwargs)
         host = self._resolve_host(data, user_api_key_dict, kwargs)
 
         proxy_server_request = (
