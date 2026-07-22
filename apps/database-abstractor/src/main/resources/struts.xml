@@ -10,6 +10,12 @@
     <constant name="struts.patternMatcher" value="regex" />
     <constant name="struts.matcher.appendNamedParameters" value="true"/>
     <constant name="struts.multipart.maxSize" value = "209715200" />
+    <!-- struts2-json-plugin 6.x added JSON request-body caps that 2.5.x didn't have (maxLength 2MB,
+         maxStringLength 256KB, maxElements 10000). Restore the old effectively-unlimited behaviour
+         (values parsed to int; max = Integer.MAX_VALUE). -->
+    <constant name="struts.json.maxLength" value="2147483647"/>
+    <constant name="struts.json.maxStringLength" value="2147483647"/>
+    <constant name="struts.json.maxElements" value="2147483647"/>
 
     <package name="user2" namespace="" extends="struts-default, json-default">
 
