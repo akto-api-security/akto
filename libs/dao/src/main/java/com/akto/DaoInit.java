@@ -360,6 +360,7 @@ public class DaoInit {
         ClassModel<NewRelicIntegration> newRelicIntegrationClassModel = ClassModel.builder(NewRelicIntegration.class).enableDiscriminator(true).build();
         ClassModel<OpenTelemetryIntegration> openTelemetryIntegrationClassModel = ClassModel.builder(OpenTelemetryIntegration.class).enableDiscriminator(true).build();
         ClassModel<ModelConfig> modelConfigClassModel = ClassModel.builder(ModelConfig.class).enableDiscriminator(true).build();
+        ClassModel<CopilotStudioIntegration> copilotStudioIntegrationClassModel = ClassModel.builder(CopilotStudioIntegration.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -405,7 +406,8 @@ public class DaoInit {
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
                 traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
                 wizIntegrationClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel, wizApiEndpointsImportJobParamsClassModel,
-                mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel, newRelicIntegrationClassModel, modelConfigClassModel, openTelemetryIntegrationClassModel)
+                mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel, newRelicIntegrationClassModel, modelConfigClassModel,
+                openTelemetryIntegrationClassModel, copilotStudioIntegrationClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -468,7 +470,8 @@ public class DaoInit {
                 new EnumCodec<>(McpRegistryConfig.RegistryType.class),
                 new EnumCodec<>(McpAllowlist.Source.class),
                 new EnumCodec<>(GuardrailPolicies.ModelRole.class),
-                new EnumCodec<>(Log.ActivityType.class)
+                new EnumCodec<>(Log.ActivityType.class),
+                new EnumCodec<>(CopilotStudioIntegration.Status.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
@@ -570,6 +573,7 @@ public class DaoInit {
         UserAnalysisDataDao.instance.createIndicesIfAbsent();
         AgentUsersDao.instance.createIndicesIfAbsent();
         OAuthStatesDao.instance.createIndicesIfAbsent();
+        CopilotStudioIntegrationDao.instance.createIndicesIfAbsent();
         AgentGuardCorpusDao.instance.createIndicesIfAbsent();
         AgentGuardCorpusQueueDao.instance.createIndicesIfAbsent();
     }

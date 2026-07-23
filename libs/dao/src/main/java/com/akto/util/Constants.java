@@ -68,6 +68,7 @@ public class Constants {
     public final static String _AKTO = "AKTO";
 
     public final static String DEFAULT_AKTO_DASHBOARD_URL = "https://app.akto.io";
+    public final static String SCOPE_COPILOT_STUDIO_MULTI_ENV = "https://service.powerapps.com//.default";
     public static final String AKTO_DISCOVERED_APIS_COLLECTION = "shadow_apis";
     public static final String AKTO_MCP_SERVER_TAG = "mcp-server";
     public static final String AKTO_MCP_SERVER_TYPE_TAG = "mcp-server-type";
