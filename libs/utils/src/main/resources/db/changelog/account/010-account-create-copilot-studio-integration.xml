@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Collection for CopilotStudioIntegrationDao (Copilot Studio Multi Environment connector:
+        tenantId/clientId/clientSecret, dataIngestionUrl, status, discovered environments, jobId).
+        Singleton-per-account document, read/written via findOne/updateOneNoUpsert/deleteAll
+        with an empty filter (CopilotStudioAction). tenantId has a unique index since only one
+        integration is supported per account for now.
+    -->
+
+    <changeSet id="010-account-create-copilot-studio-integration" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="copilot_studio_integration"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="copilot_studio_integration"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="copilot_studio_integration"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="010-account-copilot-studio-integration-tenantid-index" author="akto">
+        <mongodb:createIndex collectionName="copilot_studio_integration">
+            <mongodb:keys>{ "tenantId": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "tenantId_1", "unique": true }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="copilot_studio_integration">
+                <mongodb:keys>{ "tenantId": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
