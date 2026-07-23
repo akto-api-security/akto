@@ -139,11 +139,7 @@ public class GuardrailLatencyInfo {
             new GuardrailServiceTarget(
                     "https://1779231193-guardrails.akto.io",
                     "1779231193",
-                    GuardrailProbeType.VALIDATE),
-            new GuardrailServiceTarget(
-                    "https://akto-agent-guard-executor.billing-53a.workers.dev",
-                    null,
-                    GuardrailProbeType.SCAN)
+                    GuardrailProbeType.VALIDATE)
     );
 
     public static final class GuardrailServiceTarget {
