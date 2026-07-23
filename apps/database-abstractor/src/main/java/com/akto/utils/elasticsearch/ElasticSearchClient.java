@@ -131,7 +131,7 @@ public class ElasticSearchClient {
     private JSONObject buildQuery(int accountId, String spanId) throws JSONException {
         JSONArray must = new JSONArray()
             .put(new JSONObject().put("term", new JSONObject().put("accountId", accountId)))
-            .put(new JSONObject().put("term", new JSONObject().put("spanId", spanId)));
+            .put(new JSONObject().put("term", new JSONObject().put("spanId.keyword", spanId)));
 
         JSONObject query = new JSONObject().put("bool", new JSONObject().put("must", must));
 
