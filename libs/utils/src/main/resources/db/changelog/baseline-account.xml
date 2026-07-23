@@ -1893,15 +1893,4 @@
     <changeSet id="baseline-yaml-templates-collection" author="akto">
         <mongodb:createCollection collectionName="yaml_templates"/>
     </changeSet>
-
-    <changeSet id="baseline-copilot-studio-integration-collection" author="akto">
-        <mongodb:createCollection collectionName="copilot_studio_integration"/>
-    </changeSet>
-
-    <changeSet id="baseline-copilot-studio-integration-index-0" author="akto">
-        <mongodb:createIndex collectionName="copilot_studio_integration">
-            <mongodb:keys>{ &quot;tenantId&quot;: 1 }</mongodb:keys>
-            <mongodb:options>{ &quot;name&quot;: &quot;tenantId_1&quot;, &quot;unique&quot;: true }</mongodb:options>
-        </mongodb:createIndex>
-    </changeSet>
 </databaseChangeLog>
