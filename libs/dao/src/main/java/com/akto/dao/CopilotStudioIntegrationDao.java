@@ -21,5 +21,6 @@ public class CopilotStudioIntegrationDao extends AccountsContextDao<CopilotStudi
 
     public void createIndicesIfAbsent() {
         createCollectionIfAbsent(getDBName(), getCollName(), new CreateCollectionOptions());
+        MCollection.createUniqueIndex(getDBName(), getCollName(), new String[]{"tenantId"}, true);
     }
 }
