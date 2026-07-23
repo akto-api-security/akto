@@ -1,13 +1,17 @@
 package com.akto.action;
 
+import com.akto.dao.CopilotStudioIntegrationDao;
 import com.akto.dao.OAuthStatesDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestRolesDao;
+import com.akto.dto.CopilotStudioIntegration;
 import com.akto.dto.OAuthState;
 import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.CopilotOAuthAuthParam;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.sources.AuthWithCond;
+import com.akto.jobs.executors.copilotstudio.CopilotStudioMultiEnvApiClient;
+import com.akto.jobs.executors.copilotstudio.CopilotStudioMultiEnvApiClient.EnvironmentInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
@@ -27,6 +31,7 @@ import okhttp3.Request;
 import okhttp3.Response;
 import org.bson.types.ObjectId;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -35,6 +40,7 @@ public class CopilotOAuthCallbackAction extends ActionSupport {
     private static final LoggerMaker logger = new LoggerMaker(CopilotOAuthCallbackAction.class, LogDb.DASHBOARD);
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final OkHttpClient httpClient = CoreHTTPClient.client;
+    private static final CopilotStudioMultiEnvApiClient multiEnvApiClient = new CopilotStudioMultiEnvApiClient();
 
     private static final String TOKEN_ENDPOINT_TEMPLATE = "https://login.microsoftonline.com/%s/oauth2/v2.0/token";
     private static final String SCOPE = "https://api.powerplatform.com/CopilotStudio.Copilots.Invoke offline_access";
@@ -76,9 +82,15 @@ public class CopilotOAuthCallbackAction extends ActionSupport {
 
         Map<String, String> stateData = oauthState.getData();
         int accountId = Integer.parseInt(stateData.get("accountId"));
-        String callbackRoleId = stateData.get("roleId");
-
         Context.accountId.set(accountId);
+
+        if (CopilotStudioAction.FLOW_TYPE_MULTI_ENV_SETUP.equals(stateData.get("flowType"))) {
+            return handleMultiEnvCallback(stateData, dashboardUrl);
+        }
+
+        // --- Existing TEST_ROLE_AUTH behavior below, unchanged ---
+
+        String callbackRoleId = stateData.get("roleId");
 
         TestRoles role = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(callbackRoleId)));
         if (role == null) {
@@ -147,6 +159,100 @@ public class CopilotOAuthCallbackAction extends ActionSupport {
             redirectUrl = roleSettingsUrl + "&copilotOauthError=exception";
             return Action.ERROR.toUpperCase();
         }
+    }
+
+    /**
+     * Handles the callback for Copilot Studio (Multi Environment) connector setup:
+     * exchanges the code for a delegated token, registers the app with Power Platform,
+     * discovers every environment in the tenant, and stores results for the confirm step.
+     */
+    private String handleMultiEnvCallback(Map<String, String> stateData, String dashboardUrl) {
+        String integrationId = stateData.get("integrationId");
+        String quickStartUrl = dashboardUrl + "/dashboard/quick-start?copilotMultiEnvIntegrationId="
+            + HttpRequestResponseUtils.encode(integrationId);
+
+        CopilotStudioIntegration integration = CopilotStudioIntegrationDao.instance.findOne(
+            Filters.eq(CopilotStudioIntegration.ID, new ObjectId(integrationId)));
+        if (integration == null) {
+            logger.errorAndAddToDb("oauthCallback(multiEnv): integration not found id=" + integrationId);
+            redirectUrl = dashboardUrl + "/dashboard/quick-start?copilotMultiEnvError=integration_not_found";
+            return Action.ERROR.toUpperCase();
+        }
+
+        String callbackUrl = dashboardUrl + "/copilot/oauth/callback";
+
+        String delegatedToken;
+        try {
+            delegatedToken = multiEnvApiClient.getDelegatedToken(
+                integration.getTenantId(), integration.getClientId(), integration.getClientSecret(),
+                code, callbackUrl, Constants.SCOPE_COPILOT_STUDIO_MULTI_ENV);
+        } catch (Exception e) {
+            return failMultiEnvCallback(integrationId, quickStartUrl, e,
+                "Failed to sign in with Microsoft. Please check your Tenant ID, Client ID and Client Secret.");
+        }
+
+        try {
+            multiEnvApiClient.registerApplication(delegatedToken, integration.getClientId());
+        } catch (Exception e) {
+            return failMultiEnvCallback(integrationId, quickStartUrl, e,
+                "Power Platform rejected the app registration. Please check your app's permissions.");
+        }
+
+        String appOnlyToken;
+        try {
+            appOnlyToken = multiEnvApiClient.getClientCredentialsToken(
+                integration.getTenantId(), integration.getClientId(), integration.getClientSecret());
+        } catch (Exception e) {
+            return failMultiEnvCallback(integrationId, quickStartUrl, e,
+                "Failed to authenticate with Microsoft for environment discovery.");
+        }
+
+        List<EnvironmentInfo> discovered;
+        try {
+            discovered = multiEnvApiClient.listEnvironments(appOnlyToken);
+        } catch (Exception e) {
+            return failMultiEnvCallback(integrationId, quickStartUrl, e,
+                "Failed to list environments in your Power Platform tenant.");
+        }
+
+        List<CopilotStudioIntegration.Environment> environments = new ArrayList<>();
+        for (EnvironmentInfo env : discovered) {
+            environments.add(new CopilotStudioIntegration.Environment(env.id, env.url, env.name));
+        }
+
+        int now = Context.now();
+        CopilotStudioIntegrationDao.instance.updateOneNoUpsert(
+            Filters.eq(CopilotStudioIntegration.ID, new ObjectId(integrationId)),
+            Updates.combine(
+                Updates.set(CopilotStudioIntegration.STATUS, CopilotStudioIntegration.Status.ENVIRONMENTS_DISCOVERED.name()),
+                Updates.set(CopilotStudioIntegration.ENVIRONMENTS, environments),
+                Updates.set(CopilotStudioIntegration.UPDATED_AT, now)
+            )
+        );
+
+        logger.infoAndAddToDb("oauthCallback(multiEnv): discovered " + environments.size()
+            + " environments for integration=" + integrationId);
+        redirectUrl = quickStartUrl + "&copilotMultiEnvSuccess=true";
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Logs the full error server-side (status codes, Microsoft trace/correlation IDs, etc.) and
+     * stores/shows the user a concise, step-specific message instead of the raw exception detail.
+     */
+    private String failMultiEnvCallback(String integrationId, String quickStartUrl, Exception e, String userMessage) {
+        logger.error("oauthCallback(multiEnv): failed for integration=" + integrationId, e);
+        logger.errorAndAddToDb("oauthCallback(multiEnv): failed for integration=" + integrationId + ": " + e.getMessage());
+
+        CopilotStudioIntegrationDao.instance.updateOneNoUpsert(
+            Filters.eq(CopilotStudioIntegration.ID, new ObjectId(integrationId)),
+            Updates.combine(
+                Updates.set(CopilotStudioIntegration.LAST_ERROR, userMessage),
+                Updates.set(CopilotStudioIntegration.UPDATED_AT, Context.now())
+            )
+        );
+        redirectUrl = quickStartUrl + "&copilotMultiEnvError=setup_failed";
+        return Action.ERROR.toUpperCase();
     }
 
     private static CopilotOAuthAuthParam findCopilotParam(TestRoles role) {
