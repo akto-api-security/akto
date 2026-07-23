@@ -3,8 +3,9 @@ package com.akto.dto;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
-
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,7 +50,10 @@ public class CopilotStudioIntegration {
         }
     }
 
+    @JsonIgnore
     private ObjectId id;
+    @BsonIgnore
+    private String hexId;
     private String tenantId;
     private String clientId;
     private String clientSecret;
@@ -69,5 +73,9 @@ public class CopilotStudioIntegration {
         this.status = Status.PENDING_OAUTH;
         this.createdAt = now;
         this.updatedAt = now;
+    }
+
+    public String getHexId() {
+        return this.id.toHexString();
     }
 }
