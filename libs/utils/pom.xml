@@ -106,6 +106,16 @@
             <artifactId>graphql-java</artifactId>
             <version>20.0</version>
         </dependency>
+        <!-- Overrides the ancient mockito-core:1.10.19 transitively pulled in via
+             com.sendgrid:sendgrid-java -> java-http-client (compile scope, cglib-based
+             mock maker, broken on JDK 9+). 4.x is the last line supporting JDK 8+ as a
+             minimum, so this stays compatible with modules still building on JDK 8. -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>4.11.0</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
@@ -136,5 +146,30 @@
         <sourceDirectory>src/main/java</sourceDirectory>
         <testSourceDirectory>src/test/java</testSourceDirectory>
     </build>
+
+    <profiles>
+        <!--
+            The built-in Nashorn JS engine (jdk.nashorn.*) was removed in Java 15. When this
+            library is built on JDK 11+, pull in the standalone Nashorn engine so JS
+            test-scripts (ApiExecutorUtil) keep working.
+            - runtime scope: kept off the compile classpath, so the source still compiles on JDK 8.
+            - jdk [11,) activation: Java 8 builds of other services do NOT get this
+              dependency and keep using the built-in engine.
+        -->
+        <profile>
+            <id>nashorn-standalone</id>
+            <activation>
+                <jdk>[11,)</jdk>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.openjdk.nashorn</groupId>
+                    <artifactId>nashorn-core</artifactId>
+                    <version>15.4</version>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 
 </project>
