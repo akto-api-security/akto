@@ -12,11 +12,6 @@ import (
 
 // ExtractSessionID extracts session ID from headers with fallback chain
 func ExtractSessionID(headers map[string]string) string {
-	// NOTE: Authorization is intentionally NOT a session-id source. It works as a
-	// per-user identity only when the Authorization header is a per-principal token;
-	// in shared-upstream-key deployments (e.g. Copilot BYOK, where every request
-	// carries the same Bearer <upstream-key>) it collapses all traffic into one
-	// session, so a single flagged request blocks the entire deployment.
 	candidates := []string{
 		"X-Akto-Installer-Akto_session_id", "x-akto-installer-akto_session_id", // Akto CLI hooks
 		"x-session-id", "X-Session-Id",
