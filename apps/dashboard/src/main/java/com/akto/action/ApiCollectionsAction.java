@@ -406,7 +406,6 @@ public class ApiCollectionsAction extends UserAction {
         long start = System.currentTimeMillis();
         User user = getSUser();
         String loggedInUser = (user != null && user.getLogin() != null) ? user.getLogin() : "system";
-        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] loggedInUser = " + loggedInUser);
 
         // For account 1736798101, serve from cache if available and fresh
         if (Context.accountId.get() == CACHED_ACCOUNT_ID) {
@@ -417,7 +416,7 @@ public class ApiCollectionsAction extends UserAction {
                 httpResponse.setContentType("application/json");
                 httpResponse.setCharacterEncoding("UTF-8");
                 httpResponse.getOutputStream().write(cached);
-                loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] served from cache in " + (System.currentTimeMillis() - start) + "ms, bytes=" + cached.length);
+                loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] served from cache in " + (System.currentTimeMillis() - start) + "ms, bytes=" + cached.length+ ", loggedInUser=" + loggedInUser);
                 return Action.NONE;
             }
         }
@@ -434,7 +433,7 @@ public class ApiCollectionsAction extends UserAction {
                 "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
                 "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType"
         ));
-        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] findAll took " + (System.currentTimeMillis() - stepStart) + "ms, size=" + this.apiCollections.size());
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] findAll took " + (System.currentTimeMillis() - stepStart) + "ms, size=" + this.apiCollections.size()+ ", loggedInUser=" + loggedInUser);
         stepStart = System.currentTimeMillis();
 
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
