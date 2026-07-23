@@ -106,6 +106,12 @@
             <artifactId>graphql-java</artifactId>
             <version>20.0</version>
         </dependency>
+        <!-- Nashorn removed from JDK 15+; needed for ScriptEngine "nashorn" on JDK 17 -->
+        <dependency>
+            <groupId>org.openjdk.nashorn</groupId>
+            <artifactId>nashorn-core</artifactId>
+            <version>15.4</version>
+        </dependency>
     </dependencies>
     <build>
         <plugins>

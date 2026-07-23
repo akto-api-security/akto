@@ -25,7 +25,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jdk.nashorn.api.scripting.ScriptObjectMirror;
 
 public class ApiExecutorUtil {
 
@@ -169,17 +168,19 @@ public class ApiExecutorUtil {
     }
 
     private static StreamingRequestConfig parseStreamingRequest(Object srObj) {
-        if (!(srObj instanceof ScriptObjectMirror)) return null;
-        ScriptObjectMirror srMirror = (ScriptObjectMirror) srObj;
+        if (!(srObj instanceof Map)) return null;
+        Map<?, ?> srMirror = (Map<?, ?>) srObj;
         String srUrl = (String) srMirror.get("url");
         String srBody = (String) srMirror.get("body");
         String lastKey = (String) srMirror.get("lastKey");
         Map<String, String> srHeaders = new HashMap<>();
         Object headersObj = srMirror.get("headers");
-        if (headersObj instanceof ScriptObjectMirror) {
-            ScriptObjectMirror hm = (ScriptObjectMirror) headersObj;
-            for (String key : hm.keySet()) {
-                Object val = hm.get(key);
+        if (headersObj instanceof Map) {
+            Map<?, ?> hm = (Map<?, ?>) headersObj;
+            for (Object keyObj : hm.keySet()) {
+                if (keyObj == null) continue;
+                String key = keyObj.toString();
+                Object val = hm.get(keyObj);
                 if (val != null) srHeaders.put(key, val.toString());
             }
         }
@@ -191,7 +192,12 @@ public class ApiExecutorUtil {
         if (headers == null) return hs;
         for (String key : headers.keySet()) {
             try {
-                ScriptObjectMirror scm = ((ScriptObjectMirror) headers.get(key));
+                Object headerVal = headers.get(key);
+                if (headerVal instanceof List) {
+                    hs.put(key, (List) headerVal);
+                    continue;
+                }
+                Map<?, ?> scm = (Map<?, ?>) headerVal;
                 List<String> val = new ArrayList<>();
                 for (int i = 0; i < scm.size(); i++) {
                     val.add((String) scm.get(Integer.toString(i)));
