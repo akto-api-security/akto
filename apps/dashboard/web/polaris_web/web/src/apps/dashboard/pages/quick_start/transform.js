@@ -1134,6 +1134,30 @@ const customEndpointObj = createEndpointManagementConnector(
     "/public/endpoint_custom.svg"
 )
 
+const fleetEndpointObj = createEndpointManagementConnector(
+    "Fleet",
+    "FLEET_ENDPOINT_SHIELD",
+    "fleet-linux-mdm-deployment",
+    "Deploy Akto Endpoint Shield on Linux devices managed by Fleet MDM.",
+    "/public/fleet.svg"
+)
+
+const landscapeEndpointObj = createEndpointManagementConnector(
+    "Landscape",
+    "LANDSCAPE_ENDPOINT_SHIELD",
+    "landscape-linux-mdm-deployment",
+    "Deploy Akto Endpoint Shield on Ubuntu/Linux devices with Canonical Landscape.",
+    "/public/landscape.svg"
+)
+
+const ansibleEndpointObj = createEndpointManagementConnector(
+    "Ansible",
+    "ANSIBLE_ENDPOINT_SHIELD",
+    "ansible-linux-deployment",
+    "Deploy Akto Endpoint Shield on Linux fleets using Ansible playbooks.",
+    "/public/ansible.svg"
+)
+
 const chromeExtensionObj = {
     icon: '/public/chrome.svg',
     label: "Chrome Extension",
@@ -2221,7 +2245,7 @@ const quickStartFunc = {
 
         const aiAgentConnectors = [
             awsBedrockObj, awsAgentCoreObj, amazonQuickObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
-            n8nImportObj, langchainImportObj, snowflakeObj,
+            n8nImportObj, langchainImportObj, copilotStudioImportObj, snowflakeObj,
             vertexAICustomDeployedModelImportObj, salesforceImportObj
         ]
 
@@ -2263,7 +2287,8 @@ const quickStartFunc = {
 
         const mdmTools = [
             intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
-            jamfEndpointObj, kandjiEndpointObj, customEndpointObj
+            jamfEndpointObj, kandjiEndpointObj, fleetEndpointObj,
+            landscapeEndpointObj, ansibleEndpointObj, customEndpointObj
         ]
 
         const thirdPartySoftware = [
@@ -2302,7 +2327,7 @@ const quickStartFunc = {
                 "Endpoint Management": endpointManagement,
                 "MDM Tools": mdmTools,
                 "Agentic Proxies": agenticProxies,
-                "Platform connectors": [anthropicImportObj, openaiImportObj, m365CopilotObj, copilotStudioImportObj],
+                "Platform connectors": [anthropicImportObj, openaiImportObj, m365CopilotObj],
                 "Browser Extension": browserExtensions,
                 "Locally Hosted Models": localHostedModels,
                 "Secure Web Networks": secureWebNetworks,
@@ -2351,7 +2376,8 @@ const quickStartFunc = {
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
             cloudflareWarpObj, zscalerObj, snowflakeObj,
             intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
-            jamfEndpointObj, kandjiEndpointObj, customEndpointObj,
+            jamfEndpointObj, kandjiEndpointObj, fleetEndpointObj,
+            landscapeEndpointObj, ansibleEndpointObj, customEndpointObj,
             microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj, crowdStrikeObj
         ]
 
@@ -2362,7 +2388,8 @@ const quickStartFunc = {
                 n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, portkeyImportObj, salesforceImportObj, anthropicImportObj, openaiImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj, neovimHookObj, openCodeHookObj,hermesHookObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj,
                 intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
-                jamfEndpointObj, kandjiEndpointObj, customEndpointObj,
+                jamfEndpointObj, kandjiEndpointObj, fleetEndpointObj,
+                landscapeEndpointObj, ansibleEndpointObj, customEndpointObj,
                 microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj, crowdStrikeObj
             ])
         }
