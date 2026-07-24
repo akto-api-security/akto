@@ -234,6 +234,9 @@ func setupRouter(validationHandler *handlers.ValidationHandler, authMiddleware g
 	router.GET("/health", validationHandler.HealthCheck)
 	// Backpressure breaker snapshot — unauthenticated, for diagnostics/load tests.
 	router.GET("/backpressure", validationHandler.BackpressureStatus)
+	// OpenAI-compatible stub for Databricks custom external-model registration —
+	// unauthenticated since Databricks calls it directly with its own bearer token.
+	router.POST("/v1/chat/completions", handlers.ChatCompletions(logger))
 
 	api := router.Group("/api")
 	if authMiddleware != nil {
