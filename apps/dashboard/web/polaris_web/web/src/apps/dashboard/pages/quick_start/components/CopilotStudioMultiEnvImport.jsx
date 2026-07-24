@@ -1,4 +1,4 @@
-import { Badge, Banner, Box, Button, Divider, HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Badge, Banner, Box, Button, Divider, HorizontalStack, Scrollable, Text, TextField, VerticalStack } from '@shopify/polaris'
 import { useEffect, useState } from 'react'
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
 import api from '../api'
@@ -162,14 +162,16 @@ const CopilotStudioMultiEnvImport = () => {
                         Akto discovered {integration.environments?.length || 0} environment(s) in this tenant. Confirming will
                         provision Akto as an application user in each and start importing Copilot Studio conversation data.
                     </Text>
-                    <VerticalStack gap="2">
-                        {(integration.environments || []).map((env) => (
-                            <HorizontalStack key={env.environmentId} align='space-between'>
-                                <Text variant='bodyMd'>{env.environmentName || env.environmentId}</Text>
-                                <Text variant='bodySm' color='subdued'>{env.environmentUrl}</Text>
-                            </HorizontalStack>
-                        ))}
-                    </VerticalStack>
+                    <Scrollable style={{ maxHeight: '160px' }} shadow>
+                        <VerticalStack gap="2">
+                            {(integration.environments || []).map((env) => (
+                                <HorizontalStack key={env.environmentId} align='space-between'>
+                                    <Text variant='bodyMd'>{env.environmentName || env.environmentId}</Text>
+                                    <Text variant='bodySm' color='subdued'>{env.environmentUrl}</Text>
+                                </HorizontalStack>
+                            ))}
+                        </VerticalStack>
+                    </Scrollable>
                     <HorizontalStack align='end'>
                         <Button primary loading={confirming} onClick={handleConfirm}>Confirm & Connect</Button>
                     </HorizontalStack>
