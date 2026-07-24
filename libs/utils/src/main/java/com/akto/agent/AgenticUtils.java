@@ -11,6 +11,9 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.TestRoles;
+import com.akto.dto.traffic.CollectionTags;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.execution.Operations;
 import com.akto.util.Constants;
 import com.akto.util.enums.LoginFlowEnums;
@@ -20,6 +23,8 @@ import com.akto.dto.RawApi;
 public class AgenticUtils {
     private static final AgentClient agentClient = new AgentClient(Constants.AGENT_BASE_URL);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AgentClient.class, LogDb.TESTING);
 
     private static Map<String,String> getMcpAuthPairs(String roleName) {
 
@@ -92,4 +97,27 @@ public class AgenticUtils {
             return "userAiAgent";
         }
     }
+
+    public static boolean isCopilotBotCollection(ApiCollection col) {
+        if (col == null || col.getTagsList() == null) {
+            loggerMaker.infoAndAddToDb("isCopilotBotCollection: collection not found or has no tags");
+            return false;
+        }
+        List<CollectionTags> tags = col.getTagsList();
+        loggerMaker.infoAndAddToDb("isCopilotBotCollection: collection " + col.getId() + " tags=" + tags.stream().map(t -> t.getKeyName() + "=" + t.getValue()).collect(java.util.stream.Collectors.joining(", ")));
+        boolean hasSource  = tags.stream().anyMatch(t -> Constants.AKTO_ENDPOINT_SOURCE_TAG.equals(t.getKeyName()) && Constants.AKTO_COPILOT_SOURCE_VALUE.equals(t.getValue()));
+        boolean hasBotName = tags.stream().anyMatch(t -> Constants.AKTO_COPILOT_BOT_NAME_TAG.equals(t.getKeyName()));
+        return hasSource && hasBotName;
+    }
+
+    public static boolean isLiteLLMAgent(ApiCollection col) {
+        if (col == null || col.getTagsList() == null) {
+            loggerMaker.infoAndAddToDb("isCopilotBotCollection: collection not found or has no tags");
+            return false;
+        }
+        List<CollectionTags> tags = col.getTagsList();
+        return tags.stream().anyMatch(t -> Constants.AI_AGENT_APP_NAME.equals(t.getKeyName()) && "litellm".equals(t.getValue()));
+    }
+
+
 }

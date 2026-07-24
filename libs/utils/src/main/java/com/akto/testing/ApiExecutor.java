@@ -1,6 +1,5 @@
 package com.akto.testing;
 
-import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
@@ -10,7 +9,6 @@ import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunConfig.StreamingRequestConfig;
 import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
@@ -652,7 +650,8 @@ public class ApiExecutor {
         Set<String> toRemove = headers.keySet().stream()
             .filter(h -> h != null && h.startsWith("x-akto-")
                       && !h.equals(Constants.AKTO_IGNORE_FLAG)
-                      && !h.equals(Constants.AKTO_ATTACH_FILE))  // consumed by sendWithRequestBody before the wire
+                      && !h.equals(Constants.AKTO_ATTACH_FILE)
+                      && !h.equals(Constants.AKTO_MESSAGE_ID_HEADER)) // consumed by sendWithRequestBody before the wire
             .collect(Collectors.toSet());
 
         if (!toRemove.isEmpty()) {
