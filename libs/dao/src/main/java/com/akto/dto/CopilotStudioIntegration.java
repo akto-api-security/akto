@@ -48,6 +48,19 @@ public class CopilotStudioIntegration {
             this.environmentUrl = environmentUrl;
             this.environmentName = environmentName;
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof Environment)) return false;
+            Environment other = (Environment) o;
+            return environmentId != null && environmentId.equals(other.environmentId);
+        }
+
+        @Override
+        public int hashCode() {
+            return environmentId != null ? environmentId.hashCode() : 0;
+        }
     }
 
     @JsonIgnore

@@ -186,7 +186,7 @@ public class CopilotStudioAction extends UserAction {
             JOB_TYPE_COPILOT_STUDIO_MULTI_ENV_CONNECTOR,
             CONNECTOR_TYPE_COPILOT_STUDIO_MULTI_ENV,
             jobConfig,
-            DEFAULT_RECURRING_INTERVAL_SECONDS,
+            RECURRING_JOB_INTERVAL_30_MINUTES,
             now,
             now
         );

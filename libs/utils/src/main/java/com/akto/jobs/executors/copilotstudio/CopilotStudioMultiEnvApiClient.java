@@ -1,6 +1,6 @@
 package com.akto.jobs.executors.copilotstudio;
 
-import com.akto.jobs.exception.RetryableJobException;
+import com.akto.dto.CopilotStudioIntegration.Environment;
 import com.akto.log.LoggerMaker;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,18 +38,6 @@ public class CopilotStudioMultiEnvApiClient {
     private static final String ENVIRONMENTS_ENDPOINT =
         "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments?api-version=2020-10-01";
     private static final String APP_ONLY_SCOPE = "https://service.powerapps.com/.default";
-
-    public static class EnvironmentInfo {
-        public final String id;
-        public final String url;
-        public final String name;
-
-        public EnvironmentInfo(String id, String url, String name) {
-            this.id = id;
-            this.url = url;
-            this.name = name;
-        }
-    }
 
     /** App-only token via client_credentials — used for env listing, app-user creation, and every recurring run. */
     public String getClientCredentialsToken(String tenantId, String clientId, String clientSecret) throws Exception {
@@ -119,7 +107,7 @@ public class CopilotStudioMultiEnvApiClient {
      * Lists every environment in the tenant.
      * Response shape per Microsoft's scopes/admin/environments API — verify against current docs before relying on this in production.
      */
-    public List<EnvironmentInfo> listEnvironments(String accessToken) throws Exception {
+    public List<Environment> listEnvironments(String accessToken) throws Exception {
         Request request = new Request.Builder()
             .url(ENVIRONMENTS_ENDPOINT)
             .header("Authorization", "Bearer " + accessToken)
@@ -134,7 +122,7 @@ public class CopilotStudioMultiEnvApiClient {
 
             JsonNode root = objectMapper.readTree(body);
             JsonNode values = root.get("value");
-            List<EnvironmentInfo> environments = new ArrayList<>();
+            List<Environment> environments = new ArrayList<>();
             if (values != null && values.isArray()) {
                 for (JsonNode env : values) {
                     String id = env.has("name") ? env.get("name").asText() : null;
@@ -149,7 +137,7 @@ public class CopilotStudioMultiEnvApiClient {
                         }
                     }
                     if (id != null && instanceUrl != null) {
-                        environments.add(new EnvironmentInfo(id, instanceUrl, displayName));
+                        environments.add(new Environment(id, instanceUrl, displayName));
                     }
                 }
             }

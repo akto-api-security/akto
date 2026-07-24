@@ -11,7 +11,6 @@ import com.akto.dto.testing.CopilotOAuthAuthParam;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.jobs.executors.copilotstudio.CopilotStudioMultiEnvApiClient;
-import com.akto.jobs.executors.copilotstudio.CopilotStudioMultiEnvApiClient.EnvironmentInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
@@ -31,7 +30,6 @@ import okhttp3.Request;
 import okhttp3.Response;
 import org.bson.types.ObjectId;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -207,17 +205,12 @@ public class CopilotOAuthCallbackAction extends ActionSupport {
                 "Failed to authenticate with Microsoft for environment discovery.");
         }
 
-        List<EnvironmentInfo> discovered;
+        List<CopilotStudioIntegration.Environment> environments;
         try {
-            discovered = multiEnvApiClient.listEnvironments(appOnlyToken);
+            environments = multiEnvApiClient.listEnvironments(appOnlyToken);
         } catch (Exception e) {
             return failMultiEnvCallback(integrationId, quickStartUrl, e,
                 "Failed to list environments in your Power Platform tenant.");
-        }
-
-        List<CopilotStudioIntegration.Environment> environments = new ArrayList<>();
-        for (EnvironmentInfo env : discovered) {
-            environments.add(new CopilotStudioIntegration.Environment(env.id, env.url, env.name));
         }
 
         int now = Context.now();
