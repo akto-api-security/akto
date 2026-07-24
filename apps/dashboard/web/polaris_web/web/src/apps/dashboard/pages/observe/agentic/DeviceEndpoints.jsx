@@ -5,8 +5,6 @@ import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divide
 import MisconfiguredConfigIcon from "@/assets/MisconfiguredConfigIcon.svg";
 import PersonLockIcon from "@/assets/PersonLockIcon.svg";
 import LaptopIcon from "@/assets/Laptop.svg";
-import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
-import { AllEnterpriseModule } from "ag-grid-enterprise";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import AgGridRow from "@/apps/dashboard/components/tables/rows/AgGridRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
@@ -28,8 +26,6 @@ import func from "@/util/func";
 import api from "../api";
 import LocalStore from "../../../../main/LocalStorageStore";
 import { fetchGuardrailPolicyNamesCached } from "../../guardrails/topicGuardrailUtils";
-
-ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
 // ─── Stat + chart cards ───────────────────────────────────────────────────────
 
