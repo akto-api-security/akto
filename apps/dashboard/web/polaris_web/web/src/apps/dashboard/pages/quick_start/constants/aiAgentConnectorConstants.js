@@ -7,6 +7,7 @@
 export const CONNECTOR_TYPE_N8N = 'N8N';
 export const CONNECTOR_TYPE_LANGCHAIN = 'LANGCHAIN';
 export const CONNECTOR_TYPE_COPILOT_STUDIO = 'COPILOT_STUDIO';
+export const CONNECTOR_TYPE_COPILOT_STUDIO_MULTI_ENV = 'COPILOT_STUDIO_MULTI_ENV';
 export const CONNECTOR_TYPE_DATABRICKS = 'DATABRICKS';
 export const CONNECTOR_TYPE_SNOWFLAKE = 'SNOWFLAKE';
 export const CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'VERTEX_AI_CUSTOM_DEPLOYED_MODEL';
@@ -18,6 +19,7 @@ export const CONNECTOR_TYPE_OPENAI = 'OPENAI';
 export const CONNECTOR_NAME_N8N = 'N8N';
 export const CONNECTOR_NAME_LANGCHAIN = 'Langchain';
 export const CONNECTOR_NAME_COPILOT_STUDIO = 'Copilot Studio';
+export const CONNECTOR_NAME_COPILOT_STUDIO_MULTI_ENV = 'Copilot Studio (Multi Environment)';
 export const CONNECTOR_NAME_DATABRICKS = 'Databricks';
 export const CONNECTOR_NAME_SNOWFLAKE = 'Snowflake';
 export const CONNECTOR_NAME_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'Vertex AI Custom Deployed Model';
@@ -29,6 +31,7 @@ export const CONNECTOR_NAME_OPENAI = 'OpenAI';
 export const DOCS_URL_N8N = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/n8n';
 export const DOCS_URL_LANGCHAIN = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/langchain';
 export const DOCS_URL_COPILOT_STUDIO = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/microsoft-copilot-studio';
+export const DOCS_URL_COPILOT_STUDIO_MULTI_ENV = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/microsoft-copilot-studio';
 export const DOCS_URL_DATABRICKS = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/databrics';
 export const DOCS_URL_SNOWFLAKE = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/snowflake';
 export const DOCS_URL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/vertex-ai-custom-deployed-model';
@@ -65,6 +68,10 @@ export const FIELD_DATAVERSE_TENANT_ID = 'dataverseTenantId';
 export const FIELD_DATAVERSE_CLIENT_ID = 'dataverseClientId';
 export const FIELD_DATAVERSE_CLIENT_SECRET = 'dataverseClientSecret';
 export const FIELD_DATAVERSE_BOT_IDS = 'dataverseBotIds';
+export const FIELD_COPILOT_MULTI_ENV_TENANT_ID = 'copilotMultiEnvTenantId';
+export const FIELD_COPILOT_MULTI_ENV_CLIENT_ID = 'copilotMultiEnvClientId';
+export const FIELD_COPILOT_MULTI_ENV_CLIENT_SECRET = 'copilotMultiEnvClientSecret';
+export const FIELD_COPILOT_MULTI_ENV_DATA_INGESTION_URL = 'copilotMultiEnvDataIngestionUrl';
 export const FIELD_SNOWFLAKE_ACCOUNT_URL = 'snowflakeAccountUrl';
 export const FIELD_SNOWFLAKE_AUTH_TYPE = 'snowflakeAuthType';
 export const FIELD_SNOWFLAKE_USERNAME = 'snowflakeUsername';
@@ -108,6 +115,7 @@ export const AUTH_TYPE_KEY_PAIR = 'KEY_PAIR';
 export const DESCRIPTION_N8N = 'Use our N8N feature to capture traffic and instantly send it to your dashboard for real-time insights.';
 export const DESCRIPTION_LANGCHAIN = 'Use our Langchain feature to capture traffic from LangSmith and instantly send it to your dashboard for real-time insights.';
 export const DESCRIPTION_COPILOT_STUDIO = 'Use our Copilot Studio feature to capture traffic from Azure Application Insights and instantly send it to your dashboard for real-time insights.';
+export const DESCRIPTION_COPILOT_STUDIO_MULTI_ENV = 'Connect your Power Platform tenant once and Akto automatically discovers every environment, provisions itself as an application user in each, and imports Copilot Studio conversation data from all of them.';
 export const DESCRIPTION_DATABRICKS = 'Import Databricks agents seamlessly into AKTO.';
 export const DESCRIPTION_SNOWFLAKE = 'Connect to your Snowflake account to discover agents using Cortex and automatically fetch data for all Snowflake agents.';
 export const DESCRIPTION_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'Connect to your GCP BigQuery to import Vertex AI Custom Deployed Model prediction logs into AKTO.';
@@ -321,6 +329,39 @@ export const COPILOT_STUDIO_FIELDS = [
         label: 'URL for Data Ingestion Service',
         type: FIELD_TYPE_URL,
         placeholder: 'https://ingestion.example.com'
+    }
+];
+
+// Copilot Studio (Multi Environment) Field Configuration — credentials only; environments are
+// discovered automatically after the Microsoft OAuth redirect, not entered here.
+export const COPILOT_STUDIO_MULTI_ENV_FIELDS = [
+    {
+        name: FIELD_COPILOT_MULTI_ENV_TENANT_ID,
+        label: 'Azure AD Tenant ID',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+        configKey: FIELD_COPILOT_MULTI_ENV_TENANT_ID
+    },
+    {
+        name: FIELD_COPILOT_MULTI_ENV_CLIENT_ID,
+        label: 'Azure AD App Client ID',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+        configKey: FIELD_COPILOT_MULTI_ENV_CLIENT_ID
+    },
+    {
+        name: FIELD_COPILOT_MULTI_ENV_CLIENT_SECRET,
+        label: 'Azure AD App Client Secret',
+        type: FIELD_TYPE_PASSWORD,
+        placeholder: '*******',
+        configKey: FIELD_COPILOT_MULTI_ENV_CLIENT_SECRET
+    },
+    {
+        name: FIELD_COPILOT_MULTI_ENV_DATA_INGESTION_URL,
+        label: 'URL for Data Ingestion Service',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://ingestion.example.com',
+        configKey: FIELD_COPILOT_MULTI_ENV_DATA_INGESTION_URL
     }
 ];
 

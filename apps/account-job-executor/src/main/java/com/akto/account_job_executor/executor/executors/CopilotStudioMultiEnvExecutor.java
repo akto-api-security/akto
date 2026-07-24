@@ -1,0 +1,139 @@
+package com.akto.account_job_executor.executor.executors;
+
+import com.akto.account_job_executor.client.CyborgApiClient;
+import com.akto.account_job_executor.executor.AccountJobExecutor;
+import com.akto.dao.context.Context;
+import com.akto.dto.CopilotStudioIntegration;
+import com.akto.dto.jobs.AccountJob;
+import com.akto.jobs.executors.copilotstudio.CopilotStudioMultiEnvApiClient;
+import com.akto.log.LoggerMaker;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static com.akto.jobs.executors.AIAgentConnectorConstants.*;
+
+/**
+ * Executor for the Copilot Studio (Multi Environment) connector.
+ * On every recurring run: re-fetches the environment list from Microsoft, creates the Dataverse
+ * application user only for environments that don't already have one, then hands off to the
+ * same copilot-shield binary AIAgentConnectorExecutor uses for COPILOT_STUDIO — once per environment.
+ *
+ * This is a singleton executor - use CopilotStudioMultiEnvExecutor.INSTANCE to access it.
+ */
+public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
+
+    public static final CopilotStudioMultiEnvExecutor INSTANCE = new CopilotStudioMultiEnvExecutor();
+
+    private static final LoggerMaker logger = new LoggerMaker(CopilotStudioMultiEnvExecutor.class);
+    private static final CopilotStudioMultiEnvApiClient apiClient = new CopilotStudioMultiEnvApiClient();
+
+    private CopilotStudioMultiEnvExecutor() {
+    }
+
+    @Override
+    protected void runJob(AccountJob job) throws Exception {
+        Map<String, Object> config = job.getConfig();
+        if (config == null || config.isEmpty()) {
+            throw new IllegalArgumentException("Job config is null or empty for job: " + job.getId());
+        }
+
+        Object integrationIdObj = config.get(CONFIG_COPILOT_STUDIO_MULTI_ENV_INTEGRATION_ID);
+        if (integrationIdObj == null) {
+            throw new IllegalArgumentException("Missing copilot studio integration ID for job: " + job.getId());
+        }
+        String integrationId = integrationIdObj.toString();
+        logger.info("CopilotStudioMultiEnv: job started: jobId={}, integrationId={}", job.getId(), integrationId);
+
+        CopilotStudioIntegration integration = CyborgApiClient.findCopilotStudioIntegrationById(integrationId);
+        if (integration == null) {
+            throw new IllegalArgumentException("CopilotStudioIntegration not found: " + integrationId);
+        }
+
+        String appOnlyToken = apiClient.getClientCredentialsToken(
+            integration.getTenantId(), integration.getClientId(), integration.getClientSecret());
+
+        List<CopilotStudioIntegration.Environment> discovered = new ArrayList<>();
+        try {
+            discovered = apiClient.listEnvironments(appOnlyToken);
+        } catch (Exception e) {
+            logger.error("CopilotStudioMultiEnv: failed to list environments for integration={}: {}",
+                integrationId, e.getMessage());
+        }
+        int existingCount = integration.getEnvironments().size();
+        mergeDiscoveredEnvironments(integration, discovered);
+        int newCount = integration.getEnvironments().size() - existingCount;
+        logger.info("CopilotStudioMultiEnv: integrationId={}, existingEnvironments={}, newEnvironments={}, totalEnvironments={}",
+            integrationId, existingCount, newCount, integration.getEnvironments().size());
+
+        updateJobHeartbeat(job);
+
+        int now = Context.now();
+        int failures = 0;
+        StringBuilder errorSummary = new StringBuilder();
+
+        for (CopilotStudioIntegration.Environment env : integration.getEnvironments()) {
+            logger.info("CopilotStudioMultiEnv: processing environment: environmentId={}, appUserCreated={}",
+                env.getEnvironmentId(), env.isAppUserCreated());
+            try {
+                if (!env.isAppUserCreated()) {
+                    apiClient.createApplicationUser(appOnlyToken, env.getEnvironmentId(), integration.getClientId());
+                    env.setAppUserCreated(true);
+                    logger.info("CopilotStudioMultiEnv: app user created: environmentId={}", env.getEnvironmentId());
+                }
+
+                Map<String, Object> envConfig = new HashMap<>();
+                envConfig.put(CONFIG_DATAVERSE_ENVIRONMENT_URL, env.getEnvironmentUrl());
+                envConfig.put(CONFIG_DATAVERSE_TENANT_ID, integration.getTenantId());
+                envConfig.put(CONFIG_DATAVERSE_CLIENT_ID, integration.getClientId());
+                envConfig.put(CONFIG_DATAVERSE_CLIENT_SECRET, integration.getClientSecret());
+                envConfig.put(CONFIG_DATA_INGESTION_SERVICE_URL, integration.getDataIngestionUrl());
+
+                BinaryConnectorRunner.run(job, envConfig, BINARY_NAME_COPILOT_STUDIO);
+
+                env.setLastIngestedAt(now);
+                env.setLastError(null);
+                logger.info("CopilotStudioMultiEnv: environment ingested successfully: environmentId={}",
+                    env.getEnvironmentId());
+            } catch (Exception e) {
+                failures++;
+                String reason = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                env.setLastError(reason);
+                errorSummary.append(env.getEnvironmentId()).append(": ").append(reason).append("; ");
+                logger.error("CopilotStudioMultiEnv: environment failed: environmentId={}, error={}",
+                    env.getEnvironmentId(), reason);
+            }
+
+            updateJobHeartbeat(job);
+        }
+
+        persistEnvironments(integrationId, integration);
+
+        if (failures > 0) {
+            throw new Exception(failures + " of " + integration.getEnvironments().size()
+                + " environment(s) failed: " + errorSummary);
+        }
+
+        logger.info("CopilotStudioMultiEnv job completed successfully: jobId={}, environments={}",
+            job.getId(), integration.getEnvironments().size());
+    }
+
+    /** Adds newly-discovered environments; leaves already-known ones (and their appUserCreated/lastIngestedAt state) untouched. */
+    private static void mergeDiscoveredEnvironments(CopilotStudioIntegration integration,
+                                                     List<CopilotStudioIntegration.Environment> discovered) {
+        List<CopilotStudioIntegration.Environment> environments = integration.getEnvironments();
+        for (CopilotStudioIntegration.Environment env : discovered) {
+            if (!environments.contains(env)) {
+                environments.add(env);
+                logger.info("CopilotStudioMultiEnv: discovered new environment: environmentId={}", env.getEnvironmentId());
+            }
+        }
+    }
+
+    private static void persistEnvironments(String integrationId, CopilotStudioIntegration integration) {
+        integration.setUpdatedAt(Context.now());
+        CyborgApiClient.updateCopilotStudioIntegration(integrationId, integration);
+    }
+}

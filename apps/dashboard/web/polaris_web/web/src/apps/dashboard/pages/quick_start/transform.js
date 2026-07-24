@@ -90,6 +90,12 @@ import MicrosoftDefenderRunQueriesConnector from "./components/MicrosoftDefender
 import SentinelOneConnector from "./components/SentinelOneConnector"
 import WizSource from "./components/WizSource"
 import CrowdStrikeConnector from "./components/CrowdStrikeConnector"
+import CopilotStudioMultiEnvImport from "./components/CopilotStudioMultiEnvImport"
+import {
+    CONNECTOR_NAME_COPILOT_STUDIO_MULTI_ENV,
+    DESCRIPTION_COPILOT_STUDIO_MULTI_ENV,
+    DOCS_URL_COPILOT_STUDIO_MULTI_ENV
+} from "./constants/aiAgentConnectorConstants"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -1230,6 +1236,16 @@ const copilotStudioImportObj = {
     />
 }
 
+const copilotStudioMultiEnvImportObj = {
+    icon: '/public/copilot.svg',
+    label: CONNECTOR_NAME_COPILOT_STUDIO_MULTI_ENV,
+    text: DESCRIPTION_COPILOT_STUDIO_MULTI_ENV,
+    docsUrl: DOCS_URL_COPILOT_STUDIO_MULTI_ENV,
+    key: "COPILOT_STUDIO_MULTI_ENV_IMPORT",
+    component: <CopilotStudioMultiEnvImport />,
+    badge: "Beta"
+}
+
 const m365CopilotObj = {
     icon: '/public/microsoft-copilot.svg',
     label: "Microsoft 365 Copilot",
@@ -2302,7 +2318,7 @@ const quickStartFunc = {
                 "Endpoint Management": endpointManagement,
                 "MDM Tools": mdmTools,
                 "Agentic Proxies": agenticProxies,
-                "Platform connectors": [anthropicImportObj, openaiImportObj, m365CopilotObj, copilotStudioImportObj],
+                "Platform connectors": [anthropicImportObj, openaiImportObj, m365CopilotObj, copilotStudioImportObj, copilotStudioMultiEnvImportObj],
                 "Browser Extension": browserExtensions,
                 "Locally Hosted Models": localHostedModels,
                 "Secure Web Networks": secureWebNetworks,
@@ -2339,13 +2355,13 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal() || func.isLimitedAccount()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, neovimHookObj, openCodeHookObj, hermesHookObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, copilotStudioMultiEnvImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, neovimHookObj, openCodeHookObj, hermesHookObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, portkeyImportObj, vertexAICustomDeployedModelImportObj, neovimHookObj, openCodeHookObj,hermesHookObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, copilotStudioMultiEnvImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, portkeyImportObj, vertexAICustomDeployedModelImportObj, neovimHookObj, openCodeHookObj,hermesHookObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, authenticationTokenObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,

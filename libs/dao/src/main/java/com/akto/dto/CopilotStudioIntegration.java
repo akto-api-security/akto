@@ -20,6 +20,10 @@ import java.util.List;
 public class CopilotStudioIntegration {
 
     public static final String ID = "_id";
+    public static final String TENANT_ID = "tenantId";
+    public static final String CLIENT_ID = "clientId";
+    public static final String CLIENT_SECRET = "clientSecret";
+    public static final String DATA_INGESTION_URL = "dataIngestionUrl";
     public static final String STATUS = "status";
     public static final String ENVIRONMENTS = "environments";
     public static final String JOB_ID = "jobId";
@@ -47,6 +51,19 @@ public class CopilotStudioIntegration {
             this.environmentId = environmentId;
             this.environmentUrl = environmentUrl;
             this.environmentName = environmentName;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof Environment)) return false;
+            Environment other = (Environment) o;
+            return environmentId != null && environmentId.equals(other.environmentId);
+        }
+
+        @Override
+        public int hashCode() {
+            return environmentId != null ? environmentId.hashCode() : 0;
         }
     }
 
@@ -76,6 +93,6 @@ public class CopilotStudioIntegration {
     }
 
     public String getHexId() {
-        return this.id.toHexString();
+        return this.id == null ? null : this.id.toHexString();
     }
 }

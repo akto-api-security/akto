@@ -1,12 +1,13 @@
 package com.akto.account_job_executor.client;
 
+import com.akto.dto.CopilotStudioIntegration;
 import com.akto.dto.jobs.AccountJob;
 import com.akto.dto.jobs.JobStatus;
 import com.akto.dto.jobs.ScheduleType;
 import com.akto.log.LoggerMaker;
+import com.akto.util.JSONUtils;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mongodb.BasicDBObject;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
@@ -236,6 +237,56 @@ public class CyborgApiClient {
         } catch (Exception e) {
             logger.error("Error fetching job by ID: jobId={}", id, e);
             return null;
+        }
+    }
+
+    /**
+     * Fetch a CopilotStudioIntegration by ID via Cyborg API.
+     * Server-side endpoint to be added in database-abstractor.
+     *
+     * @param integrationId CopilotStudioIntegration ID (hex string)
+     * @return CopilotStudioIntegration or null if not found
+     */
+    public static CopilotStudioIntegration findCopilotStudioIntegrationById(String integrationId) {
+        try {
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("integrationId", integrationId);
+
+            String body = makePostRequest("/fetchCopilotStudioIntegration", requestBody);
+
+            if (body == null || body.isEmpty() || body.equals("null") || body.equals("{}")) {
+                logger.debug("CopilotStudioIntegration not found: integrationId={}", integrationId);
+                return null;
+            }
+
+            Map<String, Object> responseMap = mapper.readValue(body, Map.class);
+            Map<String, Object> integrationMap = (Map<String, Object>) responseMap.get("copilotStudioIntegration");
+
+            if (integrationMap == null || integrationMap.isEmpty()) {
+                logger.debug("CopilotStudioIntegration not found: integrationId={}", integrationId);
+                return null;
+            }
+
+            // Drop the id before converting — CopilotStudioIntegration.id is an ObjectId, which this
+            // plain ObjectMapper has no deserializer for, and the executor never needs it anyway.
+            return JSONUtils.fromJson(integrationMap, CopilotStudioIntegration.class);
+
+        } catch (Exception e) {
+            logger.error("Error fetching CopilotStudioIntegration: integrationId={}", integrationId, e);
+            return null;
+        }
+    }
+
+    public static void updateCopilotStudioIntegration(String integrationId, CopilotStudioIntegration integration) {
+        try {
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("integrationId", integrationId);
+            requestBody.put("copilotStudioIntegration", integration);
+
+            makePostRequest("/updateCopilotStudioIntegration", requestBody);
+
+        } catch (Exception e) {
+            logger.error("Failed to update CopilotStudioIntegration: integrationId={}", integrationId, e);
         }
     }
 
