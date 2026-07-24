@@ -57,6 +57,12 @@ func verifyToken(authHeader string, publicKey *rsa.PublicKey) (int, error) {
 		return 0, fmt.Errorf("missing Authorization header")
 	}
 
+	// Accept both a raw token and the "Bearer <token>" scheme (case-insensitive),
+	// since some clients send the standard Authorization: Bearer <token> form.
+	if fields := strings.Fields(authHeader); len(fields) == 2 && strings.EqualFold(fields[0], "Bearer") {
+		authHeader = fields[1]
+	}
+
 	token, err := jwt.Parse(authHeader, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
