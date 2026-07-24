@@ -86,7 +86,7 @@ function Dropdown(props) {
                 props.selected(filteredSelected[0]);
             }
         },
-        [options, props.menuItems, props.disabledOptions, props.showSelectedItemLabels, props.itemName, props.allowMultiple],
+        [options, props.menuItems, props.disabledOptions, props.showSelectedItemLabels, props.itemName, props.allowMultiple, props.selected],
     );
 
     const getLabel = (id) => {
