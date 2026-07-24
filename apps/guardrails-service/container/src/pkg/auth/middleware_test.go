@@ -80,6 +80,21 @@ func TestMiddleware_ValidTokenSetsAccountID(t *testing.T) {
 	}
 }
 
+func TestMiddleware_BearerSchemeSetsAccountID(t *testing.T) {
+	priv, pub := mustKeyPair(t)
+	token := signToken(t, priv, jwt.MapClaims{"accountId": 1718012345})
+
+	for _, prefix := range []string{"Bearer ", "bearer ", "BEARER "} {
+		status, accountID, set := runRequest(t, pub, prefix+token)
+		if status != http.StatusOK {
+			t.Fatalf("%q: status = %d, want 200", prefix, status)
+		}
+		if !set || accountID != 1718012345 {
+			t.Fatalf("%q: accountId = %d (set=%v), want 1718012345", prefix, accountID, set)
+		}
+	}
+}
+
 func TestMiddleware_MissingHeader(t *testing.T) {
 	_, pub := mustKeyPair(t)
 	if status, _, _ := runRequest(t, pub, ""); status != http.StatusUnauthorized {
