@@ -132,7 +132,7 @@ public class ApiWorkflowExecutorTest extends MongoBasedTest {
     }
 
 
-    //@Test
+    @Test
     public void testValidateTest() {
         ScriptEngineManager factory = new ScriptEngineManager();
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
