@@ -79,7 +79,7 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
                 env.getEnvironmentId(), env.isAppUserCreated());
             try {
                 if (!env.isAppUserCreated()) {
-                    apiClient.createApplicationUser(appOnlyToken, env.getEnvironmentUrl(), integration.getClientId());
+                    apiClient.createApplicationUser(appOnlyToken, env.getEnvironmentId(), integration.getClientId());
                     env.setAppUserCreated(true);
                     logger.info("CopilotStudioMultiEnv: app user created: environmentId={}", env.getEnvironmentId());
                 }
@@ -109,7 +109,7 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
             updateJobHeartbeat(job);
         }
 
-        persistEnvironments(integrationId, integration.getEnvironments());
+        persistEnvironments(integrationId, integration);
 
         if (failures > 0) {
             throw new Exception(failures + " of " + integration.getEnvironments().size()
@@ -132,23 +132,8 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
         }
     }
 
-    private static void persistEnvironments(String integrationId, List<CopilotStudioIntegration.Environment> environments) {
-        List<Map<String, Object>> environmentMaps = new ArrayList<>();
-        for (CopilotStudioIntegration.Environment env : environments) {
-            Map<String, Object> map = new HashMap<>();
-            map.put("environmentId", env.getEnvironmentId());
-            map.put("environmentUrl", env.getEnvironmentUrl());
-            map.put("environmentName", env.getEnvironmentName());
-            map.put("appUserCreated", env.isAppUserCreated());
-            map.put("lastIngestedAt", env.getLastIngestedAt());
-            map.put("lastError", env.getLastError());
-            environmentMaps.add(map);
-        }
-
-        Map<String, Object> updates = new HashMap<>();
-        updates.put("environments", environmentMaps);
-        updates.put("updatedAt", Context.now());
-
-        CyborgApiClient.updateCopilotStudioIntegration(integrationId, updates);
+    private static void persistEnvironments(String integrationId, CopilotStudioIntegration integration) {
+        integration.setUpdatedAt(Context.now());
+        CyborgApiClient.updateCopilotStudioIntegration(integrationId, integration);
     }
 }

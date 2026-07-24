@@ -270,8 +270,6 @@ public class CyborgApiClient {
 
             // Drop the id before converting — CopilotStudioIntegration.id is an ObjectId, which this
             // plain ObjectMapper has no deserializer for, and the executor never needs it anyway.
-            integrationMap.remove("_id");
-            integrationMap.remove("id");
             return JSONUtils.fromJson(integrationMap, CopilotStudioIntegration.class);
 
         } catch (Exception e) {
@@ -280,18 +278,11 @@ public class CyborgApiClient {
         }
     }
 
-    /**
-     * Update a CopilotStudioIntegration's environments (and/or other fields) via Cyborg API.
-     * Server-side endpoint to be added in database-abstractor.
-     *
-     * @param integrationId CopilotStudioIntegration ID (hex string)
-     * @param updates Map of field names to new values
-     */
-    public static void updateCopilotStudioIntegration(String integrationId, Map<String, Object> updates) {
+    public static void updateCopilotStudioIntegration(String integrationId, CopilotStudioIntegration integration) {
         try {
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("integrationId", integrationId);
-            requestBody.put("updates", updates);
+            requestBody.put("copilotStudioIntegration", integration);
 
             makePostRequest("/updateCopilotStudioIntegration", requestBody);
 

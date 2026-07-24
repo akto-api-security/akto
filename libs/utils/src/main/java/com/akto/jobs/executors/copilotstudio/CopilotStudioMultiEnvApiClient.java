@@ -2,6 +2,7 @@ package com.akto.jobs.executors.copilotstudio;
 
 import com.akto.dto.CopilotStudioIntegration.Environment;
 import com.akto.log.LoggerMaker;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.FormBody;
@@ -26,7 +27,7 @@ public class CopilotStudioMultiEnvApiClient {
 
     private static final LoggerMaker logger = new LoggerMaker(CopilotStudioMultiEnvApiClient.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    private static final OkHttpClient client = new OkHttpClient.Builder()
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
@@ -37,6 +38,8 @@ public class CopilotStudioMultiEnvApiClient {
         "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/adminApplications/%s?api-version=2020-10-01";
     private static final String ENVIRONMENTS_ENDPOINT =
         "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments?api-version=2020-10-01";
+    private static final String ADD_APP_USER_ENDPOINT_TEMPLATE =
+        "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments/%s/addAppUser?api-version=2020-10-01";
     private static final String APP_ONLY_SCOPE = "https://service.powerapps.com/.default";
 
     /** App-only token via client_credentials — used for env listing, app-user creation, and every recurring run. */
@@ -147,24 +150,22 @@ public class CopilotStudioMultiEnvApiClient {
     }
 
     /**
-     * Creates the app registration as a Dataverse application user in the given environment.
-     * Request shape per Dataverse's systemusers Web API — verify against current docs before relying on this in production.
+     * Adds the app registration as an application user in the given environment, via the
+     * Power Platform Admin API.
      */
-    public void createApplicationUser(String accessToken, String environmentUrl, String appClientId) throws Exception {
-        String url = environmentUrl + (environmentUrl.endsWith("/") ? "" : "/") + "api/data/v9.2/systemusers";
-        String requestBody = objectMapper.writeValueAsString(Collections.singletonMap("applicationid", appClientId));
+    public void createApplicationUser(String accessToken, String environmentId, String appClientId) throws Exception {
+        String requestBody = objectMapper.writeValueAsString(Collections.singletonMap("servicePrincipalAppId", appClientId));
 
         Request request = new Request.Builder()
-            .url(url)
+            .url(String.format(ADD_APP_USER_ENDPOINT_TEMPLATE, environmentId))
             .header("Authorization", "Bearer " + accessToken)
-            .header("Content-Type", "application/json")
             .post(RequestBody.create(requestBody, MediaType.parse("application/json")))
             .build();
 
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 String body = response.body() != null ? response.body().string() : "";
-                throw new Exception("Failed to create Dataverse application user: status=" + response.code() + " body=" + body);
+                throw new Exception("Failed to add application user to environment: status=" + response.code() + " body=" + body);
             }
         }
     }

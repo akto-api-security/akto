@@ -89,6 +89,6 @@ public class CopilotStudioIntegration {
     }
 
     public String getHexId() {
-        return this.id.toHexString();
+        return this.id == null ? null : this.id.toHexString();
     }
 }
