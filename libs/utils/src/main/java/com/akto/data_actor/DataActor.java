@@ -345,7 +345,12 @@ public abstract class DataActor {
     
     public abstract void storeMcpReconResultsBatch(List<McpReconResult> serverDataList);
 
-    public abstract void storeConversationResults(List<AgentConversationResult> conversationResults);
+    /**
+     * @return the stored Mongo doc ids, in the same order as conversationResults.
+     */
+    public abstract List<String> storeConversationResults(List<AgentConversationResult> conversationResults);
+
+    public abstract void updateAgentConversationToolsMetadata(String docId, Map<String, Object> toolsMetadata);
 
     public abstract void bulkWriteAgentTrafficLogs(List<Object> trafficLogs);
     public abstract YamlTemplate fetchCommonWordList();
@@ -362,5 +367,6 @@ public abstract class DataActor {
 
     public abstract void writeApiSequences(List<ApiSequences> sequences);
     public abstract void storeAgentQueryData(AgentQueryRecord agentQueryRecord);
+    public abstract List<AgentQueryRecord> fetchAgentQueryRecords(String messageId);
     public abstract Map<String, String> fetchDeviceUserMap();
 }

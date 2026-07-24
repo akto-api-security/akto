@@ -6,6 +6,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.Constants;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -20,11 +21,7 @@ import java.util.concurrent.ExecutorService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
-/**
- * Handles POST /utility/execute. Request body: { "url", "method", "body", "headers", "conversationId" }.
- * headers is a JSON string (e.g. "{\"Content-Type\":\"application/json\"}"). Query params go in url.
- * conversationId is stored with the job for correlation.
- */
+
 public class ExecuteApiHandler implements HttpHandler {
 
     private final ApiExecutionJobStore jobStore;
@@ -47,7 +44,7 @@ public class ExecuteApiHandler implements HttpHandler {
         String method = HttpUtil.stringOrNull(json, "method");
         String body = HttpUtil.stringOrNull(json, "body");
         String conversationId = HttpUtil.stringOrNull(json, "conversationId");
-        Map<String, List<String>> headers = headersFromJson(json.get("headers"));
+        Map<String, List<String>> headers = new HashMap<>(headersFromJson(json.get("headers")));
 
         if (url == null || url.isEmpty() || method == null || method.isEmpty()) {
             HttpUtil.sendError(exchange, 400, "url and method are required");
@@ -55,6 +52,12 @@ public class ExecuteApiHandler implements HttpHandler {
         }
 
         url = normalizeUrl(url);
+
+        String jobId = UUID.randomUUID().toString();
+        if (jobStore.isLiteLLMConversation(conversationId)) {
+            headers.put(Constants.AKTO_MESSAGE_ID_HEADER, Collections.singletonList(jobId));
+            headers.put(Constants.AKTO_SOURCE_HEADER, Collections.singletonList(Constants.AKTO_SOURCE_RED_TEAMING));
+        }
 
         OriginalHttpRequest request = new OriginalHttpRequest(
                 url,
@@ -65,7 +68,6 @@ public class ExecuteApiHandler implements HttpHandler {
                 ""
         );
 
-        String jobId = UUID.randomUUID().toString();
         jobStore.put(jobId, ApiExecutionJobStore.JobEntry.pending(conversationId));
 
         executorService.submit(() -> {

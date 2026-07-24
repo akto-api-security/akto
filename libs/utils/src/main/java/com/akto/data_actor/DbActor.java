@@ -751,8 +751,13 @@ public class DbActor extends DataActor {
     }
 
     @Override
-    public void storeConversationResults(List<AgentConversationResult> conversationResults) {
-        DbLayer.storeConversationResults(conversationResults);
+    public List<String> storeConversationResults(List<AgentConversationResult> conversationResults) {
+        return DbLayer.storeConversationResults(conversationResults);
+    }
+
+    @Override
+    public void updateAgentConversationToolsMetadata(String docId, Map<String, Object> toolsMetadata) {
+        DbLayer.updateAgentConversationToolsMetadata(docId, toolsMetadata);
     }
 
     @Override
@@ -834,6 +839,11 @@ public class DbActor extends DataActor {
     
     public void storeAgentQueryData(AgentQueryRecord agentQueryRecord) {
         // no-op: agent query records are sent to ES via ClientActor; DbActor has no local store
+    }
+
+    public List<AgentQueryRecord> fetchAgentQueryRecords(String messageId) {
+        // no-op: agent query records live in ES via ClientActor; DbActor has no local store
+        return new ArrayList<>();
     }
 
     public Map<String, String> fetchDeviceUserMap() {

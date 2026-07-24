@@ -52,6 +52,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -4658,7 +4659,7 @@ public class ClientActor extends DataActor {
     }
 
     @Override
-    public void storeConversationResults(List<AgentConversationResult> conversationResults) {
+    public List<String> storeConversationResults(List<AgentConversationResult> conversationResults) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("conversationResults", conversationResults);
@@ -4669,11 +4670,33 @@ public class ClientActor extends DataActor {
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in storeConversationResults", LoggerMaker.LogDb.RUNTIME);
-                return;
+                return new ArrayList<>();
             }
-        }
-        catch (Exception e) {
+            BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+            Object docIdsArr = payloadObj.get("docIds");
+            List<String> docIds = gson.fromJson(gson.toJson(docIdsArr), new TypeToken<List<String>>(){}.getType());
+            return docIds != null ? docIds : new ArrayList<>();
+        } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in storeConversationResults" + e, LoggerMaker.LogDb.RUNTIME);
+            return new ArrayList<>();
+        }
+    }
+
+    @Override
+    public void updateAgentConversationToolsMetadata(String docId, Map<String, Object> toolsMetadata) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("docId", docId);
+        obj.put("toolsMetadata", toolsMetadata);
+        String jsonBody = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateAgentConversationToolsMetadata", "", "POST", jsonBody, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateAgentConversationToolsMetadata", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateAgentConversationToolsMetadata" + e, LoggerMaker.LogDb.RUNTIME);
         }
     }
 
@@ -4891,6 +4914,30 @@ public class ClientActor extends DataActor {
             ApiExecutor.sendRequestBackOff(request, true, null, false, null);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in flushAgentQueryRecords: " + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+    @Override
+    public List<AgentQueryRecord> fetchAgentQueryRecords(String messageId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("messageId", messageId);
+        String jsonBody = gson.toJson(obj);
+        String urlFinal = Constants.AGENT_QUERY_LOGS_SERVICE_URL.length() > 0 ? Constants.AGENT_QUERY_LOGS_SERVICE_URL + "/api": url;
+        OriginalHttpRequest request = new OriginalHttpRequest(
+            urlFinal + "/getAgentTracesForMessageId", "", "POST", jsonBody, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in getAgentTracesForMessageId", LoggerMaker.LogDb.RUNTIME);
+                return new ArrayList<>();
+            }
+            List<AgentQueryRecord> records = gson.fromJson(responsePayload, new TypeToken<List<AgentQueryRecord>>(){}.getType());
+            return records != null ? records : new ArrayList<>();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in getAgentTracesForMessageId: " + e, LoggerMaker.LogDb.RUNTIME);
+            return new ArrayList<>();
         }
     }
 
