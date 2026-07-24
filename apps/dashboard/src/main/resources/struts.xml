@@ -8735,19 +8735,9 @@
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User started Copilot Studio (Multi Environment) setup</param>
             </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json">
-                <param name="ignoreHierarchy">false</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">COPILOT_STUDIO_MULTI_ENV_CONNECTOR</param>
+            </interceptor-ref>
         </action>
 
         <action name="api/copilotStudio/fetchMultiEnvIntegration" class="com.akto.action.CopilotStudioAction" method="fetchMultiEnvIntegration">
@@ -8757,19 +8747,9 @@
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json">
-                <param name="ignoreHierarchy">false</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">COPILOT_STUDIO_MULTI_ENV_CONNECTOR</param>
+            </interceptor-ref>
         </action>
 
         <action name="api/copilotStudio/multiEnv/confirm" class="com.akto.action.CopilotStudioAction" method="confirmMultiEnvIntegration">
@@ -8780,19 +8760,9 @@
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User confirmed Copilot Studio (Multi Environment) environments</param>
             </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json">
-                <param name="ignoreHierarchy">false</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">COPILOT_STUDIO_MULTI_ENV_CONNECTOR</param>
+            </interceptor-ref>
         </action>
 
         <action name="api/copilotStudio/multiEnv/remove" class="com.akto.action.CopilotStudioAction" method="removeMultiEnvIntegration">
@@ -8803,19 +8773,9 @@
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User removed Copilot Studio (Multi Environment) integration</param>
             </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json">
-                <param name="ignoreHierarchy">false</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">COPILOT_STUDIO_MULTI_ENV_CONNECTOR</param>
+            </interceptor-ref>
         </action>
 
         <action name="api/fetchEndpointsBasedOnHostName" class="com.akto.action.observe.InventoryAction" method="fetchEndpointsBasedOnHostName">
