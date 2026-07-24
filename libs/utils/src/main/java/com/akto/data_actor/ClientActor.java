@@ -4915,8 +4915,7 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in getAgentTracesForMessageId", LoggerMaker.LogDb.RUNTIME);
                 return new ArrayList<>();
             }
-            BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
-            List<AgentQueryRecord> records = gson.fromJson(gson.toJson(payloadObj), new TypeToken<List<AgentQueryRecord>>(){}.getType());
+            List<AgentQueryRecord> records = gson.fromJson(responsePayload, new TypeToken<List<AgentQueryRecord>>(){}.getType());
             return records != null ? records : new ArrayList<>();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in getAgentTracesForMessageId: " + e, LoggerMaker.LogDb.RUNTIME);
