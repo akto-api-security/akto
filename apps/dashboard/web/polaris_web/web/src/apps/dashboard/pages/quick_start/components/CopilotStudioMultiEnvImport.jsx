@@ -1,4 +1,4 @@
-import { Badge, Banner, Box, Button, Divider, HorizontalStack, Scrollable, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Badge, Banner, Box, Button, Divider, HorizontalStack, Link, Scrollable, Text, TextField, VerticalStack } from '@shopify/polaris'
 import { useEffect, useState } from 'react'
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
 import api from '../api'
@@ -10,7 +10,7 @@ import func from '@/util/func'
  * The only way to change credentials is to remove the integration (which also stops its job)
  * and connect again from a clean state.
  */
-const CopilotStudioMultiEnvImport = () => {
+const CopilotStudioMultiEnvImport = ({ docsUrl }) => {
     const [tenantId, setTenantId] = useState('')
     const [clientId, setClientId] = useState('')
     const [clientSecret, setClientSecret] = useState('')
@@ -48,8 +48,8 @@ const CopilotStudioMultiEnvImport = () => {
             .then((res) => {
                 window.location.href = res.authorizationUrl
             })
-            .catch(() => {
-                func.setToast(true, true, 'Failed to start Copilot Studio (Multi Environment) setup. Check your credentials.')
+            .catch((err) => {
+                func.setToast(true, true, err?.response?.data?.actionErrors?.[0] || 'Failed to start Copilot Studio (Multi Environment) setup. Check your credentials.')
                 setRedirecting(false)
             })
     }
@@ -61,7 +61,7 @@ const CopilotStudioMultiEnvImport = () => {
                 func.setToast(true, false, 'Copilot Studio (Multi Environment) connected. Check the Jobs page for sync status.')
                 loadIntegration()
             })
-            .catch(() => func.setToast(true, true, 'Failed to confirm the connection. Please try again.'))
+            .catch((err) => func.setToast(true, true, err?.response?.data?.actionErrors?.[0] || 'Failed to confirm the connection. Please try again.'))
             .finally(() => setConfirming(false))
     }
 
@@ -76,15 +76,15 @@ const CopilotStudioMultiEnvImport = () => {
                 setClientSecret('')
                 setDataIngestionUrl('')
             })
-            .catch(() => func.setToast(true, true, 'Failed to remove the integration. Please try again.'))
+            .catch((err) => func.setToast(true, true, err?.response?.data?.actionErrors?.[0] || 'Failed to remove the integration. Please try again.'))
             .finally(() => setRemoving(false))
     }
 
     return (
         <div className='card-items'>
             <Text variant='bodyMd'>
-                Connect your Power Platform tenant once — Akto automatically discovers every environment, provisions itself
-                as an application user in each, and imports Copilot Studio conversation data from all of them.
+                Connect your Power Platform tenant once — Akto automatically discovers every environment, provisions an application user in each, and imports Copilot Studio conversation data from all of them.
+                {docsUrl && <> <Link url={docsUrl} target="_blank">Learn more</Link></>}
             </Text>
 
             {integration && integration.status === 'CONFIRMED' && (
