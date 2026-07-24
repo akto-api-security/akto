@@ -24,30 +24,6 @@ public class IngestionAction extends ActionSupport {
 
     private static final int ACCOUNT_ID_TO_ADD_DEFAULT_DATA = getAccountId();
 
-    private boolean sendLogsToCustomAccount(List<IngestDataBatch> batchData){
-        if (batchData == null || batchData.isEmpty()) {
-            return false;
-        }
-
-
-        // for (IngestDataBatch batch : batchData) {
-        //     String requestHeaders = batch.getRequestHeaders();
-        //     if (requestHeaders != null) {
-        //         String lowerHeaders = requestHeaders.toLowerCase();
-        //         if (lowerHeaders.contains("\"host\":") || lowerHeaders.contains("\"host \":")) {
-        //             if (lowerHeaders.contains("hollywoodbets") ||
-        //                 lowerHeaders.contains("betsolutions") ||
-        //                 lowerHeaders.contains("betnix") ||
-        //                 lowerHeaders.contains("betsoft")) {
-        //                 return true;
-        //             }
-        //         }
-        //     }
-        // }
-
-        return true;
-    }
-
     public String ingestData() {
         try {
             printLogs("ingestData batch size " + batchData.size());
