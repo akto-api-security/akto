@@ -12,6 +12,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.store.SampleMessageStore;
+import com.akto.test_editor.execution.Executor;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -110,7 +111,9 @@ public class StatusCodeAnalyser {
                         }
 
                         OriginalHttpRequest request = new OriginalHttpRequest(url, null, URLMethods.Method.GET.name(), null, headers, "");
-                        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, testingRunConfig, false, new ArrayList<>(), Main.SKIP_SSRF_CHECK);
+                        RawApi rawApi = new RawApi(request, null, null);
+                        new Executor().overrideTestUrl(rawApi, testingRunConfig);
+                        OriginalHttpResponse response = ApiExecutor.sendRequest(rawApi.getRequest(), true, testingRunConfig, false, new ArrayList<>(), Main.SKIP_SSRF_CHECK);
                         boolean isStatusGood = TestPlugin.isStatusGood(response.getStatusCode());
                         if (!isStatusGood) return null;
 
@@ -223,6 +226,7 @@ public class StatusCodeAnalyser {
         if (filteredMessages.isEmpty()) return false;
 
         RawApi rawApi = filteredMessages.get(0);
+        new Executor().overrideTestUrl(rawApi, testingRunConfig);
 
         OriginalHttpRequest request = rawApi.getRequest();
         OriginalHttpResponse response = rawApi.getResponse();
