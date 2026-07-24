@@ -14,11 +14,6 @@ import org.bson.types.ObjectId;
 import lombok.Getter;
 import lombok.Setter;
 
-/**
- * Struts Action for CopilotStudioIntegration-related operations via Cyborg API.
- * Backs CyborgApiClient.findCopilotStudioIntegrationById / updateCopilotStudioIntegration,
- * called from account-job-executor's CopilotStudioMultiEnvExecutor.
- */
 @Getter
 @Setter
 public class CopilotStudioIntegrationAction extends ActionSupport {
