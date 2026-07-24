@@ -1,4 +1,4 @@
-import { Badge, Banner, Box, Button, Divider, HorizontalStack, Scrollable, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Badge, Banner, Box, Button, Divider, HorizontalStack, Link, Scrollable, Text, TextField, VerticalStack } from '@shopify/polaris'
 import { useEffect, useState } from 'react'
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
 import api from '../api'
@@ -10,7 +10,7 @@ import func from '@/util/func'
  * The only way to change credentials is to remove the integration (which also stops its job)
  * and connect again from a clean state.
  */
-const CopilotStudioMultiEnvImport = () => {
+const CopilotStudioMultiEnvImport = ({ docsUrl }) => {
     const [tenantId, setTenantId] = useState('')
     const [clientId, setClientId] = useState('')
     const [clientSecret, setClientSecret] = useState('')
@@ -83,8 +83,8 @@ const CopilotStudioMultiEnvImport = () => {
     return (
         <div className='card-items'>
             <Text variant='bodyMd'>
-                Connect your Power Platform tenant once — Akto automatically discovers every environment, provisions itself
-                as an application user in each, and imports Copilot Studio conversation data from all of them.
+                Connect your Power Platform tenant once — Akto automatically discovers every environment, provisions an application user in each, and imports Copilot Studio conversation data from all of them.
+                {docsUrl && <> <Link url={docsUrl} target="_blank">Learn more</Link></>}
             </Text>
 
             {integration && integration.status === 'CONFIRMED' && (
