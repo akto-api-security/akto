@@ -300,6 +300,7 @@ public class DaoInit {
         ClassModel<BlockedToken> blockedTokenClassModel = ClassModel.builder(BlockedToken.class).enableDiscriminator(true).build();
         ClassModel<EndpointRemoteCommand> endpointRemoteCommandClassModel = ClassModel.builder(EndpointRemoteCommand.class).enableDiscriminator(true).build();
         ClassModel<EndpointRemoteCommandExecution> endpointRemoteCommandExecutionClassModel = ClassModel.builder(EndpointRemoteCommandExecution.class).enableDiscriminator(true).build();
+        ClassModel<CopilotStudioIntegration> copilotStudioIntegrationClassModel = ClassModel.builder(CopilotStudioIntegration.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -333,7 +334,7 @@ public class DaoInit {
                 RuntimeMetricsClassModel, jobsParam, ModuleInfoClassModel,fileClassModel, tlsAuthClassModel, apiHitCountInfoClassModel, collectionTagsModel, hostRegexTestingEndpointsClassModel, tagsTestingEndpointsClassModel
                 , authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, logsEndpointShieldClassModel, proxyPatternInfoClassModel, apiSequencesClassModel, endpointMcpConfigClassModel, deviceDomainConfigClassModel
                 , newRelicIntegrationClassModel, openTelemetryIntegrationClassModel, endpointShieldSettingsClassModel, platformShieldConfigClassModel, modelConfigClassModel, blockedTokenClassModel, agentModelClassModel
-                , endpointRemoteCommandClassModel, endpointRemoteCommandExecutionClassModel).automatic(true).build());
+                , endpointRemoteCommandClassModel, endpointRemoteCommandExecutionClassModel, copilotStudioIntegrationClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -385,7 +386,8 @@ public class DaoInit {
                 new EnumCodec<>(EndpointRemoteCommand.Status.class),
                 new EnumCodec<>(EndpointRemoteCommand.TargetType.class),
                 new EnumCodec<>(EndpointRemoteCommandExecution.Status.class),
-                new EnumCodec<>(Log.ActivityType.class)
+                new EnumCodec<>(Log.ActivityType.class),
+                new EnumCodec<>(CopilotStudioIntegration.Status.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
