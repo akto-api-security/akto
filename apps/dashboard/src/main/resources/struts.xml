@@ -8735,6 +8735,9 @@
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User started Copilot Studio (Multi Environment) setup</param>
             </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">COPILOT_STUDIO_MULTI_ENV_CONNECTOR</param>
+            </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -8745,6 +8748,11 @@
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
@@ -8757,6 +8765,9 @@
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">COPILOT_STUDIO_MULTI_ENV_CONNECTOR</param>
+            </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -8767,6 +8778,11 @@
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
@@ -8780,6 +8796,9 @@
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User confirmed Copilot Studio (Multi Environment) environments</param>
             </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">COPILOT_STUDIO_MULTI_ENV_CONNECTOR</param>
+            </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -8790,6 +8809,11 @@
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
@@ -8803,6 +8827,9 @@
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User removed Copilot Studio (Multi Environment) integration</param>
             </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">COPILOT_STUDIO_MULTI_ENV_CONNECTOR</param>
+            </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -8813,6 +8840,11 @@
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
