@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.dao.CommonOrganisationMappingDao;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
@@ -156,6 +157,13 @@ public class InviteUserAction extends UserAction{
 
         // Check if both map to the same canonical org
         if (inviteeOrg != null && adminOrg != null && inviteeOrg.equalsIgnoreCase(adminOrg)) return true;
+
+        // Mongo-backed sibling groups (common_organisation_mappings): true if both
+        // domains co-occur in at least one group.
+        if (CommonOrganisationMappingDao.instance.areSiblings(inviteeDomain, adminDomain)) {
+            loggerMaker.debugAndAddToDb("invitee and admin domains are siblings via common_organisation_mappings");
+            return true;
+        }
 
         loggerMaker.debugAndAddToDb("inviteeOrg and adminOrg different");
         return false;
