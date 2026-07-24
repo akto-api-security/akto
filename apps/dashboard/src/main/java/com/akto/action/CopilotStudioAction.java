@@ -102,7 +102,7 @@ public class CopilotStudioAction extends UserAction {
         }
 
         CopilotStudioIntegration existing = CopilotStudioIntegrationDao.instance.findOne(new BasicDBObject());
-        if (existing != null) {
+        if (existing != null && existing.getStatus() != CopilotStudioIntegration.Status.PENDING_OAUTH) {
             addActionError("An integration already exists. Remove it before connecting again.");
             return Action.ERROR.toUpperCase();
         }
@@ -110,15 +110,32 @@ public class CopilotStudioAction extends UserAction {
         try {
             int now = Context.now();
 
-            CopilotStudioIntegration newIntegration =
-                new CopilotStudioIntegration(tenantId, clientId, clientSecret, dataIngestionUrl, now);
-            CopilotStudioIntegrationDao.instance.insertOne(newIntegration);
+            if (existing != null) {
+                // Auth was never completed for the existing record — retry in place instead of erroring out.
+                CopilotStudioIntegrationDao.instance.updateOneNoUpsert(
+                    Filters.eq(CopilotStudioIntegration.ID, existing.getId()),
+                    Updates.combine(
+                        Updates.set(CopilotStudioIntegration.TENANT_ID, tenantId),
+                        Updates.set(CopilotStudioIntegration.CLIENT_ID, clientId),
+                        Updates.set(CopilotStudioIntegration.CLIENT_SECRET, clientSecret),
+                        Updates.set(CopilotStudioIntegration.DATA_INGESTION_URL, dataIngestionUrl),
+                        Updates.set(CopilotStudioIntegration.STATUS, CopilotStudioIntegration.Status.PENDING_OAUTH.name()),
+                        Updates.unset(CopilotStudioIntegration.LAST_ERROR),
+                        Updates.set(CopilotStudioIntegration.UPDATED_AT, now)
+                    )
+                );
+                this.integrationId = existing.getId().toHexString();
+            } else {
+                CopilotStudioIntegration newIntegration =
+                    new CopilotStudioIntegration(tenantId, clientId, clientSecret, dataIngestionUrl, now);
+                CopilotStudioIntegrationDao.instance.insertOne(newIntegration);
+                this.integrationId = newIntegration.getId().toHexString();
+            }
 
             authorizationUrl = buildAuthorizationUrl(accountId, tenantId, clientId,
                 Constants.SCOPE_COPILOT_STUDIO_MULTI_ENV, FLOW_TYPE_MULTI_ENV_SETUP, null,
-                newIntegration.getId().toHexString());
+                integrationId);
 
-            this.integrationId = newIntegration.getId().toHexString();
             logger.infoAndAddToDb("initiateMultiEnvSetup: generated for accountId=" + accountId
                 + " integrationId=" + integrationId);
             return Action.SUCCESS.toUpperCase();

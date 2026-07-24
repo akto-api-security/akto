@@ -39,7 +39,8 @@ const CopilotStudioMultiEnvImport = () => {
     }, [])
 
     const isFormValid = tenantId.trim() && clientId.trim() && clientSecret.trim() && dataIngestionUrl.trim()
-    const isReadOnly = !!integration
+    // A PENDING_OAUTH integration means authorization was never completed — keep the form editable so Connect can be retried.
+    const isReadOnly = !!integration && integration.status !== 'PENDING_OAUTH'
 
     const handleConnect = () => {
         setRedirecting(true)

@@ -20,6 +20,10 @@ import java.util.List;
 public class CopilotStudioIntegration {
 
     public static final String ID = "_id";
+    public static final String TENANT_ID = "tenantId";
+    public static final String CLIENT_ID = "clientId";
+    public static final String CLIENT_SECRET = "clientSecret";
+    public static final String DATA_INGESTION_URL = "dataIngestionUrl";
     public static final String STATUS = "status";
     public static final String ENVIRONMENTS = "environments";
     public static final String JOB_ID = "jobId";
