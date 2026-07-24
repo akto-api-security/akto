@@ -1242,7 +1242,7 @@ const copilotStudioMultiEnvImportObj = {
     text: DESCRIPTION_COPILOT_STUDIO_MULTI_ENV,
     docsUrl: DOCS_URL_COPILOT_STUDIO_MULTI_ENV,
     key: "COPILOT_STUDIO_MULTI_ENV_IMPORT",
-    component: <CopilotStudioMultiEnvImport />,
+    component: (docsUrl) => <CopilotStudioMultiEnvImport docsUrl={docsUrl} />,
     badge: "Beta"
 }
 
