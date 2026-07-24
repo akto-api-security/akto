@@ -10,6 +10,14 @@ on:
       release_version:
         description: 'Specify the release version for the workflow.'
         required: true
+      skipTests:
+        description: 'Do you want to skip unit tests?'
+        required: true
+        default: 'False'
+        type: choice
+        options:
+          - 'False'
+          - 'True'
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -35,7 +43,12 @@ jobs:
         # Scope to db-abstractor + its dependency modules only. This avoids building
         # dashboard/billing/internal (maven-war-plugin 2.3, which breaks on JDK 17).
         # Root surefire 3.2.5 + jacoco 0.8.12 let the shared modules' tests run on JDK 17.
+        if: ${{ github.event.inputs.skipTests == 'False' }}
         run: mvn package -pl apps/database-abstractor -am
+
+      - name: mvn package command dangerously
+        if: ${{ github.event.inputs.skipTests == 'True' }}
+        run: mvn package -pl apps/database-abstractor -am -DskipTests
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
