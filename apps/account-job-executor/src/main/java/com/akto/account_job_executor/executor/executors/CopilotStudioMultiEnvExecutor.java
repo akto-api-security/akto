@@ -43,7 +43,7 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
 
         Object integrationIdObj = config.get(CONFIG_COPILOT_STUDIO_MULTI_ENV_INTEGRATION_ID);
         if (integrationIdObj == null) {
-            throw new IllegalArgumentException("Missing " + CONFIG_COPILOT_STUDIO_MULTI_ENV_INTEGRATION_ID + " for job: " + job.getId());
+            throw new IllegalArgumentException("Missing copilot studio integration ID for job: " + job.getId());
         }
         String integrationId = integrationIdObj.toString();
 
