@@ -54,8 +54,8 @@ body:has(.agentic-security-nav) .Polaris-TopBar__SecondaryMenu text {
     gap: 8px !important;
 }
 
-/* Remove extra padding from bell button */
-#beamer-btn.Polaris-Button {
-    padding: 0 !important;
-    margin: 0 4px 0 0 !important;
+/* Product category switcher: Autocomplete locks height too small for multi-line helpText */
+.Polaris-Popover__Content:has(.dashboard-category-option) {
+    height: auto !important;
+    max-height: 320px !important;
 }

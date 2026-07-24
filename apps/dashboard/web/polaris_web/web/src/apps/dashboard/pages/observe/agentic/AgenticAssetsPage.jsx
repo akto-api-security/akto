@@ -9,8 +9,6 @@ import React, {
 import { produce } from "immer";
 import { useNavigate } from "react-router-dom";
 import { Box, Card, Divider, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
-import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
-import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
@@ -47,8 +45,6 @@ import values from "@/util/values";
 import func from "@/util/func";
 import AgenticStatsCard from "./AgenticStatsCard";
 import AgenticTopListCard from "./AgenticTopListCard";
-
-ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 

@@ -15,7 +15,7 @@ import SessionStore from '../../../../main/SessionStore';
 import IssuesStore from '../../../pages/issues/issuesStore';
 import Dropdown from '../Dropdown';
 import Wrapped2025 from './Wrapped2025';
-import { categoryToShortName, shortNameToCategory } from '../../../../main/labelHelper';
+import { shortNameToCategory } from '../../../../main/labelHelper';
 
 function ContentWithIcon({ icon, text, isAvatar = false }) {
     return (
@@ -48,7 +48,6 @@ export default function Header() {
     const setDashboardCategory = PersistStore((state) => state.setDashboardCategory);
 
     useEffect(() => {
-        console.log("hey", dashboardCategory)
         if (window.beamer_config) {
             const isOnPrem = window.DASHBOARD_MODE === 'ON_PREM';
             const isAgentic = dashboardCategory === 'Agentic Security';
@@ -116,28 +115,48 @@ export default function Header() {
         return disabled;
     }, [mcpSecurityGranted, agenticSecurityGranted, dastGranted, endpointSecurityGranted]);
 
-    const dropdownInitial = disabledDashboardCategories.includes(dashboardCategory)
-        ? "API Security"
+    // Only hide API Security / DAST for Argus/Atlas-only users.
+    // API users still see DAST (Stigg may disable it), and always see Argus/Atlas.
+    const hiddenDashboardCategories = useMemo(() => {
+        const mapping = window.SCOPE_ROLE_MAPPING;
+        if (func.checkLocal() || !mapping || Object.keys(mapping).length === 0) {
+            return [];
+        }
+        const hasAccess = (scope) => {
+            const role = mapping[scope];
+            return role && role !== "NO_ACCESS" && role !== "NO ACCESS";
+        };
+        const hasApiOrDast = hasAccess("API") || hasAccess("DAST");
+        const hasArgusOrAtlas = hasAccess("AGENTIC") || hasAccess("ENDPOINT");
+        if (!hasApiOrDast && hasArgusOrAtlas) {
+            return ["API Security", "DAST"];
+        }
+        return [];
+    }, []);
+
+    const firstAccessibleCategory = useMemo(() => {
+        const mapping = window.SCOPE_ROLE_MAPPING || {};
+        const scope = Object.keys(mapping).find(key => {
+            const role = mapping[key];
+            return role && role !== "NO_ACCESS" && role !== "NO ACCESS";
+        });
+        return shortNameToCategory[scope] || "API Security";
+    }, []);
+
+    const dropdownInitial = disabledDashboardCategories.includes(dashboardCategory) || hiddenDashboardCategories.includes(dashboardCategory)
+        ? firstAccessibleCategory
         : (dashboardCategory || "API Security");
     
     useEffect(() => {
         if(window.SCOPE_ROLE_MAPPING && Object.keys(window.SCOPE_ROLE_MAPPING).length > 0 && window.location.pathname !== "/dashboard/onboarding"){
-            if(!window.SCOPE_ROLE_MAPPING[categoryToShortName[dashboardCategory]]){
-                let scope = "";
-                Object.keys(window.SCOPE_ROLE_MAPPING).forEach(key => {
-                    const value = window.SCOPE_ROLE_MAPPING[key];
-                    if(value !== "NO ACCESS" && value !== "NO_ACCESS"){
-                        scope = key;
-                        return;
-                    }
-                });
-                const category = shortNameToCategory[scope];
-                setDashboardCategory(category);
+            // Only leave categories hidden by scope (API users may use Argus/Atlas without those scopes)
+            if(hiddenDashboardCategories.includes(dashboardCategory)){
+                setDashboardCategory(firstAccessibleCategory);
             }
         }else if (disabledDashboardCategories.includes(dashboardCategory) && dashboardCategory !== "API Security") {
             setDashboardCategory("API Security");
         }
-    }, [dashboardCategory, disabledDashboardCategories, setDashboardCategory]);
+    }, [dashboardCategory, disabledDashboardCategories, hiddenDashboardCategories, firstAccessibleCategory, setDashboardCategory]);
 
     /* Search bar */
     //const allRoutes = Store((state) => state.allRoutes)
@@ -354,6 +373,7 @@ export default function Header() {
 
                             <Box minWidth='170px'>
                                 <Dropdown
+                                    id="dashboard-category-dropdown"
                                     menuItems={[
                                         {
                                             value: "API Security",
@@ -379,7 +399,7 @@ export default function Header() {
                                             id: "dast",
                                             helpText: "Scan Your Apps for Vulnerabilities"
                                         },
-                                    ]}
+                                    ].filter(item => !hiddenDashboardCategories.includes(item.value))}
                                     initial={dropdownInitial}
                                     selected={(val) => handleDashboardChange(val)}
                                     disabledOptions={disabledDashboardCategories}
