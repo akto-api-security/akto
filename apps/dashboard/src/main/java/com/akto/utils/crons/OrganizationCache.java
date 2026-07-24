@@ -1,6 +1,7 @@
 package com.akto.utils.crons;
 
 import com.akto.action.InviteUserAction;
+import com.akto.dao.CommonOrganisationMappingDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
@@ -112,14 +113,16 @@ public class OrganizationCache {
     }
     
     /**
-     * Get organization info (orgId, adminEmail, planType) by admin email domain for signup matching
-     * Handles bidirectional domain mapping using InviteUserAction.commonOrganisationsMap
+     * Get organization info (orgId, adminEmail, planType) by admin email domain for signup matching.
+     * Resolves sibling domains using the legacy static map (InviteUserAction.commonOrganisationsMap)
+     * first, then falls back to the common_organisation_mappings collection via
+     * CommonOrganisationMappingDao.getSiblings.
      */
     public static OrganizationInfo getOrganizationInfoByDomain(String emailDomain) {
         if (emailDomain == null) {
             return null;
         }
-        
+
         // First, try direct lookup
         OrganizationInfo orgInfo = domainToOrgInfoCache.get(emailDomain);
         if (orgInfo != null) {
@@ -127,39 +130,58 @@ public class OrganizationCache {
             String planType = orgInfo.getPlanType();
             if (planType == null || planType.isEmpty() || "planType".equals(planType)) {
                 logger.debug("Direct lookup found org with invalid planType: " + planType + " for domain: " + emailDomain);
-                
+
                 // Check canonical mapping for planType. If canonical domain has planType then that planType to be used
                 //Eg - If blinkrx is present in cache with no planType, then chcek it's canonical domain - blinkhealth's planType
                 String canonicalDomain = InviteUserAction.commonOrganisationsMap.get(emailDomain);
                 if (canonicalDomain != null) {
                     canonicalDomain = canonicalDomain.trim().toLowerCase();
                     OrganizationInfo canonicalOrgInfo = domainToOrgInfoCache.get(canonicalDomain);
-                    
+
                     if (canonicalOrgInfo != null) {
                         String canonicalPlanType = canonicalOrgInfo.getPlanType();
                         if (canonicalPlanType != null && !canonicalPlanType.isEmpty() && !"planType".equals(canonicalPlanType)) {
                             // Create updated orgInfo with canonical domain's planType
                             OrganizationInfo updatedOrgInfo = new OrganizationInfo(
-                                orgInfo.getOrganizationId(), 
-                                orgInfo.getAdminEmail(), 
+                                orgInfo.getOrganizationId(),
+                                orgInfo.getAdminEmail(),
                                 canonicalPlanType
                             );
-                            
+
                             // Update cache with the enhanced planType
                             domainToOrgInfoCache.put(emailDomain, updatedOrgInfo);
-                            
-                            logger.debug("Updated cache for domain: " + emailDomain + 
+
+                            logger.debug("Updated cache for domain: " + emailDomain +
                                 " with planType: " + canonicalPlanType + " from canonical domain: " + canonicalDomain);
-                            
+
+                            return updatedOrgInfo;
+                        }
+                    }
+                }
+
+                // Fallback: borrow a valid planType from a sibling domain's org (Mongo mapping).
+                for (String siblingDomain : CommonOrganisationMappingDao.instance.getSiblings(emailDomain)) {
+                    OrganizationInfo siblingOrgInfo = domainToOrgInfoCache.get(siblingDomain);
+                    if (siblingOrgInfo != null) {
+                        String siblingPlanType = siblingOrgInfo.getPlanType();
+                        if (siblingPlanType != null && !siblingPlanType.isEmpty() && !"planType".equals(siblingPlanType)) {
+                            OrganizationInfo updatedOrgInfo = new OrganizationInfo(
+                                orgInfo.getOrganizationId(),
+                                orgInfo.getAdminEmail(),
+                                siblingPlanType
+                            );
+                            domainToOrgInfoCache.put(emailDomain, updatedOrgInfo);
+                            logger.debug("Updated cache for domain: " + emailDomain +
+                                " with planType: " + siblingPlanType + " from sibling domain: " + siblingDomain);
                             return updatedOrgInfo;
                         }
                     }
                 }
             }
-            
+
             return orgInfo;
         }
-        
+
         // If domain not found in cache , check bidirectional mapping
         // Check if this domain has a canonical mapping (input domain -> canonical domain)
         String canonicalDomain = InviteUserAction.commonOrganisationsMap.get(emailDomain);
@@ -168,6 +190,15 @@ public class OrganizationCache {
             orgInfo = domainToOrgInfoCache.get(canonicalDomain);
             if (orgInfo != null) {
                 logger.debug("Found organization for domain: " + emailDomain + " via canonical mapping to: " + canonicalDomain);
+                return orgInfo;
+            }
+        }
+
+        // Fallback: domain has no org of its own and no static mapping — join a sibling's org (Mongo mapping).
+        for (String siblingDomain : CommonOrganisationMappingDao.instance.getSiblings(emailDomain)) {
+            orgInfo = domainToOrgInfoCache.get(siblingDomain);
+            if (orgInfo != null) {
+                logger.debug("Found organization for domain: " + emailDomain + " via sibling domain: " + siblingDomain);
                 return orgInfo;
             }
         }
