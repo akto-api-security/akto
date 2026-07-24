@@ -899,6 +899,7 @@ public class Main {
                     int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
                     
                     if(!maxRetriesReached){
+                        TestExecutor.initRunDeadline(trrs, maxRunTime);
                         // init producer and the consumer here
                         // producer for testing is currently calls init functions from test-executor
                         if(Constants.IS_NEW_TESTING_ENABLED){
