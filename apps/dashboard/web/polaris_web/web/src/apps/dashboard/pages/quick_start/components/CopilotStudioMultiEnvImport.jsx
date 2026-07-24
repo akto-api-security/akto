@@ -48,8 +48,8 @@ const CopilotStudioMultiEnvImport = ({ docsUrl }) => {
             .then((res) => {
                 window.location.href = res.authorizationUrl
             })
-            .catch(() => {
-                func.setToast(true, true, 'Failed to start Copilot Studio (Multi Environment) setup. Check your credentials.')
+            .catch((err) => {
+                func.setToast(true, true, err?.response?.data?.actionErrors?.[0] || 'Failed to start Copilot Studio (Multi Environment) setup. Check your credentials.')
                 setRedirecting(false)
             })
     }
@@ -61,7 +61,7 @@ const CopilotStudioMultiEnvImport = ({ docsUrl }) => {
                 func.setToast(true, false, 'Copilot Studio (Multi Environment) connected. Check the Jobs page for sync status.')
                 loadIntegration()
             })
-            .catch(() => func.setToast(true, true, 'Failed to confirm the connection. Please try again.'))
+            .catch((err) => func.setToast(true, true, err?.response?.data?.actionErrors?.[0] || 'Failed to confirm the connection. Please try again.'))
             .finally(() => setConfirming(false))
     }
 
@@ -76,7 +76,7 @@ const CopilotStudioMultiEnvImport = ({ docsUrl }) => {
                 setClientSecret('')
                 setDataIngestionUrl('')
             })
-            .catch(() => func.setToast(true, true, 'Failed to remove the integration. Please try again.'))
+            .catch((err) => func.setToast(true, true, err?.response?.data?.actionErrors?.[0] || 'Failed to remove the integration. Please try again.'))
             .finally(() => setRemoving(false))
     }
 
