@@ -129,7 +129,7 @@ public class CopilotStudioMultiEnvApiClient {
         try (Response response = client.newCall(request).execute()) {
             String body = response.body() != null ? response.body().string() : "";
             if (!response.isSuccessful()) {
-                throw new RetryableJobException("Failed to list Power Platform environments: status=" + response.code() + " body=" + body);
+                throw new Exception("Failed to list Power Platform environments: status=" + response.code() + " body=" + body);
             }
 
             JsonNode root = objectMapper.readTree(body);

@@ -55,7 +55,13 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
         String appOnlyToken = apiClient.getClientCredentialsToken(
             integration.getTenantId(), integration.getClientId(), integration.getClientSecret());
 
-        List<EnvironmentInfo> discovered = apiClient.listEnvironments(appOnlyToken);
+        List<EnvironmentInfo> discovered = new ArrayList<>();
+        try {
+            discovered = apiClient.listEnvironments(appOnlyToken);
+        } catch (Exception e) {
+            logger.error("CopilotStudioMultiEnv: failed to list environments for integration={}: {}",
+                integrationId, e.getMessage());
+        }
         mergeDiscoveredEnvironments(integration, discovered);
 
         updateJobHeartbeat(job);
