@@ -16,8 +16,8 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-java@v2
         with:
-          distribution: 'adopt'
-          java-version: '8'
+          distribution: 'temurin'
+          java-version: '17'
           architecture: x64
       - name: Convert github branch name to be compatible with docker tag name convention and generate tag name
         id: docker_tag
