@@ -73,7 +73,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.akto.testing.workflow_node_executor.Utils;
-import com.akto.agent.AgentClient;
+import com.akto.agent.AgenticUtils;
 
 public class TestExecutor {
 
@@ -1241,7 +1241,7 @@ public class TestExecutor {
         if (apiCollection == null) {
             apiCollection = dataActor.fetchApiCollectionMeta(apiInfoKey.getApiCollectionId());
         }
-        if (AgentClient.isCopilotBotCollection(apiCollection) &&
+        if (AgenticUtils.isCopilotBotCollection(apiCollection) &&
                 apiInfoKey.getUrl().startsWith(Constants.AKTO_COPILOT_CONVERSATION_URL_PREFIX)) {
             loggerMaker.infoAndAddToDb("Skipping test for Copilot Studio endpoint already covered: " + apiInfoKey);
             return generateFailedRunResultForMessage(testRunId, apiInfoKey, testSuperType, testSubType,
