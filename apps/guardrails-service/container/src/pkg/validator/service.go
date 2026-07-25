@@ -526,6 +526,29 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
+// Account type tag keys and their recognised values. The tags are written by the
+// browser extension / ingestion path onto the collection, never by this service.
+const (
+	tagKeyLoginUserEmailType = "login-user-email-type"
+	tagKeyBrowserLLMAccount  = "browser-llm-account-type" // browser extension only
+
+	accountTypePersonal   = "personal"
+	accountTypeEnterprise = "enterprise"
+	accountTypeUnknown    = "unknown"
+)
+
+// accountTypeTagKeys lists the tag keys that carry an account type, in strict
+// precedence order. login-user-email-type is the authoritative signal;
+// browser-llm-account-type covers browser-extension collections that lack it.
+//
+// Deliberately NOT included: ai-agent-account-type. That tag carries the CLI's
+// subscription plan tier (go, plus, pro, team, ...), which describes billing, not
+// account ownership, and must not drive the personal-account guardrail.
+var accountTypeTagKeys = []string{
+	tagKeyLoginUserEmailType,
+	tagKeyBrowserLLMAccount,
+}
+
 // blockPersonalAccountPolicyName returns the name of the first policy that has
 // BlockPersonalAccounts enabled, or ("", false) if none.
 func blockPersonalAccountPolicyName(policies []types.Policy) (string, bool) {
@@ -595,10 +618,11 @@ func (s *Service) refreshCollectionTagsIfNeeded() {
 	s.logger.Info("Collection tag cache refreshed", zap.Int("collectionsCount", len(byHostName)))
 }
 
-// getLoginUserEmailType looks up the host from request headers in the collection tag cache
-// and returns login-user-email-type, falling back to browser-llm-account-type.
-// The account type is resolved ONLY from the collection's tags; if the host is not
-// found in the collection cache, it returns "" (no fallback to the request tag).
+// getLoginUserEmailType looks up the host from request headers in the collection tag
+// cache and resolves the account type from any of accountTypeTagKeys (see
+// resolveAccountType). The account type is resolved ONLY from the collection's tags;
+// if the host is not found in the collection cache, it returns "" (no fallback to the
+// request tag).
 func (s *Service) getLoginUserEmailType(reqHeaders map[string]string) string {
 	host := extractHostHeader(reqHeaders)
 	s.logger.Info("getLoginUserEmailType - host extracted", zap.String("host", host))
@@ -623,16 +647,35 @@ func (s *Service) getLoginUserEmailType(reqHeaders map[string]string) string {
 		return ""
 	}
 
-	if v := tags["login-user-email-type"]; v != "" {
-		s.logger.Info("getLoginUserEmailType - returning login-user-email-type", zap.String("value", v))
-		return v
-	}
-	if v := tags["browser-llm-account-type"]; v != "" {
-		s.logger.Info("getLoginUserEmailType - returning browser-llm-account-type (cache)", zap.String("value", v))
-		return v
-	}
+	accountType, srcKey := resolveAccountType(tags)
+	s.logger.Info("getLoginUserEmailType - resolved account type",
+		zap.String("value", accountType),
+		zap.String("sourceTagKey", srcKey))
+	return accountType
+}
 
-	return ""
+// resolveAccountType reads the account type from a collection's tags, returning the
+// first non-empty value in accountTypeTagKeys order along with the key it came from
+// (for logging). login-user-email-type is authoritative; browser-llm-account-type is
+// consulted only when it is absent, for browser-extension collections.
+//
+// Strict precedence is deliberate: an authoritative "enterprise" is never overridden
+// by a lower-precedence key, so this cannot block a request that the previous
+// first-non-empty-wins behaviour allowed.
+func resolveAccountType(tags map[string]string) (string, string) {
+	for _, key := range accountTypeTagKeys {
+		if v := normalizeAccountType(tags[key]); v != "" {
+			return v, key
+		}
+	}
+	return "", ""
+}
+
+// normalizeAccountType trims and lower-cases a raw tag value so comparisons against
+// the accountType* constants are exact. Unrecognised values are returned as-is; the
+// caller decides what to do with them (see the explicit match in ValidateRequest).
+func normalizeAccountType(raw string) string {
+	return strings.ToLower(strings.TrimSpace(raw))
 }
 
 // TODO: move reportAndBlockPersonalAccount to mcp library so threat reporting
@@ -1367,8 +1410,12 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.String("path", params.Path),
 			zap.String("sessionID", sessionID),
 			zap.String("accountType", accountType))
-		if accountType != "" && accountType != "enterprise" {
-			s.logger.Warn("ValidateRequest - blocking non-enterprise account",
+		// Match explicitly: only "personal" blocks. "enterprise" is allowed, and any
+		// other value ("unknown", a missing tag, or a value this build does not know)
+		// is treated as not-personal so an unclassified login never blocks traffic.
+		switch accountType {
+		case accountTypePersonal:
+			s.logger.Warn("ValidateRequest - blocking personal account",
 				zap.String("path", params.Path),
 				zap.String("method", params.Method),
 				zap.String("account", params.AktoAccountID),
@@ -1376,6 +1423,13 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 				zap.String("policyName", policyName),
 				zap.String("sessionID", sessionID))
 			return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName)), nil
+		case accountTypeEnterprise, accountTypeUnknown, "":
+			// Explicitly allowed.
+		default:
+			s.logger.Info("ValidateRequest - unrecognised account type, allowing",
+				zap.String("accountType", accountType),
+				zap.String("policyName", policyName),
+				zap.String("sessionID", sessionID))
 		}
 	}
 
