@@ -53,6 +53,8 @@ public class UtilityServer {
             server = HttpServer.create(new InetSocketAddress(port), 0);
             server.createContext("/utility/execute", new ExecuteApiHandler(jobStore, executorService));
             server.createContext("/utility/result", new GetResultHandler(jobStore));
+            server.createContext("/utility/agentQueryRecords", new FetchAgentQueryRecordsHandler(dataActor));
+            server.createContext("/utility/agentQueryValidationResult", new AgentQueryValidationResultHandler(jobStore, dataActor));
             server.createContext("/utility/sendHealthCheck", new SendHealthCheckHandler(dataActor));
             server.createContext("/utility/sendLogs", new SendLogsHandler(dataActor));
             server.createContext("/utility/ingestTraffic", new TrafficIngestHandler());
