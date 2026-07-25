@@ -1,5 +1,9 @@
 name: Agent Guard Docker Build & Push
 
+env:
+  GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+  GAR_REGISTRY: ${{ vars.GCP_REGION || 'us-central1' }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}
+
 on:
   workflow_dispatch:
     inputs:
@@ -146,12 +150,28 @@ jobs:
           mask-password: "true"
           registry-type: public
 
-      - name: Create multi-arch manifests (DockerHub + ECR)
+      - name: Authenticate to Google Cloud
+        if: vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        if: vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        if: vars.GCP_PROJECT_ID != ''
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Create multi-arch manifests (DockerHub + ECR + GAR)
         working-directory: ${{ runner.temp }}/digests
         env:
           VERSION: ${{ github.event.inputs.release_version }}
           DH: ${{ matrix.image.dockerhub }}
           ECR: ${{ steps.login-ecr.outputs.registry }}/${{ matrix.image.ecr }}
+          GAR_ENABLED: ${{ vars.GCP_PROJECT_ID != '' }}
+          IMAGE_NAME: akto-agent-guard-${{ matrix.image.name }}
         run: |
           docker buildx imagetools create \
             -t "$DH:local" -t "$DH:$VERSION" \
@@ -159,6 +179,14 @@ jobs:
           docker buildx imagetools create \
             -t "$ECR:local" -t "$ECR:$VERSION" \
             $(printf "$ECR@sha256:%s " *)
+          # GAR gets the same manifest copied straight from the DockerHub
+          # digests (registry-to-registry, nothing rebuilt or re-pulled here).
+          if [ "$GAR_ENABLED" = "true" ]; then
+            GAR="$GAR_REGISTRY/$IMAGE_NAME"
+            docker buildx imagetools create \
+              -t "$GAR:local" -t "$GAR:$VERSION" \
+              $(printf "$DH@sha256:%s " *)
+          fi
 
   # ---------------------------------------------------------------------------
   # Tag, release, and notify — once, after all images are published.
@@ -193,7 +221,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "🚀 Agent Guard v${{ github.event.inputs.release_version }} released (worker + anonymizer + embedder) and pushed to DockerHub & ECR!"
+              "text": "🚀 Agent Guard v${{ github.event.inputs.release_version }} released (worker + anonymizer + embedder) and pushed to DockerHub, ECR & GAR!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
