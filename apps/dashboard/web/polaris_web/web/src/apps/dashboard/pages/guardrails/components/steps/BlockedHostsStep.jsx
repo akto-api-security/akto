@@ -8,6 +8,7 @@ import {
     Badge,
     Autocomplete,
     Checkbox,
+    Banner,
 } from "@shopify/polaris";
 import { DeleteMajor } from "@shopify/polaris-icons";
 
@@ -226,6 +227,9 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts
                     checked={!!blockPersonalAccounts}
                     onChange={setBlockPersonalAccounts}
                 />
+                <Box paddingBlockStart="2">
+                    <Banner tone="info">Currently supported for the following AI assistants: ChatGPT, Claude, Gemini and Microsoft Copilot.</Banner>
+                </Box>
             </SectionCard>
         </VerticalStack>
     );
