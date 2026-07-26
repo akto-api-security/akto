@@ -89,8 +89,6 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.CustomAuthUtil;
 import com.akto.utils.KafkaUtils;
-import com.akto.utils.GcpVertexAuthUtil;
-import com.akto.utils.GemmaVertexStructuredCallUtil;
 import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
 import com.akto.utils.StiCountAlert;
@@ -249,9 +247,9 @@ public class DbAction extends ActionSupport {
     @Getter @Setter
     private Map<String, Object> gemmaVertexSchema;
 
-    // Raw Vertex/Gemma predict payload binding (top-level `instances`).
+    // Azure Foundry Gemma chat/completions payload binding (top-level `messages`).
     @Getter @Setter
-    private List<Object> instances;
+    private List<Object> messages;
 
     @Getter @Setter
     private Map<String, Object> response;
@@ -6602,16 +6600,12 @@ public class DbAction extends ActionSupport {
 
     public String getGemmaResponse() {
         try {
-            String saKeyJson = System.getenv().getOrDefault("GEMMA_VERTEX_SA_KEY_JSON", "");
-            Map<String, Object> parsedJson;
-            if (this.instances == null) {
-                addActionError("Request field `instances` is required");
+            if (this.messages == null || this.messages.isEmpty()) {
+                addActionError("Request field `messages` is required");
                 return Action.ERROR.toUpperCase();
             }
 
-            Map<String, Object> vertexPayload = new HashMap<>();
-            vertexPayload.put("instances", this.instances);
-            parsedJson = GemmaVertexStructuredCallUtil.predictAndParseVertexPayload(saKeyJson, vertexPayload);
+            Map<String, Object> parsedJson = GemmaFoundryService.callGemma(this.messages);
 
             this.response = new HashMap<>();
             this.response.put("data", parsedJson);
