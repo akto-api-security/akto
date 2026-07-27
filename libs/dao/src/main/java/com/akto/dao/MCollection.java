@@ -40,6 +40,14 @@ public abstract class MCollection<T> {
         return mongoDatabase.runCommand(new Document("serverStatus",1));
     }
 
+    // Lightweight connectivity check. Unlike serverStatus (a privileged admin command that
+    // Amazon DocumentDB rejects with "Authorization failure" for non-admin users), {ping:1}
+    // requires no privileges and is supported by both MongoDB and DocumentDB.
+    public Document pingDb() {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        return mongoDatabase.runCommand(new Document("ping", 1));
+    }
+
     public boolean isCapped() {
         MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
 
