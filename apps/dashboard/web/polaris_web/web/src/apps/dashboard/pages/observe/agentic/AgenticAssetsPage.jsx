@@ -613,30 +613,23 @@ export default function AgenticAssetsPage() {
     { label: "Skills",      count: agenticFlatData.filter(r => r.type === "Skill").length,      color: "#D1D5DB",  key: "Skill" },
   ], [agenticFlatData]);
 
-  const violationsByCollectionId = useMemo(
-    () => aggregateViolationsByCollectionId(agenticViolationRows, collections),
-    [agenticViolationRows, collections],
-  );
-
+  // Count EVERY violation event by severity, including events whose host cannot
+  // be attributed to a rendered asset — a violation is a violation regardless of
+  // whether its host maps to an agentic collection. This mirrors the raw count on
+  // the Endpoints page (agenticPageBuilders.js) so the two totals reconcile.
   const violationTotals = useMemo(() => {
-    const seen = new Set();
     const t = { crit: 0, high: 0, med: 0, low: 0 };
-    agenticFlatData.forEach((r) => {
-      if (!r.violations) return;
-      (r.collectionIds || []).forEach((id) => {
-        const key = Number(id);
-        if (seen.has(key)) return;
-        seen.add(key);
-        const v = violationsByCollectionId[key];
-        if (!v) return;
-        t.crit += v.critical || 0;
-        t.high += v.high || 0;
-        t.med  += v.medium || 0;
-        t.low  += v.low || 0;
-      });
+    agenticViolationRows.forEach((r) => {
+      switch ((r.severity || "").toLowerCase()) {
+        case "critical": t.crit += 1; break;
+        case "high":     t.high += 1; break;
+        case "medium":   t.med  += 1; break;
+        case "low":      t.low  += 1; break;
+        default: break;
+      }
     });
     return { ...t, total: t.crit + t.high + t.med + t.low };
-  }, [agenticFlatData, violationsByCollectionId]);
+  }, [agenticViolationRows]);
 
   const violBreakdown = useMemo(() => [
     { label: "Critical", key: "critical", count: violationTotals.crit, color: "#DC2626" },
