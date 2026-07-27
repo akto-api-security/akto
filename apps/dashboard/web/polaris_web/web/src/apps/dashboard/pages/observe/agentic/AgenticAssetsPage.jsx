@@ -613,10 +613,6 @@ export default function AgenticAssetsPage() {
     { label: "Skills",      count: agenticFlatData.filter(r => r.type === "Skill").length,      color: "#D1D5DB",  key: "Skill" },
   ], [agenticFlatData]);
 
-  // Count EVERY violation event by severity, including events whose host cannot
-  // be attributed to a rendered asset — a violation is a violation regardless of
-  // whether its host maps to an agentic collection. This mirrors the raw count on
-  // the Endpoints page (agenticPageBuilders.js) so the two totals reconcile.
   const violationTotals = useMemo(() => {
     const t = { crit: 0, high: 0, med: 0, low: 0 };
     agenticViolationRows.forEach((r) => {
