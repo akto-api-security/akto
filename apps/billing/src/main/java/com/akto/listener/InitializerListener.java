@@ -28,7 +28,6 @@ import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
-import org.mockito.internal.matchers.Or;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
