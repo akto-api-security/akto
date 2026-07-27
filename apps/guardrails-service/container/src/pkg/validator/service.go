@@ -696,10 +696,20 @@ func accountTypeFromRequestTag(tag string) string {
 	return accountType
 }
 
+// personalAccountReason returns the user-facing reason for a personal-account guardrail
+// hit, worded to match the policy behaviour so an "alert" outcome is not reported as
+// "Blocked". Any other behaviour falls back to the block wording.
+func personalAccountReason(behaviour string) string {
+	if strings.ToLower(strings.TrimSpace(behaviour)) == "alert" {
+		return "Alert: personal accounts are not permitted by guardrail policy"
+	}
+	return "Blocked: personal accounts are not permitted by guardrail policy"
+}
+
 // TODO: move reportAndBlockPersonalAccount to mcp library so threat reporting
 // and validation live in one place alongside other policy enforcement.
 func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID, policyName, behaviour string) *mcp.ValidationResult {
-	blockReason := "Blocked: personal accounts are not permitted by guardrail policy"
+	blockReason := personalAccountReason(behaviour)
 
 	if s.sessionMgr != nil && sessionID != "" {
 		s.sessionMgr.TrackResponse(sessionID, requestID, blockReason, true)
