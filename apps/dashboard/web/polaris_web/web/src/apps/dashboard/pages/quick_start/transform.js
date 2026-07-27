@@ -2286,11 +2286,11 @@ const quickStartFunc = {
             wizObj, impervaImportObj, dataDogConnectorObj
         ]
 
-    //    if(func.checkLocal() || func.isLimitedAccount()){
-    //        return {
-    //            "Manual": manual
-    //        }
-    //    }
+       if(func.checkLocal() || func.isLimitedAccount()){
+           return {
+               "Manual": manual
+           }
+       }
 
         let connectors = {}
 
