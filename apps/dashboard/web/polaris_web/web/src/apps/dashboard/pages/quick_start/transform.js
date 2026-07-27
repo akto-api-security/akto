@@ -2236,7 +2236,7 @@ const quickStartFunc = {
         ]
 
         const aiAgentConnectors = [
-            awsBedrockObj, awsAgentCoreObj, amazonQuickObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
+            awsBedrockObj, awsAgentCoreObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
             n8nImportObj, langchainImportObj, snowflakeObj,
             vertexAICustomDeployedModelImportObj, salesforceImportObj
         ]
@@ -2318,7 +2318,7 @@ const quickStartFunc = {
                 "Endpoint Management": endpointManagement,
                 "MDM Tools": mdmTools,
                 "Agentic Proxies": agenticProxies,
-                "Platform connectors": [anthropicImportObj, openaiImportObj, m365CopilotObj, copilotStudioImportObj, copilotStudioMultiEnvImportObj],
+                "Platform connectors": [anthropicImportObj, openaiImportObj, m365CopilotObj, copilotStudioImportObj, copilotStudioMultiEnvImportObj, amazonQuickObj],
                 "Browser Extension": browserExtensions,
                 "Locally Hosted Models": localHostedModels,
                 "Secure Web Networks": secureWebNetworks,
@@ -2374,7 +2374,7 @@ const quickStartFunc = {
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj,
-                awsBedrockObj, amazonQuickObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
+                awsBedrockObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
                 n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, difyImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, portkeyImportObj, salesforceImportObj, anthropicImportObj, openaiImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj, neovimHookObj, openCodeHookObj,hermesHookObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj,
                 intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
