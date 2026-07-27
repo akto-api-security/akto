@@ -8,6 +8,7 @@ public enum ModelType {
     MISTRAL_AI,
     GEMINI,
     GITHUB_COPILOT,
-    OLLAMA
+    OLLAMA,
+    CLOUDFLARE
 
 }
