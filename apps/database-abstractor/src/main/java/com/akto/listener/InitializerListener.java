@@ -101,7 +101,9 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static void checkMongoConnection() throws Exception {
-        AccountsDao.instance.getStats();
+        // ping (privilege-free) instead of getStats/serverStatus, which DocumentDB rejects
+        // with "Authorization failure" for non-admin users. Works on MongoDB and DocumentDB.
+        AccountsDao.instance.pingDb();
         connectedToMongo = true;
     }
 
