@@ -15,7 +15,7 @@ jobs:
       IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/setup-java@v2
+      - uses: actions/setup-java@v4
         with:
           distribution: 'corretto'
           java-version: '17'
