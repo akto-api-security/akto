@@ -678,6 +678,24 @@ func normalizeAccountType(raw string) string {
 	return strings.ToLower(strings.TrimSpace(raw))
 }
 
+// accountTypeFromRequestTag resolves the account type from the request's own tag JSON
+// (a map[string]string, e.g. {"browser-llm-account-type":"enterprise"}). Browser-
+// extension traffic carries the account-type tag on the request itself rather than on a
+// stored collection, so this is consulted for those requests. Returns "" if the tag is
+// absent, unparseable, or carries no recognised account-type key — the same precedence
+// as the collection-based resolveAccountType.
+func accountTypeFromRequestTag(tag string) string {
+	if tag == "" {
+		return ""
+	}
+	var m map[string]string
+	if err := json.Unmarshal([]byte(tag), &m); err != nil {
+		return ""
+	}
+	accountType, _ := resolveAccountType(m)
+	return accountType
+}
+
 // TODO: move reportAndBlockPersonalAccount to mcp library so threat reporting
 // and validation live in one place alongside other policy enforcement.
 func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID, policyName, behaviour string) *mcp.ValidationResult {
@@ -1404,12 +1422,28 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// selection is respected (a personal-account policy scoped to server A should
 	// not block requests arriving on server B).
 	if policyName, ok := blockPersonalAccountPolicyName(policies); ok {
-		s.refreshCollectionTagsIfNeeded()
-		accountType := s.getLoginUserEmailType(valCtx.RequestHeaders)
+		var accountType, accountTypeSource string
+		// Browser-extension requests carry the account-type tag on the request itself
+		// (the extension host is usually absent from the collection cache), so read it
+		// straight from the request tag when present.
+		if mcp.IsBrowserExtensionRequest(valCtx.Tag) {
+			if at := accountTypeFromRequestTag(valCtx.Tag); at != "" {
+				accountType = at
+				accountTypeSource = "requestTag"
+			}
+		}
+		// Fall back to the collection-tag lookup (existing behaviour) when the request
+		// tag did not supply an account type.
+		if accountType == "" {
+			s.refreshCollectionTagsIfNeeded()
+			accountType = s.getLoginUserEmailType(valCtx.RequestHeaders)
+			accountTypeSource = "collection"
+		}
 		s.logger.Info("ValidateRequest - account type check",
 			zap.String("path", params.Path),
 			zap.String("sessionID", sessionID),
-			zap.String("accountType", accountType))
+			zap.String("accountType", accountType),
+			zap.String("accountTypeSource", accountTypeSource))
 		// Match explicitly: only "personal" blocks. "enterprise" is allowed, and any
 		// other value ("unknown", a missing tag, or a value this build does not know)
 		// is treated as not-personal so an unclassified login never blocks traffic.
