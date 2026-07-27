@@ -149,8 +149,7 @@ class AnthropicProvider(LLMProvider):
         self.model = model or DEFAULT_ANTHROPIC_MODEL
         self.base_url = (base_url or self._DEFAULT_BASE_URL).rstrip("/")
         logger.info(
-            f"{self._log_tag} model={self.model} base_url={self.base_url} "
-            f"api_key={_redact_secret(self.api_key)}"
+            f"{self._log_tag} model={self.model} base_url={self.base_url} api_key={_redact_secret(self.api_key)}"
         )
 
     def _messages_url(self) -> str:
