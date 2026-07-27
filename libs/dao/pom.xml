@@ -163,9 +163,13 @@
             <version>5.3.3</version>
         </dependency>
         <dependency>
+            <!-- Matches libs/utils's mockito-core:4.11.0 - keeps one mockito version across
+                 the reactor instead of mockito-inline pulling a mismatched mockito-core
+                 transitively. 4.x is the last line supporting JDK 8+ as a minimum; 5.x
+                 requires JDK 11+. -->
             <groupId>org.mockito</groupId>
             <artifactId>mockito-inline</artifactId>
-            <version>3.12.4</version>
+            <version>4.11.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>

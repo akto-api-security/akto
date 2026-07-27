@@ -95,7 +95,14 @@ start_java() {
     TEE_PID=$!
 
     # Start Java (stdout+stderr → FIFO)
-    java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar > "$FIFO" 2>&1 &
+    # --add-opens: Java 17 strong-encapsulation opens needed by reflective libraries
+    # (MongoDB POJO codec, etc.). Single-token "=" form.
+    java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m \
+        --add-opens=java.base/java.lang=ALL-UNNAMED \
+        --add-opens=java.base/java.util=ALL-UNNAMED \
+        --add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
+        --add-opens=java.base/java.time=ALL-UNNAMED \
+        -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar > "$FIFO" 2>&1 &
     JAVA_PID=$!
 
     echo "Started Java PID=$JAVA_PID, tee PID=$TEE_PID" | tee -a "$LOG_FILE"
