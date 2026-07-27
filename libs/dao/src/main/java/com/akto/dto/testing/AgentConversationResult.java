@@ -13,7 +13,9 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AgentConversationResult {
-    
+
+    public static final String TOOLS_METADATA = "toolsMetadata";
+
     private String conversationId;
     private String prompt;
     private String response;

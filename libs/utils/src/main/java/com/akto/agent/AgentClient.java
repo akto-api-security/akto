@@ -28,6 +28,8 @@ import java.util.Map;
 import java.util.UUID;
 
 import static com.akto.agent.AgenticUtils.getTestModeFromRole;
+import static com.akto.agent.AgenticUtils.isCopilotBotCollection;
+import static com.akto.agent.AgenticUtils.isLiteLLMAgent;
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 
 public class AgentClient {
@@ -39,7 +41,8 @@ public class AgentClient {
     private static final String JSON_KEY_CONVERSATION_ID = "conversationId";
     private static final String JSON_KEY_IS_LAST_REQUEST = "isLastRequest";
     private static final String JSON_KEY_TESTING_RUN_RESULT_SUMMARY_ID = "testingRunResultSummaryId";
-    
+    private static final String JSON_KEY_FETCH_QUERY_RECORDS = "shouldFetchRecords";
+
     private static final OkHttpClient agentHttpClient = CoreHTTPClient.client.newBuilder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(120, TimeUnit.SECONDS)
@@ -66,6 +69,16 @@ public class AgentClient {
 
         ApiCollection col = dataActor.fetchApiCollectionMeta(apiCollectionId);
         boolean isCopilot = isCopilotBotCollection(col);
+        boolean shouldFetchRecords = false;
+        if(!isCopilot){
+            shouldFetchRecords = isLiteLLMAgent(col);
+            if(shouldFetchRecords){
+                ApiExecutionJobStore store = ApiExecutionJobStoreRegistry.get();
+                if (store != null) {
+                    store.markLiteLLMConversation(conversationId);
+                }
+            }
+        }
         loggerMaker.infoAndAddToDb("executeAgenticTest: starting conversationId=" + conversationId + " apiCollectionId=" + apiCollectionId + " prompts=" + promptsList.size() + " copilot=" + isCopilot);
 
         try {
@@ -95,7 +108,7 @@ public class AgentClient {
         }
 
         try {
-            List<AgentConversationResult> conversationResults = processConversations(promptsList, conversationId, testMode, testingRunResultSummaryId);
+            List<AgentConversationResult> conversationResults = processConversations(promptsList, conversationId, testMode, testingRunResultSummaryId, shouldFetchRecords);
             boolean isVulnerable = conversationResults.get(conversationResults.size() - 1).isValidation();
             List<String> errors = new ArrayList<>();
 
@@ -107,7 +120,10 @@ public class AgentClient {
                 testResults.add(testResult);
             }
 
-            storeConversationResults(conversationResults);
+            List<String> docIds = storeConversationResults(conversationResults);
+            if(shouldFetchRecords){
+                linkJobIdsToConversationResultDocIds(conversationId, docIds);
+            }
             return testResults;
 
         } catch (Exception e) {
@@ -119,14 +135,14 @@ public class AgentClient {
         }
     }
     
-    private List<AgentConversationResult> processConversations(List<String> prompts, String conversationId, String testMode, String testingRunResultSummaryId) throws Exception {
+    private List<AgentConversationResult> processConversations(List<String> prompts, String conversationId, String testMode, String testingRunResultSummaryId, boolean shouldFetchRecords) throws Exception {
         List<AgentConversationResult> results = new ArrayList<>();
         int index = 0;
         int totalRequests = prompts.size();
         for (String prompt : prompts) {
             index++;
             try {
-                AgentConversationResult result = sendChatRequest(prompt, conversationId, testMode, index == totalRequests, testingRunResultSummaryId);
+                AgentConversationResult result = sendChatRequest(prompt, conversationId, testMode, index == totalRequests, testingRunResultSummaryId, shouldFetchRecords);
                 results.add(result);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error processing prompt: " + prompt + ", error: " + e.getMessage());
@@ -137,8 +153,8 @@ public class AgentClient {
         return results;
     }
     
-    private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest, String testingRunResultSummaryId) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, testingRunResultSummaryId);
+    private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest, String testingRunResultSummaryId, boolean shouldFetchRecords) throws Exception {
+        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, testingRunResultSummaryId, shouldFetchRecords);
 
         Call call = clientWithLongTimeout.newCall(request);
 
@@ -153,12 +169,13 @@ public class AgentClient {
         }
     }
     
-    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String testingRunResultSummaryId) {
+    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String testingRunResultSummaryId, boolean shouldFetchRecords) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put(JSON_KEY_PROMPT, prompt);
         requestBody.put(JSON_KEY_CONVERSATION_ID, conversationId);
         requestBody.put(JSON_KEY_IS_LAST_REQUEST, isLastRequest);
         requestBody.put(JSON_KEY_TESTING_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId != null ? testingRunResultSummaryId : "");
+        requestBody.put(JSON_KEY_FETCH_QUERY_RECORDS, shouldFetchRecords);
         
         String body;
         try {
@@ -278,30 +295,35 @@ public class AgentClient {
         }
     }
 
-    private void storeConversationResults(List<AgentConversationResult> conversationResults) {
+    private List<String> storeConversationResults(List<AgentConversationResult> conversationResults) {
         try {
-            dataActor.storeConversationResults(conversationResults);
+            return dataActor.storeConversationResults(conversationResults);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error storing conversation results: " + e.getMessage());
+            return new ArrayList<>();
         }
     }
 
-    public static boolean isCopilotBotCollection(int apiCollectionId) {
-        ApiCollection col = dataActor.fetchApiCollectionMeta(apiCollectionId);
-        return isCopilotBotCollection(col);
+    private void linkJobIdsToConversationResultDocIds(String conversationId, List<String> docIds) {
+        if (docIds == null || docIds.isEmpty()) {
+            return;
+        }
+        ApiExecutionJobStore store = ApiExecutionJobStoreRegistry.get();
+        if (store == null) {
+            return;
+        }
+        List<String> jobIds = store.getJobIdsByConversationId(conversationId);
+        if (jobIds.size() != docIds.size()) {
+            loggerMaker.errorAndAddToDb("linkJobIdsToConversationResultDocIds: jobId/docId count mismatch for conversationId="
+                    + conversationId + " jobIds=" + jobIds.size() + " docIds=" + docIds.size());
+        }
+        int count = Math.min(jobIds.size(), docIds.size());
+        for (int i = 0; i < count; i++) {
+            store.putConversationResultDocId(jobIds.get(i), docIds.get(i));
+        }
     }
 
-    public static boolean isCopilotBotCollection(ApiCollection col) {
-        if (col == null || col.getTagsList() == null) {
-            loggerMaker.infoAndAddToDb("isCopilotBotCollection: collection not found or has no tags");
-            return false;
-        }
-        List<CollectionTags> tags = col.getTagsList();
-        loggerMaker.infoAndAddToDb("isCopilotBotCollection: collection " + col.getId() + " tags=" + tags.stream().map(t -> t.getKeyName() + "=" + t.getValue()).collect(java.util.stream.Collectors.joining(", ")));
-        boolean hasSource  = tags.stream().anyMatch(t -> Constants.AKTO_ENDPOINT_SOURCE_TAG.equals(t.getKeyName()) && Constants.AKTO_COPILOT_SOURCE_VALUE.equals(t.getValue()));
-        boolean hasBotName = tags.stream().anyMatch(t -> Constants.AKTO_COPILOT_BOT_NAME_TAG.equals(t.getKeyName()));
-        return hasSource && hasBotName;
-    }
+    
 
     private static String getTagValue(List<CollectionTags> tags, String keyName) {
         if (tags == null) return null;
