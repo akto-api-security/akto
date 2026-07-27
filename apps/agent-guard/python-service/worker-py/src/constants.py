@@ -10,6 +10,8 @@ import json
 import logging
 from typing import Any
 
+from settings import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -72,8 +74,9 @@ FORCE_GEMMA_ONLY_SCANNERS = {"Password"}
 
 
 def _gemma_arbiter_provider() -> str:
-    """Return the provider name of the Gemma arbiter."""
-    # change if the gemma infra is moved
+    """Pick the configured Gemma backend: Vertex when set, else Azure Foundry."""
+    if settings.GEMMA_VERTEX_ENDPOINT_ID and not settings.GEMMA_FOUNDRY_BASE_URL:
+        return "gemma_vertexai"
     return "gemma_foundry"
 
 
