@@ -2,7 +2,7 @@
 
 import pytest
 
-from anonymizer_service import AnonymizeRequest, _analysis_view, anonymize
+from anonymizer_service import AnonymizeRequest, _blank_json_escapes, anonymize
 
 
 class _FakeRequest:
@@ -17,8 +17,8 @@ def _sanitize(text: str) -> str:
 @pytest.mark.parametrize("text", [
     r"a\nb", r"\n\n1. x", r"tabs\there", "no escapes at all", r"\r\n\f\b\v", "",
 ])
-def test_analysis_view_preserves_length(text):
-    assert len(_analysis_view(text)) == len(text)
+def test_blank_json_escapes_preserves_length(text):
+    assert len(_blank_json_escapes(text)) == len(text)
 
 
 # The bug: US_DRIVER_LICENSE matched the "n1" in "\n\n1." and ate the list markers.

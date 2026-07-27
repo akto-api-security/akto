@@ -33,7 +33,7 @@ EXCLUDED_ENTITY_TYPES = {"DATE_TIME", "NRP", "LOCATION"}
 _JSON_ESCAPE = re.compile(r"\\[nrtfbv]")
 
 
-def _analysis_view(text: str) -> str:
+def _blank_json_escapes(text: str) -> str:
     """Blank escapes so spaCy tokenizes cleanly; same length, so offsets still fit the original."""
     return _JSON_ESCAPE.sub("  ", text)
 
@@ -114,7 +114,7 @@ def anonymize(req: AnonymizeRequest, request: Request):
 
     analyze_start = time.perf_counter()
     results = analyzer.analyze(
-        text=_analysis_view(req.text),
+        text=_blank_json_escapes(req.text),
         language=req.language,
         entities=req.entities,
     )

@@ -1,0 +1,37 @@
+name: Agent Guard Anonymizer CI
+
+on:
+  pull_request:
+    paths:
+      - "apps/agent-guard/python-service/anonymizer-container/**"
+      - ".github/workflows/akto-agent-guard-anonymizer-ci.yml"
+  push:
+    branches: ["master"]
+    paths:
+      - "apps/agent-guard/python-service/anonymizer-container/**"
+      - ".github/workflows/akto-agent-guard-anonymizer-ci.yml"
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: apps/agent-guard/python-service/anonymizer-container
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: apps/agent-guard/python-service/anonymizer-container/src/requirements.txt
+
+      - name: Install dependencies
+        run: pip install --no-cache-dir -r src/requirements.txt pytest
+
+      - name: Download spaCy model
+        run: python -m spacy download en_core_web_sm
+
+      - name: pytest
+        run: pytest -q
