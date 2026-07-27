@@ -7,7 +7,6 @@ never pip-download at runtime (which was failing under parallel uvicorn startup)
 
 import logging
 import os
-import re
 import time
 from contextlib import asynccontextmanager
 from typing import List, Optional
@@ -28,14 +27,7 @@ REDACTION_PLACEHOLDER = "[REDACTED]"
 # Noisy spaCy/keyword recognizers (no format validation) that misfire on ordinary text.
 EXCLUDED_ENTITY_TYPES = {"DATE_TIME", "NRP", "LOCATION"}
 
-# Payloads arrive inner-JSON-escaped, so a literal "\n" glues itself onto the next token:
-# "\n1." was read as a licence number, and "\n4111 1111 1111 1111" hid a card entirely.
-_JSON_ESCAPE = re.compile(r"\\[nrtfbv]")
-
-
-def _blank_json_escapes(text: str) -> str:
-    """Blank escapes so spaCy tokenizes cleanly; same length, so offsets still fit the original."""
-    return _JSON_ESCAPE.sub("  ", text)
+SCORE_THRESHOLD = 0.4
 
 
 def _build_analyzer() -> AnalyzerEngine:
@@ -114,9 +106,10 @@ def anonymize(req: AnonymizeRequest, request: Request):
 
     analyze_start = time.perf_counter()
     results = analyzer.analyze(
-        text=_blank_json_escapes(req.text),
+        text=req.text,
         language=req.language,
         entities=req.entities,
+        score_threshold=SCORE_THRESHOLD,
     )
     # Drop noisy types unless the caller explicitly asked for specific entities.
     if not req.entities:
