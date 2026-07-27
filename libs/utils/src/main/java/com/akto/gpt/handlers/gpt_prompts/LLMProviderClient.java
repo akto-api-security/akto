@@ -43,6 +43,7 @@ public class LLMProviderClient {
             case OLLAMA:
             case GEMINI:
             case GITHUB_COPILOT:
+            case CLOUDFLARE:
                 throw new RuntimeException("Provider " + model.getType() + " is not yet supported for prompt handlers");
             default:
                 throw new RuntimeException("Unsupported model type: " + model.getType());
