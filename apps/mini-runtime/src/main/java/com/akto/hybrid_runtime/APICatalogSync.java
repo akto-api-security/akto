@@ -1858,7 +1858,7 @@ public class APICatalogSync {
 
             boolean isEligible = true;
             try {
-                isEligible = FilterUpdates.isEligibleForUpdate(deltaInfo.getApiCollectionId(), deltaInfo.getUrl(), deltaInfo.getMethod(), deltaInfo.getParam(), deltaInfo.getResponseCode(), "update");
+                isEligible = FilterUpdates.isEligibleForUpdate(deltaInfo.getApiCollectionId(), deltaInfo.getUrl(), deltaInfo.getMethod(), deltaInfo.getParam(), deltaInfo.getResponseCode(), deltaInfo.getSubType().getName(), "update");
                 // if (!isEligible) {
                 //     loggerMaker.infoAndAddToDb("param already found " + deltaInfo.getParam() + " " + deltaInfo.getUrl());
                 // }
@@ -1881,7 +1881,7 @@ public class APICatalogSync {
 
             boolean isEligible = true;
             try {
-                isEligible = FilterUpdates.isEligibleForUpdate(deleted.getApiCollectionId(), deleted.getUrl(), deleted.getMethod(), deleted.getParam(), deleted.getResponseCode(), "delete");
+                isEligible = FilterUpdates.isEligibleForUpdate(deleted.getApiCollectionId(), deleted.getUrl(), deleted.getMethod(), deleted.getParam(), deleted.getResponseCode(), deleted.getSubType().getName(), "delete");
                 // if (!isEligible) {
                 //     loggerMaker.infoAndAddToDb("param already found for delete update " + deleted.getParam() + " " + deleted.getUrl());
                 // }
