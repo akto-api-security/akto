@@ -10,8 +10,6 @@ import json
 import logging
 from typing import Any
 
-from settings import settings
-
 logger = logging.getLogger(__name__)
 
 
@@ -26,7 +24,7 @@ BUILTIN_DEFAULT_CONFIG: dict[str, Any] = {
             "modelRole": "FAST_THREAT_FILTER",
         },
         {
-            "provider": "gemma_vertexai",
+            "provider": "gemma_foundry",
             "model": "",
             "baseUrl": "",
             "safeDecisionThreshold": 0.9,
@@ -74,10 +72,9 @@ FORCE_GEMMA_ONLY_SCANNERS = {"Password"}
 
 
 def _gemma_arbiter_provider() -> str:
-    """Pick the configured Gemma backend: Vertex when set, else Azure Foundry."""
-    if not settings.GEMMA_VERTEX_ENDPOINT_ID and settings.GEMMA_FOUNDRY_BASE_URL:
-        return "gemma_foundry"
-    return "gemma_vertexai"
+    """Return the provider name of the Gemma arbiter."""
+    # change if the gemma infra is moved
+    return "gemma_foundry"
 
 
 def strip_qwen_tier(model_configs):

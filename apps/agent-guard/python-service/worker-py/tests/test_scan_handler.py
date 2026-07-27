@@ -58,17 +58,10 @@ async def _scan_password():
     )
 
 
-async def test_password_ignores_caller_models_and_runs_vertex_gemma(monkeypatch):
+async def test_password_ignores_caller_models_and_runs_foundry_gemma(monkeypatch):
+    # Neither the caller's modelConfigs nor a leftover GEMMA_VERTEX_* block may divert Password.
     monkeypatch.setattr(settings, "GEMMA_VERTEX_ENDPOINT_ID", "1234567890")
     monkeypatch.setattr(settings, "GEMMA_FOUNDRY_BASE_URL", "")
-    r = await _scan_password()
-    assert FakeScanner.calls == ["gemma_vertexai"]
-    assert r["is_valid"] is False
-
-
-async def test_password_ignores_caller_models_and_runs_foundry_gemma(monkeypatch):
-    monkeypatch.setattr(settings, "GEMMA_VERTEX_ENDPOINT_ID", "")
-    monkeypatch.setattr(settings, "GEMMA_FOUNDRY_BASE_URL", "https://ep.eastus2.inference.ml.azure.com/v1")
     r = await _scan_password()
     assert FakeScanner.calls == ["gemma_foundry"]
     assert r["is_valid"] is False

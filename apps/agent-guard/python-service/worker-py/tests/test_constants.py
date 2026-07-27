@@ -37,26 +37,16 @@ def test_json_without_modelconfigs_falls_back():
 def test_builtin_shape_is_intact():
     # guards against accidental edits to the fallback
     providers = [m["provider"] for m in BUILTIN_DEFAULT_CONFIG["modelConfigs"]]
-    assert providers == ["qwen3guard", "gemma_vertexai"]
+    assert providers == ["qwen3guard", "gemma_foundry"]
 
 
 # ── force_gemma_only — Gemma backend resolution ──────────────────────────────
 
 
-def test_force_gemma_only_prefers_vertex_when_configured(monkeypatch):
+def test_force_gemma_only_always_uses_foundry(monkeypatch):
+    # Hostile env: Vertex populated, Foundry not. Password must still pick Foundry —
+    # honouring a leftover GEMMA_VERTEX_* block pinned it to a dead endpoint.
     monkeypatch.setattr(settings, "GEMMA_VERTEX_ENDPOINT_ID", "1234567890")
-    monkeypatch.setattr(settings, "GEMMA_FOUNDRY_BASE_URL", "https://ep.eastus2.inference.ml.azure.com/v1")
-    assert force_gemma_only([])[0]["provider"] == "gemma_vertexai"
-
-
-def test_force_gemma_only_uses_foundry_when_vertex_absent(monkeypatch):
-    monkeypatch.setattr(settings, "GEMMA_VERTEX_ENDPOINT_ID", "")
-    monkeypatch.setattr(settings, "GEMMA_FOUNDRY_BASE_URL", "https://ep.eastus2.inference.ml.azure.com/v1")
+    monkeypatch.setattr(settings, "GEMMA_FOUNDRY_BASE_URL", "")
     cfg = force_gemma_only([])
     assert cfg == [{"provider": "gemma_foundry", "modelRole": "FINAL_ARBITER", "timeoutMs": 30000}]
-
-
-def test_force_gemma_only_defaults_to_vertex_when_nothing_configured(monkeypatch):
-    monkeypatch.setattr(settings, "GEMMA_VERTEX_ENDPOINT_ID", "")
-    monkeypatch.setattr(settings, "GEMMA_FOUNDRY_BASE_URL", "")
-    assert force_gemma_only([])[0]["provider"] == "gemma_vertexai"
