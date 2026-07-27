@@ -25,7 +25,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jdk.nashorn.api.scripting.ScriptObjectMirror;
 
 public class ApiExecutorUtil {
 
@@ -168,16 +167,20 @@ public class ApiExecutorUtil {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private static StreamingRequestConfig parseStreamingRequest(Object srObj) {
-        if (!(srObj instanceof ScriptObjectMirror)) return null;
-        ScriptObjectMirror srMirror = (ScriptObjectMirror) srObj;
+        // Nashorn's JS object (ScriptObjectMirror) implements java.util.Map. Cast to Map
+        // (not the jdk.nashorn.* type, which is gone on JDK 17) so this compiles on both
+        // JDK 8 and 17. Behaviour is unchanged from the original.
+        if (!(srObj instanceof Map)) return null;
+        Map<String, Object> srMirror = (Map<String, Object>) srObj;
         String srUrl = (String) srMirror.get("url");
         String srBody = (String) srMirror.get("body");
         String lastKey = (String) srMirror.get("lastKey");
         Map<String, String> srHeaders = new HashMap<>();
         Object headersObj = srMirror.get("headers");
-        if (headersObj instanceof ScriptObjectMirror) {
-            ScriptObjectMirror hm = (ScriptObjectMirror) headersObj;
+        if (headersObj instanceof Map) {
+            Map<String, Object> hm = (Map<String, Object>) headersObj;
             for (String key : hm.keySet()) {
                 Object val = hm.get(key);
                 if (val != null) srHeaders.put(key, val.toString());
@@ -186,12 +189,16 @@ public class ApiExecutorUtil {
         return new StreamingRequestConfig(srUrl, srBody, srHeaders, lastKey);
     }
 
+    @SuppressWarnings("unchecked")
     private static Map<String, List<String>> convertHeadersFromScript(Map<String, Object> headers) {
         Map<String, List<String>> hs = new HashMap<>();
         if (headers == null) return hs;
         for (String key : headers.keySet()) {
             try {
-                ScriptObjectMirror scm = ((ScriptObjectMirror) headers.get(key));
+                // Nashorn's JS array (ScriptObjectMirror) implements java.util.Map with array
+                // indices as string keys "0","1",... Cast to Map (not the jdk.nashorn.* type,
+                // which is gone on JDK 17) so this compiles on both JDK 8 and 17.
+                Map<String, Object> scm = ((Map<String, Object>) headers.get(key));
                 List<String> val = new ArrayList<>();
                 for (int i = 0; i < scm.size(); i++) {
                     val.add((String) scm.get(Integer.toString(i)));

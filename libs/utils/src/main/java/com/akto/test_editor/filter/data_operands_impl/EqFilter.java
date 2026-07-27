@@ -1,7 +1,5 @@
 package com.akto.test_editor.filter.data_operands_impl;
 
-import static org.mockito.Answers.valueOf;
-
 import java.util.List;
 
 import com.akto.dto.test_editor.DataOperandFilterRequest;
