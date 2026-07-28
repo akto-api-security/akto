@@ -637,11 +637,12 @@ func (s *Service) getLoginUserEmailType(reqHeaders map[string]string) string {
 
 // TODO: move reportAndBlockPersonalAccount to mcp library so threat reporting
 // and validation live in one place alongside other policy enforcement.
-func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID, policyName, behaviour string) *mcp.ValidationResult {
+func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID, policyName, behaviour string, policies []types.Policy) *mcp.ValidationResult {
 	blockReason := "Blocked: personal accounts are not permitted by guardrail policy"
+	clientMessage := clientMessageForPolicy(policies, policyName, blockReason)
 
 	if s.sessionMgr != nil && sessionID != "" {
-		s.sessionMgr.TrackResponse(sessionID, requestID, blockReason, true)
+		s.sessionMgr.TrackResponse(sessionID, requestID, clientMessage, true)
 		s.sessionMgr.UpdateBlockedReason(sessionID, blockReason)
 	}
 
@@ -683,7 +684,7 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 
 	return &mcp.ValidationResult{
 		Allowed:   false,
-		Reason:    blockReason,
+		Reason:    clientMessage,
 		Behaviour: behaviour,
 		Metadata: types.ThreatMetadata{
 			PolicyName:   policyName,
@@ -741,7 +742,8 @@ func (s *Service) checkBlockedHost(params *models.ValidateRequestParams, valCtx 
 		zap.String("policy", policyName),
 		zap.String("sessionID", sessionID),
 		zap.String("requestID", requestID))
-	return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, policyName, matchedPattern, behaviourForPolicy(policies, policyName))
+	return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, policyName, matchedPattern,
+		behaviourForPolicy(policies, policyName), policies)
 }
 
 // behaviourForPolicy returns the configured behaviour (lowercased) for the named policy,
@@ -760,8 +762,21 @@ func behaviourForPolicy(policies []types.Policy, policyName string) string {
 	return "block"
 }
 
-func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID, policyName, matchedPattern, behaviour string) *mcp.ValidationResult {
+func clientMessageForPolicy(policies []types.Policy, policyName, fallback string) string {
+	for _, p := range policies {
+		if p.Info.Name == policyName {
+			if m := strings.TrimSpace(p.BlockedMessage); m != "" {
+				return m
+			}
+			break
+		}
+	}
+	return fallback
+}
+
+func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID, policyName, matchedPattern, behaviour string, policies []types.Policy) *mcp.ValidationResult {
 	reason := "Request blocked by guardrail policy (blocked host pattern: " + matchedPattern + ")"
+	clientMessage := clientMessageForPolicy(policies, policyName, reason)
 	metadata := types.ThreatMetadata{
 		PolicyName:   policyName,
 		RuleViolated: "BlockedHost",
@@ -770,7 +785,7 @@ func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCt
 	}
 
 	if s.sessionMgr != nil && sessionID != "" {
-		s.sessionMgr.TrackResponse(sessionID, requestID, reason, true)
+		s.sessionMgr.TrackResponse(sessionID, requestID, clientMessage, true)
 		s.sessionMgr.UpdateBlockedReason(sessionID, reason)
 	}
 
@@ -801,7 +816,7 @@ func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCt
 		Allowed:         false,
 		Modified:        false,
 		ModifiedPayload: payloadToValidate,
-		Reason:          reason,
+		Reason:          clientMessage,
 		Metadata:        metadata,
 		Behaviour:       behaviour,
 	}
@@ -888,7 +903,7 @@ func (s *Service) checkToolCallAnomaly(ctx context.Context, params *models.Valid
 			if cfg.Behaviour == "block" {
 				return &mcp.ValidationResult{
 					Allowed:   false,
-					Reason:    details,
+					Reason:    clientMessageForPolicy(policies, cfg.PolicyName, details),
 					Behaviour: "block",
 					Metadata: types.ThreatMetadata{
 						PolicyName:   cfg.PolicyName,
@@ -940,7 +955,7 @@ func (s *Service) checkErrorAnomaly(ctx context.Context, params *models.Validate
 			if cfg.Behaviour == "block" {
 				return &mcp.ValidationResult{
 					Allowed:   false,
-					Reason:    details,
+					Reason:    clientMessageForPolicy(policies, cfg.PolicyName, details),
 					Behaviour: "block",
 					Metadata: types.ThreatMetadata{
 						PolicyName:   cfg.PolicyName,
@@ -1375,7 +1390,8 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 				zap.String("accountType", accountType),
 				zap.String("policyName", policyName),
 				zap.String("sessionID", sessionID))
-			return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName)), nil
+			return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName,
+				behaviourForPolicy(policies, policyName), policies), nil
 		}
 	}
 
@@ -1819,10 +1835,10 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 	s.schemaFetcher.RefreshIfNeeded()
 
 	type batchPolicyBundle struct {
-		policies        []types.Policy
-		auditPolicies   map[string]*types.AuditPolicy
-		compiledRules   map[string]*regexp.Regexp
-		hasAuditRules   bool
+		policies      []types.Policy
+		auditPolicies map[string]*types.AuditPolicy
+		compiledRules map[string]*regexp.Regexp
+		hasAuditRules bool
 	}
 	policyByContext := make(map[string]batchPolicyBundle)
 

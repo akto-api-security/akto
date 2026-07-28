@@ -486,25 +486,32 @@ def main():
 
             if not allowed:
                 if _is_warn_behaviour(behaviour):
-                    block_reason = (
+                    user_message = (
                         "Warning!!, response blocked, please review it. Send again to bypass. "
                         f"Reason for blocking: {gr_reason}"
                     )
                 else:
-                    block_reason = f"Response blocked: {gr_reason}"
+                    # systemMessage is surfaced verbatim in the Codex UI, so keep the
+                    # operator-configured blockedMessage unwrapped (see prompt hook).
+                    user_message = gr_reason or "Policy violation"
 
-                # Codex Stop: `decision: "block"` means continue with `reason` as a
-                # synthetic continuation prompt (see OpenAI Codex hooks docs). For
-                # strict denies we must use `continue: false` to end the turn.
-                if _is_warn_behaviour(behaviour):
-                    output = {"decision": "block", "reason": block_reason}
-                else:
-                    output = {
-                        "continue": False,
-                        "stopReason": gr_reason or "Policy violation",
-                        "systemMessage": block_reason,
-                    }
-                logger.warning(f"BLOCKING Stop - Reason: {gr_reason}")
+                # Codex Stop output contract (https://learn.chatgpt.com/docs/hooks):
+                # `decision: "block"` does NOT reject the turn here — it "tells Codex to
+                # continue and automatically creates a new continuation prompt that acts
+                # as a new user prompt, using your `reason` as that prompt text", so the
+                # message would be fed to the model and never shown to the user.
+                # `systemMessage` is the only field documented as "surfaced as a warning
+                # in the UI or event stream", so warn and block both report through it;
+                # `stopReason` is recorded metadata only. Same shape for both behaviours
+                # — warn differs by wording and by the resubmit bypass recorded above.
+                output = {
+                    "continue": False,
+                    "stopReason": gr_reason or "Policy violation",
+                    "systemMessage": user_message,
+                }
+                logger.warning(
+                    f"BLOCKING Stop - behaviour: {behaviour or 'block'}, Reason: {gr_reason}"
+                )
                 print(json.dumps(output))
                 ingest_blocked_response(
                     user_prompt, response_text, gr_reason, session_info
