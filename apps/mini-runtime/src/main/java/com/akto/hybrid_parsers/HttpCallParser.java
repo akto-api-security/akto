@@ -46,6 +46,7 @@ import com.akto.tracing.copilot.CopilotActivityParser;
 import com.akto.tracing.n8n.N8nTraceParser;
 import com.akto.tracing.snowflake.SnowflakeTraceParser;
 import com.akto.tracing.bedrock.BedrockAgentTraceParser;
+import com.akto.tracing.browser_extension.BrowserExtensionTraceParser;
 import com.akto.dao.tracing.TraceDao;
 import com.akto.dao.tracing.SpanDao;
 import com.akto.usage.OrgUtils;
@@ -198,6 +199,19 @@ public class HttpCallParser {
         return vxlanId;
     }
 
+
+    /**
+     * The extension registers its collection with its own id, and createCollectionForHostAndVpc
+     * upserts on hostName — so a hashCode id would never be created and its traffic orphaned.
+     */
+    private int resolveCollectionIdForHost(String hostName) {
+        for (ApiCollection apiCollection: apiCollectionsMap.values()) {
+            if (apiCollection != null && hostName.equalsIgnoreCase(apiCollection.getHostName())) {
+                return apiCollection.getId();
+            }
+        }
+        return hostName.hashCode();
+    }
 
     public int createCollectionBasedOnHostName(int id, String host, List<CollectionTags> tags, String accessType)  throws Exception {
         return createCollectionBasedOnHostName(id, host, tags, accessType, false);
@@ -670,6 +684,28 @@ public class HttpCallParser {
                     (result.getSpans() != null ? result.getSpans().size() : 0));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error parsing Copilot trace: " + e.getMessage());
+        }
+    }
+
+    private boolean isBrowserExtensionTraffic(Map<String, String> tagsMap) {
+        return tagsMap != null && tagsMap.containsKey(Constants.AKTO_BROWSER_LLM_TAG);
+    }
+
+    /** One captured browser turn -> one single-span trace for the endpoint Traces tab. */
+    private void storeBrowserExtensionTrace(HttpResponseParams httpResponseParam) {
+        try {
+            if (!BrowserExtensionTraceParser.getInstance().canParse(httpResponseParam)) {
+                return;
+            }
+            TraceParseResult result = BrowserExtensionTraceParser.getInstance().parse(httpResponseParam);
+            dataActor.storeTrace(result.getTrace());
+            if (result.getSpans() != null && !result.getSpans().isEmpty()) {
+                dataActor.storeSpans(result.getSpans());
+            }
+            loggerMaker.info("Stored browser extension trace traceId=" + result.getTrace().getId()
+                    + " apiCollectionId=" + result.getTrace().getApiCollectionId());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error storing browser extension trace: " + e.getMessage());
         }
     }
 
@@ -1293,7 +1329,7 @@ public class HttpCallParser {
                 updateApiCollectionTags(key, httpResponseParam, accessType);
 
             } else {
-                int id = hostName.hashCode();
+                int id = isBrowserExtensionTraffic(tagsMap) ? resolveCollectionIdForHost(hostName) : hostName.hashCode();
 
                 Optional<CollectionTags> mcpServerTagOpt = getMcpServerTag(httpResponseParam);
                 if (mcpServerTagOpt.isPresent()) {
@@ -1731,6 +1767,10 @@ public class HttpCallParser {
 
             if (isCopilotTraffic(tagsMap)) {
                 parseCopilotTrace(httpResponseParam);
+            }
+
+            if (isBrowserExtensionTraffic(tagsMap)) {
+                storeBrowserExtensionTrace(httpResponseParam);
             }
 
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
