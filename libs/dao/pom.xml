@@ -41,7 +41,10 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>
-            <version>1.7.5</version>
+            <!-- Must match the resolved slf4j-api 2.0.x. The old 1.7.5 binding uses the
+                 pre-2.0 StaticLoggerBinder SPI, which slf4j-api 2.x ignores -> NOP logger
+                 (no logs). Jetty 12 brings slf4j-api 2.x, exposing this mismatch. -->
+            <version>2.0.17</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
