@@ -67,10 +67,11 @@
             <version>6.10.0</version>
         </dependency>
 
+        <!-- Jetty 12 EE8 servlets (javax.servlet line). Matches the Jetty 12 server (no skew). -->
         <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-servlets</artifactId>
-            <version>9.4.57.v20241219</version>
+            <groupId>org.eclipse.jetty.ee8</groupId>
+            <artifactId>jetty-ee8-servlets</artifactId>
+            <version>12.0.37</version>
         </dependency>
 
         <dependency>
@@ -114,17 +115,14 @@
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>org.eclipse.jetty</groupId>
-                <artifactId>jetty-maven-plugin</artifactId>
-                <!-- 9.4.58 bundles ASM 9.x (reads Java 17 bytecode); 9.4.36's ASM can't,
-                     so jetty:run's annotation scan crashes on v61 classes. Runtime image
-                     is already 9.4.58. This only affects local jetty:run, not the WAR. -->
-                <version>9.4.58.v20250814</version>
+                <groupId>org.eclipse.jetty.ee8</groupId>
+                <artifactId>jetty-ee8-maven-plugin</artifactId>
+                <!-- Jetty 12 EE8 maven plugin for local `jetty:run` of the javax webapp. -->
+                <version>12.0.37</version>
                 <configuration>
                     <webAppSourceDirectory>web</webAppSourceDirectory>
                     <webApp>
                         <contextPath>/</contextPath>
-                        <descriptor>WEB-INF/web.xml</descriptor>
                     </webApp>
                 </configuration>
             </plugin>

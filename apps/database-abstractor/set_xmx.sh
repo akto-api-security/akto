@@ -29,10 +29,12 @@ echo "Detected container memory limit: ${MEM_LIMIT_MB} MB"
 XMX_MEM=$((MEM_LIMIT_MB * 80 / 100))
 echo "Calculated -Xmx value: ${XMX_MEM} MB"
 
-# Export JAVA_OPTIONS so Jetty picks it up
-# --add-opens: OGNL (Struts) needs deep reflection into java.lang on Java 17+.
-# (Predicted; confirm/extend via the Java 17 boot — each InaccessibleObjectException names any others.)
-export JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m --add-opens=java.base/java.lang=ALL-UNNAMED"
+# --add-opens (single-token "=" form): Java 17 strong-encapsulation opens needed by reflective
+# libs — OGNL (Struts) and the MongoDB POJO codec (java.util/java.time). Passed to `java` below.
+export JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.time=ALL-UNNAMED"
 
 # Log the final JAVA_OPTIONS value
 echo "JAVA_OPTIONS set to: $JAVA_OPTIONS"
+
+# Launch Jetty 12 (jetty.home = extracted distribution, jetty.base = provisioned ee8 base).
+exec java $JAVA_OPTIONS -jar /opt/jetty-home/start.jar jetty.base=/opt/jetty

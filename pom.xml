@@ -30,7 +30,7 @@
             <dependency>
                 <groupId>io.netty</groupId>
                 <artifactId>netty-bom</artifactId>
-                <version>4.1.135.Final</version>
+                <version>4.1.136.Final</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -65,7 +65,7 @@
             <dependency>
                 <groupId>org.postgresql</groupId>
                 <artifactId>postgresql</artifactId>
-                <version>42.7.11</version>
+                <version>42.7.12</version>
             </dependency>
             <!-- NOTE: spring-security-crypto High (CVE-2025-22228) has no 5.8.x fix
                  (5.8.16 is the latest 5.8 release); requires Spring Security 6.x.
