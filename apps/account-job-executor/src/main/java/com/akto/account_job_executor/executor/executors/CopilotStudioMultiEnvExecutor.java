@@ -6,6 +6,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.CopilotStudioIntegration;
 import com.akto.dto.jobs.AccountJob;
 import com.akto.jobs.executors.copilotstudio.CopilotStudioMultiEnvApiClient;
+import com.akto.jobs.executors.copilotstudio.CopilotStudioMultiEnvApiClient.AccessToken;
 import com.akto.log.LoggerMaker;
 
 import java.util.ArrayList;
@@ -52,12 +53,12 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
             throw new IllegalArgumentException("CopilotStudioIntegration not found: " + integrationId);
         }
 
-        String appOnlyToken = apiClient.getClientCredentialsToken(
+        AccessToken appOnlyToken = apiClient.getClientCredentialsTokenWithExpiry(
             integration.getTenantId(), integration.getClientId(), integration.getClientSecret());
 
         List<CopilotStudioIntegration.Environment> discovered = new ArrayList<>();
         try {
-            discovered = apiClient.listEnvironments(appOnlyToken);
+            discovered = apiClient.listEnvironments(appOnlyToken.getToken());
         } catch (Exception e) {
             logger.error("CopilotStudioMultiEnv: failed to list environments for integration={}: {}",
                 integrationId, e.getMessage());
@@ -79,7 +80,11 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
                 env.getEnvironmentId(), env.isAppUserCreated());
             try {
                 if (!env.isAppUserCreated()) {
-                    apiClient.createApplicationUser(appOnlyToken, env.getEnvironmentId(), integration.getClientId());
+                    if (appOnlyToken.isExpired()) {
+                        appOnlyToken = apiClient.getClientCredentialsTokenWithExpiry(
+                            integration.getTenantId(), integration.getClientId(), integration.getClientSecret());
+                    }
+                    apiClient.createApplicationUser(appOnlyToken.getToken(), env.getEnvironmentId(), integration.getClientId());
                     env.setAppUserCreated(true);
                     logger.info("CopilotStudioMultiEnv: app user created: environmentId={}", env.getEnvironmentId());
                 }
@@ -100,7 +105,7 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
             } catch (Exception e) {
                 failures++;
                 String reason = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-                env.setLastError(reason);
+                env.setLastError(null);
                 errorSummary.append(env.getEnvironmentId()).append(": ").append(reason).append("; ");
                 logger.error("CopilotStudioMultiEnv: environment failed: environmentId={}, error={}",
                     env.getEnvironmentId(), reason);
@@ -127,7 +132,7 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
         for (CopilotStudioIntegration.Environment env : discovered) {
             if (!environments.contains(env)) {
                 environments.add(env);
-                logger.info("CopilotStudioMultiEnv: discovered new environment: environmentId={}", env.getEnvironmentId());
+                // logger.info("CopilotStudioMultiEnv: discovered new environment: environmentId={}", env.getEnvironmentId());
             }
         }
     }

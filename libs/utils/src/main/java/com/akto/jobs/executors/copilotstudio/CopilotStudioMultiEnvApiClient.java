@@ -1,10 +1,12 @@
 package com.akto.jobs.executors.copilotstudio;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.CopilotStudioIntegration.Environment;
 import com.akto.log.LoggerMaker;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Getter;
 import okhttp3.FormBody;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -37,13 +39,36 @@ public class CopilotStudioMultiEnvApiClient {
     private static final String REGISTRATION_ENDPOINT_TEMPLATE =
         "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/adminApplications/%s?api-version=2020-10-01";
     private static final String ENVIRONMENTS_ENDPOINT =
-        "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments?api-version=2020-10-01";
+        "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments"
+        + "?api-version=2020-10-01&$select=name,properties.displayName,properties.linkedEnvironmentMetadata.instanceUrl";
     private static final String ADD_APP_USER_ENDPOINT_TEMPLATE =
         "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments/%s/addAppUser?api-version=2020-10-01";
     private static final String APP_ONLY_SCOPE = "https://service.powerapps.com/.default";
+    private static final int EXPIRY_BUFFER_SECONDS = 60;
+
+    /** App-only access token paired with the epoch second (per {@link Context#now()}) it expires at. */
+    public static class AccessToken {
+        @Getter
+        private final String token;
+        private final int expiresAt;
+
+        public AccessToken(String token, int expiresAt) {
+            this.token = token;
+            this.expiresAt = expiresAt;
+        }
+
+        public boolean isExpired() {
+            return Context.now() >= expiresAt - EXPIRY_BUFFER_SECONDS;
+        }
+    }
 
     /** App-only token via client_credentials — used for env listing, app-user creation, and every recurring run. */
     public String getClientCredentialsToken(String tenantId, String clientId, String clientSecret) throws Exception {
+        return getClientCredentialsTokenWithExpiry(tenantId, clientId, clientSecret).getToken();
+    }
+
+    /** Same as {@link #getClientCredentialsToken}, but also returns when the token expires so callers can avoid re-fetching on every use. */
+    public AccessToken getClientCredentialsTokenWithExpiry(String tenantId, String clientId, String clientSecret) throws Exception {
         FormBody formBody = new FormBody.Builder()
             .add("grant_type", "client_credentials")
             .add("client_id", clientId)
@@ -64,10 +89,10 @@ public class CopilotStudioMultiEnvApiClient {
             .add("redirect_uri", redirectUri)
             .add("scope", scope)
             .build();
-        return requestAccessToken(tenantId, formBody, "authorization_code token");
+        return requestAccessToken(tenantId, formBody, "authorization_code token").token;
     }
 
-    private String requestAccessToken(String tenantId, FormBody formBody, String description) throws Exception {
+    private AccessToken requestAccessToken(String tenantId, FormBody formBody, String description) throws Exception {
         Request request = new Request.Builder()
             .url(String.format(TOKEN_ENDPOINT_TEMPLATE, tenantId))
             .post(formBody)
@@ -83,7 +108,8 @@ public class CopilotStudioMultiEnvApiClient {
             if (accessToken == null || accessToken.isEmpty()) {
                 throw new Exception("Token response missing access_token for " + description);
             }
-            return accessToken;
+            int expiresInSeconds = json.has("expires_in") ? json.get("expires_in").asInt() : 0;
+            return new AccessToken(accessToken, Context.now() + expiresInSeconds);
         }
     }
 
@@ -111,42 +137,49 @@ public class CopilotStudioMultiEnvApiClient {
      * Response shape per Microsoft's scopes/admin/environments API — verify against current docs before relying on this in production.
      */
     public List<Environment> listEnvironments(String accessToken) throws Exception {
-        Request request = new Request.Builder()
-            .url(ENVIRONMENTS_ENDPOINT)
-            .header("Authorization", "Bearer " + accessToken)
-            .get()
-            .build();
+        List<Environment> environments = new ArrayList<>();
+        String nextUrl = ENVIRONMENTS_ENDPOINT;
 
-        try (Response response = client.newCall(request).execute()) {
-            String body = response.body() != null ? response.body().string() : "";
-            if (!response.isSuccessful()) {
-                throw new Exception("Failed to list Power Platform environments: status=" + response.code() + " body=" + body);
-            }
+        while (nextUrl != null) {
+            Request request = new Request.Builder()
+                .url(nextUrl)
+                .header("Authorization", "Bearer " + accessToken)
+                .get()
+                .build();
 
-            JsonNode root = objectMapper.readTree(body);
-            JsonNode values = root.get("value");
-            List<Environment> environments = new ArrayList<>();
-            if (values != null && values.isArray()) {
-                for (JsonNode env : values) {
-                    String id = env.has("name") ? env.get("name").asText() : null;
-                    JsonNode properties = env.get("properties");
-                    String displayName = properties != null && properties.has("displayName")
-                        ? properties.get("displayName").asText() : id;
-                    String instanceUrl = null;
-                    if (properties != null && properties.has("linkedEnvironmentMetadata")) {
-                        JsonNode linked = properties.get("linkedEnvironmentMetadata");
-                        if (linked.has("instanceUrl")) {
-                            instanceUrl = linked.get("instanceUrl").asText();
+            try (Response response = client.newCall(request).execute()) {
+                String body = response.body() != null ? response.body().string() : "";
+                if (!response.isSuccessful()) {
+                    throw new Exception("Failed to list Power Platform environments: status=" + response.code() + " body=" + body);
+                }
+
+                JsonNode root = objectMapper.readTree(body);
+                JsonNode values = root.get("value");
+                if (values != null && values.isArray()) {
+                    for (JsonNode env : values) {
+                        String id = env.has("name") ? env.get("name").asText() : null;
+                        JsonNode properties = env.get("properties");
+                        String displayName = properties != null && properties.has("displayName")
+                            ? properties.get("displayName").asText() : id;
+                        String instanceUrl = null;
+                        if (properties != null && properties.has("linkedEnvironmentMetadata")) {
+                            JsonNode linked = properties.get("linkedEnvironmentMetadata");
+                            if (linked.has("instanceUrl")) {
+                                instanceUrl = linked.get("instanceUrl").asText();
+                            }
+                        }
+                        if (id != null && instanceUrl != null) {
+                            environments.add(new Environment(id, instanceUrl, displayName));
                         }
                     }
-                    if (id != null && instanceUrl != null) {
-                        environments.add(new Environment(id, instanceUrl, displayName));
-                    }
                 }
+
+                nextUrl = root.has("nextLink") ? root.get("nextLink").asText() : null;
             }
-            logger.info("listEnvironments: discovered {} environments", environments.size());
-            return environments;
         }
+
+        logger.info("listEnvironments: discovered {} environments", environments.size());
+        return environments;
     }
 
     /**
