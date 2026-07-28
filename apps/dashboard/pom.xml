@@ -18,7 +18,7 @@
             <dependency>
                 <groupId>com.amazonaws</groupId>
                 <artifactId>aws-java-sdk-bom</artifactId>
-                <version>1.12.405</version>
+                <version>1.12.640</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -28,11 +28,13 @@
                 <artifactId>commons-io</artifactId>
                 <version>2.14.0</version>
             </dependency>
-            <!-- Pin all transitive io.netty:* to a single patched version (multiple Critical/High). -->
+            <!-- Pin all transitive io.netty:* to a single patched version (multiple Critical/High).
+                 4.1.136 fixes netty-codec / netty-codec-http Highs (GHSA-558v-64gr-wgg4,
+                 GHSA-jppx-w49h-x2qq, GHSA-6jqx-86gh-f27w, GHSA-mvh2-crg5-v77c). -->
             <dependency>
                 <groupId>io.netty</groupId>
                 <artifactId>netty-bom</artifactId>
-                <version>4.1.135.Final</version>
+                <version>4.1.136.Final</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -54,33 +56,33 @@
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-lambda</artifactId>
-            <version>1.12.405</version>
+            <version>1.12.640</version>
         </dependency>
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-logs</artifactId>
-            <version>1.12.405</version>
+            <version>1.12.640</version>
         </dependency>
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-elasticloadbalancingv2</artifactId>
-            <version>1.12.405</version>
+            <version>1.12.640</version>
         </dependency>
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-cloudformation</artifactId>
-            <version>1.12.405</version>
+            <version>1.12.640</version>
         </dependency>
         <!-- v1.11.678 does not support startInstanceRefresh, using latest version. -->
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-autoscaling</artifactId>
-            <version>1.12.405</version>
+            <version>1.12.640</version>
         </dependency>
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-ec2</artifactId>
-            <version>1.12.405</version>
+            <version>1.12.640</version>
         </dependency>
         <dependency>
             <groupId>org.apache.struts</groupId>
