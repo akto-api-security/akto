@@ -100,7 +100,7 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
             } catch (Exception e) {
                 failures++;
                 String reason = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-                env.setLastError(reason);
+                env.setLastError(null);
                 errorSummary.append(env.getEnvironmentId()).append(": ").append(reason).append("; ");
                 logger.error("CopilotStudioMultiEnv: environment failed: environmentId={}, error={}",
                     env.getEnvironmentId(), reason);
