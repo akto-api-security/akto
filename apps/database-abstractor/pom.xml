@@ -123,7 +123,6 @@
                     <webAppSourceDirectory>web</webAppSourceDirectory>
                     <webApp>
                         <contextPath>/</contextPath>
-                        <descriptor>WEB-INF/web.xml</descriptor>
                     </webApp>
                 </configuration>
             </plugin>
