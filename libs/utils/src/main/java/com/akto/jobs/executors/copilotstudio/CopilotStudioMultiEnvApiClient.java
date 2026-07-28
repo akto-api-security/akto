@@ -37,7 +37,8 @@ public class CopilotStudioMultiEnvApiClient {
     private static final String REGISTRATION_ENDPOINT_TEMPLATE =
         "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/adminApplications/%s?api-version=2020-10-01";
     private static final String ENVIRONMENTS_ENDPOINT =
-        "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments?api-version=2020-10-01";
+        "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments"
+        + "?api-version=2020-10-01&$select=name,properties.displayName,properties.linkedEnvironmentMetadata.instanceUrl";
     private static final String ADD_APP_USER_ENDPOINT_TEMPLATE =
         "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments/%s/addAppUser?api-version=2020-10-01";
     private static final String APP_ONLY_SCOPE = "https://service.powerapps.com/.default";
@@ -111,42 +112,49 @@ public class CopilotStudioMultiEnvApiClient {
      * Response shape per Microsoft's scopes/admin/environments API — verify against current docs before relying on this in production.
      */
     public List<Environment> listEnvironments(String accessToken) throws Exception {
-        Request request = new Request.Builder()
-            .url(ENVIRONMENTS_ENDPOINT)
-            .header("Authorization", "Bearer " + accessToken)
-            .get()
-            .build();
+        List<Environment> environments = new ArrayList<>();
+        String nextUrl = ENVIRONMENTS_ENDPOINT;
 
-        try (Response response = client.newCall(request).execute()) {
-            String body = response.body() != null ? response.body().string() : "";
-            if (!response.isSuccessful()) {
-                throw new Exception("Failed to list Power Platform environments: status=" + response.code() + " body=" + body);
-            }
+        while (nextUrl != null) {
+            Request request = new Request.Builder()
+                .url(nextUrl)
+                .header("Authorization", "Bearer " + accessToken)
+                .get()
+                .build();
 
-            JsonNode root = objectMapper.readTree(body);
-            JsonNode values = root.get("value");
-            List<Environment> environments = new ArrayList<>();
-            if (values != null && values.isArray()) {
-                for (JsonNode env : values) {
-                    String id = env.has("name") ? env.get("name").asText() : null;
-                    JsonNode properties = env.get("properties");
-                    String displayName = properties != null && properties.has("displayName")
-                        ? properties.get("displayName").asText() : id;
-                    String instanceUrl = null;
-                    if (properties != null && properties.has("linkedEnvironmentMetadata")) {
-                        JsonNode linked = properties.get("linkedEnvironmentMetadata");
-                        if (linked.has("instanceUrl")) {
-                            instanceUrl = linked.get("instanceUrl").asText();
+            try (Response response = client.newCall(request).execute()) {
+                String body = response.body() != null ? response.body().string() : "";
+                if (!response.isSuccessful()) {
+                    throw new Exception("Failed to list Power Platform environments: status=" + response.code() + " body=" + body);
+                }
+
+                JsonNode root = objectMapper.readTree(body);
+                JsonNode values = root.get("value");
+                if (values != null && values.isArray()) {
+                    for (JsonNode env : values) {
+                        String id = env.has("name") ? env.get("name").asText() : null;
+                        JsonNode properties = env.get("properties");
+                        String displayName = properties != null && properties.has("displayName")
+                            ? properties.get("displayName").asText() : id;
+                        String instanceUrl = null;
+                        if (properties != null && properties.has("linkedEnvironmentMetadata")) {
+                            JsonNode linked = properties.get("linkedEnvironmentMetadata");
+                            if (linked.has("instanceUrl")) {
+                                instanceUrl = linked.get("instanceUrl").asText();
+                            }
+                        }
+                        if (id != null && instanceUrl != null) {
+                            environments.add(new Environment(id, instanceUrl, displayName));
                         }
                     }
-                    if (id != null && instanceUrl != null) {
-                        environments.add(new Environment(id, instanceUrl, displayName));
-                    }
                 }
+
+                nextUrl = root.has("nextLink") ? root.get("nextLink").asText() : null;
             }
-            logger.info("listEnvironments: discovered {} environments", environments.size());
-            return environments;
         }
+
+        logger.info("listEnvironments: discovered {} environments", environments.size());
+        return environments;
     }
 
     /**
