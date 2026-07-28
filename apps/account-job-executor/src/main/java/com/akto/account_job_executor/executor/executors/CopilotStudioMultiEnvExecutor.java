@@ -132,7 +132,7 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
         for (CopilotStudioIntegration.Environment env : discovered) {
             if (!environments.contains(env)) {
                 environments.add(env);
-                logger.info("CopilotStudioMultiEnv: discovered new environment: environmentId={}", env.getEnvironmentId());
+                // logger.info("CopilotStudioMultiEnv: discovered new environment: environmentId={}", env.getEnvironmentId());
             }
         }
     }
