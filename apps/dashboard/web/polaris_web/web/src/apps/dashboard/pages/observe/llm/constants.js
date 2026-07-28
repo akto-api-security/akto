@@ -159,6 +159,17 @@ export function parseModel(row) {
     return row.model || "";
 }
 
+// Latency measured by the source (browser extension)
+export function parseDuration(row) {
+    if (row.responsePayload) {
+        try {
+            const obj = JSON.parse(row.responsePayload);
+            return Number(obj.durationMs) || 0;
+        } catch (_) {}
+    }
+    return 0;
+}
+
 
 export function truncate(str, len = 80) {
     if (!str) return "";
