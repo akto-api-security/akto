@@ -2,6 +2,8 @@ package com.akto.filter;
 
 import com.akto.dao.context.Context;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.TokenBlocklistCron;
 
 import io.jsonwebtoken.Claims;
@@ -22,6 +24,7 @@ public class AuthFilter implements Filter {
     private static final String SCOPE = "scope";
     private static final String MODULE_TYPE = "moduleType";
     private static final String EXCHANGE_TOKEN_API_PREFIX = "exchangeToken";
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AuthFilter.class, LogDb.DB_ABS);
 
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {
@@ -62,7 +65,7 @@ public class AuthFilter implements Filter {
                 chain.doFilter(servletRequest, servletResponse);
                 return;
             }
-            System.out.println(e.getMessage());
+            loggerMaker.debug("db-abs auth rejected: " + e.getMessage());
             httpServletResponse.sendError(401);
             return;
         }
