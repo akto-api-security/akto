@@ -35,6 +35,10 @@ ADD ./target/database-abstractor.war ${JETTY_BASE}/webapps/root.war
 # Do not leak the Jetty version in the Server response header.
 RUN echo "jetty.httpConfig.sendServerVersion=false" >> ${JETTY_BASE}/start.d/server.ini
 
+# gzip control knobs (response mime/methods/paths + request inflation), restored from the
+# old web.xml GzipFilter + jetty-web.xml GzipHandler. Overwrites the module's default gzip.ini.
+COPY gzip.ini ${JETTY_BASE}/start.d/gzip.ini
+
 RUN useradd jetty && chown -R jetty:jetty ${JETTY_HOME} ${JETTY_BASE}
 
 ENV JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError"
