@@ -1,9 +1,8 @@
-FROM python:3.13-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
 COPY src/requirements.txt .
-RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel
 # CPU-only torch (no CUDA wheels) keeps the image small — MiniLM inference is
 # CPU-bound and needs no GPU. Install it first so sentence-transformers reuses it.
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
