@@ -392,7 +392,7 @@ jobs:
               paths+=("$dir/$f")
             done
           }
-          [ "$BUILD_DASHBOARD" = "true" ] && add_files apps/dashboard target/dashboard.war entrypoint.sh set_xmx.sh
+          [ "$BUILD_DASHBOARD" = "true" ] && add_files apps/dashboard target/dashboard.war set_xmx.sh gzip.ini
           [ "$BUILD_TESTING" = "true" ] && add_files apps/testing target/testing-1.0-SNAPSHOT-jar-with-dependencies.jar start.sh
           [ "$BUILD_BILLING" = "true" ] && add_files apps/billing target/billing.war
           [ "$BUILD_INTERNAL" = "true" ] && add_files apps/internal target/internal.war
