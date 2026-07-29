@@ -589,7 +589,9 @@ public class HttpCallParser {
 
     private boolean isCopilotTrafficRaw(Map<String,String> tagsMap) {
         try {
-            return tagsMap != null && Constants.AI_AGENT_SOURCE_COPILOT_STUDIO.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+            if (tagsMap == null) return false;
+            return Constants.AI_AGENT_SOURCE_COPILOT_STUDIO.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE))
+                    || Constants.COPILOT_STUDIO_AI_AGENT_NAME.equalsIgnoreCase(tagsMap.get(Constants.AI_AGENT_APP_NAME));
         } catch (Exception e) { return false; }
     }
 
@@ -1729,7 +1731,7 @@ public class HttpCallParser {
                 storeSnowflakeAgentTrace(httpResponseParam);
             }
 
-            if (isCopilotTraffic(tagsMap)) {
+            if (isCopilotTrafficRaw(tagsMap)) {
                 parseCopilotTrace(httpResponseParam);
             }
 
