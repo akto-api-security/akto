@@ -1,9 +1,10 @@
-FROM python:3.12-slim
+FROM python:3.13-alpine
 
 WORKDIR /app
 
 COPY src/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir -r requirements.txt
 
 # Presidio defaults to en_core_web_lg; bake the small model and pin via SPACY_MODEL.
 ENV SPACY_MODEL=en_core_web_sm
