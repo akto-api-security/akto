@@ -28,11 +28,13 @@ import okio.BufferedSink;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class ApiExecutor {
@@ -41,6 +43,14 @@ public class ApiExecutor {
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
     private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    // Long-running SSE endpoints can legitimately stream for minutes.
+    private static final long EVENT_STREAM_TIMEOUT_SECONDS = 300;
+
+    // SSE services may report transient failures either through HTTP or a terminal
+    // `event: error` frame while still returning HTTP 200.
+    private static final int EVENT_STREAM_MAX_ATTEMPTS = 3;
+    private static final long EVENT_STREAM_RETRY_BACKOFF_MS = 2000;
 
 
     private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol, TLSAuthParam authParam) throws Exception {
@@ -71,6 +81,13 @@ public class ApiExecutor {
         Authenticator digestAuth = request.tag(Authenticator.class);
         if (digestAuth != null) {
             client = client.newBuilder().authenticator(digestAuth).build();
+        }
+
+        if (acceptsEventStream(request.header(HttpRequestResponseUtils.HEADER_ACCEPT))) {
+            client = client.newBuilder()
+                    .readTimeout(EVENT_STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .callTimeout(EVENT_STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .build();
         }
 
         Call call = client.newCall(request);
@@ -376,24 +393,34 @@ public class ApiExecutor {
             nonTestingContext = true;
         }
 
+        // Only event-stream requests are retried. Detection uses HTTP/SSE semantics and
+        // does not depend on any agent vendor's response schema or error text.
+        int maxAttempts = isEventStreamRequest(request) ? EVENT_STREAM_MAX_ATTEMPTS : 1;
+
         OriginalHttpResponse response = null;
-        switch (method) {
-            case GET:
-            case HEAD:
-                response = getRequest(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                response = executeByMethod(method, request, builder, followRedirects, debug, testLogs,
+                        skipSSRFCheck, nonTestingContext, type);
+            } catch (InterruptedIOException e) {
+                if (attempt == maxAttempts || !isTimeout(e)) {
+                    throw e;
+                }
+                loggerMaker.errorAndAddToDb("[SSE] timeout on attempt " + attempt + "/" + maxAttempts
+                        + " for " + url + ", retrying: " + e, LogDb.TESTING);
+                backOffBeforeRetry(attempt);
+                continue;
+            }
+
+            if (attempt == maxAttempts || !isRetryableEventStreamResponse(response)) {
                 break;
-            case POST:
-            case PUT:
-            case DELETE:
-            case OPTIONS:
-            case PATCH:
-            case TRACK:
-            case TRACE:
-                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, type);
-                break;
-            case OTHER:
-                throw new Exception("Invalid method name");
+            }
+            loggerMaker.errorAndAddToDb("[SSE] retryable response on attempt " + attempt + "/"
+                    + maxAttempts + " for " + url + " (status="
+                    + (response == null ? "null" : response.getStatusCode()) + "), retrying", LogDb.TESTING);
+            backOffBeforeRetry(attempt);
         }
+
         if (digestAuthenticator != null) {
             String computedAuth = digestAuthenticator.getLastAuthorizationHeader();
             if (computedAuth != null && request.getHeaders() != null) {
@@ -419,6 +446,115 @@ public class ApiExecutor {
     }
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
         return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, false);
+    }
+
+    private static OriginalHttpResponse executeByMethod(URLMethods.Method method, OriginalHttpRequest request,
+            Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs,
+            boolean skipSSRFCheck, boolean nonTestingContext, String type) throws Exception {
+        switch (method) {
+            case GET:
+            case HEAD:
+                return getRequest(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
+            case POST:
+            case PUT:
+            case DELETE:
+            case OPTIONS:
+            case PATCH:
+            case TRACK:
+            case TRACE:
+                return sendWithRequestBody(request, builder, followRedirects, debug, testLogs, skipSSRFCheck,
+                        nonTestingContext, type);
+            case OTHER:
+                throw new Exception("Invalid method name");
+            default:
+                return null;
+        }
+    }
+
+    private static void backOffBeforeRetry(int attempt) {
+        try {
+            Thread.sleep(EVENT_STREAM_RETRY_BACKOFF_MS * attempt);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private static boolean acceptsEventStream(String acceptHeaderValue) {
+        return acceptHeaderValue != null
+                && acceptHeaderValue.toLowerCase().contains(HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE);
+    }
+
+    private static boolean isEventStreamRequest(OriginalHttpRequest request) {
+        if (request == null || request.getHeaders() == null) {
+            return false;
+        }
+        for (Map.Entry<String, List<String>> entry : request.getHeaders().entrySet()) {
+            if (!HttpRequestResponseUtils.HEADER_ACCEPT.equalsIgnoreCase(entry.getKey()) || entry.getValue() == null) {
+                continue;
+            }
+            for (String value : entry.getValue()) {
+                if (acceptsEventStream(value)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isTimeout(InterruptedIOException exception) {
+        String message = exception.getMessage();
+        return message != null && message.toLowerCase().contains("timeout");
+    }
+
+    private static boolean isRetryableEventStreamResponse(OriginalHttpResponse response) {
+        if (response == null) {
+            return true;
+        }
+
+        int statusCode = response.getStatusCode();
+        if (statusCode == 408 || statusCode == 425 || statusCode == 429 || statusCode >= 500) {
+            return true;
+        }
+
+        return hasTerminalSseErrorEvent(response.getBody());
+    }
+
+    /**
+     * Returns true when the last data-bearing SSE event is explicitly typed as
+     * {@code error}. The event payload is intentionally opaque: different agents
+     * use different JSON schemas, and SSE's event field is the common contract.
+     */
+    private static boolean hasTerminalSseErrorEvent(String body) {
+        if (body == null || body.isEmpty()) {
+            return false;
+        }
+
+        String currentEventType = "message";
+        String lastDataEventType = null;
+        boolean currentEventHasData = false;
+
+        for (String line : body.split("\\r?\\n", -1)) {
+            if (line.isEmpty()) {
+                if (currentEventHasData) {
+                    lastDataEventType = currentEventType;
+                }
+                currentEventType = "message";
+                currentEventHasData = false;
+                continue;
+            }
+
+            if (line.startsWith("event:")) {
+                currentEventType = line.substring("event:".length()).trim();
+            } else if (line.startsWith("data:")) {
+                currentEventHasData = true;
+            }
+        }
+
+        if (currentEventHasData) {
+            lastDataEventType = currentEventType;
+        }
+
+        return "error".equalsIgnoreCase(lastDataEventType);
     }
 
     private static final List<Integer> BACK_OFF_LIMITS = new ArrayList<>(Arrays.asList(1, 2, 5));
