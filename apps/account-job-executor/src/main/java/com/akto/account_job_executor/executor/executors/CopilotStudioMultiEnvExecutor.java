@@ -197,10 +197,18 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
     private static void mergeDiscoveredEnvironments(CopilotStudioIntegration integration,
                                                      List<CopilotStudioIntegration.Environment> discovered) {
         List<CopilotStudioIntegration.Environment> environments = integration.getEnvironments();
+        Map<String, CopilotStudioIntegration.Environment> existingById = new HashMap<>();
+        for (CopilotStudioIntegration.Environment env : environments) {
+            existingById.put(env.getEnvironmentId(), env);
+        }
+
         for (CopilotStudioIntegration.Environment env : discovered) {
-            if (!environments.contains(env)) {
+            CopilotStudioIntegration.Environment existing = existingById.get(env.getEnvironmentId());
+            if (existing == null) {
                 environments.add(env);
                 // logger.info("CopilotStudioMultiEnv: discovered new environment: environmentId={}", env.getEnvironmentId());
+            } else {
+                existing.setEnvironmentName(env.getEnvironmentName());
             }
         }
     }

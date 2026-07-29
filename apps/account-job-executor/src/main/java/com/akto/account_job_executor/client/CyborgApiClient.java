@@ -17,6 +17,7 @@ import org.apache.http.util.EntityUtils;
 import org.bson.types.ObjectId;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -72,12 +73,12 @@ public class CyborgApiClient {
 
             // Set body
             String jsonBody = mapper.writeValueAsString(requestBody);
-            httpPost.setEntity(new StringEntity(jsonBody));
+            httpPost.setEntity(new StringEntity(jsonBody, StandardCharsets.UTF_8));
 
             // Execute request
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 int statusCode = response.getStatusLine().getStatusCode();
-                String responseBody = EntityUtils.toString(response.getEntity());
+                String responseBody = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
 
                 if (statusCode != 200) {
                     logger.error("API request failed. Status: {}, Body: {}", statusCode, responseBody);
