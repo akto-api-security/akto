@@ -89,6 +89,7 @@ public class Constants {
     public static final String AI_AGENT_CONNECTOR_SENTINEL = "SENTINELONE";
     public static final String AI_AGENT_CONNECTOR_CROWDSTRIKE = "CROWDSTRIKE";
     public static final String AI_AGENT_APP_NAME = "ai-agent";
+    public static final String COPILOT_STUDIO_AI_AGENT_NAME = "copilot-studio";
 
     public static final String AKTO_ENDPOINT_SOURCE_TAG = "source";
     public static final String AKTO_COPILOT_SOURCE_VALUE = "COPILOT_STUDIO";
