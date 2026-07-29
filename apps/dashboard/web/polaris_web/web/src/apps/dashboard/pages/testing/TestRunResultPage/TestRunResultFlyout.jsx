@@ -1348,7 +1348,9 @@ function TestRunResultFlyout(props) {
         />
     )
 
-    const askAktoComp = (
+    const hideAskAkto = window.USER_NAME && window.USER_NAME.includes('ababank')
+
+    const askAktoComp = hideAskAkto ? null : (
         <AskAktoSection
             aiSummary={aiSummary}
             aiSummaryLoading={aiSummaryLoading}
