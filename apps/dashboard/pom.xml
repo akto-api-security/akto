@@ -15,6 +15,14 @@
     <packaging>war</packaging>
     <dependencyManagement>
         <dependencies>
+            <!-- AWS SDK bumped 1.12.405 -> 1.12.640 to drop the transitive vulnerable
+                 ion-java:1.0.2 (High, CVE-2024-21634) — 1.12.640's aws-java-sdk-core no longer
+                 declares ion-java, so the jar is removed rather than patched.
+                 !! NOT YET RUNTIME-TESTED !!: only verified to (a) compile and (b) that ion-java
+                 is gone from the dependency tree. The AWS-backed dashboard features
+                 (lambda / ec2 / autoscaling / cloudformation / elb / logs) have NOT been exercised
+                 on 1.12.640 yet. (AWS SDK for Java v1 is end-of-support since Dec 2025; migrating
+                 these calls to SDK v2 is the durable fix.) -->
             <dependency>
                 <groupId>com.amazonaws</groupId>
                 <artifactId>aws-java-sdk-bom</artifactId>
