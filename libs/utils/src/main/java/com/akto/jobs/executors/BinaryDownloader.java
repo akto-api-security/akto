@@ -69,9 +69,7 @@ public final class BinaryDownloader {
             // Create directory for binaries in user home
             String homeDir = System.getProperty("user.home");
             File binariesDir = new File(homeDir, ".akto/binaries");
-            if (!binariesDir.exists() && !binariesDir.mkdirs()) {
-                throw new Exception("Failed to create binaries directory: " + binariesDir.getAbsolutePath());
-            }
+            Files.createDirectories(binariesDir.toPath());
 
             // Download binary
             File binaryFile = new File(binariesDir, binaryName);
@@ -136,9 +134,7 @@ public final class BinaryDownloader {
             // Create directory for binaries in user home
             String homeDir = System.getProperty("user.home");
             File binariesDir = new File(homeDir, ".akto/binaries");
-            if (!binariesDir.exists() && !binariesDir.mkdirs()) {
-                throw new Exception("Failed to create binaries directory: " + binariesDir.getAbsolutePath());
-            }
+            Files.createDirectories(binariesDir.toPath());
 
             // Download binary
             File binaryFile = new File(binariesDir, binaryName);
