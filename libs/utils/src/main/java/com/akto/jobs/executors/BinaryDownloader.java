@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Utility class for downloading binaries from Azure Blob Storage.
@@ -21,6 +22,9 @@ import java.util.Set;
 public final class BinaryDownloader {
 
     private static final LoggerMaker logger = new LoggerMaker(BinaryDownloader.class);
+
+    /** Per-binary-name lock so concurrent callers downloading the same binary can't race on its shared cache file. */
+    private static final ConcurrentHashMap<String, Object> DOWNLOAD_LOCKS = new ConcurrentHashMap<>();
 
     private static final Set<PosixFilePermission> EXECUTABLE_PERMISSIONS = EnumSet.of(
         PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE, PosixFilePermission.OWNER_EXECUTE,
@@ -72,30 +76,35 @@ public final class BinaryDownloader {
             // Download binary
             File binaryFile = new File(binariesDir, binaryName);
 
-            // Download if not already cached or if remote version is newer
-            if (!binaryFile.exists() || shouldRedownload(binaryFile, blobClient)) {
-                logger.info("Downloading binary from Azure Storage to: {}", binaryFile.getAbsolutePath());
+            // Serialize the check-then-write per binary name so concurrent callers downloading the
+            // same binary can't race on the same cache file (later callers just see the cached result).
+            Object lock = DOWNLOAD_LOCKS.computeIfAbsent(binaryName, k -> new Object());
+            synchronized (lock) {
+                // Download if not already cached or if remote version is newer
+                if (!binaryFile.exists() || shouldRedownload(binaryFile, blobClient)) {
+                    logger.info("Downloading binary from Azure Storage to: {}", binaryFile.getAbsolutePath());
 
-                try (InputStream inputStream = blobClient.openInputStream();
-                     FileOutputStream outputStream = new FileOutputStream(binaryFile)) {
+                    try (InputStream inputStream = blobClient.openInputStream();
+                         FileOutputStream outputStream = new FileOutputStream(binaryFile)) {
 
-                    byte[] buffer = new byte[8192];
-                    int bytesRead;
-                    while ((bytesRead = inputStream.read(buffer)) != -1) {
-                        outputStream.write(buffer, 0, bytesRead);
+                        byte[] buffer = new byte[8192];
+                        int bytesRead;
+                        while ((bytesRead = inputStream.read(buffer)) != -1) {
+                            outputStream.write(buffer, 0, bytesRead);
+                        }
                     }
+
+                    logger.info("Binary downloaded successfully: {}", binaryFile.getAbsolutePath());
+                } else {
+                    logger.info("Using cached binary: {}", binaryFile.getAbsolutePath());
                 }
 
-                logger.info("Binary downloaded successfully: {}", binaryFile.getAbsolutePath());
-            } else {
-                logger.info("Using cached binary: {}", binaryFile.getAbsolutePath());
+                // Always ensure binary is executable (covers fresh downloads and cached files)
+                makeExecutable(binaryFile);
+
+                // Validate binary file
+                validateBinary(binaryFile);
             }
-
-            // Always ensure binary is executable (covers fresh downloads and cached files)
-            makeExecutable(binaryFile);
-
-            // Validate binary file
-            validateBinary(binaryFile);
 
             return binaryFile;
 
