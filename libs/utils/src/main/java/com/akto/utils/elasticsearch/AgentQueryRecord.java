@@ -89,6 +89,7 @@ public class AgentQueryRecord {
         String sessionIdentifier = getFirstHeader(headers, HEADER_PREFIX + HEADER_SESSION_ID);
 
         String source = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_SOURCE) : null;
+        boolean isBrowserExtensionTraffic = tagsMap != null && tagsMap.containsKey(Constants.AKTO_BROWSER_LLM_TAG);
         boolean isAtlasTraffic = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(source);
 
         if (isAtlasTraffic) {
@@ -101,7 +102,9 @@ public class AgentQueryRecord {
 
         String serviceId, deviceId, userName;
 
-        if (isAtlasTraffic) {
+        // Browser traffic must not take this branch: it derives device/user from a host id it
+        // doesn't have that shape for, and returns null when it can't.
+        if (isAtlasTraffic && !isBrowserExtensionTraffic) {
             String host = getFirstHeader(headers, "host");
             String[] parts = host != null ? host.split("\\.", 3) : new String[0];
             deviceId  = parts.length >= 1 ? parts[0] : null;
@@ -160,12 +163,14 @@ public class AgentQueryRecord {
                 outputTokens,
                 traceId,
                 spanId,
-                isAtlasTraffic
+                // Browser collections are registered source=ENDPOINT, so their traffic reports as Atlas too.
+                isAtlasTraffic || isBrowserExtensionTraffic
         );
     }
 
     private static boolean isKnownAtlasSession(String sessionIdentifier) {
-        int lastSeen = ATLAS_SESSION_LAST_SEEN.get(sessionIdentifier);
+        // Non-Atlas sources also send akto_session_id, so a plain get() would unbox null here.
+        int lastSeen = ATLAS_SESSION_LAST_SEEN.getOrDefault(sessionIdentifier, 0);
         if (lastSeen == 0) {
             return false;
         }
