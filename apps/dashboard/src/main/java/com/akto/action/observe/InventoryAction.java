@@ -428,6 +428,28 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    // Batch counterpart of fetchApiInfosForCollection() for callers that need risk data across many
+    // collections at once (e.g. skill risk scoring). Returns only the fields that use case consumes
+    // (collection id, url, riskScore, tagsList) to keep the response light across thousands of collections.
+    public String fetchApiInfosForCollectionsBatch(){
+        response = new BasicDBObject();
+        if (this.apiCollectionIds == null || this.apiCollectionIds.isEmpty()) {
+            response.put("apiInfoList", new ArrayList<>());
+            return Action.SUCCESS.toUpperCase();
+        }
+
+        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(
+                Filters.and(
+                        Filters.in(SingleTypeInfo._COLLECTION_IDS, this.apiCollectionIds),
+                        Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivatedCollections)
+                ),
+                Projections.include(ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL, ApiInfo.RISK_SCORE, ApiInfo.TAGS_STRING)
+        );
+
+        response.put("apiInfoList", apiInfos);
+        return Action.SUCCESS.toUpperCase();
+    }
+
     private List<String> urls;
     public String fetchSensitiveParamsForEndpoints() {
 

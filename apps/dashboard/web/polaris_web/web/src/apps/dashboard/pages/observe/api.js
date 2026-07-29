@@ -407,6 +407,15 @@ export default {
             }
         })
     },
+    async fetchApiInfosForCollectionsBatch(apiCollectionIds) {
+        return await request({
+            url: '/api/fetchApiInfosForCollectionsBatch',
+            method: 'post',
+            data: {
+                apiCollectionIds: apiCollectionIds,
+            }
+        })
+    },
     redactCollection(apiCollectionId, redacted){
         return request({
             url: '/api/redactCollection',

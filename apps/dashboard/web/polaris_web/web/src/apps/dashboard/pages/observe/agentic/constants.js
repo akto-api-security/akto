@@ -1013,13 +1013,19 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
         return { skillScoreMap: cached.data || {}, maliciousSkills: new Set(cached.maliciousSkills || []), misconfiguredSkills: new Set(cached.misconfiguredSkills || []), misconfiguredCollectionIds: new Set(cached.misconfiguredCollectionIds || []) };
     }
 
-    const results = await Promise.all(
-        collectionIds.map(async (id) => {
+    const CHUNK_SIZE = 1000;
+    const chunks = [];
+    for (let i = 0; i < collectionIds.length; i += CHUNK_SIZE) {
+        chunks.push(collectionIds.slice(i, i + CHUNK_SIZE));
+    }
+
+    const chunkResults = await Promise.all(
+        chunks.map(async (chunk) => {
             try {
-                const resp = await api.fetchApiInfosForCollection(id);
-                return { id, infos: resp?.apiInfoList || [] };
+                const resp = await api.fetchApiInfosForCollectionsBatch(chunk);
+                return resp?.apiInfoList || [];
             } catch {
-                return { id, infos: [] };
+                return [];
             }
         })
     );
@@ -1028,23 +1034,22 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
     const maliciousSkills = new Set();
     const misconfiguredSkills = new Set();
     const misconfiguredCollectionIds = new Set();
-    results.forEach(({ id: collectionId, infos }) => {
-        infos.forEach((info) => {
-            const url = info?.id?.url || "";
-            const splits = url.split("skills/");
-            const skillName = splits?.[1];
-            if (skillName) {
-                skillScoreMap[skillName] = info.riskScore || 0;
-                const isMalicious = (info.tagsList || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true");
-                if (isMalicious) maliciousSkills.add(skillName);
-                const isMisconfigured = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
-                if (isMisconfigured) misconfiguredSkills.add(skillName);
-            }
-            if (url.includes("/config/")) {
-                const hasMisconfiguredTag = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
-                if (hasMisconfiguredTag) misconfiguredCollectionIds.add(collectionId);
-            }
-        });
+    chunkResults.flat().forEach((info) => {
+        const collectionId = info?.id?.apiCollectionId;
+        const url = info?.id?.url || "";
+        const splits = url.split("skills/");
+        const skillName = splits?.[1];
+        if (skillName) {
+            skillScoreMap[skillName] = info.riskScore || 0;
+            const isMalicious = (info.tagsList || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true");
+            if (isMalicious) maliciousSkills.add(skillName);
+            const isMisconfigured = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
+            if (isMisconfigured) misconfiguredSkills.add(skillName);
+        }
+        if (url.includes("/config/")) {
+            const hasMisconfiguredTag = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
+            if (hasMisconfiguredTag) misconfiguredCollectionIds.add(collectionId);
+        }
     });
 
     PersistStore.getState().setSkillRiskScoreCache({ data: skillScoreMap, maliciousSkills: [...maliciousSkills], misconfiguredSkills: [...misconfiguredSkills], misconfiguredCollectionIds: [...misconfiguredCollectionIds], ts: Date.now() });
