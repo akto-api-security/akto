@@ -1,9 +1,9 @@
 package com.akto.action;
 
 import com.akto.dao.BrowserExtensionConfigDao;
-import com.akto.dao.BrowserExtensionConfigV2Dao;
+import com.akto.dao.BrowserExtensionConfigCommonDao;
 import com.akto.dto.BrowserExtensionConfig;
-import com.akto.dto.BrowserExtensionConfigV2;
+import com.akto.dto.BrowserExtensionConfigCommon;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.opensymphony.xwork2.ActionSupport;
@@ -19,7 +19,7 @@ public class BrowserExtensionConfigAction extends ActionSupport {
     private List<BrowserExtensionConfig> browserExtensionConfigs;
 
     @Getter
-    private List<BrowserExtensionConfigV2> browserExtensionConfigsV2;
+    private List<BrowserExtensionConfigCommon> browserExtensionConfigsCommon;
 
     public String fetchBrowserExtensionConfigs() {
         try {
@@ -32,13 +32,13 @@ public class BrowserExtensionConfigAction extends ActionSupport {
         }
     }
 
-    public String fetchBrowserExtensionConfigsV2() {
+    public String fetchBrowserExtensionConfigsCommon() {
         try {
-            this.browserExtensionConfigsV2 = BrowserExtensionConfigV2Dao.instance.findActiveConfigs();
+            this.browserExtensionConfigsCommon = BrowserExtensionConfigCommonDao.instance.findActiveConfigs();
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error fetching browser extension configs v2: " + e.getMessage(), LogDb.DB_ABS);
-            addActionError("Failed to fetch browser extension configs v2");
+            loggerMaker.errorAndAddToDb("Error fetching common browser extension configs: " + e.getMessage(), LogDb.DB_ABS);
+            addActionError("Failed to fetch common browser extension configs");
             return ERROR.toUpperCase();
         }
     }

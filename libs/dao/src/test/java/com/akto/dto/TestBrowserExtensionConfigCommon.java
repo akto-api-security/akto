@@ -9,7 +9,7 @@ import java.util.List;
 
 import static org.junit.Assert.*;
 
-public class TestBrowserExtensionConfigV2 {
+public class TestBrowserExtensionConfigCommon {
 
     @Test
     public void testHttpConfigWithMethodAndStringPath() {
@@ -20,10 +20,11 @@ public class TestBrowserExtensionConfigV2 {
                 "'transport': 'http'," +
                 "'method': 'POST'," +
                 "'format': 'json'," +
-                "'path': 'messages[-1].content.parts'" +
+                "'path': 'messages[-1].content.parts'," +
+                "'tag': 'genai'" +
                 "}");
 
-        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
 
         assertNotNull(config);
         assertEquals("chatgpt.com", config.getHost());
@@ -33,6 +34,27 @@ public class TestBrowserExtensionConfigV2 {
         assertEquals("POST", config.getMethod());
         assertEquals("json", config.getFormat());
         assertEquals("messages[-1].content.parts", config.getPath());
+        assertEquals("genai", config.getTag());
+    }
+
+    @Test
+    public void testTagIsOptional() {
+        Document doc = Document.parse("{ 'host': 'poe.com', 'active': true }");
+
+        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
+
+        assertNotNull(config);
+        assertNull(config.getTag());
+    }
+
+    @Test
+    public void testNonStringTagIsIgnored() {
+        Document doc = new Document("host", "you.com").append("tag", Arrays.asList("genai"));
+
+        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
+
+        assertNotNull(config);
+        assertNull(config.getTag());
     }
 
     @Test
@@ -47,7 +69,7 @@ public class TestBrowserExtensionConfigV2 {
                 "'path': 'variables.query'" +
                 "}");
 
-        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
 
         assertNotNull(config);
         assertEquals("graphql", config.getTransport());
@@ -69,7 +91,7 @@ public class TestBrowserExtensionConfigV2 {
                 "'path': 'content[?type=text][*].text'" +
                 "}");
 
-        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
 
         assertNotNull(config);
         assertEquals("websocket", config.getTransport());
@@ -90,7 +112,7 @@ public class TestBrowserExtensionConfigV2 {
                 "'path': [\"['f.req'][0][0][2]\", \"['f.req'][1][0][0]\", \"['f.req'][1][0][0][2]\"]" +
                 "}");
 
-        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
 
         assertNotNull(config);
         assertTrue(config.getPath() instanceof List);
@@ -106,7 +128,7 @@ public class TestBrowserExtensionConfigV2 {
                 "'paths': ['/rest/app-chat/conversations/']" +
                 "}");
 
-        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
 
         assertNotNull(config);
         assertEquals("grok.com", config.getHost());
@@ -122,7 +144,7 @@ public class TestBrowserExtensionConfigV2 {
     public void testActiveDefaultsToTrueWhenAbsent() {
         Document doc = Document.parse("{ 'host': 'github.com', 'paths': ['/github/chat/threads/*/messages'] }");
 
-        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
 
         assertNotNull(config);
         assertTrue(config.isActive());
@@ -132,7 +154,7 @@ public class TestBrowserExtensionConfigV2 {
     public void testInactiveConfigIsMappedAsInactive() {
         Document doc = Document.parse("{ 'host': 'you.com', 'active': false }");
 
-        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
 
         assertNotNull(config);
         assertFalse(config.isActive());
@@ -143,7 +165,7 @@ public class TestBrowserExtensionConfigV2 {
         ObjectId id = new ObjectId();
         Document doc = new Document("_id", id).append("host", "duck.ai");
 
-        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
 
         assertNotNull(config);
         assertEquals(id, config.getId());
@@ -152,9 +174,9 @@ public class TestBrowserExtensionConfigV2 {
 
     @Test
     public void testDocumentWithoutHostIsSkipped() {
-        assertNull(BrowserExtensionConfigV2.fromDocument(new Document("paths", Arrays.asList("/api/chat"))));
-        assertNull(BrowserExtensionConfigV2.fromDocument(new Document("host", "   ")));
-        assertNull(BrowserExtensionConfigV2.fromDocument(null));
+        assertNull(BrowserExtensionConfigCommon.fromDocument(new Document("paths", Arrays.asList("/api/chat"))));
+        assertNull(BrowserExtensionConfigCommon.fromDocument(new Document("host", "   ")));
+        assertNull(BrowserExtensionConfigCommon.fromDocument(null));
     }
 
     @Test
@@ -164,7 +186,7 @@ public class TestBrowserExtensionConfigV2 {
                 .append("method", 42)              // wrong type
                 .append("frameMatch", "send");     // wrong type
 
-        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
 
         assertNotNull(config);
         assertEquals(Arrays.asList("/api/v2/chat"), config.getPaths());

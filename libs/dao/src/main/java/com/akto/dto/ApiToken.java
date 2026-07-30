@@ -26,7 +26,7 @@ public class ApiToken {
         CICD(Arrays.asList("/api/startTest", "/api/retrieveAllCollectionTests", "/api/fetchTestingRunResultSummaries", 
         "/api/fetchTestingRunResults","/api/fetchWorkflowTestingRun","/api/fetchWorkflowTestingSchedule",
         "/api/stopAllTests","/api/fetchTestRunResultDetails","/api/fetchIssueFromTestRunResultDetails")),
-        BROWSER_EXTENSION(Arrays.asList("/api/fetchBrowserExtensionConfigs", "/api/fetchBrowserExtensionConfigsV2"));
+        BROWSER_EXTENSION(Arrays.asList("/api/fetchBrowserExtensionConfigs", "/api/fetchBrowserExtensionConfigsCommon"));
         private final List<String> accessList;
 
         Utility(List<String> accessList) {

@@ -327,7 +327,7 @@
             </result>
         </action>
 
-        <action name="api/fetchBrowserExtensionConfigsV2" class="com.akto.action.BrowserExtensionConfigAction" method="fetchBrowserExtensionConfigsV2">
+        <action name="api/fetchBrowserExtensionConfigsCommon" class="com.akto.action.BrowserExtensionConfigAction" method="fetchBrowserExtensionConfigsCommon">
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">

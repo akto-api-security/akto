@@ -26,7 +26,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-public class BrowserExtensionConfigV2 {
+public class BrowserExtensionConfigCommon {
 
     private ObjectId id;
 
@@ -62,6 +62,9 @@ public class BrowserExtensionConfigV2 {
     public static final String FRAME_MATCH = "frameMatch";
     private Map<String, Object> frameMatch;
 
+    public static final String TAG = "tag";
+    private String tag;
+
     public String getHexId() {
         if (this.id != null) {
             return this.id.toHexString();
@@ -72,7 +75,7 @@ public class BrowserExtensionConfigV2 {
     /**
      * @return null if the document has no usable host, since host is the only mandatory field
      */
-    public static BrowserExtensionConfigV2 fromDocument(Document doc) {
+    public static BrowserExtensionConfigCommon fromDocument(Document doc) {
         if (doc == null) {
             return null;
         }
@@ -82,7 +85,7 @@ public class BrowserExtensionConfigV2 {
             return null;
         }
 
-        BrowserExtensionConfigV2 config = new BrowserExtensionConfigV2();
+        BrowserExtensionConfigCommon config = new BrowserExtensionConfigCommon();
         config.host = host.trim();
 
         Object id = doc.get("_id");
@@ -100,6 +103,7 @@ public class BrowserExtensionConfigV2 {
         config.format = asString(doc.get(FORMAT));
         config.path = asPath(doc.get(PATH));
         config.frameMatch = asMap(doc.get(FRAME_MATCH));
+        config.tag = asString(doc.get(TAG));
 
         return config;
     }
