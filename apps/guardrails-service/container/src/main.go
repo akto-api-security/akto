@@ -270,8 +270,8 @@ func setupRouter(validationHandler *handlers.ValidationHandler, copilotStudioHan
 		copilotStudio.Use(entraAuthMiddleware)
 	}
 	{
-		copilotStudio.POST("/v1/health", copilotStudioHandler.Validate)
-		copilotStudio.POST("/v1/protection", copilotStudioHandler.AnalyzeToolExecution)
+		copilotStudio.POST("/v1/protection/validate", copilotStudioHandler.Validate)
+		copilotStudio.POST("/v1/protection/analyze-tool-execution", copilotStudioHandler.AnalyzeToolExecution)
 	}
 
 	return router
