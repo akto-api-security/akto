@@ -1,11 +1,13 @@
-FROM python:3.13-alpine
+FROM fedora:44
 
 WORKDIR /app
 
+RUN dnf update -y && dnf install -y python3 python3-pip && dnf clean all
+
 # Install deps before copying any source so the (slow) pip layer stays cached and
 # only re-runs when the dependency list itself changes — not on every code edit.
-RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
-    && pip install --no-cache-dir \
+RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && pip3 install --no-cache-dir \
     rsa==4.9.1 pyasn1==0.6.4 httpx==0.28.1 detect-secrets==1.5.0 tiktoken==0.13.0 \
     fastapi==0.139.0 'uvicorn[standard]==0.50.2' pydantic==2.13.4 psutil==7.2.2
 
