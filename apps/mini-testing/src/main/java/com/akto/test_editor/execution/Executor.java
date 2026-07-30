@@ -204,8 +204,9 @@ public class Executor {
 
         if (runAutomatedPentest) {
             String testSubType = varMap.containsKey("testSubType") ? varMap.get("testSubType").toString() : "unknown";
+            RawApi preparedForPentest = applyPreRequestScript(origRawApi, testingRunConfig);
             PentestExecutionResult pentestResult =
-                    automatedAgenticTestExecutor.executeAgenticTest(origRawApi, testSubType);
+                    automatedAgenticTestExecutor.executeAgenticTest(preparedForPentest, testSubType);
             List<TestResult> automatedAgenticResults = pentestResult.getTestResults();
             aiSummaryTraces = pentestResult.getAiSummaryTraces();
             if (automatedAgenticResults != null && !automatedAgenticResults.isEmpty()) {
@@ -678,6 +679,18 @@ public class Executor {
 
         // Default to generic failure
         return TestError.API_REQUEST_FAILED_BEFORE_SENDING;
+    }
+
+    private static RawApi applyPreRequestScript(RawApi rawApi, TestingRunConfig testingRunConfig) {
+        if (rawApi == null) {
+            return null;
+        }
+        RawApi prepared = rawApi.copy();
+        if (testingRunConfig == null || prepared.getRequest() == null) {
+            return prepared;
+        }
+        ApiExecutorUtil.calculateHashAndAddAuth(prepared.getRequest(), true, testingRunConfig);
+        return prepared;
     }
 
     private static boolean removeAuthIfNotChanged(RawApi originalRawApi, RawApi testRawApi, String authMechanismHeaderKey, List<CustomAuthType> customAuthTypes) {
