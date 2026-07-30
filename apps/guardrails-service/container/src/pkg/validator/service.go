@@ -696,6 +696,68 @@ func accountTypeFromRequestTag(tag string) string {
 	return accountType
 }
 
+// resolvePersonalAccountBlock decides whether a request must be blocked by the
+// personal-account guardrail. It is the single source of truth for that decision,
+// shared by both the single-request path (ValidateRequest) and the batch/ingest
+// path (ValidateBatch) so the two can never drift.
+//
+// It returns the offending policy name and true only when a BlockPersonalAccounts
+// policy applies AND the account type resolves to exactly "personal". Detection
+// precedence: browser-extension requests read the account type from their own tag;
+// everything else falls back to the collection-tag cache. enterprise/unknown/empty
+// and any unrecognised value are allowed, so an unclassified login never blocks.
+func (s *Service) resolvePersonalAccountBlock(policies []types.Policy, tag string, reqHeaders map[string]string, path, sessionID string) (string, bool) {
+	policyName, ok := blockPersonalAccountPolicyName(policies)
+	if !ok {
+		return "", false
+	}
+
+	var accountType, accountTypeSource string
+	// Browser-extension requests carry the account-type tag on the request itself
+	// (the extension host is usually absent from the collection cache), so read it
+	// straight from the request tag when present.
+	if mcp.IsBrowserExtensionRequest(tag) {
+		if at := accountTypeFromRequestTag(tag); at != "" {
+			accountType = at
+			accountTypeSource = "requestTag"
+		}
+	}
+	// Fall back to the collection-tag lookup (existing behaviour) when the request
+	// tag did not supply an account type.
+	if accountType == "" {
+		s.refreshCollectionTagsIfNeeded()
+		accountType = s.getLoginUserEmailType(reqHeaders)
+		accountTypeSource = "collection"
+	}
+	s.logger.Info("resolvePersonalAccountBlock - account type check",
+		zap.String("path", path),
+		zap.String("sessionID", sessionID),
+		zap.String("accountType", accountType),
+		zap.String("accountTypeSource", accountTypeSource),
+		zap.String("policyName", policyName))
+
+	// Match explicitly: only "personal" blocks. "enterprise" is allowed, and any
+	// other value ("unknown", a missing tag, or a value this build does not know)
+	// is treated as not-personal so an unclassified login never blocks traffic.
+	switch accountType {
+	case accountTypePersonal:
+		s.logger.Warn("resolvePersonalAccountBlock - blocking personal account",
+			zap.String("path", path),
+			zap.String("accountType", accountType),
+			zap.String("policyName", policyName),
+			zap.String("sessionID", sessionID))
+		return policyName, true
+	case accountTypeEnterprise, accountTypeUnknown, "":
+		// Explicitly allowed.
+	default:
+		s.logger.Info("resolvePersonalAccountBlock - unrecognised account type, allowing",
+			zap.String("accountType", accountType),
+			zap.String("policyName", policyName),
+			zap.String("sessionID", sessionID))
+	}
+	return "", false
+}
+
 // personalAccountReason returns the user-facing reason for a personal-account guardrail
 // hit, worded to match the policy behaviour so an "alert" outcome is not reported as
 // "Blocked". Any other behaviour falls back to the block wording.
@@ -704,6 +766,44 @@ func personalAccountReason(behaviour string) string {
 		return "Alert: personal accounts are not permitted by guardrail policy"
 	}
 	return "Blocked: personal accounts are not permitted by guardrail policy"
+}
+
+// reportPersonalAccountThreat asynchronously reports a personal-account block to the
+// dashboard threat feed. Shared by the single-request and batch/ingest paths so both
+// report identically. It is a no-op when skipThreat is set.
+func (s *Service) reportPersonalAccountThreat(payloadToValidate string, reqHeaders map[string]string, ip, path, method, statusCodeStr, contextSource, host, sessionID, policyName, behaviour, blockReason string, skipThreat bool) {
+	if skipThreat {
+		return
+	}
+	statusCode := 0
+	if statusCodeStr != "" {
+		fmt.Sscanf(statusCodeStr, "%d", &statusCode)
+	}
+	go func() {
+		if err := mcp.ReportThreat(
+			context.Background(),
+			payloadToValidate,
+			"",
+			types.ThreatMetadata{
+				PolicyName:   policyName,
+				RuleViolated: "BlockPersonalAccounts",
+				Severity:     "MEDIUM",
+				Reason:       blockReason,
+			},
+			ip,
+			path,
+			method,
+			reqHeaders,
+			nil,
+			statusCode,
+			types.ContextSource(contextSource),
+			host,
+			sessionID,
+			behaviour,
+		); err != nil {
+			s.logger.Warn("Failed to report threat for personal account block", zap.String("policyName", policyName), zap.Error(err))
+		}
+	}()
 }
 
 // TODO: move reportAndBlockPersonalAccount to mcp library so threat reporting
@@ -716,41 +816,12 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 		s.sessionMgr.UpdateBlockedReason(sessionID, blockReason)
 	}
 
-	if !params.EffectiveSkipThreat() {
-		reqHeaders := make(map[string]string)
-		if params.RequestHeaders != "" {
-			json.Unmarshal([]byte(params.RequestHeaders), &reqHeaders)
-		}
-		statusCode := 0
-		if params.StatusCode != "" {
-			fmt.Sscanf(params.StatusCode, "%d", &statusCode)
-		}
-		go func() {
-			if err := mcp.ReportThreat(
-				context.Background(),
-				payloadToValidate,
-				"",
-				types.ThreatMetadata{
-					PolicyName:   policyName,
-					RuleViolated: "BlockPersonalAccounts",
-					Severity:     "MEDIUM",
-					Reason:       blockReason,
-				},
-				params.IP,
-				params.Path,
-				params.Method,
-				reqHeaders,
-				nil,
-				statusCode,
-				types.ContextSource(params.ContextSource),
-				extractHostHeader(reqHeaders),
-				sessionID,
-				behaviour,
-			); err != nil {
-				s.logger.Warn("Failed to report threat for personal account block", zap.String("policyName", policyName), zap.Error(err))
-			}
-		}()
+	reqHeaders := make(map[string]string)
+	if params.RequestHeaders != "" {
+		json.Unmarshal([]byte(params.RequestHeaders), &reqHeaders)
 	}
+	s.reportPersonalAccountThreat(payloadToValidate, reqHeaders, params.IP, params.Path, params.Method,
+		params.StatusCode, params.ContextSource, extractHostHeader(reqHeaders), sessionID, policyName, behaviour, blockReason, params.EffectiveSkipThreat())
 
 	return &mcp.ValidationResult{
 		Allowed:   false,
@@ -1431,50 +1502,8 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Check account-type guardrail after server filtering so the policy's server
 	// selection is respected (a personal-account policy scoped to server A should
 	// not block requests arriving on server B).
-	if policyName, ok := blockPersonalAccountPolicyName(policies); ok {
-		var accountType, accountTypeSource string
-		// Browser-extension requests carry the account-type tag on the request itself
-		// (the extension host is usually absent from the collection cache), so read it
-		// straight from the request tag when present.
-		if mcp.IsBrowserExtensionRequest(valCtx.Tag) {
-			if at := accountTypeFromRequestTag(valCtx.Tag); at != "" {
-				accountType = at
-				accountTypeSource = "requestTag"
-			}
-		}
-		// Fall back to the collection-tag lookup (existing behaviour) when the request
-		// tag did not supply an account type.
-		if accountType == "" {
-			s.refreshCollectionTagsIfNeeded()
-			accountType = s.getLoginUserEmailType(valCtx.RequestHeaders)
-			accountTypeSource = "collection"
-		}
-		s.logger.Info("ValidateRequest - account type check",
-			zap.String("path", params.Path),
-			zap.String("sessionID", sessionID),
-			zap.String("accountType", accountType),
-			zap.String("accountTypeSource", accountTypeSource))
-		// Match explicitly: only "personal" blocks. "enterprise" is allowed, and any
-		// other value ("unknown", a missing tag, or a value this build does not know)
-		// is treated as not-personal so an unclassified login never blocks traffic.
-		switch accountType {
-		case accountTypePersonal:
-			s.logger.Warn("ValidateRequest - blocking personal account",
-				zap.String("path", params.Path),
-				zap.String("method", params.Method),
-				zap.String("account", params.AktoAccountID),
-				zap.String("accountType", accountType),
-				zap.String("policyName", policyName),
-				zap.String("sessionID", sessionID))
-			return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName)), nil
-		case accountTypeEnterprise, accountTypeUnknown, "":
-			// Explicitly allowed.
-		default:
-			s.logger.Info("ValidateRequest - unrecognised account type, allowing",
-				zap.String("accountType", accountType),
-				zap.String("policyName", policyName),
-				zap.String("sessionID", sessionID))
-		}
+	if policyName, blocked := s.resolvePersonalAccountBlock(policies, valCtx.Tag, valCtx.RequestHeaders, params.Path, sessionID); blocked {
+		return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName)), nil
 	}
 
 	// Host blocklist (block-only). Evaluated after server filtering so only rules from
@@ -2032,6 +2061,33 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				zap.String("payload", data.RequestPayload))
 
 			reqPayload := s.extractPayloadForValidation(data.RequestPayload, data.Method, data.Path, true)
+
+			// Personal-account guardrail — shared with ValidateRequest via
+			// resolvePersonalAccountBlock so the inline and ingest paths enforce it
+			// identically. Blocking here bypasses the normal payload processing below.
+			if policyName, blocked := s.resolvePersonalAccountBlock(itemPolicies, data.Tag, reqHeaders, data.Path, ""); blocked {
+				behaviour := behaviourForPolicy(itemPolicies, policyName)
+				blockReason := personalAccountReason(behaviour)
+				reqResult = &mcp.ValidationResult{
+					Allowed:   false,
+					Reason:    blockReason,
+					Behaviour: behaviour,
+					Metadata: types.ThreatMetadata{
+						PolicyName:   policyName,
+						RuleViolated: "BlockPersonalAccounts",
+						Severity:     "MEDIUM",
+						Reason:       blockReason,
+					},
+				}
+				result.RequestAllowed = false
+				result.RequestReason = blockReason
+				result.RequestBehaviour = behaviour
+				s.reportPersonalAccountThreat(reqPayload, reqHeaders, data.IP, data.Path, data.Method,
+					data.StatusCode, itemContextSource, mcpServerName, "", policyName, behaviour, blockReason, skipThreat)
+				results = append(results, result)
+				continue
+			}
+
 			processResult, err := s.processor.ProcessRequest(ctx, reqPayload, valCtx, itemPolicies, auditPolicies, hasAuditRules)
 			if err != nil {
 				s.logger.Error("Failed to validate request",
