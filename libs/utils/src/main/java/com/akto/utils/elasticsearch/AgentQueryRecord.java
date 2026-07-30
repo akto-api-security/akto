@@ -126,6 +126,22 @@ public class AgentQueryRecord {
                 }
             }
 
+        } else if (isBrowserExtensionTraffic) {
+            // Host id is <heartbeat name>.<browser>.<site>, so its first label keys deviceUserMap.
+            String host = getFirstHeader(headers, "host");
+            serviceId = host;
+            deviceId  = null;
+            String moduleName = host != null ? host.split("\\.", 2)[0] : null;
+            userName = (deviceUserMap != null && moduleName != null) ? deviceUserMap.get(moduleName) : null;
+            if (userName == null || !userName.contains("@")) {
+                userName = getFirstHeader(headers, HEADER_PREFIX + HEADER_USER_EMAIL);
+            }
+            // Not registered yet, or a browser profile that isn't signed in (name is the uuid).
+            if (userName == null || !userName.contains("@")) {
+                Organization org = OrgUtils.getOrganizationCached(Context.getActualAccountId());
+                userName = org != null ? org.getAdminEmail() : null;
+            }
+
         } else if (tagsMap != null && tagsMap.containsKey(Constants.AKTO_GEN_AI_TAG)) {
             deviceId  = null;
             serviceId = getFirstHeader(headers, "host");
