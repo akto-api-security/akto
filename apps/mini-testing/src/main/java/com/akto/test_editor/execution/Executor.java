@@ -687,7 +687,7 @@ public class Executor {
         }
         RawApi prepared = rawApi.copy();
         if (testingRunConfig == null || prepared.getRequest() == null) {
-            return prepared;
+            return rawApi;
         }
         ApiExecutorUtil.calculateHashAndAddAuth(prepared.getRequest(), true, testingRunConfig);
         return prepared;
