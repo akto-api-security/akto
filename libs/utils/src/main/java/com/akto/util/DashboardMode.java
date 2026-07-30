@@ -58,6 +58,7 @@ public enum DashboardMode {
     }
 
     private static boolean isSaasDeploymentGlobal = false;
+    private static boolean isOnPremDeployment = false;
     private static int lastSaasFetched = 0;
 
     public static boolean isMetered() {
@@ -69,6 +70,7 @@ public enum DashboardMode {
                 if (setup != null) {
                     String dashboardMode = setup.getDashboardMode();
                     isSaasDeployment = dashboardMode.equalsIgnoreCase(DashboardMode.SAAS.name());
+                    isOnPremDeployment = dashboardMode.equalsIgnoreCase(DashboardMode.ON_PREM.name());
                 }
             } catch (Exception e) {
             }
@@ -76,6 +78,7 @@ public enum DashboardMode {
             lastSaasFetched = Context.now();
         }
 
-        return isSaasDeploymentGlobal || isOnPremDeployment();
+        isOnPremDeployment = isOnPremDeployment || isOnPremDeployment();
+        return isSaasDeploymentGlobal || isOnPremDeployment;
     }
 }
