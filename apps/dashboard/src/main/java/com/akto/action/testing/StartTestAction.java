@@ -315,6 +315,17 @@ public class StartTestAction extends UserAction {
         }
     }
 
+    private void resolveTestRoleId() {
+        if (StringUtils.isBlank(this.testRoleId) || ObjectId.isValid(this.testRoleId)) {
+            return;
+        }
+
+        TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(TestRoles.NAME, this.testRoleId));
+        if (testRole != null && testRole.getId() != null) {
+            this.testRoleId = testRole.getHexId();
+        }
+    }
+
     private static final Slack SLACK_INSTANCE = Slack.getInstance();
 
     public String startTest() {
@@ -327,6 +338,8 @@ public class StartTestAction extends UserAction {
         if (!validateAutoTicketingDetails(this.autoTicketingDetails)) {
             return Action.ERROR.toUpperCase();
         }
+
+        resolveTestRoleId();
 
         int scheduleTimestamp = this.startTimestamp == 0 ? Context.now() : this.startTimestamp;
         handleCallFromAktoGpt();
