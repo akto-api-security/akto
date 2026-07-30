@@ -1,0 +1,174 @@
+package com.akto.dto;
+
+import org.bson.Document;
+import org.bson.types.ObjectId;
+import org.junit.Test;
+
+import java.util.Arrays;
+import java.util.List;
+
+import static org.junit.Assert.*;
+
+public class TestBrowserExtensionConfigV2 {
+
+    @Test
+    public void testHttpConfigWithMethodAndStringPath() {
+        Document doc = Document.parse("{" +
+                "'host': 'chatgpt.com'," +
+                "'active': true," +
+                "'paths': ['/backend-api/conversation', '/backend-api/f/conversation']," +
+                "'transport': 'http'," +
+                "'method': 'POST'," +
+                "'format': 'json'," +
+                "'path': 'messages[-1].content.parts'" +
+                "}");
+
+        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+
+        assertNotNull(config);
+        assertEquals("chatgpt.com", config.getHost());
+        assertTrue(config.isActive());
+        assertEquals(Arrays.asList("/backend-api/conversation", "/backend-api/f/conversation"), config.getPaths());
+        assertEquals("http", config.getTransport());
+        assertEquals("POST", config.getMethod());
+        assertEquals("json", config.getFormat());
+        assertEquals("messages[-1].content.parts", config.getPath());
+    }
+
+    @Test
+    public void testGraphqlConfigWithOperations() {
+        Document doc = Document.parse("{" +
+                "'host': 'poe.com'," +
+                "'active': true," +
+                "'paths': ['/api/gql_POST']," +
+                "'transport': 'graphql'," +
+                "'operations': ['sendMessageMutation']," +
+                "'format': 'json'," +
+                "'path': 'variables.query'" +
+                "}");
+
+        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+
+        assertNotNull(config);
+        assertEquals("graphql", config.getTransport());
+        assertEquals(Arrays.asList("sendMessageMutation"), config.getOperations());
+        assertEquals("variables.query", config.getPath());
+        assertNull(config.getMethod());
+        assertNull(config.getFrameMatch());
+    }
+
+    @Test
+    public void testWebsocketConfigWithFrameMatch() {
+        Document doc = Document.parse("{" +
+                "'host': 'copilot.microsoft.com'," +
+                "'active': true," +
+                "'paths': ['/c/api/chat']," +
+                "'transport': 'websocket'," +
+                "'frameMatch': { 'event': 'send' }," +
+                "'format': 'ws-frame'," +
+                "'path': 'content[?type=text][*].text'" +
+                "}");
+
+        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+
+        assertNotNull(config);
+        assertEquals("websocket", config.getTransport());
+        assertEquals("ws-frame", config.getFormat());
+        assertNotNull(config.getFrameMatch());
+        assertEquals("send", config.getFrameMatch().get("event"));
+    }
+
+    @Test
+    public void testPathAsListOfCandidates() {
+        Document doc = Document.parse("{" +
+                "'host': 'gemini.google.com'," +
+                "'active': true," +
+                "'paths': ['_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate']," +
+                "'transport': 'http'," +
+                "'method': 'POST'," +
+                "'format': 'form'," +
+                "'path': [\"['f.req'][0][0][2]\", \"['f.req'][1][0][0]\", \"['f.req'][1][0][0][2]\"]" +
+                "}");
+
+        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+
+        assertNotNull(config);
+        assertTrue(config.getPath() instanceof List);
+        assertEquals(Arrays.asList("['f.req'][0][0][2]", "['f.req'][1][0][0]", "['f.req'][1][0][0][2]"),
+                config.getPath());
+    }
+
+    @Test
+    public void testHostAndPathsOnlyConfig() {
+        Document doc = Document.parse("{" +
+                "'host': 'grok.com'," +
+                "'active': true," +
+                "'paths': ['/rest/app-chat/conversations/']" +
+                "}");
+
+        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+
+        assertNotNull(config);
+        assertEquals("grok.com", config.getHost());
+        assertEquals(Arrays.asList("/rest/app-chat/conversations/"), config.getPaths());
+        assertNull(config.getTransport());
+        assertNull(config.getMethod());
+        assertNull(config.getFormat());
+        assertNull(config.getPath());
+        assertNull(config.getOperations());
+    }
+
+    @Test
+    public void testActiveDefaultsToTrueWhenAbsent() {
+        Document doc = Document.parse("{ 'host': 'github.com', 'paths': ['/github/chat/threads/*/messages'] }");
+
+        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+
+        assertNotNull(config);
+        assertTrue(config.isActive());
+    }
+
+    @Test
+    public void testInactiveConfigIsMappedAsInactive() {
+        Document doc = Document.parse("{ 'host': 'you.com', 'active': false }");
+
+        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+
+        assertNotNull(config);
+        assertFalse(config.isActive());
+    }
+
+    @Test
+    public void testHexIdIsExposed() {
+        ObjectId id = new ObjectId();
+        Document doc = new Document("_id", id).append("host", "duck.ai");
+
+        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+
+        assertNotNull(config);
+        assertEquals(id, config.getId());
+        assertEquals(id.toHexString(), config.getHexId());
+    }
+
+    @Test
+    public void testDocumentWithoutHostIsSkipped() {
+        assertNull(BrowserExtensionConfigV2.fromDocument(new Document("paths", Arrays.asList("/api/chat"))));
+        assertNull(BrowserExtensionConfigV2.fromDocument(new Document("host", "   ")));
+        assertNull(BrowserExtensionConfigV2.fromDocument(null));
+    }
+
+    @Test
+    public void testUnexpectedFieldTypesAreIgnoredInsteadOfFailing() {
+        Document doc = new Document("host", "pi.ai")
+                .append("paths", "/api/v2/chat")   // single string instead of a list
+                .append("method", 42)              // wrong type
+                .append("frameMatch", "send");     // wrong type
+
+        BrowserExtensionConfigV2 config = BrowserExtensionConfigV2.fromDocument(doc);
+
+        assertNotNull(config);
+        assertEquals(Arrays.asList("/api/v2/chat"), config.getPaths());
+        assertNull(config.getMethod());
+        assertNull(config.getFrameMatch());
+    }
+}
