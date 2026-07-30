@@ -1,8 +1,10 @@
 package com.akto.action;
 
 import com.akto.dao.BrowserExtensionConfigDao;
+import com.akto.dao.BrowserExtensionConfigCommonDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.BrowserExtensionConfig;
+import com.akto.dto.BrowserExtensionConfigCommon;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -33,6 +35,9 @@ public class BrowserExtensionConfigAction extends UserAction {
     @Getter
     private List<BrowserExtensionConfig> browserExtensionConfigs;
 
+    @Getter
+    private List<BrowserExtensionConfigCommon> browserExtensionConfigsCommon;
+
     @Setter
     private List<String> configIds;
 
@@ -43,6 +48,18 @@ public class BrowserExtensionConfigAction extends UserAction {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching browser extension configs: " + e.getMessage(), LogDb.DASHBOARD);
             addActionError("Failed to fetch browser extension configs");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    // Reads the shared list of supported browser extension configs from the common DB.
+    public String fetchBrowserExtensionConfigsCommon() {
+        try {
+            this.browserExtensionConfigsCommon = BrowserExtensionConfigCommonDao.instance.findAllConfigs();
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching common browser extension configs: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Failed to fetch common browser extension configs");
             return ERROR.toUpperCase();
         }
     }

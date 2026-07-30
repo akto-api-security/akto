@@ -75,6 +75,14 @@ export default {
         return resp
     },
 
+    async fetchBrowserExtensionConfigsCommon() {
+        const resp = await request({
+            url: '/api/fetchBrowserExtensionConfigsCommon',
+            method: 'post'
+        })
+        return resp
+    },
+
     async saveBrowserExtensionConfig(browserExtensionConfig, hexId) {
         const resp = await request({
             url: '/api/saveBrowserExtensionConfig',
