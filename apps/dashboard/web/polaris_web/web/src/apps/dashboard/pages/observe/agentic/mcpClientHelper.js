@@ -204,6 +204,9 @@ const getAgenticCategoryLabel = (collection) => {
     return CLIENT_TYPES.MCP_SERVER;
 };
 
+// Keep in sync with accountTypeTagKeys in guardrails-service validator. Note that
+// ai-agent-account-type is excluded on purpose: it holds the CLI's subscription plan
+// tier (go, plus, team, ...), not account ownership.
 const PERSONAL_ACCOUNT_TAG_KEYS = ['browser-llm-account-type', 'login-user-email-type'];
 
 const hasPersonalAccountTag = (envType) => {
