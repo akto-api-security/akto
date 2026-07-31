@@ -13,10 +13,16 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends libpcap-dev; \
     rm -rf /var/lib/apt/lists/*
 
+# Unused base-image binary (not dpkg-tracked, never invoked by docker-entrypoint.sh or our own
+# entrypoint.d scripts) - removing it clears its bundled golang.org/x/net + Go stdlib CVEs.
+RUN rm -f /usr/bin/pebble
+
 # EE8 deploys javax.servlet WARs; ee8-jsp satisfies Struts JspTemplateEngine classpath (Jetty 9 had this built-in).
+# gzip: server-side response compression, replacing the removed web.xml GzipFilter (see
+# docker/jetty-start.d/gzip.ini for the equivalent mimeTypes config).
 RUN rm -f /var/lib/jetty/start.d/threadpool.ini \
     && java -jar "$JETTY_HOME/start.jar" \
-    --add-modules=ee8-deploy,ee8-webapp,ee8-jsp,forwarded,threadpool-virtual
+    --add-modules=ee8-deploy,ee8-webapp,ee8-jsp,forwarded,threadpool-virtual,gzip
 
 ADD ./target/data-ingestion-service.war /var/lib/jetty/webapps/root.war
 RUN echo "environment=ee8" > /var/lib/jetty/webapps/root.properties
