@@ -469,7 +469,7 @@ function HomeDashboard() {
             api.findTotalIssues(startTimestamp, endTimestamp),
             api.fetchApiStats(startTimestamp, endTimestamp),
             api.fetchEndpointsCount(startTimestamp, endTimestamp),
-            testingApi.fetchSeverityInfoForIssues({}, [], 0)
+            testingApi.fetchSeverityInfoForIssues({activeCollections: true}, [], 0)
         ];
 
         // Only fetch MCP data if not in API Security category
