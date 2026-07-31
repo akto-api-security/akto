@@ -17,6 +17,27 @@ public class BedrockAgentTraceParser implements TraceParser {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String SOURCE_TYPE = "bedrock-agent";
 
+    // CloudWatch's trace data has no structured success/failure field for a tool
+    // result — only free-text. These are the phrasings actually observed across real
+    // tool failures (validation errors, missing-session lookups, etc.); this is a
+    // heuristic, not a guarantee, since a tool can fail in wording we haven't seen yet.
+    private static final String[] FAILURE_INDICATORS = {
+        "error", "not found", "failed", "invalid", "denied", "exception", "unable to"
+    };
+
+    private boolean looksLikeFailure(String result) {
+        if (result == null || result.isEmpty()) {
+            return false;
+        }
+        String lower = result.toLowerCase();
+        for (String indicator : FAILURE_INDICATORS) {
+            if (lower.contains(indicator)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static BedrockAgentTraceParser getInstance() {
         return INSTANCE;
     }
@@ -162,15 +183,34 @@ public class BedrockAgentTraceParser implements TraceParser {
 
             // Add tools edge for AgentCore
             if (agentType.equals("AGENTCORE")) {
-                String tools = awsMetadata.path("harness-configured-tools").asText("unknown");
-                if (!tools.isEmpty() && !tools.equals("unknown")) {
-                    Map<String, Object> toolsMetadata = new HashMap<>();
-                    toolsMetadata.put("type", "tool");
-                    toolsMetadata.put("edgeParam", "configured tools");
-                    edges.put(tools, new ServiceGraphEdgeInfo(sourceService, tools, toolsMetadata));
+                JsonNode toolsSummary = awsMetadata.path("traceData").path("toolsSummary");
+                JsonNode toolsActuallyUsed = toolsSummary.path("tools");
+
+                if (toolsActuallyUsed.isArray() && toolsActuallyUsed.size() > 0) {
+                    // Reflects what this specific request actually called, not just what
+                    // the harness has configured — one edge per distinct tool used.
+                    int totalToolCalls = toolsSummary.path("totalToolCalls").asInt(0);
+                    for (JsonNode toolNameNode : toolsActuallyUsed) {
+                        String toolName = toolNameNode.asText("unknown");
+                        Map<String, Object> toolsMetadata = new HashMap<>();
+                        toolsMetadata.put("type", "tool");
+                        toolsMetadata.put("edgeParam", "tool call");
+                        toolsMetadata.put("totalToolCalls", totalToolCalls);
+                        edges.put(toolName, new ServiceGraphEdgeInfo(sourceService, toolName, toolsMetadata));
+                    }
+                } else {
+                    // No tool was actually called in this request — fall back to the
+                    // harness's static configuration so the graph still shows what it can do.
+                    String tools = awsMetadata.path("harness-configured-tools").asText("unknown");
+                    if (!tools.isEmpty() && !tools.equals("unknown")) {
+                        Map<String, Object> toolsMetadata = new HashMap<>();
+                        toolsMetadata.put("type", "tool");
+                        toolsMetadata.put("edgeParam", "configured tools");
+                        edges.put(tools, new ServiceGraphEdgeInfo(sourceService, tools, toolsMetadata));
+                    }
                 }
 
-                // Add skills edge
+                // Add skills edge (always static config — we don't yet extract per-call skill usage)
                 String skills = awsMetadata.path("harness-configured-skills").asText("unknown");
                 if (!skills.isEmpty() && !skills.equals("unknown")) {
                     Map<String, Object> skillsMetadata = new HashMap<>();
@@ -229,9 +269,21 @@ public class BedrockAgentTraceParser implements TraceParser {
 
             Map<String, Object> input = new HashMap<>();
             input.put("type", stepType);
+            if ("tool-call".equalsIgnoreCase(stepType)) {
+                input.put("tool", step.path("tool").asText("unknown"));
+                input.put("action", step.path("action").asText("unknown"));
+            }
+
+            // The tool's actual result/error text (empty for non-tool-call steps, e.g. the
+            // root "agent" step). See looksLikeFailure() for why this is a heuristic.
+            String result = step.path("result").asText("");
+            boolean failed = looksLikeFailure(result);
 
             Map<String, Object> output = new HashMap<>();
-            output.put("completed", true);
+            output.put("completed", !failed);
+            if (!result.isEmpty()) {
+                output.put("result", result);
+            }
 
             Span span = Span.builder()
                 .id(spanId)
@@ -241,7 +293,7 @@ public class BedrockAgentTraceParser implements TraceParser {
                 .name(name)
                 .startTimeMillis(System.currentTimeMillis())
                 .endTimeMillis(System.currentTimeMillis())
-                .status("success")
+                .status(failed ? "error" : "success")
                 .input(input)
                 .output(output)
                 .metadata(extractStepMetadata(step, stepType))
@@ -286,6 +338,7 @@ public class BedrockAgentTraceParser implements TraceParser {
             metadata.put("tool", step.path("tool").asText("unknown"));
             metadata.put("action", step.path("action").asText("unknown"));
             metadata.put("toolUseId", step.path("toolUseId").asText(""));
+            metadata.put("result", step.path("result").asText(""));
         }
 
         if (step.has("description")) {
