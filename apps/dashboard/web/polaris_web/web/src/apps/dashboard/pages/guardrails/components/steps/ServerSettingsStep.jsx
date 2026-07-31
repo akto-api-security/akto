@@ -568,6 +568,8 @@ const ServerSettingsStep = ({
                                 helpText="When enabled, this guardrail will filter and evaluate user inputs before they're processed by the model."
                             />
                         </VerticalStack>
+
+                        <Banner tone="info">Response Guardrails are not supported for browser LLMs</Banner>
                     </VerticalStack>
                 </Box>
             </FormLayout>
