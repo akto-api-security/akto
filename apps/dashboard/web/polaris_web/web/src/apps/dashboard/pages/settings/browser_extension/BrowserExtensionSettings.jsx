@@ -111,6 +111,7 @@ function BrowserExtensionSettings() {
     return (
         <PageWithMultipleCards
             title={"Browser Extension"}
+            subtitle={"Available in Extension v1.0.61 and later"}
             isFirstPage={true}
             primaryAction={<Button primary onClick={handleDownload} disabled={loading || rawConfigs.length === 0}>Download</Button>}
             components={[configTable]}
