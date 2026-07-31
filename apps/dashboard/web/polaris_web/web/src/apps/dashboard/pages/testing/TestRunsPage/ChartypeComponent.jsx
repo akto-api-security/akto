@@ -12,12 +12,19 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
     const filtersMap = PersistStore(state => state.filtersMap)
     const setFiltersMap = PersistStore(state => state.setFiltersMap)
 
-    const isLabelClickable = !!(navUrl === '/dashboard/issues' || onSegmentClick)
+    const isLabelClickable = !!(navUrl === '/dashboard/issues' || onSegmentClick || navUrlBuilder)
 
     function handleLabelClick(key) {
         const item = data[key]
         if (onSegmentClick) {
             onSegmentClick(item?.filterValue || key)
+            return
+        }
+        if (navUrlBuilder) {
+            const builtUrl = navUrlBuilder(navUrl, item?.filterValue)
+            if (builtUrl) {
+                window.open(builtUrl, '_blank', 'noopener,noreferrer')
+            }
             return
         }
         if (navUrl === '/dashboard/issues') {
@@ -56,6 +63,8 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                 <HorizontalStack gap={1} wrap={false}>
                     <Box
                         width='30px'
+                        onClick={isLabelClickable ? () => handleLabelClick(key) : undefined}
+                        style={isLabelClickable ? { cursor: 'pointer' } : undefined}
                     >
                         <Text>{observeFunc.formatNumberWithCommas(data[key]?.text)}</Text>
                     </Box>
