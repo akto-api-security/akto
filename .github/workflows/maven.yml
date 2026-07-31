@@ -1,0 +1,174 @@
+# This workflow will build a Java project with Maven, and cache/restore any dependencies to improve the workflow execution time
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-maven
+
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Java CI with Maven
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+    - name: Build with Maven
+      run: mvn -B package --file pom.xml
+
+    # Optional: Uploads the full dependency graph to GitHub to improve the quality of Dependabot alerts this repository can receive
+    - name: Update dependency graph
+      uses: advanced-security/maven-dependency-submission-action@571e99aab1055c2e71a1e2309b9691de18d6b7d6
+[
+    {
+        "IssuingNetwork": "MASTERCARD",
+        "CardNumber": "5330871337958163",
+        "Bank": "BANK OF AMERICA",
+        "Name": "Cornelius Eyjlfsson",
+        "Address": "263 Canis Heights Drive",
+        "Country": "UNITED STATES",
+        "MoneyRange": "$2857",
+        "CVV": "78+",
+        "Expiry": "9/2030",
+        "Pin": 7520
+    },
+    {
+        "IssuingNetwork": "MASTERCARD",
+        "CardNumber": "5441391290076305",
+        "Bank": "BANK OF AMERICA",
+        "Name": "Ebbe Johnson",
+        "Address": "3745 Hidden Valley Road",
+        "Country": "UNITED STATES",
+        "MoneyRange": "$2821",
+        "CVV": "78+",
+        "Expiry": "9/2030",
+        "Pin": 5547
+    },
+    {
+        "IssuingNetwork": "MASTERCARD",
+        "CardNumber": "5330744974395660",
+        "Bank": "BANK OF AMERICA",
+        "Name": "Selassie Vedzizhev",
+        "Address": "4602 Karen Lane",
+        "Country": "UNITED STATES",
+        "MoneyRange": "$2896",
+        "CVV": "78+",
+        "Expiry": "9/2030",
+        "Pin": 9608
+    },
+    {
+        "IssuingNetwork": "MASTERCARD",
+        "CardNumber": "5330754373471350",
+        "Bank": "BANK OF AMERICA",
+        "Name": "Janienke Beckenbauer",
+        "Address": "493 Hinkle Lake Road",
+        "Country": "UNITED STATES",
+        "MoneyRange": "$2497",
+        "CVV": "78+",
+        "Expiry": "9/2030",
+        "Pin": 1717
+    },
+    {
+        "IssuingNetwork": "MASTERCARD",
+        "CardNumber": "5401518112448092",
+        "Bank": "BANK OF AMERICA",
+        "Name": "Constance Abramoff",
+        "Address": "3278 Chandler Drive",
+        "Country": "UNITED STATES",
+        "MoneyRange": "$2407",
+        "CVV": "78+",
+        "Expiry": "9/2030",
+        "Pin": 3459
+    },
+    {
+        "IssuingNetwork": "MASTERCARD",
+        "CardNumber": "5453857929220758",
+        "Bank": "BANK OF AMERICA",
+        "Name": "Charlotte Vlek",
+        "Address": "1360 Sugarfoot Lane",
+        "Country": "UNITED STATES",
+        "MoneyRange": "$2243",
+        "CVV": "78+",
+        "Expiry": "9/2030",
+        "Pin": 5969
+    },
+    {
+        "IssuingNetwork": "MASTERCARD",
+        "CardNumber": "5280708384212583",
+        "Bank": "BANK OF AMERICA",
+        "Name": "Niklas Mong",
+        "Address": "3053 Ridge Road",
+        "Country": "UNITED STATES",
+        "MoneyRange": "$2040",
+        "CVV": "78+",
+        "Expiry": "9/2030",
+        "Pin": 8372
+    },
+    {
+        "IssuingNetwork": "MASTERCARD",
+        "CardNumber": "5330959164642396",
+        "Bank": "BANK OF AMERICA",
+        "Name": "Furio Mathew",
+        "Address": "127 Virginia Street",
+        "Country": "UNITED STATES",
+        "MoneyRange": "$2049",
+        "CVV": "78+",
+        "Expiry": "9/2030",
+        "Pin": 9436
+    },
+    {
+        "IssuingNetwork": "MASTERCARD",
+        "CardNumber": "5330726464525898",
+        "Bank": "BANK OF AMERICA",
+        "Name": "Lei Yanagisawa",
+        "Address": "130 Rosemont Avenue",
+        "Country": "UNITED STATES",
+        "MoneyRange": "$2060",
+        "CVV": "78+",
+        "Expiry": "9/2030",
+        "Pin": 7762
+    },
+    {
+        "IssuingNetwork": "MASTERCARD",
+        "CardNumber": "5421742331631256",
+        "Bank": "BANK OF AMERICA",
+        "Name": "Karolina Lfgren",
+        "Address": "2406 Dogwood Lane",
+        "Country": "UNITED STATES",
+        "MoneyRange": "$2579",
+        "CVV": "78+",
+        "Expiry": "9/2030",
+        "Pin": 1008
+    }            - name: Setup Go environment
+  uses: actions/setup-go@v5.3.0
+  with:
+    # The Go version to download (if necessary) and use. Supports semver spec and ranges. Be sure to enclose this option in single quotation marks.
+    go-version: # optional
+    # Path to the go.mod or go.work file.
+    go-version-file: # optional
+    # Set this option to true if you want the action to always check for the latest available version that satisfies the version spec
+    check-latest: # optional
+    # Used to pull Go distributions from go-versions. Since there's a default, this is typically not supplied by the user. When running this action on github.com, the default value is sufficient. When running on GHES, you can pass a personal access token for github.com if you are experiencing rate limiting.
+    token: # optional, default is ${{ github.server_url == 'https://github.com' && github.token || '' }}
+    # Used to specify whether caching is needed. Set to true, if you'd like to enable caching.
+    cache: # optional, default is true
+    # Used to specify the path to a dependency file - go.sum
+    cache-dependency-path: # optional
+    # Target architecture for Go to use. Examples: x86, x64. Will use system architecture by default.
+    architecture: # optional
+          
+]
