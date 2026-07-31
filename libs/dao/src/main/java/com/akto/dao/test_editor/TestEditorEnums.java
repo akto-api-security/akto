@@ -22,6 +22,7 @@ public class TestEditorEnums {
         NEQ_OBJ,
         PARAM,
         CONTAINS_JWT,
+        JWT_SIGNING_ALG,
         COOKIE_EXPIRE_FILTER,
         DATATYPE,
         BELONGS_TO_COLLECTIONS,
