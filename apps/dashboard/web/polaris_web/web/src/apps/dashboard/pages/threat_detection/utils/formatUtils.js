@@ -1,6 +1,8 @@
 import React from 'react';
 import { Text } from "@shopify/polaris";
 import { getGuardrailCapabilityForRule } from '../constants/guardrailRuleDefinitions';
+import api from '../api';
+import guardrailApi from '../../guardrails/api';
 
 // Regular expression to validate IP address (IPv4 and IPv6)
 const IPV4_REGEX = /^(\d{1,3}\.){3}\d{1,3}$/;
@@ -70,6 +72,26 @@ export const mergePolicyComplianceMap = (capabilityMap, guardrailPolicies = []) 
     addCompliance(dbComplianceKey(policy.name, "llmRule"), policy.llmRule?.compliance);
   });
   return capabilityMap;
+};
+
+/**
+ * Fetches guardrail compliance infos + policies and builds the capability→compliance map
+ * consumed by resolveComplianceClauseMap(). Shared by the Guardrail Activity table (SusDataTable)
+ * and the Violations page so the fetch/merge logic lives in one place.
+ * Returns { complianceMap, guardrailPolicies }.
+ */
+export const fetchGuardrailComplianceMap = async () => {
+  const [complianceResp, policiesResp] = await Promise.all([
+    api.fetchGuardrailComplianceInfos(),
+    guardrailApi.fetchGuardrailPolicies(),
+  ]);
+  const capabilityMap = {};
+  (complianceResp?.guardrailComplianceInfos || []).forEach((entry) => {
+    const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
+    if (capability) capabilityMap[capability] = entry.mapComplianceToListClauses;
+  });
+  mergePolicyComplianceMap(capabilityMap, policiesResp?.guardrailPolicies);
+  return { complianceMap: capabilityMap, guardrailPolicies: policiesResp?.guardrailPolicies || [] };
 };
 
 export const resolveComplianceClauseMap = (event, isGuardrail, threatFiltersMap = {}, guardrailComplianceMap = {}) => {

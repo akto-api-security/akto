@@ -27,8 +27,9 @@ import values from "@/util/values";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import PersistStore from "@/apps/main/PersistStore";
 import LocalStore from "@/apps/main/LocalStorageStore";
+import SessionStore from "@/apps/main/SessionStore";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
-import { isEndpointSecurityCategory } from "@/apps/main/labelHelper";
+import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
 
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "@/apps/dashboard/pages/observe/api_collections/endpointShieldHelper";
 import { formatDisplayName } from "@/apps/dashboard/pages/observe/agentic/mcpClientHelper";
@@ -40,6 +41,8 @@ import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
 import { normalizeReasonPunctuation, coerceToText, sanitizeDisplayText } from "./violationsData";
+import { resolveComplianceClauseMap, fetchGuardrailComplianceMap, extractRuleViolated } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
+import ComplianceIcons from "@/apps/dashboard/pages/threat_detection/components/ComplianceIcons";
 
 // ─── Method → display type mapping ──────────────────────────────────────────────
 
@@ -130,6 +133,16 @@ function EvidenceCellRenderer({ value }) {
     return <Text variant="bodySm" truncate>{value}</Text>;
 }
 
+// Session vs Single Prompt — mirrors the Guardrail Activity table (SusDataTable).
+function DetectionTypeCellRenderer({ data }) {
+    const isSessionBased = data?.sessionId && data.sessionId !== "";
+    return <Badge status={isSessionBased ? "info" : "default"}>{isSessionBased ? "Session" : "Single Prompt"}</Badge>;
+}
+
+function ComplianceCellRenderer({ data }) {
+    return <ComplianceIcons complianceList={Object.keys(data?.complianceMapData || {})} />;
+}
+
 const STATUS_LABEL = { ACTIVE: "Open", FIXED: "Fixed", IGNORED: "Ignored", UNDER_REVIEW: "In Review" };
 const STATUS_DOT_COLOR = { ACTIVE: "#9642FC", FIXED: "#5BC0DE", IGNORED: "#F5C451", UNDER_REVIEW: "#637381" };
 function StatusCellRenderer({ value }) {
@@ -173,8 +186,8 @@ function buildColDefs(filterValues) {
         {
             field: "evidenceText",
             headerName: "Evidence",
-            width: 200,
-            minWidth: 200,
+            width: 400,
+            minWidth: 400,
             suppressAutoSize: true,
             sortable: false,
             cellRenderer: EvidenceCellRenderer,
@@ -210,11 +223,31 @@ function buildColDefs(filterValues) {
             cellRenderer: ActionCellRenderer,
         },
         {
+            field: "detectionType",
+            headerName: "Detection Type",
+            minWidth: 130,
+            sortable: false,
+            cellRenderer: DetectionTypeCellRenderer,
+        },
+        {
             field: "policyName",
             headerName: "Policy Triggered",
             minWidth: 160,
             filter: "agSetColumnFilter",
             filterParams: { values: filterValues.subCategory || [] },
+        },
+        {
+            field: "ruleViolated",
+            headerName: "Rule Violated",
+            minWidth: 160,
+            sortable: false,
+        },
+        {
+            field: "compliance",
+            headerName: "Compliance",
+            minWidth: 130,
+            sortable: false,
+            cellRenderer: ComplianceCellRenderer,
         },
         {
             field: "_status",
@@ -310,7 +343,7 @@ function deriveAgenticType(url, method) {
 
 // Transform a single backend event into a table row.
 // Kept lightweight — runs only on the current page of results (not all data).
-function transformEvent(event, collectionsMap, usernameMap) {
+function transformEvent(event, collectionsMap, usernameMap, complianceCtx) {
     const meta = parseMetadata(event.metadata);
     const typeLabel = deriveAgenticType(event.url, event.method);
 
@@ -339,6 +372,11 @@ function transformEvent(event, collectionsMap, usernameMap) {
         apiCollectionId: event.apiCollectionId,
         detected: event.timestamp,
         type: typeLabel,
+        // Rule Violated column: the exact rule from metadata (matches Guardrail Activity),
+        // with NO policy/subCategory fallback — that would just mirror the Policy Triggered column.
+        ruleViolated: extractRuleViolated(event.metadata),
+        // Flyout heading + Jira/Azure ticket title need a never-empty label, so this keeps the
+        // full fallback chain (rule → subCategory → filterId). Not shown as a table column.
         violation: meta.rule_violated || meta.nrule_violated || meta.nruleViolated || event.subCategory || event.filterId || "-",
         severity: (event.severity || "HIGH").toUpperCase(),
         evidenceText: primaryValue || normalizeReasonPunctuation(meta.reason) || "-",
@@ -354,6 +392,12 @@ function transformEvent(event, collectionsMap, usernameMap) {
         metadata: event.metadata || null,
         sessionId: event.sessionId || null,
         deviceId: rawHost,
+        complianceMapData: resolveComplianceClauseMap(
+            event,
+            complianceCtx?.needsGuardrailCompliance,
+            complianceCtx?.threatFiltersMap || {},
+            complianceCtx?.guardrailComplianceMap || {},
+        ),
     };
 }
 
@@ -567,6 +611,20 @@ function Violations() {
     const gridFilterKey = useRef(`violations-${Date.now()}`);
     const collectionsMap = PersistStore((state) => state.collectionsMap);
     const usernameMapRef = useRef({});
+
+    // Compliance icons — reuse the same map + resolver the Guardrail Activity table uses.
+    const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
+    const guardrailComplianceMap = SessionStore((state) => state.guardrailComplianceMap);
+    const setGuardrailComplianceMap = SessionStore((state) => state.setGuardrailComplianceMap);
+    const needsGuardrailCompliance = isAgenticSecurityCategory() || isEndpointSecurityCategory();
+    const guardrailComplianceLoaded = Object.keys(guardrailComplianceMap).length > 0;
+
+    useEffect(() => {
+        if (!needsGuardrailCompliance || guardrailComplianceLoaded) return;
+        fetchGuardrailComplianceMap()
+            .then(({ complianceMap }) => setGuardrailComplianceMap(complianceMap))
+            .catch((error) => console.error("Error loading guardrail compliance:", error));
+    }, [needsGuardrailCompliance, guardrailComplianceLoaded, setGuardrailComplianceMap]);
 
     useEffect(() => {
         const key = gridFilterKey.current;
@@ -863,11 +921,12 @@ function Violations() {
             severityFilter.length > 0 ? severityFilter : undefined,
         ).then(result => {
             const events = result?.maliciousEvents || [];
-            const transformed = events.map(e => transformEvent(e, collectionsMap, usernameMapRef.current));
+            const complianceCtx = { needsGuardrailCompliance, threatFiltersMap, guardrailComplianceMap };
+            const transformed = events.map(e => transformEvent(e, collectionsMap, usernameMapRef.current, complianceCtx));
             setRows(transformed);
             return { value: transformed, total: result?.total || 0 };
         });
-    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue]);
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, needsGuardrailCompliance, threatFiltersMap, guardrailComplianceMap]);
 
     // ─── Bulk actions ──────────────────────────────────────────────────────────
     // Under Server-Side Row Model, "select all" tracks selection as an abstract
@@ -961,7 +1020,7 @@ function Violations() {
                 <Text variant="headingSm">{tableHeading}</Text>
             </Box>
             <AgGridTable
-                key={`violations-grid-${tableKey}-${startTimestamp}-${endTimestamp}`}
+                key={`violations-grid-${tableKey}-${startTimestamp}-${endTimestamp}-${guardrailComplianceLoaded ? "gc" : ""}`}
                 rowData={rows}
                 columnDefs={colDefs}
                 defaultColDef={DEFAULT_COL_DEF}

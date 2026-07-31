@@ -6,11 +6,12 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
-import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, VerticalStack } from "@shopify/polaris";
+import { Badge, IndexFiltersMode, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, VerticalStack } from "@shopify/polaris";
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
-import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap } from "../utils/formatUtils";
+import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, fetchGuardrailComplianceMap } from "../utils/formatUtils";
+import ComplianceIcons from "./ComplianceIcons";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory } from "../../../../main/labelHelper";
@@ -220,21 +221,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   useEffect(() => {
     if (!needsGuardrailCompliance) return;
-    Promise.all([
-      api.fetchGuardrailComplianceInfos(),
-      guardrailApi.fetchGuardrailPolicies()
-    ]).then(([complianceResp, policiesResp]) => {
-      const capabilityMap = {};
-
-      (complianceResp?.guardrailComplianceInfos || []).forEach((entry) => {
-        const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
-        if (capability) capabilityMap[capability] = entry.mapComplianceToListClauses;
-      });
-
-      mergePolicyComplianceMap(capabilityMap, policiesResp?.guardrailPolicies);
-
-      setGuardrailComplianceMap(capabilityMap);
-      setGuardrailApprovedByPolicy(buildApprovedByPolicy(policiesResp?.guardrailPolicies));
+    fetchGuardrailComplianceMap().then(({ complianceMap, guardrailPolicies }) => {
+      setGuardrailComplianceMap(complianceMap);
+      setGuardrailApprovedByPolicy(buildApprovedByPolicy(guardrailPolicies));
     }).catch((error) => {
       console.error('Error loading guardrail compliance:', error);
     });
@@ -748,23 +737,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
             return <Badge tone={getBehaviourTone(b)}>{label}</Badge>;
           })(),
         }),
-        compliance: complianceList.length > 0 ? (
-          <HorizontalStack wrap={false} gap={1}>
-            {complianceList.slice(0, 2).map((complianceName, idx) =>
-              <Avatar
-                key={idx}
-                source={func.getComplianceIcon(complianceName)}
-                shape="square"
-                size="extraSmall"
-              />
-            )}
-            {complianceList.length > 2 && (
-              <Box>
-                <Badge size="extraSmall">+{complianceList.length - 2}</Badge>
-              </Box>
-            )}
-          </HorizontalStack>
-        ) : <Text color="subdued">-</Text>,
+        compliance: <ComplianceIcons complianceList={complianceList} />,
         nextUrl: nextUrl,
         complianceMapData: complianceMapData,
         // Inline Approve button for the "Needs Approval" tab. Each cell is wrapped by GithubRow
