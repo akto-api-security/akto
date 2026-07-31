@@ -20,16 +20,9 @@ import (
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
-	"golang.org/x/sync/errgroup"
 )
 
-const (
-	copilotErrCodeInvalidRequest = 4001
-	copilotErrCodeInternal       = 5000
-
-	// copilot studio's max wait time is 1000ms
-	analyzeToolExecutionTimeout = 1000 * time.Millisecond
-)
+const copilotErrCodeInvalidRequest = 4001
 
 type CopilotStudioHandler struct {
 	validatorService *validator.Service
@@ -79,13 +72,9 @@ func (h *CopilotStudioHandler) AnalyzeToolExecution(c *gin.Context) {
 	userMsgParams := buildUserMessageParams(&req, c.Request.Header)
 	toolParams, err := buildToolInvocationParams(&req, c.Request.Header)
 	if err != nil {
-		h.logger.Error("AnalyzeToolExecution - failed to build tool invocation payload",
+		h.logger.Error("AnalyzeToolExecution - failed to build tool invocation payload, failing open",
 			zap.String("toolName", req.ToolDefinition.Name), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, models.WebhookErrorResponse{
-			ErrorCode:  copilotErrCodeInternal,
-			Message:    "Validation failed",
-			HTTPStatus: http.StatusInternalServerError,
-		})
+		c.JSON(http.StatusOK, &models.AnalyzeToolExecutionResponse{BlockAction: false})
 		return
 	}
 
@@ -100,95 +89,73 @@ func (h *CopilotStudioHandler) AnalyzeToolExecution(c *gin.Context) {
 		zap.String("conversationId", req.ConversationMetadata.ConversationID),
 		zap.String("sessionID", sessionID))
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), analyzeToolExecutionTimeout)
+	ctx, cancel := context.WithCancel(c.Request.Context())
 	defer cancel()
 
-	var userMsgResp, toolResp *models.AnalyzeToolExecutionResponse
-	var g errgroup.Group
-	g.Go(func() error {
+	results := make(chan validationOutcome, 2)
+	go func() {
 		resp, err := h.runValidation(ctx, userMsgParams, sessionID, requestID)
-		if err != nil {
-			return err
-		}
-		userMsgResp = resp
-		return nil
-	})
-	g.Go(func() error {
+		results <- validationOutcome{label: "userMessage", resp: resp, err: err}
+	}()
+	go func() {
 		resp, err := h.runValidation(ctx, toolParams, sessionID, requestID)
-		if err != nil {
-			return err
-		}
-		toolResp = resp
-		return nil
-	})
+		results <- validationOutcome{label: "toolInvocation", resp: resp, err: err}
+	}()
 
-	if err := g.Wait(); err != nil {
-		h.logger.Error("AnalyzeToolExecution - validation failed",
-			zap.String("toolName", req.ToolDefinition.Name), zap.Error(err))
-		c.JSON(http.StatusInternalServerError, models.WebhookErrorResponse{
-			ErrorCode:  copilotErrCodeInternal,
-			Message:    "Validation failed",
-			HTTPStatus: http.StatusInternalServerError,
-		})
-		return
+	for i := 0; i < 2; i++ {
+		out := <-results
+		if out.err != nil {
+			cancel()
+			h.logger.Error("AnalyzeToolExecution - validation failed, failing open",
+				zap.String("toolName", req.ToolDefinition.Name), zap.Error(out.err))
+			c.JSON(http.StatusOK, &models.AnalyzeToolExecutionResponse{BlockAction: false})
+			return
+		}
+		if out.resp.BlockAction {
+			cancel()
+			resp := labelBlockedResponse(out.label, out.resp)
+			h.logger.Info("AnalyzeToolExecution - completed",
+				zap.String("toolName", req.ToolDefinition.Name),
+				zap.Bool("blockAction", true),
+				zap.Int64("latencyMs", time.Since(start).Milliseconds()))
+			c.JSON(http.StatusOK, resp)
+			return
+		}
 	}
 
-	resp := mergeAnalyzeToolExecutionResponses(userMsgResp, toolResp)
 	h.logger.Info("AnalyzeToolExecution - completed",
 		zap.String("toolName", req.ToolDefinition.Name),
-		zap.Bool("blockAction", resp.BlockAction),
+		zap.Bool("blockAction", false),
 		zap.Int64("latencyMs", time.Since(start).Milliseconds()))
-
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, &models.AnalyzeToolExecutionResponse{BlockAction: false})
 }
 
-// runValidation calls the shared validator core and maps its result, treating
-// a deadline miss as allowed (fail-open) — Copilot Studio's own documented
-// behavior for a slow responder — rather than surfacing it as an error.
+type validationOutcome struct {
+	label string
+	resp  *models.AnalyzeToolExecutionResponse
+	err   error
+}
+
 func (h *CopilotStudioHandler) runValidation(ctx context.Context, params *models.ValidateRequestParams, sessionID, requestID string) (*models.AnalyzeToolExecutionResponse, error) {
 	result, err := h.validatorService.ValidateRequest(ctx, params, sessionID, requestID)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return &models.AnalyzeToolExecutionResponse{BlockAction: false}, nil
-		}
 		return nil, err
 	}
 	return mapValidationResultToResponse(result), nil
 }
 
-// mergeAnalyzeToolExecutionResponses combines the user-message and
-// tool-invocation verdicts: blocked if either is blocked, with reason/
-// diagnostics labeled by which check(s) fired.
-func mergeAnalyzeToolExecutionResponses(userMsg, toolInvocation *models.AnalyzeToolExecutionResponse) *models.AnalyzeToolExecutionResponse {
-	if !userMsg.BlockAction && !toolInvocation.BlockAction {
-		return &models.AnalyzeToolExecutionResponse{BlockAction: false}
-	}
-
-	var reasons []string
-	diagnostics := map[string]json.RawMessage{}
-	if userMsg.BlockAction {
-		reasons = append(reasons, "userMessage: "+userMsg.Reason)
-		if userMsg.Diagnostics != "" {
-			diagnostics["userMessage"] = json.RawMessage(userMsg.Diagnostics)
-		}
-	}
-	if toolInvocation.BlockAction {
-		reasons = append(reasons, "toolInvocation: "+toolInvocation.Reason)
-		if toolInvocation.Diagnostics != "" {
-			diagnostics["toolInvocation"] = json.RawMessage(toolInvocation.Diagnostics)
-		}
-	}
-
-	resp := &models.AnalyzeToolExecutionResponse{
+func labelBlockedResponse(label string, resp *models.AnalyzeToolExecutionResponse) *models.AnalyzeToolExecutionResponse {
+	labeled := &models.AnalyzeToolExecutionResponse{
 		BlockAction: true,
-		Reason:      strings.Join(reasons, "; "),
+		Reason:      label + ": " + resp.Reason,
 	}
-	if len(diagnostics) > 0 {
+	if resp.Diagnostics != "" {
+		diagnostics := map[string]json.RawMessage{label: json.RawMessage(resp.Diagnostics)}
 		if b, err := json.Marshal(diagnostics); err == nil {
-			resp.Diagnostics = string(b)
+			labeled.Diagnostics = string(b)
 		}
 	}
-	return resp
+	return labeled
 }
 
 func logRawRequest(c *gin.Context, logger *zap.Logger, label string) {
