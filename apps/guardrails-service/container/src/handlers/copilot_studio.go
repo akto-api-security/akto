@@ -219,7 +219,6 @@ func toolExecutionContent(req *models.EvaluationRequest) string {
 	}
 
 	writeLine(req.PlannerContext.UserMessage)
-	writeLine(req.PlannerContext.Thought)
 	for _, msg := range req.PlannerContext.ChatHistory {
 		writeLine(msg.Role + ": " + msg.Content)
 	}
