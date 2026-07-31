@@ -162,6 +162,86 @@ public class DashboardRouter implements ARouter {
             });
 
         router
+            .post("/aggregate_by_api_endpoint")
+            .blockingHandler(ctx -> {
+                String contextSource = getContextSourceHeader(ctx);
+
+                RequestBody reqBody = ctx.body();
+                String requestJson = reqBody.asString();
+                
+                try {
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    Map<String, Object> req = mapper.readValue(requestJson, Map.class);
+                    
+                    String filterId = (String) req.get("filterId");
+                    if (filterId == null || filterId.isEmpty()) {
+                        ctx.response().setStatusCode(400).end("{\"error\": \"filterId is required\"}");
+                        return;
+                    }
+                    
+                    long startTs = ((Number) req.getOrDefault("startTs", 0L)).longValue();
+                    long endTs = ((Number) req.getOrDefault("endTs", 0L)).longValue();
+                    int skip = ((Number) req.getOrDefault("skip", 0)).intValue();
+                    int limit = ((Number) req.getOrDefault("limit", 50)).intValue();
+                    
+                    String response = threatApiService.aggregateEventsByApiEndpoint(
+                        ctx.get("accountId"),
+                        filterId,
+                        startTs,
+                        endTs,
+                        skip,
+                        limit,
+                        contextSource
+                    );
+                    
+                    ctx.response().setStatusCode(200).end(response);
+                } catch (Exception e) {
+                    logger.error("Error in aggregate_by_api_endpoint: " + e.getMessage());
+                    ctx.response().setStatusCode(400).end("{\"error\": \"" + e.getMessage() + "\"}");
+                }
+            });
+
+        router
+            .post("/schema_violations_over_time")
+            .blockingHandler(ctx -> {
+                String contextSource = getContextSourceHeader(ctx);
+
+                RequestBody reqBody = ctx.body();
+                String requestJson = reqBody.asString();
+                
+                try {
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    Map<String, Object> req = mapper.readValue(requestJson, Map.class);
+                    
+                    String filterId = (String) req.get("filterId");
+                    if (filterId == null || filterId.isEmpty()) {
+                        ctx.response().setStatusCode(400).end("{\"error\": \"filterId is required\"}");
+                        return;
+                    }
+                    
+                    long startTs = ((Number) req.getOrDefault("startTs", 0L)).longValue();
+                    long endTs = ((Number) req.getOrDefault("endTs", 0L)).longValue();
+                    int skip = ((Number) req.getOrDefault("skip", 0)).intValue();
+                    int limit = ((Number) req.getOrDefault("limit", 50)).intValue();
+                    
+                    String response = threatApiService.getSchemaViolationsOverTime(
+                        ctx.get("accountId"),
+                        filterId,
+                        startTs,
+                        endTs,
+                        skip,
+                        limit,
+                        contextSource
+                    );
+                    
+                    ctx.response().setStatusCode(200).end(response);
+                } catch (Exception e) {
+                    logger.error("Error in schema_violations_over_time: " + e.getMessage());
+                    ctx.response().setStatusCode(400).end("{\"error\": \"" + e.getMessage() + "\"}");
+                }
+            });
+
+        router
                 .post("/delete_all_malicious_events")
                 .blockingHandler(ctx -> {
                     threatActorService.deleteAllMaliciousEvents(
