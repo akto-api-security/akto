@@ -106,8 +106,11 @@ type AgentContext struct {
 	ID            string `json:"id"`
 	TenantID      string `json:"tenantId"`
 	EnvironmentID string `json:"environmentId"`
-	Version       string `json:"version,omitempty"`
-	IsPublished   bool   `json:"isPublished"`
+	// Name is the agent's display name (e.g. "금융 통찰력 세계") — not in
+	// Microsoft's documented reference table, but present on real requests.
+	Name        string `json:"name,omitempty"`
+	Version     string `json:"version,omitempty"`
+	IsPublished bool   `json:"isPublished"`
 }
 
 type UserContext struct {
