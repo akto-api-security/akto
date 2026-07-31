@@ -1199,15 +1199,12 @@ public class HttpCallParser {
 
         if (CollectionUtils.isEmpty(apiCollection.getTagsList()) || apiCollection.getTagsList().stream()
                 .noneMatch(t -> Constants.AKTO_GEN_AI_TAG.equals(t.getKeyName()))) {
-            Pair<Boolean, String> llmCollectionTag = GenAiCollectionUtils.checkAndTagLLMCollection(httpResponseParams);
+            Optional<CollectionTags> genAiTagOpt = getGenAiTag(httpResponseParams);
             if (tagsList == null) {
                 tagsList = new ArrayList<>();
             }
-            if (llmCollectionTag.getFirst()) {
-                tagsList.add(new CollectionTags(Context.now(),
-                        Constants.AKTO_GEN_AI_TAG,
-                        llmCollectionTag.getSecond(),
-                        TagSource.KUBERNETES));
+            if (genAiTagOpt.isPresent()) {
+                tagsList.add(genAiTagOpt.get());
             }
         }
 
@@ -1312,6 +1309,14 @@ public class HttpCallParser {
                         }
                         tagList.add(ragTagOpt.get());
                     }
+                }
+
+                Optional<CollectionTags> genAiTagOpt = getGenAiTag(httpResponseParam);
+                if (genAiTagOpt.isPresent()) {
+                    if (tagList == null) {
+                        tagList = new ArrayList<>();
+                    }
+                    tagList.add(genAiTagOpt.get());
                 }
                 try {
                     String accessType = getOrComputeAccessType(direction, null);
@@ -1854,6 +1859,14 @@ public class HttpCallParser {
     private Optional<CollectionTags> getRagTag(HttpResponseParams responseParams) {
         if (RagDetector.isRagRequest(responseParams)) {
             return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_RAG_DATABASE_TAG, "RAG Database", TagSource.KUBERNETES));
+        }
+        return Optional.empty();
+    }
+
+    private Optional<CollectionTags> getGenAiTag(HttpResponseParams responseParams) {
+        Pair<Boolean, String> llmCollectionTag = GenAiCollectionUtils.checkAndTagLLMCollection(responseParams);
+        if (llmCollectionTag.getFirst()) {
+            return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_GEN_AI_TAG, llmCollectionTag.getSecond(), TagSource.KUBERNETES));
         }
         return Optional.empty();
     }
