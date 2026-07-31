@@ -127,6 +127,36 @@ func TestCopilotStudioHostOmitsEnvSegmentWhenEnvironmentIDAbsent(t *testing.T) {
 	}
 }
 
+func TestCopilotStudioHostPrefersAgentName(t *testing.T) {
+	// Mirrors a real production request: Microsoft sends an undocumented
+	// "name" field (here Korean) alongside "id" on conversationMetadata.agent.
+	req := &models.EvaluationRequest{
+		ConversationMetadata: models.ConversationMetadata{
+			Agent: models.AgentContext{
+				ID:            "9068d6f0-c685-f111-ab0e-70a8a599340c",
+				Name:          "금융 통찰력 세계",
+				EnvironmentID: "Default-f4d50991-f2dd-48f1-beb9-0c137b871f76",
+			},
+		},
+	}
+	want := "금융-통찰력-세계.copilot-studio-Default-f4.microsoft.com"
+	if got := copilotStudioHost(req); got != want {
+		t.Errorf("copilotStudioHost() = %q, want %q", got, want)
+	}
+}
+
+func TestCopilotStudioHostFallsBackToAgentIDWhenNameAbsent(t *testing.T) {
+	req := &models.EvaluationRequest{
+		ConversationMetadata: models.ConversationMetadata{
+			Agent: models.AgentContext{ID: "agent-guid"},
+		},
+	}
+	want := "agent-guid.copilot-studio.microsoft.com"
+	if got := copilotStudioHost(req); got != want {
+		t.Errorf("copilotStudioHost() = %q, want %q", got, want)
+	}
+}
+
 func TestCopilotStudioHostEmptyWhenAgentIDAbsent(t *testing.T) {
 	req := &models.EvaluationRequest{}
 	if got := copilotStudioHost(req); got != "" {

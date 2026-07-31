@@ -135,8 +135,9 @@ func logRawRequest(c *gin.Context, logger *zap.Logger, label string) {
 }
 
 func rawBodyField(body []byte) zap.Field {
-	if json.Valid(body) {
-		return zap.Any("body", json.RawMessage(body))
+	var parsed interface{}
+	if err := json.Unmarshal(body, &parsed); err == nil {
+		return zap.Any("body", parsed)
 	}
 	return zap.ByteString("body", body)
 }
@@ -179,7 +180,11 @@ func sanitizeBotName(name string) string {
 }
 
 func copilotStudioHost(req *models.EvaluationRequest) string {
-	agentName := sanitizeBotName(req.ConversationMetadata.Agent.ID)
+	agent := req.ConversationMetadata.Agent
+	agentName := sanitizeBotName(agent.Name)
+	if agentName == "" {
+		agentName = sanitizeBotName(agent.ID)
+	}
 	if agentName == "" {
 		return ""
 	}
