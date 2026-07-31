@@ -60,11 +60,11 @@ func TestBuildValidateParamsFromEvaluationRequest(t *testing.T) {
 	req := sampleEvaluationRequest()
 	params := buildValidateParamsFromEvaluationRequest(req)
 
-	if params.ContextSource != copilotStudioContextSource {
-		t.Errorf("ContextSource = %q, want %q", params.ContextSource, copilotStudioContextSource)
+	if params.ContextSource != string(types.ContextSourceEndpoint) {
+		t.Errorf("ContextSource = %q, want %q", params.ContextSource, types.ContextSourceEndpoint)
 	}
-	if params.Path != "Send email" {
-		t.Errorf("Path = %q, want %q", params.Path, "Send email")
+	if want := "/copilot/conversation/messages/conv-id"; params.Path != want {
+		t.Errorf("Path = %q, want %q", params.Path, want)
 	}
 	if params.Method != "POST" {
 		t.Errorf("Method = %q, want POST", params.Method)
@@ -76,6 +76,61 @@ func TestBuildValidateParamsFromEvaluationRequest(t *testing.T) {
 	}
 	if _, ok := payload["prompt"]; !ok {
 		t.Errorf("RequestPayload missing %q key: %s", "prompt", params.RequestPayload)
+	}
+
+	var headers map[string]string
+	if err := json.Unmarshal([]byte(params.RequestHeaders), &headers); err != nil {
+		t.Fatalf("RequestHeaders is not valid JSON: %v", err)
+	}
+	if want := "agent-guid.copilot-studio-env-guid.microsoft.com"; headers["Host"] != want {
+		t.Errorf("Host = %q, want %q", headers["Host"], want)
+	}
+}
+
+func TestSanitizeBotName(t *testing.T) {
+	cases := map[string]string{
+		"agent-guid":       "agent-guid",
+		"My Cool Bot!!":    "My-Cool-Bot",
+		"  leading/trail ": "leading-trail",
+		"agent_123":        "agent-123",
+		"봇이름":              "봇이름",
+		"":                 "",
+	}
+	for input, want := range cases {
+		if got := sanitizeBotName(input); got != want {
+			t.Errorf("sanitizeBotName(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestCopilotStudioHostTruncatesLongEnvironmentID(t *testing.T) {
+	req := &models.EvaluationRequest{
+		ConversationMetadata: models.ConversationMetadata{
+			Agent: models.AgentContext{ID: "agent-guid", EnvironmentID: "environment-with-a-long-id"},
+		},
+	}
+	want := "agent-guid.copilot-studio-environmen.microsoft.com"
+	if got := copilotStudioHost(req); got != want {
+		t.Errorf("copilotStudioHost() = %q, want %q", got, want)
+	}
+}
+
+func TestCopilotStudioHostOmitsEnvSegmentWhenEnvironmentIDAbsent(t *testing.T) {
+	req := &models.EvaluationRequest{
+		ConversationMetadata: models.ConversationMetadata{
+			Agent: models.AgentContext{ID: "agent-guid"},
+		},
+	}
+	want := "agent-guid.copilot-studio.microsoft.com"
+	if got := copilotStudioHost(req); got != want {
+		t.Errorf("copilotStudioHost() = %q, want %q", got, want)
+	}
+}
+
+func TestCopilotStudioHostEmptyWhenAgentIDAbsent(t *testing.T) {
+	req := &models.EvaluationRequest{}
+	if got := copilotStudioHost(req); got != "" {
+		t.Errorf("copilotStudioHost() = %q, want empty string", got)
 	}
 }
 

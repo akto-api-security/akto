@@ -1,13 +1,17 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
@@ -19,20 +23,10 @@ const (
 	copilotErrCodeInvalidRequest = 4001
 	copilotErrCodeInternal       = 5000
 
-	// analyzeToolExecutionTimeout stays comfortably inside Copilot Studio's
-	// documented ~1000ms budget so this handler always answers before the
-	// caller's own timeout, rather than racing it.
+	// copilot studio's max wait time is 1000ms
 	analyzeToolExecutionTimeout = 950 * time.Millisecond
-
-	// copilotStudioContextSource reuses the existing "ENDPOINT" content-safety
-	// policy set — no new policy type for this integration.
-	copilotStudioContextSource = "ENDPOINT"
 )
 
-// CopilotStudioHandler implements the Microsoft Copilot Studio external
-// security webhook contract (validate + analyze-tool-execution), adapting it
-// onto the same validator.Service core the /api/validate/* endpoints use.
-// https://learn.microsoft.com/en-us/microsoft-copilot-studio/external-security-webhooks-interface-developers
 type CopilotStudioHandler struct {
 	validatorService *validator.Service
 	logger           *zap.Logger
@@ -47,6 +41,8 @@ func NewCopilotStudioHandler(validatorService *validator.Service, logger *zap.Lo
 
 // Validate handles POST /api/v1/health — Copilot Studio's setup/readiness check.
 func (h *CopilotStudioHandler) Validate(c *gin.Context) {
+	logRawRequest(c, h.logger, "Validate")
+
 	c.JSON(http.StatusOK, models.CopilotValidationResponse{
 		IsSuccessful: true,
 		Status:       "OK",
@@ -56,6 +52,8 @@ func (h *CopilotStudioHandler) Validate(c *gin.Context) {
 // AnalyzeToolExecution handles POST /api/v1/protection — evaluates a
 // planned tool call and returns an allow/block verdict.
 func (h *CopilotStudioHandler) AnalyzeToolExecution(c *gin.Context) {
+	logRawRequest(c, h.logger, "AnalyzeToolExecution")
+
 	start := time.Now()
 
 	var req models.EvaluationRequest
@@ -115,25 +113,90 @@ func (h *CopilotStudioHandler) AnalyzeToolExecution(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// buildValidateParamsFromEvaluationRequest adapts Copilot Studio's tool-execution
-// shape onto the same models.ValidateRequestParams the rest of this service
-// validates — the free-text content Copilot Studio sent is collapsed into a
-// single "prompt" payload field (the same convention handlers/file_validation.go
-// uses via marshalPromptPayload) so existing content-safety policies apply
-// unchanged.
+func logRawRequest(c *gin.Context, logger *zap.Logger, label string) {
+	body, _ := io.ReadAll(c.Request.Body)
+	c.Request.Body = io.NopCloser(bytes.NewReader(body))
+
+	headers := make(map[string][]string, len(c.Request.Header))
+	for k, v := range c.Request.Header {
+		if strings.EqualFold(k, "Authorization") {
+			headers[k] = []string{"REDACTED"}
+			continue
+		}
+		headers[k] = v
+	}
+
+	logger.Info(label+" - raw request",
+		zap.String("method", c.Request.Method),
+		zap.String("path", c.Request.URL.Path),
+		zap.String("query", c.Request.URL.RawQuery),
+		zap.Any("headers", headers),
+		rawBodyField(body))
+}
+
+func rawBodyField(body []byte) zap.Field {
+	if json.Valid(body) {
+		return zap.Any("body", json.RawMessage(body))
+	}
+	return zap.ByteString("body", body)
+}
+
 func buildValidateParamsFromEvaluationRequest(req *models.EvaluationRequest) *models.ValidateRequestParams {
 	return &models.ValidateRequestParams{
-		Path:           req.ToolDefinition.Name,
+		Path:           "/copilot/conversation/messages/" + req.ConversationMetadata.ConversationID,
 		Method:         http.MethodPost,
+		RequestHeaders: marshalHostHeader(copilotStudioHost(req)),
 		RequestPayload: marshalPromptPayload(toolExecutionContent(req)),
-		ContextSource:  copilotStudioContextSource,
+		ContextSource:  string(types.ContextSourceEndpoint),
 		Source:         "copilot-studio",
 	}
 }
 
-// toolExecutionContent collapses the free-text fields Copilot Studio sends
-// (planner reasoning, chat history, prior tool outputs, and the tool's own
-// input values) into a single string for content-safety scanning.
+// marshalHostHeader wraps a Host value in the same {"Host": ...} headers JSON
+// shape handlers/file_validation.go already builds for validationContextFromParams
+// to extract McpServerName from. Returns "" when host is empty.
+func marshalHostHeader(host string) string {
+	if host == "" {
+		return ""
+	}
+	b, err := json.Marshal(map[string]string{"Host": host})
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+var botNameJunkRegex = regexp.MustCompile(`[^\p{L}\p{N}-]+`)
+var botNameHyphenRegex = regexp.MustCompile(`-+`)
+
+func sanitizeBotName(name string) string {
+	if name == "" {
+		return ""
+	}
+	sanitized := botNameJunkRegex.ReplaceAllString(name, "-")
+	sanitized = botNameHyphenRegex.ReplaceAllString(sanitized, "-")
+	return strings.Trim(sanitized, "-")
+}
+
+func copilotStudioHost(req *models.EvaluationRequest) string {
+	agentName := sanitizeBotName(req.ConversationMetadata.Agent.ID)
+	if agentName == "" {
+		return ""
+	}
+
+	host := agentName + ".copilot-studio"
+	if envID := req.ConversationMetadata.Agent.EnvironmentID; envID != "" {
+		envName := sanitizeBotName(envID)
+		if runes := []rune(envName); len(runes) > 10 {
+			envName = string(runes[:10])
+		}
+		if envName != "" {
+			host += "-" + envName
+		}
+	}
+	return host + ".microsoft.com"
+}
+
 func toolExecutionContent(req *models.EvaluationRequest) string {
 	var b strings.Builder
 
@@ -169,10 +232,6 @@ func toolExecutionContent(req *models.EvaluationRequest) string {
 	return b.String()
 }
 
-// mapValidationResultToResponse narrows the internal engine's verdict down to
-// Copilot Studio's small external contract — the same pattern
-// handlers/file_validation.go already uses to shrink mcp.ValidationResult down
-// to its own {allowed, reason} response, just a different target shape.
 func mapValidationResultToResponse(result *mcp.ValidationResult) *models.AnalyzeToolExecutionResponse {
 	resp := &models.AnalyzeToolExecutionResponse{
 		BlockAction: !result.Allowed,
