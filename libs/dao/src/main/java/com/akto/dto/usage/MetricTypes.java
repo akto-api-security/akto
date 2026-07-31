@@ -11,7 +11,8 @@ public enum MetricTypes {
     TEST_RUNS ("feature-test-runs"),
     ACTIVE_ACCOUNTS ("feature-sso"),
     MCP_ASSET_COUNT("feature-mcp-asset-count"),
-    AI_ASSET_COUNT("feature-ai-asset-count");
+    AI_ASSET_COUNT("feature-ai-asset-count"),
+    ENDPOINT_ASSET_COUNT("feature-endpoint-asset-count");
 
     public final String label;
 

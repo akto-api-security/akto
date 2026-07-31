@@ -317,9 +317,10 @@ public class HttpCallParser {
 
             SyncLimit mcpAssetsSyncLimit = fetchSyncLimit(MetricTypes.MCP_ASSET_COUNT);
             SyncLimit aiAssetsSyncLimit = fetchSyncLimit(MetricTypes.AI_ASSET_COUNT);
+            SyncLimit endpointAssetsSyncLimit = fetchSyncLimit(MetricTypes.ENDPOINT_ASSET_COUNT);
 
             numberOfSyncs++;
-            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit, mcpAssetsSyncLimit, aiAssetsSyncLimit,
+            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit, mcpAssetsSyncLimit, aiAssetsSyncLimit, endpointAssetsSyncLimit,
                 responseParams.get(0).getSource());
             if (!skipDependencyAnalysis && DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
                 dependencyAnalyser.dbState = apiCatalogSync.dbState;
