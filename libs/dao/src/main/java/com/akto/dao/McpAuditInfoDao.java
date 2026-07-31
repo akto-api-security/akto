@@ -49,6 +49,9 @@ public class McpAuditInfoDao extends AccountsContextDao<McpAuditInfo> {
 
         fieldNames = new String[]{"updatedTimestamp"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{"type", "resourceName"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
 }
