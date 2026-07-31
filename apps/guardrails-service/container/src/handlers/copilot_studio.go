@@ -392,6 +392,7 @@ func buildCopilotStudioTag(agentName, environmentID string, isMcp bool) string {
 		utils.SourceTag: utils.EndpointSource,
 		// "bot-name":           agentName,
 		"bot-environment-id": environmentID,
+		"ai-agent":           "copilot-studio",
 	}
 	if isMcp {
 		tags["mcp-server"] = "MCP Server"
