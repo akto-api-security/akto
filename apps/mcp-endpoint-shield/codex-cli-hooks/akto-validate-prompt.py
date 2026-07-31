@@ -365,7 +365,11 @@ def main():
                     f"Reason for blocking: {gr_reason}"
                 )
             else:
-                block_reason = f"Prompt blocked: {gr_reason}"
+                # Show the operator-configured blockedMessage verbatim — no prefix.
+                # Codex renders `reason` as-is, so any wrapper text makes the message
+                # differ from what was configured on the policy (matches the
+                # PreToolUse hook, which already passes it through untouched).
+                block_reason = gr_reason or "Policy violation"
 
             # UserPromptSubmit: documented block shape only (decision + reason).
             output = {"decision": "block", "reason": block_reason}

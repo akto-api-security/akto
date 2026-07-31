@@ -150,7 +150,22 @@ Block response format:
 
 - Trigger: `Stop`
 - Captures prompt/response data from transcript and ingests it to Akto
-- Observational only (does not trigger continuation)
+- Validates the assistant response against Akto guardrails and can end the turn
+
+Block response format:
+
+```json
+{
+  "continue": false,
+  "stopReason": "<guardrails reason>",
+  "systemMessage": "Blocked by Akto Guardrails"
+}
+```
+
+`systemMessage` is the only Stop field surfaced as a warning in the Codex UI, so the
+user-facing message goes there. `decision: "block"` is deliberately **not** used: on
+`Stop` it does not reject the turn — Codex turns `reason` into a continuation prompt fed
+to the model, so the user would never see it.
 
 ### Tool Hooks
 
