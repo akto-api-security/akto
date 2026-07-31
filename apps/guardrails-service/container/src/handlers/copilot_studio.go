@@ -16,7 +16,6 @@ import (
 	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/akto-endpoint-shield/utils"
 	"github.com/akto-api-security/guardrails-service/models"
-	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -81,8 +80,9 @@ func (h *CopilotStudioHandler) AnalyzeToolExecution(c *gin.Context) {
 	applyAuthenticatedAccount(c, userMsgParams)
 	applyAuthenticatedAccount(c, toolParams)
 
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, userMsgParams.RequestHeaders)
-
+	// sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, userMsgParams.RequestHeaders)
+	sessionID := ""
+	requestID := ""
 	h.logger.Info("AnalyzeToolExecution - received request",
 		zap.String("toolName", req.ToolDefinition.Name),
 		zap.String("account", userMsgParams.AktoAccountID),
@@ -137,6 +137,7 @@ type validationOutcome struct {
 }
 
 func (h *CopilotStudioHandler) runValidation(ctx context.Context, params *models.ValidateRequestParams, sessionID, requestID string) (*models.AnalyzeToolExecutionResponse, error) {
+	h.logger.Info("runValidation - params", zap.Any("params", params))
 	result, err := h.validatorService.ValidateRequest(ctx, params, sessionID, requestID)
 	if err != nil {
 		return nil, err
