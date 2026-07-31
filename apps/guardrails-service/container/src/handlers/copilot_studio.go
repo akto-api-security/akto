@@ -137,6 +137,7 @@ type validationOutcome struct {
 }
 
 func (h *CopilotStudioHandler) runValidation(ctx context.Context, params *models.ValidateRequestParams, sessionID, requestID string) (*models.AnalyzeToolExecutionResponse, error) {
+	h.logger.Info("runValidation - params", zap.Any("params", params))
 	result, err := h.validatorService.ValidateRequest(ctx, params, sessionID, requestID)
 	if err != nil {
 		return nil, err
