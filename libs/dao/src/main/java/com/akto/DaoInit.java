@@ -507,6 +507,7 @@ public class DaoInit {
         }
 
         OrganizationsDao.createIndexIfAbsent();
+        CommonOrganisationMappingDao.instance.createIndexIfAbsent();
         UsageMetricsDao.createIndexIfAbsent();
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         TrafficMetricsDao.instance.createIndicesIfAbsent();

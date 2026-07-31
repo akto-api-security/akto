@@ -12,12 +12,22 @@ const MODEL_TYPES = {
   OLLAMA: "OLLAMA",
   DATABRICKS: "DATABRICKS",
   GITHUB_COPILOT: "GITHUB_COPILOT",
-  GEMINI: "GEMINI"
+  GEMINI: "GEMINI",
+  CLOUDFLARE: "CLOUDFLARE"
 }
 
 const OPENAI_MODELS = [
   { label: "GPT 4o", value: "gpt-4o-2024-08-06" },
-  { label: "GPT 4o mini", value: "gpt-4o-mini-2024-07-18" }
+  { label: "GPT 4o mini", value: "gpt-4o-mini-2024-07-18" },
+  { label: "GPT 5", value: "gpt-5" },
+  { label: "GPT 5 mini", value: "gpt-5-mini" },
+  { label: "GPT 5 nano", value: "gpt-5-nano" },
+  { label: "GPT 5.1", value: "gpt-5.1" },
+  { label: "GPT 5.2", value: "gpt-5.2" },
+  { label: "GPT 5.2 Pro", value: "gpt-5.2-pro" },
+  { label: "GPT 5.4", value: "gpt-5.4" },
+  { label: "GPT 5.4 mini", value: "gpt-5.4-mini" },
+  { label: "GPT 5.4 nano", value: "gpt-5.4-nano" },
 ]
 
 const ANTHROPIC_MODELS = [
@@ -90,12 +100,21 @@ function getModelSections(type, data, setData, isEdit=false) {
     title: type === MODEL_TYPES.OLLAMA ? "API Key (Optional)" : "API Key",
     type: "text",
     id: "apiKey",
-    placeholder: type === MODEL_TYPES.OLLAMA ? "API Key for the model (optional)" : "API Key for the model",
+    placeholder: type === MODEL_TYPES.OLLAMA
+      ? "API Key for the model (optional)"
+      : type === MODEL_TYPES.CLOUDFLARE
+        ? "Cloudflare API token"
+        : "API Key for the model",
   })
 
-  const shouldShowModelDropdown = true
-  
-  if (shouldShowModelDropdown) {
+  if (type === MODEL_TYPES.CLOUDFLARE) {
+    sections.push({
+      title: "Model",
+      type: "text",
+      id: "model",
+      placeholder: "e.g. @cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    })
+  } else {
     sections.push({
       title: "Model",
       type: "dropdown",
@@ -107,6 +126,14 @@ function getModelSections(type, data, setData, isEdit=false) {
     case MODEL_TYPES.ANTHROPIC:
     case MODEL_TYPES.OPENAI:
     case MODEL_TYPES.GEMINI:
+      break;
+    case MODEL_TYPES.CLOUDFLARE:
+      sections.push({
+        title: "Cloudflare Account ID",
+        type: "text",
+        id: "cloudflareAccountId",
+        placeholder: "Your Cloudflare account ID",
+      })
       break;
     case MODEL_TYPES.DATABRICKS:
       sections.push({
@@ -338,6 +365,10 @@ function AgentConfig() {
             {
               label: 'Gemini',
               value: MODEL_TYPES.GEMINI
+            },
+            {
+              label: 'Cloudflare',
+              value: MODEL_TYPES.CLOUDFLARE
             }
             ]}
             initial={modelType}

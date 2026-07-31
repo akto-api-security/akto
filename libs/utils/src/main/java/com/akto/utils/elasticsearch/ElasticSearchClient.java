@@ -109,12 +109,20 @@ public class ElasticSearchClient extends SearchClient {
                         .put("subTopics", new JSONObject()
                             .put("terms", new JSONObject().put("field", AgentQueryRecord.F_SUB_TOPIC_KW).put("size", 5)))))
                 .put(AGG_FIRST_HIT, new JSONObject()
-                    // Earliest LLM row: merged /v1/messages (has model) or legacy prompt-only (body, not tool/MCP).
+                    // Earliest LLM row: merged /v1/messages (has model), browser-extension rows
+                    // ({"userInput": ...}, no model), or legacy prompt-only (body, not tool/MCP).
                     .put("filter", new JSONObject().put("bool", new JSONObject()
                         .put("minimum_should_match", 1)
                         .put("should", new JSONArray()
                             .put(new JSONObject().put("match_phrase", new JSONObject()
                                 .put(AgentQueryRecord.F_RESPONSE_PAYLOAD, "model")))
+                            // Browser rows: a real turn only — sub-path captures carry no trace id.
+                            .put(new JSONObject().put("bool", new JSONObject()
+                                .put("must", new JSONArray()
+                                    .put(new JSONObject().put("match_phrase", new JSONObject()
+                                        .put(AgentQueryRecord.F_QUERY_PAYLOAD, "userInput")))
+                                    .put(new JSONObject().put("exists", new JSONObject()
+                                        .put("field", AgentQueryRecord.F_TRACE_ID))))))
                             .put(new JSONObject().put("bool", new JSONObject()
                                 .put("must", new JSONArray()
                                     .put(new JSONObject().put("match_phrase", new JSONObject()

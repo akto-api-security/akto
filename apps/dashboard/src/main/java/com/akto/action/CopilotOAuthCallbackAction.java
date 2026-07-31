@@ -1,13 +1,16 @@
 package com.akto.action;
 
+import com.akto.dao.CopilotStudioIntegrationDao;
 import com.akto.dao.OAuthStatesDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestRolesDao;
+import com.akto.dto.CopilotStudioIntegration;
 import com.akto.dto.OAuthState;
 import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.CopilotOAuthAuthParam;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.sources.AuthWithCond;
+import com.akto.jobs.executors.copilotstudio.CopilotStudioMultiEnvApiClient;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
@@ -35,9 +38,11 @@ public class CopilotOAuthCallbackAction extends ActionSupport {
     private static final LoggerMaker logger = new LoggerMaker(CopilotOAuthCallbackAction.class, LogDb.DASHBOARD);
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final OkHttpClient httpClient = CoreHTTPClient.client;
+    private static final CopilotStudioMultiEnvApiClient multiEnvApiClient = new CopilotStudioMultiEnvApiClient();
 
     private static final String TOKEN_ENDPOINT_TEMPLATE = "https://login.microsoftonline.com/%s/oauth2/v2.0/token";
     private static final String SCOPE = "https://api.powerplatform.com/CopilotStudio.Copilots.Invoke offline_access";
+    private static final String COPILOT_MULTI_ENV_DASHBOARD_REDIRECT_URL = Constants.DEFAULT_AKTO_DASHBOARD_URL + "/dashboard/quick-start?connector=copilot_studio_multi_env_import";
 
     @Setter private String code;
     @Setter private String state;
@@ -50,35 +55,64 @@ public class CopilotOAuthCallbackAction extends ActionSupport {
         String dashboardUrl = Constants.DEFAULT_AKTO_DASHBOARD_URL;
         String rolesListUrl = dashboardUrl + "/dashboard/testing/roles";
 
-        if (error != null && !error.isEmpty()) {
-            logger.error("oauthCallback: OAuth error=" + error + " desc=" + error_description);
-            redirectUrl = rolesListUrl + "?copilotOauthError=" + HttpRequestResponseUtils.encode(error);
-            return Action.ERROR.toUpperCase();
-        }
+        // Look up state first (Microsoft echoes it back on error responses too) so failures below
+        // can be routed per flow type instead of assuming the TEST_ROLE_AUTH flow's redirect target.
+        OAuthState oauthState = (state != null && !state.isEmpty())
+            ? OAuthStatesDao.instance.getMCollection().findOneAndDelete(Filters.eq(OAuthState.NONCE, state))
+            : null;
 
-        if (code == null || code.isEmpty() || state == null || state.isEmpty()) {
-            logger.error("oauthCallback: missing code or state");
-            redirectUrl = rolesListUrl + "?copilotOauthError=missing_params";
-            return Action.ERROR.toUpperCase();
-        }
-
-        OAuthState oauthState = OAuthStatesDao.instance.getMCollection().findOneAndDelete(Filters.eq(OAuthState.NONCE, state));
         if (oauthState == null) {
             logger.error("oauthCallback: unknown or expired state nonce");
-            redirectUrl = rolesListUrl + "?copilotOauthError=invalid_state";
-            return Action.ERROR.toUpperCase();
-        }
-        if (oauthState.getExpiresAt() < Context.now()) {
-            logger.error("oauthCallback: state nonce expired");
             redirectUrl = rolesListUrl + "?copilotOauthError=invalid_state";
             return Action.ERROR.toUpperCase();
         }
 
         Map<String, String> stateData = oauthState.getData();
         int accountId = Integer.parseInt(stateData.get("accountId"));
-        String callbackRoleId = stateData.get("roleId");
-
         Context.accountId.set(accountId);
+
+        boolean isMultiEnvFlow = CopilotStudioAction.FLOW_TYPE_MULTI_ENV_SETUP.equals(stateData.get("flowType"));
+
+        if (oauthState.getExpiresAt() < Context.now()) {
+            logger.error("oauthCallback: state nonce expired");
+            if (isMultiEnvFlow) {
+                return failMultiEnvCallback(stateData.get("integrationId"), COPILOT_MULTI_ENV_DASHBOARD_REDIRECT_URL,
+                    new Exception("state nonce expired"),
+                    "The connection attempt timed out. Please try connecting again.");
+            }
+            redirectUrl = rolesListUrl + "?copilotOauthError=invalid_state";
+            return Action.ERROR.toUpperCase();
+        }
+
+        if (error != null && !error.isEmpty()) {
+            logger.error("oauthCallback: OAuth error=" + error + " desc=" + error_description);
+            if (isMultiEnvFlow) {
+                return failMultiEnvCallback(stateData.get("integrationId"), COPILOT_MULTI_ENV_DASHBOARD_REDIRECT_URL,
+                    new Exception(error + ": " + error_description),
+                    "Microsoft sign-in was cancelled or denied. Please try connecting again.");
+            }
+            redirectUrl = rolesListUrl + "?copilotOauthError=" + HttpRequestResponseUtils.encode(error);
+            return Action.ERROR.toUpperCase();
+        }
+
+        if (code == null || code.isEmpty()) {
+            logger.error("oauthCallback: missing code");
+            if (isMultiEnvFlow) {
+                return failMultiEnvCallback(stateData.get("integrationId"), COPILOT_MULTI_ENV_DASHBOARD_REDIRECT_URL,
+                    new Exception("missing authorization code"),
+                    "Microsoft did not return an authorization code. Please try connecting again.");
+            }
+            redirectUrl = rolesListUrl + "?copilotOauthError=missing_params";
+            return Action.ERROR.toUpperCase();
+        }
+
+        if (isMultiEnvFlow) {
+            return handleMultiEnvCallback(stateData, dashboardUrl);
+        }
+
+        // --- Existing TEST_ROLE_AUTH behavior below, unchanged ---
+
+        String callbackRoleId = stateData.get("roleId");
 
         TestRoles role = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(callbackRoleId)));
         if (role == null) {
@@ -147,6 +181,92 @@ public class CopilotOAuthCallbackAction extends ActionSupport {
             redirectUrl = roleSettingsUrl + "&copilotOauthError=exception";
             return Action.ERROR.toUpperCase();
         }
+    }
+
+    /**
+     * Handles the callback for Copilot Studio (Multi Environment) connector setup:
+     * exchanges the code for a delegated token, registers the app with Power Platform,
+     * discovers every environment in the tenant, and stores results for the confirm step.
+     */
+    private String handleMultiEnvCallback(Map<String, String> stateData, String dashboardUrl) {
+        String integrationId = stateData.get("integrationId");
+        this.redirectUrl = COPILOT_MULTI_ENV_DASHBOARD_REDIRECT_URL;
+
+        CopilotStudioIntegration integration = CopilotStudioIntegrationDao.instance.findOne(
+            Filters.eq(CopilotStudioIntegration.ID, new ObjectId(integrationId)));
+        if (integration == null) {
+            logger.errorAndAddToDb("oauthCallback(multiEnv): integration not found id=" + integrationId);
+            return Action.ERROR.toUpperCase();
+        }
+
+        String callbackUrl = dashboardUrl + "/copilot/oauth/callback";
+
+        String delegatedToken;
+        try {
+            delegatedToken = multiEnvApiClient.getDelegatedToken(
+                integration.getTenantId(), integration.getClientId(), integration.getClientSecret(),
+                code, callbackUrl, Constants.SCOPE_COPILOT_STUDIO_MULTI_ENV);
+        } catch (Exception e) {
+            return failMultiEnvCallback(integrationId, redirectUrl, e,
+                "Failed to sign in with Microsoft. Please check your Tenant ID, Client ID and Client Secret.");
+        }
+
+        try {
+            multiEnvApiClient.registerApplication(delegatedToken, integration.getClientId());
+        } catch (Exception e) {
+            return failMultiEnvCallback(integrationId, redirectUrl, e,
+                "App Registration to Power Platform was rejected. Please check your app's permissions.");
+        }
+
+        String appOnlyToken;
+        try {
+            appOnlyToken = multiEnvApiClient.getClientCredentialsToken(
+                integration.getTenantId(), integration.getClientId(), integration.getClientSecret());
+        } catch (Exception e) {
+            return failMultiEnvCallback(integrationId, redirectUrl, e,
+                "Failed to authenticate with Microsoft for environment discovery.");
+        }
+
+        List<CopilotStudioIntegration.Environment> environments;
+        try {
+            environments = multiEnvApiClient.listEnvironments(appOnlyToken);
+        } catch (Exception e) {
+            return failMultiEnvCallback(integrationId, redirectUrl, e,
+                "Failed to list environments in your Power Platform tenant.");
+        }
+
+        int now = Context.now();
+        CopilotStudioIntegrationDao.instance.updateOneNoUpsert(
+            Filters.eq(CopilotStudioIntegration.ID, new ObjectId(integrationId)),
+            Updates.combine(
+                Updates.set(CopilotStudioIntegration.STATUS, CopilotStudioIntegration.Status.ENVIRONMENTS_DISCOVERED.name()),
+                Updates.set(CopilotStudioIntegration.ENVIRONMENTS, environments),
+                Updates.set(CopilotStudioIntegration.UPDATED_AT, now)
+            )
+        );
+
+        logger.infoAndAddToDb("oauthCallback(multiEnv): discovered " + environments.size()
+            + " environments for integration=" + integrationId);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Logs the full error server-side (status codes, Microsoft trace/correlation IDs, etc.) and
+     * stores/shows the user a concise, step-specific message instead of the raw exception detail.
+     */
+    private String failMultiEnvCallback(String integrationId, String quickStartUrl, Exception e, String userMessage) {
+        logger.error("oauthCallback(multiEnv): failed for integration=" + integrationId, e);
+        logger.errorAndAddToDb("oauthCallback(multiEnv): failed for integration=" + integrationId + ": " + e.getMessage());
+
+        CopilotStudioIntegrationDao.instance.updateOneNoUpsert(
+            Filters.eq(CopilotStudioIntegration.ID, new ObjectId(integrationId)),
+            Updates.combine(
+                Updates.set(CopilotStudioIntegration.LAST_ERROR, userMessage),
+                Updates.set(CopilotStudioIntegration.UPDATED_AT, Context.now())
+            )
+        );
+        redirectUrl = quickStartUrl;
+        return Action.ERROR.toUpperCase();
     }
 
     private static CopilotOAuthAuthParam findCopilotParam(TestRoles role) {

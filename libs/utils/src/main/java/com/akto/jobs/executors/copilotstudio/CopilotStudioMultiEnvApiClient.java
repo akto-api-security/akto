@@ -1,9 +1,12 @@
 package com.akto.jobs.executors.copilotstudio;
 
-import com.akto.jobs.exception.RetryableJobException;
+import com.akto.dao.context.Context;
+import com.akto.dto.CopilotStudioIntegration.Environment;
 import com.akto.log.LoggerMaker;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Getter;
 import okhttp3.FormBody;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -26,7 +29,7 @@ public class CopilotStudioMultiEnvApiClient {
 
     private static final LoggerMaker logger = new LoggerMaker(CopilotStudioMultiEnvApiClient.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    private static final OkHttpClient client = new OkHttpClient.Builder()
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
@@ -36,23 +39,36 @@ public class CopilotStudioMultiEnvApiClient {
     private static final String REGISTRATION_ENDPOINT_TEMPLATE =
         "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/adminApplications/%s?api-version=2020-10-01";
     private static final String ENVIRONMENTS_ENDPOINT =
-        "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments?api-version=2020-10-01";
+        "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments"
+        + "?api-version=2020-10-01&$select=name,properties.displayName,properties.linkedEnvironmentMetadata.instanceUrl";
+    private static final String ADD_APP_USER_ENDPOINT_TEMPLATE =
+        "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments/%s/addAppUser?api-version=2020-10-01";
     private static final String APP_ONLY_SCOPE = "https://service.powerapps.com/.default";
+    private static final int EXPIRY_BUFFER_SECONDS = 60;
 
-    public static class EnvironmentInfo {
-        public final String id;
-        public final String url;
-        public final String name;
+    /** App-only access token paired with the epoch second (per {@link Context#now()}) it expires at. */
+    public static class AccessToken {
+        @Getter
+        private final String token;
+        private final int expiresAt;
 
-        public EnvironmentInfo(String id, String url, String name) {
-            this.id = id;
-            this.url = url;
-            this.name = name;
+        public AccessToken(String token, int expiresAt) {
+            this.token = token;
+            this.expiresAt = expiresAt;
+        }
+
+        public boolean isExpired() {
+            return Context.now() >= expiresAt - EXPIRY_BUFFER_SECONDS;
         }
     }
 
     /** App-only token via client_credentials — used for env listing, app-user creation, and every recurring run. */
     public String getClientCredentialsToken(String tenantId, String clientId, String clientSecret) throws Exception {
+        return getClientCredentialsTokenWithExpiry(tenantId, clientId, clientSecret).getToken();
+    }
+
+    /** Same as {@link #getClientCredentialsToken}, but also returns when the token expires so callers can avoid re-fetching on every use. */
+    public AccessToken getClientCredentialsTokenWithExpiry(String tenantId, String clientId, String clientSecret) throws Exception {
         FormBody formBody = new FormBody.Builder()
             .add("grant_type", "client_credentials")
             .add("client_id", clientId)
@@ -73,10 +89,10 @@ public class CopilotStudioMultiEnvApiClient {
             .add("redirect_uri", redirectUri)
             .add("scope", scope)
             .build();
-        return requestAccessToken(tenantId, formBody, "authorization_code token");
+        return requestAccessToken(tenantId, formBody, "authorization_code token").token;
     }
 
-    private String requestAccessToken(String tenantId, FormBody formBody, String description) throws Exception {
+    private AccessToken requestAccessToken(String tenantId, FormBody formBody, String description) throws Exception {
         Request request = new Request.Builder()
             .url(String.format(TOKEN_ENDPOINT_TEMPLATE, tenantId))
             .post(formBody)
@@ -92,7 +108,8 @@ public class CopilotStudioMultiEnvApiClient {
             if (accessToken == null || accessToken.isEmpty()) {
                 throw new Exception("Token response missing access_token for " + description);
             }
-            return accessToken;
+            int expiresInSeconds = json.has("expires_in") ? json.get("expires_in").asInt() : 0;
+            return new AccessToken(accessToken, Context.now() + expiresInSeconds);
         }
     }
 
@@ -119,64 +136,69 @@ public class CopilotStudioMultiEnvApiClient {
      * Lists every environment in the tenant.
      * Response shape per Microsoft's scopes/admin/environments API — verify against current docs before relying on this in production.
      */
-    public List<EnvironmentInfo> listEnvironments(String accessToken) throws Exception {
-        Request request = new Request.Builder()
-            .url(ENVIRONMENTS_ENDPOINT)
-            .header("Authorization", "Bearer " + accessToken)
-            .get()
-            .build();
+    public List<Environment> listEnvironments(String accessToken) throws Exception {
+        List<Environment> environments = new ArrayList<>();
+        String nextUrl = ENVIRONMENTS_ENDPOINT;
 
-        try (Response response = client.newCall(request).execute()) {
-            String body = response.body() != null ? response.body().string() : "";
-            if (!response.isSuccessful()) {
-                throw new RetryableJobException("Failed to list Power Platform environments: status=" + response.code() + " body=" + body);
-            }
+        while (nextUrl != null) {
+            Request request = new Request.Builder()
+                .url(nextUrl)
+                .header("Authorization", "Bearer " + accessToken)
+                .get()
+                .build();
 
-            JsonNode root = objectMapper.readTree(body);
-            JsonNode values = root.get("value");
-            List<EnvironmentInfo> environments = new ArrayList<>();
-            if (values != null && values.isArray()) {
-                for (JsonNode env : values) {
-                    String id = env.has("name") ? env.get("name").asText() : null;
-                    JsonNode properties = env.get("properties");
-                    String displayName = properties != null && properties.has("displayName")
-                        ? properties.get("displayName").asText() : id;
-                    String instanceUrl = null;
-                    if (properties != null && properties.has("linkedEnvironmentMetadata")) {
-                        JsonNode linked = properties.get("linkedEnvironmentMetadata");
-                        if (linked.has("instanceUrl")) {
-                            instanceUrl = linked.get("instanceUrl").asText();
+            try (Response response = client.newCall(request).execute()) {
+                String body = response.body() != null ? response.body().string() : "";
+                if (!response.isSuccessful()) {
+                    throw new Exception("Failed to list Power Platform environments: status=" + response.code() + " body=" + body);
+                }
+
+                JsonNode root = objectMapper.readTree(body);
+                JsonNode values = root.get("value");
+                if (values != null && values.isArray()) {
+                    for (JsonNode env : values) {
+                        String id = env.has("name") ? env.get("name").asText() : null;
+                        JsonNode properties = env.get("properties");
+                        String displayName = properties != null && properties.has("displayName")
+                            ? properties.get("displayName").asText() : id;
+                        String instanceUrl = null;
+                        if (properties != null && properties.has("linkedEnvironmentMetadata")) {
+                            JsonNode linked = properties.get("linkedEnvironmentMetadata");
+                            if (linked.has("instanceUrl")) {
+                                instanceUrl = linked.get("instanceUrl").asText();
+                            }
+                        }
+                        if (id != null && instanceUrl != null) {
+                            environments.add(new Environment(id, instanceUrl, displayName));
                         }
                     }
-                    if (id != null && instanceUrl != null) {
-                        environments.add(new EnvironmentInfo(id, instanceUrl, displayName));
-                    }
                 }
+
+                nextUrl = root.has("nextLink") ? root.get("nextLink").asText() : null;
             }
-            logger.info("listEnvironments: discovered {} environments", environments.size());
-            return environments;
         }
+
+        logger.info("listEnvironments: discovered {} environments", environments.size());
+        return environments;
     }
 
     /**
-     * Creates the app registration as a Dataverse application user in the given environment.
-     * Request shape per Dataverse's systemusers Web API — verify against current docs before relying on this in production.
+     * Adds the app registration as an application user in the given environment, via the
+     * Power Platform Admin API.
      */
-    public void createApplicationUser(String accessToken, String environmentUrl, String appClientId) throws Exception {
-        String url = environmentUrl + (environmentUrl.endsWith("/") ? "" : "/") + "api/data/v9.2/systemusers";
-        String requestBody = objectMapper.writeValueAsString(Collections.singletonMap("applicationid", appClientId));
+    public void createApplicationUser(String accessToken, String environmentId, String appClientId) throws Exception {
+        String requestBody = objectMapper.writeValueAsString(Collections.singletonMap("servicePrincipalAppId", appClientId));
 
         Request request = new Request.Builder()
-            .url(url)
+            .url(String.format(ADD_APP_USER_ENDPOINT_TEMPLATE, environmentId))
             .header("Authorization", "Bearer " + accessToken)
-            .header("Content-Type", "application/json")
             .post(RequestBody.create(requestBody, MediaType.parse("application/json")))
             .build();
 
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 String body = response.body() != null ? response.body().string() : "";
-                throw new Exception("Failed to create Dataverse application user: status=" + response.code() + " body=" + body);
+                throw new Exception("Failed to add application user to environment: status=" + response.code() + " body=" + body);
             }
         }
     }

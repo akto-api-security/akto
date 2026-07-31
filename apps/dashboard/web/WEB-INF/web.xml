@@ -18,7 +18,7 @@
 
     <filter>
         <filter-name>cross-origin</filter-name>
-        <filter-class>org.eclipse.jetty.servlets.CrossOriginFilter</filter-class>
+        <filter-class>org.eclipse.jetty.ee8.servlets.CrossOriginFilter</filter-class>
         <init-param>
             <param-name>allowedOrigins</param-name>
             <param-value>*</param-value>
@@ -45,18 +45,10 @@
         <url-pattern>/*</url-pattern>
     </filter-mapping>
 
-    <filter>
-        <filter-name>GzipFilter</filter-name>
-        <filter-class>org.eclipse.jetty.servlets.GzipFilter</filter-class>
-        <init-param>
-            <param-name>mimeTypes</param-name>
-            <param-value>text/html,text/plain,text/xml,application/xhtml+xml,text/css,application/javascript,image/svg+xml,application/json</param-value>
-        </init-param>
-    </filter>
-    <filter-mapping>
-        <filter-name>GzipFilter</filter-name>
-        <url-pattern>/*</url-pattern>
-    </filter-mapping>
+    <!-- GzipFilter (org.eclipse.jetty.servlets.GzipFilter) was removed in Jetty 12. Response
+         compression is now handled server-side by the Jetty `gzip` module (enabled in the
+         Dockerfile via gzip.ini), which covers the same mime types. -->
+
 
     <filter>
         <filter-name>MongoConnectCheckFilter</filter-name>

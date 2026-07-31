@@ -21,7 +21,7 @@ public class AccountJobsCron {
 
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private static final ExecutorService executorService = Executors.newFixedThreadPool(2);
-    private static final int MAX_HEARTBEAT_THRESHOLD_SECONDS = 5;
+    private static final int MAX_HEARTBEAT_THRESHOLD_SECONDS = 300;
 
     private static final LoggerMaker logger = new LoggerMaker(AccountJobsCron.class);
 

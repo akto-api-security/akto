@@ -8,6 +8,7 @@ public enum ModelType {
     OLLAMA,
     DATABRICKS,
     GITHUB_COPILOT,
-    GEMINI
+    GEMINI,
+    CLOUDFLARE
 
 }

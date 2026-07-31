@@ -183,4 +183,5 @@ public final class AIAgentConnectorConstants {
 
     // Default Job Settings
     public static final int DEFAULT_RECURRING_INTERVAL_SECONDS = 5; // 5 seconds
+    public static final int RECURRING_JOB_INTERVAL_30_MINUTES = 1800; // 30 minutes
 }

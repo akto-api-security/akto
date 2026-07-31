@@ -2501,6 +2501,10 @@ public class InitializerListener implements ServletContextListener {
         if (Objects.equals(https, "true")) {
             sce.getServletContext().getSessionCookieConfig().setSecure(true);
         }
+        sce.getServletContext().setAttribute(
+                "org.eclipse.jetty.cookie.sameSiteDefault",
+                org.eclipse.jetty.http.HttpCookie.SameSite.LAX
+        );
 
         logger.debug("context initialized");
 

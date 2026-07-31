@@ -8,6 +8,7 @@ import {
     Badge,
     Autocomplete,
     Checkbox,
+    Banner,
 } from "@shopify/polaris";
 import { DeleteMajor } from "@shopify/polaris-icons";
 
@@ -226,6 +227,9 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts
                     checked={!!blockPersonalAccounts}
                     onChange={setBlockPersonalAccounts}
                 />
+                <Box paddingBlockStart="2">
+                    <Banner tone="info">Currently supported for the following browser LLMs: chatgpt.com, claude.ai, gemini.google.com and copilot.microsoft.com.</Banner>
+                </Box>
             </SectionCard>
         </VerticalStack>
     );

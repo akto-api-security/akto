@@ -33,6 +33,7 @@ const KNOWN_CLIENTS = {
     codex1: { displayName: 'Codex CLI', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['codex-cli', 'codexcli'] },
     codex2: { displayName: 'Codex Desktop', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['codex-desktop'] },
     gemini: { displayName: 'Gemini', domain: 'gemini.google.com', agentType: CLIENT_TYPES.LLM },
+    geminicli: { displayName: 'Gemini CLI', domain: 'gemini.google.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['geminicli', 'gemini-cli', 'gemini_cli'] },
     copilot: { displayName: 'Copilot', domain: 'copilot.microsoft.com', agentType: CLIENT_TYPES.AI_AGENT },
     githubcopilot: { displayName: 'GitHub Copilot', domain: 'github.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['github-copilot'] },
     vscopilot: { displayName: 'Visual Studio Copilot', domain: 'visualstudio.microsoft.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['visual-studio-copilot'] },
