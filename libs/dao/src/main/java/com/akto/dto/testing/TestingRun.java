@@ -4,6 +4,7 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 import java.util.List;
 
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -64,6 +65,11 @@ public class TestingRun {
 
     public static final String RUN_AUTOMATED_TESTS = "runAutomatedTests";
     private boolean runAutomatedTests = false;
+
+    public static final String CONTEXT_SOURCE_FIELD = "contextSource";
+    @Getter
+    @Setter
+    private CONTEXT_SOURCE contextSource;
 
     public TestingRun() { }
 
