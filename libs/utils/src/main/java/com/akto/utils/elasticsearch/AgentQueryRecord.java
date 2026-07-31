@@ -133,11 +133,18 @@ public class AgentQueryRecord {
             deviceId  = null;
             String moduleName = host != null ? host.split("\\.", 2)[0] : null;
             userName = (deviceUserMap != null && moduleName != null) ? deviceUserMap.get(moduleName) : null;
+            // The extension can register before its profile email resolves, naming the module by
+            // device id while the host id already says the email — so match on the email itself.
+            if (userName == null || !userName.contains("@")) {
+                userName = userByEmailPrefix(deviceUserMap, moduleName);
+            }
             if (userName == null || !userName.contains("@")) {
                 userName = getFirstHeader(headers, HEADER_PREFIX + HEADER_USER_EMAIL);
             }
-            // Not registered yet, or a browser profile that isn't signed in (name is the uuid).
             if (userName == null || !userName.contains("@")) {
+                userName = moduleName;
+            }
+            if (userName == null || userName.isEmpty()) {
                 Organization org = OrgUtils.getOrganizationCached(Context.getActualAccountId());
                 userName = org != null ? org.getAdminEmail() : null;
             }
@@ -195,6 +202,18 @@ public class AgentQueryRecord {
             return false;
         }
         return true;
+    }
+
+    // The extension builds the host-id prefix as the email's local part with non-alphanumerics
+    // stripped, so derive the same key from each mapped email and match the prefix against it.
+    private static String userByEmailPrefix(Map<String, String> deviceUserMap, String prefix) {
+        if (deviceUserMap == null || prefix == null || prefix.isEmpty()) return null;
+        for (String email : deviceUserMap.values()) {
+            if (email == null || !email.contains("@")) continue;
+            String local = email.substring(0, email.indexOf('@')).replaceAll("[^a-zA-Z0-9]", "");
+            if (local.equalsIgnoreCase(prefix)) return email;
+        }
+        return null;
     }
 
     private static String getFirstHeader(Map<String, List<String>> headers, String name) {
