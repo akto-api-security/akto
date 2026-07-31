@@ -82,7 +82,7 @@ func TestBuildValidateParamsFromEvaluationRequest(t *testing.T) {
 	if err := json.Unmarshal([]byte(params.RequestHeaders), &headers); err != nil {
 		t.Fatalf("RequestHeaders is not valid JSON: %v", err)
 	}
-	if want := "agent-guid.copilot-studio-env-guid.microsoft.com"; headers["Host"] != want {
+	if want := "agent-guid.copilot-studio-envguid.microsoft.com"; headers["Host"] != want {
 		t.Errorf("Host = %q, want %q", headers["Host"], want)
 	}
 }
@@ -139,7 +139,7 @@ func TestCopilotStudioHostPrefersAgentName(t *testing.T) {
 			},
 		},
 	}
-	want := "금융-통찰력-세계.copilot-studio-Default-f4.microsoft.com"
+	want := "금융-통찰력-세계.copilot-studio-Defaultf4d.microsoft.com"
 	if got := copilotStudioHost(req); got != want {
 		t.Errorf("copilotStudioHost() = %q, want %q", got, want)
 	}

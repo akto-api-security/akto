@@ -32,6 +32,10 @@ type CopilotStudioHandler struct {
 	logger           *zap.Logger
 }
 
+var botNameJunkRegex = regexp.MustCompile(`[^\p{L}\p{N}-]+`)
+var botNameHyphenRegex = regexp.MustCompile(`-+`)
+var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9]`)
+
 func NewCopilotStudioHandler(validatorService *validator.Service, logger *zap.Logger) *CopilotStudioHandler {
 	return &CopilotStudioHandler{
 		validatorService: validatorService,
@@ -167,9 +171,6 @@ func marshalHostHeader(host string) string {
 	return string(b)
 }
 
-var botNameJunkRegex = regexp.MustCompile(`[^\p{L}\p{N}-]+`)
-var botNameHyphenRegex = regexp.MustCompile(`-+`)
-
 func sanitizeBotName(name string) string {
 	if name == "" {
 		return ""
@@ -190,16 +191,18 @@ func copilotStudioHost(req *models.EvaluationRequest) string {
 	}
 
 	host := agentName + ".copilot-studio"
-	if envID := req.ConversationMetadata.Agent.EnvironmentID; envID != "" {
-		envName := sanitizeBotName(envID)
-		if runes := []rune(envName); len(runes) > 10 {
-			envName = string(runes[:10])
-		}
-		if envName != "" {
-			host += "-" + envName
-		}
+	if envSuffix := sanitizeEnvironmentID(agent.EnvironmentID); envSuffix != "" {
+		host += "-" + envSuffix
 	}
 	return host + ".microsoft.com"
+}
+
+func sanitizeEnvironmentID(environmentID string) string {
+	suffix := nonAlphanumericRegex.ReplaceAllString(environmentID, "")
+	if len(suffix) > 10 {
+		suffix = suffix[:10]
+	}
+	return suffix
 }
 
 func toolExecutionContent(req *models.EvaluationRequest) string {
