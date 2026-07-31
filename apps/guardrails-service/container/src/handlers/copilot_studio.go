@@ -5,18 +5,22 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
+	"github.com/akto-api-security/akto-endpoint-shield/utils"
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -24,7 +28,7 @@ const (
 	copilotErrCodeInternal       = 5000
 
 	// copilot studio's max wait time is 1000ms
-	analyzeToolExecutionTimeout = 950 * time.Millisecond
+	analyzeToolExecutionTimeout = 1000 * time.Millisecond
 )
 
 type CopilotStudioHandler struct {
@@ -53,8 +57,9 @@ func (h *CopilotStudioHandler) Validate(c *gin.Context) {
 	})
 }
 
-// AnalyzeToolExecution handles POST /api/v1/protection — evaluates a
-// planned tool call and returns an allow/block verdict.
+// AnalyzeToolExecution handles POST /api/v1/protection — validates the user
+// message and the planned tool invocation concurrently, and returns a merged
+// allow/block verdict.
 func (h *CopilotStudioHandler) AnalyzeToolExecution(c *gin.Context) {
 	logRawRequest(c, h.logger, "AnalyzeToolExecution")
 
@@ -71,35 +76,11 @@ func (h *CopilotStudioHandler) AnalyzeToolExecution(c *gin.Context) {
 		return
 	}
 
-	params := buildValidateParamsFromEvaluationRequest(&req)
-	applyAuthenticatedAccount(c, params)
-
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, "")
-
-	h.logger.Info("AnalyzeToolExecution - received request",
-		zap.String("toolName", req.ToolDefinition.Name),
-		zap.String("account", params.AktoAccountID),
-		zap.String("conversationId", req.ConversationMetadata.ConversationID),
-		zap.String("sessionID", sessionID))
-
-	ctx, cancel := context.WithTimeout(c.Request.Context(), analyzeToolExecutionTimeout)
-	defer cancel()
-
-	result, err := h.validatorService.ValidateRequest(ctx, params, sessionID, requestID)
+	userMsgParams := buildUserMessageParams(&req, c.Request.Header)
+	toolParams, err := buildToolInvocationParams(&req, c.Request.Header)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			// Mirrors Copilot Studio's own documented fallback: a missed
-			// deadline is treated as "allow", so answer that way ourselves
-			// rather than letting the caller's client-side timeout do it.
-			h.logger.Warn("AnalyzeToolExecution - validation timed out, failing open",
-				zap.String("toolName", req.ToolDefinition.Name),
-				zap.Int64("latencyMs", time.Since(start).Milliseconds()))
-			c.JSON(http.StatusOK, models.AnalyzeToolExecutionResponse{BlockAction: false})
-			return
-		}
-		h.logger.Error("AnalyzeToolExecution - validation failed",
-			zap.String("toolName", req.ToolDefinition.Name),
-			zap.Error(err))
+		h.logger.Error("AnalyzeToolExecution - failed to build tool invocation payload",
+			zap.String("toolName", req.ToolDefinition.Name), zap.Error(err))
 		c.JSON(http.StatusInternalServerError, models.WebhookErrorResponse{
 			ErrorCode:  copilotErrCodeInternal,
 			Message:    "Validation failed",
@@ -108,13 +89,106 @@ func (h *CopilotStudioHandler) AnalyzeToolExecution(c *gin.Context) {
 		return
 	}
 
-	resp := mapValidationResultToResponse(result)
+	applyAuthenticatedAccount(c, userMsgParams)
+	applyAuthenticatedAccount(c, toolParams)
+
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, userMsgParams.RequestHeaders)
+
+	h.logger.Info("AnalyzeToolExecution - received request",
+		zap.String("toolName", req.ToolDefinition.Name),
+		zap.String("account", userMsgParams.AktoAccountID),
+		zap.String("conversationId", req.ConversationMetadata.ConversationID),
+		zap.String("sessionID", sessionID))
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), analyzeToolExecutionTimeout)
+	defer cancel()
+
+	var userMsgResp, toolResp *models.AnalyzeToolExecutionResponse
+	var g errgroup.Group
+	g.Go(func() error {
+		resp, err := h.runValidation(ctx, userMsgParams, sessionID, requestID)
+		if err != nil {
+			return err
+		}
+		userMsgResp = resp
+		return nil
+	})
+	g.Go(func() error {
+		resp, err := h.runValidation(ctx, toolParams, sessionID, requestID)
+		if err != nil {
+			return err
+		}
+		toolResp = resp
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		h.logger.Error("AnalyzeToolExecution - validation failed",
+			zap.String("toolName", req.ToolDefinition.Name), zap.Error(err))
+		c.JSON(http.StatusInternalServerError, models.WebhookErrorResponse{
+			ErrorCode:  copilotErrCodeInternal,
+			Message:    "Validation failed",
+			HTTPStatus: http.StatusInternalServerError,
+		})
+		return
+	}
+
+	resp := mergeAnalyzeToolExecutionResponses(userMsgResp, toolResp)
 	h.logger.Info("AnalyzeToolExecution - completed",
 		zap.String("toolName", req.ToolDefinition.Name),
 		zap.Bool("blockAction", resp.BlockAction),
 		zap.Int64("latencyMs", time.Since(start).Milliseconds()))
 
 	c.JSON(http.StatusOK, resp)
+}
+
+// runValidation calls the shared validator core and maps its result, treating
+// a deadline miss as allowed (fail-open) — Copilot Studio's own documented
+// behavior for a slow responder — rather than surfacing it as an error.
+func (h *CopilotStudioHandler) runValidation(ctx context.Context, params *models.ValidateRequestParams, sessionID, requestID string) (*models.AnalyzeToolExecutionResponse, error) {
+	result, err := h.validatorService.ValidateRequest(ctx, params, sessionID, requestID)
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return &models.AnalyzeToolExecutionResponse{BlockAction: false}, nil
+		}
+		return nil, err
+	}
+	return mapValidationResultToResponse(result), nil
+}
+
+// mergeAnalyzeToolExecutionResponses combines the user-message and
+// tool-invocation verdicts: blocked if either is blocked, with reason/
+// diagnostics labeled by which check(s) fired.
+func mergeAnalyzeToolExecutionResponses(userMsg, toolInvocation *models.AnalyzeToolExecutionResponse) *models.AnalyzeToolExecutionResponse {
+	if !userMsg.BlockAction && !toolInvocation.BlockAction {
+		return &models.AnalyzeToolExecutionResponse{BlockAction: false}
+	}
+
+	var reasons []string
+	diagnostics := map[string]json.RawMessage{}
+	if userMsg.BlockAction {
+		reasons = append(reasons, "userMessage: "+userMsg.Reason)
+		if userMsg.Diagnostics != "" {
+			diagnostics["userMessage"] = json.RawMessage(userMsg.Diagnostics)
+		}
+	}
+	if toolInvocation.BlockAction {
+		reasons = append(reasons, "toolInvocation: "+toolInvocation.Reason)
+		if toolInvocation.Diagnostics != "" {
+			diagnostics["toolInvocation"] = json.RawMessage(toolInvocation.Diagnostics)
+		}
+	}
+
+	resp := &models.AnalyzeToolExecutionResponse{
+		BlockAction: true,
+		Reason:      strings.Join(reasons, "; "),
+	}
+	if len(diagnostics) > 0 {
+		if b, err := json.Marshal(diagnostics); err == nil {
+			resp.Diagnostics = string(b)
+		}
+	}
+	return resp
 }
 
 func logRawRequest(c *gin.Context, logger *zap.Logger, label string) {
@@ -146,25 +220,187 @@ func rawBodyField(body []byte) zap.Field {
 	return zap.ByteString("body", body)
 }
 
-func buildValidateParamsFromEvaluationRequest(req *models.EvaluationRequest) *models.ValidateRequestParams {
+// buildUserMessageParams validates plannerContext.userMessage alone.
+func buildUserMessageParams(req *models.EvaluationRequest, header http.Header) *models.ValidateRequestParams {
+	agent := req.ConversationMetadata.Agent
+	agentName := agentDisplayName(agent)
+
 	return &models.ValidateRequestParams{
 		Path:           "/copilot/conversation/messages/" + req.ConversationMetadata.ConversationID,
 		Method:         http.MethodPost,
-		RequestHeaders: marshalHostHeader(copilotStudioHost(req)),
-		RequestPayload: marshalPromptPayload(toolExecutionContent(req)),
+		RequestHeaders: buildRequestHeaders(header, copilotStudioHost(req), req.ConversationMetadata.ConversationID),
+		RequestPayload: marshalPromptPayload(req.PlannerContext.UserMessage),
 		ContextSource:  string(types.ContextSourceEndpoint),
 		Source:         "copilot-studio",
+		IP:             clientIPFromHeaders(header),
+		Tag:            buildCopilotStudioTag(agentName, agent.EnvironmentID, false),
 	}
 }
 
-// marshalHostHeader wraps a Host value in the same {"Host": ...} headers JSON
-// shape handlers/file_validation.go already builds for validationContextFromParams
-// to extract McpServerName from. Returns "" when host is empty.
-func marshalHostHeader(host string) string {
-	if host == "" {
+// buildToolInvocationParams validates the tool call itself: name + actual
+// arguments, as an MCP tools/call request when the tool is MCP-backed,
+// otherwise the raw inputValues JSON.
+func buildToolInvocationParams(req *models.EvaluationRequest, header http.Header) (*models.ValidateRequestParams, error) {
+	agent := req.ConversationMetadata.Agent
+	agentName := agentDisplayName(agent)
+	isMcp := isMcpTool(req.ToolDefinition)
+
+	host := copilotStudioHost(req)
+	if isMcp {
+		host = copilotStudioMcpHost(req, mcpServerNameFromToolDefinition(req.ToolDefinition))
+	}
+
+	payload, err := toolInvocationPayload(req.ToolDefinition, req.InputValues, isMcp)
+	if err != nil {
+		return nil, err
+	}
+
+	path := "/copilot/tool/" + url.PathEscape(strings.ToLower(req.ToolDefinition.Name))
+	if isMcp {
+		path = "/copilot/mcp"
+	}
+
+	return &models.ValidateRequestParams{
+		Path:           path,
+		Method:         http.MethodPost,
+		RequestHeaders: buildRequestHeaders(header, host, req.ConversationMetadata.ConversationID),
+		RequestPayload: payload,
+		ContextSource:  string(types.ContextSourceEndpoint),
+		Source:         "copilot-studio",
+		IP:             clientIPFromHeaders(header),
+		Tag:            buildCopilotStudioTag(agentName, agent.EnvironmentID, isMcp),
+	}, nil
+}
+
+// toolInvocationPayload builds the RequestPayload for the tool-invocation
+// check: an MCP tools/call JSON-RPC request when the tool is MCP-backed
+// (params.name/params.arguments, matching the wire shape the vendored mcp
+// package's own extractFromParams already expects), otherwise the raw
+// inputValues JSON directly (structured data, not the free-text "prompt"
+// convention).
+func toolInvocationPayload(t models.ToolDefinition, inputValues map[string]interface{}, isMcp bool) (string, error) {
+	if !isMcp {
+		b, err := json.Marshal(inputValues)
+		return string(b), err
+	}
+
+	payload := map[string]interface{}{
+		"jsonrpc":       "2.0",
+		"id":            1,
+		utils.MCPMethod: utils.MCPToolCall,
+		utils.MCPParams: map[string]interface{}{
+			"name":      mcpOperationName(t),
+			"arguments": inputValues,
+		},
+	}
+	b, err := json.Marshal(payload)
+	return string(b), err
+}
+
+func isMcpTool(t models.ToolDefinition) bool {
+	return t.Type == "DynamicServerToolDefinition"
+}
+
+func splitMcpToolID(id string) (server, operation string, ok bool) {
+	idx := strings.Index(id, "~")
+	if idx < 0 {
+		return "", "", false
+	}
+	return id[:idx], id[idx+1:], true
+}
+
+func mcpOperationName(t models.ToolDefinition) string {
+	if _, operation, ok := splitMcpToolID(t.ID); ok && operation != "" {
+		return operation
+	}
+	return t.Name
+}
+
+func mcpServerNameFromToolDefinition(t models.ToolDefinition) string {
+	if _, operation, ok := splitMcpToolID(t.ID); ok && operation != "" && strings.HasSuffix(t.Name, "-"+operation) {
+		return strings.TrimSuffix(t.Name, "-"+operation)
+	}
+	return t.Name
+}
+
+func buildRequestHeaders(header http.Header, host, conversationID string) string {
+	headers := flattenHeaders(header)
+	if host != "" {
+		headers["Host"] = host
+	}
+	if conversationID != "" {
+		headers["X-Conversation-Id"] = conversationID
+	}
+	b, err := json.Marshal(headers)
+	if err != nil {
 		return ""
 	}
-	b, err := json.Marshal(map[string]string{"Host": host})
+	return string(b)
+}
+
+// flattenHeaders takes the first value per header key. Authorization is
+// redacted: it carries a live Entra ID bearer token, and this value can end
+// up embedded in a stored/reported malicious-event payload downstream, not
+// just a log line.
+func flattenHeaders(h http.Header) map[string]string {
+	flat := make(map[string]string, len(h))
+	for k, v := range h {
+		if len(v) == 0 {
+			continue
+		}
+		if strings.EqualFold(k, "Authorization") {
+			flat[k] = "REDACTED"
+			continue
+		}
+		flat[k] = v[0]
+	}
+	return flat
+}
+
+// clientIPFromHeaders extracts the originating client IP from proxy headers:
+// the first X-Forwarded-For entry, else X-Real-Ip.
+func clientIPFromHeaders(h http.Header) string {
+	if xff := h.Get("X-Forwarded-For"); xff != "" {
+		if first := strings.TrimSpace(strings.Split(xff, ",")[0]); first != "" {
+			return normalizeIP(first)
+		}
+	}
+	return normalizeIP(h.Get("X-Real-Ip"))
+}
+
+// normalizeIP unwraps an IPv4-mapped IPv6 address (e.g. "::ffff:14.143.179.162")
+// down to its plain IPv4 form. Non-IP or genuinely IPv6 input is returned unchanged.
+func normalizeIP(ip string) string {
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return ip
+	}
+	if v4 := parsed.To4(); v4 != nil {
+		return v4.String()
+	}
+	return ip
+}
+
+// buildCopilotStudioTag mirrors the same mutually-exclusive tag convention
+// the Claude CLI hook uses (apps/mcp-endpoint-shield/claude-cli-hooks/
+// akto-validate-mcp-request.py, build_hook_tags): mcp-server/mcp-client for
+// MCP calls, gen-ai/ai-agent otherwise. Not cosmetic — mcp/policy_validator.go's
+// allowlistAppliesToRequest checks for the "mcp-server" key to decide whether
+// MCP-server-scoped allowlist policies apply.
+func buildCopilotStudioTag(agentName, environmentID string, isMcp bool) string {
+	tags := map[string]string{
+		utils.SourceTag: utils.EndpointSource,
+		// "bot-name":           agentName,
+		"bot-environment-id": environmentID,
+	}
+	if isMcp {
+		tags["mcp-server"] = "MCP Server"
+		tags["mcp-client"] = "copilot-studio"
+	} else {
+		tags["gen-ai"] = "Gen AI"
+		tags[utils.AgentSource] = "copilot-studio"
+	}
+	b, err := json.Marshal(tags)
 	if err != nil {
 		return ""
 	}
@@ -177,15 +413,22 @@ func sanitizeBotName(name string) string {
 	}
 	sanitized := botNameJunkRegex.ReplaceAllString(name, "-")
 	sanitized = botNameHyphenRegex.ReplaceAllString(sanitized, "-")
-	return strings.Trim(sanitized, "-")
+	return strings.ToLower(strings.Trim(sanitized, "-"))
+}
+
+// agentDisplayName prefers the agent's display name (present on real
+// requests, not in Microsoft's documented schema) over its id, sanitized for
+// use in a hostname.
+func agentDisplayName(agent models.AgentContext) string {
+	if name := sanitizeBotName(agent.Name); name != "" {
+		return name
+	}
+	return sanitizeBotName(agent.ID)
 }
 
 func copilotStudioHost(req *models.EvaluationRequest) string {
 	agent := req.ConversationMetadata.Agent
-	agentName := sanitizeBotName(agent.Name)
-	if agentName == "" {
-		agentName = sanitizeBotName(agent.ID)
-	}
+	agentName := agentDisplayName(agent)
 	if agentName == "" {
 		return ""
 	}
@@ -197,46 +440,30 @@ func copilotStudioHost(req *models.EvaluationRequest) string {
 	return host + ".microsoft.com"
 }
 
+// copilotStudioMcpHost builds a synthetic Host for MCP tool-invocation
+// checks that encodes the specific MCP server instead of the environment,
+// mirroring the Claude CLI hook's mcp_mirror_host (device/agent identity +
+// connector + the specific server) so McpServerName-scoped policies can
+// target this one MCP server.
+func copilotStudioMcpHost(req *models.EvaluationRequest, mcpServerName string) string {
+	agentName := agentDisplayName(req.ConversationMetadata.Agent)
+	if agentName == "" {
+		return ""
+	}
+
+	host := agentName + ".copilot-studio"
+	if serverSuffix := sanitizeBotName(mcpServerName); serverSuffix != "" {
+		host += "." + serverSuffix
+	}
+	return host
+}
+
 func sanitizeEnvironmentID(environmentID string) string {
 	suffix := nonAlphanumericRegex.ReplaceAllString(environmentID, "")
 	if len(suffix) > 10 {
 		suffix = suffix[:10]
 	}
-	return suffix
-}
-
-func toolExecutionContent(req *models.EvaluationRequest) string {
-	var b strings.Builder
-
-	writeLine := func(s string) {
-		if s == "" {
-			return
-		}
-		if b.Len() > 0 {
-			b.WriteByte('\n')
-		}
-		b.WriteString(s)
-	}
-
-	writeLine(req.PlannerContext.UserMessage)
-	for _, msg := range req.PlannerContext.ChatHistory {
-		writeLine(msg.Role + ": " + msg.Content)
-	}
-	for _, out := range req.PlannerContext.PreviousToolsOutputs {
-		for _, o := range out.Outputs {
-			if s, ok := o.Value.(string); ok {
-				writeLine(s)
-			}
-		}
-	}
-	writeLine(req.ToolDefinition.Name + ": " + req.ToolDefinition.Description)
-	for name, value := range req.InputValues {
-		if s, ok := value.(string); ok {
-			writeLine(name + ": " + s)
-		}
-	}
-
-	return b.String()
+	return strings.ToLower(suffix)
 }
 
 func mapValidationResultToResponse(result *mcp.ValidationResult) *models.AnalyzeToolExecutionResponse {
