@@ -46,15 +46,22 @@ public class CopilotStudioMultiEnvApiClient {
     private static final String APP_ONLY_SCOPE = "https://service.powerapps.com/.default";
     private static final int EXPIRY_BUFFER_SECONDS = 60;
 
-    /** App-only access token paired with the epoch second (per {@link Context#now()}) it expires at. */
+    /** Access token + expiry; refreshToken is set only for delegated tokens, never client_credentials. */
     public static class AccessToken {
         @Getter
         private final String token;
         private final int expiresAt;
+        @Getter
+        private final String refreshToken;
 
         public AccessToken(String token, int expiresAt) {
+            this(token, expiresAt, null);
+        }
+
+        public AccessToken(String token, int expiresAt, String refreshToken) {
             this.token = token;
             this.expiresAt = expiresAt;
+            this.refreshToken = refreshToken;
         }
 
         public boolean isExpired() {
@@ -69,18 +76,24 @@ public class CopilotStudioMultiEnvApiClient {
 
     /** Same as {@link #getClientCredentialsToken}, but also returns when the token expires so callers can avoid re-fetching on every use. */
     public AccessToken getClientCredentialsTokenWithExpiry(String tenantId, String clientId, String clientSecret) throws Exception {
+        return getClientCredentialsTokenForScope(tenantId, clientId, clientSecret, APP_ONLY_SCOPE);
+    }
+
+    /** App-only token for an arbitrary resource scope — inventory needs a different one than env listing. */
+    public AccessToken getClientCredentialsTokenForScope(String tenantId, String clientId, String clientSecret,
+                                                          String scope) throws Exception {
         FormBody formBody = new FormBody.Builder()
             .add("grant_type", "client_credentials")
             .add("client_id", clientId)
             .add("client_secret", clientSecret)
-            .add("scope", APP_ONLY_SCOPE)
+            .add("scope", scope)
             .build();
-        return requestAccessToken(tenantId, formBody, "client_credentials token");
+        return requestAccessToken(tenantId, formBody, "client_credentials token for " + scope);
     }
 
-    /** Delegated token via authorization_code — used exactly once, at OAuth callback time, for the registration call. */
-    public String getDelegatedToken(String tenantId, String clientId, String clientSecret, String code,
-                                     String redirectUri, String scope) throws Exception {
+    /** Delegated token from the one-time Connect sign-in; persist its refreshToken for silent renewal later. */
+    public AccessToken getDelegatedToken(String tenantId, String clientId, String clientSecret, String code,
+                                          String redirectUri, String scope) throws Exception {
         FormBody formBody = new FormBody.Builder()
             .add("grant_type", "authorization_code")
             .add("client_id", clientId)
@@ -89,7 +102,20 @@ public class CopilotStudioMultiEnvApiClient {
             .add("redirect_uri", redirectUri)
             .add("scope", scope)
             .build();
-        return requestAccessToken(tenantId, formBody, "authorization_code token").token;
+        return requestAccessToken(tenantId, formBody, "authorization_code token");
+    }
+
+    /** Refresh-token grant for the recurring job's silent renewal; scope must name exactly one resource. */
+    public AccessToken getDelegatedTokenFromRefreshToken(String tenantId, String clientId, String clientSecret,
+                                                          String refreshToken, String scope) throws Exception {
+        FormBody formBody = new FormBody.Builder()
+            .add("grant_type", "refresh_token")
+            .add("client_id", clientId)
+            .add("client_secret", clientSecret)
+            .add("refresh_token", refreshToken)
+            .add("scope", scope)
+            .build();
+        return requestAccessToken(tenantId, formBody, "refresh_token grant for " + scope);
     }
 
     private AccessToken requestAccessToken(String tenantId, FormBody formBody, String description) throws Exception {
@@ -109,7 +135,8 @@ public class CopilotStudioMultiEnvApiClient {
                 throw new Exception("Token response missing access_token for " + description);
             }
             int expiresInSeconds = json.has("expires_in") ? json.get("expires_in").asInt() : 0;
-            return new AccessToken(accessToken, Context.now() + expiresInSeconds);
+            String refreshToken = json.has("refresh_token") ? json.get("refresh_token").asText() : null;
+            return new AccessToken(accessToken, Context.now() + expiresInSeconds, refreshToken);
         }
     }
 

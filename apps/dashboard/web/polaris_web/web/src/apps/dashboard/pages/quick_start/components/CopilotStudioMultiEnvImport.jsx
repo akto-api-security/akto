@@ -17,6 +17,7 @@ const CopilotStudioMultiEnvImport = ({ docsUrl }) => {
     const [dataIngestionUrl, setDataIngestionUrl] = useState('')
     const [redirecting, setRedirecting] = useState(false)
     const [removing, setRemoving] = useState(false)
+    const [reconnecting, setReconnecting] = useState(false)
 
     const [integration, setIntegration] = useState(null)
     const [confirming, setConfirming] = useState(false)
@@ -65,6 +66,18 @@ const CopilotStudioMultiEnvImport = ({ docsUrl }) => {
             .finally(() => setConfirming(false))
     }
 
+    const handleReconnect = () => {
+        setReconnecting(true)
+        api.reconnectCopilotStudioMultiEnvIntegration()
+            .then((res) => {
+                window.location.href = res.authorizationUrl
+            })
+            .catch((err) => {
+                func.setToast(true, true, err?.response?.data?.actionErrors?.[0] || 'Failed to start reconnect. Please try again.')
+                setReconnecting(false)
+            })
+    }
+
     const handleRemove = () => {
         setRemoving(true)
         api.removeCopilotStudioMultiEnvIntegration()
@@ -95,6 +108,16 @@ const CopilotStudioMultiEnvImport = ({ docsUrl }) => {
                             {integration.environments?.length || 0} environment(s) syncing. See the Jobs page for status.
                         </Text>
                     </HorizontalStack>
+                </Box>
+            )}
+
+            {integration && integration.status === 'REAUTH_REQUIRED' && (
+                <Box paddingBlockStart="3">
+                    <Banner status="warning" title="Sign-in needs to be renewed">
+                        Microsoft rejected the stored sign-in (expired, revoked, or a permission was added to the app
+                        registration after you last connected). Transcript sync is unaffected - only agent inventory
+                        is paused. Click Reconnect below to sign in again.
+                    </Banner>
                 </Box>
             )}
 
@@ -143,9 +166,15 @@ const CopilotStudioMultiEnvImport = ({ docsUrl }) => {
                     disabled={isReadOnly}
                 />
 
-                <HorizontalStack align='end'>
+                <HorizontalStack align='end' gap="2">
                     {isReadOnly ? (
-                        <Button destructive onClick={handleRemove} loading={removing}>Remove Integration</Button>
+                        <>
+                            {/* Only meaningful once confirmMultiEnvIntegration has created the recurring job — matches the backend's own gate. */}
+                            {integration.jobId && (
+                                <Button onClick={handleReconnect} loading={reconnecting}>Reconnect</Button>
+                            )}
+                            <Button destructive onClick={handleRemove} loading={removing}>Remove Integration</Button>
+                        </>
                     ) : (
                         <Button primary onClick={handleConnect} disabled={!isFormValid} loading={redirecting}>
                             Connect

@@ -5,9 +5,13 @@ import com.akto.account_job_executor.executor.AccountJobExecutor;
 import com.akto.dao.context.Context;
 import com.akto.dto.CopilotStudioIntegration;
 import com.akto.dto.jobs.AccountJob;
+import com.akto.jobs.executors.copilotstudio.CopilotStudioInventoryClient;
+import com.akto.util.Constants;
+import com.akto.jobs.executors.copilotstudio.CopilotStudioInventoryPublisher;
 import com.akto.jobs.executors.copilotstudio.CopilotStudioMultiEnvApiClient;
 import com.akto.jobs.executors.copilotstudio.CopilotStudioMultiEnvApiClient.AccessToken;
 import com.akto.log.LoggerMaker;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -38,7 +42,10 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
 
     private static final LoggerMaker logger = new LoggerMaker(CopilotStudioMultiEnvExecutor.class);
     private static final CopilotStudioMultiEnvApiClient apiClient = new CopilotStudioMultiEnvApiClient();
+    private static final CopilotStudioInventoryClient inventoryClient = new CopilotStudioInventoryClient();
+    private static final CopilotStudioInventoryPublisher inventoryPublisher = new CopilotStudioInventoryPublisher();
     private static final int MAX_PARALLEL_ENVIRONMENTS = 8;
+    private static final String DATABASE_ABSTRACTOR_SERVICE_TOKEN_ENV = "DATABASE_ABSTRACTOR_SERVICE_TOKEN";
 
     private CopilotStudioMultiEnvExecutor() {
     }
@@ -123,6 +130,10 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
                 logger.error("CopilotStudioMultiEnv: environment task error: {}", e.getMessage());
             }
         }
+
+        // After transcripts, while the heartbeat still runs — inventory is additive and must never fail the transcript work.
+        publishAgentInventory(integrationId, integration);
+
         heartbeatExecutor.shutdownNow();
 
         persistEnvironments(integrationId, integration);
@@ -173,6 +184,82 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
             int done = completed.incrementAndGet();
             logger.info("CopilotStudioMultiEnv: progress: {} of {} environments processed, {} remaining",
                 done, totalEnvironments, totalEnvironments - done);
+        }
+    }
+
+    /** Pulls tenant-wide agent inventory once per job (not per environment) and publishes samples; best-effort, never blocks transcripts: https://learn.microsoft.com/en-us/power-platform/admin/power-platform-inventory#access-requirements */
+    private void publishAgentInventory(String integrationId, CopilotStudioIntegration integration) {
+        try {
+            String ingestionUrl = integration.getDataIngestionUrl();
+            if (ingestionUrl == null || ingestionUrl.isEmpty()) {
+                logger.warn("CopilotStudioMultiEnv: no data ingestion URL, skipping agent inventory");
+                return;
+            }
+
+            String storedRefreshToken = integration.getRefreshToken();
+            if (storedRefreshToken == null || storedRefreshToken.isEmpty()) {
+                // Connected before this feature shipped, or a prior refresh already failed and cleared it.
+                logger.warn("CopilotStudioMultiEnv: no delegated refresh token on file, skipping agent "
+                    + "inventory until the customer reconnects. integrationId={}", integrationId);
+                return;
+            }
+
+            AccessToken inventoryToken;
+            try {
+                inventoryToken = apiClient.getDelegatedTokenFromRefreshToken(
+                    integration.getTenantId(), integration.getClientId(), integration.getClientSecret(),
+                    storedRefreshToken, Constants.SCOPE_COPILOT_STUDIO_INVENTORY);
+            } catch (Exception e) {
+                // Expired or revoked — clear it rather than retrying the same dead token every 30 minutes.
+                logger.warn("CopilotStudioMultiEnv: delegated refresh token rejected, marking for "
+                    + "reconnect. integrationId={} error={}", integrationId, e.getMessage());
+                integration.setRefreshToken(null);
+                integration.setStatus(CopilotStudioIntegration.Status.REAUTH_REQUIRED);
+                persistEnvironments(integrationId, integration);
+                return;
+            }
+
+            // Microsoft rotates refresh tokens on use; persist the new one or the next run fails.
+            if (inventoryToken.getRefreshToken() != null
+                    && !inventoryToken.getRefreshToken().equals(storedRefreshToken)) {
+                integration.setRefreshToken(inventoryToken.getRefreshToken());
+                persistEnvironments(integrationId, integration);
+            }
+
+            List<JsonNode> agents = inventoryClient.fetchAgents(inventoryToken.getToken(), null);
+            if (agents.isEmpty()) {
+                logger.info("CopilotStudioMultiEnv: agent inventory returned no agents");
+                return;
+            }
+
+            // One call covers the tenant; split by environment so each sample gets its environment's host.
+            Map<String, List<JsonNode>> agentsByEnvironment = new HashMap<>();
+            for (JsonNode agent : agents) {
+                String environmentId = agent.path("properties").path("environmentId").asText("");
+                agentsByEnvironment.computeIfAbsent(environmentId, k -> new ArrayList<>()).add(agent);
+            }
+
+            String jwtToken = System.getenv(DATABASE_ABSTRACTOR_SERVICE_TOKEN_ENV);
+            int published = 0;
+            for (Map.Entry<String, List<JsonNode>> entry : agentsByEnvironment.entrySet()) {
+                List<Map<String, Object>> samples = inventoryPublisher.buildSamples(
+                    entry.getValue(), entry.getKey(), null);
+                published += inventoryPublisher.publish(ingestionUrl, jwtToken, samples);
+            }
+
+            logger.info("CopilotStudioMultiEnv: published inventory for {} agents across {} environments",
+                published, agentsByEnvironment.size());
+
+        } catch (CopilotStudioInventoryClient.InventoryException e) {
+            if (e.isAuthorizationError()) {
+                logger.warn("CopilotStudioMultiEnv: agent inventory not authorized - the user who "
+                    + "connected needs Global Administrator, Power Platform Administrator, Dynamics 365 "
+                    + "Administrator, Global Reader, AI Administrator or AI Reader. Skipping. " + e.getMessage());
+            } else {
+                logger.error("CopilotStudioMultiEnv: agent inventory query failed: " + e.getMessage());
+            }
+        } catch (Exception e) {
+            logger.error("CopilotStudioMultiEnv: agent inventory failed: " + e.getMessage());
         }
     }
 
