@@ -25,11 +25,13 @@ public class CopilotStudioIntegration {
     public static final String JOB_ID = "jobId";
     public static final String LAST_ERROR = "lastError";
     public static final String UPDATED_AT = "updatedAt";
+    public static final String REFRESH_TOKEN = "refreshToken";
 
     public enum Status {
         PENDING_OAUTH,
         ENVIRONMENTS_DISCOVERED,
-        CONFIRMED
+        CONFIRMED,
+        REAUTH_REQUIRED
     }
 
     @Getter
@@ -72,6 +74,7 @@ public class CopilotStudioIntegration {
     private String clientSecret;
     private String dataIngestionUrl;
     private Status status;
+    private String refreshToken;
     private List<Environment> environments = new ArrayList<>();
     private String jobId;
     private String lastError;

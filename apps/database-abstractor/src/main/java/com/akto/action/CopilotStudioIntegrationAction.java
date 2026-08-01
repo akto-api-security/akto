@@ -49,9 +49,9 @@ public class CopilotStudioIntegrationAction extends ActionSupport {
     }
 
     /**
-     * Update a CopilotStudioIntegration's environments and updatedAt. Takes the typed object
-     * (deserialized straight into copilotStudioIntegration.environments/updatedAt) instead of a
-     * generic field map, so int/List values land in their real types with no manual coercion.
+     * Update a CopilotStudioIntegration's environments, updatedAt, refreshToken and status. Takes the
+     * typed object (deserialized straight into copilotStudioIntegration's fields) instead of a generic
+     * field map, so int/List values land in their real types with no manual coercion.
      */
     public String updateCopilotStudioIntegration() {
         try {
@@ -60,7 +60,9 @@ public class CopilotStudioIntegrationAction extends ActionSupport {
 
             Bson update = Updates.combine(
                 Updates.set(CopilotStudioIntegration.ENVIRONMENTS, copilotStudioIntegration.getEnvironments()),
-                Updates.set(CopilotStudioIntegration.UPDATED_AT, copilotStudioIntegration.getUpdatedAt())
+                Updates.set(CopilotStudioIntegration.UPDATED_AT, copilotStudioIntegration.getUpdatedAt()),
+                Updates.set(CopilotStudioIntegration.REFRESH_TOKEN, copilotStudioIntegration.getRefreshToken()),
+                Updates.set(CopilotStudioIntegration.STATUS, copilotStudioIntegration.getStatus())
             );
 
             CopilotStudioIntegrationDao.instance.getMCollection().updateOne(filter, update);
