@@ -33,6 +33,10 @@ import { CLIENT_TYPES, ROW_TYPES, hasPersonalAccountTag } from "./mcpClientHelpe
 
 const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills'];
 
+// Free-text search matches only the agentic asset name column (like the "Agentic asset" filter),
+// not every flattened field on the row.
+const SEARCH_KEYS = ["groupName"];
+
 function Endpoints() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
@@ -75,6 +79,44 @@ function Endpoints() {
         h[1] = { ...h[1], value: "groupNameDisplay" };
         return h;
     }, []);
+
+    // Default the view to Risk score (highest first) instead of Name A-Z. Two quirks handled here
+    // (page-scoped — the shared sortOptions export is left untouched for other pages):
+    //  1. getInitialSortSelected picks sortOptions[0] when there's no persisted sort, so the
+    //     highest-risk option must be first.
+    //  2. The legacy client-side numeric sort is INVERTED vs its labels: func.sortFunc orders
+    //     numbers as sortOrder*(a-b) and "desc" maps to sortOrder=1 → ascending (lowest first).
+    //     So the value that actually shows highest-first for a numeric field is "riskScore asc".
+    //     Swap the two Risk score option VALUES so each directionLabel matches real behavior.
+    const riskFirstSortOptions = useMemo(() => {
+        const swapped = sortOptions.map((o) => {
+            if (o.sortKey !== "riskScore") return o;
+            if (o.directionLabel === "Highest") return { ...o, value: "riskScore asc" };
+            if (o.directionLabel === "Lowest") return { ...o, value: "riskScore desc" };
+            return o;
+        });
+        const riskHighest = swapped.find((o) => o.sortKey === "riskScore" && o.directionLabel === "Highest");
+        return riskHighest ? [riskHighest, ...swapped.filter((o) => o !== riskHighest)] : swapped;
+    }, []);
+
+    // Filter-only header (not a visible column) for the malicious/misconfigured tags we add on
+    // skills. Kept out of `headings` so it drives the filter facet without rendering a column.
+    const tagFilterHeader = useMemo(() => ({
+        title: "Tag", text: "Tag", value: "assetTags",
+        filterKey: "assetTags", filterLabel: "Tag", showFilter: true,
+    }), []);
+
+    // Only expose the tag filter once enriched rows actually carry tags. Adding the header changes
+    // the transform filter-choices cache key, so the "Malicious" choice appears after async
+    // enrichment rather than being cached-empty from the pre-enrichment first render.
+    const hasAssetTags = useMemo(
+        () => (data.skills || []).some((r) => (r.assetTags || []).length > 0),
+        [data.skills],
+    );
+    const filterHeaders = useMemo(
+        () => (hasAssetTags ? [...headers, tagFilterHeader] : headers),
+        [headers, tagFilterHeader, hasAssetTags],
+    );
 
     const getRiskScoreStatus = useCallback((riskScore) => {
         if (riskScore >= 4.5) return "critical";
@@ -139,6 +181,12 @@ function Endpoints() {
                     maxRiskScore: riskScore,
                     isMalicious,
                     isMisconfigured,
+                    // Filterable tag values (drives the "Tag" filter facet). Array so a row can
+                    // carry more than one tag; empty for clean skills so no facet value is added.
+                    assetTags: [
+                        ...(isMalicious ? ["Malicious"] : []),
+                        ...(isMisconfigured ? ["Misconfigured"] : []),
+                    ],
                     groupNameDisplay,
                     riskScoreComp: riskScore
                         ? <Badge status={getRiskScoreStatus(riskScore)} size="small">{riskScore}</Badge>
@@ -297,16 +345,21 @@ function Endpoints() {
 
     const tableComponent = useMemo(() => {
         const commonTabProps = { tableTabs, onSelect: handleSelectedTab, selected };
-        const tableKey = selectedTab === "skills" ? `table-skills-${skillEnrichVersion}` : "table";
         return (
             <GithubSimpleTable
-                key={tableKey}
+                key="table"
                 pageLimit={PAGE_LIMIT}
                 data={data[selectedTab]}
-                sortOptions={sortOptions}
+                searchKeys={SEARCH_KEYS}
+                // Skill risk scores/badges load asynchronously. Instead of remounting the table
+                // (which wipes the in-progress search query — LLM tab works, Skills didn't),
+                // bump callFromOutside so the table re-derives rows from the enriched data while
+                // preserving queryValue/filters/page.
+                callFromOutside={selectedTab === "skills" ? skillEnrichVersion : undefined}
+                sortOptions={riskFirstSortOptions}
                 resourceName={resourceName}
                 filters={[]}
-                headers={headers}
+                headers={filterHeaders}
                 selectable={false}
                 mode={IndexFiltersMode.Default}
                 headings={headers}
@@ -318,7 +371,7 @@ function Endpoints() {
                 {...commonTabProps}
             />
         );
-    }, [data, selectedTab, skillEnrichVersion, headers, disambiguateLabel, handleRowClick, tableTabs, selected]);
+    }, [data, selectedTab, skillEnrichVersion, headers, filterHeaders, riskFirstSortOptions, disambiguateLabel, handleRowClick, tableTabs, selected]);
 
     const pageTitle = useMemo(() => (
         <TitleWithInfo

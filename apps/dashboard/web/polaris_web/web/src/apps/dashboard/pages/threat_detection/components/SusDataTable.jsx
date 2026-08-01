@@ -149,6 +149,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   const [loading, setLoading] = useState(true);
   const collectionsMap = PersistStore((state) => state.collectionsMap);
+  const hostNameMap = PersistStore((state) => state.hostNameMap);
   const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
   const guardrailComplianceMap = SessionStore((state) => state.guardrailComplianceMap);
   const setGuardrailComplianceMap = SessionStore((state) => state.setGuardrailComplianceMap);
@@ -174,6 +175,32 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     setApproveMode("ALWAYS");
     setApproveDays("7");
     setApproveRow(x);
+  };
+
+  // Threat events for skills carry the threat/traffic collection id in `apiCollectionId`, which is
+  // NOT the inventory collection that renders the skill content. That inventory collection is keyed
+  // by host, so resolve it by reverse-looking up the host in hostNameMap / collectionsMap.
+  const resolveSkillCollectionId = (host) => {
+    if (!host || host === '-') return null;
+    const match = (map) => Object.keys(map || {}).find((id) => map[id] === host);
+    return match(hostNameMap) || match(collectionsMap) || null;
+  };
+
+  // Open the skill-content page (inventory ApiDetails flyout, Values tab) for a skill threat row.
+  const openSkillContent = (x) => {
+    const collectionId = resolveSkillCollectionId(x?.host);
+    if (!collectionId) {
+      func.setToast(true, true, "Could not find the skill collection for this host");
+      return;
+    }
+    // Inventory endpoints are stored path-only; strip any host prefix before matching selected_url.
+    const pathOnlyUrl = String(x?.url || "").replace(/^https?:\/\/[^/]+/, "");
+    const params = new URLSearchParams();
+    params.set("selected_url", pathOnlyUrl);
+    params.set("selected_method", x?.method || "POST");
+    params.set("agentic_view", "skills");
+    const navigateUrl = `${window.location.origin}/dashboard/observe/inventory/${collectionId}?${params.toString()}`;
+    window.open(navigateUrl, "_blank");
   };
 
   const submitInlineApprove = async () => {
@@ -702,7 +729,21 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           ? getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap)
           : formatActorId(x.actor),
         host: x.host || "-",
-        endpointComp: (
+        endpointComp: String(x?.url || "").includes('/skills/') ? (
+          // Skill rows link to the skill-content page (Values tab markdown) for this host.
+          // preventDefault/stopPropagation stops the row's <a href=nextUrl> and onRowClick.
+          <div
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); openSkillContent(x); }}
+            style={{ cursor: "pointer" }}
+          >
+            <GetPrettifyEndpoint
+              maxWidth="300px"
+              method={x.method}
+              url={x.url}
+              isNew={false}
+            />
+          </div>
+        ) : (
           <GetPrettifyEndpoint
             maxWidth="300px"
             method={x.method}

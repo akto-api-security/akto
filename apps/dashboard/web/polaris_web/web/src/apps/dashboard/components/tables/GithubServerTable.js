@@ -338,19 +338,25 @@ function GithubServerTable(props) {
     setAppliedFilters(temp);
   }, [appliedFilters, props.disambiguateLabel, handleRemoveAppliedFilter, setFiltersMap, currentPageKey, pageFiltersMap]);
 
-  const debouncedSearch = debounce((searchQuery) => {
-      fetchData(searchQuery)
-  }, 500);
+  // Always call the latest fetchData. Without this ref the handlers below (useCallback([]))
+  // freeze the first-render fetchData/props.data, so clearing/canceling search re-renders with
+  // stale rows (e.g. dropping async-enriched badges when the table no longer remounts).
+  const fetchDataRef = useRef(fetchData);
+  fetchDataRef.current = fetchData;
+
+  const debouncedSearch = useMemo(() => debounce((searchQuery) => {
+      fetchDataRef.current(searchQuery)
+  }, 500), []);
 
   const handleFiltersQueryChange = useCallback((val) => {
     setQueryValue(val);
     debouncedSearch(val);
-  }, []);
+  }, [debouncedSearch]);
 
   const handleFiltersQueryClear = useCallback(
     () => {setQueryValue("");
     debouncedSearch("")},
-    [],
+    [debouncedSearch],
   );
 
   const handleFilterStatusChange = (key, value) => {
