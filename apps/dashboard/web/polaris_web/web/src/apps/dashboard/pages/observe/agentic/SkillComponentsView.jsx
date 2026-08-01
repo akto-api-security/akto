@@ -1,23 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Box, Spinner, VerticalStack, Text } from "@shopify/polaris";
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
+import { stripMarkdownLinks } from "../../../components/shared/markdownUtils";
 import observeApi from "../api";
-
-// Remove any links from the skill data so only plain text is shown
-function stripLinks(text) {
-    if (!text) return text;
-    return text
-        // Markdown images: ![alt](url) -> alt
-        .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-        // Markdown links: [text](url) -> text
-        .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-        // Reference-style links: [text][ref] -> text
-        .replace(/\[([^\]]*)\]\[[^\]]*\]/g, "$1")
-        // Autolinks: <http://...> -> (removed)
-        .replace(/<https?:\/\/[^>]*>/gi, "")
-        // Bare URLs
-        .replace(/\bhttps?:\/\/\S+/gi, "");
-}
 
 function buildSkillMarkdown(sampleMessage, skillName) {
     try {
@@ -28,9 +13,9 @@ function buildSkillMarkdown(sampleMessage, skillName) {
         // Only return content for the specific skill being viewed
         if (skillName && body.skill_name.toLowerCase() !== skillName.toLowerCase()) return null;
         return (
-            `# ${stripLinks(body.skill_name)}\n\n` +
-            (body.skill_description ? `**${stripLinks(body.skill_description)}**\n\n` : "") +
-            stripLinks(body.skill_content || "")
+            `# ${stripMarkdownLinks(body.skill_name)}\n\n` +
+            (body.skill_description ? `**${stripMarkdownLinks(body.skill_description)}**\n\n` : "") +
+            stripMarkdownLinks(body.skill_content || "")
         );
     } catch (_) {
         return null;
