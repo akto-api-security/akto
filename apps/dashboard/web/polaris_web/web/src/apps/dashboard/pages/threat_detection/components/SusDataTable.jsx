@@ -24,6 +24,17 @@ const resourceName = {
   plural: "activities",
 };
 
+// A "Skills Evaluations" entry: a skill-endpoint event (url contains "/skills/") that is a skill
+// evaluation — either the skill_evaluation policy, or whose rule_violated (from metadata) is not a
+// "skill:<name>" rule (i.e. not a malicious-skill detection). These show under the Skills
+// Evaluations tab and are excluded from the Active tab.
+const isSkillEvaluationEntry = (r) => {
+  if (!String(r?.url || '').toLowerCase().includes('/skills/')) return false;
+  const isSkillEvalPolicy = String(r?.filterId || '').toLowerCase() === 'skill_evaluation';
+  const ruleViolated = String(extractRuleViolated(r?.metadata) || '').toLowerCase();
+  return isSkillEvalPolicy || !ruleViolated.includes('skill:');
+};
+
 const getHeaders = () => {
   const baseHeaders = [
     {
@@ -156,7 +167,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const guardrailApprovedByPolicy = SessionStore((state) => state.guardrailApprovedByPolicy);
   const setGuardrailApprovedByPolicy = SessionStore((state) => state.setGuardrailApprovedByPolicy);
   const needsGuardrailCompliance = label === LABELS.GUARDRAIL || isAgenticSecurityCategory() || isEndpointSecurityCategory();
-  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, needs_approval: 3, training: 4 };
+  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, needs_approval: 3, training: 4, skills_evaluations: 4 };
   const resolvedInitialTab = initialTab || 'active';
   const [currentTab, setCurrentTab] = useState(resolvedInitialTab);
   const [selected, setSelected] = useState(tabIndexMap[resolvedInitialTab] || 0)
@@ -322,7 +333,19 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       index: 4
     });
   }
-  const tableTabs = [...baseTabs, ...guardrailExtraTabs]
+  // "Skills Evaluations" — ACTIVE skill_evaluation policy events on skill endpoints. Client-side
+  // view like "Needs Approval". Endpoint (Atlas) only. Positioned after the guardrail extra tabs.
+  const skillsExtraTabs = [];
+  if (isEndpointSecurityCategory()) {
+    skillsExtraTabs.push({
+      content: 'Skills Evaluations',
+      badge: 'Beta',
+      onAction: () => { setCurrentTab('skills_evaluations'); },
+      id: 'skills_evaluations',
+      index: baseTabs.length + guardrailExtraTabs.length
+    });
+  }
+  const tableTabs = [...baseTabs, ...guardrailExtraTabs, ...skillsExtraTabs]
 
   const handleSelectedTab = (selectedIndex) => {
     setLoading(true)
@@ -616,9 +639,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     // "Needs Approval" is a client-side view over ACTIVE events filtered to behaviour==="approval".
     // Fetch active events with a high limit (single page) and filter after mapping.
     const isNeedsApproval = currentTab === 'needs_approval';
-    const effectiveStatus = isNeedsApproval ? 'ACTIVE' : currentTab.toUpperCase();
-    const effectiveSkip = isNeedsApproval ? 0 : skip;
-    const effectiveLimit = isNeedsApproval ? 200 : limit;
+    // Skills Evaluations: client-side view over ACTIVE skill_evaluation events on skill endpoints.
+    const isSkillsEvaluations = currentTab === 'skills_evaluations';
+    const isClientSideView = isNeedsApproval || isSkillsEvaluations;
+    const effectiveStatus = isClientSideView ? 'ACTIVE' : currentTab.toUpperCase();
+    const effectiveSkip = isClientSideView ? 0 : skip;
+    const effectiveLimit = isClientSideView ? 200 : limit;
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
       matchingUrlFilter = [],
@@ -833,6 +859,25 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       );
       total = ret.length;
     }
+    // Skills Evaluations tab: keep only the skill-evaluation entries. In the Policy Triggered
+    // column, relabel malicious_skill_detected as "Skills Evaluation" (display only — the real
+    // filterId stays on the row for row-click deep-links/actions; header value swapped below).
+    if (isSkillsEvaluations) {
+      ret = ret.filter(isSkillEvaluationEntry).map(r => ({
+        ...r,
+        policyDisplay: String(r.filterId || '').toLowerCase() === 'malicious_skill_detected'
+          ? 'Skills Evaluation'
+          : r.filterId,
+      }));
+      total = ret.length;
+    }
+    // Active tab (Atlas only): hide the skill-evaluation entries that now live under the Skills
+    // Evaluations tab. Server-paginated, so the page count can be slightly off — see note.
+    if (currentTab === 'active' && isEndpointSecurityCategory()) {
+      const kept = ret.filter(r => !isSkillEvaluationEntry(r));
+      total = Math.max(0, total - (ret.length - kept.length));
+      ret = kept;
+    }
     setLoading(false);
     return { value: ret, total: total };
   }
@@ -961,6 +1006,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const headers = getHeaders();
   if (currentTab === 'needs_approval') {
     headers.push({ text: "Action", value: "approveAction", title: "Action" });
+  }
+  // Skills Evaluations tab: render the Policy Triggered column from policyDisplay (which relabels
+  // malicious_skill_detected as "Skills Evaluation") instead of the raw filterId.
+  if (currentTab === 'skills_evaluations') {
+    const idx = headers.findIndex(h => h.value === 'filterId');
+    if (idx !== -1) headers[idx] = { ...headers[idx], value: 'policyDisplay' };
   }
 
   return (
