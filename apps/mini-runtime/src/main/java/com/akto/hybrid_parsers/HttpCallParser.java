@@ -726,6 +726,9 @@ public class HttpCallParser {
 
             // Parse trace using N8nTraceParser
             TraceParseResult result = N8nTraceParser.getInstance().parse(n8nTraceJson);
+            if (result.getTrace() != null && httpResponseParam.getRequestParams() != null) {
+                result.getTrace().setApiCollectionId(httpResponseParam.getRequestParams().getApiCollectionId());
+            }
 
             // Store trace and spans using dataActor
             dataActor.storeTrace(result.getTrace());
@@ -801,6 +804,9 @@ public class HttpCallParser {
 
             // Parse trace using BedrockAgentTraceParser
             TraceParseResult result = BedrockAgentTraceParser.getInstance().parse(bedrockTraceJson);
+            if (result.getTrace() != null && httpResponseParam.getRequestParams() != null) {
+                result.getTrace().setApiCollectionId(httpResponseParam.getRequestParams().getApiCollectionId());
+            }
 
             // Store trace and spans using dataActor
             dataActor.storeTrace(result.getTrace());
