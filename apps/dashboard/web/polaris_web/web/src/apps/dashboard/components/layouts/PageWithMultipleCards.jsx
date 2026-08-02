@@ -8,7 +8,7 @@ import { useEffect, useRef } from "react";
 
 const PageWithMultipleCards = (props) => {
 
-    const {backUrl, isFirstPage, title, primaryAction, secondaryActions, divider, components, fullWidth} = props
+    const {backUrl, isFirstPage, title, subtitle, primaryAction, secondaryActions, divider, components, fullWidth} = props
 
     const location = useLocation();
     const navigate = useNavigate()
@@ -126,6 +126,7 @@ const PageWithMultipleCards = (props) => {
     return (
         <Page fullWidth={fullWidth === undefined ? true: fullWidth}
             title={title}
+            subtitle={subtitle}
             backAction={getBackAction()}
             primaryAction={primaryAction}
             secondaryActions={useSecondaryActions}

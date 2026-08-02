@@ -228,7 +228,7 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts
                     onChange={setBlockPersonalAccounts}
                 />
                 <Box paddingBlockStart="2">
-                    <Banner tone="info">Currently supported for the following browser LLMs: chatgpt.com, claude.ai, gemini.google.com and copilot.microsoft.com.</Banner>
+                    <Banner tone="info">Currently supported for the following browser LLMs: chatgpt.com, claude.ai, gemini.google.com, copilot.microsoft.com and grok.com.</Banner>
                 </Box>
             </SectionCard>
         </VerticalStack>
