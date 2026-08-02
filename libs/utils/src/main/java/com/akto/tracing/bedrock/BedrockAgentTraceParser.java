@@ -19,6 +19,13 @@ public class BedrockAgentTraceParser implements TraceParser {
     private static final String AGENT_TYPE_AGENTCORE = "AGENTCORE";
     private static final String AGENT_TYPE_BEDROCK = "BEDROCK";
 
+    // AWS surfaces the execution role under different keys depending on how the
+    // agent was deployed: Harness-based AgentCore, native AgentCore Runtime, or a
+    // bare Bedrock model invoke with no agent harness at all.
+    private static final String FIELD_HARNESS_ROLE = "harness-execution-role";
+    private static final String FIELD_RUNTIME_ROLE = "runtime-execution-role";
+    private static final String FIELD_BEDROCK_ROLE = "bedrock-execution-role";
+
     // CloudWatch's trace data has no structured success/failure field for a tool
     // result — only free-text. These are the phrasings actually observed across real
     // tool failures (validation errors, missing-session lookups, etc.); this is a
@@ -55,12 +62,31 @@ public class BedrockAgentTraceParser implements TraceParser {
     }
 
     private boolean isValidBedrockTrace(JsonNode awsMetadata) {
-        boolean hasHarnessRole = awsMetadata.has("harness-execution-role");
-        boolean hasBedrockRole = awsMetadata.has("bedrock-execution-role");
-        if (!hasHarnessRole && !hasBedrockRole) {
+        boolean hasExecutionRole = awsMetadata.has(FIELD_HARNESS_ROLE)
+            || awsMetadata.has(FIELD_RUNTIME_ROLE)
+            || awsMetadata.has(FIELD_BEDROCK_ROLE);
+        if (!hasExecutionRole) {
             return false;
         }
         return awsMetadata.has("model") && awsMetadata.has("traceData");
+    }
+
+    // Harness-based AgentCore and native AgentCore Runtime traces both drive tool
+    // calls through an agent; a bare "bedrock-execution-role" means a direct,
+    // un-orchestrated model invoke with no agent involved.
+    private String resolveAgentType(JsonNode awsMetadata) {
+        if (awsMetadata.has(FIELD_HARNESS_ROLE) || awsMetadata.has(FIELD_RUNTIME_ROLE)) {
+            return AGENT_TYPE_AGENTCORE;
+        }
+        return AGENT_TYPE_BEDROCK;
+    }
+
+    private String extractExecutionRoleValue(JsonNode awsMetadata) {
+        String field = awsMetadata.has(FIELD_HARNESS_ROLE) ? FIELD_HARNESS_ROLE
+            : awsMetadata.has(FIELD_RUNTIME_ROLE) ? FIELD_RUNTIME_ROLE
+            : FIELD_BEDROCK_ROLE;
+        String value = awsMetadata.path(field).asText("");
+        return value.isEmpty() ? "unknown" : value;
     }
 
     @Override
@@ -86,8 +112,7 @@ public class BedrockAgentTraceParser implements TraceParser {
             // Extract agent/harness info
             String botName = extractBotName(awsMetadata);
             String model = awsMetadata.path("model").asText("unknown");
-            String harnessRole = awsMetadata.path("harness-execution-role").asText("");
-            String agentType = (!harnessRole.isEmpty()) ? AGENT_TYPE_AGENTCORE : AGENT_TYPE_BEDROCK;
+            String agentType = resolveAgentType(awsMetadata);
 
             // Generate IDs
             String traceId = UUID.randomUUID().toString();
@@ -159,16 +184,13 @@ public class BedrockAgentTraceParser implements TraceParser {
                 throw new Exception("Invalid Bedrock Agent trace for service graph extraction");
             }
 
-            String harnessRole = awsMetadata.path("harness-execution-role").asText("");
-            String agentType = (!harnessRole.isEmpty()) ? AGENT_TYPE_AGENTCORE : AGENT_TYPE_BEDROCK;
+            String agentType = resolveAgentType(awsMetadata);
 
             Map<String, ServiceGraphEdgeInfo> edges = new HashMap<>();
 
             // Extract model edge
             String model = awsMetadata.path("model").asText("unknown");
-            String executionRole = agentType.equals(AGENT_TYPE_AGENTCORE) ?
-                awsMetadata.path("harness-execution-role").asText("unknown") :
-                awsMetadata.path("bedrock-execution-role").asText("unknown");
+            String executionRole = extractExecutionRoleValue(awsMetadata);
 
             String sourceService = "BEDROCK_AGENT (Role - " + executionRole + ")";
 
@@ -349,11 +371,12 @@ public class BedrockAgentTraceParser implements TraceParser {
 
         // Add role information
         if (agentType.equals(AGENT_TYPE_AGENTCORE)) {
-            metadata.put("harnessExecutionRole", awsMetadata.path("harness-execution-role").asText(""));
+            metadata.put("harnessExecutionRole", awsMetadata.path(FIELD_HARNESS_ROLE).asText(""));
+            metadata.put("runtimeExecutionRole", awsMetadata.path(FIELD_RUNTIME_ROLE).asText(""));
             metadata.put("configuredTools", awsMetadata.path("harness-configured-tools").asText(""));
             metadata.put("configuredSkills", awsMetadata.path("harness-configured-skills").asText(""));
         } else {
-            metadata.put("bedrockExecutionRole", awsMetadata.path("bedrock-execution-role").asText(""));
+            metadata.put("bedrockExecutionRole", awsMetadata.path(FIELD_BEDROCK_ROLE).asText(""));
         }
 
         // Add execution summary
