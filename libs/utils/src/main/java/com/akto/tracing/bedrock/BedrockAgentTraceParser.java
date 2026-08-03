@@ -194,6 +194,15 @@ public class BedrockAgentTraceParser implements TraceParser {
 
             String sourceService = "BEDROCK_AGENT (Role - " + executionRole + ")";
 
+            // The agent node is only ever a source below, never a target — without an
+            // edge that targets it, the UI has no "type" for it and defaults to
+            // "Internal Service" (see buildServiceGraphFromSpans in HttpCallParser for
+            // the same pattern used by Copilot/Snowflake).
+            Map<String, Object> agentMetadata = new HashMap<>();
+            agentMetadata.put("type", TracingConstants.SpanKind.AGENT);
+            agentMetadata.put("edgeParam", "AI Agent");
+            edges.put(sourceService, new ServiceGraphEdgeInfo("User", sourceService, agentMetadata));
+
             // LLM Call edge
             Map<String, Object> llmMetadata = new HashMap<>();
             llmMetadata.put("type", "llmCall");
