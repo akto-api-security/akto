@@ -871,13 +871,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       }));
       total = ret.length;
     }
-    // Active tab (Atlas only): hide the skill-evaluation entries that now live under the Skills
-    // Evaluations tab. Server-paginated, so the page count can be slightly off — see note.
-    if (currentTab === 'active' && isEndpointSecurityCategory()) {
-      const kept = ret.filter(r => !isSkillEvaluationEntry(r));
-      total = Math.max(0, total - (ret.length - kept.length));
-      ret = kept;
-    }
+    // NOTE: We intentionally do NOT hide skill-evaluation entries from the Active tab here.
+    // Active is server-paginated (total comes from the backend), so removing rows client-side per
+    // page made "Showing X of N" wrong. Excluding them correctly needs a server-side filter (see
+    // subCategory-based approach); until then skill-evaluation rows appear in both Active and the
+    // Skills Evaluations tab, but pagination stays correct.
     setLoading(false);
     return { value: ret, total: total };
   }
