@@ -36,8 +36,7 @@ public class CopilotStudioInventoryPublisher {
     private static final String BOT_ID_TAG = "bot-id";
     private static final String TAG_VALUE_TRUE = "true";
     private static final String HEADER_HOST = "host";
-    private static final String AGENT_PATH_PREFIX = "/copilot/agent/";
-    private static final String AGENT_PATH_SUFFIX = "/inventory";
+    private static final String AGENT_PATH_PREFIX = "/copilot/bot/";
 
     /** Kept at "{}" on purpose — over 3 chars triggers an unwanted AgentQueryRecord write downstream. */
     private static final String EMPTY_REQUEST_PAYLOAD = "{}";
@@ -75,7 +74,7 @@ public class CopilotStudioInventoryPublisher {
             requestHeaders.put("content-type", AIAgentConnectorConstants.CONTENT_TYPE_JSON);
 
             Map<String, Object> sample = new HashMap<>();
-            sample.put("path", AGENT_PATH_PREFIX + agentId + AGENT_PATH_SUFFIX);
+            sample.put("path", AGENT_PATH_PREFIX + agentId);
             sample.put("method", AIAgentConnectorConstants.HTTP_METHOD_GET);
             // Headers/tags go on the wire as JSON strings — OriginalHttpRequest.buildHeadersMap casts the field to String.
             sample.put("requestHeaders", toJson(requestHeaders));
