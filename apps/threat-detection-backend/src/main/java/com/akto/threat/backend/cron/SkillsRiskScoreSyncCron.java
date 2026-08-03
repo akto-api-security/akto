@@ -23,8 +23,6 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.type.URLMethods;
-import com.akto.billing.UsageMetricUtils;
-import com.akto.dto.billing.FeatureAccess;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.threat.backend.dao.MaliciousEventDao;
@@ -112,8 +110,9 @@ public class SkillsRiskScoreSyncCron {
                             }
 
                             Map<ApiInfoKey, Float> apiInfoKeyToRiskScore = new HashMap<>();
-                            // non-skill ENDPOINT events: same host->collectionId resolution as above, but
-                            // scored via RiskScoreSyncCron.resolveThreatScores (generic severity formula), no malicious tag.
+                            // non-skill ENDPOINT events: same host->collectionId resolution as above, and the
+                            // same computeRiskScore formula as skill events, just via RiskScoreSyncCron's shared
+                            // url-template matching. No malicious tag.
                             Map<String, List<String>> nonSkillApiInfoKeyToSeverities = new HashMap<>();
                             while (cursor.hasNext()) {
                                 BasicDBObject document = cursor.next();
@@ -152,7 +151,8 @@ public class SkillsRiskScoreSyncCron {
                                 apiInfoKeyToRiskScore.put(apiInfoKey, Math.max(apiInfoKeyToRiskScore.getOrDefault(apiInfoKey, 0.0f), riskScore));
                             }
 
-                            Map<ApiInfoKey, Float> nonSkillApiInfoKeyToThreatScore = RiskScoreSyncCron.resolveThreatScores(nonSkillApiInfoKeyToSeverities);
+                            Map<ApiInfoKey, Float> nonSkillApiInfoKeyToThreatScore = RiskScoreSyncCron.resolveThreatScores(
+                                nonSkillApiInfoKeyToSeverities, SkillsRiskScoreSyncCron::computeRiskScore);
 
                             loggerMaker.infoAndAddToDb("Skills malicious events count: " + apiInfoKeyToRiskScore.size());
 
@@ -217,6 +217,7 @@ public class SkillsRiskScoreSyncCron {
                 case "CRITICAL": score = 5f; break;
                 case "HIGH":     score = 4f; break;
                 case "MEDIUM":   score = 3f; break;
+                case "LOW":      score = 2f; break;
                 default:         break;
             }
             max = Math.max(max, score);

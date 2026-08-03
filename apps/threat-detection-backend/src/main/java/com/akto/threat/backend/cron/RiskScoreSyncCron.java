@@ -10,6 +10,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.ahocorasick.trie.Trie;
 import org.bson.conversions.Bson;
@@ -113,7 +114,7 @@ public class RiskScoreSyncCron {
 
                         loggerMaker.warnAndAddToDb("Malicious events count: " + apiInfoKeyToSeverities.size());
 
-                        Map<ApiInfoKey, Float> apiInfoKeyToThreatScore = resolveThreatScores(apiInfoKeyToSeverities);
+                        Map<ApiInfoKey, Float> apiInfoKeyToThreatScore = resolveThreatScores(apiInfoKeyToSeverities, MaliciousEventDao::getThreatScoreFromSeverities);
                         List<WriteModel<ApiInfo>> updates = new ArrayList<>();
 
                         if(apiInfoKeyToThreatScore.size() > 0){
@@ -136,9 +137,11 @@ public class RiskScoreSyncCron {
     }
 
     // shared with SkillsRiskScoreSyncCron's non-skill endpoint events: resolves each event's literal
-    // (apiCollectionId, url, method) against ApiInfo's stored template/literal urls and scores it.
+    // (apiCollectionId, url, method) against ApiInfo's stored template/literal urls and scores it via
+    // the caller-supplied severity->score formula (each cron scores on its own scale).
     // apiInfoKeyToSeverities keys are formatted as "apiCollectionId url method".
-    public static Map<ApiInfoKey, Float> resolveThreatScores(Map<String, List<String>> apiInfoKeyToSeverities) {
+    public static Map<ApiInfoKey, Float> resolveThreatScores(Map<String, List<String>> apiInfoKeyToSeverities,
+            Function<List<String>, Float> severityScorer) {
         Map<ApiInfoKey, Float> apiInfoKeyToThreatScore = new HashMap<>();
         if (apiInfoKeyToSeverities.isEmpty()) {
             return apiInfoKeyToThreatScore;
@@ -161,7 +164,7 @@ public class RiskScoreSyncCron {
             String method = parts[2];
             URLTemplate urlTemplate = isMatchingUrl(apiCollectionId, url, method, apiCollectionUrlTemplates, lfiTrie, osCommandInjectionTrie, ssrfTrie);
             List<String> severities = apiInfoKeyToSeverities.get(apiInfoKey);
-            float threatScore = MaliciousEventDao.getThreatScoreFromSeverities(severities);
+            float threatScore = severityScorer.apply(severities);
             if(urlTemplate != null || apiInfoKeyToApiInfo.containsKey(apiInfoKey)){
                 ApiInfoKey apiInfoKeyObj = null;
                 if(urlTemplate != null){
