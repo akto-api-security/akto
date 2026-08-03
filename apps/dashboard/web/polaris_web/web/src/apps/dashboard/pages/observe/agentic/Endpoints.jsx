@@ -1,7 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Box, Badge, HorizontalStack, Text, TextField, Icon } from "@shopify/polaris";
-import { SearchMinor } from "@shopify/polaris-icons";
-import { debounce } from "lodash";
+import { IndexFiltersMode, Box, Badge, HorizontalStack, Text } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -35,8 +33,8 @@ import { CLIENT_TYPES, ROW_TYPES, hasPersonalAccountTag } from "./mcpClientHelpe
 
 const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills'];
 
-// Free-text search matches only the agentic asset name column (like the "Agentic asset" filter),
-// not every flattened field on the row.
+// Restrict free-text search to the asset-name column only. Rows carry large nested objects
+// (collections, etc.); a broad flatten-every-field match is slow enough to freeze the UI.
 const SEARCH_KEYS = ["groupName"];
 
 function Endpoints() {
@@ -51,14 +49,12 @@ function Endpoints() {
         }
     }, [navigate, agenticNewLayout]);
     const [data, setData] = useState({ all: [], 'ai_agents': [], 'mcp_servers': [], llms: [], skills: [] });
-    // Skills tab owns its own search (scoped to this page) instead of the shared table's built-in
-    // search box. skillSearchInput drives the TextField; skillFilterQuery is the debounced value we
-    // actually filter on; skillViewVersion is bumped (via effect on skillsToShow) to push the
-    // filtered/enriched rows into the table through callFromOutside — no remount, so the query and
-    // the table's sort/tag-filters all survive async risk-score enrichment.
-    const [skillSearchInput, setSkillSearchInput] = useState("");
-    const [skillFilterQuery, setSkillFilterQuery] = useState("");
-    const [skillViewVersion, setSkillViewVersion] = useState(0);
+    // Skill risk scores/badges arrive asynchronously (after the initial render). When they land,
+    // applySkillRiskScores rewrites the source rows (data.skills) and bumps skillEnrichVersion; that
+    // version is fed to the table as callFromOutside, which re-derives its rows from the now-enriched
+    // source using the current search query — so badges appear without remounting or wiping the
+    // search. Reading the source (not patching a stale snapshot) avoids the first-load race.
+    const [skillEnrichVersion, setSkillEnrichVersion] = useState(0);
     const [summaryData, setSummaryData] = useState({ totalAssets: 0, totalEndpoints: 0 });
 
     const { tabsInfo } = useTable();
@@ -126,31 +122,6 @@ function Endpoints() {
         () => (hasAssetTags ? [...headers, tagFilterHeader] : headers),
         [headers, tagFilterHeader, hasAssetTags],
     );
-
-    // Debounced skill search — updates the filter query 300ms after the user stops typing. Cancel
-    // on unmount to avoid a late setState on an unmounted component.
-    const debouncedSetSkillQuery = useMemo(() => debounce((v) => setSkillFilterQuery(v), 300), []);
-    useEffect(() => () => debouncedSetSkillQuery.cancel(), [debouncedSetSkillQuery]);
-    const handleSkillSearchChange = useCallback((val) => {
-        setSkillSearchInput(val);
-        debouncedSetSkillQuery(val);
-    }, [debouncedSetSkillQuery]);
-
-    // Skills rows filtered by the (debounced) query over SEARCH_KEYS. Recomputes on enrichment too,
-    // so malicious/misconfigured badges appear without dropping the active search.
-    const skillsToShow = useMemo(() => {
-        const q = skillFilterQuery.trim().toLowerCase();
-        if (!q) return data.skills;
-        return (data.skills || []).filter((row) =>
-            SEARCH_KEYS.some((k) => String(row?.[k] ?? "").toLowerCase().includes(q))
-        );
-    }, [data.skills, skillFilterQuery]);
-
-    // Push the freshly filtered/enriched skill rows into the table without a remount (see
-    // callFromOutside on the table). Bumps on both search-query and async-enrichment changes.
-    useEffect(() => {
-        if (selectedTab === "skills") setSkillViewVersion((v) => v + 1);
-    }, [skillsToShow, selectedTab]);
 
     const getRiskScoreStatus = useCallback((riskScore) => {
         if (riskScore >= 4.5) return "critical";
@@ -236,6 +207,9 @@ function Endpoints() {
                 }),
             };
         });
+        // Bump the version fed to the table as callFromOutside → it re-derives from the enriched
+        // data.skills with the current query, so badges show without remount or search loss.
+        setSkillEnrichVersion((v) => v + 1);
     }, [getRiskScoreStatus]);
 
     const enrichSkillsWithApiRiskScores = useCallback(async (skillRows, isMountedRef = { current: true }) => {
@@ -383,15 +357,14 @@ function Endpoints() {
             <GithubSimpleTable
                 key="table"
                 pageLimit={PAGE_LIMIT}
-                data={isSkills ? skillsToShow : data[selectedTab]}
-                // Skills search is owned by this page (custom TextField above), not the table's
-                // built-in search — so hide the query field and keep the table's internal key stable
-                // (hardCodedKey) so external filtering doesn't remount it. Async risk-score/badge
-                // enrichment and each search change bump skillViewVersion, and callFromOutside
-                // re-derives rows in place — preserving the table's sort/tag-filters and our query.
-                hideQueryField={isSkills}
+                data={data[selectedTab]}
+                searchKeys={SEARCH_KEYS}
+                // Skills tab keeps a constant table key (hardCodedKey) so it never remounts — the
+                // risk-first sort set on mount stays put, and async risk-score/badge enrichment shows
+                // via callFromOutside (re-derives from the now-enriched data.skills with the current
+                // query) instead of a remount. Both sort and search survive enrichment.
                 hardCodedKey={isSkills}
-                callFromOutside={isSkills ? skillViewVersion : undefined}
+                callFromOutside={isSkills ? skillEnrichVersion : undefined}
                 sortOptions={riskFirstSortOptions}
                 resourceName={resourceName}
                 filters={[]}
@@ -407,7 +380,7 @@ function Endpoints() {
                 {...commonTabProps}
             />
         );
-    }, [data, selectedTab, skillsToShow, skillViewVersion, headers, filterHeaders, riskFirstSortOptions, disambiguateLabel, handleRowClick, tableTabs, selected]);
+    }, [data, selectedTab, skillEnrichVersion, headers, filterHeaders, riskFirstSortOptions, disambiguateLabel, handleRowClick, tableTabs, selected]);
 
     const pageTitle = useMemo(() => (
         <TitleWithInfo
@@ -420,23 +393,6 @@ function Endpoints() {
     const layoutToggle = (
         <NewLayoutTooltip checked={false} onChange={() => { setAgenticNewLayout(true); navigate("/dashboard/observe/agentic-assets"); }} />
     );
-
-    // Custom, page-scoped search for the Skills tab (replaces the table's built-in query field).
-    const skillSearchComponent = selectedTab === "skills" ? (
-        <Box key="skill-search" paddingBlockEnd="2">
-            <TextField
-                labelHidden
-                label="Search skills"
-                value={skillSearchInput}
-                onChange={handleSkillSearchChange}
-                placeholder="Search skills by name"
-                autoComplete="off"
-                prefix={<Icon source={SearchMinor} color="subdued" />}
-                clearButton
-                onClearButtonClick={() => handleSkillSearchChange("")}
-            />
-        </Box>
-    ) : null;
 
     if (loading) {
         return (
@@ -454,7 +410,7 @@ function Endpoints() {
             title={pageTitle}
             isFirstPage={true}
             secondaryActions={layoutToggle}
-            components={[summaryComponent, skillSearchComponent, tableComponent].filter(Boolean)}
+            components={[summaryComponent, tableComponent]}
         />
     );
 }
