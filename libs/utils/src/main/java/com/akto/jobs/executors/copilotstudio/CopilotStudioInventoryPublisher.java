@@ -44,7 +44,7 @@ public class CopilotStudioInventoryPublisher {
 
     /** Builds one traffic sample per agent. Agents without a usable display name are skipped. */
     public List<Map<String, Object>> buildSamples(List<JsonNode> agents, String environmentId,
-                                                   Map<String, String> botIdToDataverseName) {
+                                                   Map<String, String> botIdToDataverseName, int accountId) {
         List<Map<String, Object>> samples = new ArrayList<>();
         String host = hostForEnvironment(environmentId);
 
@@ -87,7 +87,7 @@ public class CopilotStudioInventoryPublisher {
             sample.put("statusCode", String.valueOf(AIAgentConnectorConstants.HTTP_STATUS_200));
             sample.put("type", AIAgentConnectorConstants.HTTP_VERSION);
             sample.put("status", AIAgentConnectorConstants.HTTP_STATUS_OK);
-            sample.put("akto_account_id", AIAgentConnectorConstants.AKTO_ACCOUNT_ID_CONSTANT);
+            sample.put("akto_account_id", String.valueOf(accountId));
             sample.put("akto_vxlan_id", AIAgentConnectorConstants.AKTO_VXLAN_ID_DEFAULT);
             sample.put("is_pending", AIAgentConnectorConstants.IS_PENDING_FALSE);
             sample.put("source", AIAgentConnectorConstants.DATA_SOURCE_MIRRORING);

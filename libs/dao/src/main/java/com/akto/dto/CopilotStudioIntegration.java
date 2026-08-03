@@ -30,12 +30,12 @@ public class CopilotStudioIntegration {
     public static final String LAST_ERROR = "lastError";
     public static final String UPDATED_AT = "updatedAt";
     public static final String REFRESH_TOKEN = "refreshToken";
+    public static final String AGENT_GRAPH_ENABLED = "agentGraphEnabled";
 
     public enum Status {
         PENDING_OAUTH,
         ENVIRONMENTS_DISCOVERED,
-        CONFIRMED,
-        REAUTH_REQUIRED
+        CONFIRMED
     }
 
     @Getter
@@ -79,6 +79,7 @@ public class CopilotStudioIntegration {
     private String dataIngestionUrl;
     private Status status;
     private String refreshToken;
+    private Boolean agentGraphEnabled;
     private List<Environment> environments = new ArrayList<>();
     private String jobId;
     private String lastError;
@@ -97,5 +98,10 @@ public class CopilotStudioIntegration {
 
     public String getHexId() {
         return this.id == null ? null : this.id.toHexString();
+    }
+
+    /** Null or false both mean disabled; only an explicit true counts. */
+    public boolean isAgentGraphEnabled() {
+        return Boolean.TRUE.equals(agentGraphEnabled);
     }
 }

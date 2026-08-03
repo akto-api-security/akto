@@ -189,6 +189,26 @@ public class CopilotStudioAction extends UserAction {
         }
     }
 
+    /** One-way opt-in for an integration that predates this feature; new connections enable it automatically. */
+    public String enableAgentGraph() {
+        CopilotStudioIntegration existing = CopilotStudioIntegrationDao.instance.findOne(new BasicDBObject());
+        if (existing == null) {
+            addActionError("Integration not found");
+            return Action.ERROR.toUpperCase();
+        }
+
+        CopilotStudioIntegrationDao.instance.updateOneNoUpsert(
+            Filters.eq(CopilotStudioIntegration.ID, existing.getId()),
+            Updates.combine(
+                Updates.set(CopilotStudioIntegration.AGENT_GRAPH_ENABLED, true),
+                Updates.set(CopilotStudioIntegration.UPDATED_AT, Context.now())
+            )
+        );
+
+        logger.infoAndAddToDb("enableAgentGraph: enabled for accountId=" + Context.accountId.get());
+        return Action.SUCCESS.toUpperCase();
+    }
+
     /** Removes the integration and stops its job — the only way to change tenantId/clientId/clientSecret/dataIngestionUrl. */
     public String removeMultiEnvIntegration() {
         CopilotStudioIntegration existing = CopilotStudioIntegrationDao.instance.findOne(new BasicDBObject());
@@ -249,11 +269,13 @@ public class CopilotStudioAction extends UserAction {
         AccountJobDao.instance.insertOne(accountJob);
         this.jobId = accountJob.getId().toHexString();
 
+        // New connections opt into agent graphs automatically — only pre-existing integrations see the checkbox.
         CopilotStudioIntegrationDao.instance.updateOneNoUpsert(
             Filters.eq(CopilotStudioIntegration.ID, existing.getId()),
             Updates.combine(
                 Updates.set(CopilotStudioIntegration.STATUS, CopilotStudioIntegration.Status.CONFIRMED.name()),
                 Updates.set(CopilotStudioIntegration.JOB_ID, this.jobId),
+                Updates.set(CopilotStudioIntegration.AGENT_GRAPH_ENABLED, true),
                 Updates.set(CopilotStudioIntegration.UPDATED_AT, now)
             )
         );

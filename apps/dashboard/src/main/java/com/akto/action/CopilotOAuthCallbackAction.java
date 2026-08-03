@@ -294,10 +294,10 @@ public class CopilotOAuthCallbackAction extends ActionSupport {
         }
 
         int now = Context.now();
+        // Status deliberately untouched: reconnect is only reachable on an already-CONFIRMED integration.
         CopilotStudioIntegrationDao.instance.updateOneNoUpsert(
             Filters.eq(CopilotStudioIntegration.ID, new ObjectId(integrationId)),
             Updates.combine(
-                Updates.set(CopilotStudioIntegration.STATUS, CopilotStudioIntegration.Status.CONFIRMED.name()),
                 Updates.set(CopilotStudioIntegration.REFRESH_TOKEN, delegated.getRefreshToken()),
                 Updates.unset(CopilotStudioIntegration.LAST_ERROR),
                 Updates.set(CopilotStudioIntegration.UPDATED_AT, now)

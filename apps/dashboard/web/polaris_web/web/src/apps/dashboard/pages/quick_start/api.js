@@ -542,6 +542,14 @@ const api = {
         })
     },
 
+    enableCopilotStudioMultiEnvAgentGraph() {
+        return request({
+            url: '/api/copilotStudio/multiEnv/enableAgentGraph',
+            method: 'post',
+            data: {}
+        })
+    },
+
 }
 
 export default api

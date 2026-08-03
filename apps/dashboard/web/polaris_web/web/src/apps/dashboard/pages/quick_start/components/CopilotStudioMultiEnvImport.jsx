@@ -1,4 +1,4 @@
-import { Badge, Banner, Box, Button, Divider, HorizontalStack, Link, Scrollable, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Badge, Banner, Box, Button, Checkbox, Divider, HorizontalStack, Link, Scrollable, Text, TextField, VerticalStack } from '@shopify/polaris'
 import { useEffect, useState } from 'react'
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
 import api from '../api'
@@ -18,6 +18,7 @@ const CopilotStudioMultiEnvImport = ({ docsUrl }) => {
     const [redirecting, setRedirecting] = useState(false)
     const [removing, setRemoving] = useState(false)
     const [reconnecting, setReconnecting] = useState(false)
+    const [enablingAgentGraph, setEnablingAgentGraph] = useState(false)
 
     const [integration, setIntegration] = useState(null)
     const [confirming, setConfirming] = useState(false)
@@ -78,6 +79,20 @@ const CopilotStudioMultiEnvImport = ({ docsUrl }) => {
             })
     }
 
+    // One-way opt-in: enable, then immediately reconnect so the stored token actually gains the new scope.
+    const handleEnableAgentGraph = () => {
+        setEnablingAgentGraph(true)
+        api.enableCopilotStudioMultiEnvAgentGraph()
+            .then(() => api.reconnectCopilotStudioMultiEnvIntegration())
+            .then((res) => {
+                window.location.href = res.authorizationUrl
+            })
+            .catch((err) => {
+                func.setToast(true, true, err?.response?.data?.actionErrors?.[0] || 'Failed to enable agent graphs. Please try again.')
+                setEnablingAgentGraph(false)
+            })
+    }
+
     const handleRemove = () => {
         setRemoving(true)
         api.removeCopilotStudioMultiEnvIntegration()
@@ -111,19 +126,22 @@ const CopilotStudioMultiEnvImport = ({ docsUrl }) => {
                 </Box>
             )}
 
-            {integration && integration.status === 'REAUTH_REQUIRED' && (
-                <Box paddingBlockStart="3">
-                    <Banner status="warning" title="Sign-in needs to be renewed">
-                        Microsoft rejected the stored sign-in (expired, revoked, or a permission was added to the app
-                        registration after you last connected). Transcript sync is unaffected - only agent inventory
-                        is paused. Click Reconnect below to sign in again.
-                    </Banner>
-                </Box>
-            )}
-
             {integration && integration.lastError && (
                 <Box paddingBlockStart="3">
                     <Banner status="critical" title={integration.lastError} />
+                </Box>
+            )}
+
+            {/* One-time upgrade prompt for integrations that predate agent graphs; new connections never see this. */}
+            {integration && integration.jobId && integration.agentGraphEnabled !== true && (
+                <Box paddingBlockStart="3">
+                    <Checkbox
+                        label="Enable agent graphs"
+                        helpText="Pulls the agent/tool inventory to build agent graphs. Requires reconnecting once to grant the Power Platform API permission."
+                        checked={false}
+                        disabled={enablingAgentGraph}
+                        onChange={handleEnableAgentGraph}
+                    />
                 </Box>
             )}
 

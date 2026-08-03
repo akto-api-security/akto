@@ -132,7 +132,7 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
         }
 
         // After transcripts, while the heartbeat still runs — inventory is additive and must never fail the transcript work.
-        publishAgentInventory(integrationId, integration);
+        publishAgentInventory(integrationId, integration, job.getAccountId());
 
         heartbeatExecutor.shutdownNow();
 
@@ -188,8 +188,14 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
     }
 
     /** Pulls tenant-wide agent inventory once per job (not per environment) and publishes samples; best-effort, never blocks transcripts: https://learn.microsoft.com/en-us/power-platform/admin/power-platform-inventory#access-requirements */
-    private void publishAgentInventory(String integrationId, CopilotStudioIntegration integration) {
+    private void publishAgentInventory(String integrationId, CopilotStudioIntegration integration, int accountId) {
         try {
+            // Existing integrations default off until the customer opts in; new ones enable this at setup.
+            if (!integration.isAgentGraphEnabled()) {
+                logger.info("CopilotStudioMultiEnv: agent graphs not enabled, skipping inventory. integrationId={}", integrationId);
+                return;
+            }
+
             String ingestionUrl = integration.getDataIngestionUrl();
             if (ingestionUrl == null || ingestionUrl.isEmpty()) {
                 logger.warn("CopilotStudioMultiEnv: no data ingestion URL, skipping agent inventory");
@@ -198,7 +204,7 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
 
             String storedRefreshToken = integration.getRefreshToken();
             if (storedRefreshToken == null || storedRefreshToken.isEmpty()) {
-                // Connected before this feature shipped, or a prior refresh already failed and cleared it.
+                // Only ever null when the customer connected before this feature shipped — never cleared by us.
                 logger.warn("CopilotStudioMultiEnv: no delegated refresh token on file, skipping agent "
                     + "inventory until the customer reconnects. integrationId={}", integrationId);
                 return;
@@ -210,20 +216,17 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
                     integration.getTenantId(), integration.getClientId(), integration.getClientSecret(),
                     storedRefreshToken, Constants.SCOPE_COPILOT_STUDIO_INVENTORY);
             } catch (Exception e) {
-                // Expired or revoked — clear it rather than retrying the same dead token every 30 minutes.
-                logger.warn("CopilotStudioMultiEnv: delegated refresh token rejected, marking for "
-                    + "reconnect. integrationId={} error={}", integrationId, e.getMessage());
-                integration.setRefreshToken(null);
-                integration.setStatus(CopilotStudioIntegration.Status.REAUTH_REQUIRED);
-                persistEnvironments(integrationId, integration);
+                // Token kept, never cleared — this also catches transient failures, and only a sign-in can replace it.
+                logger.warn("CopilotStudioMultiEnv: delegated refresh token rejected, skipping agent "
+                    + "inventory this run. integrationId={} error={}", integrationId, e.getMessage());
                 return;
             }
 
-            // Microsoft rotates refresh tokens on use; persist the new one or the next run fails.
+            // Rotated on use; written on its own so a concurrent Reconnect can't be clobbered by this run's stale copy.
             if (inventoryToken.getRefreshToken() != null
                     && !inventoryToken.getRefreshToken().equals(storedRefreshToken)) {
                 integration.setRefreshToken(inventoryToken.getRefreshToken());
-                persistEnvironments(integrationId, integration);
+                CyborgApiClient.updateCopilotStudioRefreshToken(integrationId, inventoryToken.getRefreshToken());
             }
 
             List<JsonNode> agents = inventoryClient.fetchAgents(inventoryToken.getToken(), null);
@@ -243,7 +246,7 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
             int published = 0;
             for (Map.Entry<String, List<JsonNode>> entry : agentsByEnvironment.entrySet()) {
                 List<Map<String, Object>> samples = inventoryPublisher.buildSamples(
-                    entry.getValue(), entry.getKey(), null);
+                    entry.getValue(), entry.getKey(), null, accountId);
                 published += inventoryPublisher.publish(ingestionUrl, jwtToken, samples);
             }
 
@@ -300,6 +303,7 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
         }
     }
 
+    /** Writes environments + updatedAt only; refreshToken has its own endpoint so the two can't clobber each other. */
     private static void persistEnvironments(String integrationId, CopilotStudioIntegration integration) {
         integration.setUpdatedAt(Context.now());
         CyborgApiClient.updateCopilotStudioIntegration(integrationId, integration);

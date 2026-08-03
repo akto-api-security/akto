@@ -291,6 +291,20 @@ public class CyborgApiClient {
         }
     }
 
+    /** Single-field write so a long-running job can't revert a Reconnect that landed mid-run. */
+    public static void updateCopilotStudioRefreshToken(String integrationId, String refreshToken) {
+        try {
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("integrationId", integrationId);
+            requestBody.put("refreshToken", refreshToken);
+
+            makePostRequest("/updateCopilotStudioRefreshToken", requestBody);
+
+        } catch (Exception e) {
+            logger.error("Failed to update CopilotStudioIntegration refreshToken: integrationId={}", integrationId, e);
+        }
+    }
+
     /**
      * Convert Map to AccountJob object.
      * Handles type conversions for ObjectId, enums, and primitive types.
