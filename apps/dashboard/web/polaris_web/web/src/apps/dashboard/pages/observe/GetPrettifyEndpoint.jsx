@@ -6,7 +6,7 @@ import observeFunc from "./transform"
 import { isAgenticSecurityCategory, isMCPSecurityCategory, isEndpointSecurityCategory } from '../../../main/labelHelper'
 import ShowListInBadge from '../../components/shared/ShowListInBadge'
 
-const MAX_VISIBLE_SKILL_TAGS = 2
+const MAX_VISIBLE_SKILL_TAGS = 1
 
 export const getMethod = (url, method, apiType) => {
     if (func.shouldHideHttpMethodForEndpoint({ apiType, url })) {
@@ -95,24 +95,26 @@ function GetPrettifyEndpoint({method, url, isNew, maxWidth, methodBoxWidth, guar
                   </div>
                 </Tooltip>
               ) : null}
-              {isMalicious ? (
-                <Tooltip content="Malicious activity detected on this skill" dismissOnMouseOut>
-                  <Badge status="critical" size="small">Malicious</Badge>
-                </Tooltip>
-              ) : null}
-              {isMisconfigured ? (
-                <Tooltip content="Misconfigured Claude settings detected on this skill" dismissOnMouseOut>
-                  <Badge status="attention" size="small">Misconfigured</Badge>
-                </Tooltip>
-              ) : null}
-              {skillTags && skillTags.length > 0 ? (
-                <ShowListInBadge
-                  itemsArr={skillTags}
-                  maxItems={MAX_VISIBLE_SKILL_TAGS}
-                  status="warning"
-                  useTooltip={true}
-                />
-              ) : null}
+              {(() => {
+                // Show at most one tag; the rest collapse into a "+N" badge (with a tooltip
+                // listing them). Malicious first (most important), then Misconfigured, then the
+                // skill category tags. Colour follows the visible (first) tag's severity.
+                const allTags = [
+                  ...(isMalicious ? ['Malicious'] : []),
+                  ...(isMisconfigured ? ['Misconfigured'] : []),
+                  ...(skillTags || []),
+                ];
+                if (allTags.length === 0) return null;
+                const status = isMalicious ? 'critical' : (isMisconfigured ? 'attention' : 'warning');
+                return (
+                  <ShowListInBadge
+                    itemsArr={allTags}
+                    maxItems={MAX_VISIBLE_SKILL_TAGS}
+                    status={status}
+                    useTooltip={true}
+                  />
+                );
+              })()}
               {copyActive ? (
                 <div
                   onClick={(e) => {
