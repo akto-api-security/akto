@@ -255,7 +255,7 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
 
 // ─── Approve server button (for "approval" behaviour policies) ─────────────────
 
-function ApproveServerButton({ row }) {
+function ApproveServerButton({ row, onApproved }) {
     const [modalActive, setModalActive] = useState(false);
     const [mode, setMode]               = useState("ALWAYS"); // ALWAYS | DURATION
     const [days, setDays]               = useState("7");
@@ -263,12 +263,14 @@ function ApproveServerButton({ row }) {
 
     const serverId = row?.deviceId || null;                       // request Host = serverId
     const serverName = row?.agenticAsset || row?.agenticAssetRaw || serverId || "";
+    // Policy identity for approval is the event's filterId (same as the Guardrail Activity table).
+    const policyName = row?.filterId || row?.policyName || null;
 
     const openModal = () => { setMode("ALWAYS"); setDays("7"); setModalActive(true); };
 
     const handleApprove = async () => {
-        if (!row?.policyId) { func.setToast(true, true, "Could not resolve the policy for this violation"); return; }
-        if (!serverId)      { func.setToast(true, true, "Could not resolve the server for this violation"); return; }
+        if (!policyName) { func.setToast(true, true, "Could not resolve the policy for this violation"); return; }
+        if (!serverId)   { func.setToast(true, true, "Could not resolve the server for this violation"); return; }
         let value = 0;
         if (mode === "DURATION") {
             value = parseInt(days, 10);
@@ -278,8 +280,7 @@ function ApproveServerButton({ row }) {
         try {
             // request util rejects (and toasts the backend error) on non-2xx, so reaching here = success.
             await guardrailsApi.approveServerForPolicy({
-                hexId: row.policyId,
-                policyName: row.policyName,
+                policyName,
                 approvedServerId: serverId,
                 approvedServerName: serverName,
                 approvalMode: mode,
@@ -288,6 +289,7 @@ function ApproveServerButton({ row }) {
             const scope = mode === "DURATION" ? `for ${value} day(s)` : "always";
             func.setToast(true, false, `Approved ${serverName} ${scope}`);
             setModalActive(false);
+            onApproved?.();
         } catch {
             // Error toast already surfaced by the request interceptor; keep the modal open.
         } finally {
@@ -339,7 +341,7 @@ function ApproveServerButton({ row }) {
 
 // ─── Header ─────────────────────────────────────────────────────────────────────
 
-function FlyoutHeader({ row, onClose, onStatusUpdate }) {
+function FlyoutHeader({ row, onClose, onStatusUpdate, onApproved }) {
     return (
         <>
             <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="3" paddingBlockEnd="3">
@@ -360,7 +362,7 @@ function FlyoutHeader({ row, onClose, onStatusUpdate }) {
                             onStatusUpdate={onStatusUpdate}
                             row={row}
                         />
-                        {row.behaviour === "approval" && <ApproveServerButton row={row} />}
+                        {row.behaviour === "approval" && <ApproveServerButton row={row} onApproved={onApproved} />}
                         <Button plain icon={MobileCancelMajor} onClick={onClose} accessibilityLabel="Close" />
                     </HorizontalStack>
                 </HorizontalStack>
@@ -372,7 +374,7 @@ function FlyoutHeader({ row, onClose, onStatusUpdate }) {
 
 // ─── Flyout ─────────────────────────────────────────────────────────────────────
 
-export default function ViolationFlyout({ violation, show, onClose, onStatusUpdate }) {
+export default function ViolationFlyout({ violation, show, onClose, onStatusUpdate, onApproved }) {
     const [selectedTab, setSelectedTab] = useState(0);
 
     useEffect(() => { setSelectedTab(0); }, [violation?.id]);
@@ -442,7 +444,7 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
             width={840}
             header={
                 <>
-                    <FlyoutHeader row={violation} onClose={onClose} onStatusUpdate={onStatusUpdate} />
+                    <FlyoutHeader row={violation} onClose={onClose} onStatusUpdate={onStatusUpdate} onApproved={onApproved} />
                     <Box paddingInlineStart="1" paddingInlineEnd="1">
                         <Tabs tabs={tabModel.tabs} selected={selectedTab} onSelect={handleTabSelect} />
                     </Box>
