@@ -64,6 +64,47 @@ public class BrowserExtensionConfigAction extends UserAction {
         }
     }
 
+    // Enables/disables a host for this account by upserting an account-level override row keyed by host.
+    // Unlike saveBrowserExtensionConfig this needs no paths, since toggling a supported (common) host is
+    // only about the active flag - the paths come from the common catalogue.
+    public String setBrowserExtensionConfigActive() {
+        try {
+            if (browserExtensionConfig == null
+                    || browserExtensionConfig.getHost() == null
+                    || browserExtensionConfig.getHost().trim().isEmpty()) {
+                addActionError("Host is required");
+                return ERROR.toUpperCase();
+            }
+
+            User user = getSUser();
+            int currentTime = Context.now();
+            String host = browserExtensionConfig.getHost().trim();
+
+            List<Bson> updates = new ArrayList<>();
+            updates.add(Updates.set(BrowserExtensionConfig.ACTIVE, browserExtensionConfig.isActive()));
+            updates.add(Updates.set(BrowserExtensionConfig.UPDATED_TIMESTAMP, currentTime));
+            updates.add(Updates.set(BrowserExtensionConfig.UPDATED_BY, user.getLogin()));
+            updates.add(Updates.setOnInsert(BrowserExtensionConfig.PATHS, new ArrayList<String>()));
+            updates.add(Updates.setOnInsert(BrowserExtensionConfig.CREATED_BY, user.getLogin()));
+            updates.add(Updates.setOnInsert(BrowserExtensionConfig.CREATED_TIMESTAMP, currentTime));
+
+            BrowserExtensionConfigDao.instance.getMCollection().updateOne(
+                Filters.eq(BrowserExtensionConfig.HOST, host),
+                Updates.combine(updates),
+                new UpdateOptions().upsert(true)
+            );
+
+            loggerMaker.info("Set browser extension config active=" + browserExtensionConfig.isActive()
+                + " for host: " + host + " by user: " + user.getLogin());
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error toggling browser extension config: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Failed to update browser extension config");
+            return ERROR.toUpperCase();
+        }
+    }
+
     public String saveBrowserExtensionConfig() {
         try {
             if (browserExtensionConfig == null) {
@@ -99,6 +140,19 @@ public class BrowserExtensionConfigAction extends UserAction {
             updates.add(Updates.set(BrowserExtensionConfig.UPDATED_BY, user.getLogin()));
             updates.add(Updates.setOnInsert(BrowserExtensionConfig.CREATED_BY, user.getLogin()));
             updates.add(Updates.setOnInsert(BrowserExtensionConfig.CREATED_TIMESTAMP, currentTime));
+
+            // config-driven monitoring fields — set only what the client sent, so a plain
+            // host+paths config stays minimal and a rich one carries its full extraction spec.
+            addIfPresent(updates, BrowserExtensionConfig.TRANSPORT, emptyToNull(browserExtensionConfig.getTransport()));
+            addIfPresent(updates, BrowserExtensionConfig.METHOD, emptyToNull(browserExtensionConfig.getMethod()));
+            addIfPresent(updates, BrowserExtensionConfig.FORMAT, emptyToNull(browserExtensionConfig.getFormat()));
+            addIfPresent(updates, BrowserExtensionConfig.PATH, nonEmpty(browserExtensionConfig.getPath()));
+            addIfPresent(updates, BrowserExtensionConfig.OPERATIONS, nonEmpty(browserExtensionConfig.getOperations()));
+            addIfPresent(updates, BrowserExtensionConfig.FRAME_MATCH,
+                (browserExtensionConfig.getFrameMatch() != null && !browserExtensionConfig.getFrameMatch().isEmpty()) ? browserExtensionConfig.getFrameMatch() : null);
+            addIfPresent(updates, BrowserExtensionConfig.RESPONSE_FORMAT, emptyToNull(browserExtensionConfig.getResponseFormat()));
+            addIfPresent(updates, BrowserExtensionConfig.RESPONSE_PATH, nonEmpty(browserExtensionConfig.getResponsePath()));
+            addIfPresent(updates, BrowserExtensionConfig.MODEL_PATH, nonEmpty(browserExtensionConfig.getModelPath()));
 
             BrowserExtensionConfigDao.instance.getMCollection().updateOne(
                 filter,
@@ -141,5 +195,19 @@ public class BrowserExtensionConfigAction extends UserAction {
             addActionError("Failed to delete browser extension configs");
             return ERROR.toUpperCase();
         }
+    }
+
+    private static void addIfPresent(List<Bson> updates, String field, Object value) {
+        if (value != null) {
+            updates.add(Updates.set(field, value));
+        }
+    }
+
+    private static String emptyToNull(String s) {
+        return (s == null || s.trim().isEmpty()) ? null : s.trim();
+    }
+
+    private static <T> List<T> nonEmpty(List<T> list) {
+        return (list == null || list.isEmpty()) ? null : list;
     }
 }

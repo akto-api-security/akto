@@ -36,6 +36,10 @@ public class BrowserExtensionConfigCommon {
     public static final String HOST = "host";
     private String host;
 
+    // optional friendly product name (e.g. "ChatGPT" for openai.com); falls back to host in the UI
+    public static final String NAME = "name";
+    private String name;
+
     public static final String ACTIVE = "active";
     // absent in the document means enabled
     private boolean active = true;
@@ -69,6 +73,10 @@ public class BrowserExtensionConfigCommon {
     public static final String ICON_URL = "icon_url";
     private String iconUrl;
 
+    // e.g. ["chat","code"] — used by the dashboard to filter the Add-hosts catalogue by type
+    public static final String CATEGORIES = "categories";
+    private List<String> categories;
+
     public String getHexId() {
         if (this.id != null) {
             return this.id.toHexString();
@@ -91,6 +99,7 @@ public class BrowserExtensionConfigCommon {
 
         BrowserExtensionConfigCommon config = new BrowserExtensionConfigCommon();
         config.host = host.trim();
+        config.name = asString(doc.get(NAME));
 
         Object id = doc.get("_id");
         if (id instanceof ObjectId) {
@@ -109,6 +118,7 @@ public class BrowserExtensionConfigCommon {
         config.frameMatch = asMap(doc.get(FRAME_MATCH));
         config.tag = asString(doc.get(TAG));
         config.iconUrl = asString(doc.get(ICON_URL));
+        config.categories = asStringList(doc.get(CATEGORIES));
 
         return config;
     }

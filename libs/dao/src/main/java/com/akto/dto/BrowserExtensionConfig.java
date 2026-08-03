@@ -1,6 +1,7 @@
 package com.akto.dto;
 
 import java.util.List;
+import java.util.Map;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
@@ -27,6 +28,41 @@ public class BrowserExtensionConfig {
 
     public static final String ACTIVE = "active";
     private boolean active;
+
+    // ── config-driven monitoring fields (mirror the extension's monitoring-configs schema) ──
+    // how the chat send travels: "http" | "websocket" | "graphql"
+    public static final String TRANSPORT = "transport";
+    private String transport;
+
+    // HTTP method for http transport (POST/GET/…)
+    public static final String METHOD = "method";
+    private String method;
+
+    // body decoder: json | form | sse | ws-frame | dgw | connect-rpc | socket.io | nested-envelope
+    public static final String FORMAT = "format";
+    private String format;
+
+    // candidate paths to the user prompt in the request body (first match wins)
+    public static final String PATH = "path";
+    private List<String> path;
+
+    // GraphQL only: operation names that carry a send
+    public static final String OPERATIONS = "operations";
+    private List<String> operations;
+
+    // WebSocket only: key→value conditions selecting the prompt-bearing frame
+    public static final String FRAME_MATCH = "frameMatch";
+    private Map<String, String> frameMatch;
+
+    // optional response/model extraction
+    public static final String RESPONSE_FORMAT = "responseFormat";
+    private String responseFormat;
+
+    public static final String RESPONSE_PATH = "responsePath";
+    private List<String> responsePath;
+
+    public static final String MODEL_PATH = "modelPath";
+    private List<String> modelPath;
 
     public static final String CREATED_BY = "createdBy";
     private String createdBy;

@@ -7,7 +7,9 @@ import com.mongodb.client.model.Filters;
 import org.bson.Document;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Reads the shared browser extension config collection from the common DB.
@@ -30,8 +32,9 @@ public class BrowserExtensionConfigCommonDao extends CommonContextDao<Document> 
         return Document.class;
     }
 
+    // Sorted by _id ascending: top brands were seeded with the oldest _ids, so they always lead.
     public List<BrowserExtensionConfigCommon> findAllConfigs() {
-        return toConfigs(instance.findAll(new BasicDBObject()));
+        return toConfigs(instance.findAll(new BasicDBObject(), 0, 0, new BasicDBObject("_id", 1)));
     }
 
     /**
@@ -53,6 +56,42 @@ public class BrowserExtensionConfigCommonDao extends CommonContextDao<Document> 
                 configs.add(config);
             }
         }
-        return configs;
+        return dedupeByHost(configs);
+    }
+
+    /**
+     * The common collection has no unique index on host, so the same host can be listed multiple times.
+     * Collapse duplicates by normalized host, preferring an active entry over an inactive one and the
+     * richer document (more paths/operations) on ties, so the dashboard never shows duplicate rows.
+     */
+    private static List<BrowserExtensionConfigCommon> dedupeByHost(List<BrowserExtensionConfigCommon> configs) {
+        Map<String, BrowserExtensionConfigCommon> byHost = new LinkedHashMap<>();
+        for (BrowserExtensionConfigCommon config : configs) {
+            String key = config.getHost().trim().toLowerCase();
+            BrowserExtensionConfigCommon existing = byHost.get(key);
+            if (existing == null || isRicher(config, existing)) {
+                byHost.put(key, config);
+            }
+        }
+        return new ArrayList<>(byHost.values());
+    }
+
+    private static boolean isRicher(BrowserExtensionConfigCommon candidate, BrowserExtensionConfigCommon existing) {
+        // an active entry always wins over an inactive one for the same host
+        if (candidate.isActive() != existing.isActive()) {
+            return candidate.isActive();
+        }
+        return detailScore(candidate) > detailScore(existing);
+    }
+
+    private static int detailScore(BrowserExtensionConfigCommon config) {
+        int score = 0;
+        if (config.getPaths() != null) {
+            score += config.getPaths().size();
+        }
+        if (config.getOperations() != null) {
+            score += config.getOperations().size();
+        }
+        return score;
     }
 }
