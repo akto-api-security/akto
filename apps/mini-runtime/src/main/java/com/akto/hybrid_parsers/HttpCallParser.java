@@ -370,6 +370,13 @@ public class HttpCallParser {
                 return baseHostname;
             }
 
+            // COPILOT_STUDIO: copilot-shield sends the final collection name as the raw host already - trust it as-is.
+            String appNameTag = tagsMap.get(Constants.AI_AGENT_APP_NAME);
+            if (source.equals(Constants.AI_AGENT_SOURCE_COPILOT_STUDIO)
+                    || Constants.COPILOT_STUDIO_AI_AGENT_NAME.equalsIgnoreCase(appNameTag)) {
+                return baseHostname;
+            }
+
             // Microsoft Defender traffic: collection name is bot-name.openclaw.defender.microsoft.com
             if (source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)) {
                 return botName;
