@@ -7,6 +7,7 @@ import com.akto.dto.CopilotStudioIntegration;
 import com.akto.dto.jobs.AccountJob;
 import com.akto.jobs.executors.copilotstudio.CopilotStudioMultiEnvApiClient;
 import com.akto.jobs.executors.copilotstudio.CopilotStudioMultiEnvApiClient.AccessToken;
+import com.akto.jobs.executors.copilotstudio.CopilotStudioUserResolver;
 import com.akto.log.LoggerMaker;
 
 import java.util.ArrayList;
@@ -80,6 +81,19 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
 
         updateJobHeartbeat(job);
 
+        // Resolve Graph users once per job tick (cached to a local runtime file with a TTL,
+        // see CopilotStudioUserResolver) so this never scales with environment/binary count.
+        // The binary itself never calls Graph - it only receives a path to the derived map
+        // file, not the content, since that content can exceed the 128KB env-var limit at scale.
+        String resolvedUserMapFilePath = "";
+        try {
+            resolvedUserMapFilePath = CopilotStudioUserResolver.buildUserMapFile(
+                integration.getTenantId(), integration.getClientId(), integration.getClientSecret());
+        } catch (Exception e) {
+            logger.error("CopilotStudioMultiEnv: failed to build Graph user map: {}", e.getMessage());
+        }
+        final String userMapFilePath = resolvedUserMapFilePath;
+
         int now = Context.now();
         List<CopilotStudioIntegration.Environment> environments = integration.getEnvironments();
         persistEnvironments(integrationId, integration);
@@ -112,7 +126,7 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
         List<Future<?>> futures = new ArrayList<>();
         for (CopilotStudioIntegration.Environment env : environments) {
             futures.add(envPool.submit(() ->
-                processEnvironment(job, integration, env, tokenRef, now, failures, errors, completed, totalEnvironments)));
+                processEnvironment(job, integration, env, tokenRef, now, failures, errors, completed, totalEnvironments, userMapFilePath)));
         }
 
         envPool.shutdown();
@@ -138,7 +152,8 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
 
     private void processEnvironment(AccountJob job, CopilotStudioIntegration integration,
             CopilotStudioIntegration.Environment env, AtomicReference<AccessToken> tokenRef, int now,
-            AtomicInteger failures, List<String> errors, AtomicInteger completed, int totalEnvironments) {
+            AtomicInteger failures, List<String> errors, AtomicInteger completed, int totalEnvironments,
+            String userMapFilePath) {
         logger.info("CopilotStudioMultiEnv: processing environment: environmentId={}, appUserCreated={}",
             env.getEnvironmentId(), env.isAppUserCreated());
         try {
@@ -155,6 +170,7 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
             envConfig.put(CONFIG_DATAVERSE_CLIENT_ID, integration.getClientId());
             envConfig.put(CONFIG_DATAVERSE_CLIENT_SECRET, integration.getClientSecret());
             envConfig.put(CONFIG_DATA_INGESTION_SERVICE_URL, integration.getDataIngestionUrl());
+            envConfig.put("COPILOT_STUDIO_USER_MAP_FILE", userMapFilePath);
 
                 BinaryConnectorRunner.run(job, envConfig, BINARY_NAME_COPILOT_STUDIO);
 
