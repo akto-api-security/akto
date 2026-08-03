@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
     ActionList, Avatar, Box, Button, Divider, Form, HorizontalStack, Icon,
-    Modal, Pagination, Popover, Text, TextField, VerticalStack,
+    Modal, Pagination, Popover, Text, TextField, Tooltip, VerticalStack,
 } from "@shopify/polaris";
-import { SearchMinor, HorizontalDotsMinor, DeleteMinor } from "@shopify/polaris-icons";
+import { SearchMinor, HorizontalDotsMinor, DeleteMinor, InfoMinor } from "@shopify/polaris-icons";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import Dropdown from "../../../components/layouts/Dropdown";
 import { sharedIconCacheService } from "../../../components/shared/CollectionIcon";
@@ -53,6 +53,9 @@ const CSS = `
 @media (prefers-reduced-motion:reduce){ .bext-sk{ animation:none } }
 .bext-eyebrow { font-size:11px; font-weight:660; letter-spacing:.09em; text-transform:uppercase;
   color:var(--p-color-text-secondary,#9aa2b1); }
+.bext-info { display:inline-flex; width:15px; height:15px; cursor:help; opacity:.7; }
+.bext-info:hover { opacity:1; }
+.bext-info .Polaris-Icon { width:15px; height:15px; margin:0; }
 .bext-pick { display:flex; align-items:center; gap:13px; padding:10px 10px; border-radius:12px; cursor:pointer; border:1px solid transparent; transition:background .1s; }
 .bext-pick:hover { background:var(--p-color-bg-surface-hover,#f6f7fa); }
 .bext-pick.sel { background:var(--p-color-bg-surface-selected,#f1f1fd); border-color:var(--p-color-border-emphasis,#cfcef6); }
@@ -686,7 +689,15 @@ function BrowserExtensionSettings() {
             <style>{CSS}</style>
             <PageWithMultipleCards
                 title={"Browser Extension"}
-                subtitle={"Choose which hosts the Akto extension inspects. Available in v1.0.61 and later."}
+                titleMetadata={
+                    <Tooltip
+                        content="Before v1.0.61 the extension supported only ChatGPT, Grok, Claude, Gemini, Copilot and DeepSeek. From v1.0.61 onwards every host configured here is supported."
+                        dismissOnMouseOut
+                    >
+                        <span className="bext-info"><Icon source={InfoMinor} color="subdued" /></span>
+                    </Tooltip>
+                }
+                subtitle={"Choose which hosts the Akto extension inspects."}
                 isFirstPage={true}
                 fullWidth={false}
                 primaryAction={<Button primary onClick={() => openPicker("akto")}>Add hosts</Button>}
