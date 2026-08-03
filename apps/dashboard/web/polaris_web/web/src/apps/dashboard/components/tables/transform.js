@@ -218,7 +218,18 @@ const tableFunc = {
         // Optimize search query - skip if no query
         if (queryValue && queryValue.length > 0) {
           const lowerQuery = queryValue.toLowerCase();
+          // When the table specifies searchKeys, restrict free-text search to just those fields
+          // (e.g. the asset-name column). Rows can carry large/nested objects (collections, etc.);
+          // flattening every field for a broad match is expensive enough to freeze the UI, so opt-in
+          // callers scope it to the fields that matter.
+          const searchKeys = Array.isArray(props?.searchKeys) && props.searchKeys.length > 0 ? props.searchKeys : null;
           tempData = tempData.filter((value) => {
+            if (searchKeys) {
+              return searchKeys.some((k) => {
+                const v = value?.[k];
+                return v !== undefined && v !== null && v.toString().toLowerCase().includes(lowerQuery);
+              });
+            }
             return func.findInObjectValue(value, lowerQuery, ['id', 'time', 'icon', 'order', 'conditions']);
           });
         }

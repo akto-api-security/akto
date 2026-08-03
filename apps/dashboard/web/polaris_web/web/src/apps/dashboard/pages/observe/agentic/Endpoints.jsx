@@ -33,6 +33,10 @@ import { CLIENT_TYPES, ROW_TYPES, hasPersonalAccountTag } from "./mcpClientHelpe
 
 const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills'];
 
+// Restrict free-text search to the asset-name column only. Rows carry large nested objects
+// (collections, etc.); a broad flatten-every-field match is slow enough to freeze the UI.
+const SEARCH_KEYS = ["groupName"];
+
 function Endpoints() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
@@ -45,6 +49,11 @@ function Endpoints() {
         }
     }, [navigate, agenticNewLayout]);
     const [data, setData] = useState({ all: [], 'ai_agents': [], 'mcp_servers': [], llms: [], skills: [] });
+    // Skill risk scores/badges arrive asynchronously (after the initial render). When they land,
+    // applySkillRiskScores rewrites the source rows (data.skills) and bumps skillEnrichVersion; that
+    // version is fed to the table as callFromOutside, which re-derives its rows from the now-enriched
+    // source using the current search query — so badges appear without remounting or wiping the
+    // search. Reading the source (not patching a stale snapshot) avoids the first-load race.
     const [skillEnrichVersion, setSkillEnrichVersion] = useState(0);
     const [summaryData, setSummaryData] = useState({ totalAssets: 0, totalEndpoints: 0 });
 
@@ -75,6 +84,44 @@ function Endpoints() {
         h[1] = { ...h[1], value: "groupNameDisplay" };
         return h;
     }, []);
+
+    // Default the view to Risk score (highest first) instead of Name A-Z. Two quirks handled here
+    // (page-scoped — the shared sortOptions export is left untouched for other pages):
+    //  1. getInitialSortSelected picks sortOptions[0] when there's no persisted sort, so the
+    //     highest-risk option must be first.
+    //  2. The legacy client-side numeric sort is INVERTED vs its labels: func.sortFunc orders
+    //     numbers as sortOrder*(a-b) and "desc" maps to sortOrder=1 → ascending (lowest first).
+    //     So the value that actually shows highest-first for a numeric field is "riskScore asc".
+    //     Swap the two Risk score option VALUES so each directionLabel matches real behavior.
+    const riskFirstSortOptions = useMemo(() => {
+        const swapped = sortOptions.map((o) => {
+            if (o.sortKey !== "riskScore") return o;
+            if (o.directionLabel === "Highest") return { ...o, value: "riskScore asc" };
+            if (o.directionLabel === "Lowest") return { ...o, value: "riskScore desc" };
+            return o;
+        });
+        const riskHighest = swapped.find((o) => o.sortKey === "riskScore" && o.directionLabel === "Highest");
+        return riskHighest ? [riskHighest, ...swapped.filter((o) => o !== riskHighest)] : swapped;
+    }, []);
+
+    // Filter-only header (not a visible column) for the malicious/misconfigured tags we add on
+    // skills. Kept out of `headings` so it drives the filter facet without rendering a column.
+    const tagFilterHeader = useMemo(() => ({
+        title: "Tag", text: "Tag", value: "assetTags",
+        filterKey: "assetTags", filterLabel: "Tag", showFilter: true,
+    }), []);
+
+    // Only expose the tag filter once enriched rows actually carry tags. Adding the header changes
+    // the transform filter-choices cache key, so the "Malicious" choice appears after async
+    // enrichment rather than being cached-empty from the pre-enrichment first render.
+    const hasAssetTags = useMemo(
+        () => (data.skills || []).some((r) => (r.assetTags || []).length > 0),
+        [data.skills],
+    );
+    const filterHeaders = useMemo(
+        () => (hasAssetTags ? [...headers, tagFilterHeader] : headers),
+        [headers, tagFilterHeader, hasAssetTags],
+    );
 
     const getRiskScoreStatus = useCallback((riskScore) => {
         if (riskScore >= 4.5) return "critical";
@@ -139,6 +186,12 @@ function Endpoints() {
                     maxRiskScore: riskScore,
                     isMalicious,
                     isMisconfigured,
+                    // Filterable tag values (drives the "Tag" filter facet). Array so a row can
+                    // carry more than one tag; empty for clean skills so no facet value is added.
+                    assetTags: [
+                        ...(isMalicious ? ["Malicious"] : []),
+                        ...(isMisconfigured ? ["Misconfigured"] : []),
+                    ],
                     groupNameDisplay,
                     riskScoreComp: riskScore
                         ? <Badge status={getRiskScoreStatus(riskScore)} size="small">{riskScore}</Badge>
@@ -154,6 +207,8 @@ function Endpoints() {
                 }),
             };
         });
+        // Bump the version fed to the table as callFromOutside → it re-derives from the enriched
+        // data.skills with the current query, so badges show without remount or search loss.
         setSkillEnrichVersion((v) => v + 1);
     }, [getRiskScoreStatus]);
 
@@ -297,16 +352,23 @@ function Endpoints() {
 
     const tableComponent = useMemo(() => {
         const commonTabProps = { tableTabs, onSelect: handleSelectedTab, selected };
-        const tableKey = selectedTab === "skills" ? `table-skills-${skillEnrichVersion}` : "table";
+        const isSkills = selectedTab === "skills";
         return (
             <GithubSimpleTable
-                key={tableKey}
+                key="table"
                 pageLimit={PAGE_LIMIT}
                 data={data[selectedTab]}
-                sortOptions={sortOptions}
+                searchKeys={SEARCH_KEYS}
+                // Skills tab keeps a constant table key (hardCodedKey) so it never remounts — the
+                // risk-first sort set on mount stays put, and async risk-score/badge enrichment shows
+                // via callFromOutside (re-derives from the now-enriched data.skills with the current
+                // query) instead of a remount. Both sort and search survive enrichment.
+                hardCodedKey={isSkills}
+                callFromOutside={isSkills ? skillEnrichVersion : undefined}
+                sortOptions={riskFirstSortOptions}
                 resourceName={resourceName}
                 filters={[]}
-                headers={headers}
+                headers={filterHeaders}
                 selectable={false}
                 mode={IndexFiltersMode.Default}
                 headings={headers}
@@ -318,7 +380,7 @@ function Endpoints() {
                 {...commonTabProps}
             />
         );
-    }, [data, selectedTab, skillEnrichVersion, headers, disambiguateLabel, handleRowClick, tableTabs, selected]);
+    }, [data, selectedTab, skillEnrichVersion, headers, filterHeaders, riskFirstSortOptions, disambiguateLabel, handleRowClick, tableTabs, selected]);
 
     const pageTitle = useMemo(() => (
         <TitleWithInfo

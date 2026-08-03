@@ -24,6 +24,17 @@ const resourceName = {
   plural: "activities",
 };
 
+// A "Skills Evaluations" entry: a skill-endpoint event (url contains "/skills/") that is a skill
+// evaluation — either the skill_evaluation policy, or whose rule_violated (from metadata) is not a
+// "skill:<name>" rule (i.e. not a malicious-skill detection). These show under the Skills
+// Evaluations tab and are excluded from the Active tab.
+const isSkillEvaluationEntry = (r) => {
+  if (!String(r?.url || '').toLowerCase().includes('/skills/')) return false;
+  const isSkillEvalPolicy = String(r?.filterId || '').toLowerCase() === 'skill_evaluation';
+  const ruleViolated = String(extractRuleViolated(r?.metadata) || '').toLowerCase();
+  return isSkillEvalPolicy || !ruleViolated.includes('skill:');
+};
+
 const getHeaders = () => {
   const baseHeaders = [
     {
@@ -149,13 +160,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   const [loading, setLoading] = useState(true);
   const collectionsMap = PersistStore((state) => state.collectionsMap);
+  const hostNameMap = PersistStore((state) => state.hostNameMap);
   const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
   const guardrailComplianceMap = SessionStore((state) => state.guardrailComplianceMap);
   const setGuardrailComplianceMap = SessionStore((state) => state.setGuardrailComplianceMap);
   const guardrailApprovedByPolicy = SessionStore((state) => state.guardrailApprovedByPolicy);
   const setGuardrailApprovedByPolicy = SessionStore((state) => state.setGuardrailApprovedByPolicy);
   const needsGuardrailCompliance = label === LABELS.GUARDRAIL || isAgenticSecurityCategory() || isEndpointSecurityCategory();
-  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, needs_approval: 3, training: 4 };
+  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, needs_approval: 3, training: 4, skills_evaluations: 4 };
   const resolvedInitialTab = initialTab || 'active';
   const [currentTab, setCurrentTab] = useState(resolvedInitialTab);
   const [selected, setSelected] = useState(tabIndexMap[resolvedInitialTab] || 0)
@@ -174,6 +186,32 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     setApproveMode("ALWAYS");
     setApproveDays("7");
     setApproveRow(x);
+  };
+
+  // Threat events for skills carry the threat/traffic collection id in `apiCollectionId`, which is
+  // NOT the inventory collection that renders the skill content. That inventory collection is keyed
+  // by host, so resolve it by reverse-looking up the host in hostNameMap / collectionsMap.
+  const resolveSkillCollectionId = (host) => {
+    if (!host || host === '-') return null;
+    const match = (map) => Object.keys(map || {}).find((id) => map[id] === host);
+    return match(hostNameMap) || match(collectionsMap) || null;
+  };
+
+  // Open the skill-content page (inventory ApiDetails flyout, Values tab) for a skill threat row.
+  const openSkillContent = (x) => {
+    const collectionId = resolveSkillCollectionId(x?.host);
+    if (!collectionId) {
+      func.setToast(true, true, "Could not find the skill collection for this host");
+      return;
+    }
+    // Inventory endpoints are stored path-only; strip any host prefix before matching selected_url.
+    const pathOnlyUrl = String(x?.url || "").replace(/^https?:\/\/[^/]+/, "");
+    const params = new URLSearchParams();
+    params.set("selected_url", pathOnlyUrl);
+    params.set("selected_method", x?.method || "POST");
+    params.set("agentic_view", "skills");
+    const navigateUrl = `${window.location.origin}/dashboard/observe/inventory/${collectionId}?${params.toString()}`;
+    window.open(navigateUrl, "_blank");
   };
 
   const submitInlineApprove = async () => {
@@ -295,7 +333,19 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       index: 4
     });
   }
-  const tableTabs = [...baseTabs, ...guardrailExtraTabs]
+  // "Skills Evaluations" — ACTIVE skill_evaluation policy events on skill endpoints. Client-side
+  // view like "Needs Approval". Endpoint (Atlas) only. Positioned after the guardrail extra tabs.
+  const skillsExtraTabs = [];
+  if (isEndpointSecurityCategory()) {
+    skillsExtraTabs.push({
+      content: 'Skills Evaluations',
+      badge: 'Beta',
+      onAction: () => { setCurrentTab('skills_evaluations'); },
+      id: 'skills_evaluations',
+      index: baseTabs.length + guardrailExtraTabs.length
+    });
+  }
+  const tableTabs = [...baseTabs, ...guardrailExtraTabs, ...skillsExtraTabs]
 
   const handleSelectedTab = (selectedIndex) => {
     setLoading(true)
@@ -589,9 +639,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     // "Needs Approval" is a client-side view over ACTIVE events filtered to behaviour==="approval".
     // Fetch active events with a high limit (single page) and filter after mapping.
     const isNeedsApproval = currentTab === 'needs_approval';
-    const effectiveStatus = isNeedsApproval ? 'ACTIVE' : currentTab.toUpperCase();
-    const effectiveSkip = isNeedsApproval ? 0 : skip;
-    const effectiveLimit = isNeedsApproval ? 200 : limit;
+    // Skills Evaluations: client-side view over ACTIVE skill_evaluation events on skill endpoints.
+    const isSkillsEvaluations = currentTab === 'skills_evaluations';
+    const isClientSideView = isNeedsApproval || isSkillsEvaluations;
+    const effectiveStatus = isClientSideView ? 'ACTIVE' : currentTab.toUpperCase();
+    const effectiveSkip = isClientSideView ? 0 : skip;
+    const effectiveLimit = isClientSideView ? 200 : limit;
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
       matchingUrlFilter = [],
@@ -702,7 +755,21 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           ? getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap)
           : formatActorId(x.actor),
         host: x.host || "-",
-        endpointComp: (
+        endpointComp: String(x?.url || "").includes('/skills/') ? (
+          // Skill rows link to the skill-content page (Values tab markdown) for this host.
+          // preventDefault/stopPropagation stops the row's <a href=nextUrl> and onRowClick.
+          <div
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); openSkillContent(x); }}
+            style={{ cursor: "pointer" }}
+          >
+            <GetPrettifyEndpoint
+              maxWidth="300px"
+              method={x.method}
+              url={x.url}
+              isNew={false}
+            />
+          </div>
+        ) : (
           <GetPrettifyEndpoint
             maxWidth="300px"
             method={x.method}
@@ -792,6 +859,23 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       );
       total = ret.length;
     }
+    // Skills Evaluations tab: keep only the skill-evaluation entries. In the Policy Triggered
+    // column, relabel malicious_skill_detected as "Skills Evaluation" (display only — the real
+    // filterId stays on the row for row-click deep-links/actions; header value swapped below).
+    if (isSkillsEvaluations) {
+      ret = ret.filter(isSkillEvaluationEntry).map(r => ({
+        ...r,
+        policyDisplay: String(r.filterId || '').toLowerCase() === 'malicious_skill_detected'
+          ? 'Skills Evaluation'
+          : r.filterId,
+      }));
+      total = ret.length;
+    }
+    // NOTE: We intentionally do NOT hide skill-evaluation entries from the Active tab here.
+    // Active is server-paginated (total comes from the backend), so removing rows client-side per
+    // page made "Showing X of N" wrong. Excluding them correctly needs a server-side filter (see
+    // subCategory-based approach); until then skill-evaluation rows appear in both Active and the
+    // Skills Evaluations tab, but pagination stays correct.
     setLoading(false);
     return { value: ret, total: total };
   }
@@ -920,6 +1004,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const headers = getHeaders();
   if (currentTab === 'needs_approval') {
     headers.push({ text: "Action", value: "approveAction", title: "Action" });
+  }
+  // Skills Evaluations tab: render the Policy Triggered column from policyDisplay (which relabels
+  // malicious_skill_detected as "Skills Evaluation") instead of the raw filterId.
+  if (currentTab === 'skills_evaluations') {
+    const idx = headers.findIndex(h => h.value === 'filterId');
+    if (idx !== -1) headers[idx] = { ...headers[idx], value: 'policyDisplay' };
   }
 
   return (

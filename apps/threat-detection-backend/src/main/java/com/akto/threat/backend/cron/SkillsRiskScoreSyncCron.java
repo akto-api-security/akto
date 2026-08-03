@@ -91,7 +91,8 @@ public class SkillsRiskScoreSyncCron {
                                 Filters.gte("detectedAt", deltaStartTime),
                                 Filters.lte("detectedAt", deltaEndTime),
                                 Filters.eq("successfulExploit", true),
-                                Filters.eq("contextSource", "ENDPOINT")
+                                Filters.eq("contextSource", "ENDPOINT"),
+                                Filters.eq("category", "malicious_skill_detected")
                             )));
                             pipeline.add(Aggregates.group(groupedId, Accumulators.addToSet("severities", "$severity")));
 

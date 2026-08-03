@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Box, Spinner, VerticalStack, Text } from "@shopify/polaris";
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
+import { stripMarkdownLinks } from "../../../components/shared/markdownUtils";
 import observeApi from "../api";
 
 function buildSkillMarkdown(sampleMessage, skillName) {
@@ -12,9 +13,9 @@ function buildSkillMarkdown(sampleMessage, skillName) {
         // Only return content for the specific skill being viewed
         if (skillName && body.skill_name.toLowerCase() !== skillName.toLowerCase()) return null;
         return (
-            `# ${body.skill_name}\n\n` +
-            (body.skill_description ? `**${body.skill_description}**\n\n` : "") +
-            (body.skill_content || "")
+            `# ${stripMarkdownLinks(body.skill_name)}\n\n` +
+            (body.skill_description ? `**${stripMarkdownLinks(body.skill_description)}**\n\n` : "") +
+            stripMarkdownLinks(body.skill_content || "")
         );
     } catch (_) {
         return null;
