@@ -521,7 +521,8 @@ public class SkillValidationV2Action extends ActionSupport {
         payload.put("messages", messages);
         payload.put("temperature", 0);
         // The inventory lists benign behaviors too, so responses are longer than a verdict-only reply.
-        payload.put("max_tokens", 8000);
+        // Azure books this figure against the deployment's TPM at admission, so keep it tight.
+        payload.put("max_tokens", 5000);
 
         Map<String, Object> llmResponse = LLMService.callLLM(payload);
         if (llmResponse == null) throw new RuntimeException("Empty LLM response");
