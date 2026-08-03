@@ -802,8 +802,13 @@ public class HttpCallParser {
 
             loggerMaker.info("Found valid Bedrock Agent execution trace", LogDb.RUNTIME);
 
+            // awsMetadata's traceData can be empty (e.g. a plain Converse call), leaving
+            // BedrockAgentTraceParser nothing to derive a bot name from — the HTTP-level
+            // "bot-name" tag (the same one used to name the collection) covers that gap.
+            String fallbackBotName = resolveAgentNameFromTags(httpResponseParam.getTags());
+
             // Parse trace using BedrockAgentTraceParser
-            TraceParseResult result = BedrockAgentTraceParser.getInstance().parse(bedrockTraceJson);
+            TraceParseResult result = BedrockAgentTraceParser.getInstance().parse(bedrockTraceJson, fallbackBotName);
             if (result.getTrace() != null && httpResponseParam.getRequestParams() != null) {
                 result.getTrace().setApiCollectionId(httpResponseParam.getRequestParams().getApiCollectionId());
             }
@@ -815,18 +820,16 @@ public class HttpCallParser {
                 loggerMaker.info("Stored Bedrock Agent trace with " + result.getSpans().size() + " spans", LogDb.RUNTIME);
             }
 
-            // Attach the service graph to the same collection the trace itself was just
-            // stored under — a botName-based name lookup (as N8N still does) breaks
-            // whenever extractBotName() can't find a real name in awsMetadata (e.g. a
-            // plain Converse call with empty traceData) and falls back to a generic
-            // label that won't match any stored collection name. Mirrors parseCopilotTrace.
+            // Attach the service graph to the same collection the trace was just stored
+            // under (not a name-based lookup, unlike N8N — that breaks whenever the
+            // resolved botName doesn't match any stored collection name).
             String botName = (String) result.getMetadata().get("botName");
             String agentType = (String) result.getMetadata().get("agentType");
 
             if (httpResponseParam.getRequestParams() != null) {
                 int apiCollectionId = httpResponseParam.getRequestParams().getApiCollectionId();
                 if (apiCollectionId != -1) {
-                    Map<String, ServiceGraphEdgeInfo> edges = BedrockAgentTraceParser.getInstance().extractServiceGraph(bedrockTraceJson);
+                    Map<String, ServiceGraphEdgeInfo> edges = BedrockAgentTraceParser.getInstance().extractServiceGraph(bedrockTraceJson, fallbackBotName);
                     if (edges != null && !edges.isEmpty()) {
                         ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
                         loggerMaker.info("Updated service graph for Bedrock Agent: " + botName

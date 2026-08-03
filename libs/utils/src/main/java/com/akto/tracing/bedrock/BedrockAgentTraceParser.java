@@ -102,6 +102,11 @@ public class BedrockAgentTraceParser implements TraceParser {
 
     @Override
     public TraceParseResult parse(Object input) throws Exception {
+        return parse(input, null);
+    }
+
+    /** @param botName the HTTP-level "bot-name" tag; this class has no other source for it. */
+    public TraceParseResult parse(Object input, String botName) throws Exception {
         try {
             JsonNode awsMetadata = parseToJsonNode(input);
 
@@ -110,7 +115,7 @@ public class BedrockAgentTraceParser implements TraceParser {
             }
 
             // Extract agent/harness info
-            String botName = extractBotName(awsMetadata);
+            botName = extractBotName(botName);
             String model = awsMetadata.path("model").asText("unknown");
             String agentType = resolveAgentType(awsMetadata);
 
@@ -177,6 +182,11 @@ public class BedrockAgentTraceParser implements TraceParser {
 
     @Override
     public Map<String, ServiceGraphEdgeInfo> extractServiceGraph(Object input) throws Exception {
+        return extractServiceGraph(input, null);
+    }
+
+    /** @param botName see {@link #parse(Object, String)}. */
+    public Map<String, ServiceGraphEdgeInfo> extractServiceGraph(Object input, String botName) throws Exception {
         try {
             JsonNode awsMetadata = parseToJsonNode(input);
 
@@ -192,7 +202,7 @@ public class BedrockAgentTraceParser implements TraceParser {
             String model = awsMetadata.path("model").asText("unknown");
             String executionRole = extractExecutionRoleValue(awsMetadata);
 
-            String sourceService = extractBotName(awsMetadata);
+            String sourceService = extractBotName(botName);
 
             // The agent node is only ever a source below, never a target — without an
             // edge that targets it, the UI has no "type" for it and defaults to
@@ -261,25 +271,11 @@ public class BedrockAgentTraceParser implements TraceParser {
         return SOURCE_TYPE;
     }
 
-    private String extractBotName(JsonNode awsMetadata) {
-        // Extract bot name from first step of executionFlow
-        JsonNode executionFlow = awsMetadata.path("traceData").path("executionFlow");
-        if (executionFlow.isArray() && executionFlow.size() > 0) {
-            JsonNode firstStep = executionFlow.get(0);
-            String name = firstStep.path("name").asText(null);
-            if (name != null && !name.isEmpty()) {
-                return name;
-            }
-        }
-
-        // Fallback: use from toolsSummary
-        JsonNode toolsSummary = awsMetadata.path("traceData").path("toolsSummary");
-        String orchestrator = toolsSummary.path("agentOrchestrator").asText(null);
-        if (orchestrator != null && !orchestrator.isEmpty()) {
-            return orchestrator;
-        }
-
-        return "Bedrock Agent";
+    // The HTTP-level "bot-name" tag (also used to name the collection itself) is the
+    // agent's identity — awsMetadata's own traceData can be empty (e.g. a plain
+    // Converse call), so it's not a reliable source to derive a name from.
+    private String extractBotName(String botName) {
+        return (botName != null && !botName.isEmpty()) ? botName : "Bedrock Agent";
     }
 
     private List<Span> buildSpansFromExecutionFlow(String traceId, String rootSpanId, JsonNode executionFlow) {
