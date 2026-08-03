@@ -8,8 +8,8 @@ COPY src/requirements.txt .
 RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
 # CPU-only torch (no CUDA wheels) keeps the image small — MiniLM inference is
 # CPU-bound and needs no GPU. Install it first so sentence-transformers reuses it.
-RUN pip3 install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
-    && pip3 install --no-cache-dir -r requirements.txt
+RUN python3 -m pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+    && python3 -m pip install --no-cache-dir -r requirements.txt
 
 # Pre-bake the model into the image so the first request isn't blocked on a
 # HuggingFace download (mirrors anonymizer-container's spacy download step).
