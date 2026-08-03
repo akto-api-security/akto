@@ -192,7 +192,7 @@ public class BedrockAgentTraceParser implements TraceParser {
             String model = awsMetadata.path("model").asText("unknown");
             String executionRole = extractExecutionRoleValue(awsMetadata);
 
-            String sourceService = "BEDROCK_AGENT (Role - " + executionRole + ")";
+            String sourceService = extractBotName(awsMetadata);
 
             // The agent node is only ever a source below, never a target — without an
             // edge that targets it, the UI has no "type" for it and defaults to
@@ -201,6 +201,7 @@ public class BedrockAgentTraceParser implements TraceParser {
             Map<String, Object> agentMetadata = new HashMap<>();
             agentMetadata.put("type", TracingConstants.SpanKind.AGENT);
             agentMetadata.put("edgeParam", "AI Agent");
+            agentMetadata.put("role", executionRole);
             edges.put(sourceService, new ServiceGraphEdgeInfo("User", sourceService, agentMetadata));
 
             // LLM Call edge
@@ -278,7 +279,7 @@ public class BedrockAgentTraceParser implements TraceParser {
             return orchestrator;
         }
 
-        return "bedrock-agent";
+        return "Bedrock Agent";
     }
 
     private List<Span> buildSpansFromExecutionFlow(String traceId, String rootSpanId, JsonNode executionFlow) {
