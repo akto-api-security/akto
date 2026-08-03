@@ -112,6 +112,9 @@ public class SkillsRiskScoreSyncCron {
                             }
 
                             Map<ApiInfoKey, Float> apiInfoKeyToRiskScore = new HashMap<>();
+                            // non-skill ENDPOINT events: same host->collectionId resolution as above, but
+                            // scored via RiskScoreSyncCron.resolveThreatScores (generic severity formula), no malicious tag.
+                            Map<String, List<String>> nonSkillApiInfoKeyToSeverities = new HashMap<>();
                             while (cursor.hasNext()) {
                                 BasicDBObject document = cursor.next();
                                 BasicDBObject id = (BasicDBObject) document.get("_id");
@@ -119,7 +122,7 @@ public class SkillsRiskScoreSyncCron {
                                 String method = id.getString("method");
                                 String endpoint = id.getString("endpoint");
 
-                                if (endpoint == null || !endpoint.startsWith("/skill")) {
+                                if (endpoint == null) {
                                     continue;
                                 }
 
@@ -131,6 +134,15 @@ public class SkillsRiskScoreSyncCron {
 
                                 @SuppressWarnings("unchecked")
                                 List<String> severities = (List<String>) document.get("severities");
+
+                                if (!endpoint.startsWith("/skill")) {
+                                    if (severities != null && !severities.isEmpty() && method != null) {
+                                        String key = collectionId + " " + endpoint + " " + method;
+                                        nonSkillApiInfoKeyToSeverities.put(key, severities);
+                                    }
+                                    continue;
+                                }
+
                                 if (severities == null || severities.isEmpty()) continue;
                                 if (method == null) continue;
                                 float riskScore = computeRiskScore(severities);
@@ -139,6 +151,8 @@ public class SkillsRiskScoreSyncCron {
                                 ApiInfoKey apiInfoKey = new ApiInfoKey(collectionId, endpoint, URLMethods.Method.valueOf(method));
                                 apiInfoKeyToRiskScore.put(apiInfoKey, Math.max(apiInfoKeyToRiskScore.getOrDefault(apiInfoKey, 0.0f), riskScore));
                             }
+
+                            Map<ApiInfoKey, Float> nonSkillApiInfoKeyToThreatScore = RiskScoreSyncCron.resolveThreatScores(nonSkillApiInfoKeyToSeverities);
 
                             loggerMaker.infoAndAddToDb("Skills malicious events count: " + apiInfoKeyToRiskScore.size());
 
@@ -173,8 +187,14 @@ public class SkillsRiskScoreSyncCron {
                                     Updates.addToSet(ApiInfo.TAGS_LIST, maliciousTag)));
                             }
 
+                            // non-skill endpoint events: threat score only, no malicious tag
+                            for (Map.Entry<ApiInfoKey, Float> entry : nonSkillApiInfoKeyToThreatScore.entrySet()) {
+                                Bson filter = ApiInfoDao.getFilter(entry.getKey());
+                                updates.add(new UpdateManyModel<>(filter, Updates.set(ApiInfo.THREAT_SCORE, entry.getValue())));
+                            }
+
                             if (!updates.isEmpty()) {
-                                loggerMaker.infoAndAddToDb("Updating risk score for " + updates.size() + " api infos from skills events");
+                                loggerMaker.infoAndAddToDb("Updating risk score for " + updates.size() + " api infos from skills/endpoint events");
                                 ApiInfoDao.instance.bulkWrite(updates, new BulkWriteOptions().ordered(false));
                             }
 
