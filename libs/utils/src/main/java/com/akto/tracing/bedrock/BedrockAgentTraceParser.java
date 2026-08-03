@@ -16,9 +16,77 @@ public class BedrockAgentTraceParser implements TraceParser {
     private static final BedrockAgentTraceParser INSTANCE = new BedrockAgentTraceParser();
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String SOURCE_TYPE = "bedrock-agent";
+    private static final String AGENT_TYPE_AGENTCORE = "AGENTCORE";
+    private static final String AGENT_TYPE_BEDROCK = "BEDROCK";
+
+    // AWS surfaces the execution role under different keys depending on how the
+    // agent was deployed: Harness-based AgentCore, native AgentCore Runtime, or a
+    // bare Bedrock model invoke with no agent harness at all.
+    private static final String FIELD_HARNESS_ROLE = "harness-execution-role";
+    private static final String FIELD_RUNTIME_ROLE = "runtime-execution-role";
+    private static final String FIELD_BEDROCK_ROLE = "bedrock-execution-role";
+
+    // CloudWatch's trace data has no structured success/failure field for a tool
+    // result — only free-text. These are the phrasings actually observed across real
+    // tool failures (validation errors, missing-session lookups, etc.); this is a
+    // heuristic, not a guarantee, since a tool can fail in wording we haven't seen yet.
+    private static final String[] FAILURE_INDICATORS = {
+        "error", "not found", "failed", "invalid", "denied", "exception", "unable to"
+    };
+
+    private boolean looksLikeFailure(String result) {
+        if (result == null || result.isEmpty()) {
+            return false;
+        }
+        String lower = result.toLowerCase();
+        for (String indicator : FAILURE_INDICATORS) {
+            if (lower.contains(indicator)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     public static BedrockAgentTraceParser getInstance() {
         return INSTANCE;
+    }
+
+    /**
+     * The caller (HttpCallParser) already extracts and unwraps the "awsMetadata"
+     * field from the response payload before handing input here, so the parsed
+     * root IS the awsMetadata content — not a wrapper around it.
+     */
+    private JsonNode parseToJsonNode(Object input) throws Exception {
+        String jsonStr = input instanceof String ? (String) input : OBJECT_MAPPER.writeValueAsString(input);
+        return OBJECT_MAPPER.readTree(jsonStr);
+    }
+
+    private boolean isValidBedrockTrace(JsonNode awsMetadata) {
+        boolean hasExecutionRole = awsMetadata.has(FIELD_HARNESS_ROLE)
+            || awsMetadata.has(FIELD_RUNTIME_ROLE)
+            || awsMetadata.has(FIELD_BEDROCK_ROLE);
+        if (!hasExecutionRole) {
+            return false;
+        }
+        return awsMetadata.has("model") && awsMetadata.has("traceData");
+    }
+
+    // Harness-based AgentCore and native AgentCore Runtime traces both drive tool
+    // calls through an agent; a bare "bedrock-execution-role" means a direct,
+    // un-orchestrated model invoke with no agent involved.
+    private String resolveAgentType(JsonNode awsMetadata) {
+        if (awsMetadata.has(FIELD_HARNESS_ROLE) || awsMetadata.has(FIELD_RUNTIME_ROLE)) {
+            return AGENT_TYPE_AGENTCORE;
+        }
+        return AGENT_TYPE_BEDROCK;
+    }
+
+    private String extractExecutionRoleValue(JsonNode awsMetadata) {
+        String field = awsMetadata.has(FIELD_HARNESS_ROLE) ? FIELD_HARNESS_ROLE
+            : awsMetadata.has(FIELD_RUNTIME_ROLE) ? FIELD_RUNTIME_ROLE
+            : FIELD_BEDROCK_ROLE;
+        String value = awsMetadata.path(field).asText("");
+        return value.isEmpty() ? "unknown" : value;
     }
 
     @Override
@@ -26,26 +94,7 @@ public class BedrockAgentTraceParser implements TraceParser {
         if (input == null) return false;
 
         try {
-            String jsonStr = input instanceof String ? (String) input : OBJECT_MAPPER.writeValueAsString(input);
-            JsonNode root = OBJECT_MAPPER.readTree(jsonStr);
-
-            // Check for awsMetadata field
-            JsonNode awsMetadata = root.path("awsMetadata");
-            if (awsMetadata.isMissingNode()) {
-                return false;
-            }
-
-            // Check for either harness or bedrock execution role
-            boolean hasHarnessRole = awsMetadata.has("harness-execution-role");
-            boolean hasBedrockRole = awsMetadata.has("bedrock-execution-role");
-
-            if (!hasHarnessRole && !hasBedrockRole) {
-                return false;
-            }
-
-            // Check for model and traceData
-            return awsMetadata.has("model") && awsMetadata.has("traceData");
-
+            return isValidBedrockTrace(parseToJsonNode(input));
         } catch (Exception e) {
             return false;
         }
@@ -53,21 +102,22 @@ public class BedrockAgentTraceParser implements TraceParser {
 
     @Override
     public TraceParseResult parse(Object input) throws Exception {
-        try {
-            String jsonStr = input instanceof String ? (String) input : OBJECT_MAPPER.writeValueAsString(input);
-            JsonNode root = OBJECT_MAPPER.readTree(jsonStr);
+        return parse(input, null);
+    }
 
-            if (!canParse(input)) {
-                throw new Exception("Invalid Bedrock Agent trace: " + jsonStr);
+    /** @param botName the HTTP-level "bot-name" tag; this class has no other source for it. */
+    public TraceParseResult parse(Object input, String botName) throws Exception {
+        try {
+            JsonNode awsMetadata = parseToJsonNode(input);
+
+            if (!isValidBedrockTrace(awsMetadata)) {
+                throw new Exception("Invalid Bedrock Agent trace: " + awsMetadata);
             }
 
-            JsonNode awsMetadata = root.path("awsMetadata");
-
             // Extract agent/harness info
-            String botName = extractBotName(awsMetadata);
+            botName = extractBotName(botName);
             String model = awsMetadata.path("model").asText("unknown");
-            String harnessRole = awsMetadata.path("harness-execution-role").asText("");
-            String agentType = (!harnessRole.isEmpty()) ? "AGENTCORE" : "BEDROCK";
+            String agentType = resolveAgentType(awsMetadata);
 
             // Generate IDs
             String traceId = UUID.randomUUID().toString();
@@ -132,27 +182,37 @@ public class BedrockAgentTraceParser implements TraceParser {
 
     @Override
     public Map<String, ServiceGraphEdgeInfo> extractServiceGraph(Object input) throws Exception {
-        try {
-            String jsonStr = input instanceof String ? (String) input : OBJECT_MAPPER.writeValueAsString(input);
-            JsonNode root = OBJECT_MAPPER.readTree(jsonStr);
+        return extractServiceGraph(input, null);
+    }
 
-            if (!canParse(input)) {
+    /** @param botName see {@link #parse(Object, String)}. */
+    public Map<String, ServiceGraphEdgeInfo> extractServiceGraph(Object input, String botName) throws Exception {
+        try {
+            JsonNode awsMetadata = parseToJsonNode(input);
+
+            if (!isValidBedrockTrace(awsMetadata)) {
                 throw new Exception("Invalid Bedrock Agent trace for service graph extraction");
             }
 
-            JsonNode awsMetadata = root.path("awsMetadata");
-            String harnessRole = awsMetadata.path("harness-execution-role").asText("");
-            String agentType = (!harnessRole.isEmpty()) ? "AGENTCORE" : "BEDROCK";
+            String agentType = resolveAgentType(awsMetadata);
 
             Map<String, ServiceGraphEdgeInfo> edges = new HashMap<>();
 
             // Extract model edge
             String model = awsMetadata.path("model").asText("unknown");
-            String executionRole = agentType.equals("AGENTCORE") ?
-                awsMetadata.path("harness-execution-role").asText("unknown") :
-                awsMetadata.path("bedrock-execution-role").asText("unknown");
+            String executionRole = extractExecutionRoleValue(awsMetadata);
 
-            String sourceService = "BEDROCK_AGENT (Role - " + executionRole + ")";
+            String sourceService = extractBotName(botName);
+
+            // The agent node is only ever a source below, never a target — without an
+            // edge that targets it, the UI has no "type" for it and defaults to
+            // "Internal Service" (see buildServiceGraphFromSpans in HttpCallParser for
+            // the same pattern used by Copilot/Snowflake).
+            Map<String, Object> agentMetadata = new HashMap<>();
+            agentMetadata.put("type", TracingConstants.SpanKind.AGENT);
+            agentMetadata.put("edgeParam", "AI Agent");
+            agentMetadata.put("role", executionRole);
+            edges.put(sourceService, new ServiceGraphEdgeInfo("User", sourceService, agentMetadata));
 
             // LLM Call edge
             Map<String, Object> llmMetadata = new HashMap<>();
@@ -161,16 +221,35 @@ public class BedrockAgentTraceParser implements TraceParser {
             edges.put(model, new ServiceGraphEdgeInfo(sourceService, model, llmMetadata));
 
             // Add tools edge for AgentCore
-            if (agentType.equals("AGENTCORE")) {
-                String tools = awsMetadata.path("harness-configured-tools").asText("unknown");
-                if (!tools.isEmpty() && !tools.equals("unknown")) {
-                    Map<String, Object> toolsMetadata = new HashMap<>();
-                    toolsMetadata.put("type", "tool");
-                    toolsMetadata.put("edgeParam", "configured tools");
-                    edges.put(tools, new ServiceGraphEdgeInfo(sourceService, tools, toolsMetadata));
+            if (agentType.equals(AGENT_TYPE_AGENTCORE)) {
+                JsonNode toolsSummary = awsMetadata.path("traceData").path("toolsSummary");
+                JsonNode toolsActuallyUsed = toolsSummary.path("tools");
+
+                if (toolsActuallyUsed.isArray() && toolsActuallyUsed.size() > 0) {
+                    // Reflects what this specific request actually called, not just what
+                    // the harness has configured — one edge per distinct tool used.
+                    int totalToolCalls = toolsSummary.path("totalToolCalls").asInt(0);
+                    for (JsonNode toolNameNode : toolsActuallyUsed) {
+                        String toolName = toolNameNode.asText("unknown");
+                        Map<String, Object> toolsMetadata = new HashMap<>();
+                        toolsMetadata.put("type", "tool");
+                        toolsMetadata.put("edgeParam", "tool call");
+                        toolsMetadata.put("totalToolCalls", totalToolCalls);
+                        edges.put(toolName, new ServiceGraphEdgeInfo(sourceService, toolName, toolsMetadata));
+                    }
+                } else {
+                    // No tool was actually called in this request — fall back to the
+                    // harness's static configuration so the graph still shows what it can do.
+                    String tools = awsMetadata.path("harness-configured-tools").asText("unknown");
+                    if (!tools.isEmpty() && !tools.equals("unknown")) {
+                        Map<String, Object> toolsMetadata = new HashMap<>();
+                        toolsMetadata.put("type", "tool");
+                        toolsMetadata.put("edgeParam", "configured tools");
+                        edges.put(tools, new ServiceGraphEdgeInfo(sourceService, tools, toolsMetadata));
+                    }
                 }
 
-                // Add skills edge
+                // Add skills edge (always static config — we don't yet extract per-call skill usage)
                 String skills = awsMetadata.path("harness-configured-skills").asText("unknown");
                 if (!skills.isEmpty() && !skills.equals("unknown")) {
                     Map<String, Object> skillsMetadata = new HashMap<>();
@@ -192,25 +271,11 @@ public class BedrockAgentTraceParser implements TraceParser {
         return SOURCE_TYPE;
     }
 
-    private String extractBotName(JsonNode awsMetadata) {
-        // Extract bot name from first step of executionFlow
-        JsonNode executionFlow = awsMetadata.path("traceData").path("executionFlow");
-        if (executionFlow.isArray() && executionFlow.size() > 0) {
-            JsonNode firstStep = executionFlow.get(0);
-            String name = firstStep.path("name").asText(null);
-            if (name != null && !name.isEmpty()) {
-                return name;
-            }
-        }
-
-        // Fallback: use from toolsSummary
-        JsonNode toolsSummary = awsMetadata.path("traceData").path("toolsSummary");
-        String orchestrator = toolsSummary.path("agentOrchestrator").asText(null);
-        if (orchestrator != null && !orchestrator.isEmpty()) {
-            return orchestrator;
-        }
-
-        return "bedrock-agent";
+    // The HTTP-level "bot-name" tag (also used to name the collection itself) is the
+    // agent's identity — awsMetadata's own traceData can be empty (e.g. a plain
+    // Converse call), so it's not a reliable source to derive a name from.
+    private String extractBotName(String botName) {
+        return (botName != null && !botName.isEmpty()) ? botName : "Bedrock Agent";
     }
 
     private List<Span> buildSpansFromExecutionFlow(String traceId, String rootSpanId, JsonNode executionFlow) {
@@ -221,6 +286,9 @@ public class BedrockAgentTraceParser implements TraceParser {
             return spans;
         }
 
+        // executionFlow steps form a linear chain (each step's parent is the previous
+        // step), so depth == position in the chain.
+        int depth = 0;
         for (JsonNode step : executionFlow) {
             String spanId = UUID.randomUUID().toString();
             String stepType = step.path("type").asText("unknown");
@@ -229,36 +297,41 @@ public class BedrockAgentTraceParser implements TraceParser {
 
             Map<String, Object> input = new HashMap<>();
             input.put("type", stepType);
+            if ("tool-call".equalsIgnoreCase(stepType)) {
+                input.put("tool", step.path("tool").asText("unknown"));
+                input.put("action", step.path("action").asText("unknown"));
+            }
+
+            // The tool's actual result/error text (empty for non-tool-call steps, e.g. the
+            // root "agent" step). See looksLikeFailure() for why this is a heuristic.
+            String result = step.path("result").asText("");
+            boolean failed = looksLikeFailure(result);
 
             Map<String, Object> output = new HashMap<>();
-            output.put("completed", true);
+            output.put("completed", !failed);
+            if (!result.isEmpty()) {
+                output.put("result", result);
+            }
 
+            long stepTimeMillis = System.currentTimeMillis();
             Span span = Span.builder()
                 .id(spanId)
                 .traceId(traceId)
                 .parentSpanId(parentSpanId)
                 .spanKind(spanKind)
                 .name(name)
-                .startTimeMillis(System.currentTimeMillis())
-                .endTimeMillis(System.currentTimeMillis())
-                .status("success")
+                .startTimeMillis(stepTimeMillis)
+                .endTimeMillis(stepTimeMillis)
+                .status(failed ? "error" : "success")
                 .input(input)
                 .output(output)
                 .metadata(extractStepMetadata(step, stepType))
-                .depth(0)
+                .depth(depth++)
                 .tags(Arrays.asList(SOURCE_TYPE, stepType))
                 .build();
 
             spans.add(span);
             parentSpanId = spanId; // Set as parent for next span
-        }
-
-        // Set depths based on hierarchy
-        if (!spans.isEmpty()) {
-            spans.get(0).setDepth(0);
-            for (int i = 1; i < spans.size(); i++) {
-                spans.get(i).setDepth(i);
-            }
         }
 
         return spans;
@@ -286,6 +359,7 @@ public class BedrockAgentTraceParser implements TraceParser {
             metadata.put("tool", step.path("tool").asText("unknown"));
             metadata.put("action", step.path("action").asText("unknown"));
             metadata.put("toolUseId", step.path("toolUseId").asText(""));
+            metadata.put("result", step.path("result").asText(""));
         }
 
         if (step.has("description")) {
@@ -302,12 +376,13 @@ public class BedrockAgentTraceParser implements TraceParser {
         metadata.put("model", awsMetadata.path("model").asText("unknown"));
 
         // Add role information
-        if (agentType.equals("AGENTCORE")) {
-            metadata.put("harnessExecutionRole", awsMetadata.path("harness-execution-role").asText(""));
+        if (agentType.equals(AGENT_TYPE_AGENTCORE)) {
+            metadata.put("harnessExecutionRole", awsMetadata.path(FIELD_HARNESS_ROLE).asText(""));
+            metadata.put("runtimeExecutionRole", awsMetadata.path(FIELD_RUNTIME_ROLE).asText(""));
             metadata.put("configuredTools", awsMetadata.path("harness-configured-tools").asText(""));
             metadata.put("configuredSkills", awsMetadata.path("harness-configured-skills").asText(""));
         } else {
-            metadata.put("bedrockExecutionRole", awsMetadata.path("bedrock-execution-role").asText(""));
+            metadata.put("bedrockExecutionRole", awsMetadata.path(FIELD_BEDROCK_ROLE).asText(""));
         }
 
         // Add execution summary
