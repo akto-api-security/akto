@@ -815,30 +815,25 @@ public class HttpCallParser {
                 loggerMaker.info("Stored Bedrock Agent trace with " + result.getSpans().size() + " spans", LogDb.RUNTIME);
             }
 
-            // Extract bot name and use as workflowId
+            // Attach the service graph to the same collection the trace itself was just
+            // stored under — a botName-based name lookup (as N8N still does) breaks
+            // whenever extractBotName() can't find a real name in awsMetadata (e.g. a
+            // plain Converse call with empty traceData) and falls back to a generic
+            // label that won't match any stored collection name. Mirrors parseCopilotTrace.
             String botName = (String) result.getMetadata().get("botName");
             String agentType = (String) result.getMetadata().get("agentType");
 
-            if (botName == null || botName.isEmpty()) {
-                loggerMaker.info("Bedrock Agent trace missing botName, skipping service graph update", LogDb.RUNTIME);
-                return;
-            }
-
-            // Use botName as hostname (from executionFlow[0].name)
-            String hostname = botName;
-            int apiCollectionId = ServiceGraphBuilder.getInstance().getApiCollectionIdFromWorkflowId(botName, hostname);
-
-            if (apiCollectionId != -1) {
-                // Save the service graph edges
-                java.util.Map<String, ServiceGraphEdgeInfo> edges = BedrockAgentTraceParser.getInstance().extractServiceGraph(bedrockTraceJson);
-                if (edges != null && !edges.isEmpty()) {
-                    ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
-                    loggerMaker.info("Updated service graph for Bedrock Agent: " + botName
-                        + " (agentType: " + agentType + ", collection: " + apiCollectionId
-                        + ", hostname: " + hostname + ") with " + edges.size() + " edges", LogDb.RUNTIME);
+            if (httpResponseParam.getRequestParams() != null) {
+                int apiCollectionId = httpResponseParam.getRequestParams().getApiCollectionId();
+                if (apiCollectionId != -1) {
+                    Map<String, ServiceGraphEdgeInfo> edges = BedrockAgentTraceParser.getInstance().extractServiceGraph(bedrockTraceJson);
+                    if (edges != null && !edges.isEmpty()) {
+                        ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
+                        loggerMaker.info("Updated service graph for Bedrock Agent: " + botName
+                            + " (agentType: " + agentType + ", collection: " + apiCollectionId
+                            + ") with " + edges.size() + " edges", LogDb.RUNTIME);
+                    }
                 }
-            } else {
-                loggerMaker.info("Invalid API collection ID for Bedrock Agent botName: " + botName, LogDb.RUNTIME);
             }
 
         } catch (Exception e) {
