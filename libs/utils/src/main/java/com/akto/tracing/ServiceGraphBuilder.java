@@ -49,9 +49,6 @@ public class ServiceGraphBuilder {
                 ServiceGraphEdgeInfo edgeInfo = existingEdges.get(targetService);
                 if (edgeInfo == null) {
                     edgeInfo = newEdge;
-                } else {
-                    // Edge already exists — keep any metadata the incoming edge has that the existing one lacks; never overwrite.
-                    mergeMetadata(edgeInfo, newEdge);
                 }
 
                 existingEdges.put(targetService, edgeInfo);
