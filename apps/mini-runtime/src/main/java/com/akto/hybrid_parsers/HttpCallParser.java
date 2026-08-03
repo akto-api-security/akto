@@ -626,6 +626,18 @@ public class HttpCallParser {
         return null;
     }
 
+    /** The one agent identifier Copilot Studio transcripts actually carry. */
+    private String resolveAgentIdFromTags(String tagsJson) {
+        try {
+            if (tagsJson == null || tagsJson.isEmpty()) return null;
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) return null;
+            String id = tagsMap.get(Constants.AI_AGENT_TAG_BOT_SCHEMA_NAME);
+            return id != null && !id.isEmpty() ? id : null;
+        } catch (Exception ignored) { return null; }
+    }
+
     private void parseCopilotTrace(HttpResponseParams httpResponseParam) {
         try {
             String payload = httpResponseParam.getPayload();
@@ -670,7 +682,8 @@ public class HttpCallParser {
             if (httpResponseParam.getRequestParams() != null) {
                 int apiCollectionId = httpResponseParam.getRequestParams().getApiCollectionId();
                 if (apiCollectionId != -1) {
-                    Map<String, ServiceGraphEdgeInfo> edges = buildServiceGraphFromSpans(result.getSpans());
+                    String agentId = resolveAgentIdFromTags(httpResponseParam.getTags());
+                    Map<String, ServiceGraphEdgeInfo> edges = buildServiceGraphFromSpans(result.getSpans(), agentId);
                     if (edges != null && !edges.isEmpty()) {
                         ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
                     }
@@ -1038,7 +1051,7 @@ public class HttpCallParser {
             if (httpResponseParam.getRequestParams() != null) {
                 int apiCollectionId = httpResponseParam.getRequestParams().getApiCollectionId();
                 if (apiCollectionId != -1) {
-                    Map<String, ServiceGraphEdgeInfo> edges = buildServiceGraphFromSpans(snowflakeResult.getSpans());
+                    Map<String, ServiceGraphEdgeInfo> edges = buildServiceGraphFromSpans(snowflakeResult.getSpans(), null);
                     if (edges != null && !edges.isEmpty()) {
                         ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
                     }
@@ -1049,7 +1062,7 @@ public class HttpCallParser {
         }
     }
 
-    private Map<String, ServiceGraphEdgeInfo> buildServiceGraphFromSpans(List<Span> spans) {
+    private Map<String, ServiceGraphEdgeInfo> buildServiceGraphFromSpans(List<Span> spans, String agentId) {
         Map<String, ServiceGraphEdgeInfo> edges = new HashMap<>();
         if (spans == null || spans.isEmpty()) return edges;
         Map<String, Span> byId = new HashMap<>();
@@ -1063,6 +1076,8 @@ public class HttpCallParser {
 
             if (span.getParentSpanId() == null) {
                 // Root (agent) span — add as a target so the UI shows it as "AI Agent"
+                // Stamped so same-named agents' transcript roots stay disambiguated, same as inventory-built roots.
+                if (agentId != null) meta.put(CopilotInventoryParser.AGENT_ID_KEY, agentId);
                 edges.put(targetService, new ServiceGraphEdgeInfo("User", targetService, meta));
             } else {
                 Span parent = byId.get(span.getParentSpanId());

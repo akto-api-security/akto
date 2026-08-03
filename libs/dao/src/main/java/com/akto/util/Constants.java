@@ -83,6 +83,7 @@ public class Constants {
     public static final String AI_AGENT_SOURCE_AWS_BEDROCK="AWS_BEDROCK";
     public static final String AI_AGENT_SOURCE_ENDPOINT = "ENDPOINT";
     public static final String AI_AGENT_TAG_BOT_NAME = "bot-name";
+    public static final String AI_AGENT_TAG_BOT_SCHEMA_NAME = "bot-schemaname";
     public static final String AI_AGENT_TAG_SOURCE = "source";
     public static final String AI_AGENT_TAG_CONNECTOR = "connector";
     public static final String AI_AGENT_CONNECTOR_MICROSOFT_DEFENDER = "MICROSOFT_DEFENDER";

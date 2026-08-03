@@ -110,7 +110,7 @@ public class CopilotInventoryParser {
 
         // Display names aren't unique — when another agent already owns this node name, take a private namespace instead of silently hiding one.
         String owner = rootAgentId(existingEdges, baseNode);
-        String suffix = owner != null && !owner.equals(agentId) ? "_" + shortId(agentId) : "";
+        String suffix = owner != null && !owner.equals(agentId) ? "-" + shortId(agentId) : "";
         String agentNode = baseNode + suffix;
 
         edges.put(agentNode, new ServiceGraphEdgeInfo(USER_NODE, agentNode, agentMetadata(root, properties)));
@@ -144,13 +144,11 @@ public class CopilotInventoryParser {
         return properties.path(FIELD_CAPABILITIES_COUNTS).path(FIELD_DISTINCT_CONNECTORS).asInt(0) > carried;
     }
 
-    /** The agent that owns an inventory-built root at {@code key}, or null if none does. */
+    /** The agent that owns a root at {@code key}, or null if none does. */
     private String rootAgentId(Map<String, ServiceGraphEdgeInfo> existingEdges, String key) {
         if (existingEdges == null) return null;
         ServiceGraphEdgeInfo root = existingEdges.get(key);
         if (root == null || root.getMetadata() == null) return null;
-        // A transcript-built root carries no discoveredVia and is not an owner — inventory merges onto it instead.
-        if (!DISCOVERED_VIA.equals(root.getMetadata().get(DISCOVERED_VIA_KEY))) return null;
         Object agentId = root.getMetadata().get(AGENT_ID_KEY);
         return agentId instanceof String && !((String) agentId).isEmpty() ? (String) agentId : null;
     }
@@ -161,8 +159,10 @@ public class CopilotInventoryParser {
         return agentId.length() > 8 ? agentId.substring(0, 8) : agentId;
     }
 
-    /** agentID -> entraAgentId (the canonical id elsewhere in Akto); falls back to the internal GUID for Lite/pre-Entra-identity agents. */
+    /** schemaName first — it's the one identifier transcripts also carry. */
     private String resolveAgentId(JsonNode root, JsonNode properties) {
+        String schemaName = properties.path("schemaName").asText("");
+        if (!schemaName.isEmpty()) return schemaName;
         String entraAgentId = properties.path(FIELD_ENTRA_AGENT_ID).asText("");
         return !entraAgentId.isEmpty() ? entraAgentId : root.path(FIELD_NAME).asText("");
     }
@@ -351,18 +351,18 @@ public class CopilotInventoryParser {
         return decoded.isEmpty() ? connectorId : decoded;
     }
 
-    /** Picks the agent root key: reuses an existing transcript-created root under either spelling, else sanitizes displayName directly. */
+    /** Picks the agent root key: defaults to the collection's hyphen-style naming, reusing an existing root under either spelling if one's on file. */
     private String resolveAgentNode(String displayName, Map<String, ServiceGraphEdgeInfo> existingEdges) {
-        String defaultNode = sanitizeServiceName(displayName);
-        if (existingEdges == null || existingEdges.isEmpty()) return defaultNode;
-
-        if (existingEdges.containsKey(defaultNode)) return defaultNode;
-
-        // The transcript fallback names its root from the bot-name tag, already hyphen-sanitized by the Go binary — a different result than sanitizing displayName directly.
         String botNameStyleNode = sanitizeServiceName(sanitizeBotNameStyle(displayName));
+        if (existingEdges == null || existingEdges.isEmpty()) return botNameStyleNode;
+
         if (existingEdges.containsKey(botNameStyleNode)) return botNameStyleNode;
 
-        return defaultNode;
+        // Or reuse an existing underscore-style root left by a transcript's SessionInfo path.
+        String underscoreNode = sanitizeServiceName(displayName);
+        if (existingEdges.containsKey(underscoreNode)) return underscoreNode;
+
+        return botNameStyleNode;
     }
 
     /** Java port of sanitizeBotName in extractor.go; must stay identical to both or it stops matching the fallback root it detects. */
