@@ -384,7 +384,6 @@ function Endpoints() {
                 key="table"
                 pageLimit={PAGE_LIMIT}
                 data={isSkills ? skillsToShow : data[selectedTab]}
-                searchKeys={SEARCH_KEYS}
                 // Skills search is owned by this page (custom TextField above), not the table's
                 // built-in search — so hide the query field and keep the table's internal key stable
                 // (hardCodedKey) so external filtering doesn't remount it. Async risk-score/badge
