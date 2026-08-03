@@ -805,6 +805,9 @@ public class HttpCallParser {
 
             // Parse trace using N8nTraceParser
             TraceParseResult result = N8nTraceParser.getInstance().parse(n8nTraceJson);
+            if (result.getTrace() != null && httpResponseParam.getRequestParams() != null) {
+                result.getTrace().setApiCollectionId(httpResponseParam.getRequestParams().getApiCollectionId());
+            }
 
             // Store trace and spans using dataActor
             dataActor.storeTrace(result.getTrace());
@@ -878,8 +881,16 @@ public class HttpCallParser {
 
             loggerMaker.info("Found valid Bedrock Agent execution trace", LogDb.RUNTIME);
 
+            // awsMetadata's traceData can be empty (e.g. a plain Converse call), leaving
+            // BedrockAgentTraceParser nothing to derive a bot name from — the HTTP-level
+            // "bot-name" tag (the same one used to name the collection) covers that gap.
+            String fallbackBotName = resolveAgentNameFromTags(httpResponseParam.getTags());
+
             // Parse trace using BedrockAgentTraceParser
-            TraceParseResult result = BedrockAgentTraceParser.getInstance().parse(bedrockTraceJson);
+            TraceParseResult result = BedrockAgentTraceParser.getInstance().parse(bedrockTraceJson, fallbackBotName);
+            if (result.getTrace() != null && httpResponseParam.getRequestParams() != null) {
+                result.getTrace().setApiCollectionId(httpResponseParam.getRequestParams().getApiCollectionId());
+            }
 
             // Store trace and spans using dataActor
             dataActor.storeTrace(result.getTrace());
@@ -888,30 +899,23 @@ public class HttpCallParser {
                 loggerMaker.info("Stored Bedrock Agent trace with " + result.getSpans().size() + " spans", LogDb.RUNTIME);
             }
 
-            // Extract bot name and use as workflowId
+            // Attach the service graph to the same collection the trace was just stored
+            // under (not a name-based lookup, unlike N8N — that breaks whenever the
+            // resolved botName doesn't match any stored collection name).
             String botName = (String) result.getMetadata().get("botName");
             String agentType = (String) result.getMetadata().get("agentType");
 
-            if (botName == null || botName.isEmpty()) {
-                loggerMaker.info("Bedrock Agent trace missing botName, skipping service graph update", LogDb.RUNTIME);
-                return;
-            }
-
-            // Use botName as hostname (from executionFlow[0].name)
-            String hostname = botName;
-            int apiCollectionId = ServiceGraphBuilder.getInstance().getApiCollectionIdFromWorkflowId(botName, hostname);
-
-            if (apiCollectionId != -1) {
-                // Save the service graph edges
-                java.util.Map<String, ServiceGraphEdgeInfo> edges = BedrockAgentTraceParser.getInstance().extractServiceGraph(bedrockTraceJson);
-                if (edges != null && !edges.isEmpty()) {
-                    ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
-                    loggerMaker.info("Updated service graph for Bedrock Agent: " + botName
-                        + " (agentType: " + agentType + ", collection: " + apiCollectionId
-                        + ", hostname: " + hostname + ") with " + edges.size() + " edges", LogDb.RUNTIME);
+            if (httpResponseParam.getRequestParams() != null) {
+                int apiCollectionId = httpResponseParam.getRequestParams().getApiCollectionId();
+                if (apiCollectionId != -1) {
+                    Map<String, ServiceGraphEdgeInfo> edges = BedrockAgentTraceParser.getInstance().extractServiceGraph(bedrockTraceJson, fallbackBotName);
+                    if (edges != null && !edges.isEmpty()) {
+                        ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
+                        loggerMaker.info("Updated service graph for Bedrock Agent: " + botName
+                            + " (agentType: " + agentType + ", collection: " + apiCollectionId
+                            + ") with " + edges.size() + " edges", LogDb.RUNTIME);
+                    }
                 }
-            } else {
-                loggerMaker.info("Invalid API collection ID for Bedrock Agent botName: " + botName, LogDb.RUNTIME);
             }
 
         } catch (Exception e) {
@@ -1281,15 +1285,12 @@ public class HttpCallParser {
 
         if (CollectionUtils.isEmpty(apiCollection.getTagsList()) || apiCollection.getTagsList().stream()
                 .noneMatch(t -> Constants.AKTO_GEN_AI_TAG.equals(t.getKeyName()))) {
-            Pair<Boolean, String> llmCollectionTag = GenAiCollectionUtils.checkAndTagLLMCollection(httpResponseParams);
+            Optional<CollectionTags> genAiTagOpt = getGenAiTag(httpResponseParams);
             if (tagsList == null) {
                 tagsList = new ArrayList<>();
             }
-            if (llmCollectionTag.getFirst()) {
-                tagsList.add(new CollectionTags(Context.now(),
-                        Constants.AKTO_GEN_AI_TAG,
-                        llmCollectionTag.getSecond(),
-                        TagSource.KUBERNETES));
+            if (genAiTagOpt.isPresent()) {
+                tagsList.add(genAiTagOpt.get());
             }
         }
 
@@ -1394,6 +1395,14 @@ public class HttpCallParser {
                         }
                         tagList.add(ragTagOpt.get());
                     }
+                }
+
+                Optional<CollectionTags> genAiTagOpt = getGenAiTag(httpResponseParam);
+                if (genAiTagOpt.isPresent()) {
+                    if (tagList == null) {
+                        tagList = new ArrayList<>();
+                    }
+                    tagList.add(genAiTagOpt.get());
                 }
                 try {
                     String accessType = getOrComputeAccessType(direction, null);
@@ -1938,6 +1947,14 @@ public class HttpCallParser {
     private Optional<CollectionTags> getRagTag(HttpResponseParams responseParams) {
         if (RagDetector.isRagRequest(responseParams)) {
             return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_RAG_DATABASE_TAG, "RAG Database", TagSource.KUBERNETES));
+        }
+        return Optional.empty();
+    }
+
+    private Optional<CollectionTags> getGenAiTag(HttpResponseParams responseParams) {
+        Pair<Boolean, String> llmCollectionTag = GenAiCollectionUtils.checkAndTagLLMCollection(responseParams);
+        if (llmCollectionTag.getFirst()) {
+            return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_GEN_AI_TAG, llmCollectionTag.getSecond(), TagSource.KUBERNETES));
         }
         return Optional.empty();
     }
