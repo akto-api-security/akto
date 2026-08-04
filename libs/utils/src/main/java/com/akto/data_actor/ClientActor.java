@@ -1032,8 +1032,6 @@ public class ClientActor extends DataActor {
     }
 
     private void bulkWriteApiInfoWithPath(List<ApiInfo> apiInfoList, String path) {
-        ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
-
         List<ApiInfo> apiInfoBatch = new ArrayList<>();
         for (int i = 0; i < apiInfoList.size(); i++) {
             apiInfoBatch.add(apiInfoList.get(i));
