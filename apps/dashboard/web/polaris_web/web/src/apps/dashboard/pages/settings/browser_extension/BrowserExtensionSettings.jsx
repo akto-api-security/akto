@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-    ActionList, Avatar, Badge, Box, Button, Divider, Form, HorizontalStack, Icon,
+    ActionList, Avatar, Box, Button, Divider, Form, HorizontalStack, Icon,
     Modal, Pagination, Popover, Text, TextField, Tooltip, VerticalStack,
 } from "@shopify/polaris";
 import { SearchMinor, HorizontalDotsMinor, DeleteMinor, InfoMinor } from "@shopify/polaris-icons";
@@ -143,9 +143,10 @@ function BrowserExtensionSettings() {
         const key = (host || "").toLowerCase();
         return !!catalogueByHost[key] && !stableHosts.has(key);
     };
-    const betaBadge = (host) => isBeta(host) && (
+    // Beta is shown as the same subtle info icon used near the page title (no loud badge).
+    const betaInfo = (host) => isBeta(host) && (
         <Tooltip content={BETA_TOOLTIP} dismissOnMouseOut>
-            <Badge status="attention">Beta</Badge>
+            <span className="bext-info"><Icon source={InfoMinor} color="subdued" /></span>
         </Tooltip>
     );
 
@@ -355,7 +356,7 @@ function BrowserExtensionSettings() {
                 <Box className="bext-grow">
                     <HorizontalStack gap="2" blockAlign="center">
                         <Text variant="bodyMd" fontWeight="medium" truncate>{common?.name || c.host}</Text>
-                        {betaBadge(c.host)}
+                        {betaInfo(c.host)}
                     </HorizontalStack>
                     <Text variant="bodySm" color="subdued" truncate>
                         {common?.name ? c.host : (isAkto ? "Akto" : ((c.paths || []).join(", ") || "Custom"))}
@@ -472,7 +473,7 @@ function BrowserExtensionSettings() {
                 <Box style={{ flex: 1, minWidth: 0 }}>
                     <HorizontalStack gap="2" blockAlign="center">
                         <Text variant="bodyMd" fontWeight="medium" truncate>{c.name || c.host}</Text>
-                        {betaBadge(c.host)}
+                        {betaInfo(c.host)}
                     </HorizontalStack>
                     {c.name && <Text variant="bodySm" color="subdued" truncate>{c.host}</Text>}
                 </Box>
