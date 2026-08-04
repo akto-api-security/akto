@@ -66,9 +66,6 @@ public class BrowserExtensionConfigCommon {
     public static final String FRAME_MATCH = "frameMatch";
     private Map<String, Object> frameMatch;
 
-    public static final String TAG = "tag";
-    private String tag;
-
     // stored as `icon_url` in the document, used as the host's icon
     public static final String ICON_URL = "icon_url";
     private String iconUrl;
@@ -126,7 +123,6 @@ public class BrowserExtensionConfigCommon {
         config.format = asString(doc.get(FORMAT));
         config.path = asPath(doc.get(PATH));
         config.frameMatch = asMap(doc.get(FRAME_MATCH));
-        config.tag = asString(doc.get(TAG));
         config.iconUrl = asString(doc.get(ICON_URL));
         config.categories = asStringList(doc.get(CATEGORIES));
         config.responseFormat = asString(doc.get(RESPONSE_FORMAT));
