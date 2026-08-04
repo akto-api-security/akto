@@ -525,13 +525,12 @@ public class MaliciousEventService {
     // Done server-side so the total count and pagination stay correct.
     if (skillEvalMode != null && !skillEvalMode.isEmpty()
         && "ENDPOINT".equalsIgnoreCase(contextSource)) {
-      Document skillEval = new Document("filterId", "skill_evaluation");
       Document existing = new Document(query);
       query.clear();
       if ("only".equalsIgnoreCase(skillEvalMode)) {
-        query.append("$and", Arrays.asList(existing, skillEval));
+        query.append("$and", Arrays.asList(existing, new Document("filterId", "skill_evaluation")));
       } else if ("exclude".equalsIgnoreCase(skillEvalMode)) {
-        query.append("$and", Arrays.asList(existing, new Document("$nor", Arrays.asList(skillEval))));
+        query.append("$and", Arrays.asList(existing, new Document("filterId", new Document("$ne", "skill_evaluation"))));
       } else {
         query.putAll(existing);
       }
