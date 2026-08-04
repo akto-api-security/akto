@@ -119,12 +119,16 @@ public class AtlasRiskScoreSyncCron {
                                     hostToCollectionId = new HashMap<>();
                                     for (ApiCollection col : ApiCollectionsDao.fetchAllHosts()) {
                                         if (col.getHostName() != null) {
-                                            hostToCollectionId.put(col.getHostName(), col.getId());
+                                            hostToCollectionId.put(col.getHostName().toLowerCase(), col.getId());
                                         }
                                     }
                                 }
 
-                                Integer collectionId = hostToCollectionId.get(host);
+                                if (host == null) {
+                                    continue;
+                                }
+
+                                Integer collectionId = hostToCollectionId.get(host.toLowerCase());
                                 if (collectionId == null) {
                                     loggerMaker.infoAndAddToDb("No collection found for host: " + host);
                                     continue;
