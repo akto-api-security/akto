@@ -30,8 +30,8 @@ public class CopilotStudioInventoryPublisher {
         .build();
 
     private static final MediaType JSON = MediaType.parse("application/json");
-    private static final String COPILOT_STUDIO_HOST = "copilot-studio.microsoft.com";
-    private static final int ENV_SUFFIX_LENGTH = 10;
+    /** Must match extractor.go's host construction exactly, or inventory and transcript data for the same agent land in different collections. */
+    private static final String AI_AGENT_HOST_INFIX = ".ai-agent.";
     /** Informational only — carried for traceability back to the inventory row, nothing reads it. */
     private static final String BOT_ID_TAG = "bot-id";
     private static final String TAG_VALUE_TRUE = "true";
@@ -43,9 +43,9 @@ public class CopilotStudioInventoryPublisher {
 
     /** Builds one traffic sample per agent. Agents without a usable display name are skipped. */
     public List<Map<String, Object>> buildSamples(List<JsonNode> agents, String environmentId,
-                                                   Map<String, String> botIdToDataverseName, int accountId) {
+                                                   Map<String, String> botIdToDataverseName, int accountId,
+                                                   Map<String, String> ownerIdToUserId) {
         List<Map<String, Object>> samples = new ArrayList<>();
-        String host = hostForEnvironment(environmentId);
 
         for (JsonNode agent : agents) {
             JsonNode properties = agent.path("properties");
@@ -60,11 +60,16 @@ public class CopilotStudioInventoryPublisher {
                 continue;
             }
 
+            // Host carries the identity now — same convention as extractor.go's ExtractBotMessage/ExtractTranscriptMessages, so this lands in the same collection.
+            String ownerId = properties.path("ownerId").asText("");
+            String resolvedOwnerId = ownerIdToUserId != null ? ownerIdToUserId.get(ownerId) : null;
+            String host = (resolvedOwnerId != null && !resolvedOwnerId.isEmpty())
+                ? resolvedOwnerId + AI_AGENT_HOST_INFIX + botName : botName;
+
             Map<String, String> tags = new HashMap<>();
             tags.put(Constants.AKTO_ENDPOINT_SOURCE_TAG, Constants.AKTO_ENDPOINT_SOURCE_VALUE);
             tags.put(Constants.AKTO_GEN_AI_TAG, AIAgentConnectorConstants.DATA_TAG_GEN_AI);
             tags.put(Constants.AKTO_AI_AGENT_TAG, Constants.COPILOT_STUDIO_AI_AGENT_NAME);
-            tags.put(Constants.AKTO_COPILOT_BOT_NAME_TAG, botName);
             tags.put(BOT_ID_TAG, agentId);
             tags.put(Constants.AKTO_COPILOT_BOT_ENVIRONMENT_TAG, environmentId != null ? environmentId : "");
             tags.put(Constants.AKTO_COPILOT_INVENTORY_TAG, TAG_VALUE_TRUE);
@@ -141,21 +146,6 @@ public class CopilotStudioInventoryPublisher {
         logger.info("CopilotStudioInventory: published {} of {} agent samples to ingestion",
             published, samples.size());
         return published;
-    }
-
-    /** Port of copilotStudioHostForEnv in extractor.go — folds the env id into the host so each env gets its own collection. */
-    static String hostForEnvironment(String environmentId) {
-        if (environmentId == null) {
-            return COPILOT_STUDIO_HOST;
-        }
-        String suffix = environmentId.replaceAll("[^a-zA-Z0-9]", "");
-        if (suffix.length() > ENV_SUFFIX_LENGTH) {
-            suffix = suffix.substring(0, ENV_SUFFIX_LENGTH);
-        }
-        if (suffix.isEmpty()) {
-            return COPILOT_STUDIO_HOST;
-        }
-        return COPILOT_STUDIO_HOST.replaceFirst("copilot-studio", "copilot-studio-" + suffix);
     }
 
     /** Port of sanitizeBotName in extractor.go; must stay identical to the binary's version or one agent yields two collections. */

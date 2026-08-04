@@ -56,6 +56,14 @@ public class CopilotStudioUserResolver {
      * 10k-user tenant's map (~600KB) blows past by ~5x.
      */
     public static String buildUserMapFile(String tenantId, String clientId, String clientSecret) throws Exception {
+        Map<String, String> userIdMap = resolveUserMap(tenantId, clientId, clientSecret);
+        File mapFile = userMapFile(tenantId);
+        Files.write(mapFile.toPath(), objectMapper.writeValueAsBytes(userIdMap));
+        return mapFile.getAbsolutePath();
+    }
+
+    /** Same resolution as buildUserMapFile, returned in-process instead of written to disk — for the Java inventory publisher, which needs it to build a matching host string, not just hand a path to a child process. */
+    public static Map<String, String> resolveUserMap(String tenantId, String clientId, String clientSecret) throws Exception {
         List<GraphUser> users = loadCachedUsers(tenantId);
         if (users == null) {
             String token = fetchGraphToken(tenantId, clientId, clientSecret);
@@ -68,10 +76,7 @@ public class CopilotStudioUserResolver {
             if (u.id == null || u.id.isEmpty()) continue;
             userIdMap.put(u.id, buildUserId(u));
         }
-
-        File mapFile = userMapFile(tenantId);
-        Files.write(mapFile.toPath(), objectMapper.writeValueAsBytes(userIdMap));
-        return mapFile.getAbsolutePath();
+        return userIdMap;
     }
 
     private static File userMapFile(String tenantId) {

@@ -93,13 +93,18 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
         // The binary itself never calls Graph - it only receives a path to the derived map
         // file, not the content, since that content can exceed the 128KB env-var limit at scale.
         String resolvedUserMapFilePath = "";
+        Map<String, String> ownerIdToUserId = null;
         try {
             resolvedUserMapFilePath = CopilotStudioUserResolver.buildUserMapFile(
+                integration.getTenantId(), integration.getClientId(), integration.getClientSecret());
+            // Cache-file read, not a second Graph call — buildUserMapFile above just populated it for this tenantId.
+            ownerIdToUserId = CopilotStudioUserResolver.resolveUserMap(
                 integration.getTenantId(), integration.getClientId(), integration.getClientSecret());
         } catch (Exception e) {
             logger.error("CopilotStudioMultiEnv: failed to build Graph user map: {}", e.getMessage());
         }
         final String userMapFilePath = resolvedUserMapFilePath;
+        final Map<String, String> finalOwnerIdToUserId = ownerIdToUserId;
 
         int now = Context.now();
         List<CopilotStudioIntegration.Environment> environments = integration.getEnvironments();
@@ -146,7 +151,7 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
         }
 
         // After transcripts, while the heartbeat still runs — inventory is additive and must never fail the transcript work.
-        publishAgentInventory(integrationId, integration, job.getAccountId());
+        publishAgentInventory(integrationId, integration, job.getAccountId(), finalOwnerIdToUserId);
 
         heartbeatExecutor.shutdownNow();
 
@@ -204,7 +209,8 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
     }
 
     /** Pulls tenant-wide agent inventory once per job (not per environment) and publishes samples; best-effort, never blocks transcripts: https://learn.microsoft.com/en-us/power-platform/admin/power-platform-inventory#access-requirements */
-    private void publishAgentInventory(String integrationId, CopilotStudioIntegration integration, int accountId) {
+    private void publishAgentInventory(String integrationId, CopilotStudioIntegration integration, int accountId,
+            Map<String, String> ownerIdToUserId) {
         try {
             // Existing integrations default off until the customer opts in; new ones enable this at setup.
             if (!integration.isAgentGraphEnabled()) {
@@ -262,7 +268,7 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
             int published = 0;
             for (Map.Entry<String, List<JsonNode>> entry : agentsByEnvironment.entrySet()) {
                 List<Map<String, Object>> samples = inventoryPublisher.buildSamples(
-                    entry.getValue(), entry.getKey(), null, accountId);
+                    entry.getValue(), entry.getKey(), null, accountId, ownerIdToUserId);
                 published += inventoryPublisher.publish(ingestionUrl, jwtToken, samples);
             }
 
