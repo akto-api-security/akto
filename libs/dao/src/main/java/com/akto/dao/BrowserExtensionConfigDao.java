@@ -3,8 +3,6 @@ package com.akto.dao;
 import com.akto.dto.BrowserExtensionConfig;
 import com.akto.dto.BrowserExtensionConfigCommon;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 
 import org.bson.Document;
@@ -48,14 +46,13 @@ public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensi
      * codec can't decode; also keeps the account's createdBy/updatedBy audit/PII out of the response).
      */
     private List<BrowserExtensionConfigCommon> findAllAccountConfigs() {
-        MongoCollection<Document> coll = getMCollection(getDBName(), getCollName(), Document.class);
+        List<Document> docs = getMCollection(getDBName(), getCollName(), Document.class)
+                .find().into(new ArrayList<>());
         List<BrowserExtensionConfigCommon> configs = new ArrayList<>();
-        try (MongoCursor<Document> cursor = coll.find().cursor()) {
-            while (cursor.hasNext()) {
-                BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(cursor.next());
-                if (config != null) {
-                    configs.add(config);
-                }
+        for (Document doc : docs) {
+            BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
+            if (config != null) {
+                configs.add(config);
             }
         }
         return configs;
