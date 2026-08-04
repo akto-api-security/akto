@@ -1,13 +1,17 @@
 package com.akto.dao;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AgenticUsers;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
     public static final AgentUsersDao instance = new AgentUsersDao();
@@ -122,7 +126,7 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         instance.updateOne(Filters.eq(AgenticUsers.USER_NAME, trimmedName), Updates.combine(updates));
     }
 
-    public List<String> findDeviceIdsByTeamsAndRoles(List<String> teams, List<String> roles) {
+    public List<String> findDeviceIdsByTeamsRolesAndDeviceIds(List<String> teams, List<String> roles, List<String> deviceIds) {
         List<Bson> conditions = new ArrayList<>();
         if (teams != null && !teams.isEmpty()) {
             conditions.add(Filters.or(
@@ -136,18 +140,37 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
                 Filters.and(Filters.ne(AgenticUsers.ROLE_SOURCE, AgenticUsers.SOURCE_MANUAL), Filters.in(AgenticUsers.SSO_USER_ROLE, roles))
             ));
         }
-        if (conditions.isEmpty()) {
+        boolean hasTeamOrRole = !conditions.isEmpty();
+        boolean hasDeviceIds = deviceIds != null && !deviceIds.isEmpty();
+        if (!hasTeamOrRole && !hasDeviceIds) {
             return new ArrayList<>();
         }
 
+        // Device IDs come straight from a dropdown built off live module_info data at pick time —
+        // trust them directly rather than re-deriving through a username/team/role join.
+        if (!hasTeamOrRole) {
+            return new ArrayList<>(new HashSet<>(deviceIds));
+        }
+
+        // module_info is updated on every heartbeat, unlike AgenticUsers.devices which is only
+        // ever backfilled once — resolve devices live instead of trusting the stored field.
+        Map<String, Set<String>> liveDevicesByUsername = ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield();
         Bson userFilter = conditions.size() == 1 ? conditions.get(0) : Filters.and(conditions);
-        List<String> deviceIds = new ArrayList<>();
+        Set<String> teamRoleDeviceIds = new HashSet<>();
         for (AgenticUsers user : instance.findAll(userFilter)) {
-            if (user.getDevices() != null) {
-                deviceIds.addAll(user.getDevices());
+            Set<String> liveDevices = liveDevicesByUsername.get(user.getUserName());
+            if (liveDevices != null) {
+                teamRoleDeviceIds.addAll(liveDevices);
             }
         }
-        return deviceIds;
+
+        if (!hasDeviceIds) {
+            return new ArrayList<>(teamRoleDeviceIds);
+        }
+
+        // Both dimensions given — a device must satisfy the team/role match AND be explicitly picked.
+        teamRoleDeviceIds.retainAll(new HashSet<>(deviceIds));
+        return new ArrayList<>(teamRoleDeviceIds);
     }
 
     @Override
