@@ -24,17 +24,6 @@ const resourceName = {
   plural: "activities",
 };
 
-// A "Skills Evaluations" entry: a skill-endpoint event (url contains "/skills/") that is a skill
-// evaluation — either the skill_evaluation policy, or whose rule_violated (from metadata) is not a
-// "skill:<name>" rule (i.e. not a malicious-skill detection). These show under the Skills
-// Evaluations tab and are excluded from the Active tab.
-const isSkillEvaluationEntry = (r) => {
-  if (!String(r?.url || '').toLowerCase().includes('/skills/')) return false;
-  const isSkillEvalPolicy = String(r?.filterId || '').toLowerCase() === 'skill_evaluation';
-  const ruleViolated = String(extractRuleViolated(r?.metadata) || '').toLowerCase();
-  return isSkillEvalPolicy || !ruleViolated.includes('skill:');
-};
-
 const getHeaders = () => {
   const baseHeaders = [
     {
@@ -639,12 +628,19 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     // "Needs Approval" is a client-side view over ACTIVE events filtered to behaviour==="approval".
     // Fetch active events with a high limit (single page) and filter after mapping.
     const isNeedsApproval = currentTab === 'needs_approval';
-    // Skills Evaluations: client-side view over ACTIVE skill_evaluation events on skill endpoints.
     const isSkillsEvaluations = currentTab === 'skills_evaluations';
-    const isClientSideView = isNeedsApproval || isSkillsEvaluations;
-    const effectiveStatus = isClientSideView ? 'ACTIVE' : currentTab.toUpperCase();
+    // Needs Approval is a client-side view (fetch a big page, filter after mapping). Skills
+    // Evaluations is now SERVER-paginated: it shows ACTIVE events narrowed to the skill-evaluation
+    // set by the backend (x-skill-eval-mode header), so totals/pagination are correct.
+    const isClientSideView = isNeedsApproval;
+    const effectiveStatus = (isNeedsApproval || isSkillsEvaluations) ? 'ACTIVE' : currentTab.toUpperCase();
     const effectiveSkip = isClientSideView ? 0 : skip;
     const effectiveLimit = isClientSideView ? 200 : limit;
+    // Skills Evaluations partition (Atlas only): "only" on the Skills Evaluations tab, "exclude" on
+    // the Active tab. Backend applies it (gated to contextSource=ENDPOINT); undefined elsewhere.
+    const skillEvaluationMode = isEndpointSecurityCategory()
+      ? (isSkillsEvaluations ? 'only' : (currentTab === 'active' ? 'exclude' : undefined))
+      : undefined;
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
       matchingUrlFilter = [],
@@ -715,7 +711,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       latestApiOrigRegex,
       undefined,
       undefined,
-      severityFilter
+      severityFilter,
+      skillEvaluationMode
     );
 
     // Store the total count for filtered results
@@ -859,17 +856,17 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       );
       total = ret.length;
     }
-    // Skills Evaluations tab: keep only the skill-evaluation entries. In the Policy Triggered
-    // column, relabel malicious_skill_detected as "Skills Evaluation" (display only — the real
-    // filterId stays on the row for row-click deep-links/actions; header value swapped below).
+    // Skills Evaluations tab: rows are already the skill-evaluation set (filtered server-side via
+    // x-skill-eval-mode), so total/pagination come straight from the backend. Only relabel the
+    // Policy Triggered column: malicious_skill_detected → "Skills Evaluation" (display only — the
+    // real filterId stays on the row for row-click deep-links/actions; header value swapped below).
     if (isSkillsEvaluations) {
-      ret = ret.filter(isSkillEvaluationEntry).map(r => ({
+      ret = ret.map(r => ({
         ...r,
         policyDisplay: String(r.filterId || '').toLowerCase() === 'malicious_skill_detected'
           ? 'Skills Evaluation'
           : r.filterId,
       }));
-      total = ret.length;
     }
     // NOTE: We intentionally do NOT hide skill-evaluation entries from the Active tab here.
     // Active is server-paginated (total comes from the backend), so removing rows client-side per

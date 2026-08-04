@@ -41,6 +41,7 @@ import org.bson.conversions.Bson;
 
 import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.mongodb.client.model.Updates;
@@ -413,7 +414,7 @@ public class MaliciousEventService {
   }
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
-      String accountId, ListMaliciousRequestsRequest request, String contextSource) {
+      String accountId, ListMaliciousRequestsRequest request, String contextSource, String skillEvalMode) {
 
     if(!shouldNotCreateIndexes.getOrDefault(accountId, false)) {
       createIndexIfAbsent(accountId);
@@ -516,6 +517,39 @@ public class MaliciousEventService {
     Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
     if (!contextFilter.isEmpty()) {
       query.putAll(contextFilter);
+    }
+
+    // Skills Evaluations partition — Atlas (ENDPOINT) only. A skill endpoint event
+    // (latestApiEndpoint contains "/skills/") belongs to Skills Evaluations when:
+    //   - filterId == "skill_evaluation"                       → always, OR
+    //   - its rule (rule_violated) is NOT a malicious-skill detection, i.e. it is neither
+    //     "malicious_skill*" nor a named "skill:<name>" form.
+    // Malicious-skill detections stay on the Active tab; only evaluations move to the new tab.
+    //   "only"    → return just those events (Skills Evaluations tab)
+    //   "exclude" → return everything except them (Active tab)
+    // Done server-side so the total count and pagination stay correct.
+    if (skillEvalMode != null && !skillEvalMode.isEmpty()
+        && "ENDPOINT".equalsIgnoreCase(contextSource)) {
+      // NOTE: the real rule_violated lives inside `metadata`, which is stored as raw protobuf
+      // TextFormat (unquoted snake_case keys, e.g. `rule_violated: "skill:code-reviewer"`) — NOT
+      // JSON. (The API layer reformats it to camelCase JSON via ProtoMessageUtils before returning
+      // it to the frontend; that reformatted shape must not be assumed here.)
+      Pattern maliciousSkillRulePattern = Pattern.compile(
+          "rule_violated\\s*:\\s*\"[^\"]*(?:malicious_skill|skill:)", Pattern.CASE_INSENSITIVE);
+      Document skillEval = new Document("latestApiEndpoint", new Document("$regex", "/skills/").append("$options", "i"))
+          .append("$or", Arrays.asList(
+              new Document("filterId", "skill_evaluation"),
+              new Document("metadata", new Document("$not", maliciousSkillRulePattern))
+          ));
+      Document existing = new Document(query);
+      query.clear();
+      if ("only".equalsIgnoreCase(skillEvalMode)) {
+        query.append("$and", Arrays.asList(existing, skillEval));
+      } else if ("exclude".equalsIgnoreCase(skillEvalMode)) {
+        query.append("$and", Arrays.asList(existing, new Document("$nor", Arrays.asList(skillEval))));
+      } else {
+        query.putAll(existing);
+      }
     }
 
     // Check if sortBySeverity flag is set
