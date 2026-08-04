@@ -6,6 +6,7 @@ import sys
 if not os.getenv("LOG_DIR"):
     os.environ["LOG_DIR"] = os.path.expanduser("~/.claude/akto/logs")
 
+from akto_heartbeat import send_heartbeat
 from akto_ingestion_utility import run_observability_hook
 
 if __name__ == "__main__":
@@ -14,6 +15,10 @@ if __name__ == "__main__":
         sys.exit(1)
 
     hook = sys.argv[1]
+
+    # Registers this device so mini-runtime can resolve it to a user; without it
+    # every event is dropped before indexing. Rate-limited and fail-open.
+    send_heartbeat(os.path.expanduser(os.environ["LOG_DIR"]))
 
     run_observability_hook(hook)
     print("{}")
