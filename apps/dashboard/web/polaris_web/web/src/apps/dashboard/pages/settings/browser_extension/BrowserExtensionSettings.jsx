@@ -9,6 +9,7 @@ import Dropdown from "../../../components/layouts/Dropdown";
 import { sharedIconCacheService } from "../../../components/shared/CollectionIcon";
 import func from "@/util/func";
 import api from "../../guardrails/api";
+import "./BrowserExtensionSettings.css";
 
 const CONFIG_PAGE_SIZE = 10;   // configured hosts per page
 
@@ -29,52 +30,10 @@ const FORMAT_OPTIONS = {
     graphql: [["json", "JSON"]],
 };
 
-// Scoped styles for behaviours inline styles can't express (hover-reveal, row hover, status dot).
-// Uses Polaris tokens so light/dark both track the theme.
-const CSS = `
-.bext-list { border:1px solid var(--p-color-border,#e9ebf1); border-radius:14px; overflow:hidden;
-  background:var(--p-color-bg-surface,#fff); box-shadow:0 1px 2px rgba(17,20,28,.04),0 4px 18px rgba(17,20,28,.05); }
-.bext-row { display:flex; align-items:center; gap:14px; padding:13px 16px;
-  border-top:1px solid var(--p-color-border-subdued,#eef0f4); transition:background .1s; }
-.bext-row:first-child { border-top:0; }
-.bext-row:hover { background:var(--p-color-bg-surface-hover,#f6f7fa); }
-.bext-grow { flex:1; min-width:0; }
-.bext-switch:focus-visible { outline:2px solid var(--p-color-border-focus,#5b5bd6); outline-offset:2px; border-radius:999px; }
-.bext-summary { display:flex; align-items:center; gap:16px; margin-top:7px; }
-.bext-summary .k { display:inline-flex; align-items:center; gap:7px; font-size:13px; color:var(--p-color-text-secondary,#5b6472); }
-.bext-summary .k b { color:var(--p-color-text,#14161c); font-weight:640; font-variant-numeric:tabular-nums; }
-.bext-summary .d { width:7px; height:7px; border-radius:50%; }
-/* unified favicon tile — every logo sits on the same white rounded surface */
-.bext-tile { width:38px; height:38px; border-radius:10px; flex:0 0 auto; background:var(--p-color-bg-surface,#fff);
-  border:1px solid var(--p-color-border,#e9ebf1); display:grid; place-items:center; box-shadow:0 1px 2px rgba(17,20,28,.06); overflow:hidden; }
-.bext-tile.sm { width:30px; height:30px; border-radius:8px; }
-.bext-sk { height:16px; border-radius:6px; background:linear-gradient(90deg,var(--p-color-bg-surface-secondary,#f3f5f8) 25%,var(--p-color-bg-surface-hover,#f6f7fa) 37%,var(--p-color-bg-surface-secondary,#f3f5f8) 63%); background-size:400% 100%; animation:bextsh 1.3s ease infinite; }
-@keyframes bextsh { 0%{background-position:100% 0} 100%{background-position:-100% 0} }
-@media (prefers-reduced-motion:reduce){ .bext-sk{ animation:none } }
-.bext-eyebrow { font-size:11px; font-weight:660; letter-spacing:.09em; text-transform:uppercase;
-  color:var(--p-color-text-secondary,#9aa2b1); }
-.bext-info { display:inline-flex; width:15px; height:15px; cursor:help; opacity:.7; }
-.bext-info:hover { opacity:1; }
-.bext-info .Polaris-Icon { width:15px; height:15px; margin:0; }
-.bext-pick { display:flex; align-items:center; gap:13px; padding:10px 10px; border-radius:12px; cursor:pointer; border:1px solid transparent; transition:background .1s; }
-.bext-pick:hover { background:var(--p-color-bg-surface-hover,#f6f7fa); }
-.bext-pick.sel { background:var(--p-color-bg-surface-selected,#f1f1fd); border-color:var(--p-color-border-emphasis,#cfcef6); }
-.bext-chk { width:22px; height:22px; border-radius:7px; border:1.5px solid var(--p-color-border-strong,#dfe2ea); flex:0 0 auto; display:grid; place-items:center; color:#fff; font-size:12px; transition:.12s; }
-.bext-pick.sel .bext-chk { background:var(--p-color-bg-fill-brand,#5b5bd6); border-color:var(--p-color-bg-fill-brand,#5b5bd6); }
-/* custom-host form: force the product's default text color (base Polaris Text/labels inherit a themed
-   green in this modal); keep subdued/critical variants intact. */
-.bext-form .Polaris-Choice__Label,
-.bext-form .Polaris-Text--root:not(.Polaris-Text--subdued):not(.Polaris-Text--critical) { color: var(--text-default, #202223); }
-/* premium light segmented control (replaces the heavy dark block) */
-.bext-seg { display:inline-flex; background:var(--p-color-bg-surface-secondary,#f3f5f8); border:1px solid var(--p-color-border-subdued,#eef0f4); border-radius:11px; padding:4px; gap:2px; }
-.bext-seg button { border:0; background:none; font:inherit; font-size:13px; font-weight:560; padding:7px 18px; border-radius:8px; color:var(--p-color-text-secondary,#5b6472); cursor:pointer; transition:.13s; }
-.bext-seg button.on { background:var(--p-color-bg-surface,#fff); color:var(--p-color-text,#14161c); box-shadow:0 1px 2px rgba(17,20,28,.10); }
-`;
-
 // Lightweight, theme-aware toggle (Polaris ships no native switch in this version).
 function Switch({ active, onChange, title }) {
     return (
-        <div
+        <Box
             className="bext-switch"
             role="switch" aria-checked={active} aria-label={title} tabIndex={0} title={title}
             onClick={onChange}
@@ -86,11 +45,11 @@ function Switch({ active, onChange, title }) {
                 boxShadow: active ? "none" : "inset 0 0 0 1px var(--p-color-border, #e0e2e8)",
             }}
         >
-            <div style={{
+            <Box style={{
                 position: "absolute", top: 3, left: active ? 15 : 3, width: 12, height: 12, borderRadius: "50%",
                 background: "#fff", boxShadow: "0 1px 2px rgba(17,20,28,.28)", transition: "left .18s ease",
             }} />
-        </div>
+        </Box>
     );
 }
 
@@ -277,17 +236,17 @@ function BrowserExtensionSettings() {
             <VerticalStack gap="2">
                 {form[key].map((val, i) => (
                     <HorizontalStack key={i} gap="2" wrap={false} blockAlign="center">
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                        <Box style={{ flex: 1, minWidth: 0 }}>
                             <TextField labelHidden label={`${label} ${i + 1}`} value={val}
                                 onChange={(v) => setArrItem(key, i, v)} placeholder={placeholder} autoComplete="off" monospaced />
-                        </div>
+                        </Box>
                         {form[key].length > 1 && (
                             <Button plain icon={DeleteMinor} accessibilityLabel="Remove" onClick={() => rmArrItem(key, i)} />
                         )}
                     </HorizontalStack>
                 ))}
             </VerticalStack>
-            <div><Button plain onClick={() => addArrItem(key)}>{addLabel}</Button></div>
+            <Box><Button plain onClick={() => addArrItem(key)}>{addLabel}</Button></Box>
             {error && <Text variant="bodySm" color="critical">{error}</Text>}
             {helpText && <Text variant="bodySm" color="subdued">{helpText}</Text>}
         </VerticalStack>
@@ -350,18 +309,18 @@ function BrowserExtensionSettings() {
 
     // ── configured section ──────────────────────────────────────────────
     const skeletonList = (
-        <div className="bext-list">
+        <Box className="bext-list">
             {Array.from({ length: 5 }).map((_, i) => (
-                <div className="bext-row" key={`sk-${i}`}>
-                    <div className="bext-sk" style={{ width: 36, height: 36, borderRadius: 9 }} />
-                    <div className="bext-grow">
-                        <div className="bext-sk" style={{ width: 130 }} />
-                        <div className="bext-sk" style={{ width: 80, height: 11, marginTop: 7 }} />
-                    </div>
-                    <div className="bext-sk" style={{ width: 70, height: 14 }} />
-                </div>
+                <Box className="bext-row" key={`sk-${i}`}>
+                    <Box className="bext-sk" style={{ width: 36, height: 36, borderRadius: 9 }} />
+                    <Box className="bext-grow">
+                        <Box className="bext-sk" style={{ width: 130 }} />
+                        <Box className="bext-sk" style={{ width: 80, height: 11, marginTop: 7 }} />
+                    </Box>
+                    <Box className="bext-sk" style={{ width: 70, height: 14 }} />
+                </Box>
             ))}
-        </div>
+        </Box>
     );
 
     const configuredRow = (c) => {
@@ -372,14 +331,14 @@ function BrowserExtensionSettings() {
             { content: "Remove", destructive: true, onAction: () => { setOpenMenuId(null); removeConfigured(c.host, c.hexId); } },
         ];
         return (
-            <div className="bext-row" key={c.hexId} style={{ opacity: c.active ? 1 : 0.6 }}>
+            <Box className="bext-row" key={c.hexId} style={{ opacity: c.active ? 1 : 0.6 }}>
                 {hostAvatar(c.host, common?.iconUrl)}
-                <div className="bext-grow">
+                <Box className="bext-grow">
                     <Text variant="bodyMd" fontWeight="medium" truncate>{common?.name || c.host}</Text>
                     <Text variant="bodySm" color="subdued" truncate>
                         {common?.name ? c.host : (isAkto ? "Akto" : ((c.paths || []).join(", ") || "Custom"))}
                     </Text>
-                </div>
+                </Box>
                 <Switch active={c.active} onChange={() => toggleConfigured(c.host, !c.active)}
                     title={c.active ? "Disable" : "Enable"} />
                 <Popover
@@ -397,31 +356,31 @@ function BrowserExtensionSettings() {
                 >
                     <ActionList actionRole="menuitem" items={menuItems} />
                 </Popover>
-            </div>
+            </Box>
         );
     };
 
     const configuredSection = (
-        <div key="ext-configured">
+        <Box key="ext-configured">
             <HorizontalStack align="space-between" blockAlign="start">
-                <div>
+                <Box>
                     <span className="bext-eyebrow">Configured</span>
                     {!loading && configured.length > 0 && (
-                        <div className="bext-summary">
+                        <Box className="bext-summary">
                             <span className="k"><b>{configured.length}</b> host{configured.length !== 1 ? "s" : ""}</span>
                             <span className="k"><span className="d" style={{ background: "var(--p-color-bg-fill-success, #1f9d55)" }} /><b>{activeCount}</b> active</span>
                             {offCount > 0 && <span className="k"><span className="d" style={{ background: "var(--p-color-icon-disabled, #98a1b0)" }} /><b>{offCount}</b> off</span>}
-                        </div>
+                        </Box>
                     )}
-                </div>
+                </Box>
                 {!loading && configured.length > 0 && (
-                    <div style={{ width: 230 }}>
+                    <Box style={{ width: 230 }}>
                         <TextField
                             labelHidden label="Filter configured" value={cfgFilter} onChange={setCfgFilter}
                             placeholder="Filter configured…" prefix={<Icon source={SearchMinor} color="subdued" />}
                             autoComplete="off" clearButton onClearButtonClick={() => setCfgFilter("")}
                         />
-                    </div>
+                    </Box>
                 )}
             </HorizontalStack>
             <Box paddingBlockStart="3">
@@ -442,11 +401,11 @@ function BrowserExtensionSettings() {
                     </Box>
                 ) : (
                     <VerticalStack gap="3">
-                        <div className="bext-list">
+                        <Box className="bext-list">
                             {visibleConfigured.length === 0
-                                ? <div className="bext-row"><Text color="subdued">No configured hosts match “{cfgFilter}”.</Text></div>
+                                ? <Box className="bext-row"><Text color="subdued">No configured hosts match “{cfgFilter}”.</Text></Box>
                                 : pagedConfigured.map(configuredRow)}
-                        </div>
+                        </Box>
                         {visibleConfigured.length > CONFIG_PAGE_SIZE && (
                             <Box paddingBlockStart="1">
                                 <HorizontalStack align="center" blockAlign="center" gap="4">
@@ -463,7 +422,7 @@ function BrowserExtensionSettings() {
                     </VerticalStack>
                 )}
             </Box>
-        </div>
+        </Box>
     );
 
     // ── picker modal ────────────────────────────────────────────────────
@@ -480,19 +439,19 @@ function BrowserExtensionSettings() {
     const pickRow = (c) => {
         const isSel = selected.has(c.host);
         return (
-            <div
+            <Box
                 className={`bext-pick ${isSel ? "sel" : ""}`} key={c.host}
                 role="checkbox" aria-checked={isSel} tabIndex={0}
                 onClick={() => toggleSelected(c.host)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSelected(c.host); } }}
             >
-                <div className="bext-chk">{isSel ? "✓" : ""}</div>
+                <Box className="bext-chk">{isSel ? "✓" : ""}</Box>
                 {hostAvatar(c.host, c.iconUrl, "small")}
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <Box style={{ flex: 1, minWidth: 0 }}>
                     <Text variant="bodyMd" fontWeight="medium" truncate>{c.name || c.host}</Text>
                     {c.name && <Text variant="bodySm" color="subdued" truncate>{c.host}</Text>}
-                </div>
-            </div>
+                </Box>
+            </Box>
         );
     };
 
@@ -507,10 +466,10 @@ function BrowserExtensionSettings() {
         >
             {!editingHexId && (
                 <Modal.Section>
-                    <div className="bext-seg">
+                    <Box className="bext-seg">
                         <button className={mode === "akto" ? "on" : ""} onClick={() => setMode("akto")}>Akto catalogue</button>
                         <button className={mode === "custom" ? "on" : ""} onClick={() => setMode("custom")}>Custom host</button>
-                    </div>
+                    </Box>
                 </Modal.Section>
             )}
             <Modal.Section>
@@ -540,7 +499,7 @@ function BrowserExtensionSettings() {
                                 </VerticalStack>
                             </Box>
                         ) : (
-                            <div
+                            <Box
                                 style={{ maxHeight: "44vh", overflowY: "auto", margin: "0 -4px" }}
                                 onScroll={(e) => {
                                     const el = e.currentTarget;
@@ -550,11 +509,11 @@ function BrowserExtensionSettings() {
                                 }}
                             >
                                 {pickFiltered.map(pickRow)}
-                            </div>
+                            </Box>
                         )}
                     </VerticalStack>
                 ) : (
-                    <div className="form-class bext-form">
+                    <Box className="form-class bext-form">
                     <Form onSubmit={saveCustom}>
                         <VerticalStack gap="4">
                             {!editingHexId && (
@@ -607,16 +566,16 @@ function BrowserExtensionSettings() {
 
                             {form.transport === "http" && (
                                 <HorizontalStack gap="4" wrap={false}>
-                                    <div style={{ flex: 1 }}>
+                                    <Box style={{ flex: 1 }}>
                                         <Dropdown id="bext-method" label="Method"
                                             menuItems={["POST", "GET", "PUT", "PATCH"].map((m) => ({ label: m, value: m }))}
                                             initial={form.method} selected={(v) => setField("method", v)} />
-                                    </div>
-                                    <div style={{ flex: 1 }}>
+                                    </Box>
+                                    <Box style={{ flex: 1 }}>
                                         <Dropdown id="bext-format-http" label="Body format"
                                             menuItems={FORMAT_OPTIONS.http.map(([v, l]) => ({ label: l, value: v }))}
                                             initial={form.format} selected={(v) => setField("format", v)} />
-                                    </div>
+                                    </Box>
                                 </HorizontalStack>
                             )}
 
@@ -632,13 +591,13 @@ function BrowserExtensionSettings() {
                                         <VerticalStack gap="2">
                                             {form.frameMatch.map((row, i) => (
                                                 <HorizontalStack key={i} gap="2" wrap={false} blockAlign="center">
-                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <Box style={{ flex: 1, minWidth: 0 }}>
                                                         <TextField labelHidden label={`key ${i}`} value={row.k} onChange={(v) => setFmItem(i, "k", v)} placeholder="event" autoComplete="off" monospaced />
-                                                    </div>
+                                                    </Box>
                                                     <Text>=</Text>
-                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <Box style={{ flex: 1, minWidth: 0 }}>
                                                         <TextField labelHidden label={`value ${i}`} value={row.v} onChange={(v) => setFmItem(i, "v", v)} placeholder="send" autoComplete="off" monospaced />
-                                                    </div>
+                                                    </Box>
                                                     {form.frameMatch.length > 1 && (
                                                         <Button plain icon={DeleteMinor} accessibilityLabel="Remove" onClick={() => rmArrItem("frameMatch", i)} />
                                                     )}
@@ -678,16 +637,14 @@ function BrowserExtensionSettings() {
                             )}
                         </VerticalStack>
                     </Form>
-                    </div>
+                    </Box>
                 )}
             </Modal.Section>
         </Modal>
     );
 
     return (
-        <>
-            <style>{CSS}</style>
-            <PageWithMultipleCards
+        <PageWithMultipleCards
                 title={"Browser Extension"}
                 titleMetadata={
                     <Tooltip
@@ -703,8 +660,7 @@ function BrowserExtensionSettings() {
                 primaryAction={<Button primary onClick={() => openPicker("akto")}>Add hosts</Button>}
                 secondaryActions={<Button onClick={handleDownload} disabled={loading || configured.length === 0}>Download</Button>}
                 components={[pickerModal, configuredSection]}
-            />
-        </>
+        />
     );
 }
 

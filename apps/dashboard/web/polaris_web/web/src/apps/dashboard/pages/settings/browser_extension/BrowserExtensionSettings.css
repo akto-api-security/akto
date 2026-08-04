@@ -1,0 +1,42 @@
+/* Browser Extension settings — scoped styles for behaviours Polaris props can't express
+   (hover-reveal, row hover, status dot, custom toggle/segmented control). Uses Polaris
+   tokens so light/dark both track the theme. */
+
+.bext-list { border:1px solid var(--p-color-border,#e9ebf1); border-radius:14px; overflow:hidden;
+  background:var(--p-color-bg-surface,#fff); box-shadow:0 1px 2px rgba(17,20,28,.04),0 4px 18px rgba(17,20,28,.05); }
+.bext-row { display:flex; align-items:center; gap:14px; padding:13px 16px;
+  border-top:1px solid var(--p-color-border-subdued,#eef0f4); transition:background .1s; }
+.bext-row:first-child { border-top:0; }
+.bext-row:hover { background:var(--p-color-bg-surface-hover,#f6f7fa); }
+.bext-grow { flex:1; min-width:0; }
+.bext-switch { border:0; padding:0; appearance:none; }
+.bext-switch:focus-visible { outline:2px solid var(--p-color-border-focus,#5b5bd6); outline-offset:2px; border-radius:999px; }
+.bext-summary { display:flex; align-items:center; gap:16px; margin-top:7px; }
+.bext-summary .k { display:inline-flex; align-items:center; gap:7px; font-size:13px; color:var(--p-color-text-secondary,#5b6472); }
+.bext-summary .k b { color:var(--p-color-text,#14161c); font-weight:640; font-variant-numeric:tabular-nums; }
+.bext-summary .d { width:7px; height:7px; border-radius:50%; }
+/* unified favicon tile — every logo sits on the same white rounded surface */
+.bext-tile { width:38px; height:38px; border-radius:10px; flex:0 0 auto; background:var(--p-color-bg-surface,#fff);
+  border:1px solid var(--p-color-border,#e9ebf1); display:grid; place-items:center; box-shadow:0 1px 2px rgba(17,20,28,.06); overflow:hidden; }
+.bext-tile.sm { width:30px; height:30px; border-radius:8px; }
+.bext-sk { height:16px; border-radius:6px; background:linear-gradient(90deg,var(--p-color-bg-surface-secondary,#f3f5f8) 25%,var(--p-color-bg-surface-hover,#f6f7fa) 37%,var(--p-color-bg-surface-secondary,#f3f5f8) 63%); background-size:400% 100%; animation:bextsh 1.3s ease infinite; }
+@keyframes bextsh { 0%{background-position:100% 0} 100%{background-position:-100% 0} }
+@media (prefers-reduced-motion:reduce){ .bext-sk{ animation:none } }
+.bext-eyebrow { font-size:11px; font-weight:660; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--p-color-text-secondary,#9aa2b1); }
+.bext-info { display:inline-flex; width:15px; height:15px; cursor:help; opacity:.7; }
+.bext-info:hover { opacity:1; }
+.bext-info .Polaris-Icon { width:15px; height:15px; margin:0; }
+.bext-pick { display:flex; align-items:center; gap:13px; padding:10px 10px; border-radius:12px; cursor:pointer; border:1px solid transparent; transition:background .1s; }
+.bext-pick:hover { background:var(--p-color-bg-surface-hover,#f6f7fa); }
+.bext-pick.sel { background:var(--p-color-bg-surface-selected,#f1f1fd); border-color:var(--p-color-border-emphasis,#cfcef6); }
+.bext-chk { width:22px; height:22px; border-radius:7px; border:1.5px solid var(--p-color-border-strong,#dfe2ea); flex:0 0 auto; display:grid; place-items:center; color:#fff; font-size:12px; transition:.12s; }
+.bext-pick.sel .bext-chk { background:var(--p-color-bg-fill-brand,#5b5bd6); border-color:var(--p-color-bg-fill-brand,#5b5bd6); }
+/* custom-host form: force the product's default text color (base Polaris Text/labels inherit a themed
+   green in this modal); keep subdued/critical variants intact. */
+.bext-form .Polaris-Choice__Label,
+.bext-form .Polaris-Text--root:not(.Polaris-Text--subdued):not(.Polaris-Text--critical) { color: var(--text-default, #202223); }
+/* premium light segmented control (replaces the heavy dark block) */
+.bext-seg { display:inline-flex; background:var(--p-color-bg-surface-secondary,#f3f5f8); border:1px solid var(--p-color-border-subdued,#eef0f4); border-radius:11px; padding:4px; gap:2px; }
+.bext-seg button { border:0; background:none; font:inherit; font-size:13px; font-weight:560; padding:7px 18px; border-radius:8px; color:var(--p-color-text-secondary,#5b6472); cursor:pointer; transition:.13s; }
+.bext-seg button.on { background:var(--p-color-bg-surface,#fff); color:var(--p-color-text,#14161c); box-shadow:0 1px 2px rgba(17,20,28,.10); }
