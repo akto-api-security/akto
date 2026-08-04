@@ -322,8 +322,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       index: 4
     });
   }
-  // "Skills Evaluations" — ACTIVE skill_evaluation policy events on skill endpoints. Client-side
-  // view like "Needs Approval". Endpoint (Atlas) only. Positioned after the guardrail extra tabs.
+  // "Skills Evaluations" — events with filterId == "skill_evaluation", filtered server-side.
+  // Endpoint (Atlas) only. Positioned after the guardrail extra tabs.
   const skillsExtraTabs = [];
   if (isEndpointSecurityCategory()) {
     skillsExtraTabs.push({
@@ -857,22 +857,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       total = ret.length;
     }
     // Skills Evaluations tab: rows are already the skill-evaluation set (filtered server-side via
-    // x-skill-eval-mode), so total/pagination come straight from the backend. Only relabel the
-    // Policy Triggered column: malicious_skill_detected → "Skills Evaluation" (display only — the
-    // real filterId stays on the row for row-click deep-links/actions; header value swapped below).
-    if (isSkillsEvaluations) {
-      ret = ret.map(r => ({
-        ...r,
-        policyDisplay: String(r.filterId || '').toLowerCase() === 'malicious_skill_detected'
-          ? 'Skills Evaluation'
-          : r.filterId,
-      }));
-    }
-    // NOTE: We intentionally do NOT hide skill-evaluation entries from the Active tab here.
-    // Active is server-paginated (total comes from the backend), so removing rows client-side per
-    // page made "Showing X of N" wrong. Excluding them correctly needs a server-side filter (see
-    // subCategory-based approach); until then skill-evaluation rows appear in both Active and the
-    // Skills Evaluations tab, but pagination stays correct.
+    // x-skill-eval-mode: filterId == "skill_evaluation"), so total/pagination come straight from
+    // the backend. Active applies the complementary "exclude" mode, so skill-evaluation rows don't
+    // also appear there.
     setLoading(false);
     return { value: ret, total: total };
   }
@@ -1002,13 +989,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   if (currentTab === 'needs_approval') {
     headers.push({ text: "Action", value: "approveAction", title: "Action" });
   }
-  // Skills Evaluations tab: render the Policy Triggered column from policyDisplay (which relabels
-  // malicious_skill_detected as "Skills Evaluation") instead of the raw filterId.
-  if (currentTab === 'skills_evaluations') {
-    const idx = headers.findIndex(h => h.value === 'filterId');
-    if (idx !== -1) headers[idx] = { ...headers[idx], value: 'policyDisplay' };
-  }
-
   return (
     <>
       <GithubServerTable
