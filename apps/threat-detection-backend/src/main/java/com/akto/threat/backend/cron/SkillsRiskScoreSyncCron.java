@@ -94,7 +94,7 @@ public class SkillsRiskScoreSyncCron {
                                 Filters.lte("detectedAt", deltaEndTime),
                                 Filters.eq("successfulExploit", true),
                                 Filters.eq("contextSource", "ENDPOINT"),
-                                Filters.eq("category", "malicious_skill_detected")
+                                Filters.eq("category", "Prompt Injection")
                             )));
                             pipeline.add(Aggregates.group(groupedId, Accumulators.addToSet("severities", "$severity")));
 
@@ -191,17 +191,18 @@ public class SkillsRiskScoreSyncCron {
     }
 
     private static float computeRiskScore(List<String> severities) {
-        float max = 0f;
-        for (String s : severities) {
-            float score = 0f;
-            switch (s.toUpperCase()) {
-                case "CRITICAL": score = 5f; break;
-                case "HIGH":     score = 4f; break;
-                case "MEDIUM":   score = 3f; break;
-                default:         break;
-            }
-            max = Math.max(max, score);
-        }
-        return max;
+        // float max = 0f;
+        // for (String s : severities) {
+        //     float score = 0f;
+        //     switch (s.toUpperCase()) {
+        //         case "CRITICAL": score = 5f; break;
+        //         case "HIGH":     score = 4f; break;
+        //         case "MEDIUM":   score = 3f; break;
+        //         default:         break;
+        //     }
+        //     max = Math.max(max, score);
+        // }
+        // return max;
+        return 4f;
     }
 }
