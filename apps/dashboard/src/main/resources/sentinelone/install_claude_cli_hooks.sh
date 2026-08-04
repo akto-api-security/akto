@@ -200,7 +200,7 @@ EOF
 
     sed -e "s|{{AKTO_DATA_INGESTION_URL}}|$ingestion_url|g" \
         -e "s|{{AKTO_API_TOKEN}}|$API_TOKEN|g" \
-        -e "s|{{DEVICE_ID}}|$device_id|g" \
+        -e "s|{{DEVICE_ID (optional)}}|$device_id|g" \
         "$wrapper_file.tmp" > "$wrapper_file"
 
     rm -f "$wrapper_file.tmp"
@@ -225,7 +225,7 @@ create_mcp_wrapper() {
 
     sed -e "s|{{AKTO_DATA_INGESTION_URL}}|$ingestion_url|g" \
         -e "s|{{AKTO_API_TOKEN}}|$API_TOKEN|g" \
-        -e "s|{{DEVICE_ID}}|$device_id|g" \
+        -e "s|{{DEVICE_ID (optional)}}|$device_id|g" \
         "$wrapper_file.tmp" > "$wrapper_file"
 
     rm -f "$wrapper_file.tmp"
@@ -263,7 +263,7 @@ EOF
 
     sed -e "s|{{AKTO_DATA_INGESTION_URL}}|$ingestion_url|g" \
         -e "s|{{AKTO_API_TOKEN}}|$API_TOKEN|g" \
-        -e "s|{{DEVICE_ID}}|$device_id|g" \
+        -e "s|{{DEVICE_ID (optional)}}|$device_id|g" \
         "$wrapper_file.tmp" > "$wrapper_file"
 
     rm -f "$wrapper_file.tmp"
