@@ -43,6 +43,7 @@ import com.akto.dto.tracing.Span;
 import com.akto.tracing.ServiceGraphBuilder;
 import com.akto.tracing.TraceParseResult;
 import com.akto.tracing.copilot.CopilotActivityParser;
+import com.akto.tracing.copilot.CopilotInventoryParser;
 import com.akto.tracing.n8n.N8nTraceParser;
 import com.akto.tracing.snowflake.SnowflakeTraceParser;
 import com.akto.tracing.bedrock.BedrockAgentTraceParser;
@@ -595,6 +596,15 @@ public class HttpCallParser {
         } catch (Exception e) { return false; }
     }
 
+    /** Configuration snapshots, not conversations; also satisfies isCopilotTrafficRaw, so callers must check this first. */
+    private boolean isCopilotInventory(Map<String,String> tagsMap) {
+        try {
+            if (tagsMap == null) return false;
+            return isCopilotTrafficRaw(tagsMap)
+                    && "true".equalsIgnoreCase(tagsMap.get(Constants.AKTO_COPILOT_INVENTORY_TAG));
+        } catch (Exception e) { return false; }
+    }
+
     private boolean shouldStoreSnowflakeAgentTrace(Map<String,String> tagsMap) {
         try {
             String source = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_SOURCE) : null;
@@ -614,6 +624,18 @@ public class HttpCallParser {
             if (name != null && !name.isEmpty()) return name;
         } catch (Exception ignored) {}
         return null;
+    }
+
+    /** The one agent identifier Copilot Studio transcripts actually carry. */
+    private String resolveAgentIdFromTags(String tagsJson) {
+        try {
+            if (tagsJson == null || tagsJson.isEmpty()) return null;
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) return null;
+            String id = tagsMap.get(Constants.AI_AGENT_TAG_BOT_SCHEMA_NAME);
+            return id != null && !id.isEmpty() ? id : null;
+        } catch (Exception ignored) { return null; }
     }
 
     private void parseCopilotTrace(HttpResponseParams httpResponseParam) {
@@ -660,7 +682,8 @@ public class HttpCallParser {
             if (httpResponseParam.getRequestParams() != null) {
                 int apiCollectionId = httpResponseParam.getRequestParams().getApiCollectionId();
                 if (apiCollectionId != -1) {
-                    Map<String, ServiceGraphEdgeInfo> edges = buildServiceGraphFromSpans(result.getSpans());
+                    String agentId = resolveAgentIdFromTags(httpResponseParam.getTags());
+                    Map<String, ServiceGraphEdgeInfo> edges = buildServiceGraphFromSpans(result.getSpans(), agentId);
                     if (edges != null && !edges.isEmpty()) {
                         ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
                     }
@@ -672,6 +695,62 @@ public class HttpCallParser {
                     (result.getSpans() != null ? result.getSpans().size() : 0));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error parsing Copilot trace: " + e.getMessage());
+        }
+    }
+
+    /** Builds the agent's tool graph from an inventory sample — graph edges only, same shape as parseArcadeServiceGraph. */
+    private void parseCopilotInventory(HttpResponseParams httpResponseParam) {
+        try {
+            String payload = httpResponseParam.getPayload();
+            if (payload == null || payload.isEmpty()) {
+                return;
+            }
+            if (!CopilotInventoryParser.getInstance().canParse(payload)) {
+                loggerMaker.info("Copilot inventory: payload is not an agent row, skipping", LogDb.RUNTIME);
+                return;
+            }
+            if (httpResponseParam.getRequestParams() == null) {
+                return;
+            }
+
+            int apiCollectionId = httpResponseParam.getRequestParams().getApiCollectionId();
+            if (apiCollectionId == -1) {
+                return;
+            }
+
+            // Fetch existing edges so the parser can merge onto a transcript-created root instead of forking a second one.
+            Map<String, ServiceGraphEdgeInfo> existingEdges = null;
+            ApiCollection existingCollection = dataActor.fetchApiCollectionMeta(apiCollectionId);
+            if (existingCollection != null) {
+                existingEdges = existingCollection.getServiceGraphEdges();
+            }
+
+            Map<String, ServiceGraphEdgeInfo> edges = CopilotInventoryParser.getInstance().parse(payload, existingEdges);
+            if (edges != null && !edges.isEmpty()) {
+                // Inventory is a full snapshot every run — anything missing now was genuinely removed, so prune; scope by agentId too since two agents can share a name.
+                ServiceGraphEdgeInfo rootEdge = edges.values().stream()
+                        .filter(e -> CopilotInventoryParser.USER_NODE.equals(e.getSourceService()))
+                        .findFirst().orElse(null);
+                String agentId = rootEdge != null && rootEdge.getMetadata() != null
+                        ? (String) rootEdge.getMetadata().get(CopilotInventoryParser.AGENT_ID_KEY) : null;
+                // Above 200 connectors Microsoft returns a random subset per run, so pruning against it would churn the graph.
+                boolean truncated = rootEdge != null && rootEdge.getMetadata() != null
+                        && Boolean.TRUE.equals(rootEdge.getMetadata().get(CopilotInventoryParser.SNAPSHOT_TRUNCATED_KEY));
+                if (rootEdge != null && agentId != null && !agentId.isEmpty() && !truncated) {
+                    Map<String, String> scope = new HashMap<>();
+                    scope.put(CopilotInventoryParser.DISCOVERED_VIA_KEY, CopilotInventoryParser.DISCOVERED_VIA);
+                    scope.put(CopilotInventoryParser.AGENT_ID_KEY, agentId);
+                    ServiceGraphBuilder.getInstance().pruneAndUpdateServiceGraph(
+                            apiCollectionId, existingEdges, rootEdge.getTargetService(), scope, edges);
+                } else {
+                    // Nothing safe to prune against — no agent id, or a partial row; fall back to add-only.
+                    ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
+                }
+                loggerMaker.infoAndAddToDb("Copilot inventory: service graph updated with " + edges.size()
+                        + " edges for collectionId=" + apiCollectionId, LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing Copilot inventory: " + e.getMessage());
         }
     }
 
@@ -976,7 +1055,7 @@ public class HttpCallParser {
             if (httpResponseParam.getRequestParams() != null) {
                 int apiCollectionId = httpResponseParam.getRequestParams().getApiCollectionId();
                 if (apiCollectionId != -1) {
-                    Map<String, ServiceGraphEdgeInfo> edges = buildServiceGraphFromSpans(snowflakeResult.getSpans());
+                    Map<String, ServiceGraphEdgeInfo> edges = buildServiceGraphFromSpans(snowflakeResult.getSpans(), null);
                     if (edges != null && !edges.isEmpty()) {
                         ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
                     }
@@ -987,7 +1066,7 @@ public class HttpCallParser {
         }
     }
 
-    private Map<String, ServiceGraphEdgeInfo> buildServiceGraphFromSpans(List<Span> spans) {
+    private Map<String, ServiceGraphEdgeInfo> buildServiceGraphFromSpans(List<Span> spans, String agentId) {
         Map<String, ServiceGraphEdgeInfo> edges = new HashMap<>();
         if (spans == null || spans.isEmpty()) return edges;
         Map<String, Span> byId = new HashMap<>();
@@ -1001,6 +1080,8 @@ public class HttpCallParser {
 
             if (span.getParentSpanId() == null) {
                 // Root (agent) span — add as a target so the UI shows it as "AI Agent"
+                // Stamped so same-named agents' transcript roots stay disambiguated, same as inventory-built roots.
+                if (agentId != null) meta.put(CopilotInventoryParser.AGENT_ID_KEY, agentId);
                 edges.put(targetService, new ServiceGraphEdgeInfo("User", targetService, meta));
             } else {
                 Span parent = byId.get(span.getParentSpanId());
@@ -1011,9 +1092,10 @@ public class HttpCallParser {
         return edges;
     }
 
+    /** \p{L}/\p{N} preserves non-Latin names instead of collapsing to underscores; must stay identical to CopilotInventoryParser.sanitizeServiceName. */
     private static String sanitizeServiceName(String name) {
         if (name == null) return "unknown";
-        return name.replaceAll("[^a-zA-Z0-9_\\-]", "_");
+        return name.replaceAll("[^\\p{L}\\p{N}_\\-]", "_");
     }
 
     private List<HttpResponseParams> filterDefaultPayloads(List<HttpResponseParams> filteredResponseParams, Map<String, DefaultPayload> defaultPayloadMap) {
@@ -1740,7 +1822,10 @@ public class HttpCallParser {
                 storeSnowflakeAgentTrace(httpResponseParam);
             }
 
-            if (isCopilotTrafficRaw(tagsMap)) {
+            if (isCopilotInventory(tagsMap)) {
+                parseCopilotInventory(httpResponseParam);
+                continue; // graph edges only — not a real endpoint, and fanned out to N collections per agent, so must not reach apiCatalogSync.
+            } else if (isCopilotTrafficRaw(tagsMap)) {
                 parseCopilotTrace(httpResponseParam);
             }
 
