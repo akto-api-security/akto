@@ -14,8 +14,11 @@ import okhttp3.Response;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /** Turns inventory rows into traffic samples; shape must match the copilot-shield binary's or agents split across collections. */
@@ -41,10 +44,11 @@ public class CopilotStudioInventoryPublisher {
     /** Kept at "{}" on purpose — over 3 chars triggers an unwanted AgentQueryRecord write downstream. */
     private static final String EMPTY_REQUEST_PAYLOAD = "{}";
 
-    /** Builds one traffic sample per agent. Agents without a usable display name are skipped. */
+    /** Builds one sample per (agent, known user) pair — reaches every user who talks to a bot, not just its owner. Agents without a usable name are skipped. */
     public List<Map<String, Object>> buildSamples(List<JsonNode> agents, String environmentId,
                                                    Map<String, String> botIdToDataverseName, int accountId,
-                                                   Map<String, String> ownerIdToUserId) {
+                                                   Map<String, String> ownerIdToUserId,
+                                                   Map<String, Set<String>> botNameToKnownUserIds) {
         List<Map<String, Object>> samples = new ArrayList<>();
 
         for (JsonNode agent : agents) {
@@ -54,53 +58,75 @@ public class CopilotStudioInventoryPublisher {
 
             // Prefer the Dataverse name so this lands in bot discovery's existing collection; Lite agents fall back to displayName.
             String preferredName = botIdToDataverseName != null ? botIdToDataverseName.get(agentId) : null;
-            String botName = sanitizeBotName(preferredName != null ? preferredName : displayName);
+            // Lowercased to match extractor.go's ExtractBotMessage/ExtractTranscriptMessages (strings.ToLower(sanitizeBotName(...))) — otherwise a mixed-case bot name splits into two collections.
+            String botName = sanitizeBotName(preferredName != null ? preferredName : displayName).toLowerCase(Locale.ROOT);
             if (botName.isEmpty()) {
                 logger.warn("CopilotStudioInventory: skipping agent with no usable name, agentId={}", agentId);
                 continue;
             }
 
-            // Host carries the identity now — same convention as extractor.go's ExtractBotMessage/ExtractTranscriptMessages, so this lands in the same collection.
+            // Owner + every known chatter for this bot (from copilot-shield's output file), deduped.
             String ownerId = properties.path("ownerId").asText("");
             String resolvedOwnerId = ownerIdToUserId != null ? ownerIdToUserId.get(ownerId) : null;
-            String host = (resolvedOwnerId != null && !resolvedOwnerId.isEmpty())
-                ? resolvedOwnerId + AI_AGENT_HOST_INFIX + botName : botName;
+            Set<String> userIds = new LinkedHashSet<>();
+            if (resolvedOwnerId != null && !resolvedOwnerId.isEmpty()) {
+                userIds.add(resolvedOwnerId);
+            }
+            Set<String> knownUsers = botNameToKnownUserIds != null ? botNameToKnownUserIds.get(botKey(environmentId, botName)) : null;
+            if (knownUsers != null) {
+                userIds.addAll(knownUsers);
+            }
 
-            Map<String, String> tags = new HashMap<>();
-            tags.put(Constants.AKTO_ENDPOINT_SOURCE_TAG, Constants.AKTO_ENDPOINT_SOURCE_VALUE);
-            tags.put(Constants.AKTO_GEN_AI_TAG, AIAgentConnectorConstants.DATA_TAG_GEN_AI);
-            tags.put(Constants.AKTO_AI_AGENT_TAG, Constants.COPILOT_STUDIO_AI_AGENT_NAME);
-            tags.put(BOT_ID_TAG, agentId);
-            tags.put(Constants.AKTO_COPILOT_BOT_ENVIRONMENT_TAG, environmentId != null ? environmentId : "");
-            tags.put(Constants.AKTO_COPILOT_INVENTORY_TAG, TAG_VALUE_TRUE);
+            List<String> hosts = new ArrayList<>();
+            if (userIds.isEmpty()) {
+                // Nobody resolved (new agent, no chatters yet, or Graph lookup failed) — single unresolved-owner-style collection, same fallback the binary uses.
+                hosts.add(botName);
+            } else {
+                for (String userId : userIds) {
+                    hosts.add(userId + AI_AGENT_HOST_INFIX + botName);
+                }
+            }
 
-            Map<String, String> requestHeaders = new HashMap<>();
-            requestHeaders.put(HEADER_HOST, host);
-            requestHeaders.put("content-type", AIAgentConnectorConstants.CONTENT_TYPE_JSON);
-
-            Map<String, Object> sample = new HashMap<>();
-            sample.put("path", AGENT_PATH_PREFIX + agentId);
-            sample.put("method", AIAgentConnectorConstants.HTTP_METHOD_GET);
-            // Headers/tags go on the wire as JSON strings — OriginalHttpRequest.buildHeadersMap casts the field to String.
-            sample.put("requestHeaders", toJson(requestHeaders));
-            sample.put("responseHeaders", "{}");
-            sample.put("requestPayload", EMPTY_REQUEST_PAYLOAD);
-            sample.put("responsePayload", agent.toString());
-            sample.put("ip", AIAgentConnectorConstants.IP_ADDRESS_DEFAULT);
-            sample.put("time", String.valueOf(System.currentTimeMillis() / 1000L));
-            sample.put("statusCode", String.valueOf(AIAgentConnectorConstants.HTTP_STATUS_200));
-            sample.put("type", AIAgentConnectorConstants.HTTP_VERSION);
-            sample.put("status", AIAgentConnectorConstants.HTTP_STATUS_OK);
-            sample.put("akto_account_id", String.valueOf(accountId));
-            sample.put("akto_vxlan_id", AIAgentConnectorConstants.AKTO_VXLAN_ID_DEFAULT);
-            sample.put("is_pending", AIAgentConnectorConstants.IS_PENDING_FALSE);
-            sample.put("source", AIAgentConnectorConstants.DATA_SOURCE_MIRRORING);
-            sample.put("tag", toJson(tags));
-
-            samples.add(sample);
+            for (String host : hosts) {
+                samples.add(buildSample(agent, agentId, host, environmentId, accountId));
+            }
         }
 
         return samples;
+    }
+
+    private Map<String, Object> buildSample(JsonNode agent, String agentId, String host, String environmentId, int accountId) {
+        Map<String, String> tags = new HashMap<>();
+        tags.put(Constants.AKTO_ENDPOINT_SOURCE_TAG, Constants.AKTO_ENDPOINT_SOURCE_VALUE);
+        tags.put(Constants.AKTO_GEN_AI_TAG, AIAgentConnectorConstants.DATA_TAG_GEN_AI);
+        tags.put(Constants.AKTO_AI_AGENT_TAG, Constants.COPILOT_STUDIO_AI_AGENT_NAME);
+        tags.put(BOT_ID_TAG, agentId);
+        tags.put(Constants.AKTO_COPILOT_BOT_ENVIRONMENT_TAG, environmentId != null ? environmentId : "");
+        tags.put(Constants.AKTO_COPILOT_INVENTORY_TAG, TAG_VALUE_TRUE);
+
+        Map<String, String> requestHeaders = new HashMap<>();
+        requestHeaders.put(HEADER_HOST, host);
+        requestHeaders.put("content-type", AIAgentConnectorConstants.CONTENT_TYPE_JSON);
+
+        Map<String, Object> sample = new HashMap<>();
+        sample.put("path", AGENT_PATH_PREFIX + agentId);
+        sample.put("method", AIAgentConnectorConstants.HTTP_METHOD_GET);
+        // Headers/tags go on the wire as JSON strings — OriginalHttpRequest.buildHeadersMap casts the field to String.
+        sample.put("requestHeaders", toJson(requestHeaders));
+        sample.put("responseHeaders", "{}");
+        sample.put("requestPayload", EMPTY_REQUEST_PAYLOAD);
+        sample.put("responsePayload", agent.toString());
+        sample.put("ip", AIAgentConnectorConstants.IP_ADDRESS_DEFAULT);
+        sample.put("time", String.valueOf(System.currentTimeMillis() / 1000L));
+        sample.put("statusCode", String.valueOf(AIAgentConnectorConstants.HTTP_STATUS_200));
+        sample.put("type", AIAgentConnectorConstants.HTTP_VERSION);
+        sample.put("status", AIAgentConnectorConstants.HTTP_STATUS_OK);
+        sample.put("akto_account_id", String.valueOf(accountId));
+        sample.put("akto_vxlan_id", AIAgentConnectorConstants.AKTO_VXLAN_ID_DEFAULT);
+        sample.put("is_pending", AIAgentConnectorConstants.IS_PENDING_FALSE);
+        sample.put("source", AIAgentConnectorConstants.DATA_SOURCE_MIRRORING);
+        sample.put("tag", toJson(tags));
+        return sample;
     }
 
     /** Posts samples in batches; a failing batch is skipped since the next run republishes everything anyway. */
@@ -146,6 +172,11 @@ public class CopilotStudioInventoryPublisher {
         logger.info("CopilotStudioInventory: published {} of {} agent samples to ingestion",
             published, samples.size());
         return published;
+    }
+
+    /** Scopes a bot name to its environment — keeps same-named bots in different environments from sharing chatters. */
+    public static String botKey(String environmentId, String botName) {
+        return (environmentId != null ? environmentId : "") + "::" + botName;
     }
 
     /** Port of sanitizeBotName in extractor.go; must stay identical to the binary's version or one agent yields two collections. */
