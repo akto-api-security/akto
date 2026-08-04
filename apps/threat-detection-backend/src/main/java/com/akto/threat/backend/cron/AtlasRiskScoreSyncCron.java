@@ -53,6 +53,10 @@ public class AtlasRiskScoreSyncCron {
                     public void accept(Account t) {
                         try {
                             int accountId = t.getId();
+                            if (accountId != 1783981503) {
+                                loggerMaker.infoAndAddToDb("Skipping Atlas risk score sync cron for account 0");
+                                return;
+                            }
                             int startTimestamp = Context.now();
                             loggerMaker.infoAndAddToDb("Atlas risk score sync cron started for account " + accountId + " at " + startTimestamp);
 
