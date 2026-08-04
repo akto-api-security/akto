@@ -16,8 +16,6 @@ if __name__ == "__main__":
 
     hook = sys.argv[1]
 
-    # Registers this device so mini-runtime can resolve it to a user; without it
-    # every event is dropped before indexing. Rate-limited and fail-open.
     send_heartbeat(os.path.expanduser(os.environ["LOG_DIR"]))
 
     run_observability_hook(hook)
