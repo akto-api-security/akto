@@ -80,7 +80,8 @@ public class ExecuteApiHandler implements HttpHandler {
                         true,
                         testingRunConfig,
                         false,
-                        Collections.emptyList()
+                        Collections.emptyList(),
+                        true
                 );
                 jobStore.update(jobId, ApiExecutionJobStore.JobEntry.completed(response, conversationId, request));
             } catch (Throwable t) {
