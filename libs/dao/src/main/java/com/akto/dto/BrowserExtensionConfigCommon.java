@@ -62,9 +62,6 @@ public class BrowserExtensionConfigCommon {
     public static final String FRAME_MATCH = "frameMatch";
     private Map<String, Object> frameMatch;
 
-    public static final String TAG = "tag";
-    private String tag;
-
     // where the logged-in user's identity/email is read from: { source, endpoint, emailPath }
     public static final String IDENTITY = "identity";
     private Map<String, Object> identity;
@@ -138,7 +135,6 @@ public class BrowserExtensionConfigCommon {
         config.format = asString(doc.get(FORMAT));
         config.path = asPath(doc.get(PATH));
         config.frameMatch = asMap(doc.get(FRAME_MATCH));
-        config.tag = asString(doc.get(TAG));
         config.identity = asMap(doc.get(IDENTITY));
         config.responseFormat = asString(doc.get(RESPONSE_FORMAT));
         config.responsePath = asPath(doc.get(RESPONSE_PATH));
