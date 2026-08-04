@@ -12,8 +12,6 @@ import api from "../../guardrails/api";
 import "./BrowserExtensionSettings.css";
 
 const CONFIG_PAGE_SIZE = 10;   // configured hosts per page
-const STABLE_COUNT = 5;        // top N ranked hosts are GA; every other supported host is beta
-const BETA_TOOLTIP = "Beta — support for this host is still experimental and may change.";
 
 // full config-driven custom-host form (mirrors the extension's monitoring-config schema)
 const EMPTY_FORM = {
@@ -131,24 +129,6 @@ function BrowserExtensionSettings() {
     // sort by the Mongo id (hexId) ascending — top brands were given the oldest ids, so they lead
     const idOf = (c) => c?.hexId || "￿";
     const byId = (a, b) => idOf(a).localeCompare(idOf(b));
-
-    // The top STABLE_COUNT ranked hosts are GA; every other supported host is beta. Derived from
-    // rank so there is no per-document flag to maintain (see removed `tag`).
-    const stableHosts = useMemo(
-        () => new Set(catalogue.slice().sort(byId).slice(0, STABLE_COUNT).map((c) => (c.host || "").toLowerCase())),
-        [catalogue]
-    );
-    // A supported (catalogue) host beyond the top STABLE_COUNT is beta; custom hosts carry no badge.
-    const isBeta = (host) => {
-        const key = (host || "").toLowerCase();
-        return !!catalogueByHost[key] && !stableHosts.has(key);
-    };
-    // Beta is shown as the same subtle info icon used near the page title (no loud badge).
-    const betaInfo = (host) => isBeta(host) && (
-        <Tooltip content={BETA_TOOLTIP} dismissOnMouseOut>
-            <span className="bext-info"><Icon source={InfoMinor} color="subdued" /></span>
-        </Tooltip>
-    );
 
     const visibleConfigured = useMemo(() => {
         const q = cfgFilter.trim().toLowerCase();
@@ -354,10 +334,7 @@ function BrowserExtensionSettings() {
             <Box className="bext-row" key={c.hexId} style={{ opacity: c.active ? 1 : 0.6 }}>
                 {hostAvatar(c.host, common?.iconUrl)}
                 <Box className="bext-grow">
-                    <HorizontalStack gap="2" blockAlign="center">
-                        <Text variant="bodyMd" fontWeight="medium" truncate>{common?.name || c.host}</Text>
-                        {betaInfo(c.host)}
-                    </HorizontalStack>
+                    <Text variant="bodyMd" fontWeight="medium" truncate>{common?.name || c.host}</Text>
                     <Text variant="bodySm" color="subdued" truncate>
                         {common?.name ? c.host : (isAkto ? "Akto" : ((c.paths || []).join(", ") || "Custom"))}
                     </Text>
@@ -471,10 +448,7 @@ function BrowserExtensionSettings() {
                 <Box className="bext-chk">{isSel ? "✓" : ""}</Box>
                 {hostAvatar(c.host, c.iconUrl, "small")}
                 <Box style={{ flex: 1, minWidth: 0 }}>
-                    <HorizontalStack gap="2" blockAlign="center">
-                        <Text variant="bodyMd" fontWeight="medium" truncate>{c.name || c.host}</Text>
-                        {betaInfo(c.host)}
-                    </HorizontalStack>
+                    <Text variant="bodyMd" fontWeight="medium" truncate>{c.name || c.host}</Text>
                     {c.name && <Text variant="bodySm" color="subdued" truncate>{c.host}</Text>}
                 </Box>
             </Box>
@@ -674,7 +648,7 @@ function BrowserExtensionSettings() {
                 title={"Browser Extension"}
                 titleMetadata={
                     <Tooltip
-                        content="Before v1.0.61 the extension supported only ChatGPT, Grok, Claude, Gemini, Copilot and DeepSeek. From v1.0.61 onwards every host configured here is supported."
+                        content="Before v1.0.61 the extension supported only ChatGPT, Grok, Claude, Gemini, Copilot and DeepSeek. From v1.0.61 every configured host is inspected — the top 5 are generally available, and every other supported host is in beta and may change."
                         dismissOnMouseOut
                     >
                         <span className="bext-info"><Icon source={InfoMinor} color="subdued" /></span>
