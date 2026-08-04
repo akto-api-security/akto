@@ -96,14 +96,7 @@ public class AtlasRiskScoreSyncCron {
                                 .aggregate(pipeline, BasicDBObject.class)
                                 .cursor();
 
-                            // Build host -> apiCollectionId map
-                            List<ApiCollection> allCollections = ApiCollectionsDao.fetchAllHosts();
-                            Map<String, Integer> hostToCollectionId = new HashMap<>();
-                            for (ApiCollection col : allCollections) {
-                                if (col.getHostName() != null) {
-                                    hostToCollectionId.put(col.getHostName(), col.getId());
-                                }
-                            }
+                            Map<String, Integer> hostToCollectionId = null;
 
                             Map<String, List<String>> apiInfoKeyToSeverities = new HashMap<>();
                             while (cursor.hasNext()) {
@@ -120,6 +113,15 @@ public class AtlasRiskScoreSyncCron {
                                 // /skill-prefixed endpoints belong entirely to SkillsRiskScoreSyncCron's bucket
                                 if (endpoint.startsWith("/skill")) {
                                     continue;
+                                }
+
+                                if (hostToCollectionId == null) {
+                                    hostToCollectionId = new HashMap<>();
+                                    for (ApiCollection col : ApiCollectionsDao.fetchAllHosts()) {
+                                        if (col.getHostName() != null) {
+                                            hostToCollectionId.put(col.getHostName(), col.getId());
+                                        }
+                                    }
                                 }
 
                                 Integer collectionId = hostToCollectionId.get(host);
