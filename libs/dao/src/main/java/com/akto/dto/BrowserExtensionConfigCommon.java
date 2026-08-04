@@ -65,6 +65,41 @@ public class BrowserExtensionConfigCommon {
     public static final String TAG = "tag";
     private String tag;
 
+    // where the logged-in user's identity/email is read from: { source, endpoint, emailPath }
+    public static final String IDENTITY = "identity";
+    private Map<String, Object> identity;
+
+    public static final String RESPONSE_FORMAT = "responseFormat";
+    private String responseFormat;
+
+    // either a String or a List<String> of candidate paths, mirrored as stored
+    public static final String RESPONSE_PATH = "responsePath";
+    private Object responsePath;
+
+    public static final String RESPONSE_PATHS = "responsePaths";
+    private List<String> responsePaths;
+
+    public static final String RESPONSE_KEY_PATH = "responseKeyPath";
+    private String responseKeyPath;
+
+    // either a String or a List<String> of candidate paths, mirrored as stored
+    public static final String MODEL_PATH = "modelPath";
+    private Object modelPath;
+
+    // header-based model resolution: { name, index, map }
+    public static final String MODEL_HEADER = "modelHeader";
+    private Map<String, Object> modelHeader;
+
+    public static final String TRIGGER_FRAME = "triggerFrame";
+    private Map<String, Object> triggerFrame;
+
+    // synthetic frames replayed after a blocked send; each entry is a raw frame object
+    public static final String BLOCK_RESPONSE_FRAMES = "blockResponseFrames";
+    private List<Object> blockResponseFrames;
+
+    public static final String ENFORCE_AT = "enforceAt";
+    private String enforceAt;
+
     public String getHexId() {
         if (this.id != null) {
             return this.id.toHexString();
@@ -104,6 +139,16 @@ public class BrowserExtensionConfigCommon {
         config.path = asPath(doc.get(PATH));
         config.frameMatch = asMap(doc.get(FRAME_MATCH));
         config.tag = asString(doc.get(TAG));
+        config.identity = asMap(doc.get(IDENTITY));
+        config.responseFormat = asString(doc.get(RESPONSE_FORMAT));
+        config.responsePath = asPath(doc.get(RESPONSE_PATH));
+        config.responsePaths = asStringList(doc.get(RESPONSE_PATHS));
+        config.responseKeyPath = asString(doc.get(RESPONSE_KEY_PATH));
+        config.modelPath = asPath(doc.get(MODEL_PATH));
+        config.modelHeader = asMap(doc.get(MODEL_HEADER));
+        config.triggerFrame = asMap(doc.get(TRIGGER_FRAME));
+        config.blockResponseFrames = asObjectList(doc.get(BLOCK_RESPONSE_FRAMES));
+        config.enforceAt = asString(doc.get(ENFORCE_AT));
 
         return config;
     }
@@ -126,6 +171,14 @@ public class BrowserExtensionConfigCommon {
             }
         }
         return result;
+    }
+
+    // list of arbitrary objects (e.g. raw frame templates), mirrored as stored
+    private static List<Object> asObjectList(Object value) {
+        if (!(value instanceof List)) {
+            return null;
+        }
+        return new ArrayList<>((List<?>) value);
     }
 
     // keeps the stored shape - a bare String stays a String, a list stays a list
