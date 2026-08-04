@@ -51,14 +51,9 @@ function faviconFor(host, iconUrl) {
     return host ? sharedIconCacheService.getFaviconUrl(host) : undefined;
 }
 
-// Every favicon sits inside a unified white rounded tile so light/dark logos read evenly.
-function hostAvatar(host, iconUrl, size = "small") {
-    const sm = size === "extraSmall";
-    return (
-        <span className={`bext-tile ${sm ? "sm" : ""}`}>
-            <Avatar size="extraSmall" shape="square" source={faviconFor(host, iconUrl) || undefined} name={host} />
-        </span>
-    );
+// A square Polaris Avatar shows the favicon and falls back to the host's initials if it fails.
+function hostAvatar(host, iconUrl) {
+    return <Avatar size="medium" shape="square" source={faviconFor(host, iconUrl) || undefined} name={host} />;
 }
 
 function BrowserExtensionSettings() {
@@ -335,7 +330,7 @@ function BrowserExtensionSettings() {
         <Box key="ext-configured">
             <HorizontalStack align="space-between" blockAlign="start">
                 <Box>
-                    <span className="bext-eyebrow">Inspected hosts</span>
+                    <Text variant="headingSm" as="h3">Inspected hosts</Text>
                     {!loading && totalCount > 0 && (
                         <Box paddingBlockStart="1">
                             <HorizontalStack gap="2" blockAlign="center">
