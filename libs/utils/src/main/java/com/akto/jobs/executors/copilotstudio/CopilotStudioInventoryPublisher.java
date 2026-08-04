@@ -2,6 +2,7 @@ package com.akto.jobs.executors.copilotstudio;
 
 import com.akto.jobs.executors.AIAgentConnectorConstants;
 import com.akto.util.Constants;
+import com.akto.util.JSONUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -58,8 +59,7 @@ public class CopilotStudioInventoryPublisher {
 
             // Prefer the Dataverse name so this lands in bot discovery's existing collection; Lite agents fall back to displayName.
             String preferredName = botIdToDataverseName != null ? botIdToDataverseName.get(agentId) : null;
-            // Lowercased to match extractor.go's ExtractBotMessage/ExtractTranscriptMessages (strings.ToLower(sanitizeBotName(...))) — otherwise a mixed-case bot name splits into two collections.
-            String botName = sanitizeBotName(preferredName != null ? preferredName : displayName).toLowerCase(Locale.ROOT);
+            String botName = sanitizeBotName(preferredName != null ? preferredName : displayName);
             if (botName.isEmpty()) {
                 logger.warn("CopilotStudioInventory: skipping agent with no usable name, agentId={}", agentId);
                 continue;
@@ -112,7 +112,7 @@ public class CopilotStudioInventoryPublisher {
         sample.put("path", AGENT_PATH_PREFIX + agentId);
         sample.put("method", AIAgentConnectorConstants.HTTP_METHOD_GET);
         // Headers/tags go on the wire as JSON strings — OriginalHttpRequest.buildHeadersMap casts the field to String.
-        sample.put("requestHeaders", toJson(requestHeaders));
+        sample.put("requestHeaders", JSONUtils.getString(requestHeaders));
         sample.put("responseHeaders", "{}");
         sample.put("requestPayload", EMPTY_REQUEST_PAYLOAD);
         sample.put("responsePayload", agent.toString());
@@ -125,7 +125,7 @@ public class CopilotStudioInventoryPublisher {
         sample.put("akto_vxlan_id", AIAgentConnectorConstants.AKTO_VXLAN_ID_DEFAULT);
         sample.put("is_pending", AIAgentConnectorConstants.IS_PENDING_FALSE);
         sample.put("source", AIAgentConnectorConstants.DATA_SOURCE_MIRRORING);
-        sample.put("tag", toJson(tags));
+        sample.put("tag", JSONUtils.getString(tags));
         return sample;
     }
 
@@ -179,22 +179,13 @@ public class CopilotStudioInventoryPublisher {
         return (environmentId != null ? environmentId : "") + "::" + botName;
     }
 
-    /** Port of sanitizeBotName in extractor.go; must stay identical to the binary's version or one agent yields two collections. */
+    /** Port of extractor.go's sanitizeBotName + its callers' strings.ToLower(...); must stay identical or one agent yields two collections. */
     static String sanitizeBotName(String name) {
         if (name == null || name.isEmpty()) {
             return "";
         }
         String sanitized = name.replaceAll("[^\\p{L}\\p{N}-]+", "-");
         sanitized = sanitized.replaceAll("-+", "-");
-        return sanitized.replaceAll("^-+", "").replaceAll("-+$", "");
-    }
-
-    private String toJson(Map<String, String> value) {
-        try {
-            return objectMapper.writeValueAsString(value);
-        } catch (Exception e) {
-            logger.error("CopilotStudioInventory: failed to serialize tags: " + e.getMessage());
-            return "{}";
-        }
+        return sanitized.replaceAll("^-+", "").replaceAll("-+$", "").toLowerCase(Locale.ROOT);
     }
 }
