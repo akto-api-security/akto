@@ -142,6 +142,9 @@ public class DashboardRouter implements ARouter {
             .post("/list_malicious_requests")
             .blockingHandler(ctx -> {
                 String contextSource = getContextSourceHeader(ctx);
+                // Skills Evaluations partition mode ("only" | "exclude"), Atlas-only. Passed as a
+                // header like x-context-source so we don't need a new proto filter field.
+                String skillEvalMode = ctx.request().getHeader("x-skill-eval-mode");
 
                 RequestBody reqBody = ctx.body();
                 ListMaliciousRequestsRequest req = ProtoMessageUtils.<
@@ -157,7 +160,7 @@ public class DashboardRouter implements ARouter {
                 }
 
                 ProtoMessageUtils.toString(
-                    dsService.listMaliciousRequests(ctx.get("accountId"), req, contextSource)
+                    dsService.listMaliciousRequests(ctx.get("accountId"), req, contextSource, skillEvalMode)
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 

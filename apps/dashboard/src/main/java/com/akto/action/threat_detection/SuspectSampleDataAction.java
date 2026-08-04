@@ -85,6 +85,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter List<String> hosts;
   @Getter @Setter String latestApiOrigRegex;
   @Getter @Setter Boolean sortBySeverity;
+  // Skills Evaluations partition mode ("only" | "exclude"), sent to the threat backend as a header.
+  @Getter @Setter String skillEvaluationMode;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -111,6 +113,9 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
     post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
+    if (this.skillEvaluationMode != null && !this.skillEvaluationMode.isEmpty()) {
+      post.addHeader("x-skill-eval-mode", this.skillEvaluationMode);
+    }
 
     Map<String, Object> filter = new HashMap<>();
     if (this.ips != null && !this.ips.isEmpty()) {
