@@ -68,7 +68,11 @@ public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensi
                 continue;
             }
             String key = cc.getHost().trim().toLowerCase();
-            commonHosts.add(key);
+            // record the host even when opted out, so it is never re-added as a "custom" host below,
+            // and never listed twice if the catalogue itself repeats a host
+            if (!commonHosts.add(key)) {
+                continue;
+            }
             Document override = accountByHost.get(key);
             if (override != null && Boolean.FALSE.equals(override.get(BrowserExtensionConfig.ACTIVE))) {
                 continue;
