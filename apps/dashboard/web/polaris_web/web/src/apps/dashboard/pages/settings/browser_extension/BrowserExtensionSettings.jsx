@@ -1,17 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-    ActionList, Avatar, Badge, Box, Button, Divider, Form, HorizontalStack, Icon,
-    Modal, Pagination, Popover, SkeletonBodyText, SkeletonThumbnail, Text, TextField, Tooltip, VerticalStack,
+    Avatar, Badge, Box, Button, Divider, Form, HorizontalStack, Icon,
+    Modal, Text, TextField, Tooltip, VerticalStack,
 } from "@shopify/polaris";
-import { SearchMinor, HorizontalDotsMinor, DeleteMinor, InfoMinor } from "@shopify/polaris-icons";
+import { DeleteMinor, InfoMinor } from "@shopify/polaris-icons";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
+import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import Dropdown from "../../../components/layouts/Dropdown";
 import { sharedIconCacheService } from "../../../components/shared/CollectionIcon";
 import func from "@/util/func";
 import api from "../../guardrails/api";
 import "./BrowserExtensionSettings.css";
 
-const CONFIG_PAGE_SIZE = 10;   // configured hosts per page
 
 // full config-driven custom-host form (mirrors the extension's monitoring-config schema)
 const EMPTY_FORM = {
@@ -64,9 +64,6 @@ function BrowserExtensionSettings() {
     const [configured, setConfigured] = useState([]);
     const [catalogue, setCatalogue] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [cfgFilter, setCfgFilter] = useState("");
-    const [cfgPage, setCfgPage] = useState(0);            // configured list pagination (10 / page)
-    const [openMenuId, setOpenMenuId] = useState(null);   // which row's ⋯ menu is open
 
     // custom-host add/edit modal
     const [pickerOpen, setPickerOpen] = useState(false);
@@ -94,7 +91,6 @@ function BrowserExtensionSettings() {
     }, []);
 
     useEffect(() => { fetchAll(); }, [fetchAll]);
-    useEffect(() => { setCfgPage(0); }, [cfgFilter]);   // jump back to page 1 on a new filter
 
     // sort by the Mongo id (hexId) ascending — top brands were given the oldest ids, so they lead
     const idOf = (c) => c?.hexId || "￿";
@@ -129,18 +125,6 @@ function BrowserExtensionSettings() {
     const totalCount = mergedRows.length;
     const activeCount = useMemo(() => mergedRows.filter((r) => r.active).length, [mergedRows]);
     const offCount = totalCount - activeCount;
-
-    const visibleConfigured = useMemo(() => {
-        const q = cfgFilter.trim().toLowerCase();
-        if (!q) return mergedRows;
-        return mergedRows.filter((r) => (r.host || "").toLowerCase().includes(q) || (r.name || "").toLowerCase().includes(q));
-    }, [mergedRows, cfgFilter]);
-
-    // paginate the configured list (10 / page)
-    const cfgTotalPages = Math.max(1, Math.ceil(visibleConfigured.length / CONFIG_PAGE_SIZE));
-    const cfgPageSafe = Math.min(cfgPage, cfgTotalPages - 1);
-    const cfgStart = cfgPageSafe * CONFIG_PAGE_SIZE;
-    const pagedConfigured = visibleConfigured.slice(cfgStart, cfgStart + CONFIG_PAGE_SIZE);
 
     // ── write actions ───────────────────────────────────────────────────
     const toggleConfigured = async (host, nextActive) => {
@@ -279,124 +263,64 @@ function BrowserExtensionSettings() {
     };
 
     // ── configured section ──────────────────────────────────────────────
-    const skeletonList = (
-        <Box className="bext-list" background="bg-surface" borderColor="border" borderWidth="1" borderRadius="300" overflowX="hidden">
-            {Array.from({ length: 5 }).map((_, i) => (
-                <Box className="bext-row" key={`sk-${i}`} paddingBlock="4" paddingInline="5">
-                    <HorizontalStack gap="3" blockAlign="center" wrap={false}>
-                        <SkeletonThumbnail size="small" />
-                        <Box width="100%" minWidth="0">
-                            <SkeletonBodyText lines={2} />
-                        </Box>
-                    </HorizontalStack>
-                </Box>
-            ))}
-        </Box>
-    );
+    // ── configured section — the product-standard table (search + pagination built in) ──
+    const tableHeaders = [
+        { text: "Host", value: "hostComp", itemOrder: 1 },
+        { text: "Domain", value: "domain", itemOrder: 2 },
+        { text: "Status", value: "statusComp", itemOrder: 3 },
+    ];
+    const tableResourceName = { singular: "host", plural: "hosts" };
 
-    const configuredRow = (c) => {
-        const isCustom = c.source === "custom";
-        const menuItems = [
-            { content: "Edit", onAction: () => { setOpenMenuId(null); openEdit(c); } },
-            { content: "Remove", destructive: true, onAction: () => { setOpenMenuId(null); removeConfigured(c.host, c.hexId); } },
-        ];
-        return (
-            <Box className={`bext-row ${c.active ? "" : "off"}`} key={c.host} paddingBlock="4" paddingInline="5">
-                <HorizontalStack gap="3" blockAlign="center" wrap={false}>
-                    {hostAvatar(c.host, c.iconUrl)}
-                    <Box width="100%" minWidth="0">
-                        <Text variant="bodyMd" fontWeight="medium" truncate>{c.name || c.host}</Text>
-                        <Text variant="bodySm" color="subdued" truncate>
-                            {c.name ? c.host : (isCustom ? ((c.paths || []).join(", ") || "Custom") : "Akto")}
-                        </Text>
-                    </Box>
-                    <Switch active={c.active} onChange={() => toggleConfigured(c.host, !c.active)}
-                        title={c.active ? "Disable for this account" : "Enable"} />
-                    {isCustom && (
-                        <Popover
-                            active={openMenuId === c.host}
-                            onClose={() => setOpenMenuId(null)}
-                            preferredAlignment="right"
-                            activator={
-                                <Button
-                                    plain
-                                    icon={HorizontalDotsMinor}
-                                    accessibilityLabel={`Actions for ${c.name || c.host}`}
-                                    onClick={() => setOpenMenuId(openMenuId === c.host ? null : c.host)}
-                                />
-                            }
-                        >
-                            <ActionList actionRole="menuitem" items={menuItems} />
-                        </Popover>
-                    )}
-                </HorizontalStack>
-            </Box>
-        );
+    // each row keeps its plain fields (host/name are what search matches) plus JSX cells; the search
+    // helper skips React elements, so the avatar/toggle cells are safe.
+    const tableData = useMemo(() => mergedRows.map((c) => ({
+        ...c,
+        id: c.host,
+        domain: c.host,
+        hostComp: (
+            <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                {hostAvatar(c.host, c.iconUrl)}
+                <Text fontWeight="medium">{c.name || c.host}</Text>
+            </HorizontalStack>
+        ),
+        statusComp: (
+            <Switch active={c.active} onChange={() => toggleConfigured(c.host, !c.active)}
+                title={c.active ? "Disable for this account" : "Enable"} />
+        ),
+    })), [mergedRows]);
+
+    // only account-added custom hosts can be edited/removed; catalogue hosts are toggled via the switch
+    const getRowActions = (item) => {
+        if (item.source !== "custom") return [];
+        return [{ items: [
+            { content: "Edit", onAction: () => openEdit(item) },
+            { content: "Remove", destructive: true, onAction: () => removeConfigured(item.host, item.hexId) },
+        ] }];
     };
 
     const configuredSection = (
-        <Box key="ext-configured" maxWidth="880px">
-            <HorizontalStack align="space-between" blockAlign="start">
-                <Box>
-                    <Text variant="headingSm" as="h3">Inspected hosts</Text>
-                    {!loading && totalCount > 0 && (
-                        <Box paddingBlockStart="1">
-                            <HorizontalStack gap="2" blockAlign="center">
-                                <Text variant="bodySm" color="subdued">{totalCount} host{totalCount !== 1 ? "s" : ""}</Text>
-                                <Badge status="success">{`${activeCount} active`}</Badge>
-                                {offCount > 0 && <Badge>{`${offCount} off`}</Badge>}
-                            </HorizontalStack>
-                        </Box>
-                    )}
-                </Box>
+        <Box key="ext-configured">
+            <VerticalStack gap="1">
+                <Text variant="headingSm" as="h3">Inspected hosts</Text>
                 {!loading && totalCount > 0 && (
-                    <Box width="230px">
-                        <TextField
-                            labelHidden label="Filter hosts" value={cfgFilter} onChange={setCfgFilter}
-                            placeholder="Filter hosts…" prefix={<Icon source={SearchMinor} color="subdued" />}
-                            autoComplete="off" clearButton onClearButtonClick={() => setCfgFilter("")}
-                        />
-                    </Box>
+                    <HorizontalStack gap="2" blockAlign="center">
+                        <Text variant="bodySm" color="subdued">{totalCount} host{totalCount !== 1 ? "s" : ""}</Text>
+                        <Badge status="success">{`${activeCount} active`}</Badge>
+                        {offCount > 0 && <Badge>{`${offCount} off`}</Badge>}
+                    </HorizontalStack>
                 )}
-            </HorizontalStack>
+            </VerticalStack>
             <Box paddingBlockStart="3">
-                {loading ? skeletonList : totalCount === 0 ? (
-                    <Box background="bg-surface" borderColor="border" borderWidth="1" borderRadius="300" padding="10">
-                        <VerticalStack gap="4" inlineAlign="center">
-                            <Box background="bg-subdued" borderRadius="300" padding="3">
-                                <Icon source={SearchMinor} color="subdued" />
-                            </Box>
-                            <VerticalStack gap="1" inlineAlign="center">
-                                <Text variant="headingSm">No hosts yet</Text>
-                                <Text alignment="center" color="subdued">
-                                    Akto's supported hosts load here automatically. You can also add your own custom host.
-                                </Text>
-                            </VerticalStack>
-                            <Button primary onClick={openCustom}>Add custom host</Button>
-                        </VerticalStack>
-                    </Box>
-                ) : (
-                    <VerticalStack gap="3">
-                        <Box className="bext-list" background="bg-surface" borderColor="border" borderWidth="1" borderRadius="300" overflowX="hidden">
-                            {visibleConfigured.length === 0
-                                ? <Box paddingBlock="4" paddingInline="5"><Text color="subdued">No hosts match “{cfgFilter}”.</Text></Box>
-                                : pagedConfigured.map(configuredRow)}
-                        </Box>
-                        {visibleConfigured.length > CONFIG_PAGE_SIZE && (
-                            <Box paddingBlockStart="1">
-                                <HorizontalStack align="center" blockAlign="center" gap="4">
-                                    <Pagination
-                                        hasPrevious={cfgPageSafe > 0}
-                                        onPrevious={() => setCfgPage((p) => Math.max(0, p - 1))}
-                                        hasNext={cfgPageSafe < cfgTotalPages - 1}
-                                        onNext={() => setCfgPage((p) => Math.min(cfgTotalPages - 1, p + 1))}
-                                        label={`${cfgStart + 1}–${Math.min(cfgStart + CONFIG_PAGE_SIZE, visibleConfigured.length)} of ${visibleConfigured.length}`}
-                                    />
-                                </HorizontalStack>
-                            </Box>
-                        )}
-                    </VerticalStack>
-                )}
+                <GithubSimpleTable
+                    key="ext-table"
+                    data={tableData}
+                    resourceName={tableResourceName}
+                    headers={tableHeaders}
+                    loading={loading}
+                    getActions={getRowActions}
+                    hasRowActions={true}
+                    pageLimit={10}
+                />
             </Box>
         </Box>
     );
