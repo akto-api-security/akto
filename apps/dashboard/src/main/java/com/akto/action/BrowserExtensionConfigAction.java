@@ -47,10 +47,8 @@ public class BrowserExtensionConfigAction extends UserAction {
     @Setter
     private String hexId;
 
-    // account rows are read through the tolerant common mapper (their `path`/`modelPath` are
-    // polymorphic and would break the pojo codec), so both lists are BrowserExtensionConfigCommon.
     @Getter
-    private List<BrowserExtensionConfigCommon> browserExtensionConfigs;
+    private List<BrowserExtensionConfig> browserExtensionConfigs;
 
     @Getter
     private List<BrowserExtensionConfigCommon> browserExtensionConfigsCommon;
@@ -60,7 +58,7 @@ public class BrowserExtensionConfigAction extends UserAction {
 
     public String fetchBrowserExtensionConfigs() {
         try {
-            this.browserExtensionConfigs = BrowserExtensionConfigDao.instance.findAllSortedByCreatedTimestamp(0, 100);
+            this.browserExtensionConfigs = BrowserExtensionConfigDao.instance.findAllConfigs();
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching browser extension configs: " + e.getMessage(), LogDb.DASHBOARD);
@@ -188,13 +186,13 @@ public class BrowserExtensionConfigAction extends UserAction {
             addIfPresent(updates, BrowserExtensionConfig.TRANSPORT, emptyToNull(browserExtensionConfig.getTransport()));
             addIfPresent(updates, BrowserExtensionConfig.METHOD, emptyToNull(browserExtensionConfig.getMethod()));
             addIfPresent(updates, BrowserExtensionConfig.FORMAT, emptyToNull(browserExtensionConfig.getFormat()));
-            addIfPresent(updates, BrowserExtensionConfig.PATH, nonEmpty(browserExtensionConfig.getPath()));
+            addIfPresent(updates, BrowserExtensionConfig.PATH, nonEmptyObject(browserExtensionConfig.getPath()));
             addIfPresent(updates, BrowserExtensionConfig.OPERATIONS, nonEmpty(browserExtensionConfig.getOperations()));
             addIfPresent(updates, BrowserExtensionConfig.FRAME_MATCH,
                 (browserExtensionConfig.getFrameMatch() != null && !browserExtensionConfig.getFrameMatch().isEmpty()) ? browserExtensionConfig.getFrameMatch() : null);
             addIfPresent(updates, BrowserExtensionConfig.RESPONSE_FORMAT, emptyToNull(browserExtensionConfig.getResponseFormat()));
-            addIfPresent(updates, BrowserExtensionConfig.RESPONSE_PATH, nonEmpty(browserExtensionConfig.getResponsePath()));
-            addIfPresent(updates, BrowserExtensionConfig.MODEL_PATH, nonEmpty(browserExtensionConfig.getModelPath()));
+            addIfPresent(updates, BrowserExtensionConfig.RESPONSE_PATH, nonEmptyObject(browserExtensionConfig.getResponsePath()));
+            addIfPresent(updates, BrowserExtensionConfig.MODEL_PATH, nonEmptyObject(browserExtensionConfig.getModelPath()));
 
             BrowserExtensionConfigDao.instance.getMCollection().updateOne(
                 filter,
@@ -251,5 +249,16 @@ public class BrowserExtensionConfigAction extends UserAction {
 
     private static <T> List<T> nonEmpty(List<T> list) {
         return (list == null || list.isEmpty()) ? null : list;
+    }
+
+    // path/responsePath/modelPath are polymorphic (a String or a List); drop only when empty/blank.
+    private static Object nonEmptyObject(Object value) {
+        if (value instanceof List) {
+            return ((List<?>) value).isEmpty() ? null : value;
+        }
+        if (value instanceof String) {
+            return ((String) value).trim().isEmpty() ? null : ((String) value).trim();
+        }
+        return value;
     }
 }

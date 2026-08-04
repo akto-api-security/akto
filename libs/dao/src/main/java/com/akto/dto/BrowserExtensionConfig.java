@@ -42,9 +42,10 @@ public class BrowserExtensionConfig {
     public static final String FORMAT = "format";
     private String format;
 
-    // candidate paths to the user prompt in the request body (first match wins)
+    // candidate path(s) to the user prompt in the request body (first match wins). Polymorphic:
+    // a single json path (String) or a list of them — stored/read as-is, so it is typed Object.
     public static final String PATH = "path";
-    private List<String> path;
+    private Object path;
 
     // GraphQL only: operation names that carry a send
     public static final String OPERATIONS = "operations";
@@ -58,11 +59,12 @@ public class BrowserExtensionConfig {
     public static final String RESPONSE_FORMAT = "responseFormat";
     private String responseFormat;
 
+    // like path, a single json path or a list of them
     public static final String RESPONSE_PATH = "responsePath";
-    private List<String> responsePath;
+    private Object responsePath;
 
     public static final String MODEL_PATH = "modelPath";
-    private List<String> modelPath;
+    private Object modelPath;
 
     public static final String CREATED_BY = "createdBy";
     private String createdBy;
