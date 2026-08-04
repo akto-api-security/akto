@@ -265,7 +265,7 @@ public class CopilotOAuthCallbackAction extends ActionSupport {
     /** Reconnect callback: renews only refreshToken/status on the existing integration, unlike handleMultiEnvCallback. */
     private String handleReconnectCallback(Map<String, String> stateData, String dashboardUrl) {
         String integrationId = stateData.get("integrationId");
-        this.redirectUrl = dashboardUrl + MULTI_ENV_CONNECTOR_PATH;
+        this.redirectUrl = COPILOT_MULTI_ENV_DASHBOARD_REDIRECT_URL;
 
         CopilotStudioIntegration integration = CopilotStudioIntegrationDao.instance.findOne(
             Filters.eq(CopilotStudioIntegration.ID, new ObjectId(integrationId)));
