@@ -77,6 +77,16 @@ public class BrowserExtensionConfigCommon {
     public static final String CATEGORIES = "categories";
     private List<String> categories;
 
+    public static final String RESPONSE_FORMAT = "responseFormat";
+    private String responseFormat;
+
+    // like path: a single json path or a list of candidate paths, mirrored as stored
+    public static final String RESPONSE_PATH = "responsePath";
+    private Object responsePath;
+
+    public static final String MODEL_PATH = "modelPath";
+    private Object modelPath;
+
     public String getHexId() {
         if (this.id != null) {
             return this.id.toHexString();
@@ -119,6 +129,9 @@ public class BrowserExtensionConfigCommon {
         config.tag = asString(doc.get(TAG));
         config.iconUrl = asString(doc.get(ICON_URL));
         config.categories = asStringList(doc.get(CATEGORIES));
+        config.responseFormat = asString(doc.get(RESPONSE_FORMAT));
+        config.responsePath = asPath(doc.get(RESPONSE_PATH));
+        config.modelPath = asPath(doc.get(MODEL_PATH));
 
         return config;
     }

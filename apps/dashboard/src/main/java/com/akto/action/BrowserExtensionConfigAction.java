@@ -15,15 +15,30 @@ import com.mongodb.client.model.Updates;
 
 import lombok.Getter;
 import lombok.Setter;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class BrowserExtensionConfigAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(BrowserExtensionConfigAction.class, LogDb.DASHBOARD);
+
+    // When enabling a supported host we copy the WHOLE catalogue document into the account row, so any
+    // extraction field - present or added in future - flows through with no code change. This set is not
+    // that allow-list; it is only the fields the account row owns and that this method sets itself.
+    // Copying them would either be illegal (`_id` cannot be $set) or clash with the explicit $set below
+    // ("update path twice" error) - and `active` must come from the toggle, not the catalogue.
+    private static final Set<String> ACCOUNT_OWNED_FIELDS = new HashSet<>(Arrays.asList(
+        "_id", BrowserExtensionConfig.HOST, BrowserExtensionConfig.ACTIVE,
+        BrowserExtensionConfig.CREATED_BY, BrowserExtensionConfig.UPDATED_BY,
+        BrowserExtensionConfig.CREATED_TIMESTAMP, BrowserExtensionConfig.UPDATED_TIMESTAMP
+    ));
 
     @Getter
     @Setter
@@ -32,8 +47,10 @@ public class BrowserExtensionConfigAction extends UserAction {
     @Setter
     private String hexId;
 
+    // account rows are read through the tolerant common mapper (their `path`/`modelPath` are
+    // polymorphic and would break the pojo codec), so both lists are BrowserExtensionConfigCommon.
     @Getter
-    private List<BrowserExtensionConfig> browserExtensionConfigs;
+    private List<BrowserExtensionConfigCommon> browserExtensionConfigs;
 
     @Getter
     private List<BrowserExtensionConfigCommon> browserExtensionConfigsCommon;
@@ -84,9 +101,34 @@ public class BrowserExtensionConfigAction extends UserAction {
             updates.add(Updates.set(BrowserExtensionConfig.ACTIVE, browserExtensionConfig.isActive()));
             updates.add(Updates.set(BrowserExtensionConfig.UPDATED_TIMESTAMP, currentTime));
             updates.add(Updates.set(BrowserExtensionConfig.UPDATED_BY, user.getLogin()));
-            updates.add(Updates.setOnInsert(BrowserExtensionConfig.PATHS, new ArrayList<String>()));
             updates.add(Updates.setOnInsert(BrowserExtensionConfig.CREATED_BY, user.getLogin()));
             updates.add(Updates.setOnInsert(BrowserExtensionConfig.CREATED_TIMESTAMP, currentTime));
+
+            // Enabling a supported host copies its full extraction spec (transport, format, prompt
+            // path, response/model paths, …) from the common catalogue into the account row, so the
+            // extension gets a config-driven entry rather than a bare host+paths one. Falls back to
+            // an empty paths list on insert when the host is not in the catalogue.
+            boolean pathsSet = false;
+            if (browserExtensionConfig.isActive()) {
+                Document commonDoc = BrowserExtensionConfigCommonDao.instance.findRawByHost(host);
+                if (commonDoc != null) {
+                    for (String field : commonDoc.keySet()) {
+                        if (ACCOUNT_OWNED_FIELDS.contains(field)) {
+                            continue;
+                        }
+                        Object value = commonDoc.get(field);
+                        if (value != null) {
+                            updates.add(Updates.set(field, value));
+                            if (BrowserExtensionConfig.PATHS.equals(field)) {
+                                pathsSet = true;
+                            }
+                        }
+                    }
+                }
+            }
+            if (!pathsSet) {
+                updates.add(Updates.setOnInsert(BrowserExtensionConfig.PATHS, new ArrayList<String>()));
+            }
 
             BrowserExtensionConfigDao.instance.getMCollection().updateOne(
                 Filters.eq(BrowserExtensionConfig.HOST, host),

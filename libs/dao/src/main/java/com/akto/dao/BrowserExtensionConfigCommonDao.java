@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Reads the shared browser extension config collection from the common DB.
@@ -42,6 +43,25 @@ public class BrowserExtensionConfigCommonDao extends CommonContextDao<Document> 
      */
     public List<BrowserExtensionConfigCommon> findActiveConfigs() {
         return toConfigs(instance.findAll(Filters.ne(BrowserExtensionConfigCommon.ACTIVE, false)));
+    }
+
+    /**
+     * Raw catalogue document for a host (case-insensitive), or null. Returned as a schema-loose
+     * {@link Document} so the caller can copy every extraction field the extension needs - including
+     * ones not modelled on the DTO (identity, triggerFrame, modelHeader, …) - into an account row.
+     */
+    public Document findRawByHost(String host) {
+        if (host == null) {
+            return null;
+        }
+        String normalized = host.trim();
+        Document doc = instance.getMCollection().find(Filters.eq(BrowserExtensionConfigCommon.HOST, normalized)).first();
+        if (doc == null) {
+            doc = instance.getMCollection()
+                    .find(Filters.regex(BrowserExtensionConfigCommon.HOST, "^" + Pattern.quote(normalized) + "$", "i"))
+                    .first();
+        }
+        return doc;
     }
 
     private List<BrowserExtensionConfigCommon> toConfigs(List<Document> docs) {
