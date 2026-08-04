@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-    ActionList, Avatar, Badge, Box, Button, Divider, Form, HorizontalStack, Icon,
-    Modal, Pagination, Popover, SkeletonBodyText, SkeletonThumbnail, Text, TextField, Tooltip, VerticalStack,
+    ActionList, Avatar, Box, Button, Divider, Form, HorizontalStack, Icon,
+    Modal, Pagination, Popover, Text, TextField, Tooltip, VerticalStack,
 } from "@shopify/polaris";
 import { SearchMinor, HorizontalDotsMinor, DeleteMinor, InfoMinor } from "@shopify/polaris-icons";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
@@ -52,9 +52,10 @@ function faviconFor(host, iconUrl) {
 }
 
 // Every favicon sits inside a unified white rounded tile so light/dark logos read evenly.
-function hostAvatar(host, iconUrl) {
+function hostAvatar(host, iconUrl, size = "small") {
+    const sm = size === "extraSmall";
     return (
-        <span className="bext-tile">
+        <span className={`bext-tile ${sm ? "sm" : ""}`}>
             <Avatar size="extraSmall" shape="square" source={faviconFor(host, iconUrl) || undefined} name={host} />
         </span>
     );
@@ -207,7 +208,7 @@ function BrowserExtensionSettings() {
             <VerticalStack gap="2">
                 {form[key].map((val, i) => (
                     <HorizontalStack key={i} gap="2" wrap={false} blockAlign="center">
-                        <Box width="100%" minWidth="0">
+                        <Box className="bext-grow">
                             <TextField labelHidden label={`${label} ${i + 1}`} value={val}
                                 onChange={(v) => setArrItem(key, i, v)} placeholder={placeholder} autoComplete="off" />
                         </Box>
@@ -280,15 +281,15 @@ function BrowserExtensionSettings() {
 
     // ── configured section ──────────────────────────────────────────────
     const skeletonList = (
-        <Box className="bext-list" background="bg-surface" borderColor="border" borderWidth="1" borderRadius="300" overflowX="hidden">
+        <Box className="bext-list">
             {Array.from({ length: 5 }).map((_, i) => (
-                <Box className="bext-row" key={`sk-${i}`} paddingBlock="4" paddingInline="5">
-                    <HorizontalStack gap="3" blockAlign="center" wrap={false}>
-                        <SkeletonThumbnail size="small" />
-                        <Box width="100%" minWidth="0">
-                            <SkeletonBodyText lines={2} />
-                        </Box>
-                    </HorizontalStack>
+                <Box className="bext-row" key={`sk-${i}`}>
+                    <Box className="bext-sk bext-sk-avatar" />
+                    <Box className="bext-grow">
+                        <Box className="bext-sk bext-sk-title" />
+                        <Box className="bext-sk bext-sk-sub" />
+                    </Box>
+                    <Box className="bext-sk bext-sk-switch" />
                 </Box>
             ))}
         </Box>
@@ -301,56 +302,52 @@ function BrowserExtensionSettings() {
             { content: "Remove", destructive: true, onAction: () => { setOpenMenuId(null); removeConfigured(c.host, c.hexId); } },
         ];
         return (
-            <Box className={`bext-row ${c.active ? "" : "off"}`} key={c.host} paddingBlock="4" paddingInline="5">
-                <HorizontalStack gap="3" blockAlign="center" wrap={false}>
-                    {hostAvatar(c.host, c.iconUrl)}
-                    <Box width="100%" minWidth="0">
-                        <Text variant="bodyMd" fontWeight="medium" truncate>{c.name || c.host}</Text>
-                        <Text variant="bodySm" color="subdued" truncate>
-                            {c.name ? c.host : (isCustom ? ((c.paths || []).join(", ") || "Custom") : "Akto")}
-                        </Text>
-                    </Box>
-                    <Switch active={c.active} onChange={() => toggleConfigured(c.host, !c.active)}
-                        title={c.active ? "Disable for this account" : "Enable"} />
-                    {isCustom && (
-                        <Popover
-                            active={openMenuId === c.host}
-                            onClose={() => setOpenMenuId(null)}
-                            preferredAlignment="right"
-                            activator={
-                                <Button
-                                    plain
-                                    icon={HorizontalDotsMinor}
-                                    accessibilityLabel={`Actions for ${c.name || c.host}`}
-                                    onClick={() => setOpenMenuId(openMenuId === c.host ? null : c.host)}
-                                />
-                            }
-                        >
-                            <ActionList actionRole="menuitem" items={menuItems} />
-                        </Popover>
-                    )}
-                </HorizontalStack>
+            <Box className={`bext-row ${c.active ? "" : "off"}`} key={c.host}>
+                {hostAvatar(c.host, c.iconUrl)}
+                <Box className="bext-grow">
+                    <Text variant="bodyMd" fontWeight="medium" truncate>{c.name || c.host}</Text>
+                    <Text variant="bodySm" color="subdued" truncate>
+                        {c.name ? c.host : (isCustom ? ((c.paths || []).join(", ") || "Custom") : "Akto")}
+                    </Text>
+                </Box>
+                <Switch active={c.active} onChange={() => toggleConfigured(c.host, !c.active)}
+                    title={c.active ? "Disable for this account" : "Enable"} />
+                {isCustom && (
+                    <Popover
+                        active={openMenuId === c.host}
+                        onClose={() => setOpenMenuId(null)}
+                        preferredAlignment="right"
+                        activator={
+                            <Button
+                                plain
+                                icon={HorizontalDotsMinor}
+                                accessibilityLabel={`Actions for ${c.name || c.host}`}
+                                onClick={() => setOpenMenuId(openMenuId === c.host ? null : c.host)}
+                            />
+                        }
+                    >
+                        <ActionList actionRole="menuitem" items={menuItems} />
+                    </Popover>
+                )}
             </Box>
         );
     };
 
     const configuredSection = (
-        <Box key="ext-configured" maxWidth="880px">
+        <Box key="ext-configured">
             <HorizontalStack align="space-between" blockAlign="start">
                 <Box>
-                    <Text variant="headingSm" as="h3">Inspected hosts</Text>
+                    <span className="bext-eyebrow">Inspected hosts</span>
                     {!loading && totalCount > 0 && (
-                        <Box paddingBlockStart="1">
-                            <HorizontalStack gap="2" blockAlign="center">
-                                <Text variant="bodySm" color="subdued">{totalCount} host{totalCount !== 1 ? "s" : ""}</Text>
-                                <Badge status="success">{`${activeCount} active`}</Badge>
-                                {offCount > 0 && <Badge>{`${offCount} off`}</Badge>}
-                            </HorizontalStack>
+                        <Box className="bext-summary">
+                            <span className="k"><b>{totalCount}</b> host{totalCount !== 1 ? "s" : ""}</span>
+                            <span className="k"><span className="d on" /><b>{activeCount}</b> active</span>
+                            {offCount > 0 && <span className="k"><span className="d off" /><b>{offCount}</b> off</span>}
                         </Box>
                     )}
                 </Box>
                 {!loading && totalCount > 0 && (
-                    <Box width="230px">
+                    <Box className="bext-filter">
                         <TextField
                             labelHidden label="Filter hosts" value={cfgFilter} onChange={setCfgFilter}
                             placeholder="Filter hosts…" prefix={<Icon source={SearchMinor} color="subdued" />}
@@ -377,9 +374,9 @@ function BrowserExtensionSettings() {
                     </Box>
                 ) : (
                     <VerticalStack gap="3">
-                        <Box className="bext-list" background="bg-surface" borderColor="border" borderWidth="1" borderRadius="300" overflowX="hidden">
+                        <Box className="bext-list">
                             {visibleConfigured.length === 0
-                                ? <Box paddingBlock="4" paddingInline="5"><Text color="subdued">No hosts match “{cfgFilter}”.</Text></Box>
+                                ? <Box className="bext-row"><Text color="subdued">No hosts match “{cfgFilter}”.</Text></Box>
                                 : pagedConfigured.map(configuredRow)}
                         </Box>
                         {visibleConfigured.length > CONFIG_PAGE_SIZE && (
@@ -463,12 +460,12 @@ function BrowserExtensionSettings() {
 
                             {form.transport === "http" && (
                                 <HorizontalStack gap="4" wrap={false}>
-                                    <Box width="100%" minWidth="0">
+                                    <Box className="bext-grow">
                                         <Dropdown id="bext-method" label="Method"
                                             menuItems={["POST", "GET", "PUT", "PATCH"].map((m) => ({ label: m, value: m }))}
                                             initial={form.method} selected={(v) => setField("method", v)} />
                                     </Box>
-                                    <Box width="100%" minWidth="0">
+                                    <Box className="bext-grow">
                                         <Dropdown id="bext-format-http" label="Body format"
                                             menuItems={FORMAT_OPTIONS.http.map(([v, l]) => ({ label: l, value: v }))}
                                             initial={form.format} selected={(v) => setField("format", v)} />
@@ -488,11 +485,11 @@ function BrowserExtensionSettings() {
                                         <VerticalStack gap="2">
                                             {form.frameMatch.map((row, i) => (
                                                 <HorizontalStack key={i} gap="2" wrap={false} blockAlign="center">
-                                                    <Box width="100%" minWidth="0">
+                                                    <Box className="bext-grow">
                                                         <TextField labelHidden label={`key ${i}`} value={row.k} onChange={(v) => setFmItem(i, "k", v)} placeholder="event" autoComplete="off" />
                                                     </Box>
                                                     <Text>=</Text>
-                                                    <Box width="100%" minWidth="0">
+                                                    <Box className="bext-grow">
                                                         <TextField labelHidden label={`value ${i}`} value={row.v} onChange={(v) => setFmItem(i, "v", v)} placeholder="send" autoComplete="off" />
                                                     </Box>
                                                     {form.frameMatch.length > 1 && (
