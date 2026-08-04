@@ -555,19 +555,21 @@ const ServerSettingsStep = ({
 
                         <VerticalStack gap="2">
                             <Checkbox
-                                label="Apply guardrail to responses"
-                                checked={applyOnResponse}
-                                onChange={setApplyOnResponse}
-                                helpText="When enabled, this guardrail will filter and evaluate model responses before they're sent to users."
-                            />
-
-                            <Checkbox
                                 label="Apply guardrail to requests"
                                 checked={applyOnRequest}
                                 onChange={setApplyOnRequest}
                                 helpText="When enabled, this guardrail will filter and evaluate user inputs before they're processed by the model."
                             />
+
+                            <Checkbox
+                                label="Apply guardrail to responses"
+                                checked={applyOnResponse}
+                                onChange={setApplyOnResponse}
+                                helpText="When enabled, this guardrail will filter and evaluate model responses before they're sent to users."
+                            />
                         </VerticalStack>
+
+                        <Banner tone="info">Response Guardrails are not supported for browser LLMs</Banner>
                     </VerticalStack>
                 </Box>
             </FormLayout>

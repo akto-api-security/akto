@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
-import java.util.regex.Pattern;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -21,10 +20,6 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.traffic.CollectionTags;
-import com.akto.dto.type.URLMethods;
-import com.akto.billing.UsageMetricUtils;
-import com.akto.dto.billing.FeatureAccess;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.threat.backend.dao.MaliciousEventDao;
@@ -41,10 +36,14 @@ import com.mongodb.client.model.UpdateManyModel;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
-public class SkillsRiskScoreSyncCron {
+// Handles ENDPOINT-context malicious events that are NOT skill events (those are owned by
+// SkillsRiskScoreSyncCron, matched on endpoint prefix "/skill" + category "malicious_skill_detected").
+// Resolves apiCollectionId via host (same as SkillsRiskScoreSyncCron, since these events don't carry a
+// reliable apiCollectionId), then scores via RiskScoreSyncCron's shared url-template matching. No tag.
+public class AtlasRiskScoreSyncCron {
 
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(SkillsRiskScoreSyncCron.class, LogDb.THREAT_DETECTION);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AtlasRiskScoreSyncCron.class, LogDb.THREAT_DETECTION);
 
     public void setUp() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -54,13 +53,12 @@ public class SkillsRiskScoreSyncCron {
                     public void accept(Account t) {
                         try {
                             int accountId = t.getId();
-                            // FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "THREAT_DETECTION");
-                            // if (featureAccess == null || !featureAccess.getIsGranted()) {
-                            //     loggerMaker.debugAndAddToDb("THREAT_DETECTION feature not granted for account " + accountId + ", skipping skills risk score sync");
-                            //     return;
-                            // }
+                            if (accountId != 1783981503) {
+                                loggerMaker.infoAndAddToDb("Skipping Atlas risk score sync cron for account " + accountId);
+                                return;
+                            }
                             int startTimestamp = Context.now();
-                            loggerMaker.infoAndAddToDb("Skills risk score sync cron started for account " + accountId + " at " + startTimestamp);
+                            loggerMaker.infoAndAddToDb("Atlas risk score sync cron started for account " + accountId + " at " + startTimestamp);
 
                             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                             LastCronRunInfo lastRunTimerInfo = accountSettings.getLastUpdatedCronInfo();
@@ -68,13 +66,13 @@ public class SkillsRiskScoreSyncCron {
                             int deltaStartTime = deltaEndTime - Constants.ONE_DAY_TIMESTAMP;
 
                             Bson updateForLastCronRunInfo = Updates.set(
-                                AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_ATLAS_THREAT_SCORE_SYNC,
+                                AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_NON_SKILL_THREAT_SCORE_SYNC,
                                 deltaEndTime
                             );
 
                             if (lastRunTimerInfo != null) {
                                 if (deltaEndTime - lastRunTimerInfo.getLastInfoResetted() <= Constants.ONE_DAY_TIMESTAMP) {
-                                    int last = lastRunTimerInfo.getLastAtlasThreatScoreSync();
+                                    int last = lastRunTimerInfo.getLastNonSkillThreatScoreSync();
                                     deltaStartTime = (last > 0) ? last : (deltaEndTime - Constants.ONE_DAY_TIMESTAMP);
                                 } else {
                                     updateForLastCronRunInfo = Updates.combine(
@@ -93,8 +91,7 @@ public class SkillsRiskScoreSyncCron {
                                 Filters.gte("detectedAt", deltaStartTime),
                                 Filters.lte("detectedAt", deltaEndTime),
                                 Filters.eq("successfulExploit", true),
-                                Filters.eq("contextSource", "ENDPOINT"),
-                                Filters.eq("category", "malicious_skill_detected")
+                                Filters.eq("contextSource", "ENDPOINT")
                             )));
                             pipeline.add(Aggregates.group(groupedId, Accumulators.addToSet("severities", "$severity")));
 
@@ -103,16 +100,9 @@ public class SkillsRiskScoreSyncCron {
                                 .aggregate(pipeline, BasicDBObject.class)
                                 .cursor();
 
-                            // Build host -> apiCollectionId map
-                            List<ApiCollection> allCollections = ApiCollectionsDao.fetchAllHosts();
-                            Map<String, Integer> hostToCollectionId = new HashMap<>();
-                            for (ApiCollection col : allCollections) {
-                                if (col.getHostName() != null) {
-                                    hostToCollectionId.put(col.getHostName(), col.getId());
-                                }
-                            }
+                            Map<String, Integer> hostToCollectionId = null;
 
-                            Map<ApiInfoKey, Float> apiInfoKeyToRiskScore = new HashMap<>();
+                            Map<String, List<String>> apiInfoKeyToSeverities = new HashMap<>();
                             while (cursor.hasNext()) {
                                 BasicDBObject document = cursor.next();
                                 BasicDBObject id = (BasicDBObject) document.get("_id");
@@ -120,11 +110,29 @@ public class SkillsRiskScoreSyncCron {
                                 String method = id.getString("method");
                                 String endpoint = id.getString("endpoint");
 
-                                if (endpoint == null || !endpoint.startsWith("/skill")) {
+                                if (endpoint == null) {
                                     continue;
                                 }
 
-                                Integer collectionId = hostToCollectionId.get(host);
+                                // /skill-prefixed endpoints belong entirely to SkillsRiskScoreSyncCron's bucket
+                                if (endpoint.startsWith("/skill")) {
+                                    continue;
+                                }
+
+                                if (hostToCollectionId == null) {
+                                    hostToCollectionId = new HashMap<>();
+                                    for (ApiCollection col : ApiCollectionsDao.fetchAllHosts()) {
+                                        if (col.getHostName() != null) {
+                                            hostToCollectionId.put(col.getHostName().toLowerCase(), col.getId());
+                                        }
+                                    }
+                                }
+
+                                if (host == null) {
+                                    continue;
+                                }
+
+                                Integer collectionId = hostToCollectionId.get(host.toLowerCase());
                                 if (collectionId == null) {
                                     loggerMaker.infoAndAddToDb("No collection found for host: " + host);
                                     continue;
@@ -134,58 +142,34 @@ public class SkillsRiskScoreSyncCron {
                                 List<String> severities = (List<String>) document.get("severities");
                                 if (severities == null || severities.isEmpty()) continue;
                                 if (method == null) continue;
-                                float riskScore = computeRiskScore(severities);
-                                if (riskScore == 0f) continue;
 
-                                ApiInfoKey apiInfoKey = new ApiInfoKey(collectionId, endpoint, URLMethods.Method.valueOf(method));
-                                apiInfoKeyToRiskScore.put(apiInfoKey, Math.max(apiInfoKeyToRiskScore.getOrDefault(apiInfoKey, 0.0f), riskScore));
+                                String key = collectionId + " " + endpoint + " " + method;
+                                apiInfoKeyToSeverities.put(key, severities);
                             }
 
-                            loggerMaker.infoAndAddToDb("Skills malicious events count: " + apiInfoKeyToRiskScore.size());
+                            loggerMaker.infoAndAddToDb("Atlas malicious events count: " + apiInfoKeyToSeverities.size());
 
-                            CollectionTags maliciousTag =
-                                new CollectionTags(Context.now(), "malicious-skill", "true", CollectionTags.TagSource.AKTO);
-
-                            // only-if-absent guard: matches docs that do NOT already carry the malicious-skill tag
-                            Bson tagNotPresent = Filters.not(Filters.elemMatch(ApiInfo.TAGS_LIST,
-                                Filters.and(
-                                    Filters.eq(CollectionTags.KEY_NAME, "malicious-skill"),
-                                    Filters.eq(CollectionTags.VALUE, "true")
-                                )));
+                            Map<ApiInfoKey, Float> apiInfoKeyToThreatScore = RiskScoreSyncCron.resolveThreatScores(
+                                apiInfoKeyToSeverities, AtlasRiskScoreSyncCron::computeRiskScore);
 
                             List<WriteModel<ApiInfo>> updates = new ArrayList<>();
-                            for (Map.Entry<ApiInfoKey, Float> entry : apiInfoKeyToRiskScore.entrySet()) {
-                                ApiInfoKey key = entry.getKey();
-                                // db stores url as hostname+path; malicious event has only path
-                                Pattern urlPattern = Pattern.compile(".*" + Pattern.quote(key.getUrl()) + "$");
-                                Bson filter = Filters.and(
-                                    Filters.regex("_id.url", urlPattern),
-                                    Filters.eq("_id.method", key.getMethod().name()),
-                                    Filters.eq("_id.apiCollectionId", key.getApiCollectionId())
-                                );
-
-                                // always keep the threat score fresh
-                                updates.add(new UpdateManyModel<>(filter,
-                                    Updates.set(ApiInfo.THREAT_SCORE, entry.getValue())));
-
-                                // append the malicious tag only when it isn't already there (no-op otherwise),
-                                // preserving any other existing tags on the api
-                                updates.add(new UpdateManyModel<>(Filters.and(filter, tagNotPresent),
-                                    Updates.addToSet(ApiInfo.TAGS_LIST, maliciousTag)));
+                            for (Map.Entry<ApiInfoKey, Float> entry : apiInfoKeyToThreatScore.entrySet()) {
+                                Bson filter = ApiInfoDao.getFilter(entry.getKey());
+                                updates.add(new UpdateManyModel<>(filter, Updates.set(ApiInfo.THREAT_SCORE, entry.getValue())));
                             }
 
                             if (!updates.isEmpty()) {
-                                loggerMaker.infoAndAddToDb("Updating risk score for " + updates.size() + " api infos from skills events");
+                                loggerMaker.infoAndAddToDb("Updating risk score for " + updates.size() + " api infos from atlas events");
                                 ApiInfoDao.instance.bulkWrite(updates, new BulkWriteOptions().ordered(false));
                             }
 
                             AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), updateForLastCronRunInfo);
-                            loggerMaker.infoAndAddToDb("Skills risk score sync cron completed for account " + accountId + " in " + (Context.now() - startTimestamp) + " seconds");
+                            loggerMaker.infoAndAddToDb("Atlas risk score sync cron completed for account " + accountId + " in " + (Context.now() - startTimestamp) + " seconds");
                         } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e, "Error in skills risk score sync cron: " + e.getMessage());
+                            loggerMaker.errorAndAddToDb(e, "Error in atlas risk score sync cron: " + e.getMessage());
                         }
                     }
-                }, "skills-risk-score-sync-cron");
+                }, "atlas-risk-score-sync-cron");
             }
         }, 0, 15, TimeUnit.MINUTES);
     }
@@ -195,9 +179,10 @@ public class SkillsRiskScoreSyncCron {
         for (String s : severities) {
             float score = 0f;
             switch (s.toUpperCase()) {
-                case "CRITICAL": score = 5f; break;
-                case "HIGH":     score = 4f; break;
-                case "MEDIUM":   score = 3f; break;
+                case "CRITICAL": score = 4f; break;
+                case "HIGH":     score = 3f; break;
+                case "MEDIUM":   score = 2f; break;
+                case "LOW":      score = 1f; break;
                 default:         break;
             }
             max = Math.max(max, score);
