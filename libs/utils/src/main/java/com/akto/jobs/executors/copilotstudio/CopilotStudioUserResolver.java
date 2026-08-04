@@ -37,7 +37,7 @@ public class CopilotStudioUserResolver {
     private static final String TOKEN_ENDPOINT_TEMPLATE = "https://login.microsoftonline.com/%s/oauth2/v2.0/token";
     private static final String GRAPH_SCOPE = "https://graph.microsoft.com/.default";
     private static final String GRAPH_USERS_URL =
-        "https://graph.microsoft.com/v1.0/users?$select=id,displayName,userPrincipalName&$top=999";
+        "https://graph.microsoft.com/v1.0/users?$select=id,displayName,userPrincipalName";
     private static final long CACHE_TTL_MILLIS = 24L * 60 * 60 * 1000;
 
     /** One raw Microsoft Graph user record, as cached to disk. */
