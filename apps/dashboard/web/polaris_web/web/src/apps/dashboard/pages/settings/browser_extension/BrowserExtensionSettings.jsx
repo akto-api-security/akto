@@ -203,7 +203,7 @@ function BrowserExtensionSettings() {
             <VerticalStack gap="2">
                 {form[key].map((val, i) => (
                     <HorizontalStack key={i} gap="2" wrap={false} blockAlign="center">
-                        <Box className="bext-grow">
+                        <Box width="100%" minWidth="0">
                             <TextField labelHidden label={`${label} ${i + 1}`} value={val}
                                 onChange={(v) => setArrItem(key, i, v)} placeholder={placeholder} autoComplete="off" />
                         </Box>
@@ -280,7 +280,7 @@ function BrowserExtensionSettings() {
             {Array.from({ length: 5 }).map((_, i) => (
                 <Box className="bext-row" key={`sk-${i}`}>
                     <SkeletonThumbnail size="small" />
-                    <Box className="bext-grow">
+                    <Box width="100%" minWidth="0">
                         <SkeletonBodyText lines={2} />
                     </Box>
                 </Box>
@@ -297,7 +297,7 @@ function BrowserExtensionSettings() {
         return (
             <Box className={`bext-row ${c.active ? "" : "off"}`} key={c.host}>
                 {hostAvatar(c.host, c.iconUrl)}
-                <Box className="bext-grow">
+                <Box width="100%" minWidth="0">
                     <Text variant="bodyMd" fontWeight="medium" truncate>{c.name || c.host}</Text>
                     <Text variant="bodySm" color="subdued" truncate>
                         {c.name ? c.host : (isCustom ? ((c.paths || []).join(", ") || "Custom") : "Akto")}
@@ -455,12 +455,12 @@ function BrowserExtensionSettings() {
 
                             {form.transport === "http" && (
                                 <HorizontalStack gap="4" wrap={false}>
-                                    <Box className="bext-grow">
+                                    <Box width="100%" minWidth="0">
                                         <Dropdown id="bext-method" label="Method"
                                             menuItems={["POST", "GET", "PUT", "PATCH"].map((m) => ({ label: m, value: m }))}
                                             initial={form.method} selected={(v) => setField("method", v)} />
                                     </Box>
-                                    <Box className="bext-grow">
+                                    <Box width="100%" minWidth="0">
                                         <Dropdown id="bext-format-http" label="Body format"
                                             menuItems={FORMAT_OPTIONS.http.map(([v, l]) => ({ label: l, value: v }))}
                                             initial={form.format} selected={(v) => setField("format", v)} />
@@ -480,11 +480,11 @@ function BrowserExtensionSettings() {
                                         <VerticalStack gap="2">
                                             {form.frameMatch.map((row, i) => (
                                                 <HorizontalStack key={i} gap="2" wrap={false} blockAlign="center">
-                                                    <Box className="bext-grow">
+                                                    <Box width="100%" minWidth="0">
                                                         <TextField labelHidden label={`key ${i}`} value={row.k} onChange={(v) => setFmItem(i, "k", v)} placeholder="event" autoComplete="off" />
                                                     </Box>
                                                     <Text>=</Text>
-                                                    <Box className="bext-grow">
+                                                    <Box width="100%" minWidth="0">
                                                         <TextField labelHidden label={`value ${i}`} value={row.v} onChange={(v) => setFmItem(i, "v", v)} placeholder="send" autoComplete="off" />
                                                     </Box>
                                                     {form.frameMatch.length > 1 && (
