@@ -7,9 +7,9 @@ import java.util.List;
 import java.util.Map;
 
 import org.bson.Document;
-import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -28,10 +28,10 @@ import lombok.Setter;
 @NoArgsConstructor
 public class BrowserExtensionConfigCommon {
 
+    // NONE: lombok must not generate getId() returning the raw ObjectId (it serializes as a
+    // messy nested object). get_id() below emits it as the plain hex string under key `_id`.
+    @Getter(AccessLevel.NONE)
     private ObjectId id;
-
-    @BsonIgnore
-    private String hexId;
 
     public static final String HOST = "host";
     private String host;
@@ -97,7 +97,10 @@ public class BrowserExtensionConfigCommon {
     public static final String ENFORCE_AT = "enforceAt";
     private String enforceAt;
 
-    public String getHexId() {
+    // getter name is get_id() on purpose: the struts json serializer keys output off the bean
+    // property, so this surfaces as `_id` (matching the db) with the same 24-char hex value as the
+    // stored ObjectId. json has no native ObjectId, so the hex string is the faithful form.
+    public String get_id() {
         if (this.id != null) {
             return this.id.toHexString();
         }

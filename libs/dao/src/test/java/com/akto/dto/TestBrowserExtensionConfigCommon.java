@@ -139,15 +139,14 @@ public class TestBrowserExtensionConfigCommon {
     }
 
     @Test
-    public void testHexIdIsExposed() {
+    public void testIdIsExposedAsHexString() {
         ObjectId id = new ObjectId();
         Document doc = new Document("_id", id).append("host", "duck.ai");
 
         BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
 
         assertNotNull(config);
-        assertEquals(id, config.getId());
-        assertEquals(id.toHexString(), config.getHexId());
+        assertEquals(id.toHexString(), config.get_id());
     }
 
     @Test
