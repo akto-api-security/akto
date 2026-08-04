@@ -2,11 +2,12 @@
    (hover-reveal, row hover, status dot, custom toggle). Uses Polaris tokens so light/dark
    both track the theme. */
 
-/* rows are spaced cards (border/radius/padding via Box props); only the hover lift and the
-   disabled dim have no Polaris prop equivalent. */
-.bext-row { transition:background .12s, box-shadow .12s, border-color .12s; }
-.bext-row:hover { background:var(--p-color-bg-surface-hover,#f9fafb); border-color:var(--p-color-border-emphasis,#cfcfe6);
-  box-shadow:0 1px 3px rgba(17,20,28,.07); }
+/* white list card lifted off the page background; container border/radius come from Box props */
+.bext-list { box-shadow:0 1px 2px rgba(17,20,28,.04), 0 4px 16px rgba(17,20,28,.05); }
+/* rows: spacing via Box padding; only the divider, hover and disabled dim have no Polaris prop */
+.bext-row { border-top:1px solid var(--p-color-border-subdued,#eef0f4); transition:background .12s; }
+.bext-row:first-child { border-top:0; }
+.bext-row:hover { background:var(--p-color-bg-surface-hover,#f6f7fa); }
 .bext-row.off { opacity:.55; }
 
 /* lightweight theme-aware toggle (Polaris ships no native switch in this version) */
