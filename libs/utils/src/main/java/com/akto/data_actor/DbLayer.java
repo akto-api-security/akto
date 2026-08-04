@@ -700,31 +700,33 @@ public class DbLayer {
 
     public static void bulkWriteApiInfo(List<ApiInfo> apiInfoList) {
         List<WriteModel<ApiInfo>> writesForApiInfo = ApiInfoBulkUpdate.getUpdatesForApiInfo(apiInfoList);
-        ApiInfoDao.instance.getMCollection().bulkWrite(writesForApiInfo);
+        ApiInfoDao.instance.getMCollection().bulkWrite(writesForApiInfo, new BulkWriteOptions().ordered(false));
     }
     public static void bulkWriteSingleTypeInfo(List<WriteModel<SingleTypeInfo>> writesForSingleTypeInfo) {
-        BulkWriteResult res = SingleTypeInfoDao.instance.getMCollection().bulkWrite(writesForSingleTypeInfo);
+        BulkWriteResult res = SingleTypeInfoDao.instance.getMCollection().bulkWrite(writesForSingleTypeInfo,
+                new BulkWriteOptions().ordered(false));
         System.out.println("bulk write result: del:" + res.getDeletedCount() + " ins:" + res.getInsertedCount() + " match:" + res.getMatchedCount() + " modify:" +res.getModifiedCount());
     }
 
     public static void bulkWriteSampleData(List<WriteModel<SampleData>> writesForSampleData) {
-        SampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
+        SampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData, new BulkWriteOptions().ordered(false));
     }
 
     public static void bulkWriteSensitiveSampleData(List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData) {
-        SensitiveSampleDataDao.instance.getMCollection().bulkWrite(writesForSensitiveSampleData);
+        SensitiveSampleDataDao.instance.getMCollection().bulkWrite(writesForSensitiveSampleData,
+                new BulkWriteOptions().ordered(false));
     }
 
     public static void bulkWriteTrafficInfo(List<WriteModel<TrafficInfo>> writesForTrafficInfo) {
-        TrafficInfoDao.instance.getMCollection().bulkWrite(writesForTrafficInfo);
+        TrafficInfoDao.instance.getMCollection().bulkWrite(writesForTrafficInfo, new BulkWriteOptions().ordered(false));
     }
 
     public static void bulkWriteTrafficMetrics(List<WriteModel<TrafficMetrics>> writesForTrafficMetrics) {
-        TrafficMetricsDao.instance.getMCollection().bulkWrite(writesForTrafficMetrics);
+        TrafficMetricsDao.instance.getMCollection().bulkWrite(writesForTrafficMetrics, new BulkWriteOptions().ordered(false));
     }
 
     public static void bulkWriteSensitiveParamInfo(List<WriteModel<SensitiveParamInfo>> writesForSensitiveParamInfo) {
-        SensitiveParamInfoDao.instance.getMCollection().bulkWrite(writesForSensitiveParamInfo);
+        SensitiveParamInfoDao.instance.getMCollection().bulkWrite(writesForSensitiveParamInfo, new BulkWriteOptions().ordered(false));
     }
 
     public static void bulkWriteTestingRunIssues(List<WriteModel<TestingRunIssues>> writeModelList) {
