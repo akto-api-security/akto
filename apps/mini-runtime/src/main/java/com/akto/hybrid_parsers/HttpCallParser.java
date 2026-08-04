@@ -1824,6 +1824,7 @@ public class HttpCallParser {
 
             if (isCopilotInventory(tagsMap)) {
                 parseCopilotInventory(httpResponseParam);
+                continue; // graph edges only — not a real endpoint, and fanned out to N collections per agent, so must not reach apiCatalogSync.
             } else if (isCopilotTrafficRaw(tagsMap)) {
                 parseCopilotTrace(httpResponseParam);
             }
