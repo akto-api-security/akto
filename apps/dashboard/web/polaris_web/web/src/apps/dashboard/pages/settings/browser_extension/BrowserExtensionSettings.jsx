@@ -280,9 +280,9 @@ function BrowserExtensionSettings() {
 
     // ── configured section ──────────────────────────────────────────────
     const skeletonList = (
-        <Box background="bg-surface" borderColor="border" borderWidth="1" borderRadius="300" overflowX="hidden">
+        <VerticalStack gap="2">
             {Array.from({ length: 5 }).map((_, i) => (
-                <Box className="bext-row" key={`sk-${i}`} paddingBlock="3" paddingInline="4">
+                <Box key={`sk-${i}`} background="bg-surface" borderColor="border" borderWidth="1" borderRadius="300" paddingBlock="3" paddingInline="4">
                     <HorizontalStack gap="3" blockAlign="center" wrap={false}>
                         <SkeletonThumbnail size="small" />
                         <Box width="100%" minWidth="0">
@@ -291,7 +291,7 @@ function BrowserExtensionSettings() {
                     </HorizontalStack>
                 </Box>
             ))}
-        </Box>
+        </VerticalStack>
     );
 
     const configuredRow = (c) => {
@@ -301,7 +301,8 @@ function BrowserExtensionSettings() {
             { content: "Remove", destructive: true, onAction: () => { setOpenMenuId(null); removeConfigured(c.host, c.hexId); } },
         ];
         return (
-            <Box className={`bext-row ${c.active ? "" : "off"}`} key={c.host} paddingBlock="3" paddingInline="4">
+            <Box className={`bext-row ${c.active ? "" : "off"}`} key={c.host}
+                background="bg-surface" borderColor="border" borderWidth="1" borderRadius="300" paddingBlock="3" paddingInline="4">
                 <HorizontalStack gap="3" blockAlign="center" wrap={false}>
                     {hostAvatar(c.host, c.iconUrl)}
                     <Box width="100%" minWidth="0">
@@ -377,11 +378,9 @@ function BrowserExtensionSettings() {
                     </Box>
                 ) : (
                     <VerticalStack gap="3">
-                        <Box background="bg-surface" borderColor="border" borderWidth="1" borderRadius="300" overflowX="hidden">
-                            {visibleConfigured.length === 0
-                                ? <Box className="bext-row"><Text color="subdued">No hosts match “{cfgFilter}”.</Text></Box>
-                                : pagedConfigured.map(configuredRow)}
-                        </Box>
+                        {visibleConfigured.length === 0
+                            ? <Box background="bg-surface" borderColor="border" borderWidth="1" borderRadius="300" padding="4"><Text color="subdued">No hosts match “{cfgFilter}”.</Text></Box>
+                            : <VerticalStack gap="2">{pagedConfigured.map(configuredRow)}</VerticalStack>}
                         {visibleConfigured.length > CONFIG_PAGE_SIZE && (
                             <Box paddingBlockStart="1">
                                 <HorizontalStack align="center" blockAlign="center" gap="4">
