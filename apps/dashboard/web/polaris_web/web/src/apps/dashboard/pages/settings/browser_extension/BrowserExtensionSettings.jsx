@@ -52,10 +52,9 @@ function faviconFor(host, iconUrl) {
 }
 
 // Every favicon sits inside a unified white rounded tile so light/dark logos read evenly.
-function hostAvatar(host, iconUrl, size = "small") {
-    const sm = size === "extraSmall";
+function hostAvatar(host, iconUrl) {
     return (
-        <span className={`bext-tile ${sm ? "sm" : ""}`}>
+        <span className="bext-tile">
             <Avatar size="extraSmall" shape="square" source={faviconFor(host, iconUrl) || undefined} name={host} />
         </span>
     );

@@ -32,7 +32,6 @@
 /* unified favicon tile — every logo sits on the same white rounded surface */
 .bext-tile { width:38px; height:38px; border-radius:10px; flex:0 0 auto; background:var(--p-color-bg-surface,#fff);
   border:1px solid var(--p-color-border,#e9ebf1); display:grid; place-items:center; box-shadow:0 1px 2px rgba(17,20,28,.06); overflow:hidden; }
-.bext-tile.sm { width:30px; height:30px; border-radius:8px; }
 
 /* loading skeleton bars */
 .bext-sk { height:16px; border-radius:6px; background:linear-gradient(90deg,var(--p-color-bg-surface-secondary,#f3f5f8) 25%,var(--p-color-bg-surface-hover,#f6f7fa) 37%,var(--p-color-bg-surface-secondary,#f3f5f8) 63%); background-size:400% 100%; animation:bextsh 1.3s ease infinite; }
