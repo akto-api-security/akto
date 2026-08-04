@@ -24,15 +24,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
 
 import com.akto.action.threat_detection.utils.ThreatDetectionHelper;
+import com.akto.action.threat_detection.utils.ThreatsUtils;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
@@ -197,7 +196,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
           ListMaliciousRequestsResponse.class, responseBody)
@@ -282,7 +281,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       post.setEntity(requestEntity);
 
       try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-        String responseBody = EntityUtils.toString(resp.getEntity());
+        String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
         ProtoMessageUtils.<FetchAlertFiltersResponse>toProtoMessage(
             FetchAlertFiltersResponse.class, responseBody)
@@ -319,7 +318,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
     } catch (Exception e) {
       e.printStackTrace();
       return ERROR.toUpperCase();
@@ -591,7 +590,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       if (resp.getStatusLine().getStatusCode() != 200) {
         this.deleteSuccess = false;
