@@ -106,33 +106,35 @@ function BrowserExtensionSettings() {
     useEffect(() => { fetchAll(); }, [fetchAll]);
     useEffect(() => { setCfgPage(0); }, [cfgFilter]);   // jump back to page 1 on a new filter
 
-    const catalogueByHost = useMemo(() => {
-        const map = {};
-        catalogue.forEach((c) => { map[(c.host || "").toLowerCase()] = c; });
-        return map;
-    }, [catalogue]);
-
     // sort by the Mongo id (hexId) ascending — top brands were given the oldest ids, so they lead
     const idOf = (c) => c?.hexId || "￿";
     const byId = (a, b) => idOf(a).localeCompare(idOf(b));
 
     // Every catalogue host is ON by default; the account collection only stores what the user changed
-    // (an opt-out with active:false, or a custom host). The displayed list is common ⊕ account overlaid.
+    // (an opt-out with active:false, or a custom host). The displayed list is common ⊕ account overlaid:
+    // each host appears exactly once, and the account row's `active` always wins over the default.
     const mergedRows = useMemo(() => {
         const overrideByHost = {};
         configured.forEach((c) => { overrideByHost[(c.host || "").toLowerCase()] = c; });
+        const seen = new Set();
         const rows = [];
         // catalogue hosts, in rank order — on unless the account opted this one out
         catalogue.slice().sort(byId).forEach((cat) => {
-            const ov = overrideByHost[(cat.host || "").toLowerCase()];
+            const key = (cat.host || "").toLowerCase();
+            if (!key || seen.has(key)) return;   // never list the same host twice
+            seen.add(key);
+            const ov = overrideByHost[key];
             rows.push({ ...cat, active: ov ? ov.active !== false : true, hexId: ov?.hexId || null, source: "catalogue" });
         });
-        // account-only custom hosts (not in the catalogue) keep their own row
+        // account-only custom hosts (any host not already shown from the catalogue)
         configured.forEach((c) => {
-            if (!catalogueByHost[(c.host || "").toLowerCase()]) rows.push({ ...c, active: c.active !== false, source: "custom" });
+            const key = (c.host || "").toLowerCase();
+            if (!key || seen.has(key)) return;
+            seen.add(key);
+            rows.push({ ...c, active: c.active !== false, source: "custom" });
         });
         return rows;
-    }, [catalogue, configured, catalogueByHost]);
+    }, [catalogue, configured]);
 
     const totalCount = mergedRows.length;
     const activeCount = useMemo(() => mergedRows.filter((r) => r.active).length, [mergedRows]);
