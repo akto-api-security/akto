@@ -152,6 +152,50 @@ public class BrowserExtensionConfigCommon {
         return config;
     }
 
+    /**
+     * Effective config list for an account = the active common catalogue overlaid with the account's
+     * own choices, keyed by host:
+     *  - an active account config for a NEW host is added (a custom host)
+     *  - an inactive account config removes that host (an opt-out of a common host)
+     *  - a common host the account did not touch stays on
+     * Common wins when both have the same host (putIfAbsent), so a same-host account row only opts
+     * out or adds - it does not override the catalogue entry's fields.
+     */
+    public static List<BrowserExtensionConfigCommon> merge(
+            List<BrowserExtensionConfigCommon> commonActive,
+            List<BrowserExtensionConfigCommon> accountConfigs) {
+        Map<String, BrowserExtensionConfigCommon> byHost = new LinkedHashMap<>();
+        if (commonActive != null) {
+            for (BrowserExtensionConfigCommon c : commonActive) {
+                String key = hostKey(c);
+                if (key != null) {
+                    byHost.putIfAbsent(key, c);   // if the catalogue repeats a host, keep the first
+                }
+            }
+        }
+        if (accountConfigs != null) {
+            for (BrowserExtensionConfigCommon a : accountConfigs) {
+                String key = hostKey(a);
+                if (key == null) {
+                    continue;
+                }
+                if (a.isActive()) {
+                    byHost.putIfAbsent(key, a);   // custom host; common entry (if any) wins
+                } else {
+                    byHost.remove(key);           // opt-out
+                }
+            }
+        }
+        return new ArrayList<>(byHost.values());
+    }
+
+    private static String hostKey(BrowserExtensionConfigCommon config) {
+        if (config == null || config.host == null || config.host.trim().isEmpty()) {
+            return null;
+        }
+        return config.host.trim().toLowerCase();
+    }
+
     private static String asString(Object value) {
         return value instanceof String ? (String) value : null;
     }

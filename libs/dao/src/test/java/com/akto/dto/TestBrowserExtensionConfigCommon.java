@@ -170,4 +170,57 @@ public class TestBrowserExtensionConfigCommon {
         assertNull(config.getMethod());
         assertNull(config.getFrameMatch());
     }
+
+    // ---- merge(common, account) ----
+
+    private static BrowserExtensionConfigCommon cfg(String host, boolean active) {
+        return BrowserExtensionConfigCommon.fromDocument(
+                new Document("host", host).append("active", active));
+    }
+
+    private static List<String> hosts(List<BrowserExtensionConfigCommon> configs) {
+        List<String> out = new java.util.ArrayList<>();
+        for (BrowserExtensionConfigCommon c : configs) out.add(c.getHost());
+        return out;
+    }
+
+    @Test
+    public void testMergeCommonOnly() {
+        List<BrowserExtensionConfigCommon> common = Arrays.asList(cfg("chatgpt.com", true), cfg("claude.ai", true));
+        List<BrowserExtensionConfigCommon> merged = BrowserExtensionConfigCommon.merge(common, Arrays.asList());
+        assertEquals(Arrays.asList("chatgpt.com", "claude.ai"), hosts(merged));
+    }
+
+    @Test
+    public void testMergeOptOutDropsCommonHost() {
+        List<BrowserExtensionConfigCommon> common = Arrays.asList(cfg("chatgpt.com", true), cfg("claude.ai", true));
+        List<BrowserExtensionConfigCommon> account = Arrays.asList(cfg("chatgpt.com", false)); // opt-out
+        List<BrowserExtensionConfigCommon> merged = BrowserExtensionConfigCommon.merge(common, account);
+        assertEquals(Arrays.asList("claude.ai"), hosts(merged));
+    }
+
+    @Test
+    public void testMergeAddsAccountCustomHost() {
+        List<BrowserExtensionConfigCommon> common = Arrays.asList(cfg("chatgpt.com", true));
+        List<BrowserExtensionConfigCommon> account = Arrays.asList(cfg("my-internal.ai", true)); // custom
+        List<BrowserExtensionConfigCommon> merged = BrowserExtensionConfigCommon.merge(common, account);
+        assertEquals(Arrays.asList("chatgpt.com", "my-internal.ai"), hosts(merged));
+    }
+
+    @Test
+    public void testMergeSameHostActiveDoesNotDuplicateOrOverride() {
+        BrowserExtensionConfigCommon commonEntry = cfg("chatgpt.com", true);
+        List<BrowserExtensionConfigCommon> merged = BrowserExtensionConfigCommon.merge(
+                Arrays.asList(commonEntry), Arrays.asList(cfg("chatgpt.com", true)));
+        assertEquals(Arrays.asList("chatgpt.com"), hosts(merged));
+        assertSame(commonEntry, merged.get(0)); // catalogue entry wins
+    }
+
+    @Test
+    public void testMergeOptOutOfUnknownHostIsNoOp() {
+        List<BrowserExtensionConfigCommon> common = Arrays.asList(cfg("chatgpt.com", true));
+        List<BrowserExtensionConfigCommon> account = Arrays.asList(cfg("not-in-common.ai", false));
+        List<BrowserExtensionConfigCommon> merged = BrowserExtensionConfigCommon.merge(common, account);
+        assertEquals(Arrays.asList("chatgpt.com"), hosts(merged));
+    }
 }
