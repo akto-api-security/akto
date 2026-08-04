@@ -281,7 +281,7 @@ function BrowserExtensionSettings() {
 
     // ── configured section ──────────────────────────────────────────────
     const skeletonList = (
-        <Box className="bext-list">
+        <Box background="bg-surface" borderColor="border" borderWidth="1" borderRadius="300" overflowX="hidden">
             {Array.from({ length: 5 }).map((_, i) => (
                 <Box className="bext-row" key={`sk-${i}`}>
                     <SkeletonThumbnail size="small" />
@@ -347,7 +347,7 @@ function BrowserExtensionSettings() {
                     )}
                 </Box>
                 {!loading && totalCount > 0 && (
-                    <Box className="bext-filter">
+                    <Box width="230px">
                         <TextField
                             labelHidden label="Filter hosts" value={cfgFilter} onChange={setCfgFilter}
                             placeholder="Filter hosts…" prefix={<Icon source={SearchMinor} color="subdued" />}
@@ -374,7 +374,7 @@ function BrowserExtensionSettings() {
                     </Box>
                 ) : (
                     <VerticalStack gap="3">
-                        <Box className="bext-list">
+                        <Box background="bg-surface" borderColor="border" borderWidth="1" borderRadius="300" overflowX="hidden">
                             {visibleConfigured.length === 0
                                 ? <Box className="bext-row"><Text color="subdued">No hosts match “{cfgFilter}”.</Text></Box>
                                 : pagedConfigured.map(configuredRow)}

@@ -2,15 +2,12 @@
    (hover-reveal, row hover, status dot, custom toggle). Uses Polaris tokens so light/dark
    both track the theme. */
 
-.bext-list { border:1px solid var(--p-color-border,#e9ebf1); border-radius:14px; overflow:hidden;
-  background:var(--p-color-bg-surface,#fff); box-shadow:0 1px 2px rgba(17,20,28,.04),0 4px 18px rgba(17,20,28,.05); }
 .bext-row { display:flex; align-items:center; gap:14px; padding:13px 16px;
   border-top:1px solid var(--p-color-border-subdued,#eef0f4); transition:background .1s; }
 .bext-row:first-child { border-top:0; }
 .bext-row:hover { background:var(--p-color-bg-surface-hover,#f6f7fa); }
 .bext-row.off { opacity:.6; }
 .bext-grow { flex:1; min-width:0; }
-.bext-filter { width:230px; }
 
 /* lightweight theme-aware toggle (Polaris ships no native switch in this version) */
 .bext-switch { position:relative; flex:0 0 auto; width:30px; height:18px; border:0; padding:0; appearance:none;
