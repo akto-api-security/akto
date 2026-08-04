@@ -331,7 +331,9 @@ public class Executor {
         try {
             String url = "";
             List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
-            if (!originalHostHeaders.isEmpty() && testingRunConfig != null
+            // agentic samples are often absolute URLs without a host header, so allow override in that case too
+            boolean absoluteUrl = rawApi.getRequest().getUrl() != null && rawApi.getRequest().getUrl().startsWith("http");
+            if ((!originalHostHeaders.isEmpty() || absoluteUrl) && testingRunConfig != null
                 && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
 
                 Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
