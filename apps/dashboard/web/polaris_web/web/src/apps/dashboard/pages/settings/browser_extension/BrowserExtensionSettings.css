@@ -2,8 +2,9 @@
    (hover-reveal, row hover, status dot, custom toggle). Uses Polaris tokens so light/dark
    both track the theme. */
 
-.bext-row { display:flex; align-items:center; gap:14px; padding:13px 16px;
-  border-top:1px solid var(--p-color-border-subdued,#eef0f4); transition:background .1s; }
+/* row spacing/layout comes from Box padding + HorizontalStack gap; only the hover, the divider
+   between rows, and the disabled dim have no Polaris prop equivalent. */
+.bext-row { border-top:1px solid var(--p-color-border-subdued,#eef0f4); transition:background .1s; }
 .bext-row:first-child { border-top:0; }
 .bext-row:hover { background:var(--p-color-bg-surface-hover,#f6f7fa); }
 .bext-row.off { opacity:.6; }

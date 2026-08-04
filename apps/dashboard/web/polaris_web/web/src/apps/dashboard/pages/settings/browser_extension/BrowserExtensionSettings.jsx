@@ -278,11 +278,13 @@ function BrowserExtensionSettings() {
     const skeletonList = (
         <Box background="bg-surface" borderColor="border" borderWidth="1" borderRadius="300" overflowX="hidden">
             {Array.from({ length: 5 }).map((_, i) => (
-                <Box className="bext-row" key={`sk-${i}`}>
-                    <SkeletonThumbnail size="small" />
-                    <Box width="100%" minWidth="0">
-                        <SkeletonBodyText lines={2} />
-                    </Box>
+                <Box className="bext-row" key={`sk-${i}`} paddingBlock="3" paddingInline="4">
+                    <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                        <SkeletonThumbnail size="small" />
+                        <Box width="100%" minWidth="0">
+                            <SkeletonBodyText lines={2} />
+                        </Box>
+                    </HorizontalStack>
                 </Box>
             ))}
         </Box>
@@ -295,33 +297,35 @@ function BrowserExtensionSettings() {
             { content: "Remove", destructive: true, onAction: () => { setOpenMenuId(null); removeConfigured(c.host, c.hexId); } },
         ];
         return (
-            <Box className={`bext-row ${c.active ? "" : "off"}`} key={c.host}>
-                {hostAvatar(c.host, c.iconUrl)}
-                <Box width="100%" minWidth="0">
-                    <Text variant="bodyMd" fontWeight="medium" truncate>{c.name || c.host}</Text>
-                    <Text variant="bodySm" color="subdued" truncate>
-                        {c.name ? c.host : (isCustom ? ((c.paths || []).join(", ") || "Custom") : "Akto")}
-                    </Text>
-                </Box>
-                <Switch active={c.active} onChange={() => toggleConfigured(c.host, !c.active)}
-                    title={c.active ? "Disable for this account" : "Enable"} />
-                {isCustom && (
-                    <Popover
-                        active={openMenuId === c.host}
-                        onClose={() => setOpenMenuId(null)}
-                        preferredAlignment="right"
-                        activator={
-                            <Button
-                                plain
-                                icon={HorizontalDotsMinor}
-                                accessibilityLabel={`Actions for ${c.name || c.host}`}
-                                onClick={() => setOpenMenuId(openMenuId === c.host ? null : c.host)}
-                            />
-                        }
-                    >
-                        <ActionList actionRole="menuitem" items={menuItems} />
-                    </Popover>
-                )}
+            <Box className={`bext-row ${c.active ? "" : "off"}`} key={c.host} paddingBlock="3" paddingInline="4">
+                <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                    {hostAvatar(c.host, c.iconUrl)}
+                    <Box width="100%" minWidth="0">
+                        <Text variant="bodyMd" fontWeight="medium" truncate>{c.name || c.host}</Text>
+                        <Text variant="bodySm" color="subdued" truncate>
+                            {c.name ? c.host : (isCustom ? ((c.paths || []).join(", ") || "Custom") : "Akto")}
+                        </Text>
+                    </Box>
+                    <Switch active={c.active} onChange={() => toggleConfigured(c.host, !c.active)}
+                        title={c.active ? "Disable for this account" : "Enable"} />
+                    {isCustom && (
+                        <Popover
+                            active={openMenuId === c.host}
+                            onClose={() => setOpenMenuId(null)}
+                            preferredAlignment="right"
+                            activator={
+                                <Button
+                                    plain
+                                    icon={HorizontalDotsMinor}
+                                    accessibilityLabel={`Actions for ${c.name || c.host}`}
+                                    onClick={() => setOpenMenuId(openMenuId === c.host ? null : c.host)}
+                                />
+                            }
+                        >
+                            <ActionList actionRole="menuitem" items={menuItems} />
+                        </Popover>
+                    )}
+                </HorizontalStack>
             </Box>
         );
     };
