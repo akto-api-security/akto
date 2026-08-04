@@ -406,6 +406,30 @@ public class SkillValidationV2Action extends ActionSupport {
                 ? resolveOwaspCategories(parsed, maliciousEvents) : new ArrayList<>();
         String remediation = flagged ? buildRemediation(modelRemediation, owaspCategories) : modelRemediation.trim();
 
+        // The verdict must show up as an explicit, tagged entry in the inventory too, carrying the
+        // exact same reason/evidence as the top-level fields — reuse the event that cleared the bar
+        // if one exists, otherwise add one, so a consumer never has to reconcile two disagreeing copies.
+        if (flagged) {
+            Map<String, Object> verdictEvent = maliciousEvents.stream()
+                    .filter(event -> {
+                        Object categories = event.get("owaspCategories");
+                        return categories instanceof List && !((List<?>) categories).isEmpty();
+                    })
+                    .findFirst()
+                    .orElse(null);
+            if (verdictEvent == null) {
+                verdictEvent = new LinkedHashMap<>();
+                verdictEvent.put("owaspCategories",
+                        owaspCategories.stream().map(c -> c.get("id")).collect(Collectors.toList()));
+                maliciousEvents.add(verdictEvent);
+            }
+            verdictEvent.put("rule", "injection");
+            verdictEvent.put("reason", reason);
+            verdictEvent.put("evidence", evidence);
+            verdictEvent.put("riskScore", maliciousScore);
+            verdictEvent.put("tag", "malicious_skill_detected");
+        }
+
         logger.infoAndAddToDb(String.format(
                 "[SkillValidation] skill=%s agent=%s flagged=%b maliciousScore=%.2f events=%d discardedEvents=%d reason=%s owaspCategories=%s",
                 skillName, agentName, flagged, maliciousScore, maliciousEvents.size(), discardedEvents, reason,
