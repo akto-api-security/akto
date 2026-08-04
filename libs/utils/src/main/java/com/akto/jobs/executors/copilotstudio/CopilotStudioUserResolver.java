@@ -82,7 +82,9 @@ public class CopilotStudioUserResolver {
         String localPart = (u.userPrincipalName != null && u.userPrincipalName.contains("@"))
             ? u.userPrincipalName.substring(0, u.userPrincipalName.indexOf('@'))
             : (u.displayName != null ? u.displayName : "user");
-        String sanitized = localPart.replaceAll("[^a-zA-Z0-9]+", "-").replaceAll("^-+|-+$", "").toLowerCase();
+        // \p{L}/\p{N} (Unicode letter/number) instead of [a-zA-Z0-9] so CJK, Arabic, Cyrillic, etc.
+        // survive instead of collapsing to "user" — matches sanitizeBotName's script-preserving behavior.
+        String sanitized = localPart.replaceAll("[^\\p{L}\\p{N}]+", "-").replaceAll("^-+|-+$", "").toLowerCase();
         if (sanitized.isEmpty()) {
             sanitized = "user";
         }
