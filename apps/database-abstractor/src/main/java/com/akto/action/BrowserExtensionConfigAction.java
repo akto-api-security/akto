@@ -21,12 +21,28 @@ public class BrowserExtensionConfigAction extends ActionSupport {
     @Getter
     private List<BrowserExtensionConfigCommon> browserExtensionConfigsCommon;
 
+    // v2 returns the rich, per-site config shape the browser extension supports
+    // (transport/format/path/response*/model*/frameMatch/...), typed via the shared mapper.
+    @Getter
+    private List<BrowserExtensionConfigCommon> browserExtensionConfigsV2;
+
     public String fetchBrowserExtensionConfigs() {
         try {
             this.browserExtensionConfigs = BrowserExtensionConfigDao.instance.findActiveConfigs();
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching browser extension configs: " + e.getMessage(), LogDb.DB_ABS);
+            addActionError("Failed to fetch browser extension configs");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchBrowserExtensionConfigsV2() {
+        try {
+            this.browserExtensionConfigsV2 = BrowserExtensionConfigDao.instance.findActiveConfigsV2();
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching browser extension configs v2: " + e.getMessage(), LogDb.DB_ABS);
             addActionError("Failed to fetch browser extension configs");
             return ERROR.toUpperCase();
         }

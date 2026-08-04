@@ -20,8 +20,7 @@ public class TestBrowserExtensionConfigCommon {
                 "'transport': 'http'," +
                 "'method': 'POST'," +
                 "'format': 'json'," +
-                "'path': 'messages[-1].content.parts'," +
-                "'tag': 'genai'" +
+                "'path': 'messages[-1].content.parts'" +
                 "}");
 
         BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
@@ -34,27 +33,6 @@ public class TestBrowserExtensionConfigCommon {
         assertEquals("POST", config.getMethod());
         assertEquals("json", config.getFormat());
         assertEquals("messages[-1].content.parts", config.getPath());
-        assertEquals("genai", config.getTag());
-    }
-
-    @Test
-    public void testTagIsOptional() {
-        Document doc = Document.parse("{ 'host': 'poe.com', 'active': true }");
-
-        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
-
-        assertNotNull(config);
-        assertNull(config.getTag());
-    }
-
-    @Test
-    public void testNonStringTagIsIgnored() {
-        Document doc = new Document("host", "you.com").append("tag", Arrays.asList("genai"));
-
-        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
-
-        assertNotNull(config);
-        assertNull(config.getTag());
     }
 
     @Test
@@ -161,15 +139,14 @@ public class TestBrowserExtensionConfigCommon {
     }
 
     @Test
-    public void testHexIdIsExposed() {
+    public void testIdIsExposedAsHexString() {
         ObjectId id = new ObjectId();
         Document doc = new Document("_id", id).append("host", "duck.ai");
 
         BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
 
         assertNotNull(config);
-        assertEquals(id, config.getId());
-        assertEquals(id.toHexString(), config.getHexId());
+        assertEquals(id.toHexString(), config.get_id());
     }
 
     @Test
@@ -192,5 +169,58 @@ public class TestBrowserExtensionConfigCommon {
         assertEquals(Arrays.asList("/api/v2/chat"), config.getPaths());
         assertNull(config.getMethod());
         assertNull(config.getFrameMatch());
+    }
+
+    // ---- merge(common, account) ----
+
+    private static BrowserExtensionConfigCommon cfg(String host, boolean active) {
+        return BrowserExtensionConfigCommon.fromDocument(
+                new Document("host", host).append("active", active));
+    }
+
+    private static List<String> hosts(List<BrowserExtensionConfigCommon> configs) {
+        List<String> out = new java.util.ArrayList<>();
+        for (BrowserExtensionConfigCommon c : configs) out.add(c.getHost());
+        return out;
+    }
+
+    @Test
+    public void testMergeCommonOnly() {
+        List<BrowserExtensionConfigCommon> common = Arrays.asList(cfg("chatgpt.com", true), cfg("claude.ai", true));
+        List<BrowserExtensionConfigCommon> merged = BrowserExtensionConfigCommon.merge(common, Arrays.asList());
+        assertEquals(Arrays.asList("chatgpt.com", "claude.ai"), hosts(merged));
+    }
+
+    @Test
+    public void testMergeOptOutDropsCommonHost() {
+        List<BrowserExtensionConfigCommon> common = Arrays.asList(cfg("chatgpt.com", true), cfg("claude.ai", true));
+        List<BrowserExtensionConfigCommon> account = Arrays.asList(cfg("chatgpt.com", false)); // opt-out
+        List<BrowserExtensionConfigCommon> merged = BrowserExtensionConfigCommon.merge(common, account);
+        assertEquals(Arrays.asList("claude.ai"), hosts(merged));
+    }
+
+    @Test
+    public void testMergeAddsAccountCustomHost() {
+        List<BrowserExtensionConfigCommon> common = Arrays.asList(cfg("chatgpt.com", true));
+        List<BrowserExtensionConfigCommon> account = Arrays.asList(cfg("my-internal.ai", true)); // custom
+        List<BrowserExtensionConfigCommon> merged = BrowserExtensionConfigCommon.merge(common, account);
+        assertEquals(Arrays.asList("chatgpt.com", "my-internal.ai"), hosts(merged));
+    }
+
+    @Test
+    public void testMergeSameHostActiveDoesNotDuplicateOrOverride() {
+        BrowserExtensionConfigCommon commonEntry = cfg("chatgpt.com", true);
+        List<BrowserExtensionConfigCommon> merged = BrowserExtensionConfigCommon.merge(
+                Arrays.asList(commonEntry), Arrays.asList(cfg("chatgpt.com", true)));
+        assertEquals(Arrays.asList("chatgpt.com"), hosts(merged));
+        assertSame(commonEntry, merged.get(0)); // catalogue entry wins
+    }
+
+    @Test
+    public void testMergeOptOutOfUnknownHostIsNoOp() {
+        List<BrowserExtensionConfigCommon> common = Arrays.asList(cfg("chatgpt.com", true));
+        List<BrowserExtensionConfigCommon> account = Arrays.asList(cfg("not-in-common.ai", false));
+        List<BrowserExtensionConfigCommon> merged = BrowserExtensionConfigCommon.merge(common, account);
+        assertEquals(Arrays.asList("chatgpt.com"), hosts(merged));
     }
 }
