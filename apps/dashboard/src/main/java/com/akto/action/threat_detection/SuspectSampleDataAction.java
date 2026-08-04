@@ -24,15 +24,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
 
 import com.akto.action.threat_detection.utils.ThreatDetectionHelper;
+import com.akto.action.threat_detection.utils.ThreatsUtils;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
@@ -85,6 +84,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter List<String> hosts;
   @Getter @Setter String latestApiOrigRegex;
   @Getter @Setter Boolean sortBySeverity;
+  // Skills Evaluations partition mode ("only" | "exclude"), sent to the threat backend as a header.
+  @Getter @Setter String skillEvaluationMode;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -111,6 +112,9 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
     post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
+    if (this.skillEvaluationMode != null && !this.skillEvaluationMode.isEmpty()) {
+      post.addHeader("x-skill-eval-mode", this.skillEvaluationMode);
+    }
 
     Map<String, Object> filter = new HashMap<>();
     if (this.ips != null && !this.ips.isEmpty()) {
@@ -192,7 +196,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
           ListMaliciousRequestsResponse.class, responseBody)
@@ -277,7 +281,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       post.setEntity(requestEntity);
 
       try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-        String responseBody = EntityUtils.toString(resp.getEntity());
+        String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
         ProtoMessageUtils.<FetchAlertFiltersResponse>toProtoMessage(
             FetchAlertFiltersResponse.class, responseBody)
@@ -314,7 +318,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
     } catch (Exception e) {
       e.printStackTrace();
       return ERROR.toUpperCase();
@@ -586,7 +590,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       if (resp.getStatusLine().getStatusCode() != 200) {
         this.deleteSuccess = false;

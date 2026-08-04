@@ -413,7 +413,7 @@ public class MaliciousEventService {
   }
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
-      String accountId, ListMaliciousRequestsRequest request, String contextSource) {
+      String accountId, ListMaliciousRequestsRequest request, String contextSource, String skillEvalMode) {
 
     if(!shouldNotCreateIndexes.getOrDefault(accountId, false)) {
       createIndexIfAbsent(accountId);
@@ -516,6 +516,24 @@ public class MaliciousEventService {
     Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
     if (!contextFilter.isEmpty()) {
       query.putAll(contextFilter);
+    }
+
+    // Skills Evaluations partition — Atlas (ENDPOINT) only. An event belongs to Skills
+    // Evaluations iff filterId == "skill_evaluation".
+    //   "only"    → return just those events (Skills Evaluations tab)
+    //   "exclude" → return everything except them (Active tab)
+    // Done server-side so the total count and pagination stay correct.
+    if (skillEvalMode != null && !skillEvalMode.isEmpty()
+        && "ENDPOINT".equalsIgnoreCase(contextSource)) {
+      Document existing = new Document(query);
+      query.clear();
+      if ("only".equalsIgnoreCase(skillEvalMode)) {
+        query.append("$and", Arrays.asList(existing, new Document("filterId", "skill_evaluation")));
+      } else if ("exclude".equalsIgnoreCase(skillEvalMode)) {
+        query.append("$and", Arrays.asList(existing, new Document("filterId", new Document("$ne", "skill_evaluation"))));
+      } else {
+        query.putAll(existing);
+      }
     }
 
     // Check if sortBySeverity flag is set

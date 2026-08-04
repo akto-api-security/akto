@@ -6,20 +6,20 @@ import com.akto.dto.jobs.JobStatus;
 import com.akto.dto.jobs.ScheduleType;
 import com.akto.log.LoggerMaker;
 import com.akto.util.JSONUtils;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 import org.bson.types.ObjectId;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * API client for making requests to Cyborg service for AccountJob operations.
@@ -31,6 +31,12 @@ public class CyborgApiClient {
     private static final LoggerMaker logger = new LoggerMaker(CyborgApiClient.class);
     private static final ObjectMapper mapper = new ObjectMapper()
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+    private static final OkHttpClient httpClient = CoreHTTPClient.client.newBuilder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .build();
 
     /**
      * Build Cyborg service URL from environment variable.
@@ -60,33 +66,28 @@ public class CyborgApiClient {
     }
 
     /**
-     * Make HTTP POST request to Cyborg API using Apache HttpClient.
+     * Make HTTP POST request to Cyborg API using the shared CoreHTTPClient.
      * This bypasses ApiExecutor's SSRF protection since we're making trusted internal calls.
      */
     private static String makePostRequest(String endpoint, Map<String, Object> requestBody) throws IOException {
-        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-            HttpPost httpPost = new HttpPost(url + endpoint);
+        String jsonBody = mapper.writeValueAsString(requestBody);
+        RequestBody body = RequestBody.create(jsonBody, MediaType.parse("application/json"));
+        Request request = new Request.Builder()
+            .url(url + endpoint)
+            .post(body)
+            .addHeader("Authorization", getAuthToken())
+            .addHeader("Content-Type", "application/json")
+            .build();
 
-            // Set headers
-            httpPost.setHeader("Authorization", getAuthToken());
-            httpPost.setHeader("Content-Type", "application/json");
+        try (Response response = httpClient.newCall(request).execute()) {
+            String responseBody = response.body() != null ? response.body().string() : "";
 
-            // Set body
-            String jsonBody = mapper.writeValueAsString(requestBody);
-            httpPost.setEntity(new StringEntity(jsonBody, StandardCharsets.UTF_8));
-
-            // Execute request
-            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
-                int statusCode = response.getStatusLine().getStatusCode();
-                String responseBody = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
-
-                if (statusCode != 200) {
-                    logger.error("API request failed. Status: {}, Body: {}", statusCode, responseBody);
-                    throw new IOException("API request failed with status: " + statusCode);
-                }
-
-                return responseBody;
+            if (!response.isSuccessful()) {
+                logger.error("API request failed. Status: {}, Body: {}", response.code(), responseBody);
+                throw new IOException("API request failed with status: " + response.code());
             }
+
+            return responseBody;
         }
     }
 

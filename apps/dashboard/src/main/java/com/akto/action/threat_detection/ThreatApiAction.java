@@ -1,6 +1,7 @@
 package com.akto.action.threat_detection;
 
 import com.akto.ProtoMessageUtils;
+import com.akto.action.threat_detection.utils.ThreatsUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
@@ -30,7 +31,6 @@ import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
 import org.bson.Document;
 import lombok.Getter;
 
@@ -129,7 +129,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<ThreatCategoryWiseCountResponse>toProtoMessage(
           ThreatCategoryWiseCountResponse.class, responseBody)
@@ -177,7 +177,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<ThreatSeverityWiseCountResponse>toProtoMessage(
         ThreatSeverityWiseCountResponse.class, responseBody)
@@ -217,7 +217,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<DailyActorsCountResponse>toProtoMessage(
         DailyActorsCountResponse.class, responseBody)
@@ -266,7 +266,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<ThreatActivityTimelineResponse>toProtoMessage(
         ThreatActivityTimelineResponse.class, responseBody)
@@ -318,7 +318,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<ListThreatApiResponse>toProtoMessage(
           ListThreatApiResponse.class, responseBody)
@@ -365,7 +365,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<FetchTopNDataResponse>toProtoMessage(
         FetchTopNDataResponse.class, responseBody)
@@ -485,7 +485,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<FetchDashboardTopDataResponse>toProtoMessage(
           FetchDashboardTopDataResponse.class, responseBody)
