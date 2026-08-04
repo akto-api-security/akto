@@ -189,7 +189,7 @@ function BrowserExtensionSettings() {
                 await api.setBrowserExtensionConfigActive(host, true);
             }
             func.setToast(true, false, `${hosts.length} host${hosts.length !== 1 ? "s" : ""} added`);
-            setSelected(new Set());
+            closePicker();
             await fetchAll();
         } catch (error) {
             func.setToast(true, true, "Failed to add hosts");
@@ -218,7 +218,8 @@ function BrowserExtensionSettings() {
         setEditingHexId(config.hexId); setFormErrors({}); setShowAdv(!!config.responseFormat); setPickerOpen(true);
     };
     const closePicker = () => {
-        setPickerOpen(false); setForm(EMPTY_FORM); setEditingHexId(null); setFormErrors({}); setShowAdv(false); setShowExample(false);
+        setPickerOpen(false); setForm(EMPTY_FORM); setEditingHexId(null); setFormErrors({});
+        setShowAdv(false); setShowExample(false); setSelected(new Set()); setPickSearch("");
     };
     // form helpers for the repeatable array fields
     const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
