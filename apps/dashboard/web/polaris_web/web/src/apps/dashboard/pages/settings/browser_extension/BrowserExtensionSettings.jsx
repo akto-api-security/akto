@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-    ActionList, Avatar, Box, Button, Divider, Form, HorizontalStack, Icon,
-    Modal, Pagination, Popover, Text, TextField, Tooltip, VerticalStack,
+    ActionList, Avatar, Badge, Box, Button, Divider, Form, HorizontalStack, Icon,
+    Modal, Pagination, Popover, SkeletonBodyText, SkeletonThumbnail, Text, TextField, Tooltip, VerticalStack,
 } from "@shopify/polaris";
 import { SearchMinor, HorizontalDotsMinor, DeleteMinor, InfoMinor } from "@shopify/polaris-icons";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
@@ -284,12 +284,10 @@ function BrowserExtensionSettings() {
         <Box className="bext-list">
             {Array.from({ length: 5 }).map((_, i) => (
                 <Box className="bext-row" key={`sk-${i}`}>
-                    <Box className="bext-sk bext-sk-avatar" />
+                    <SkeletonThumbnail size="small" />
                     <Box className="bext-grow">
-                        <Box className="bext-sk bext-sk-title" />
-                        <Box className="bext-sk bext-sk-sub" />
+                        <SkeletonBodyText lines={2} />
                     </Box>
-                    <Box className="bext-sk bext-sk-switch" />
                 </Box>
             ))}
         </Box>
@@ -339,10 +337,12 @@ function BrowserExtensionSettings() {
                 <Box>
                     <span className="bext-eyebrow">Inspected hosts</span>
                     {!loading && totalCount > 0 && (
-                        <Box className="bext-summary">
-                            <span className="k"><b>{totalCount}</b> host{totalCount !== 1 ? "s" : ""}</span>
-                            <span className="k"><span className="d on" /><b>{activeCount}</b> active</span>
-                            {offCount > 0 && <span className="k"><span className="d off" /><b>{offCount}</b> off</span>}
+                        <Box paddingBlockStart="1">
+                            <HorizontalStack gap="2" blockAlign="center">
+                                <Text variant="bodySm" color="subdued">{totalCount} host{totalCount !== 1 ? "s" : ""}</Text>
+                                <Badge status="success">{`${activeCount} active`}</Badge>
+                                {offCount > 0 && <Badge>{`${offCount} off`}</Badge>}
+                            </HorizontalStack>
                         </Box>
                     )}
                 </Box>
