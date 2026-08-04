@@ -78,7 +78,7 @@ public class CopilotStudioUserResolver {
         return new File(System.getProperty("java.io.tmpdir"), "copilot-studio-user-map-" + tenantId + ".json");
     }
 
-    private static String buildUserId(GraphUser u) {
+    public static String buildUserId(GraphUser u) {
         String localPart = (u.userPrincipalName != null && u.userPrincipalName.contains("@"))
             ? u.userPrincipalName.substring(0, u.userPrincipalName.indexOf('@'))
             : (u.displayName != null ? u.displayName : "user");
