@@ -208,7 +208,7 @@ function BrowserExtensionSettings() {
     const rmArrItem = (k, i) => setForm((f) => ({ ...f, [k]: f[k].length > 1 ? f[k].filter((_, j) => j !== i) : f[k] }));
     const setFmItem = (i, key, val) => setForm((f) => ({ ...f, frameMatch: f.frameMatch.map((x, j) => (j === i ? { ...x, [key]: val } : x)) }));
 
-    // renders a labelled list of monospaced text inputs with add/remove (paths, prompt paths, operations)
+    // renders a labelled list of text inputs with add/remove (paths, prompt paths, operations)
     const renderRepeatable = (key, { label, sub, placeholder, helpText, addLabel, error }) => (
         <VerticalStack gap="1">
             <Text variant="bodyMd" fontWeight="semibold">
@@ -219,7 +219,7 @@ function BrowserExtensionSettings() {
                     <HorizontalStack key={i} gap="2" wrap={false} blockAlign="center">
                         <Box style={{ flex: 1, minWidth: 0 }}>
                             <TextField labelHidden label={`${label} ${i + 1}`} value={val}
-                                onChange={(v) => setArrItem(key, i, v)} placeholder={placeholder} autoComplete="off" monospaced />
+                                onChange={(v) => setArrItem(key, i, v)} placeholder={placeholder} autoComplete="off" />
                         </Box>
                         {form[key].length > 1 && (
                             <Button plain icon={DeleteMinor} accessibilityLabel="Remove" onClick={() => rmArrItem(key, i)} />
@@ -450,7 +450,7 @@ function BrowserExtensionSettings() {
                             )}
                             <TextField
                                 label="Host" value={form.host} onChange={(v) => setField("host", v)}
-                                placeholder="chat.example.com" error={formErrors.host} autoComplete="off" monospaced
+                                placeholder="chat.example.com" error={formErrors.host} autoComplete="off"
                                 helpText="The domain the chat UI runs on — no https:// or path."
                                 disabled={!!editingHexId}
                             />
@@ -495,11 +495,11 @@ function BrowserExtensionSettings() {
                                             {form.frameMatch.map((row, i) => (
                                                 <HorizontalStack key={i} gap="2" wrap={false} blockAlign="center">
                                                     <Box style={{ flex: 1, minWidth: 0 }}>
-                                                        <TextField labelHidden label={`key ${i}`} value={row.k} onChange={(v) => setFmItem(i, "k", v)} placeholder="event" autoComplete="off" monospaced />
+                                                        <TextField labelHidden label={`key ${i}`} value={row.k} onChange={(v) => setFmItem(i, "k", v)} placeholder="event" autoComplete="off" />
                                                     </Box>
                                                     <Text>=</Text>
                                                     <Box style={{ flex: 1, minWidth: 0 }}>
-                                                        <TextField labelHidden label={`value ${i}`} value={row.v} onChange={(v) => setFmItem(i, "v", v)} placeholder="send" autoComplete="off" monospaced />
+                                                        <TextField labelHidden label={`value ${i}`} value={row.v} onChange={(v) => setFmItem(i, "v", v)} placeholder="send" autoComplete="off" />
                                                     </Box>
                                                     {form.frameMatch.length > 1 && (
                                                         <Button plain icon={DeleteMinor} accessibilityLabel="Remove" onClick={() => rmArrItem("frameMatch", i)} />
@@ -533,9 +533,9 @@ function BrowserExtensionSettings() {
                                         menuItems={[{ label: "None", value: "none" }, { label: "SSE", value: "sse" }, { label: "JSON", value: "json" }, { label: "Nested-envelope", value: "nested-envelope" }]}
                                         initial={form.responseFormat} selected={(v) => setField("responseFormat", v)} />
                                     <TextField label="Response path" value={form.responsePath} onChange={(v) => setField("responsePath", v)}
-                                        placeholder="choices[*].delta.content" autoComplete="off" monospaced helpText="Where the AI answer is in the response." />
+                                        placeholder="choices[*].delta.content" autoComplete="off" helpText="Where the AI answer is in the response." />
                                     <TextField label="Model path" value={form.modelPath} onChange={(v) => setField("modelPath", v)}
-                                        placeholder="model" autoComplete="off" monospaced helpText="Where the model name is." />
+                                        placeholder="model" autoComplete="off" helpText="Where the model name is." />
                                 </VerticalStack>
                             )}
                         </VerticalStack>
