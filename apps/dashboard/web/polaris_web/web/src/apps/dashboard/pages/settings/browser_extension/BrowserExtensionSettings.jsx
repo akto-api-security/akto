@@ -51,9 +51,13 @@ function faviconFor(host, iconUrl) {
     return host ? sharedIconCacheService.getFaviconUrl(host) : undefined;
 }
 
-// A square Polaris Avatar shows the favicon and falls back to the host's initials if it fails.
+// Every favicon sits inside a unified white rounded tile so light/dark logos read evenly.
 function hostAvatar(host, iconUrl) {
-    return <Avatar size="medium" shape="square" source={faviconFor(host, iconUrl) || undefined} name={host} />;
+    return (
+        <span className="bext-tile">
+            <Avatar size="extraSmall" shape="square" source={faviconFor(host, iconUrl) || undefined} name={host} />
+        </span>
+    );
 }
 
 function BrowserExtensionSettings() {

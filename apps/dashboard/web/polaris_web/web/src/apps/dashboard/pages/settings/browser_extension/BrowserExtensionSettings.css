@@ -19,6 +19,10 @@
   background:#fff; box-shadow:0 1px 2px rgba(17,20,28,.28); transition:left .18s ease; }
 .bext-switch.on .bext-switch-knob { left:15px; }
 
+/* unified favicon tile — every logo sits on the same small white rounded surface */
+.bext-tile { width:34px; height:34px; border-radius:9px; flex:0 0 auto; background:var(--p-color-bg-surface,#fff);
+  border:1px solid var(--p-color-border,#e9ebf1); display:grid; place-items:center; box-shadow:0 1px 2px rgba(17,20,28,.06); overflow:hidden; }
+
 .bext-info { display:inline-flex; width:15px; height:15px; cursor:help; opacity:.7; }
 .bext-info:hover { opacity:1; }
 .bext-info .Polaris-Icon { width:15px; height:15px; margin:0; }
