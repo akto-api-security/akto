@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import com.akto.dao.CopilotStudioIntegrationDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.CopilotStudioIntegration;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -23,6 +24,7 @@ public class CopilotStudioIntegrationAction extends ActionSupport {
     // Input/Output field — reused for both fetch (output) and update (input), same as the client's typed object.
     private CopilotStudioIntegration copilotStudioIntegration;
     private String integrationId;
+    private String refreshToken;
 
     /**
      * Fetch a specific CopilotStudioIntegration by ID.
@@ -49,9 +51,9 @@ public class CopilotStudioIntegrationAction extends ActionSupport {
     }
 
     /**
-     * Update a CopilotStudioIntegration's environments and updatedAt. Takes the typed object
-     * (deserialized straight into copilotStudioIntegration.environments/updatedAt) instead of a
-     * generic field map, so int/List values land in their real types with no manual coercion.
+     * Update a CopilotStudioIntegration's environments, updatedAt, refreshToken and status. Takes the
+     * typed object (deserialized straight into copilotStudioIntegration's fields) instead of a generic
+     * field map, so int/List values land in their real types with no manual coercion.
      */
     public String updateCopilotStudioIntegration() {
         try {
@@ -68,6 +70,31 @@ public class CopilotStudioIntegrationAction extends ActionSupport {
 
         } catch (Exception e) {
             loggerMaker.error("Error in updateCopilotStudioIntegration", e);
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    /** Writes only refreshToken, and never clears one: an empty value is a no-op, not a delete. */
+    public String updateCopilotStudioRefreshToken() {
+        try {
+            if (refreshToken == null || refreshToken.isEmpty()) {
+                loggerMaker.warn("Skipping empty refreshToken write: integrationId={}", integrationId);
+                return Action.SUCCESS.toUpperCase();
+            }
+
+            ObjectId id = new ObjectId(integrationId);
+            Bson update = Updates.combine(
+                Updates.set(CopilotStudioIntegration.REFRESH_TOKEN, refreshToken),
+                Updates.set(CopilotStudioIntegration.UPDATED_AT, Context.now())
+            );
+
+            CopilotStudioIntegrationDao.instance.getMCollection()
+                .updateOne(Filters.eq(CopilotStudioIntegration.ID, id), update);
+            loggerMaker.debug("Updated CopilotStudioIntegration refreshToken: integrationId={}", integrationId);
+
+        } catch (Exception e) {
+            loggerMaker.error("Error in updateCopilotStudioRefreshToken", e);
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
