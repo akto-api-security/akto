@@ -20,8 +20,7 @@ public class TestBrowserExtensionConfigCommon {
                 "'transport': 'http'," +
                 "'method': 'POST'," +
                 "'format': 'json'," +
-                "'path': 'messages[-1].content.parts'," +
-                "'tag': 'genai'" +
+                "'path': 'messages[-1].content.parts'" +
                 "}");
 
         BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
@@ -34,27 +33,6 @@ public class TestBrowserExtensionConfigCommon {
         assertEquals("POST", config.getMethod());
         assertEquals("json", config.getFormat());
         assertEquals("messages[-1].content.parts", config.getPath());
-        assertEquals("genai", config.getTag());
-    }
-
-    @Test
-    public void testTagIsOptional() {
-        Document doc = Document.parse("{ 'host': 'poe.com', 'active': true }");
-
-        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
-
-        assertNotNull(config);
-        assertNull(config.getTag());
-    }
-
-    @Test
-    public void testNonStringTagIsIgnored() {
-        Document doc = new Document("host", "you.com").append("tag", Arrays.asList("genai"));
-
-        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
-
-        assertNotNull(config);
-        assertNull(config.getTag());
     }
 
     @Test
