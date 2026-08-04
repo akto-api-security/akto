@@ -56,6 +56,7 @@ public class CopilotStudioUserResolver {
      * 10k-user tenant's map (~600KB) blows past by ~5x.
      */
     public static String buildUserMapFile(String tenantId, String clientId, String clientSecret) throws Exception {
+        logger.info("CopilotStudioUserResolver: java.io.tmpdir={}", System.getProperty("java.io.tmpdir"));
         List<GraphUser> users = loadCachedUsers(tenantId);
         if (users == null) {
             String token = fetchGraphToken(tenantId, clientId, clientSecret);
