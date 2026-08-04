@@ -186,13 +186,13 @@ public class BrowserExtensionConfigAction extends UserAction {
             addIfPresent(updates, BrowserExtensionConfig.TRANSPORT, emptyToNull(browserExtensionConfig.getTransport()));
             addIfPresent(updates, BrowserExtensionConfig.METHOD, emptyToNull(browserExtensionConfig.getMethod()));
             addIfPresent(updates, BrowserExtensionConfig.FORMAT, emptyToNull(browserExtensionConfig.getFormat()));
-            addIfPresent(updates, BrowserExtensionConfig.PATH, nonEmptyObject(browserExtensionConfig.getPath()));
+            addIfPresent(updates, BrowserExtensionConfig.PATH, nonEmpty(browserExtensionConfig.getPath()));
             addIfPresent(updates, BrowserExtensionConfig.OPERATIONS, nonEmpty(browserExtensionConfig.getOperations()));
             addIfPresent(updates, BrowserExtensionConfig.FRAME_MATCH,
                 (browserExtensionConfig.getFrameMatch() != null && !browserExtensionConfig.getFrameMatch().isEmpty()) ? browserExtensionConfig.getFrameMatch() : null);
             addIfPresent(updates, BrowserExtensionConfig.RESPONSE_FORMAT, emptyToNull(browserExtensionConfig.getResponseFormat()));
-            addIfPresent(updates, BrowserExtensionConfig.RESPONSE_PATH, nonEmptyObject(browserExtensionConfig.getResponsePath()));
-            addIfPresent(updates, BrowserExtensionConfig.MODEL_PATH, nonEmptyObject(browserExtensionConfig.getModelPath()));
+            addIfPresent(updates, BrowserExtensionConfig.RESPONSE_PATH, nonEmpty(browserExtensionConfig.getResponsePath()));
+            addIfPresent(updates, BrowserExtensionConfig.MODEL_PATH, nonEmpty(browserExtensionConfig.getModelPath()));
 
             BrowserExtensionConfigDao.instance.getMCollection().updateOne(
                 filter,
@@ -249,16 +249,5 @@ public class BrowserExtensionConfigAction extends UserAction {
 
     private static <T> List<T> nonEmpty(List<T> list) {
         return (list == null || list.isEmpty()) ? null : list;
-    }
-
-    // path/responsePath/modelPath are polymorphic (a String or a List); drop only when empty/blank.
-    private static Object nonEmptyObject(Object value) {
-        if (value instanceof List) {
-            return ((List<?>) value).isEmpty() ? null : value;
-        }
-        if (value instanceof String) {
-            return ((String) value).trim().isEmpty() ? null : ((String) value).trim();
-        }
-        return value;
     }
 }
