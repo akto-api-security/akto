@@ -1,6 +1,6 @@
 /* Browser Extension settings — scoped styles for behaviours Polaris props can't express
-   (hover-reveal, row hover, status dot, custom toggle/segmented control). Uses Polaris
-   tokens so light/dark both track the theme. */
+   (hover-reveal, row hover, status dot, custom toggle). Uses Polaris tokens so light/dark
+   both track the theme. */
 
 .bext-list { border:1px solid var(--p-color-border,#e9ebf1); border-radius:14px; overflow:hidden;
   background:var(--p-color-bg-surface,#fff); box-shadow:0 1px 2px rgba(17,20,28,.04),0 4px 18px rgba(17,20,28,.05); }
@@ -8,20 +8,41 @@
   border-top:1px solid var(--p-color-border-subdued,#eef0f4); transition:background .1s; }
 .bext-row:first-child { border-top:0; }
 .bext-row:hover { background:var(--p-color-bg-surface-hover,#f6f7fa); }
+.bext-row.off { opacity:.6; }
 .bext-grow { flex:1; min-width:0; }
-.bext-switch { border:0; padding:0; appearance:none; }
-.bext-switch:focus-visible { outline:2px solid var(--p-color-border-focus,#5b5bd6); outline-offset:2px; border-radius:999px; }
+.bext-filter { width:230px; }
+
+/* lightweight theme-aware toggle (Polaris ships no native switch in this version) */
+.bext-switch { position:relative; flex:0 0 auto; width:30px; height:18px; border:0; padding:0; appearance:none;
+  border-radius:999px; cursor:pointer; transition:background .18s ease;
+  background:var(--p-color-bg-fill-tertiary,#e6e8ee); box-shadow:inset 0 0 0 1px var(--p-color-border,#e0e2e8); }
+.bext-switch.on { background:var(--p-color-bg-fill-brand,#5a5ad6); box-shadow:none; }
+.bext-switch:focus-visible { outline:2px solid var(--p-color-border-focus,#5b5bd6); outline-offset:2px; }
+.bext-switch-knob { position:absolute; top:3px; left:3px; width:12px; height:12px; border-radius:50%;
+  background:#fff; box-shadow:0 1px 2px rgba(17,20,28,.28); transition:left .18s ease; }
+.bext-switch.on .bext-switch-knob { left:15px; }
+
 .bext-summary { display:flex; align-items:center; gap:16px; margin-top:7px; }
 .bext-summary .k { display:inline-flex; align-items:center; gap:7px; font-size:13px; color:var(--p-color-text-secondary,#5b6472); }
 .bext-summary .k b { color:var(--p-color-text,#14161c); font-weight:640; font-variant-numeric:tabular-nums; }
 .bext-summary .d { width:7px; height:7px; border-radius:50%; }
+.bext-summary .d.on { background:var(--p-color-bg-fill-success,#1f9d55); }
+.bext-summary .d.off { background:var(--p-color-icon-disabled,#98a1b0); }
+
 /* unified favicon tile — every logo sits on the same white rounded surface */
 .bext-tile { width:38px; height:38px; border-radius:10px; flex:0 0 auto; background:var(--p-color-bg-surface,#fff);
   border:1px solid var(--p-color-border,#e9ebf1); display:grid; place-items:center; box-shadow:0 1px 2px rgba(17,20,28,.06); overflow:hidden; }
 .bext-tile.sm { width:30px; height:30px; border-radius:8px; }
+
+/* loading skeleton bars */
 .bext-sk { height:16px; border-radius:6px; background:linear-gradient(90deg,var(--p-color-bg-surface-secondary,#f3f5f8) 25%,var(--p-color-bg-surface-hover,#f6f7fa) 37%,var(--p-color-bg-surface-secondary,#f3f5f8) 63%); background-size:400% 100%; animation:bextsh 1.3s ease infinite; }
+.bext-sk-avatar { width:36px; height:36px; border-radius:9px; }
+.bext-sk-title { width:130px; }
+.bext-sk-sub { width:80px; height:11px; margin-top:7px; }
+.bext-sk-switch { width:70px; height:14px; }
 @keyframes bextsh { 0%{background-position:100% 0} 100%{background-position:-100% 0} }
 @media (prefers-reduced-motion:reduce){ .bext-sk{ animation:none } }
+
 .bext-eyebrow { font-size:11px; font-weight:660; letter-spacing:.09em; text-transform:uppercase;
   color:var(--p-color-text-secondary,#9aa2b1); }
 .bext-info { display:inline-flex; width:15px; height:15px; cursor:help; opacity:.7; }

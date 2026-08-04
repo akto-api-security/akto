@@ -34,21 +34,12 @@ const FORMAT_OPTIONS = {
 function Switch({ active, onChange, title }) {
     return (
         <Box
-            className="bext-switch"
+            className={`bext-switch ${active ? "on" : ""}`}
             role="switch" aria-checked={active} aria-label={title} tabIndex={0} title={title}
             onClick={onChange}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onChange(); } }}
-            style={{
-                width: 30, height: 18, borderRadius: 999, cursor: "pointer", position: "relative", flex: "0 0 auto",
-                transition: "background .18s ease",
-                background: active ? "var(--p-color-bg-fill-brand, #5a5ad6)" : "var(--p-color-bg-fill-tertiary, #e6e8ee)",
-                boxShadow: active ? "none" : "inset 0 0 0 1px var(--p-color-border, #e0e2e8)",
-            }}
         >
-            <Box style={{
-                position: "absolute", top: 3, left: active ? 15 : 3, width: 12, height: 12, borderRadius: "50%",
-                background: "#fff", boxShadow: "0 1px 2px rgba(17,20,28,.28)", transition: "left .18s ease",
-            }} />
+            <Box as="span" className="bext-switch-knob" />
         </Box>
     );
 }
@@ -217,7 +208,7 @@ function BrowserExtensionSettings() {
             <VerticalStack gap="2">
                 {form[key].map((val, i) => (
                     <HorizontalStack key={i} gap="2" wrap={false} blockAlign="center">
-                        <Box style={{ flex: 1, minWidth: 0 }}>
+                        <Box className="bext-grow">
                             <TextField labelHidden label={`${label} ${i + 1}`} value={val}
                                 onChange={(v) => setArrItem(key, i, v)} placeholder={placeholder} autoComplete="off" />
                         </Box>
@@ -293,12 +284,12 @@ function BrowserExtensionSettings() {
         <Box className="bext-list">
             {Array.from({ length: 5 }).map((_, i) => (
                 <Box className="bext-row" key={`sk-${i}`}>
-                    <Box className="bext-sk" style={{ width: 36, height: 36, borderRadius: 9 }} />
+                    <Box className="bext-sk bext-sk-avatar" />
                     <Box className="bext-grow">
-                        <Box className="bext-sk" style={{ width: 130 }} />
-                        <Box className="bext-sk" style={{ width: 80, height: 11, marginTop: 7 }} />
+                        <Box className="bext-sk bext-sk-title" />
+                        <Box className="bext-sk bext-sk-sub" />
                     </Box>
-                    <Box className="bext-sk" style={{ width: 70, height: 14 }} />
+                    <Box className="bext-sk bext-sk-switch" />
                 </Box>
             ))}
         </Box>
@@ -311,7 +302,7 @@ function BrowserExtensionSettings() {
             { content: "Remove", destructive: true, onAction: () => { setOpenMenuId(null); removeConfigured(c.host, c.hexId); } },
         ];
         return (
-            <Box className="bext-row" key={c.host} style={{ opacity: c.active ? 1 : 0.6 }}>
+            <Box className={`bext-row ${c.active ? "" : "off"}`} key={c.host}>
                 {hostAvatar(c.host, c.iconUrl)}
                 <Box className="bext-grow">
                     <Text variant="bodyMd" fontWeight="medium" truncate>{c.name || c.host}</Text>
@@ -350,13 +341,13 @@ function BrowserExtensionSettings() {
                     {!loading && totalCount > 0 && (
                         <Box className="bext-summary">
                             <span className="k"><b>{totalCount}</b> host{totalCount !== 1 ? "s" : ""}</span>
-                            <span className="k"><span className="d" style={{ background: "var(--p-color-bg-fill-success, #1f9d55)" }} /><b>{activeCount}</b> active</span>
-                            {offCount > 0 && <span className="k"><span className="d" style={{ background: "var(--p-color-icon-disabled, #98a1b0)" }} /><b>{offCount}</b> off</span>}
+                            <span className="k"><span className="d on" /><b>{activeCount}</b> active</span>
+                            {offCount > 0 && <span className="k"><span className="d off" /><b>{offCount}</b> off</span>}
                         </Box>
                     )}
                 </Box>
                 {!loading && totalCount > 0 && (
-                    <Box style={{ width: 230 }}>
+                    <Box className="bext-filter">
                         <TextField
                             labelHidden label="Filter hosts" value={cfgFilter} onChange={setCfgFilter}
                             placeholder="Filter hosts…" prefix={<Icon source={SearchMinor} color="subdued" />}
@@ -469,12 +460,12 @@ function BrowserExtensionSettings() {
 
                             {form.transport === "http" && (
                                 <HorizontalStack gap="4" wrap={false}>
-                                    <Box style={{ flex: 1 }}>
+                                    <Box className="bext-grow">
                                         <Dropdown id="bext-method" label="Method"
                                             menuItems={["POST", "GET", "PUT", "PATCH"].map((m) => ({ label: m, value: m }))}
                                             initial={form.method} selected={(v) => setField("method", v)} />
                                     </Box>
-                                    <Box style={{ flex: 1 }}>
+                                    <Box className="bext-grow">
                                         <Dropdown id="bext-format-http" label="Body format"
                                             menuItems={FORMAT_OPTIONS.http.map(([v, l]) => ({ label: l, value: v }))}
                                             initial={form.format} selected={(v) => setField("format", v)} />
@@ -494,11 +485,11 @@ function BrowserExtensionSettings() {
                                         <VerticalStack gap="2">
                                             {form.frameMatch.map((row, i) => (
                                                 <HorizontalStack key={i} gap="2" wrap={false} blockAlign="center">
-                                                    <Box style={{ flex: 1, minWidth: 0 }}>
+                                                    <Box className="bext-grow">
                                                         <TextField labelHidden label={`key ${i}`} value={row.k} onChange={(v) => setFmItem(i, "k", v)} placeholder="event" autoComplete="off" />
                                                     </Box>
                                                     <Text>=</Text>
-                                                    <Box style={{ flex: 1, minWidth: 0 }}>
+                                                    <Box className="bext-grow">
                                                         <TextField labelHidden label={`value ${i}`} value={row.v} onChange={(v) => setFmItem(i, "v", v)} placeholder="send" autoComplete="off" />
                                                     </Box>
                                                     {form.frameMatch.length > 1 && (
