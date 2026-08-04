@@ -534,6 +534,22 @@ const api = {
         })
     },
 
+    reconnectCopilotStudioMultiEnvIntegration() {
+        return request({
+            url: '/api/copilotStudio/multiEnv/reconnect',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    enableCopilotStudioMultiEnvAgentGraph() {
+        return request({
+            url: '/api/copilotStudio/multiEnv/enableAgentGraph',
+            method: 'post',
+            data: {}
+        })
+    },
+
 }
 
 export default api

@@ -42,6 +42,7 @@ public class CopilotStudioAction extends UserAction {
     private static final String SCOPE = "https://api.powerplatform.com/CopilotStudio.Copilots.Invoke offline_access";
 
     public static final String FLOW_TYPE_MULTI_ENV_SETUP = "COPILOT_STUDIO_MULTI_ENV_SETUP";
+    public static final String FLOW_TYPE_MULTI_ENV_RECONNECT = "COPILOT_STUDIO_MULTI_ENV_RECONNECT";
     private static final String FLOW_TYPE_TEST_ROLE_AUTH = "TEST_ROLE_AUTH";
 
     @Setter private String roleId;
@@ -157,7 +158,58 @@ public class CopilotStudioAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    /** Removes the integration and stops its job — the only way to change settings is to remove and reconnect. */
+    /** Re-runs Microsoft sign-in to pick up a new app-registration permission, without touching credentials/environments/job. */
+    public String initiateReconnect() {
+        int accountId = Context.accountId.get();
+
+        CopilotStudioIntegration existing = CopilotStudioIntegrationDao.instance.findOne(new BasicDBObject());
+        if (existing == null) {
+            addActionError("Integration not found");
+            return Action.ERROR.toUpperCase();
+        }
+        // Reconnect never creates the job, so only allow it where confirmMultiEnvIntegration already has (jobId set).
+        if (existing.getJobId() == null || existing.getJobId().isEmpty()) {
+            addActionError("Integration setup was never completed. Use Connect instead.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        try {
+            this.integrationId = existing.getId().toHexString();
+            authorizationUrl = buildAuthorizationUrl(accountId, existing.getTenantId(), existing.getClientId(),
+                Constants.SCOPE_COPILOT_STUDIO_MULTI_ENV, FLOW_TYPE_MULTI_ENV_RECONNECT, null,
+                integrationId);
+
+            logger.infoAndAddToDb("initiateReconnect: generated for accountId=" + accountId
+                + " integrationId=" + integrationId);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.errorAndAddToDb("initiateReconnect: failed: " + e.getMessage());
+            addActionError("Failed to start reconnect");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /** One-way opt-in for an integration that predates this feature; new connections enable it automatically. */
+    public String enableAgentGraph() {
+        CopilotStudioIntegration existing = CopilotStudioIntegrationDao.instance.findOne(new BasicDBObject());
+        if (existing == null) {
+            addActionError("Integration not found");
+            return Action.ERROR.toUpperCase();
+        }
+
+        CopilotStudioIntegrationDao.instance.updateOneNoUpsert(
+            Filters.eq(CopilotStudioIntegration.ID, existing.getId()),
+            Updates.combine(
+                Updates.set(CopilotStudioIntegration.AGENT_GRAPH_ENABLED, true),
+                Updates.set(CopilotStudioIntegration.UPDATED_AT, Context.now())
+            )
+        );
+
+        logger.infoAndAddToDb("enableAgentGraph: enabled for accountId=" + Context.accountId.get());
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    /** Removes the integration and stops its job — the only way to change tenantId/clientId/clientSecret/dataIngestionUrl. */
     public String removeMultiEnvIntegration() {
         CopilotStudioIntegration existing = CopilotStudioIntegrationDao.instance.findOne(new BasicDBObject());
         if (existing == null) {
@@ -217,11 +269,13 @@ public class CopilotStudioAction extends UserAction {
         AccountJobDao.instance.insertOne(accountJob);
         this.jobId = accountJob.getId().toHexString();
 
+        // New connections opt into agent graphs automatically — only pre-existing integrations see the checkbox.
         CopilotStudioIntegrationDao.instance.updateOneNoUpsert(
             Filters.eq(CopilotStudioIntegration.ID, existing.getId()),
             Updates.combine(
                 Updates.set(CopilotStudioIntegration.STATUS, CopilotStudioIntegration.Status.CONFIRMED.name()),
                 Updates.set(CopilotStudioIntegration.JOB_ID, this.jobId),
+                Updates.set(CopilotStudioIntegration.AGENT_GRAPH_ENABLED, true),
                 Updates.set(CopilotStudioIntegration.UPDATED_AT, now)
             )
         );
@@ -253,7 +307,9 @@ public class CopilotStudioAction extends UserAction {
             + "&client_id=" + HttpRequestResponseUtils.encode(clientId)
             + "&redirect_uri=" + HttpRequestResponseUtils.encode(callbackUrl)
             + "&scope=" + HttpRequestResponseUtils.encode(scope)
-            + "&state=" + HttpRequestResponseUtils.encode(nonce);
+            + "&state=" + HttpRequestResponseUtils.encode(nonce)
+            // Forces the consent screen every reconnect so newly-added permissions get surfaced, not silently skipped: https://learn.microsoft.com/en-us/entra/identity-platform/scopes-oidc#example-3-the-user-has-consented-and-the-client-requests-more-scopes
+            + "&prompt=consent";
     }
 
     private static CopilotOAuthAuthParam findCopilotParam(TestRoles role) {
