@@ -28,7 +28,7 @@ public class GuardrailPoliciesAction extends ActionSupport {
             this.guardrailPolicies = DbLayer.fetchGuardrailPolicies(updatedAfter, contextSource);
 
 
-            // Resolve targetTeams/targetRoles → device IDs fresh on every fetch.
+            // Resolve targetTeams/targetRoles/targetDeviceIds → device IDs fresh on every fetch.
             // applyToDeviceIds stays null when there's no targeting → apply to all devices.
             // When targeting is configured, applyToDeviceIds is always set to a (possibly empty) list →
             // apply ONLY to those ids; empty means 0 matches right now, i.e. apply to none.
@@ -36,11 +36,12 @@ public class GuardrailPoliciesAction extends ActionSupport {
             for (GuardrailPolicies p : this.guardrailPolicies) {
                 EnterpriseLicenseComplianceCatalog.applyToPolicy(p);
                 boolean hasTargeting = (p.getTargetTeams() != null && !p.getTargetTeams().isEmpty())
-                        || (p.getTargetRoles() != null && !p.getTargetRoles().isEmpty());
+                        || (p.getTargetRoles() != null && !p.getTargetRoles().isEmpty())
+                        || (p.getTargetDeviceIds() != null && !p.getTargetDeviceIds().isEmpty());
                 if (hasTargeting) {
                     try {
-                        p.setApplyToDeviceIds(DbLayer.findDeviceIdsByTeamsAndRoles(
-                                p.getTargetTeams(), p.getTargetRoles()));
+                        p.setApplyToDeviceIds(DbLayer.findDeviceIdsByTeamsRolesAndDeviceIds(
+                                p.getTargetTeams(), p.getTargetRoles(), p.getTargetDeviceIds()));
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Error resolving device IDs for policy " + p.getHexId() + ": " + e.getMessage(), LogDb.DASHBOARD);
                         p.setApplyToDeviceIds(new java.util.ArrayList<>());
