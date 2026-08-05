@@ -10,6 +10,7 @@ import HeadingWithTooltip from '../../../components/shared/HeadingWithTooltip';
 import TooltipText from '../../../components/shared/TooltipText';
 import { FILTER_TYPES } from './useAgenticFilter';
 import { getAgenticCategoryLabel, hasPersonalAccountTag, hasLocalMcpServerTag, hasMisconfiguredConfigTag, CLIENT_TYPES } from '../agentic/mcpClientHelper';
+import { skillCollectionKey } from '../agentic/constants';
 import PersistStore from '../../../../main/PersistStore';
 
 /** IndexTable adds a leading selection column when `selectable` is true (see AgentEndpointTreeTable). */
@@ -178,8 +179,10 @@ const resourceName = {
  * Groups collections by endpoint ID and merges their data
  */
 const groupByEndpointId = (collections) => {
-    const maliciousSkillsSet = new Set(
-        ((PersistStore.getState().skillRiskScoreCache)?.maliciousSkills || []).map(s => String(s).toLowerCase())
+    // Collection-scoped keys: only the collection that actually owns the tagged skill is flagged,
+    // so a same-named skill under another user/agent doesn't inherit the badge.
+    const maliciousSkillKeys = new Set(
+        (PersistStore.getState().skillRiskScoreCache)?.maliciousSkillKeys || []
     );
     const groups = {};
 
@@ -218,7 +221,7 @@ const groupByEndpointId = (collections) => {
             groups[endpointId].hasMisconfiguredConfig = true;
         }
         if (!groups[endpointId].hasMaliciousSkill && Array.isArray(collection.skills)) {
-            groups[endpointId].hasMaliciousSkill = collection.skills.some(s => maliciousSkillsSet.has(String(s).toLowerCase()));
+            groups[endpointId].hasMaliciousSkill = collection.skills.some(s => maliciousSkillKeys.has(skillCollectionKey(collection.id, s)));
         }
 
         // Merge values
@@ -341,9 +344,9 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
     const navigate = useNavigate();
     const childHeaders = getChildHeaders(filterType, showCategoryColumn);
     const columnConfig = getChildColumnConfig(filterType);
-    const maliciousSkillsSet = useMemo(() => {
+    const maliciousSkillKeys = useMemo(() => {
         const cached = PersistStore.getState().skillRiskScoreCache;
-        return new Set((cached?.maliciousSkills || []).map(s => String(s).toLowerCase()));
+        return new Set(cached?.maliciousSkillKeys || []);
     }, []);
 
     // Config endpoints (/<tool>/config/*) and skill endpoints (/skills/*) coexist in one collection.
@@ -413,7 +416,7 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
             const childCategory = getAgenticCategoryLabel(child);
             const showsBundledSkills = childCategory === CLIENT_TYPES.AI_AGENT || childCategory === CLIENT_TYPES.MCP_SERVER;
             const bundledSkillsCount = showsBundledSkills && Array.isArray(child.skills) ? child.skills.length : 0;
-            const childHasMaliciousSkill = Array.isArray(child.skills) && child.skills.some(s => maliciousSkillsSet.has(String(s).toLowerCase()));
+            const childHasMaliciousSkill = Array.isArray(child.skills) && child.skills.some(s => maliciousSkillKeys.has(skillCollectionKey(child.id, s)));
             childHeaders.forEach(header => {
                 if (header.value === 'displayNameComp') {
                     cells.push(
@@ -460,7 +463,7 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
 
             return cells;
         });
-    }, [children, handleChildClick, childHeaders, columnConfig, showCategoryColumn, maliciousSkillsSet]);
+    }, [children, handleChildClick, childHeaders, columnConfig, showCategoryColumn, maliciousSkillKeys]);
 
     const columnContentTypes = useMemo(
         () => ["text", ...childHeaders.map(() => "text")],
