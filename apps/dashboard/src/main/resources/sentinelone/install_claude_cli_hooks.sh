@@ -476,19 +476,20 @@ main() {
 
     log "Downloading hook scripts from GitHub..."
 
-    if ! download_file "$GITHUB_SHARED_BASE/akto_ingestion_utility.py" "$CLAUDE_HOOKS_DIR/akto_ingestion_utility.py"; then
-        log_error "Failed to download akto_ingestion_utility.py"
-        return 1
-    fi
-    chmod +x "$CLAUDE_HOOKS_DIR/akto_ingestion_utility.py"
-    log "Downloaded akto_ingestion_utility.py"
+    SHARED_PY_FILES=(
+        "akto_ingestion_utility.py"
+        "akto_machine_id.py"
+        "akto_heartbeat.py"
+    )
 
-    if ! download_file "$GITHUB_RAW_BASE/akto_machine_id.py" "$CLAUDE_HOOKS_DIR/akto_machine_id.py"; then
-        log_error "Failed to download akto_machine_id.py"
-        return 1
-    fi
-    chmod +x "$CLAUDE_HOOKS_DIR/akto_machine_id.py"
-    log "Downloaded akto_machine_id.py"
+    for f in "${SHARED_PY_FILES[@]}"; do
+        if ! download_file "$GITHUB_SHARED_BASE/$f" "$CLAUDE_HOOKS_DIR/$f"; then
+            log_error "Failed to download $f"
+            return 1
+        fi
+        chmod +x "$CLAUDE_HOOKS_DIR/$f"
+        log "Downloaded $f"
+    done
 
     HOOK_PY_FILES=(
         "akto-hooks.py"

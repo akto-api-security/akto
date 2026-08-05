@@ -21,7 +21,13 @@ Copy the following files to this directory:
 - `akto-validate-response-wrapper.sh`
 - `akto-validate-mcp-request-wrapper.sh`
 - `akto-validate-mcp-response-wrapper.sh`
+
+Plus these from `../shared/` — they are imported as plain top-level modules, so they
+must sit in the same directory as the hook scripts:
+
+- `akto_ingestion_utility.py`
 - `akto_machine_id.py`
+- `akto_heartbeat.py`
 
 ### 2. Configure environment
 

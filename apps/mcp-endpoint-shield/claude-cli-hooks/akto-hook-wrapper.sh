@@ -11,6 +11,7 @@ export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="claude_code_cli"
 export CONTEXT_SOURCE="ENDPOINT"
 export DEVICE_ID="{{DEVICE_ID (optional)}}"
+export DATABASE_ABSTRACTOR_SERVICE_URL="${DATABASE_ABSTRACTOR_SERVICE_URL:-https://cyborg.akto.io}"
 
 # Logging Configuration
 export LOG_LEVEL="INFO"

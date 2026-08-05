@@ -10,6 +10,7 @@ import urllib.request
 from typing import Any, Dict, Set, Tuple, Union
 
 from akto_machine_id import get_machine_id, get_username
+from akto_heartbeat import send_heartbeat
 from akto_ingestion_utility import installer_headers, resolve_session_info
 
 # Configure logging
@@ -423,6 +424,8 @@ def send_ingestion_data(
 
 def main():
     logger.info(f"=== Hook execution started - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
+
+    send_heartbeat(LOG_DIR, logger)
 
     try:
         input_data = json.load(sys.stdin)

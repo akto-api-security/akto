@@ -288,14 +288,15 @@ function Install-ForUser {
     }
     Write-Log "Downloaded akto-validate-response.py"
 
-    # akto_machine_id.py is fetched from master branch (has Windows-compatible import pwd fix)
-    $machineIdPy = Join-Path $ClaudeHooksDir "akto_machine_id.py"
-    $machineIdUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/apps/mcp-endpoint-shield/claude-cli-hooks/akto_machine_id.py"
-    if (-not (Get-FileFromUrl $machineIdUrl $machineIdPy)) {
-        Write-ErrorLog "Failed to download akto_machine_id.py"
-        return $false
+    $sharedBase = "https://raw.githubusercontent.com/akto-api-security/akto/master/apps/mcp-endpoint-shield/shared"
+    foreach ($sharedFile in @("akto_machine_id.py", "akto_heartbeat.py")) {
+        $sharedDest = Join-Path $ClaudeHooksDir $sharedFile
+        if (-not (Get-FileFromUrl "$sharedBase/$sharedFile" $sharedDest)) {
+            Write-ErrorLog "Failed to download $sharedFile"
+            return $false
+        }
+        Write-Log "Downloaded $sharedFile"
     }
-    Write-Log "Downloaded akto_machine_id.py"
 
     Write-Log "Creating wrapper scripts with environment variables..."
     New-WrapperScript -HookType "prompt" -IngestionUrl $GuardrailsUrl -DeviceId $DeviceId -HooksDir $ClaudeHooksDir
