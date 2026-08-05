@@ -439,12 +439,14 @@ function GuardrailPolicies() {
         if (isEndpointSecurityCategory()) {
             const targetTeams = policy.targetTeams || [];
             const targetRoles = policy.targetRoles || [];
-            if (targetTeams.length === 0 && targetRoles.length === 0) {
+            const targetDeviceIds = policy.targetDeviceIds || [];
+            if (targetTeams.length === 0 && targetRoles.length === 0 && targetDeviceIds.length === 0) {
                 details.push({ label: "Target Users", value: "All users" });
             } else {
                 const userParts = [];
                 if (targetTeams.length > 0) userParts.push(`${targetTeams.length} Team${targetTeams.length !== 1 ? 's' : ''}`);
                 if (targetRoles.length > 0) userParts.push(`${targetRoles.length} Role${targetRoles.length !== 1 ? 's' : ''}`);
+                if (targetDeviceIds.length > 0) userParts.push(`${targetDeviceIds.length} User${targetDeviceIds.length !== 1 ? 's' : ''}`);
                 details.push({ label: "Target Users", value: userParts.join(", ") });
             }
         }
@@ -636,6 +638,7 @@ function GuardrailPolicies() {
                 applyToAllServers: guardrailData.applyToAllServers ?? true,
                 targetTeams: guardrailData.targetTeams || [],
                 targetRoles: guardrailData.targetRoles || [],
+                targetDeviceIds: guardrailData.targetDeviceIds || [],
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
                 behaviour: guardrailData.behaviour != null

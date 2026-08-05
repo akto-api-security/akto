@@ -67,6 +67,15 @@ import "./createGuardrailPage.css";
 const expandGroupsToV2 = (selectedKeys) =>
     (selectedKeys || []).filter(key => key).map(key => ({ id: key, name: key }));
 
+// deviceId is the agent's device label, "{hostname}-{first8ofMachineID}" — the unique,
+// stable part is the segment after the LAST hyphen (the hostname itself may contain hyphens).
+// Falls back to a plain prefix slice for any value that doesn't follow that format.
+const deviceIdSuffix = (deviceId) => {
+    if (!deviceId) return '';
+    const idx = deviceId.lastIndexOf('-');
+    return idx >= 0 ? deviceId.slice(idx + 1) : deviceId.slice(0, 8);
+};
+
 // Agents: expand each selected canonical group key (e.g. 'claude2') into every raw wire-level
 // tag value it aliases. The guardrails-service matches on the raw client-type segment the client
 // sends — it never sees this dashboard's canonical grouping key — so we must store the raw values.
@@ -241,6 +250,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [applyToAllUsers, setApplyToAllUsers] = useState(true);
     const [targetTeams, setTargetTeams] = useState([]);
     const [targetRoles, setTargetRoles] = useState([]);
+    const [targetDeviceIds, setTargetDeviceIds] = useState([]);
     const [enterpriseLicenseComplianceCategories, setEnterpriseLicenseComplianceCategories] = useState([]);
 
     const [agenticUsers, setAgenticUsers] = useState([]);
@@ -267,6 +277,43 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         (agenticUsers || []).forEach(u => { if (u.userRole) roles.add(u.userRole); });
         return Array.from(roles).sort();
     }, [agenticUsers]);
+
+    // One dropdown option per device (not per username) — usernames can repeat across devices
+    // (or even across different people), so the device ID is the actual selectable/stored value.
+    // Devices with no ID (agenticUsers[].devices already excludes them, see ModuleInfoDao) are
+    // never in this list, so there's nothing un-targetable to show.
+    const availableDevices = useMemo(() => {
+        const options = [];
+        (agenticUsers || []).forEach(u => {
+            (u.devices || []).forEach(deviceId => {
+                if (!deviceId) return;
+                options.push({ label: `${u.userName || u.userEmail} · ${deviceIdSuffix(deviceId)}`, value: deviceId });
+            });
+        });
+        return options.sort((a, b) => a.label.localeCompare(b.label));
+    }, [agenticUsers]);
+
+    // Flatten agenticUsers[].devices into per-device rows, then filter by the same
+    // AND-across-type / OR-within-type semantics used server-side to resolve applyToDeviceIds —
+    // this is what powers the live "applies to N devices" preview in the wizard.
+    const matchingDeviceRows = useMemo(() => {
+        const rows = [];
+        (agenticUsers || []).forEach(u => {
+            (u.devices || []).forEach(deviceId => {
+                rows.push({ deviceId, username: u.userName, team: u.teamName, role: u.userRole });
+            });
+        });
+        if (applyToAllUsers) return rows;
+        const teamSet = new Set(targetTeams);
+        const roleSet = new Set(targetRoles);
+        const deviceSet = new Set(targetDeviceIds);
+        if (teamSet.size === 0 && roleSet.size === 0 && deviceSet.size === 0) return [];
+        return rows.filter(r =>
+            (teamSet.size === 0 || teamSet.has(r.team)) &&
+            (roleSet.size === 0 || roleSet.has(r.role)) &&
+            (deviceSet.size === 0 || deviceSet.has(r.deviceId))
+        );
+    }, [agenticUsers, applyToAllUsers, targetTeams, targetRoles, targetDeviceIds]);
 
     // Create validation state object
     const getStoredStateData = () => ({
@@ -341,6 +388,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         applyToAllUsers,
         targetTeams,
         targetRoles,
+        targetDeviceIds,
         enterpriseLicenseComplianceCategories,
         serverScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllServers &&
             (selectedMcpServers || []).length === 0 &&
@@ -348,7 +396,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             (selectedBrowserLlms || []).length === 0,
         userScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllUsers &&
             (targetTeams || []).length === 0 &&
-            (targetRoles || []).length === 0,
+            (targetRoles || []).length === 0 &&
+            (targetDeviceIds || []).length === 0,
     });
 
     const getStepsWithSummary = () => {
@@ -820,9 +869,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             caseSensitive: !!entry.caseSensitive
         })));
 
-        setApplyToAllUsers(!policy.targetTeams?.length && !policy.targetRoles?.length);
+        setApplyToAllUsers(!policy.targetTeams?.length && !policy.targetRoles?.length && !policy.targetDeviceIds?.length);
         setTargetTeams(policy.targetTeams || []);
         setTargetRoles(policy.targetRoles || []);
+        setTargetDeviceIds(policy.targetDeviceIds || []);
         setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
     };
 
@@ -959,6 +1009,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 applyOnRequest,
                 targetTeams: applyToAllUsers ? [] : targetTeams,
                 targetRoles: applyToAllUsers ? [] : targetRoles,
+                targetDeviceIds: applyToAllUsers ? [] : targetDeviceIds,
                 enterpriseLicenseComplianceCategories,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
@@ -1171,8 +1222,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setTargetTeams={setTargetTeams}
                         targetRoles={targetRoles}
                         setTargetRoles={setTargetRoles}
+                        targetDeviceIds={targetDeviceIds}
+                        setTargetDeviceIds={setTargetDeviceIds}
                         availableTeams={availableTeams}
                         availableRoles={availableRoles}
+                        availableDevices={availableDevices}
+                        matchingDeviceRows={matchingDeviceRows}
                         usersLoading={usersLoading}
                         applyToAllUsers={applyToAllUsers}
                         setApplyToAllUsers={setApplyToAllUsers}

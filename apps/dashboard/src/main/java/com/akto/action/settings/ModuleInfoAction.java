@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class ModuleInfoAction extends UserAction {
     private List<ModuleInfo> moduleInfos;
@@ -297,6 +298,23 @@ public class ModuleInfoAction extends UserAction {
             if (!AgenticUsers.SOURCE_MANUAL.equals(u.getRoleSource()) && u.getSsoUserRole() != null) {
                 u.setUserRole(u.getSsoUserRole());
             }
+        }
+
+        // AgenticUsers.devices is only ever backfilled once by a startup migration and never
+        // kept in sync afterwards — overwrite with live devices from module_info (updated every
+        // heartbeat) instead of trusting the stored field.
+        Map<String, Set<String>> liveDevicesByUsername = ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield();
+        for (AgenticUsers u : agenticUsers) {
+            Set<String> liveDevices = liveDevicesByUsername.remove(u.getUserName());
+            u.setDevices(liveDevices != null ? new ArrayList<>(liveDevices) : new ArrayList<>());
+        }
+        // Any username reporting devices but with no team/role ever assigned has no AgenticUsers
+        // doc yet — synthesize a lightweight entry so it still shows up as filterable/previewable.
+        for (Map.Entry<String, Set<String>> entry : liveDevicesByUsername.entrySet()) {
+            AgenticUsers synthetic = new AgenticUsers();
+            synthetic.setUserName(entry.getKey());
+            synthetic.setDevices(new ArrayList<>(entry.getValue()));
+            agenticUsers.add(synthetic);
         }
         return SUCCESS.toUpperCase();
     }
