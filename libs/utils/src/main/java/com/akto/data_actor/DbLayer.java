@@ -3131,11 +3131,11 @@ public class DbLayer {
         }
     }
 
-    public static List<String> findDeviceIdsByTeamsAndRoles(List<String> teams, List<String> roles) {
+    public static List<String> findDeviceIdsByTeamsRolesAndDeviceIds(List<String> teams, List<String> roles, List<String> deviceIds) {
         try {
-            return AgentUsersDao.instance.findDeviceIdsByTeamsAndRoles(teams, roles);
+            return AgentUsersDao.instance.findDeviceIdsByTeamsRolesAndDeviceIds(teams, roles, deviceIds);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in findDeviceIdsByTeamsAndRoles: " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Error in findDeviceIdsByTeamsRolesAndDeviceIds: " + e.getMessage());
             return new ArrayList<>();
         }
     }

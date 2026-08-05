@@ -7,7 +7,9 @@ import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.bson.conversions.Bson;
 
 public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
@@ -51,10 +53,11 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
     }
 
     /**
-     * Returns the flat list of device IDs belonging to users that match any of the
-     * given teams or roles. Pass empty/null lists to get an empty result (not all devices).
+     * Returns the flat list of device IDs belonging to users that match any of the given
+     * teams/roles, optionally narrowed to (or substituted by) an explicit set of device IDs.
+     * Pass all-empty/null lists to get an empty result (not all devices).
      */
-    public List<String> findDeviceIdsByTeamsAndRoles(List<String> teams, List<String> roles) {
+    public List<String> findDeviceIdsByTeamsRolesAndDeviceIds(List<String> teams, List<String> roles, List<String> deviceIds) {
         List<Bson> conditions = new ArrayList<>();
         if (teams != null && !teams.isEmpty()) {
             conditions.add(Filters.or(
@@ -68,18 +71,33 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
                 Filters.and(Filters.ne(AgenticUsers.ROLE_SOURCE, AgenticUsers.SOURCE_MANUAL), Filters.in(AgenticUsers.SSO_USER_ROLE, roles))
             ));
         }
-        if (conditions.isEmpty()) {
+        boolean hasTeamOrRole = !conditions.isEmpty();
+        boolean hasDeviceIds = deviceIds != null && !deviceIds.isEmpty();
+        if (!hasTeamOrRole && !hasDeviceIds) {
             return new ArrayList<>();
         }
 
+        // Explicit device IDs come straight from a dropdown sourced off live device data at pick
+        // time — trust them directly rather than re-deriving through a team/role join.
+        if (!hasTeamOrRole) {
+            return new ArrayList<>(new HashSet<>(deviceIds));
+        }
+
         Bson userFilter = conditions.size() == 1 ? conditions.get(0) : Filters.and(conditions);
-        List<String> deviceIds = new ArrayList<>();
+        Set<String> teamRoleDeviceIds = new HashSet<>();
         for (AgenticUsers user : instance.findAll(userFilter)) {
             if (user.getDevices() != null) {
-                deviceIds.addAll(user.getDevices());
+                teamRoleDeviceIds.addAll(user.getDevices());
             }
         }
-        return deviceIds;
+
+        if (!hasDeviceIds) {
+            return new ArrayList<>(teamRoleDeviceIds);
+        }
+
+        // Both dimensions given — a device must satisfy the team/role match AND be explicitly picked.
+        teamRoleDeviceIds.retainAll(new HashSet<>(deviceIds));
+        return new ArrayList<>(teamRoleDeviceIds);
     }
 
     @Override
