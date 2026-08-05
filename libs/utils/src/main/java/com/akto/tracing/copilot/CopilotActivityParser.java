@@ -65,8 +65,8 @@ public class CopilotActivityParser implements TraceParser {
         if (input == null) return false;
         try {
             String json = toJson(input);
-            JsonNode root = OBJECT_MAPPER.readTree(json);
-            JsonNode activities = root.path("traces");
+            JsonNode activities = OBJECT_MAPPER.readTree(json);
+            // JsonNode activities = root.path("traces");
             if (!activities.isArray() || activities.size() == 0) return false;
             boolean hasUserMessage = false;
             boolean hasDynamicPlan = false;
