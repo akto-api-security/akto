@@ -1403,7 +1403,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               agentProxyGuardrailEnabled: apiInfoMap[key] ? (apiInfoMap[key]["agentProxyGuardrailEnabled"] || false) : false,
               guardrailSchema: apiInfoMap[key] ? (apiInfoMap[key]["guardrailSchema"] || null) : null,
               isMalicious: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "malicious-skill-tag" || t.key === "malicious-skill-tag") && t.value === "true") : false,
-              isMisconfigured: (apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true") : false) || (x.url?.startsWith("/claude/config/") && (collectionEnvTypeMap[x.apiCollectionId] || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true")),
+              isMisconfigured: (apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true") : false) || (x.endpoint?.startsWith("/claude/config/") && (collectionEnvTypeMap[x.apiCollectionId] || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true")),
               skillTags: apiInfoMap[key] ? [...new Set((apiInfoMap[key]["tagsList"] || []).filter(t => (t.keyName === "skill-tags" || t.key === "skill-tags") && t.value && !/^version=/i.test(t.value)).map(t => t.value))] : [],
               tagsList: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []) : [],
               apiType,
