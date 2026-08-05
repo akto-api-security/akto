@@ -237,6 +237,15 @@ export default function Header() {
         PersistStore.getState().setHostNameMap({});
         PersistStore.getState().setLastCalledSensitiveInfo(0);
         PersistStore.getState().setLastFetchedInfo({ lastRiskScoreInfo: 0, lastSensitiveInfo: 0 });
+        // Clear summary-stat caches too, else stats from the previous scope (e.g. Total Components)
+        // flash stale values since they're only corrected once the async refetch completes
+        PersistStore.getState().setTotalAPIs(0);
+        PersistStore.getState().setLastFetchedResp({ criticalUrls: 0, riskScoreMap: {} });
+        PersistStore.getState().setLastFetchedSeverityResp({});
+        PersistStore.getState().setLastFetchedSensitiveResp([]);
+        PersistStore.getState().setLastFetchedUntrackedResp([]);
+        PersistStore.getState().setCoverageMap({});
+        PersistStore.getState().setTrafficMap({});
         LocalStore.getState().setCategoryMap({});
         LocalStore.getState().setSubCategoryMap({});
         SessionStore.getState().setThreatFiltersMap({});
