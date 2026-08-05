@@ -319,7 +319,10 @@ export function buildSkillsFlyoutData(collection, apiInfoList = [], stiEndpoints
         const vCount = Object.values(info.violations || {}).reduce((a, b) => a + (b || 0), 0);
         if (vCount > 0) violationsBySkill[skillName] = vCount;
         threatScoreBySkill[skillName] = Math.max(threatScoreBySkill[skillName] || 0, info.threatScore || 0);
-        const hasThreatTag = (info.tagsList || []).some(t => ["skill-tags", "malicious-skill-tag"].includes(t.keyName || t.key));
+        const hasThreatTag = (info.tagsList || []).some((t) =>
+            (((t.keyName === "skill-tags" || t.key === "skill-tags") && t.value && !/^version=/i.test(t.value)) ||
+             ((t.keyName === "malicious-skill-tag" || t.key === "malicious-skill-tag") && t.value === "true"))
+        );
         if (hasThreatTag) hasThreatTagBySkill[skillName] = true;
     });
 
