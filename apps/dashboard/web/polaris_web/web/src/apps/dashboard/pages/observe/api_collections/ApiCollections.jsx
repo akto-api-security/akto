@@ -1490,8 +1490,8 @@ function ApiCollections(props) {
             )
         }
 
-        // Add Run Test button for multi-collection testing
-        if (selectedResources.length > 1) {
+        // Add Run Test button for multi-collection testing (hidden for Atlas / Endpoint Security)
+        if (selectedResources.length > 1 && !isEndpointSecurityCategory()) {
             actions.push({
                 content: <Button id="bulk-run-test-button" primary>Run test</Button>,
                 onAction: () => {
