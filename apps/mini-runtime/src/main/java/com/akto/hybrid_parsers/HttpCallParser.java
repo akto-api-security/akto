@@ -650,10 +650,19 @@ public class HttpCallParser {
                 return;
             }
             Object tracesValue = JSONUtils.fromJson(traces, Object.class);
-            payloadMap.put("_traces", tracesValue != null ? tracesValue : traces);
+            payloadMap.put("traces", tracesValue != null ? tracesValue : traces);
             String updatedPayload = JSONUtils.getString(payloadMap);
-            if (updatedPayload != null) {
-                httpResponseParam.setPayload(updatedPayload);
+            if (updatedPayload == null) {
+                return;
+            }
+            httpResponseParam.setPayload(updatedPayload);
+            Map<String, Object> origMap = JSONUtils.getMap(httpResponseParam.getOrig());
+            if (origMap != null) {
+                origMap.put("responsePayload", updatedPayload);
+                String updatedOrig = JSONUtils.getString(origMap);
+                if (updatedOrig != null) {
+                    httpResponseParam.setOrig(updatedOrig);
+                }
             }
             loggerMaker.warn("[Trace Embedding] embedded traces in response payload successfully");
         } catch (Exception e) {
