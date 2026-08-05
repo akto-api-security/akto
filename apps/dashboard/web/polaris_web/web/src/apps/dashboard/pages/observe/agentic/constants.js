@@ -1035,7 +1035,7 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
             const skillName = splits?.[1];
             if (skillName) {
                 skillScoreMap[skillName] = info.riskScore || 0;
-                const isMalicious = (info.tagsList || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true");
+                const isMalicious = (info.tagsList || []).some(t => (t.keyName === "malicious-skill-tag" || t.key === "malicious-skill-tag") && t.value === "true");
                 if (isMalicious) maliciousSkills.add(skillName);
                 const isMisconfigured = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
                 if (isMisconfigured) misconfiguredSkills.add(skillName);
