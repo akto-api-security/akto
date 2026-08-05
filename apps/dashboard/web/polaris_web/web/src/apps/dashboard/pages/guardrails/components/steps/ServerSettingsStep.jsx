@@ -53,6 +53,15 @@ export const ServerSettingsConfig = {
 
 const conditionsReducer = produce((draft, action) => func.conditionsReducer(draft, action));
 
+// deviceId is the agent's device label, "{hostname}-{first8ofMachineID}" — the unique,
+// stable part is the segment after the LAST hyphen (the hostname itself may contain hyphens).
+// Falls back to a plain prefix slice for any value that doesn't follow that format.
+const deviceIdSuffix = (deviceId) => {
+    if (!deviceId) return '';
+    const idx = deviceId.lastIndexOf('-');
+    return idx >= 0 ? deviceId.slice(idx + 1) : deviceId.slice(0, 8);
+};
+
 const CountPopover = ({ count, label, items }) => {
     const [active, setActive] = useState(false);
     const [search, setSearch] = useState('');
@@ -485,7 +494,7 @@ const ServerSettingsStep = ({
                                                         label={`user${matchingDeviceRows.length !== 1 ? 's' : ''}`}
                                                         items={matchingDeviceRows.map(r => ({
                                                             value: r.deviceId,
-                                                            label: `${r.username} · ${(r.deviceId || '').slice(0, 8)}`,
+                                                            label: `${r.username} · ${deviceIdSuffix(r.deviceId)}`,
                                                         }))}
                                                     />
                                                     <Text variant="bodyMd" tone="subdued">with the current selection.</Text>

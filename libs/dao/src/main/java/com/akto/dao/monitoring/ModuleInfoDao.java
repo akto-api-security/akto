@@ -40,18 +40,22 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
     // Computed fresh on every call from module_info (updated every heartbeat) rather than
     // from AgenticUsers.devices, which is only ever backfilled once by a startup migration
     // and never kept in sync with devices that report in afterwards.
-    // Devices with no stable additionalData.deviceId are skipped — falling back to the mutable
-    // module name would make a "device" appear/disappear across reinstalls, which is worse than
-    // just not being targetable.
+    //
+    // Uses ModuleInfo.name (== the Go agent's GetDeviceLabel(), "{hostname}-{first8ofMachineID}"),
+    // NOT additionalData.deviceId (the raw machine ID) — the enforcement layer's
+    // filterPoliciesByDeviceId (guardrails-service/.../validator/service.go) matches
+    // ApplyToDeviceIds against the device-label prefix parsed out of mcpServerName, which is
+    // built from GetDeviceLabel(), never the raw machine ID. Using additionalData.deviceId here
+    // would silently make Team/Role/Device targeting match nothing at enforcement time.
     public Map<String, Set<String>> fetchUsernameToDeviceIdsForEndpointShield() {
         List<ModuleInfo> modules = findAll(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD),
-            Projections.include(ModuleInfo.ADDITIONAL_DATA));
+            Projections.include(ModuleInfo.NAME, ModuleInfo.ADDITIONAL_DATA));
         Map<String, Set<String>> result = new HashMap<>();
         for (ModuleInfo m : modules) {
             Map<String, Object> ad = m.getAdditionalData();
-            if (ad == null || ad.get("username") == null || ad.get("deviceId") == null) continue;
+            if (ad == null || ad.get("username") == null) continue;
             String username = String.valueOf(ad.get("username")).trim();
-            String deviceId = String.valueOf(ad.get("deviceId")).trim();
+            String deviceId = m.getName() == null ? "" : m.getName().trim();
             if (username.isEmpty() || deviceId.isEmpty()) continue;
             result.computeIfAbsent(username, k -> new HashSet<>()).add(deviceId);
         }
