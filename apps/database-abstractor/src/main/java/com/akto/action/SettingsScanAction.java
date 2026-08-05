@@ -401,7 +401,17 @@ public class SettingsScanAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
 
-        findings = parsed != null ? parsed : new ArrayList<>();
+        List<Map<String, Object>> rawFindings = parsed != null ? parsed : new ArrayList<>();
+        boolean disableAllHooksIsFalse = settingsJson != null
+                && (settingsJson.contains("\"disableAllHooks\": false") || settingsJson.contains("\"disableAllHooks\":false"));
+        findings = new ArrayList<>();
+        for (Map<String, Object> finding : rawFindings) {
+            if ("disableAllHooks".equals(finding.get("fieldPath")) && disableAllHooksIsFalse) {
+                logger.info("[SettingsScan] Dropping disableAllHooks finding — settingsJson has disableAllHooks: false", LogDb.DB_ABS);
+                continue;
+            }
+            findings.add(finding);
+        }
         logger.info(String.format(
                 "[SettingsScan] tool=%s cfgPath=%s findings=%d", tool, cfgPath, findings.size()), LogDb.DB_ABS);
         return Action.SUCCESS.toUpperCase();
