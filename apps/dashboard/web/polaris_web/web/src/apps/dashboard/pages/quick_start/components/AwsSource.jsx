@@ -108,6 +108,7 @@ function AwsSource() {
     }
 
     useEffect(()=> {
+      if(isLocalDeploy) return;
       fetchLBs()
       checkStackState()
     },[])
