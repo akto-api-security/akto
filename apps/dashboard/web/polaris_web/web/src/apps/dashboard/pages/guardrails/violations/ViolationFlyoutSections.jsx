@@ -320,7 +320,11 @@ export function FileSection({ detail }) {
             <SampleData
                 data={{
                     message: detail.fileContent,
-                    vulnerabilitySegments: (detail.fileHighlights || []).map((phrase) => ({ phrase })),
+                    vulnerabilitySegments: (detail.fileHighlights || []).map((highlight) =>
+                        typeof highlight === "string"
+                            ? { phrase: highlight }
+                            : { ...highlight, includeKeyInHighlight: true }
+                    ),
                 }}
                 editorLanguage={detail.fileLanguage || "json"}
                 minHeight="640px"
