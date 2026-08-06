@@ -2,9 +2,26 @@ import { flags } from "../components/flags/index.mjs";
 import SessionStore from "../../../../main/SessionStore";
 import PersistStore from "../../../../main/PersistStore";
 import { getDashboardCategory, categoryToShortName } from "../../../../main/labelHelper";
+import values from "@/util/values";
 
 // New tab starts with a fresh PersistStore, so carry the category via ?category= (see ThreatReport.jsx).
 const getCategoryParam = () => categoryToShortName[getDashboardCategory()];
+
+// The "All time" preset starts at new Date(1000), so forwarding it as a raw timestamp makes the
+// destination page render a custom range starting Jan 1970. Forward the preset alias instead —
+// both destination pages resolve ?range= before the timestamp params.
+const allTimeRange = values.ranges.find((r) => r.alias === "allTime");
+const allTimeStartTs = allTimeRange ? Math.floor(allTimeRange.period.since.getTime() / 1000) : 1;
+
+const setTimeRangeParams = (params, filters, startKey, endKey) => {
+    if (!filters.startTimestamp || !filters.endTimestamp) return;
+    if (filters.startTimestamp <= allTimeStartTs) {
+        params.set("range", "allTime");
+        return;
+    }
+    params.set(startKey, filters.startTimestamp);
+    params.set(endKey, filters.endTimestamp);
+};
 
 export const formatCategoryName = (name) => {
     if (!name) return "Unknown";
@@ -112,8 +129,7 @@ export const openThreatActivityPage = (filters = {}) => {
     if (filters.severity) filterParts.push(`severity__${filters.severity}`);
     if (filterParts.length > 0) params.set("filters", filterParts.join("&"));
     if (filters.eventStatus) params.set("eventStatus", filters.eventStatus);
-    if (filters.startTimestamp) params.set("startTimestamp", filters.startTimestamp);
-    if (filters.endTimestamp) params.set("endTimestamp", filters.endTimestamp);
+    setTimeRangeParams(params, filters, "startTimestamp", "endTimestamp");
     const categoryParam = getCategoryParam();
     if (categoryParam) params.set("category", categoryParam);
     const url = `${window.location.origin}/dashboard/protection/threat-activity?${params.toString()}`;
@@ -126,8 +142,7 @@ export const openThreatActorsPage = (filters = {}) => {
     if (filters.country) filterParts.push(`country__${filters.country}`);
     if (filters.latestAttack) filterParts.push(`latestAttack__${filters.latestAttack}`);
     if (filterParts.length > 0) params.set("filters", filterParts.join("&"));
-    if (filters.startTimestamp) params.set("since", filters.startTimestamp);
-    if (filters.endTimestamp) params.set("until", filters.endTimestamp);
+    setTimeRangeParams(params, filters, "since", "until");
     const categoryParam = getCategoryParam();
     if (categoryParam) params.set("category", categoryParam);
     const url = `${window.location.origin}/dashboard/protection/threat-actor?${params.toString()}`;

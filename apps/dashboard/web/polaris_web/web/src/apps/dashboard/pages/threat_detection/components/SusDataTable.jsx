@@ -749,7 +749,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         ...x,
         id: x.id,
         actorComp: isEndpointSecurityCategory()
-          ? getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap)
+          ? getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap, x.actor)
           : formatActorId(x.actor),
         host: x.host || "-",
         endpointComp: String(x?.url || "").includes('/skills/') ? (
