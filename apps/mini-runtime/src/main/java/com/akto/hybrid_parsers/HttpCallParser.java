@@ -55,6 +55,7 @@ import com.akto.hybrid_runtime.Main;
 import com.akto.hybrid_runtime.URLAggregator;
 import com.akto.util.Pair;
 import com.akto.util.Constants;
+import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.google.gson.Gson;
@@ -638,19 +639,50 @@ public class HttpCallParser {
         } catch (Exception ignored) { return null; }
     }
 
-    private void parseCopilotTrace(HttpResponseParams httpResponseParam) {
+    private void embedTracesInResponsePayload(HttpResponseParams httpResponseParam, String traces) {
         try {
-            String payload = httpResponseParam.getPayload();
-            if (payload == null || payload.isEmpty()) {
-                loggerMaker.warn("Copilot trace: payload is null or empty, skipping");
+            if (traces == null || traces.isEmpty()) {
                 return;
             }
-            if (!CopilotActivityParser.getInstance().canParse(payload)) {
+            Map<String, Object> payloadMap = JSONUtils.getMap(httpResponseParam.getPayload());
+            if (payloadMap == null) {
+                loggerMaker.warn("[Trace Embedding] response payload is not a JSON object, skipping traces embedding");
+                return;
+            }
+            Object tracesValue = JSONUtils.fromJson(traces, Object.class);
+            payloadMap.put("traces", tracesValue != null ? tracesValue : traces);
+            String updatedPayload = JSONUtils.getString(payloadMap);
+            if (updatedPayload == null) {
+                return;
+            }
+            httpResponseParam.setPayload(updatedPayload);
+            Map<String, Object> origMap = JSONUtils.getMap(httpResponseParam.getOrig());
+            if (origMap != null) {
+                origMap.put("responsePayload", updatedPayload);
+                String updatedOrig = JSONUtils.getString(origMap);
+                if (updatedOrig != null) {
+                    httpResponseParam.setOrig(updatedOrig);
+                }
+            }
+            loggerMaker.warn("[Trace Embedding] embedded traces in response payload successfully");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error embedding traces in response payload: " + e.getMessage());
+        }
+    }
+
+    private void parseCopilotTrace(HttpResponseParams httpResponseParam) {
+        try {
+            String traces = httpResponseParam.getTraces();
+            if (traces == null || traces.isEmpty()) {
+                loggerMaker.warn("Copilot trace: traces field is null or empty, skipping");
+                return;
+            }
+            if (!CopilotActivityParser.getInstance().canParse(traces)) {
                 loggerMaker.warn("Copilot trace: canParse returned false, skipping");
                 return;
             }
             loggerMaker.warn("Copilot trace: attempting to parse activities");
-            TraceParseResult result = CopilotActivityParser.getInstance().parse(payload);
+            TraceParseResult result = CopilotActivityParser.getInstance().parse(traces);
             if (result.getTrace() != null) {
                 if (httpResponseParam.getRequestParams() != null) {
                     result.getTrace().setApiCollectionId(httpResponseParam.getRequestParams().getApiCollectionId());
@@ -1827,6 +1859,7 @@ public class HttpCallParser {
                 continue; // graph edges only — not a real endpoint, and fanned out to N collections per agent, so must not reach apiCatalogSync.
             } else if (isCopilotTrafficRaw(tagsMap)) {
                 parseCopilotTrace(httpResponseParam);
+                embedTracesInResponsePayload(httpResponseParam, httpResponseParam.getTraces());
             }
 
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")

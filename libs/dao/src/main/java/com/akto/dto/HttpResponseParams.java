@@ -31,6 +31,7 @@ public class HttpResponseParams {
     // K8 pod tags in JSON string
     String tags;
     List<String> parentMcpToolNames;
+    String traces;
 
     public HttpResponseParams() {}
 
@@ -261,5 +262,13 @@ public class HttpResponseParams {
 
     public void setParentMcpToolNames(List<String> parentMcpToolNames) {
         this.parentMcpToolNames = parentMcpToolNames;
+    }
+
+    public String getTraces() {
+        return traces;
+    }
+
+    public void setTraces(String traces) {
+        this.traces = traces;
     }
 }
