@@ -203,7 +203,14 @@ export function OverviewSection({ row, detail }) {
                 <DetailGrid items={gridItems} columns={3} />
             </Box>
 
-            {guardrailSections.length > 0 && (
+            {detail?.overview && (
+                <>
+                    <Divider />
+                    <MarkdownViewer markdown={detail.overview} />
+                </>
+            )}
+
+            {guardrailSections.length > 0 && !detail?.overview && (
                 <>
                     <Divider />
 

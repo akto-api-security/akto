@@ -5,6 +5,13 @@ function _parseAktoOuter(payloadStr) {
     try { return JSON.parse(payloadStr); } catch { return null; }
 }
 
+function _metaField(metadata, key) {
+    if (!metadata || typeof metadata !== "string") return null;
+    const m = metadata.match(new RegExp('(?:^|\\n)\\s*' + key + '\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"'));
+    if (!m) return null;
+    try { return JSON.parse('"' + m[1] + '"'); } catch (e) { return m[1]; }
+}
+
 function _parseJson(str) {
     if (!str) return null;
     try { return JSON.parse(str); } catch { return null; }
@@ -206,6 +213,8 @@ export function buildFallbackDetail(row) {
     // requestPayload.evidence for Config, responsePayload.evidence for Skill — plus
     // metadata.reason and the policy name.
     const meta = _parseJson(row.metadata) || {};
+    const metaOverview = meta.overview || _metaField(row.metadata, "overview");
+    const metaRemediation = meta.remediation || _metaField(row.metadata, "remediation");
     const outer = _parseAktoOuter(row.payload) || {};
     const req = _parseJson(outer.requestPayload);
     const resp = _parseJson(outer.responsePayload);
@@ -256,6 +265,7 @@ export function buildFallbackDetail(row) {
         fileContent: fileContent || undefined,
         fileTabLabel: fileTabLabel || undefined,
         skillName: skillName || undefined,
-        remediation: `### Recommended actions\n\n1. Review the ${row.type} activity on **${row.agenticAsset || row.user}**.\n2. Confirm whether **${row.user}** is authorized for this action.\n3. Update the relevant guardrail policy if this should be blocked going forward.`,
+        overview: row.type === "Config" ? (metaOverview || undefined) : undefined,
+        remediation: metaRemediation || undefined,
     };
 }
