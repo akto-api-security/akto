@@ -130,6 +130,16 @@ const fetchEndpointShieldUserMetadata = async () => {
     }
 };
 
+const PLACEHOLDER_ACTORS = new Set(['', '-', '127.0.0.1', '0.0.0.0']);
+
+const coworkActorFallback = (collection, actor) => {
+    const host = (collection?.displayName || collection?.name || '').toLowerCase();
+    if (!host.includes('claude_cowork')) return null;
+    const a = typeof actor === 'string' ? actor.trim() : '';
+    if (!a || PLACEHOLDER_ACTORS.has(a)) return null;
+    return a;
+};
+
 /**
  * Gets username for a collection from the username map
  * Collection name format: <device-id>.<source-id>.<service-name>
@@ -140,12 +150,14 @@ const fetchEndpointShieldUserMetadata = async () => {
  * 2. Full name match
  * 3. By deviceId/endpointId directly (first part of collection name)
  * 4. Endpoint shield format: deviceId.serviceName (skipping source-id)
+ * 5. Claude Cowork hosts: optional actor (user.email) when shield map misses
  *
  * @param {Object} collection - Collection object with displayName and/or name
  * @param {Object} usernameMap - Map of collection name to username
+ * @param {string} [actor] - Optional threat-event actor (e.g. user.email for Cowork)
  * @returns {string} - Username or "-" if not found
  */
-const getUsernameForCollection = (collection, usernameMap) => {
+const getUsernameForCollection = (collection, usernameMap, actor) => {
     if (!usernameMap || Object.keys(usernameMap).length === 0 || !collection) return DEFAULT_VALUE;
 
     const displayName = collection.displayName?.toLowerCase();
@@ -180,7 +192,7 @@ const getUsernameForCollection = (collection, usernameMap) => {
         }
     }
 
-    return DEFAULT_VALUE;
+    return coworkActorFallback(collection, actor) || DEFAULT_VALUE;
 };
 
 /**
