@@ -167,7 +167,7 @@ public class MaliciousEventService {
         .setFilterId(filterId)
         .setLatestApiEndpoint(evt.getLatestApiEndpoint())
         .setLatestApiMethod(URLMethods.Method.fromString(evt.getLatestApiMethod()))
-        .setLatestApiOrig(evt.getLatestApiPayload())
+        .setLatestApiOrig("settings-scanner".equals(actor) ? ThreatUtils.repairConfigScanEnvelope(evt.getLatestApiPayload()) : evt.getLatestApiPayload())
         .setLatestApiCollectionId(evt.getLatestApiCollectionId())
         .setEventType(maliciousEventType)
         .setLatestApiIp(evt.getLatestApiIp())
