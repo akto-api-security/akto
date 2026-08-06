@@ -24,6 +24,30 @@ import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig"
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import OwaspTag from "../../guardrails/components/OwaspTag";
 import ComplianceTags from "../../guardrails/components/ComplianceTags";
+import { parseConfigEvidence } from "../../guardrails/violations/violationsData";
+
+// Unwraps a JSON config_content (TOML stays a string) and builds the highlight segment for it.
+function buildConfigScanSample(orig) {
+    try {
+        const outer = JSON.parse(orig);
+        const req = JSON.parse(outer.requestPayload);
+
+        if (typeof req?.config_content === "string") {
+            try { req.config_content = JSON.parse(req.config_content); } catch (e) { /* TOML, not JSON */ }
+        }
+        outer.requestPayload = JSON.stringify(req);
+
+        const { field, value } = parseConfigEvidence(req?.evidence);
+        return {
+            message: JSON.stringify(outer),
+            vulnerabilitySegments: field && value
+                ? [{ phrase: value, field, location: "REQUEST", includeKeyInHighlight: true }]
+                : undefined,
+        };
+    } catch (e) {
+        return { message: orig, vulnerabilitySegments: undefined };
+    }
+}
 
 // Self-contained approve button + modal. Kept as its own component so typing the duration
 // re-renders only this small tree, not the whole SampleDetails flyout (which caused a flash).
@@ -403,7 +427,10 @@ function SampleDetails(props) {
                     vertical={true}
                     isWebSocket={func.isWebSocketApiType(moreInfoData?.apiType)}
                     sampleData={data && Array.isArray(data) && data.length > 0 ? data.map((result) => {
-                        return { message: result.orig, highlightPaths: [], metadata: result.metadata }
+                        const { message, vulnerabilitySegments } = isSettingsRisk
+                            ? buildConfigScanSample(result.orig)
+                            : { message: result.orig, vulnerabilitySegments: undefined };
+                        return { message, highlightPaths: [], metadata: result.metadata, vulnerabilitySegments }
                     }) : []}
                     redactHeaders={window.ACTIVE_ACCOUNT === 1758787662 ? ['authorization'] : []}
                 />

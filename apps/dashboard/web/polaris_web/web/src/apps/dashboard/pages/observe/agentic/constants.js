@@ -932,6 +932,8 @@ export function buildAgenticAssetsPageData(
             riskScore,
             endpointCount: group.endpointsCount,
             deviceCount: group.endpointsCount,
+            // Needed to scope the malicious-skill flag to this asset's own collections.
+            collectionIds,
             lastSeen: lastSeen > 0 ? func.prettifyEpoch(lastSeen) : "",
             lastSeenEpoch: lastSeen,
             hasPersonalAccount: group.hasPersonalAccount || false,
@@ -1001,8 +1003,29 @@ export function buildAgenticAssetsPageData(
 }
 
 /**
+ * Composite key for collection-scoped malicious-skill lookups.
+ * The malicious tag lives on a specific collection's apiInfo, so it must only mark that
+ * collection's (i.e. that user/agent/host's) copy of the skill — a same-named skill belonging
+ * to a different user must not inherit the flag.
+ */
+export function skillCollectionKey(collectionId, skillName) {
+    return `${collectionId}|${String(skillName).toLowerCase()}`;
+}
+
+/** True when any of the given collections carries the malicious tag on one of its own skills. */
+export function hasMaliciousSkillInCollections(maliciousSkillKeys, collections) {
+    if (!maliciousSkillKeys?.size || !Array.isArray(collections)) return false;
+    return collections.some((c) =>
+        (Array.isArray(c?.skills) ? c.skills : []).some((s) => maliciousSkillKeys.has(skillCollectionKey(c.id, s)))
+    );
+}
+
+/**
  * Fetch apiInfos for the given collection IDs, build and cache skillScoreMap + maliciousSkills,
  * then return { skillScoreMap, maliciousSkills }. Uses PersistStore cache; skips fetch if warm.
+ * `maliciousSkillKeys` holds `<collectionId>|<skillName>` keys so callers can scope the flag to
+ * the collection that actually owns the tagged skill; `maliciousSkills` stays name-only for
+ * callers that have no collection context.
  */
 export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistStore }) {
 
@@ -1010,7 +1033,7 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
     const cacheAge = Date.now() - (cached?.ts || 0);
 
     if (cacheAge <= SKILL_RISK_CACHE_TTL_MS && cached?.ts > 0) {
-        return { skillScoreMap: cached.data || {}, maliciousSkills: new Set(cached.maliciousSkills || []), misconfiguredSkills: new Set(cached.misconfiguredSkills || []), misconfiguredCollectionIds: new Set(cached.misconfiguredCollectionIds || []) };
+        return { skillScoreMap: cached.data || {}, maliciousSkills: new Set(cached.maliciousSkills || []), maliciousSkillKeys: new Set(cached.maliciousSkillKeys || []), misconfiguredSkills: new Set(cached.misconfiguredSkills || []), misconfiguredCollectionIds: new Set(cached.misconfiguredCollectionIds || []) };
     }
 
     const results = await Promise.all(
@@ -1026,6 +1049,7 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
 
     const skillScoreMap = {};
     const maliciousSkills = new Set();
+    const maliciousSkillKeys = new Set();
     const misconfiguredSkills = new Set();
     const misconfiguredCollectionIds = new Set();
     results.forEach(({ id: collectionId, infos }) => {
@@ -1036,7 +1060,10 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
             if (skillName) {
                 skillScoreMap[skillName] = info.riskScore || 0;
                 const isMalicious = (info.tagsList || []).some(t => (t.keyName === "malicious-skill-tag" || t.key === "malicious-skill-tag") && t.value === "true");
-                if (isMalicious) maliciousSkills.add(skillName);
+                if (isMalicious) {
+                    maliciousSkills.add(skillName);
+                    maliciousSkillKeys.add(skillCollectionKey(collectionId, skillName));
+                }
                 const isMisconfigured = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
                 if (isMisconfigured) misconfiguredSkills.add(skillName);
             }
@@ -1047,6 +1074,6 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
         });
     });
 
-    PersistStore.getState().setSkillRiskScoreCache({ data: skillScoreMap, maliciousSkills: [...maliciousSkills], misconfiguredSkills: [...misconfiguredSkills], misconfiguredCollectionIds: [...misconfiguredCollectionIds], ts: Date.now() });
-    return { skillScoreMap, maliciousSkills, misconfiguredSkills, misconfiguredCollectionIds };
+    PersistStore.getState().setSkillRiskScoreCache({ data: skillScoreMap, maliciousSkills: [...maliciousSkills], maliciousSkillKeys: [...maliciousSkillKeys], misconfiguredSkills: [...misconfiguredSkills], misconfiguredCollectionIds: [...misconfiguredCollectionIds], ts: Date.now() });
+    return { skillScoreMap, maliciousSkills, maliciousSkillKeys, misconfiguredSkills, misconfiguredCollectionIds };
 }

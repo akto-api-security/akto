@@ -36,6 +36,7 @@ import {
   buildAgenticAssetsPageData,
   buildUserAnalysisLookup,
   fetchAndCacheSkillApiData,
+  skillCollectionKey,
 } from "./constants";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
@@ -424,11 +425,13 @@ export default function AgenticAssetsPage() {
         });
         if (skillCollectionIds.length) {
           fetchAndCacheSkillApiData(skillCollectionIds, { api, PersistStore })
-            .then(({ maliciousSkills }) => {
-              if (!isMountedRef.current || !maliciousSkills?.size) return;
+            .then(({ maliciousSkillKeys }) => {
+              if (!isMountedRef.current || !maliciousSkillKeys?.size) return;
+              // Scoped to the asset's own collections so a same-named skill belonging to a
+              // different user/agent doesn't mark this one malicious.
               const markMalicious = (rows) =>
                 rows.map((r) =>
-                  r.type === "Skill" && maliciousSkills.has(r.name)
+                  r.type === "Skill" && (r.collectionIds || []).some((cid) => maliciousSkillKeys.has(skillCollectionKey(cid, r.name)))
                     ? { ...r, isMalicious: true }
                     : r,
                 );

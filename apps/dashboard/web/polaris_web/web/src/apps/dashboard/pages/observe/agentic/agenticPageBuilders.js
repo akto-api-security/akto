@@ -296,6 +296,8 @@ export function buildSkillsFlyoutData(collection, apiInfoList = [], stiEndpoints
     const urlBySkill = {};
     const methodBySkill = {};
     const descriptionBySkill = {};
+    const threatScoreBySkill = {};
+    const hasThreatTagBySkill = {};
 
     const skillNameFromUrl = (url) => {
         if (!url) return null;
@@ -316,6 +318,12 @@ export function buildSkillsFlyoutData(collection, apiInfoList = [], stiEndpoints
         riskBySkill[skillName] = Math.max(riskBySkill[skillName] || 0, info.riskScore || 0);
         const vCount = Object.values(info.violations || {}).reduce((a, b) => a + (b || 0), 0);
         if (vCount > 0) violationsBySkill[skillName] = vCount;
+        threatScoreBySkill[skillName] = Math.max(threatScoreBySkill[skillName] || 0, info.threatScore || 0);
+        const hasThreatTag = (info.tagsList || []).some((t) =>
+            (((t.keyName === "skill-tags" || t.key === "skill-tags") && t.value && !/^version=/i.test(t.value)) ||
+             ((t.keyName === "malicious-skill-tag" || t.key === "malicious-skill-tag") && t.value === "true"))
+        );
+        if (hasThreatTag) hasThreatTagBySkill[skillName] = true;
     });
 
     // Also pick up skills present as STI endpoints (SKILL /skills/<name>) that may not yet have apiInfo
@@ -340,6 +348,8 @@ export function buildSkillsFlyoutData(collection, apiInfoList = [], stiEndpoints
         method: methodBySkill[name] || "SKILL",
         apiCollectionId,
         description: descriptionBySkill[name] || "",
+        threatScore: threatScoreBySkill[name] || 0,
+        isThreatEnabled: (threatScoreBySkill[name] || 0) > 0 || !!hasThreatTagBySkill[name],
     }));
 
     return { skills };

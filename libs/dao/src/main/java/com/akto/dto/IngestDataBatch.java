@@ -28,6 +28,7 @@ public class IngestDataBatch {
     String daemonset_id;
     String enabled_graph;
     String tag;
+    String _traces;
     Boolean publishToGuardrails;
 
 }
