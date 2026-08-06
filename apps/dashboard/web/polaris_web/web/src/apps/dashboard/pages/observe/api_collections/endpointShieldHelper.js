@@ -134,7 +134,7 @@ const PLACEHOLDER_ACTORS = new Set(['', '-', '127.0.0.1', '0.0.0.0']);
 
 const coworkActorFallback = (collection, actor) => {
     const host = (collection?.displayName || collection?.name || '').toLowerCase();
-    if (!host.includes('claude_cowork')) return null;
+    if (!host.includes('cowork')) return null;
     const a = typeof actor === 'string' ? actor.trim() : '';
     if (!a || PLACEHOLDER_ACTORS.has(a)) return null;
     return a;
