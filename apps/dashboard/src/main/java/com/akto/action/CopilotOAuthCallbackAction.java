@@ -71,7 +71,9 @@ public class CopilotOAuthCallbackAction extends ActionSupport {
         int accountId = Integer.parseInt(stateData.get("accountId"));
         Context.accountId.set(accountId);
 
-        boolean isMultiEnvFlow = CopilotStudioAction.FLOW_TYPE_MULTI_ENV_SETUP.equals(stateData.get("flowType"));
+        String flowType = stateData.get("flowType");
+        boolean isMultiEnvFlow = CopilotStudioAction.FLOW_TYPE_MULTI_ENV_SETUP.equals(flowType)
+                || CopilotStudioAction.FLOW_TYPE_MULTI_ENV_RECONNECT.equals(flowType);
 
         if (oauthState.getExpiresAt() < Context.now()) {
             logger.error("oauthCallback: state nonce expired");
@@ -106,6 +108,9 @@ public class CopilotOAuthCallbackAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
 
+        if (CopilotStudioAction.FLOW_TYPE_MULTI_ENV_RECONNECT.equals(flowType)) {
+            return handleReconnectCallback(stateData, dashboardUrl);
+        }
         if (isMultiEnvFlow) {
             return handleMultiEnvCallback(stateData, dashboardUrl);
         }
@@ -201,14 +206,20 @@ public class CopilotOAuthCallbackAction extends ActionSupport {
 
         String callbackUrl = dashboardUrl + "/copilot/oauth/callback";
 
-        String delegatedToken;
+        CopilotStudioMultiEnvApiClient.AccessToken delegated;
         try {
-            delegatedToken = multiEnvApiClient.getDelegatedToken(
+            delegated = multiEnvApiClient.getDelegatedToken(
                 integration.getTenantId(), integration.getClientId(), integration.getClientSecret(),
                 code, callbackUrl, Constants.SCOPE_COPILOT_STUDIO_MULTI_ENV);
         } catch (Exception e) {
             return failMultiEnvCallback(integrationId, redirectUrl, e,
                 "Failed to sign in with Microsoft. Please check your Tenant ID, Client ID and Client Secret.");
+        }
+        String delegatedToken = delegated.getToken();
+
+        // Kept for the recurring job: the inventory API only accepts a delegated token, unlike environment listing.
+        if (delegated.getRefreshToken() == null || delegated.getRefreshToken().isEmpty()) {
+            logger.error("oauthCallback(multiEnv): no refresh_token in response for integration=" + integrationId);
         }
 
         try {
@@ -240,6 +251,7 @@ public class CopilotOAuthCallbackAction extends ActionSupport {
             Filters.eq(CopilotStudioIntegration.ID, new ObjectId(integrationId)),
             Updates.combine(
                 Updates.set(CopilotStudioIntegration.STATUS, CopilotStudioIntegration.Status.ENVIRONMENTS_DISCOVERED.name()),
+                Updates.set(CopilotStudioIntegration.REFRESH_TOKEN, delegated.getRefreshToken()),
                 Updates.set(CopilotStudioIntegration.ENVIRONMENTS, environments),
                 Updates.set(CopilotStudioIntegration.UPDATED_AT, now)
             )
@@ -247,6 +259,52 @@ public class CopilotOAuthCallbackAction extends ActionSupport {
 
         logger.infoAndAddToDb("oauthCallback(multiEnv): discovered " + environments.size()
             + " environments for integration=" + integrationId);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    /** Reconnect callback: renews only refreshToken/status on the existing integration, unlike handleMultiEnvCallback. */
+    private String handleReconnectCallback(Map<String, String> stateData, String dashboardUrl) {
+        String integrationId = stateData.get("integrationId");
+        this.redirectUrl = COPILOT_MULTI_ENV_DASHBOARD_REDIRECT_URL;
+
+        CopilotStudioIntegration integration = CopilotStudioIntegrationDao.instance.findOne(
+            Filters.eq(CopilotStudioIntegration.ID, new ObjectId(integrationId)));
+        if (integration == null) {
+            logger.errorAndAddToDb("oauthCallback(reconnect): integration not found id=" + integrationId);
+            return Action.ERROR.toUpperCase();
+        }
+
+        String callbackUrl = dashboardUrl + "/copilot/oauth/callback";
+
+        CopilotStudioMultiEnvApiClient.AccessToken delegated;
+        try {
+            delegated = multiEnvApiClient.getDelegatedToken(
+                integration.getTenantId(), integration.getClientId(), integration.getClientSecret(),
+                code, callbackUrl, Constants.SCOPE_COPILOT_STUDIO_MULTI_ENV);
+        } catch (Exception e) {
+            return failMultiEnvCallback(integrationId, redirectUrl, e,
+                "Failed to sign in with Microsoft. Please try reconnecting again.");
+        }
+
+        if (delegated.getRefreshToken() == null || delegated.getRefreshToken().isEmpty()) {
+            logger.error("oauthCallback(reconnect): no refresh_token in response for integration=" + integrationId);
+            return failMultiEnvCallback(integrationId, redirectUrl,
+                new Exception("no refresh_token in response"),
+                "Microsoft did not return a refresh token. Please try reconnecting again.");
+        }
+
+        int now = Context.now();
+        // Status deliberately untouched: reconnect is only reachable on an already-CONFIRMED integration.
+        CopilotStudioIntegrationDao.instance.updateOneNoUpsert(
+            Filters.eq(CopilotStudioIntegration.ID, new ObjectId(integrationId)),
+            Updates.combine(
+                Updates.set(CopilotStudioIntegration.REFRESH_TOKEN, delegated.getRefreshToken()),
+                Updates.unset(CopilotStudioIntegration.LAST_ERROR),
+                Updates.set(CopilotStudioIntegration.UPDATED_AT, now)
+            )
+        );
+
+        logger.infoAndAddToDb("oauthCallback(reconnect): refresh token renewed for integration=" + integrationId);
         return Action.SUCCESS.toUpperCase();
     }
 

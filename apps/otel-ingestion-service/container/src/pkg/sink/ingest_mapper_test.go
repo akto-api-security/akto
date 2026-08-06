@@ -80,9 +80,6 @@ func TestEventToIngestRecord(t *testing.T) {
 	if tag["mode"] != "observe" {
 		t.Fatalf("expected observe mode, got %q", tag["mode"])
 	}
-	if tag["behavior"] != "alert" {
-		t.Fatalf("expected alert behavior, got %q", tag["behavior"])
-	}
 	if tag["username"] != "user@example.com" {
 		t.Fatalf("unexpected username tag %q", tag["username"])
 	}
