@@ -20,7 +20,6 @@ var slugSanitizer = regexp.MustCompile(`[^a-z0-9._~-]+`)
 const (
 	connectorClaudeCowork = "claude_cowork"
 	guardrailModeObserve  = "observe"
-	guardrailBehaviorAlert = "alert"
 	genAITagValue         = "Gen AI"
 	coworkHookHeader      = "x-claude_cowork-hook"
 	installerHeaderPrefix = "x-akto-installer-"
@@ -249,7 +248,6 @@ func eventToIngestRecord(e model.OtelIngestEvent) (ingestDataRecord, error) {
 		"hook":           hookName,
 		"akto_connector": connectorClaudeCowork,
 		"mode":           guardrailModeObserve,
-		"behavior":       guardrailBehaviorAlert, // Cowork defaults to alert (never block)
 	}
 	if isMCP {
 		tagObj["mcp-server"] = "MCP Server"
