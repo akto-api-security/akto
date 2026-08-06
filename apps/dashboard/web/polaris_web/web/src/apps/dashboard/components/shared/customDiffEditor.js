@@ -25,6 +25,33 @@ const transform = {
         allKeys.sort();
         return JSON.stringify(data, allKeys, 2)
     },
+    // Reading order for config-scan payload fields; other keys keep their original order.
+    CONFIG_FIELD_ORDER: ["message", "evidence", "config_content"],
+
+    // Rebuilds payload in CONFIG_FIELD_ORDER (a key-array replacer would also filter nested keys).
+    formatConfigJson(payload){
+        const leading = this.CONFIG_FIELD_ORDER.filter(key => key in payload)
+        const trailing = Object.keys(payload).filter(key => !leading.includes(key))
+        const ordered = {}
+        for (const key of [...leading, ...trailing]) ordered[key] = payload[key]
+        return JSON.stringify(ordered, null, 2)
+    },
+
+    // Un-escapes config_content's \n back into real, indented lines (display-only, no longer valid JSON).
+    expandConfigContentNewlines(jsonText){
+        const lineRegex = /^(\s*)"config_content":\s*"((?:[^"\\]|\\.)*)"(,?)\s*$/m
+        const match = lineRegex.exec(jsonText)
+        if (!match) return jsonText
+        const [fullLine, indent, escapedValue, trailingComma] = match
+        let value
+        try {
+            value = JSON.parse('"' + escapedValue + '"')
+        } catch (e) {
+            return jsonText
+        }
+        const expanded = indent + '"config_content": "' + value.replace(/\n/g, '\n' + indent) + '"' + trailingComma
+        return jsonText.slice(0, match.index) + expanded + jsonText.slice(match.index + fullLine.length)
+    },
     compareJsonKeys(original, current){
         let changedKeys = []
         let insertedKeys = []
@@ -364,6 +391,11 @@ const transform = {
                     formattedPayload = payLoad
                 } else if (this.isGraphQLPayload(payLoad)) {
                     formattedPayload = this.formatGraphQLPayload(payLoad)
+                } else if (payLoad?.config_content != null) {
+                    formattedPayload = this.formatConfigJson(payLoad)
+                    if (typeof payLoad.config_content === 'string' && payLoad.config_content.includes('\n')) {
+                        formattedPayload = this.expandConfigContentNewlines(formattedPayload)
+                    }
                 } else {
                     formattedPayload = this.formatJson(payLoad)
                 }
