@@ -42,4 +42,8 @@ public class MaliciousEventDao extends AccountBasedDao<MaliciousEventDto> {
     public long countDocuments(String accountId, Bson filter) {
         return getCollection(accountId).countDocuments(filter);
     }
+
+    public MongoCollection<Document> getRawCollection(String accountId) {
+        return getDatabase(accountId).getCollection(getCollectionName(), Document.class);
+    }
 }

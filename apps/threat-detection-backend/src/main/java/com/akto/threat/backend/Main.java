@@ -16,6 +16,8 @@ import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
 import com.akto.threat.backend.tasks.FlushMessagesToDB;
+import com.akto.threat.backend.utils.ThreatUtils;
+import com.akto.util.AccountTask;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ReadPreference;
@@ -53,6 +55,10 @@ public class Main {
     DaoInit.init(connectionString);
 
     ThreatDetectionDaoInit.init(threatProtectionMongo);
+
+    AccountTask.instance.executeTask(
+        account -> ThreatUtils.repairConfigScanHistoricalData(String.valueOf(account.getId()), MaliciousEventDao.instance),
+        "repairConfigScanHistoricalData");
 
     KafkaConfig internalKafkaConfig =
         KafkaConfig.newBuilder()
