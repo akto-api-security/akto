@@ -137,13 +137,13 @@ func TestToIngestDataRequestSkipsMcpToolDecision(t *testing.T) {
 				EventName: "claude_code.tool_decision",
 				Timestamp: time.Unix(1783577792, 0).UTC(),
 				Attributes: map[string]string{
-					"tool_name":       "Bash",
-					"tool_use_id":     "toolu_01R8q7zzP3qnoaDxpdW4zTFC",
-					"tool_parameters": `{"bash_command":"find","mcp_server_name":"workspace","mcp_tool_name":"bash"}`,
-					"decision":        "accept",
+					"tool_name":         "Bash",
+					"tool_use_id":       "toolu_01R8q7zzP3qnoaDxpdW4zTFC",
+					"tool_parameters":   `{"bash_command":"find","mcp_server_name":"workspace","mcp_tool_name":"bash"}`,
+					"decision":          "accept",
 					"user.account_uuid": "19bc4c9a-880a-4294-908d-522e9bb54b8f",
-					"user.email":      "shivansh@akto.io",
-					"session.id":      "c806e88e-af7e-4f1f-bd95-ede175eba20a",
+					"user.email":        "shivansh@akto.io",
+					"session.id":        "c806e88e-af7e-4f1f-bd95-ede175eba20a",
 				},
 			},
 		},
@@ -170,14 +170,14 @@ func TestEventToIngestRecordMcpToolDecisionPayload(t *testing.T) {
 		EventName: "claude_code.tool_decision",
 		Timestamp: time.Unix(1783577792, 0).UTC(),
 		Attributes: map[string]string{
-			"tool_name":       "Bash",
-			"tool_use_id":     "toolu_01R8q7zzP3qnoaDxpdW4zTFC",
-			"tool_parameters": `{"bash_command":"find","mcp_server_name":"workspace","mcp_tool_name":"bash"}`,
-			"decision":        "accept",
-			"source":          "config",
+			"tool_name":         "Bash",
+			"tool_use_id":       "toolu_01R8q7zzP3qnoaDxpdW4zTFC",
+			"tool_parameters":   `{"bash_command":"find","mcp_server_name":"workspace","mcp_tool_name":"bash"}`,
+			"decision":          "accept",
+			"source":            "config",
 			"user.account_uuid": "19bc4c9a-880a-4294-908d-522e9bb54b8f",
-			"user.email":      "shivansh@akto.io",
-			"session.id":      "c806e88e-af7e-4f1f-bd95-ede175eba20a",
+			"user.email":        "shivansh@akto.io",
+			"session.id":        "c806e88e-af7e-4f1f-bd95-ede175eba20a",
 		},
 	}
 
@@ -290,10 +290,10 @@ func TestEventToIngestRecordReadBuiltinTool(t *testing.T) {
 		EventName: "claude_code.tool_decision",
 		Timestamp: time.Unix(1783577797, 0).UTC(),
 		Attributes: map[string]string{
-			"tool_name":  "Read",
+			"tool_name":   "Read",
 			"tool_use_id": "toolu_014Ku6wAYT4axH7ZGYiM36Zc",
-			"decision":   "accept",
-			"user.id":    "0571cbc5",
+			"decision":    "accept",
+			"user.id":     "0571cbc5",
 		},
 	}
 
@@ -412,9 +412,18 @@ func TestToIngestDataRequestSkipsPluginLoaded(t *testing.T) {
 			{
 				EventName: "claude_code.user_prompt",
 				Attributes: map[string]string{
+					"prompt.id":  "plugin-loaded-test",
 					"prompt":     "hi",
 					"user.id":    "0571cbc5",
 					"user.email": "user@example.com",
+				},
+			},
+			{
+				EventName: "claude_code.api_request",
+				Attributes: map[string]string{
+					"prompt.id": "plugin-loaded-test",
+					"model":     "claude-sonnet-4-6",
+					"user.id":   "0571cbc5",
 				},
 			},
 			{
@@ -461,9 +470,9 @@ func TestMergePromptTurnEvents(t *testing.T) {
 				EventName: "claude_code.user_prompt",
 				Timestamp: time.Unix(100, 0).UTC(),
 				Attributes: map[string]string{
-					"prompt.id": "p1",
-					"prompt":    "hello",
-					"user.id":   "0571cbc5",
+					"prompt.id":  "p1",
+					"prompt":     "hello",
+					"user.id":    "0571cbc5",
 					"user.email": "user@example.com",
 					"session.id": "sess-1",
 				},
@@ -485,10 +494,10 @@ func TestMergePromptTurnEvents(t *testing.T) {
 				EventName: "claude_code.assistant_response",
 				Timestamp: time.Unix(102, 0).UTC(),
 				Attributes: map[string]string{
-					"prompt.id": "p1",
-					"response":  "hi there",
-					"model":     "claude-haiku-4-5-20251001",
-					"user.id":   "0571cbc5",
+					"prompt.id":  "p1",
+					"response":   "hi there",
+					"model":      "claude-haiku-4-5-20251001",
+					"user.id":    "0571cbc5",
 					"user.email": "user@example.com",
 					"session.id": "sess-1",
 				},
@@ -553,6 +562,94 @@ func TestMergePromptTurnEvents(t *testing.T) {
 	usage, ok := respBody["usage"].(map[string]interface{})
 	if !ok || int(usage["input_tokens"].(float64)) != 2 {
 		t.Fatalf("unexpected usage %v", respBody["usage"])
+	}
+}
+
+// TestMergePromptTurnEventsAcrossBatches covers the Cowork async case: user_prompt and
+// api_request arrive in separate OTLP exports (separate calls to toIngestDataRequest).
+// The first export must not ship a model-less row; the second must complete it into one
+// merged /v1/messages record carrying the model.
+func TestMergePromptTurnEventsAcrossBatches(t *testing.T) {
+	promptID := "cross-batch-prompt-1"
+
+	batch1 := Batch{
+		AccountID: 1000000,
+		Events: []model.OtelIngestEvent{
+			{
+				EventName: "claude_code.user_prompt",
+				Timestamp: time.Unix(200, 0).UTC(),
+				Attributes: map[string]string{
+					"prompt.id":  promptID,
+					"prompt":     "summarize this doc",
+					"user.id":    "0571cbc5",
+					"user.email": "user@example.com",
+					"session.id": "sess-async-1",
+				},
+			},
+		},
+	}
+
+	body1, err := toIngestDataRequest(batch1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var req1 ingestDataRequest
+	if err := json.Unmarshal(body1, &req1); err != nil {
+		t.Fatal(err)
+	}
+	if len(req1.BatchData) != 0 {
+		t.Fatalf("prompt-only export should be held pending, not ingested yet, got %d records", len(req1.BatchData))
+	}
+
+	batch2 := Batch{
+		AccountID: 1000000,
+		Events: []model.OtelIngestEvent{
+			{
+				EventName: "claude_code.api_request",
+				Timestamp: time.Unix(240, 0).UTC(),
+				Attributes: map[string]string{
+					"prompt.id":     promptID,
+					"model":         "claude-haiku-4-5-20251001",
+					"input_tokens":  "5",
+					"output_tokens": "30",
+					"user.id":       "0571cbc5",
+					"session.id":    "sess-async-1",
+				},
+			},
+		},
+	}
+
+	body2, err := toIngestDataRequest(batch2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var req2 ingestDataRequest
+	if err := json.Unmarshal(body2, &req2); err != nil {
+		t.Fatal(err)
+	}
+	if len(req2.BatchData) != 1 {
+		t.Fatalf("expected one merged record once api_request completes the turn, got %d", len(req2.BatchData))
+	}
+
+	llm := req2.BatchData[0]
+	if llm.Path != "/v1/messages" {
+		t.Fatalf("unexpected path %q", llm.Path)
+	}
+
+	var reqBody map[string]string
+	if err := json.Unmarshal([]byte(llm.RequestPayload), &reqBody); err != nil {
+		t.Fatal(err)
+	}
+	if reqBody["body"] != "summarize this doc" {
+		t.Fatalf("expected prompt from the first export to carry over, got %q", reqBody["body"])
+	}
+
+	var respBody map[string]interface{}
+	if err := json.Unmarshal([]byte(llm.ResponsePayload), &respBody); err != nil {
+		t.Fatal(err)
+	}
+	if respBody["model"] != "claude-haiku-4-5-20251001" {
+		t.Fatalf("expected model from the second export on the merged row, got %v", respBody["model"])
 	}
 }
 
