@@ -239,6 +239,21 @@ const DEFAULT_COL_DEF = {
     cellStyle: { display: "flex", alignItems: "center", fontSize: 13, color: "#202223" },
 };
 
+// Backend row field names don't match the grid's column defs directly — device (parent) rows carry
+// team/userRole/lastSeenEpoch (AgenticObserveAction.HostGroupSummary.toRow), service (child) rows
+// carry lastTrafficEpoch (buildDeviceChildren) and no team/role at all. Reshape both into the
+// group/role/lastTraffic the columns actually read, matching AgenticAssetsPage.jsx's shapeRow.
+function shapeRow(row) {
+    if (!row) return row;
+    const epoch = row.lastSeenEpoch ?? row.lastTrafficEpoch;
+    return {
+        ...row,
+        group: row.team,
+        role: row.userRole,
+        lastTraffic: epoch > 0 ? func.prettifyEpoch(epoch) : "",
+    };
+}
+
 function getHostNamesForDevice(deviceId, collections) {
     if (!deviceId || !collections?.length) return [];
     const prefix = deviceId + ".";
@@ -247,7 +262,7 @@ function getHostNamesForDevice(deviceId, collections) {
 
 // ─── Table section ────────────────────────────────────────────────────────────
 
-function TableSection({ onServerFetch, fetchDeviceChildren, collections, startTimestamp, endTimestamp, violationRows, refreshKey }) {
+function TableSection({ onServerFetch, fetchDeviceChildren, collections, startTimestamp, endTimestamp, refreshKey }) {
     const [selectedCount, setSelectedCount] = useState(0);
     const [deviceFlyout, setDeviceFlyout] = useState(null);
     const gridRef = useRef(null);
@@ -347,7 +362,6 @@ function TableSection({ onServerFetch, fetchDeviceChildren, collections, startTi
                 collections={collections}
                 startTimestamp={startTimestamp}
                 endTimestamp={endTimestamp}
-                violationRows={violationRows}
             />
         </VerticalStack>
     );
@@ -360,12 +374,12 @@ export default function DeviceEndpoints() {
     const [loading, setLoading] = useState(true);
     const [collections, setCollections] = useState([]);
     const [stats, setStats] = useState({ deviceCount: 0, browserDeviceCount: 0, totalUsers: 0, monthLabels: [], osTrend: {}, browserTrend: {}, sparklines: {} });
-    const [totalViolations, setTotalViolations] = useState(0);
     const [violationsBySeverity, setViolationsBySeverity] = useState([]);
+    const totalViolations = useMemo(
+        () => violationsBySeverity.reduce((sum, s) => sum + (s.y || 0), 0),
+        [violationsBySeverity],
+    );
     const [refreshKey, setRefreshKey] = useState(0);
-    // undefined (not []) until loaded, so DeviceFlyout/ViolationsTab can tell "not loaded yet" apart
-    // from "confirmed zero violations".
-    const [allViolationRows] = useState(undefined);
     const newLayout = LocalStore((state) => state.agenticNewLayout);
     const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
 
@@ -417,13 +431,10 @@ export default function DeviceEndpoints() {
                     severitySums.medium += c.medium || 0;
                     severitySums.low += c.low || 0;
                 });
-                const total = severitySums.critical + severitySums.high + severitySums.medium + severitySums.low;
-
                 enrichRef.current = {
                     trafficMap, riskScoreMap, usernameMap, userMetadataMap, deviceMetadataMap, violationsByCollectionId,
                 };
                 setCollections(collections);
-                setTotalViolations(total);
                 setViolationsBySeverity([
                     { name: "Critical", y: severitySums.critical, color: "#DC2626" },
                     { name: "High", y: severitySums.high, color: "#F97316" },
@@ -468,13 +479,13 @@ export default function DeviceEndpoints() {
         return api.fetchDeviceEndpointsSummary({
             parentDeviceId, skip, limit, sortKey: mappedSortKey, sortOrder: mongoSortOrder, queryValue: searchString,
             trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId,
-        }).then((res) => ({ value: res.rows || [], total: res.total || 0 }));
+        }).then((res) => ({ value: (res.rows || []).map(shapeRow), total: res.total || 0 }));
     }, []);
 
     const fetchDeviceChildren = useCallback(async (deviceId) => {
         const { trafficMap, riskScoreMap, violationsByCollectionId } = enrichRef.current;
         const res = await api.fetchDeviceEndpointsSummary({ parentDeviceId: deviceId, trafficMap, riskScoreMap, violationsByCollectionId });
-        return res.rows || [];
+        return (res.rows || []).map(shapeRow);
     }, []);
 
     const headerActions = (
@@ -520,7 +531,6 @@ export default function DeviceEndpoints() {
                     collections={collections}
                     startTimestamp={startTimestamp}
                     endTimestamp={endTimestamp}
-                    violationRows={allViolationRows}
                     refreshKey={refreshKey}
                 />,
             ]}
