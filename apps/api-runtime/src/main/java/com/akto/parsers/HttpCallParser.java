@@ -82,7 +82,7 @@ public class HttpCallParser {
             .build();
 
     private Map<Integer, ApiCollection> apiCollectionMap;
-    private boolean skipDependencyAnalysis = false;
+    private boolean skipDependencyAnalysis = true;
 
     private static final ConcurrentLinkedQueue<BasicDBObject> queue = new ConcurrentLinkedQueue<>();
 

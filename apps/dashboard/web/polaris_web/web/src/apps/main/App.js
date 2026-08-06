@@ -35,6 +35,7 @@ import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TrafficCollectorsMetrics from "../dashboard/pages/settings/metrics/TrafficCollectorsMetrics";
 import ThreatDetectionMetrics from "../dashboard/pages/settings/metrics/ThreatDetectionMetrics";
 import MiniRuntimeMetrics from "../dashboard/pages/settings/metrics/MiniRuntimeMetrics";
+import AccountJobExecutorMetrics from "../dashboard/pages/settings/metrics/AccountJobExecutorMetrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import PromptHardening from "../dashboard/pages/prompt_hardening/PromptHardening";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
@@ -459,6 +460,10 @@ const router = createBrowserRouter([
                     {
                         path: "mini-runtime-metrics",
                         element: <MiniRuntimeMetrics/>,
+                    },
+                    {
+                        path: "account-job-executor-metrics",
+                        element: <AccountJobExecutorMetrics/>,
                     },
                     {
                         path: "integrations/burp",

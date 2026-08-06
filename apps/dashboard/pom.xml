@@ -15,12 +15,47 @@
     <packaging>war</packaging>
     <dependencyManagement>
         <dependencies>
+            <!-- AWS SDK bumped 1.12.405 -> 1.12.640 to drop the transitive vulnerable
+                 ion-java:1.0.2 (High, CVE-2024-21634) — 1.12.640's aws-java-sdk-core no longer
+                 declares ion-java, so the jar is removed rather than patched.
+                 !! NOT YET RUNTIME-TESTED !!: only verified to (a) compile and (b) that ion-java
+                 is gone from the dependency tree. The AWS-backed dashboard features
+                 (lambda / ec2 / autoscaling / cloudformation / elb / logs) have NOT been exercised
+                 on 1.12.640 yet. (AWS SDK for Java v1 is end-of-support since Dec 2025; migrating
+                 these calls to SDK v2 is the durable fix.) -->
             <dependency>
                 <groupId>com.amazonaws</groupId>
                 <artifactId>aws-java-sdk-bom</artifactId>
-                <version>1.12.405</version>
+                <version>1.12.640</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <!-- Force the transitive commons-io to a patched version (GHSA-78wr, High). -->
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>2.14.0</version>
+            </dependency>
+            <!-- Pin all transitive io.netty:* to a single patched version (multiple Critical/High).
+                 4.1.136 fixes netty-codec / netty-codec-http Highs (GHSA-558v-64gr-wgg4,
+                 GHSA-jppx-w49h-x2qq, GHSA-6jqx-86gh-f27w, GHSA-mvh2-crg5-v77c). -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>4.1.136.Final</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Patched kafka-clients (GHSA-5qcv, High) and its transitive lz4 (GHSA-vqf4/cmp6, High). -->
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-clients</artifactId>
+                <version>3.9.2</version>
+            </dependency>
+            <dependency>
+                <groupId>org.lz4</groupId>
+                <artifactId>lz4-java</artifactId>
+                <version>1.8.1</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -29,43 +64,62 @@
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-lambda</artifactId>
-            <version>1.12.405</version>
+            <version>1.12.640</version>
         </dependency>
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-logs</artifactId>
-            <version>1.12.405</version>
+            <version>1.12.640</version>
         </dependency>
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-elasticloadbalancingv2</artifactId>
-            <version>1.12.405</version>
+            <version>1.12.640</version>
         </dependency>
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-cloudformation</artifactId>
-            <version>1.12.405</version>
+            <version>1.12.640</version>
         </dependency>
         <!-- v1.11.678 does not support startInstanceRefresh, using latest version. -->
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-autoscaling</artifactId>
-            <version>1.12.405</version>
+            <version>1.12.640</version>
         </dependency>
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-ec2</artifactId>
-            <version>1.12.405</version>
+            <version>1.12.640</version>
         </dependency>
         <dependency>
             <groupId>org.apache.struts</groupId>
             <artifactId>struts2-core</artifactId>
-            <version>2.5.33</version>
+            <!-- Struts 6.x (javax line, runs on Java 8+): clears the 2.5.33 Critical/High CVEs.
+                 Struts 7 is the jakarta line and is intentionally not used here. -->
+            <version>6.10.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
             <version>3.18.0</version>
+        </dependency>
+        <!-- Override the inherited jackson 2.16.1 (root pom) with a patched version for this
+             module only (GHSA-rmj7 / GHSA-j3rv, High). Direct declaration wins over inherited. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.18.9</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>2.18.9</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>2.18.9</version>
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.kohsuke/github-api -->
         <dependency>
@@ -73,11 +127,12 @@
             <artifactId>github-api</artifactId>
             <version>1.316</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/org.eclipse.jetty/jetty-servlets -->
+        <!-- Jetty 12 EE8 servlets (javax.servlet line): provides CrossOriginFilter (used in
+             web.xml). Matches the Jetty 12 server (no version skew). Replaces jetty-servlets 9.4. -->
         <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-servlets</artifactId>
-            <version>9.4.58.v20250814</version>
+            <groupId>org.eclipse.jetty.ee8</groupId>
+            <artifactId>jetty-ee8-servlets</artifactId>
+            <version>12.0.37</version>
         </dependency>
         <dependency>
             <groupId>javax.servlet</groupId>
@@ -146,7 +201,8 @@
         <dependency>
             <groupId>org.apache.struts</groupId>
             <artifactId>struts2-json-plugin</artifactId>
-            <version>2.5.30</version>
+            <!-- Must match struts2-core version. -->
+            <version>6.10.0</version>
         </dependency>
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
@@ -261,33 +317,68 @@
             </resource>
         </resources>
         <plugins>
+            <!-- mockito-inline 3.4.0's bundled ByteBuddy can't redefine classes on Java 17
+                 (class file v61) -> "Could not modify all classes". The experimental flag lets
+                 ByteBuddy proceed; add-opens covers the inline mock-maker's reflection. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>-Dnet.bytebuddy.experimental=true --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED</argLine>
+                </configuration>
+            </plugin>
             <plugin>
                 <artifactId>maven-war-plugin</artifactId>
-                <version>2.3</version>
+                <!-- 3.4.0: war-plugin 2.3 fails on JDK 17 (reflective TreeMap access). -->
+                <version>3.4.0</version>
                 <configuration>
                     <warSourceDirectory>web</warSourceDirectory>
                     <failOnMissingWebXml>false</failOnMissingWebXml>
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>org.eclipse.jetty</groupId>
-                <artifactId>jetty-maven-plugin</artifactId>
-                <version>9.4.58.v20250814</version>
+                <groupId>org.eclipse.jetty.ee8</groupId>
+                <artifactId>jetty-ee8-maven-plugin</artifactId>
+                <!-- Jetty 12 EE8 maven plugin for local `jetty-ee8:run` of the javax webapp.
+                     <descriptor> removed: it resolves relative to the CWD (not the module) and
+                     breaks the run; web.xml is auto-discovered under webAppSourceDirectory/WEB-INF. -->
+                <version>12.0.37</version>
                 <configuration>
                     <webAppSourceDirectory>web</webAppSourceDirectory>
                     <webApp>
                         <contextPath>/</contextPath>
-                        <descriptor>WEB-INF/web.xml</descriptor>
                     </webApp>
                 </configuration>
             </plugin>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <groupId>org.apache.maven.plugins</groupId>
+                <!-- 3.13.0: 3.1 predates and silently ignores <release>. -->
+                <version>3.13.0</version>
                 <configuration>
-                    <source>8</source>
-                    <target>8</target>
+                    <release>17</release>
                 </configuration>
+            </plugin>
+            <!-- Require JDK 17+ to build/run this module (fail fast on older JDKs). -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>enforce-java-17</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[17,)</version>
+                                </requireJavaVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
         <finalName>${project.artifactId}</finalName>

@@ -502,6 +502,54 @@ const api = {
         })
     },
 
+    initiateCopilotStudioMultiEnvSetup(tenantId, clientId, clientSecret, dataIngestionUrl) {
+        return request({
+            url: '/api/copilotStudio/multiEnv/initiate',
+            method: 'post',
+            data: { tenantId, clientId, clientSecret, dataIngestionUrl }
+        })
+    },
+
+    fetchCopilotStudioMultiEnvIntegration(integrationId) {
+        return request({
+            url: '/api/copilotStudio/fetchMultiEnvIntegration',
+            method: 'post',
+            data: { integrationId }
+        })
+    },
+
+    confirmCopilotStudioMultiEnvIntegration(integrationId) {
+        return request({
+            url: '/api/copilotStudio/multiEnv/confirm',
+            method: 'post',
+            data: { integrationId }
+        })
+    },
+
+    removeCopilotStudioMultiEnvIntegration() {
+        return request({
+            url: '/api/copilotStudio/multiEnv/remove',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    reconnectCopilotStudioMultiEnvIntegration() {
+        return request({
+            url: '/api/copilotStudio/multiEnv/reconnect',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    enableCopilotStudioMultiEnvAgentGraph() {
+        return request({
+            url: '/api/copilotStudio/multiEnv/enableAgentGraph',
+            method: 'post',
+            data: {}
+        })
+    },
+
 }
 
 export default api

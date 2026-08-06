@@ -39,6 +39,8 @@ public class Constants {
     public static final int ONE_DAY_TIMESTAMP = ( 60 * 60 * 24 );
 
     public static final int TWO_HOURS_TIMESTAMP = ( 60 * 60 * 2 );
+
+    public static final int FOUR_HOURS_TIMESTAMP = ( 60 * 60 * 4 );
     public static final String ONBOARDING_DEMO_TEST = "Onboarding demo test";
 
     public static final String AKTO_IGNORE_FLAG = "x-akto-ignore";
@@ -68,6 +70,10 @@ public class Constants {
     public final static String _AKTO = "AKTO";
 
     public final static String DEFAULT_AKTO_DASHBOARD_URL = "https://app.akto.io";
+    /** .default's consent covers every permission configured on the app registration, not just this resource; combining with a named scope errors AADSTS70011. */
+    public final static String SCOPE_COPILOT_STUDIO_MULTI_ENV = "https://service.powerapps.com//.default offline_access";
+    // Single-resource scope for the refresh_token grant to call the inventory API — a token request can't span resources like /authorize can.
+    public final static String SCOPE_COPILOT_STUDIO_INVENTORY = "https://api.powerplatform.com/.default offline_access";
     public static final String AKTO_DISCOVERED_APIS_COLLECTION = "shadow_apis";
     public static final String AKTO_MCP_SERVER_TAG = "mcp-server";
     public static final String AKTO_MCP_SERVER_TYPE_TAG = "mcp-server-type";
@@ -79,6 +85,8 @@ public class Constants {
     public static final String AKTO_COPILOT_BOT_PUBLISHED_STATE_TAG = "bot-published-state";
     public static final String AKTO_COPILOT_SOURCE_VALUE = "COPILOT_STUDIO";
     public static final String AKTO_COPILOT_CONVERSATION_URL_PREFIX = "/copilot/conversation";
+    public static final String COPILOT_STUDIO_AI_AGENT_NAME = "copilot-studio";
+    public static final String AKTO_COPILOT_INVENTORY_TAG = "copilot-inventory";
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
     public static final String AKTO_AGENT_PROXY_TAG = "agent-proxy";
     public static final String AKTO_GUARD_RAIL_TAG = "guard-rail";

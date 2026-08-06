@@ -30,7 +30,6 @@ import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
@@ -72,8 +71,6 @@ import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.type.URLMethods;
 import com.akto.utils.scripts.AcesssTypeCollectionLevel;
-import com.akto.dao.ApiCollectionIconsDao;
-import com.akto.dto.ApiCollectionIcon;
 import com.akto.gpt.handlers.gpt_prompts.AgentGuardSystemPromptClassifier;
 import com.akto.gpt.handlers.gpt_prompts.AzureOpenAIPromptHandler;
 import com.mongodb.client.model.Projections;
@@ -407,6 +404,8 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchAllCollectionsBasic() throws Exception {
         long start = System.currentTimeMillis();
+        User user = getSUser();
+        String loggedInUser = (user != null && user.getLogin() != null) ? user.getLogin() : "system";
 
         // For account 1736798101, serve from cache if available and fresh
         if (Context.accountId.get() == CACHED_ACCOUNT_ID) {
@@ -417,7 +416,7 @@ public class ApiCollectionsAction extends UserAction {
                 httpResponse.setContentType("application/json");
                 httpResponse.setCharacterEncoding("UTF-8");
                 httpResponse.getOutputStream().write(cached);
-                loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] served from cache in " + (System.currentTimeMillis() - start) + "ms, bytes=" + cached.length);
+                loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] served from cache in " + (System.currentTimeMillis() - start) + "ms, bytes=" + cached.length+ ", loggedInUser=" + loggedInUser);
                 return Action.NONE;
             }
         }
@@ -434,7 +433,7 @@ public class ApiCollectionsAction extends UserAction {
                 "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
                 "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType"
         ));
-        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] findAll took " + (System.currentTimeMillis() - stepStart) + "ms, size=" + this.apiCollections.size());
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] findAll took " + (System.currentTimeMillis() - stepStart) + "ms, size=" + this.apiCollections.size()+ ", loggedInUser=" + loggedInUser);
         stepStart = System.currentTimeMillis();
 
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));

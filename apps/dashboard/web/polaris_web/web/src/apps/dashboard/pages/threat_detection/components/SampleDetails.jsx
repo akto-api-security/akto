@@ -1,4 +1,4 @@
-import { Badge, Box, Button, ChoiceList, Divider, HorizontalStack, Modal, Text, TextField, Tooltip, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
+import { Badge, Box, Button, ChoiceList, Divider, HorizontalStack, Modal, Text, TextField, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -17,7 +17,7 @@ import settingFunctions from "../../settings/module";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal";
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
-import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN, SETTINGS_RISK_CONFIGS } from "../constants/guardrailDescriptions";
+import { GUARDRAIL_REMEDIATION_MARKDOWN, SETTINGS_RISK_CONFIGS } from "../constants/guardrailDescriptions";
 import { extractOverviewAndRemediation, extractBehaviour } from "../utils/formatUtils";
 import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
@@ -132,10 +132,14 @@ function SampleDetails(props) {
         ? getGuardrailRuleInfo(moreInfoData?.ruleViolated, moreInfoData?.templateId)
         : null;
 
-    // Build guardrail sections: use matched rule's overview if found, else fall back to all generic sections
+    // Build guardrail sections from the matched rule's overview. If no rule matched, show NO
+    // sections - we deliberately do NOT fall back to a generic guardrail catalogue, which isn't
+    // specific to the event that fired (e.g. a block_host_test event showing "Content Filters /
+    // Denied Topics" filler). The Overview tab itself is hidden below when there's nothing
+    // meaningful left to show.
     const guardrailSectionsToShow = guardrailRuleInfo
         ? [{ heading: guardrailRuleInfo.heading, description: null, subSections: guardrailRuleInfo.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
-        : GUARDRAIL_SECTIONS;
+        : [];
 
     // Resolve the specific settings-risk entry (used for both overview and remediation tabs)
     const getSettingsRiskKey = (urlPrefix) => {
@@ -350,7 +354,13 @@ function SampleDetails(props) {
     // guardrailRuleDefinitions.js template adds no extra context, so hide the tab instead.
     const isSkillEvent = (moreInfoData?.url || '').includes('skills/');
 
-    const overviewTab = (isSkillEvent && !hasLiveOverview) ? false : {
+    // Guardrail event with no matched rule and no per-event live overview: there are no
+    // event-specific sections to show (we no longer fall back to a generic catalogue), so hide the
+    // Overview tab entirely rather than render an empty/filler tab. Settings-risk and live-overview
+    // events have their own content and are excluded.
+    const isGenericGuardrailFallback = useGuardrailDescription && !isSettingsRisk && !guardrailRuleInfo && !hasLiveOverview;
+
+    const overviewTab = ((isSkillEvent && !hasLiveOverview) || isGenericGuardrailFallback) ? false : {
         id: "overview",
         content: 'Overview',
         component: currentTemplateObj && overviewComp
@@ -1037,33 +1047,19 @@ Reference URL: ${window.location.href}`.trim();
         );
         return(
             <Box padding={"4"} paddingBlockStart={"0"} maxWidth="100%">
+                <VerticalStack gap={"2"}>
                 <HorizontalStack wrap={false} align="space-between" gap={"6"}>
                     <Box maxWidth="50%">
-                        <VerticalStack gap={"2"}>
-                            <HorizontalStack gap={"2"} align="start">
-                                {isTitleClickable ? (
-                                    <Button onClick={() => openTest(templateId)} removeUnderline plain monochrome>
-                                        {titleText}
-                                    </Button>
-                                ) : titleText}
-                                <div className={`badge-wrapper-${severity}`}>
-                                    <Badge size="small">{func.toSentenceCase(severity)}</Badge>
-                                </div>
-                            </HorizontalStack>
-                            <HorizontalStack gap={"1"} wrap={false}>
-                                <Tooltip content={moreInfoData?.url}>
-                                    <Text color="subdued" variant="bodySm" truncate>{moreInfoData?.url}</Text>
-                                </Tooltip>
-                                {
-                                    currentTemplateObj?.category?.name && (
-                                        <>
-                                            <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
-                                            <Text color="subdued" variant="bodySm">{currentTemplateObj?.category?.name || "-"}</Text>
-                                        </>
-                                    )
-                                }
-                            </HorizontalStack>
-                        </VerticalStack>
+                        <HorizontalStack gap={"2"} align="start">
+                            {isTitleClickable ? (
+                                <Button onClick={() => openTest(templateId)} removeUnderline plain monochrome>
+                                    {titleText}
+                                </Button>
+                            ) : titleText}
+                            <div className={`badge-wrapper-${severity}`}>
+                                <Badge size="small">{func.toSentenceCase(severity)}</Badge>
+                            </div>
+                        </HorizontalStack>
                     </Box>
                     <HorizontalStack gap={"2"} wrap={false}>
                         <Popover
@@ -1181,6 +1177,24 @@ Reference URL: ${window.location.href}`.trim();
                         )}
                     </HorizontalStack>
                 </HorizontalStack>
+                <HorizontalStack gap={"1"} wrap={false} align="start">
+                    <Box maxWidth="90%">
+                        <TooltipText
+                            tooltip={moreInfoData?.url}
+                            text={moreInfoData?.url}
+                            textProps={{ color: "subdued", variant: "bodySm" }}
+                        />
+                    </Box>
+                    {
+                        currentTemplateObj?.category?.name && (
+                            <>
+                                <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px'/>
+                                <Text color="subdued" variant="bodySm">{currentTemplateObj?.category?.name || "-"}</Text>
+                            </>
+                        )
+                    }
+                </HorizontalStack>
+                </VerticalStack>
             </Box>
         )
     }

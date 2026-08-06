@@ -97,7 +97,10 @@ public class MetricData {
 
         // Guardrail metrics (Akto Agent Gateway)
         GUARDRAIL_REQUEST_LATENCY("Guardrail Request Latency", "P95 latency for validating incoming requests through guardrails"),
-        GUARDRAIL_RESPONSE_LATENCY("Guardrail Response Latency", "P95 latency for validating outgoing responses through guardrails");
+        GUARDRAIL_RESPONSE_LATENCY("Guardrail Response Latency", "P95 latency for validating outgoing responses through guardrails"),
+
+        // Account Job Executor metrics
+        ACCOUNT_JOBS_RUN_FAILED("Failed Job Runs", "Number of account jobs that failed or were retried due to an error");
 
         private final String descriptionName;
         private final String description;

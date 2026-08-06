@@ -1,5 +1,9 @@
 name: Production
 
+env:
+  GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+  GAR_REGISTRY: ${{ vars.GCP_REGION || 'us-central1' }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}
+
 # Controls when the workflow will run
 on:
   # Allows you to run this workflow manually from the Actions tab
@@ -131,8 +135,8 @@ jobs:
 
       - uses: actions/setup-java@v5
         with:
-          distribution: "adopt"
-          java-version: "8"
+          distribution: "temurin"
+          java-version: "17"
           architecture: x64
       - uses: actions/setup-node@v6
         with:
@@ -516,17 +520,51 @@ jobs:
           mask-password: "true"
           registry-type: public
 
+      - name: Authenticate to Google Cloud
+        if: vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        if: vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        if: vars.GCP_PROJECT_ID != ''
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Compute image tags
+        id: tags
+        env:
+          VER: ${{ github.event.inputs.release_version_agent_guard }}
+          ECR: ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2
+          GAR_ENABLED: ${{ vars.GCP_PROJECT_ID != '' }}
+        run: |
+          set -euo pipefail
+          for img in worker anonymizer embedder; do
+            NAME="akto-agent-guard-$img"
+            {
+              echo "${img}<<EOF"
+              echo "aktosecurity/$NAME:local"
+              echo "aktosecurity/$NAME:$VER"
+              echo "$ECR/$NAME:local"
+              echo "$ECR/$NAME:$VER"
+              if [ "$GAR_ENABLED" = "true" ]; then
+                echo "$GAR_REGISTRY/$NAME:local"
+                echo "$GAR_REGISTRY/$NAME:$VER"
+              fi
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          done
+
       - name: Build and push worker image (portable FastAPI)
         uses: docker/build-push-action@v4
         with:
           context: ./apps/agent-guard/python-service/worker-py
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            aktosecurity/akto-agent-guard-worker:local
-            aktosecurity/akto-agent-guard-worker:${{ github.event.inputs.release_version_agent_guard }}
-            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-worker:local
-            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-worker:${{ github.event.inputs.release_version_agent_guard }}
+          tags: ${{ steps.tags.outputs.worker }}
           cache-from: type=gha,scope=agent-guard-worker
           cache-to: type=gha,mode=max,scope=agent-guard-worker
 
@@ -536,11 +574,7 @@ jobs:
           context: ./apps/agent-guard/python-service/anonymizer-container
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            aktosecurity/akto-agent-guard-anonymizer:local
-            aktosecurity/akto-agent-guard-anonymizer:${{ github.event.inputs.release_version_agent_guard }}
-            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-anonymizer:local
-            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-anonymizer:${{ github.event.inputs.release_version_agent_guard }}
+          tags: ${{ steps.tags.outputs.anonymizer }}
           cache-from: type=gha,scope=agent-guard-anonymizer
           cache-to: type=gha,mode=max,scope=agent-guard-anonymizer
 
@@ -550,11 +584,7 @@ jobs:
           context: ./apps/agent-guard/python-service/embedder-container
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            aktosecurity/akto-agent-guard-embedder:local
-            aktosecurity/akto-agent-guard-embedder:${{ github.event.inputs.release_version_agent_guard }}
-            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-embedder:local
-            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-embedder:${{ github.event.inputs.release_version_agent_guard }}
+          tags: ${{ steps.tags.outputs.embedder }}
           cache-from: type=gha,scope=agent-guard-embedder
           cache-to: type=gha,mode=max,scope=agent-guard-embedder
 
@@ -578,7 +608,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "🚀 Agent Guard v${{ github.event.inputs.release_version_agent_guard }} released (worker + anonymizer + embedder) and pushed to DockerHub & ECR!"
+              "text": "🚀 Agent Guard v${{ github.event.inputs.release_version_agent_guard }} released (worker + anonymizer + embedder) and pushed to DockerHub, ECR & GAR!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -605,8 +635,8 @@ jobs:
 
       - uses: actions/setup-java@v5
         with:
-          distribution: "adopt"
-          java-version: "8"
+          distribution: "temurin"
+          java-version: "17"
           architecture: x64
 
       - name: Setup Protoc
@@ -695,8 +725,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
         with:
-          distribution: "adopt"
-          java-version: "8"
+          distribution: "temurin"
+          java-version: "17"
           architecture: x64
       - uses: actions/setup-node@v6
         with:
@@ -798,8 +828,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
         with:
-          distribution: "adopt"
-          java-version: "8"
+          distribution: "temurin"
+          java-version: "17"
           architecture: x64
       - name: Setup Protoc
         uses: arduino/setup-protoc@v3

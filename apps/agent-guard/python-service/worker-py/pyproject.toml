@@ -6,7 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     # cascade auth + HTTP
     "rsa==4.9.1",
-    "pyasn1==0.6.3",
+    "pyasn1==0.6.4",
     "httpx==0.28.1",
     # local scanners
     "detect-secrets==1.5.0",

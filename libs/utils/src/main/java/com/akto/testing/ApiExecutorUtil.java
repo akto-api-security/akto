@@ -19,7 +19,6 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import jdk.nashorn.api.scripting.ScriptObjectMirror;
 
 public class ApiExecutorUtil {
 
@@ -67,7 +66,11 @@ public class ApiExecutorUtil {
         Map<String, List<String>> hs = new HashMap<>();
         for (String key : headers.keySet()) {
             try {
-                ScriptObjectMirror scm = ((ScriptObjectMirror) headers.get(key));
+                // Nashorn's JS array (ScriptObjectMirror) implements java.util.Map with array
+                // indices as string keys "0","1",... Cast to Map (not the jdk.nashorn.* type,
+                // which is gone on JDK 17) so this compiles on both JDK 8 and 17. Behaviour is
+                // unchanged from the original — header values are expected to be arrays.
+                Map<String, Object> scm = ((Map<String, Object>) headers.get(key));
                 List<String> val = new ArrayList<>();
                 for (int i = 0; i < scm.size(); i++) {
                     val.add((String) scm.get(Integer.toString(i)));

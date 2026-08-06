@@ -39,6 +39,7 @@ const CollectionIcon = React.memo(({ hostName, assetTagValue, displayName, tagsL
     if (isApiSecurityCategory() || isDastCategory()) return <Avatar source={HardDrivesIcon} shape="square" size="extraSmall" />;
 
     // Argus / Atlas fallbacks
+    if (tagsList?.some(t => t.keyName === "source" && t.value === "AWS_BEDROCK")) return <Avatar source="/public/aws_bedrock.svg" shape="square" size="extraSmall" />;
     if (tagsList?.some(t => t.name === "gen-ai")) return <Icon source={tagsList.some(t => t.name === "AI Agent") ? AutomationMajor : MagicMajor} color="base" />;
     if (tagsList?.some(t => t.name === "mcp-server")) return <Avatar source={MCPIcon} shape="square" size="extraSmall" />;
     if (tagsList?.some(t => t.name === "browser-llm")) return <Avatar source={LaptopIcon} shape="square" size="extraSmall" />;

@@ -1,8 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import { themeQuartz } from "ag-grid-enterprise";
-import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
-import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import { Box, HorizontalStack, Pagination, Text, VerticalStack, Button, TextField, Icon } from "@shopify/polaris";
 import { MobileCancelMajor, SearchMinor } from "@shopify/polaris-icons";
 import PersistStore from "@/apps/main/PersistStore";
@@ -13,12 +11,7 @@ import { CellType } from "./rows/GithubRow";
 
 const AG_GRID_COLUMN_TYPES = {
     [CellType.TEXT]: { cellRenderer: "agGridRow" },
-    // CellType.ACTION: wire a dedicated cellRenderer per column — no grid-level preset
-    // CellType.COLLAPSIBLE: use AG Grid's built-in treeData/grouping instead
 };
-
-ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
-LicenseManager.setLicenseKey(window.AG_GRID_LICENSE_KEY);
 
 export const agTableTheme = themeQuartz.withParams({
     accentColor: "#9642FC",

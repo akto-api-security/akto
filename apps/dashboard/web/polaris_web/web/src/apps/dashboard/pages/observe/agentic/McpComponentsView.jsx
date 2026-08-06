@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Text, Badge, Divider, ActionList, Button, Spinner, VerticalStack, HorizontalStack } from "@shopify/polaris";
+import { Box, Text, Badge, Divider, ActionList, Button, Spinner, VerticalStack, HorizontalStack, Tabs } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { ParamNameCellRenderer, ParamTypeCellRenderer, ParamDescCellRenderer, SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges";
 import agenticObserveApi from "./agenticObserveApi";
 import observeApi from "../api";
 import SampleDataList from "../../../components/shared/SampleDataList";
+import ApiIssuesTab from "../api_collections/ApiIssuesTab";
 
 // ── Shared detail panel helpers ───────────────────────────────────────────────
 
@@ -84,13 +85,36 @@ function ResourcePromptDetailPanel({ item }) {
 
 export function SkillDetailPanel({ skill }) {
     const { traffic, loading } = useEndpointTraffic(skill, true);
+    const [selectedTab, setSelectedTab] = useState(0);
+    const isThreatEnabled = skill?.isThreatEnabled || false;
+
+    const tabs = [
+        { id: "values", content: "Values" },
+        ...(isThreatEnabled ? [{ id: "threat-issues", content: "Threat Issues" }] : []),
+    ];
+    const activeTab = isThreatEnabled ? selectedTab : 0;
+
     return (
         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <Box paddingInlineStart="3" paddingInlineEnd="3" paddingBlockStart="3" paddingBlockEnd="2">
                 <Text variant="headingSm" as="h3" fontWeight="semibold">{skill.name}</Text>
             </Box>
             <Divider />
-            <TrafficView traffic={traffic} loading={loading} />
+            {isThreatEnabled && (
+                <Box paddingInlineStart="3" paddingInlineEnd="3">
+                    <Tabs tabs={tabs} selected={activeTab} onSelect={setSelectedTab} />
+                </Box>
+            )}
+            {activeTab === 0 ? (
+                <TrafficView traffic={traffic} loading={loading} />
+            ) : (
+                <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "16px" }}>
+                    <ApiIssuesTab
+                        apiDetail={{ apiCollectionId: skill.apiCollectionId, endpoint: skill.url, method: skill.method }}
+                        isThreatEnabled={true}
+                    />
+                </div>
+            )}
         </div>
     );
 }

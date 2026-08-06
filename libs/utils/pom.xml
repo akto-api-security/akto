@@ -188,5 +188,30 @@
         <sourceDirectory>src/main/java</sourceDirectory>
         <testSourceDirectory>src/test/java</testSourceDirectory>
     </build>
-    
+
+    <profiles>
+        <!--
+            The built-in Nashorn JS engine (jdk.nashorn.*) was removed in Java 15. When this
+            library is built on JDK 11+ (dashboard/testing move to Java 17), pull in the
+            standalone Nashorn engine so JS test-scripts (ApiExecutorUtil) keep working.
+            - runtime scope: kept off the compile classpath, so the source still compiles on JDK 8.
+            - jdk [11,) activation: Java 8 builds of other services (mini-runtime, api-runtime,
+              db-abstractor, ...) do NOT get this dependency and keep using the built-in engine.
+        -->
+        <profile>
+            <id>nashorn-standalone</id>
+            <activation>
+                <jdk>[11,)</jdk>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>org.openjdk.nashorn</groupId>
+                    <artifactId>nashorn-core</artifactId>
+                    <version>15.4</version>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
+
 </project>

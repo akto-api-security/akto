@@ -12,7 +12,6 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.util.EntityUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -118,7 +117,7 @@ public class ThreatDetectionHelper {
             post.setEntity(requestEntity);
 
             try (CloseableHttpResponse resp = httpClient.execute(post)) {
-                String responseBody = EntityUtils.toString(resp.getEntity());
+                String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
                 if (resp.getStatusLine().getStatusCode() != 200) {
                     String errorMsg = "Failed to update malicious event: " + responseBody;

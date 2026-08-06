@@ -55,6 +55,12 @@ public class HarAction extends UserAction {
     @Override
     @Audit(description = "User uploaded a HAR file", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"getApiCollectionId"})
     public String execute() throws IOException {
+
+        if (Context.accountId.get() == 1710118493) {
+            addActionError("This feature is temporarily disabled");
+            return ERROR.toUpperCase();            
+        }
+        
         if (DashboardMode.isKubernetes()) {
             skipKafka = true;
         }

@@ -21,6 +21,38 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+            <!-- Force the transitive commons-io to a patched version (GHSA-78wr, High). -->
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>2.14.0</version>
+            </dependency>
+            <!-- Pin all transitive io.netty:* to a single patched version (multiple High). -->
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-bom</artifactId>
+                <version>4.1.136.Final</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Patched kafka-clients (High) and its transitive lz4 (High). -->
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-clients</artifactId>
+                <version>3.9.2</version>
+            </dependency>
+            <dependency>
+                <groupId>org.lz4</groupId>
+                <artifactId>lz4-java</artifactId>
+                <version>1.8.1</version>
+            </dependency>
+            <!-- Transitive, not used directly by this module's own code - pin via management
+                 rather than adding an unnecessary direct dependency (Medium). -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>3.18.0</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -28,7 +60,27 @@
         <dependency>
             <groupId>org.apache.struts</groupId>
             <artifactId>struts2-core</artifactId>
-            <version>2.5.33</version>
+            <!-- Struts 6.x (javax line, runs on Java 8+): clears the 2.5.33 Critical/High CVEs.
+                 Struts 7 is the jakarta line and is intentionally not used here. -->
+            <version>6.10.0</version>
+        </dependency>
+        <!-- Override the inherited jackson 2.16.1 (root pom) with a patched version. All three
+             must move together - databind's bytecode calls core/annotations APIs tied to its
+             own release, so a mismatched trio risks NoSuchMethodError at runtime. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.18.9</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>2.18.9</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>2.18.9</version>
         </dependency>
 
         <dependency>
@@ -55,12 +107,8 @@
         <dependency>
             <groupId>org.apache.struts</groupId>
             <artifactId>struts2-json-plugin</artifactId>
-            <version>2.5.33</version>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-servlets</artifactId>
-            <version>9.4.58.v20250814</version>
+            <!-- Must match struts2-core version. -->
+            <version>6.10.0</version>
         </dependency>
 
     </dependencies>
@@ -86,7 +134,9 @@
         <plugins>
             <plugin>
                 <artifactId>maven-war-plugin</artifactId>
-                <version>2.3</version>
+                <!-- 3.4.0: war-plugin 2.3 fails to run on JDK 17 (xstream/TreeMap reflection).
+                     Build-only change; module stays source/target 8 -> Java 8 bytecode/runtime. -->
+                <version>3.4.0</version>
                 <configuration>
                     <attachClasses>true</attachClasses>
                     <warSourceDirectory>web</warSourceDirectory>
@@ -94,14 +144,17 @@
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>org.eclipse.jetty</groupId>
-                <artifactId>jetty-maven-plugin</artifactId>
-                <version>9.4.58.v20250814</version>
+                <groupId>org.eclipse.jetty.ee8</groupId>
+                <artifactId>jetty-ee8-maven-plugin</artifactId>
+                <!-- Jetty 12 EE8 maven plugin for local `jetty-ee8:run` of the javax webapp.
+                     <descriptor> removed: it resolves relative to the CWD (not the module) and
+                     breaks the run; web.xml is auto-discovered under webAppSourceDirectory/WEB-INF.
+                     12.1.10 matches this module's actual Docker runtime (jetty:12.1.10-jdk21). -->
+                <version>12.1.10</version>
                 <configuration>
                     <webAppSourceDirectory>web</webAppSourceDirectory>
                     <webApp>
                         <contextPath>/</contextPath>
-                        <descriptor>WEB-INF/web.xml</descriptor>
                     </webApp>
                 </configuration>
             </plugin>

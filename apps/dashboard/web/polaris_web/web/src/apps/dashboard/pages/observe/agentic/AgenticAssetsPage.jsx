@@ -9,8 +9,6 @@ import React, {
 import { produce } from "immer";
 import { useNavigate } from "react-router-dom";
 import { Box, Card, Divider, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
-import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
-import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
@@ -39,6 +37,7 @@ import {
   buildAgenticAssetsPageData,
   buildUserAnalysisLookup,
   fetchAndCacheSkillApiData,
+  skillCollectionKey,
 } from "./constants";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
@@ -48,8 +47,6 @@ import values from "@/util/values";
 import func from "@/util/func";
 import AgenticStatsCard from "./AgenticStatsCard";
 import AgenticTopListCard from "./AgenticTopListCard";
-
-ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
@@ -431,11 +428,13 @@ export default function AgenticAssetsPage() {
         });
         if (skillCollectionIds.length) {
           fetchAndCacheSkillApiData(skillCollectionIds, { api, PersistStore })
-            .then(({ maliciousSkills }) => {
-              if (!isMountedRef.current || !maliciousSkills?.size) return;
+            .then(({ maliciousSkillKeys }) => {
+              if (!isMountedRef.current || !maliciousSkillKeys?.size) return;
+              // Scoped to the asset's own collections so a same-named skill belonging to a
+              // different user/agent doesn't mark this one malicious.
               const markMalicious = (rows) =>
                 rows.map((r) =>
-                  r.type === "Skill" && maliciousSkills.has(r.name)
+                  r.type === "Skill" && (r.collectionIds || []).some((cid) => maliciousSkillKeys.has(skillCollectionKey(cid, r.name)))
                     ? { ...r, isMalicious: true }
                     : r,
                 );
@@ -620,30 +619,19 @@ export default function AgenticAssetsPage() {
     { label: "Skills",      count: agenticFlatData.filter(r => r.type === "Skill").length,      color: "#D1D5DB",  key: "Skill" },
   ], [agenticFlatData]);
 
-  const violationsByCollectionId = useMemo(
-    () => aggregateViolationsByCollectionId(agenticViolationRows, collections),
-    [agenticViolationRows, collections],
-  );
-
   const violationTotals = useMemo(() => {
-    const seen = new Set();
     const t = { crit: 0, high: 0, med: 0, low: 0 };
-    agenticFlatData.forEach((r) => {
-      if (!r.violations) return;
-      (r.collectionIds || []).forEach((id) => {
-        const key = Number(id);
-        if (seen.has(key)) return;
-        seen.add(key);
-        const v = violationsByCollectionId[key];
-        if (!v) return;
-        t.crit += v.critical || 0;
-        t.high += v.high || 0;
-        t.med  += v.medium || 0;
-        t.low  += v.low || 0;
-      });
+    agenticViolationRows.forEach((r) => {
+      switch ((r.severity || "").toLowerCase()) {
+        case "critical": t.crit += 1; break;
+        case "high":     t.high += 1; break;
+        case "medium":   t.med  += 1; break;
+        case "low":      t.low  += 1; break;
+        default: break;
+      }
     });
     return { ...t, total: t.crit + t.high + t.med + t.low };
-  }, [agenticFlatData, violationsByCollectionId]);
+  }, [agenticViolationRows]);
 
   const violBreakdown = useMemo(() => [
     { label: "Critical", key: "critical", count: violationTotals.crit, color: "#DC2626" },

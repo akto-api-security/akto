@@ -7,6 +7,7 @@ import com.akto.dto.jobs.JobStatus;
 import com.akto.dto.jobs.ScheduleType;
 import com.akto.jobs.exception.RetryableJobException;
 import com.akto.log.LoggerMaker;
+import com.akto.metrics.AllMetrics;
 import org.bson.types.ObjectId;
 
 import java.util.HashMap;
@@ -56,12 +57,14 @@ public abstract class AccountJobExecutor {
 
         } catch (RetryableJobException rex) {
             // Retryable error - reschedule job for 5 minutes later
+            AllMetrics.instance.setAccountJobsRunFailed(1);
             executedJob = reScheduleJob(job);
             logger.error("Retryable error occurred. Re-scheduling job for 5 minutes later: jobId={}",
                 jobId, rex);
 
         } catch (Exception e) {
             // Non-retryable error - mark as failed
+            AllMetrics.instance.setAccountJobsRunFailed(1);
             executedJob = logFailure(jobId, e);
             logger.error("Non-retryable error occurred. Job marked as FAILED: jobId={}", jobId, e);
         }

@@ -16,7 +16,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <sonar.organization>akto-api-security</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-        <jacoco.version>0.8.5</jacoco.version>
+        <jacoco.version>0.8.12</jacoco.version>
         <jacoco.reportPath>${project.basedir}/../../target/jacoco.exec</jacoco.reportPath>
     </properties>
 
@@ -42,6 +42,15 @@
 
     <build>
         <plugins>
+
+            <!-- Pin surefire: Maven's built-in default (2.12.4) crashes the forked test VM on
+                 JDK 17 ("forked VM terminated without saying properly goodbye"). 3.2.5 is
+                 JDK-17-compatible and still runs fine on Java 8 for the other modules. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
+            </plugin>
 
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>

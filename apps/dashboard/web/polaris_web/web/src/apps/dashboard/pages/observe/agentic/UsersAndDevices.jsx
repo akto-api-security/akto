@@ -25,6 +25,7 @@ import {
     groupCollectionsByDevice,
     buildAgenticInventoryFilterForRow,
     fetchAndCacheSkillApiData,
+    hasMaliciousSkillInCollections,
 } from "./constants";
 
 const definedTableTabs = ["Users", "Devices"];
@@ -127,13 +128,12 @@ function UsersAndDevices() {
         [getRiskScoreStatus, buildGroupNameDisplay],
     );
 
-    const applyMaliciousBadgeToUsers = useCallback((maliciousSkillsSet, misconfiguredCollectionIdsSet, isMountedRef) => {
+    const applyMaliciousBadgeToUsers = useCallback((maliciousSkillKeys, misconfiguredCollectionIdsSet, isMountedRef) => {
         if (!isMountedRef.current) return;
         const enrichRow = (row) => {
-            const skillNames = row.uniqueSkillNames || new Set(
-                (row.collections || []).flatMap(c => Array.isArray(c.skills) ? c.skills.map(s => String(s).toLowerCase()) : [])
-            );
-            const hasMalicious = [...skillNames].some((s) => maliciousSkillsSet.has(s));
+            // Scoped to each collection's own tagged skills: a same-named skill owned by another
+            // user/agent must not mark this row as malicious.
+            const hasMalicious = hasMaliciousSkillInCollections(maliciousSkillKeys, row.collections);
             const collectionIds = (row.collections || []).map((c) => c.id);
             const hasMisconfigured = collectionIds.some((id) => misconfiguredCollectionIdsSet.has(id));
             const extraBadges = [];
@@ -156,10 +156,10 @@ function UsersAndDevices() {
         });
         if (!allCollectionIds.length) return;
 
-        const { maliciousSkills, misconfiguredCollectionIds } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
+        const { maliciousSkillKeys, misconfiguredCollectionIds } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
 
         if (!isMountedRef.current) return;
-        applyMaliciousBadgeToUsers(maliciousSkills, misconfiguredCollectionIds || new Set(), isMountedRef);
+        applyMaliciousBadgeToUsers(maliciousSkillKeys || new Set(), misconfiguredCollectionIds || new Set(), isMountedRef);
     }, [applyMaliciousBadgeToUsers]);
 
     async function fetchData(isMountedRef = { current: true }) {
