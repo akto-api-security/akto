@@ -124,6 +124,12 @@ public class SampleParser {
         HttpResponseParams httpResponseParams = new HttpResponseParams(
                 type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction, tags, parentMcpToolNames
         );
+
+        Object tracesObj = json.get("_traces");
+        String traces = tracesObj != null ? tracesObj.toString() : "";
+        if (!traces.isEmpty()) {
+            httpResponseParams.setTraces(traces);
+        }
         if(tags != null && !tags.isEmpty()){
             String tagLog = "K8 Pod Tags: " + tags + " Host: " + requestHeaders.getOrDefault("host", new ArrayList<>()) + " Url: " + url;
             printL(tagLog);
