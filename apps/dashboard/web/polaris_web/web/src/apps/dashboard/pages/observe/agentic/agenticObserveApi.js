@@ -2,8 +2,10 @@ import request from "@/util/request";
 import observeApi from "../api";
 import { buildMcpComponentsFromStis, buildAgentBuiltinToolsFromStis, buildSkillsFlyoutData, normalizeSeverity } from "./agenticPageBuilders";
 import { deviceServiceKey } from "./constants";
+import { skillNameFromUrl } from "./agenticUrlHelpers";
 
 export { deviceServiceKey };
+export { skillNameFromUrl, deriveSkillOrToolName } from "./agenticUrlHelpers";
 
 function extractRuleViolated(metadata) {
     if (!metadata) return "-";
@@ -176,6 +178,36 @@ export function summarizeViolations(rows = []) {
     });
     t.total = t.critical + t.high + t.medium + t.low;
     return t;
+}
+
+// ── Skill-scoped violation attribution ───────────────────────────────────────
+// Skill identity lives on the event URL as /skills/<skillName> (not on host).
+// Host-level aggregation must not be used for Skill assets — it pulls in
+// agent/config findings (e.g. claude_settings_risk) from every parent collection.
+// skillNameFromUrl reuses the Violations-page URL parser (agenticUrlHelpers).
+
+export function eventMatchesSkill(row, skillName) {
+    if (!skillName || !row) return false;
+    return skillNameFromUrl(row.url) === skillName;
+}
+
+export function selectSkillViolationRows(violationRows = [], skillName) {
+    if (!skillName) return [];
+    return violationRows.filter((r) => eventMatchesSkill(r, skillName));
+}
+
+export function aggregateViolationsBySkillName(violationRows = []) {
+    const bySkill = {};
+    violationRows.forEach((row) => {
+        const skillName = skillNameFromUrl(row.url);
+        if (!skillName) return;
+        const sev = normalizeSeverity(row.severity);
+        if (!sev) return;
+        const key = sev.toLowerCase();
+        if (!bySkill[skillName]) bySkill[skillName] = { critical: 0, high: 0, medium: 0, low: 0 };
+        bySkill[skillName][key] += 1;
+    });
+    return bySkill;
 }
 
 export function buildAgenticObserveChatMetadata(scope, data = {}) {

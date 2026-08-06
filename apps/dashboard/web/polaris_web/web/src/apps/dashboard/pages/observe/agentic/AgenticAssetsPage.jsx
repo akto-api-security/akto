@@ -29,6 +29,7 @@ import NewLayoutTooltip from "./NewLayoutTooltip";
 import api from "../api";
 import agenticObserveApi, {
   aggregateViolationsByCollectionId,
+  aggregateViolationsBySkillName,
   fetchAgenticViolations,
   deviceServiceKey,
 } from "./agenticObserveApi";
@@ -385,6 +386,7 @@ export default function AgenticAssetsPage() {
         } = shieldResult || {};
         const violationsByCollectionId =
           aggregateViolationsByCollectionId(violationRows, collections);
+        const violationsBySkillName = aggregateViolationsBySkillName(violationRows);
         const analysisByKey = buildUserAnalysisLookup(userAnalysisList);
 
         const pageData = buildAgenticAssetsPageData(
@@ -396,6 +398,7 @@ export default function AgenticAssetsPage() {
             usernameMap,
             userMetadataMap,
             violationsByCollectionId,
+            violationsBySkillName,
             analysisByKey,
             userAnalysisKeysByDeviceId,
           },

@@ -33,6 +33,7 @@ import { isEndpointSecurityCategory } from "@/apps/main/labelHelper";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "@/apps/dashboard/pages/observe/api_collections/endpointShieldHelper";
 import { formatDisplayName } from "@/apps/dashboard/pages/observe/agentic/mcpClientHelper";
 import { extractServiceName } from "@/apps/dashboard/pages/observe/agentic/constants";
+import { deriveSkillOrToolName } from "@/apps/dashboard/pages/observe/agentic/agenticUrlHelpers";
 
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph";
@@ -282,17 +283,6 @@ function parseAktoPayload(payloadStr) {
         const resp = respStr ? safeJson(respStr) : null;
         return { req, resp, raw: outer };
     } catch { return {}; }
-}
-
-function deriveSkillOrToolName(url) {
-    if (!url) return null;
-    const skillMatch = url.match(/\/skills\/([^/?#]+)/i);
-    if (skillMatch) return skillMatch[1];
-    const toolMatch = url.match(/\/tools\/([^/?#]+)/i);
-    if (toolMatch) return toolMatch[1];
-    const mcpToolMatch = url.match(/\/mcp\/([^/?#]+)/i);
-    if (mcpToolMatch) return mcpToolMatch[1];
-    return null;
 }
 
 function deriveAgenticType(url, method) {
