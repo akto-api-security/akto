@@ -32,6 +32,14 @@ export default {
             data: { startTimestamp, endTimestamp }
         })
     },
+    // Distinct filter-dropdown values (markedBy) — replaces pulling 1000 full audit rows just to derive them.
+    async fetchAuditDataFilterOptions() {
+        return await request({
+            url: '/api/fetchAuditDataFilterOptions',
+            method: 'post',
+            data: {}
+        });
+    },
     async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators, searchString, mergeMcpServers = false, aiAgentName = null, mcpServerName = null) {
         const data = { sortKey, sortOrder, skip, limit, filters, filterOperators, searchString, mergeMcpServers };
         if (typeof aiAgentName === 'string' && aiAgentName.length > 0) data.aiAgentName = aiAgentName;
@@ -221,6 +229,87 @@ export default {
             data: {}
         })
     },
+    // Paginated, sorted, searchable grouped-asset rows for the Agentic Assets "New Layout" table —
+    // replaces computing all ~800 grouped rows client-side on every load (see
+    // atlas-scale-test/DASHBOARD_OPTIMIZATION.md's "paginated server-side aggregation rebuild").
+    // trafficMap/riskScoreMap are the same maps AgenticAssetsPage.jsx already fetches via
+    // fetchAndCacheAgenticCollectionsBundle.
+    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, startTimestamp, endTimestamp } = {}) {
+        const resp = await request({
+            url: '/api/fetchAgenticAssetsSummary',
+            method: 'post',
+            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, startTimestamp, endTimestamp },
+        })
+        return { rows: resp?.rows || [], total: resp?.total || 0 }
+    },
+    // Header-tile stats (asset counts by type) for the Agentic Assets page — same classification
+    // pass as fetchAgenticAssetsSummary, aggregated rather than paginated.
+    async fetchAgenticAssetsStats({ trafficMap, riskScoreMap, startTimestamp, endTimestamp } = {}) {
+        const resp = await request({
+            url: '/api/fetchAgenticAssetsStats',
+            method: 'post',
+            data: { trafficMap, riskScoreMap, startTimestamp, endTimestamp },
+        })
+        return { totalAssets: resp?.totalAssets || 0, countsByType: resp?.countsByType || {} }
+    },
+    // Paginated, sorted, searchable user/device rows for Users-and-Devices / Endpoints — same
+    // lightweight-summary-first-then-slice shape as fetchAgenticAssetsSummary. groupBy: "user"|"device".
+    async fetchUsersAndDevicesSummary({ groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap } = {}) {
+        const resp = await request({
+            url: '/api/fetchUsersAndDevicesSummary',
+            method: 'post',
+            data: { groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap },
+        })
+        return { rows: resp?.rows || [], total: resp?.total || 0 }
+    },
+    // Tab-header counts ("Users (N)" / "Devices (N)") for Users-and-Devices / Endpoints, each tab's
+    // "Agentic assets" total, plus distinct team/role names for the "Edit team & role" modal's autocomplete.
+    async fetchUsersAndDevicesStats({ trafficMap, riskScoreMap, usernameMap, userMetadataMap } = {}) {
+        const resp = await request({
+            url: '/api/fetchUsersAndDevicesStats',
+            method: 'post',
+            data: { trafficMap, riskScoreMap, usernameMap, userMetadataMap },
+        })
+        return {
+            usersCount: resp?.usersCount || 0,
+            devicesCount: resp?.devicesCount || 0,
+            usersAgenticAssetsTotal: resp?.usersAgenticAssetsTotal || 0,
+            devicesAgenticAssetsTotal: resp?.devicesAgenticAssetsTotal || 0,
+            teams: resp?.teams || [],
+            roles: resp?.roles || [],
+        }
+    },
+    // Paginated top-level device rows for Endpoints' tree grid, or (when parentDeviceId is set) one
+    // device's (device,service) children — see AgenticObserveAction.fetchDeviceEndpointsSummary.
+    async fetchDeviceEndpointsSummary({ parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId } = {}) {
+        const resp = await request({
+            url: '/api/fetchDeviceEndpointsSummary',
+            method: 'post',
+            data: { parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId },
+        })
+        return { rows: resp?.rows || [], total: resp?.total || 0 }
+    },
+    // Endpoints header stats: trend charts, deltas, Browsers/Endpoints/Users totals — see
+    // AgenticObserveAction.fetchDeviceEndpointsStats.
+    async fetchDeviceEndpointsStats({ usernameMap, deviceMetadataMap, startTimestamp, endTimestamp } = {}) {
+        const resp = await request({
+            url: '/api/fetchDeviceEndpointsStats',
+            method: 'post',
+            data: { usernameMap, deviceMetadataMap, startTimestamp, endTimestamp },
+        })
+        return {
+            deviceCount: resp?.deviceCount || 0,
+            browserDeviceCount: resp?.browserDeviceCount || 0,
+            totalUsers: resp?.totalUsers || 0,
+            monthLabels: resp?.monthLabels || [],
+            osTrend: resp?.osTrend || {},
+            browserTrend: resp?.browserTrend || {},
+            sparklines: resp?.sparklines || {},
+            deltaEndpoints: resp?.deltaEndpoints || 0,
+            deltaBrowsers: resp?.deltaBrowsers || 0,
+            deltaUsers: resp?.deltaUsers || 0,
+        }
+    },
     async createCollection(name) {
         return await request({
             url: '/api/createCollection',
@@ -405,6 +494,15 @@ export default {
             data: {
                 apiCollectionId: apiCollectionId,
             }
+        })
+    },
+    // ATLAS: single call returning skill risk / malicious / misconfigured maps for the whole account
+    // (replaces the per-collection fetchApiInfosForCollection N+1 on the agentic pages).
+    async fetchAgenticSkillData() {
+        return await request({
+            url: '/api/fetchAgenticSkillData',
+            method: 'post',
+            data: {}
         })
     },
     redactCollection(apiCollectionId, redacted){
@@ -1146,22 +1244,61 @@ export default {
         return resp?.identities || []
     },
 
-    async fetchAllNhiViolations(startTimestamp, endTimestamp) {
+    // Server-side paginated (ATLAS NHI Governance): pass skip/limit/sortKey/sortOrder/queryValue/status
+    // to get one page; omit them to get the backend's default page (50 rows). Returns {violations, total}
+    // — callers that need charts/tab-counts across the whole range should use fetchNhiViolationsStats
+    // instead of paging through everything.
+    async fetchAllNhiViolations(startTimestamp, endTimestamp, { skip, limit, sortKey, sortOrder, queryValue, status } = {}) {
         const resp = await request({
             url: '/api/fetchAllNhiViolations',
             method: 'post',
-            data: { startTimestamp, endTimestamp }
+            data: { startTimestamp, endTimestamp, skip, limit, sortKey, sortOrder, queryValue, status }
         })
-        return resp?.violations || []
+        return { violations: resp?.violations || [], total: resp?.total || 0 }
     },
 
+    // Server-computed aggregates for the Violations page (severity breakdown, day-bucketed trend,
+    // open/fixed totals) — replaces client-side reduction over the full violations list.
+    async fetchNhiViolationsStats(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/fetchNhiViolationsStats',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp?.stats || {}
+    },
+
+    // Scoped, paginated violations for ONE identity (identity-details flyout) — replaces fetching every
+    // violation account-wide with no time bound just to filter down to a single identity client-side.
+    async fetchViolationsByIdentity(identityId, { skip, limit } = {}) {
+        const resp = await request({
+            url: '/api/fetchViolationsByIdentity',
+            method: 'post',
+            data: { identityId, skip, limit }
+        })
+        return { violations: resp?.violations || [], total: resp?.total || 0, stats: resp?.stats || {} }
+    },
+
+    // Per-identity violation counts, grouped server-side (one row per identityName x severity)
+    // instead of every non-fixed violation document.
     async fetchViolationCountsByIdentity() {
         const resp = await request({
             url: '/api/fetchViolationCountsByIdentity',
             method: 'post',
             data: {}
         })
-        return resp?.violations || []
+        return resp?.identityViolationCounts || []
+    },
+
+    // Per-policy violation counts, grouped server-side (one row per policyId x severity)
+    // instead of every non-fixed violation projected doc.
+    async fetchViolationCountsByPolicy() {
+        const resp = await request({
+            url: '/api/fetchViolationCountsByPolicy',
+            method: 'post',
+            data: {}
+        })
+        return resp?.policyViolationCounts || []
     },
 
     async disableNhiIdentity(identityId) {
@@ -1250,6 +1387,18 @@ export default {
                 ...(hosts?.length  ? { hosts }          : {}),
             },
         })
+    },
+
+    // Per-host severity counts for the whole date range (every host, not raw events) — lets a caller
+    // attribute violation counts to its own asset/device groupings via the host join key without
+    // pulling every raw malicious-event doc just to run a per-row severity tally client-side.
+    async fetchHostSeverityCounts(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/fetchHostSeverityCounts',
+            method: 'post',
+            data: { startTs: startTimestamp, endTs: endTimestamp },
+        })
+        return resp?.hostSeverityCounts || []
     },
 
 }

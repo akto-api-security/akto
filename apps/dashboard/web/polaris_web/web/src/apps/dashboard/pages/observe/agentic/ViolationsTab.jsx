@@ -31,7 +31,7 @@ const VIOLATIONS_COL_DEFS = [
 
 const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 
-export default function ViolationsTab({ asset, collections = [], startTimestamp, endTimestamp, onViolationClick }) {
+export default function ViolationsTab({ asset, collections = [], startTimestamp, endTimestamp, onViolationClick, allViolationRows }) {
     const [violations, setViolations] = useState([]);
     const [loading, setLoading] = useState(false);
 
@@ -57,32 +57,43 @@ export default function ViolationsTab({ asset, collections = [], startTimestamp,
                 .filter(Boolean)
         );
 
-        let cancelled = false;
         const hostSet = new Set(hostNames);
         const looseHostSet = new Set(hostNames.map(h => deviceServiceKey(h)).filter(Boolean));
+        const applyFilter = (rows) => rows.filter(r =>
+            hostSet.has(r.host) ||
+            looseHostSet.has(deviceServiceKey(r.host)) ||
+            (isClaudeConfigHost(r.host) && (
+                isClaudeAsset ||
+                claudeDeviceIds.has(r.host.split(".")[0])
+            ))
+        ).map((r) => ({
+            ...r,
+            time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
+            deviceId: r.host ? r.host.split(".")[0] : "",
+        }));
+
+        // The parent (AgenticAssetsPage) already fetched every account-wide violation once for the
+        // asset table's violation column — reuse that in-memory set instead of re-fetching it over the
+        // network on every flyout tab open.
+        if (Array.isArray(allViolationRows)) {
+            setViolations(applyFilter(allViolationRows));
+            setLoading(false);
+            return;
+        }
+
+        // Fallback for any caller that doesn't have the rows already in memory.
+        let cancelled = false;
         fetchAgenticViolations({ startTimestamp, endTimestamp })
             .then((rows) => {
                 if (cancelled) return;
-                const filtered = rows.filter(r =>
-                    hostSet.has(r.host) ||
-                    looseHostSet.has(deviceServiceKey(r.host)) ||
-                    (isClaudeConfigHost(r.host) && (
-                        isClaudeAsset ||
-                        claudeDeviceIds.has(r.host.split(".")[0])
-                    ))
-                );
-                setViolations(filtered.map((r) => ({
-                    ...r,
-                    time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
-                    deviceId: r.host ? r.host.split(".")[0] : "",
-                })));
+                setViolations(applyFilter(rows));
                 setLoading(false);
             })
             .catch(() => {
                 if (!cancelled) { setViolations([]); setLoading(false); }
             });
         return () => { cancelled = true; };
-    }, [asset?.id, asset?.assetTagValue, asset?.collectionIds, collections, startTimestamp, endTimestamp]);
+    }, [asset?.id, asset?.assetTagValue, asset?.collectionIds, collections, startTimestamp, endTimestamp, allViolationRows]);
 
     const handleViolationClick = useCallback((e) => {
         if (!e.data) return;

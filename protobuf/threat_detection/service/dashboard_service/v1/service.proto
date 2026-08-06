@@ -447,6 +447,23 @@ message FetchTopNDataResponse {
   repeated TopHostData top_hosts = 2;
 }
 
+message FetchHostSeverityCountsRequest {
+  uint32 start_ts = 1;
+  uint32 end_ts = 2;
+}
+
+message FetchHostSeverityCountsResponse {
+  message HostSeverityCount {
+    string host = 1;
+    uint32 critical = 2;
+    uint32 high = 3;
+    uint32 medium = 4;
+    uint32 low = 5;
+  }
+
+  repeated HostSeverityCount host_counts = 1;
+}
+
 message FetchDashboardTopDataRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;

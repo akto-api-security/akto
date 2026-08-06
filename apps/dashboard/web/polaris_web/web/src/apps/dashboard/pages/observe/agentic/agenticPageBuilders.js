@@ -355,7 +355,7 @@ export function buildSkillsFlyoutData(collection, apiInfoList = [], stiEndpoints
     return { skills };
 }
 
-function buildModuleDeviceMap(moduleInfos = []) {
+export function buildModuleDeviceMap(moduleInfos = []) {
     const map = {};
     moduleInfos.forEach((module) => {
         if (!module?.name) return;

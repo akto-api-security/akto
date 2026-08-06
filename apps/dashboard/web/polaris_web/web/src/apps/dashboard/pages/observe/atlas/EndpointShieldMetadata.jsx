@@ -12,7 +12,7 @@ import settingRequests from "../../settings/api";
 import PersistStore from "../../../../main/PersistStore";
 import { mapLabel } from "../../../../main/labelHelper";
 import AgentDetails from "./AgentDetails";
-import { MODULE_TYPE, DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
+import { DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
 
 const createHeading = (text, value = null, sortKey = null) => ({
     text,
@@ -126,18 +126,38 @@ const convertDataIntoTableFormat = (agentData) => {
     };
 };
 
-const deduplicateAgents = (agents) => {
-    const map = new Map();
-    for (const agent of agents) {
-        const key = agent.hostname || agent.deviceId;
-        if (!key) continue;
-        const existing = map.get(key);
-        if (!existing || agent.lastHeartbeat > existing.lastHeartbeat) {
-            map.set(key, agent);
-        }
-    }
-    return Array.from(map.values());
-};
+const mapModuleToAgent = (module) => ({
+    agentId: module.id,
+    hostname: module.name,
+    deviceId: module.additionalData?.deviceId || DEFAULT_VALUE,
+    agentVersion: module.currentVersion || DEFAULT_VALUE,
+    username: module.additionalData?.username || DEFAULT_VALUE,
+    lastHeartbeat: module.lastHeartbeatReceived || 0,
+    lastDeployed: module.startedTs || 0,
+    os: module.additionalData?.os || DEFAULT_VALUE,
+    osDisplayName: module.additionalData?.osDisplayName || DEFAULT_VALUE,
+    osVersion: module.additionalData?.osVersion || DEFAULT_VALUE,
+    arch: module.additionalData?.arch || DEFAULT_VALUE,
+    kernelVersion: module.additionalData?.kernelVersion || DEFAULT_VALUE,
+    totalRamGB: module.additionalData?.totalRamGB ?? DEFAULT_VALUE,
+    cpuCount: module.additionalData?.cpuCount ?? DEFAULT_VALUE,
+    isVM: module.additionalData?.isVM ?? null,
+    locale: module.additionalData?.locale || DEFAULT_VALUE,
+    timezone: module.additionalData?.timezone || DEFAULT_VALUE,
+    publicIP: module.additionalData?.publicIP || DEFAULT_VALUE,
+    cpuModel: module.additionalData?.cpuModel || DEFAULT_VALUE,
+    macModel: module.additionalData?.macModel || DEFAULT_VALUE,
+    totalDiskGB: module.additionalData?.totalDiskGB ?? DEFAULT_VALUE,
+    availableDiskGB: module.additionalData?.availableDiskGB ?? DEFAULT_VALUE,
+    localIP: module.additionalData?.localIP || DEFAULT_VALUE,
+    localHostname: module.additionalData?.localHostname || DEFAULT_VALUE,
+    userFullName: module.additionalData?.userFullName || DEFAULT_VALUE,
+    userShell: module.additionalData?.userShell || DEFAULT_VALUE,
+    bootTime: module.additionalData?.bootTime || null,
+    installedApps: module.additionalData?.installedApps || [],
+    installStatus: module.additionalData?.installStatus || null,
+    _moduleData: module
+});
 
 function EndpointShieldMetadata() {
 
@@ -147,7 +167,7 @@ function EndpointShieldMetadata() {
     const allCollections = PersistStore((state) => state.allCollections) || [];
     const [selectedAgent, setSelectedAgent] = useState(null);
     const [showFlyout, setShowFlyout] = useState(false);
-    const [endpointShieldData, setEndpointShieldData] = useState(null);
+    const [refreshKey, setRefreshKey] = useState(0);
     const [allowedEnvFields, setAllowedEnvFields] = useState([]);
     const [filters, setFilters] = useState([
         createFilter('username', 'Username'),
@@ -164,159 +184,62 @@ function EndpointShieldMetadata() {
         return func.convertToDisambiguateLabelObj(value, null, 2);
     }
 
-    const fetchModuleInfo = useCallback(async () => {
-        try {
-            const response = await settingRequests.fetchModuleInfo({
-                moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD
-            });
-            const endpointShieldModules = response.moduleInfos || [];
-            setAllowedEnvFields(response.allowedEnvFields || []);
-            const agents = endpointShieldModules.map(module => ({
-                agentId: module.id,
-                hostname: module.name,
-                deviceId: module.additionalData?.deviceId || DEFAULT_VALUE,
-                agentVersion: module.currentVersion || DEFAULT_VALUE,
-                username: module.additionalData?.username || DEFAULT_VALUE,
-                lastHeartbeat: module.lastHeartbeatReceived || 0,
-                lastDeployed: module.startedTs || 0,
-                os: module.additionalData?.os || DEFAULT_VALUE,
-                osDisplayName: module.additionalData?.osDisplayName || DEFAULT_VALUE,
-                osVersion: module.additionalData?.osVersion || DEFAULT_VALUE,
-                arch: module.additionalData?.arch || DEFAULT_VALUE,
-                kernelVersion: module.additionalData?.kernelVersion || DEFAULT_VALUE,
-                totalRamGB: module.additionalData?.totalRamGB ?? DEFAULT_VALUE,
-                cpuCount: module.additionalData?.cpuCount ?? DEFAULT_VALUE,
-                isVM: module.additionalData?.isVM ?? null,
-                locale: module.additionalData?.locale || DEFAULT_VALUE,
-                timezone: module.additionalData?.timezone || DEFAULT_VALUE,
-                publicIP: module.additionalData?.publicIP || DEFAULT_VALUE,
-                cpuModel: module.additionalData?.cpuModel || DEFAULT_VALUE,
-                macModel: module.additionalData?.macModel || DEFAULT_VALUE,
-                totalDiskGB: module.additionalData?.totalDiskGB ?? DEFAULT_VALUE,
-                availableDiskGB: module.additionalData?.availableDiskGB ?? DEFAULT_VALUE,
-                localIP: module.additionalData?.localIP || DEFAULT_VALUE,
-                localHostname: module.additionalData?.localHostname || DEFAULT_VALUE,
-                userFullName: module.additionalData?.userFullName || DEFAULT_VALUE,
-                userShell: module.additionalData?.userShell || DEFAULT_VALUE,
-                bootTime: module.additionalData?.bootTime || null,
-                installedApps: module.additionalData?.installedApps || [],
-                installStatus: module.additionalData?.installStatus || null,
-                _moduleData: module
-            }));
-            setEndpointShieldData({ agents: deduplicateAgents(agents) });
-        } catch (error) {
-        }
-    }, []);
-
+    // Filter dropdown options (distinct values across ALL agents) — fetched ONCE, server-side.
     useEffect(() => {
-        fetchModuleInfo();
-    }, [fetchModuleInfo]);
+        (async () => {
+            try {
+                const resp = await settingRequests.fetchEndpointShieldFilterOptions();
+                const opts = resp?.filterOptions || {};
+                setFilters([
+                    { ...createFilter('username', 'Username'), choices: (opts.usernames || []).map(u => ({ label: u, value: u })) },
+                    { ...createFilter('hostname', 'Hostname'), choices: (opts.hostnames || []).map(h => ({ label: h, value: h })) },
+                    { ...createFilter('deviceId', 'Device ID'), choices: (opts.deviceIds || []).map(d => ({ label: d, value: d })) },
+                    { ...createFilter('os', 'OS'), choices: (opts.oses || []).map(o => ({ label: o, value: o })) }
+                ]);
+            } catch (e) { /* ignore */ }
+        })();
+    }, []);
 
     const handleSaveEnv = useCallback(async (moduleId, moduleName, envData) => {
         await settingRequests.updateModuleEnvAndReboot(moduleId, moduleName, envData);
         func.setToast(true, false, "Configuration saved. Agent will pick up changes shortly.");
-        const response = await settingRequests.fetchModuleInfo({ moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD });
-        const endpointShieldModules = response.moduleInfos || [];
-        setAllowedEnvFields(response.allowedEnvFields || []);
-        const agents = endpointShieldModules.map(module => ({
-            agentId: module.id,
-            hostname: module.name,
-            deviceId: module.additionalData?.deviceId || DEFAULT_VALUE,
-            agentVersion: module.currentVersion || DEFAULT_VALUE,
-            username: module.additionalData?.username || DEFAULT_VALUE,
-            lastHeartbeat: module.lastHeartbeatReceived || 0,
-            lastDeployed: module.startedTs || 0,
-            os: module.additionalData?.os || DEFAULT_VALUE,
-            osDisplayName: module.additionalData?.osDisplayName || DEFAULT_VALUE,
-            osVersion: module.additionalData?.osVersion || DEFAULT_VALUE,
-            arch: module.additionalData?.arch || DEFAULT_VALUE,
-            kernelVersion: module.additionalData?.kernelVersion || DEFAULT_VALUE,
-            totalRamGB: module.additionalData?.totalRamGB ?? DEFAULT_VALUE,
-            cpuCount: module.additionalData?.cpuCount ?? DEFAULT_VALUE,
-            isVM: module.additionalData?.isVM ?? null,
-            locale: module.additionalData?.locale || DEFAULT_VALUE,
-            timezone: module.additionalData?.timezone || DEFAULT_VALUE,
-            publicIP: module.additionalData?.publicIP || DEFAULT_VALUE,
-            cpuModel: module.additionalData?.cpuModel || DEFAULT_VALUE,
-            macModel: module.additionalData?.macModel || DEFAULT_VALUE,
-            totalDiskGB: module.additionalData?.totalDiskGB ?? DEFAULT_VALUE,
-            availableDiskGB: module.additionalData?.availableDiskGB ?? DEFAULT_VALUE,
-            localIP: module.additionalData?.localIP || DEFAULT_VALUE,
-            localHostname: module.additionalData?.localHostname || DEFAULT_VALUE,
-            userFullName: module.additionalData?.userFullName || DEFAULT_VALUE,
-            userShell: module.additionalData?.userShell || DEFAULT_VALUE,
-            bootTime: module.additionalData?.bootTime || null,
-            installedApps: module.additionalData?.installedApps || [],
-            installStatus: module.additionalData?.installStatus || null,
-            _moduleData: module
-        }));
-        setEndpointShieldData({ agents: deduplicateAgents(agents) });
+        // reflect the saved env in the open flyout optimistically, and refresh the current table page
         setSelectedAgent(prev => {
-            if (!prev) return prev;
-            const fresh = agents.find(a => a.agentId === prev.agentId);
-            return fresh || prev;
+            if (!prev || !prev._moduleData) return prev;
+            const ad = prev._moduleData.additionalData || {};
+            return { ...prev, _moduleData: { ...prev._moduleData, additionalData: { ...ad, env: { ...(ad.env || {}), ...(envData || {}) } } } };
         });
+        setRefreshKey(k => k + 1);
     }, []);
 
-    useEffect(() => {
-        if (endpointShieldData?.agents) {
-            const agentsData = endpointShieldData.agents;
-            const uniqueUsernames = [...new Set(agentsData.map(a => a.username).filter(v => v && v !== DEFAULT_VALUE))];
-            const uniqueHostnames = [...new Set(agentsData.map(a => a.hostname).filter(Boolean))];
-            const uniqueDeviceIds = [...new Set(agentsData.map(a => a.deviceId).filter(v => v && v !== DEFAULT_VALUE))];
-            const uniqueOSValues = [...new Set(agentsData.map(a => a.os).filter(v => v && v !== DEFAULT_VALUE))];
-            setFilters([
-                { ...createFilter('username', 'Username'), choices: uniqueUsernames.map(u => ({ label: u, value: u })) },
-                { ...createFilter('hostname', 'Hostname'), choices: uniqueHostnames.map(h => ({ label: h, value: h })) },
-                { ...createFilter('deviceId', 'Device ID'), choices: uniqueDeviceIds.map(d => ({ label: d, value: d })) },
-                { ...createFilter('os', 'OS'), choices: uniqueOSValues.map(o => ({ label: o, value: o })) }
-            ]);
-        }
-    }, [endpointShieldData]);
-
+    // Server-side paginated fetch — one page (skip/limit) with filters/sort/query pushed to the backend.
     const fetchData = useCallback(async (sortKey, sortOrder, skip, limit, filters, _filterOperators, queryValue) => {
         setLoading(true);
         let ret = [];
         let total = 0;
         try {
-            const agentsData = endpointShieldData?.agents || [];
-            const filteredData = agentsData.filter(agent => {
-                if (agent.lastHeartbeat < startTimestamp || agent.lastHeartbeat > endTimestamp) return false;
-                if (filters.username?.length > 0 && !filters.username.includes(agent.username)) return false;
-                if (filters.hostname?.length > 0 && !filters.hostname.includes(agent.hostname)) return false;
-                if (filters.deviceId?.length > 0 && !filters.deviceId.includes(agent.deviceId)) return false;
-                if (filters.os?.length > 0 && !filters.os.includes(agent.os)) return false;
-                if (queryValue) {
-                    const q = queryValue.toLowerCase();
-                    if (!agent.agentId?.toLowerCase().includes(q) &&
-                        !agent.hostname?.toLowerCase().includes(q) &&
-                        !agent.deviceId?.toLowerCase().includes(q) &&
-                        !agent.username?.toLowerCase().includes(q)) return false;
-                }
-                return true;
+            const resp = await settingRequests.fetchEndpointShieldAgents({
+                skip, limit,
+                sortKey: sortKey || "lastHeartbeat",
+                sortOrder: sortOrder === 1 ? 1 : -1,
+                usernames: filters?.username || [],
+                hostnames: filters?.hostname || [],
+                deviceIds: filters?.deviceId || [],
+                oses: filters?.os || [],
+                queryValue: queryValue || "",
+                startTimestamp, endTimestamp,
             });
-
-            if (sortKey) {
-                filteredData.sort((a, b) => {
-                    const aVal = a[sortKey], bVal = b[sortKey];
-                    if (aVal == null && bVal == null) return 0;
-                    if (aVal == null) return 1;
-                    if (bVal == null) return -1;
-                    if (typeof aVal === 'number' && typeof bVal === 'number') return sortOrder * (aVal - bVal);
-                    if (typeof aVal === 'string' && typeof bVal === 'string') return sortOrder * (bVal.toLowerCase().localeCompare(aVal.toLowerCase()));
-                    return 0;
-                });
-            }
-
-            total = filteredData.length;
-            ret = filteredData.slice(skip, skip + limit).map(convertDataIntoTableFormat);
+            setAllowedEnvFields(resp?.allowedEnvFields || []);
+            const agents = (resp?.moduleInfos || []).map(mapModuleToAgent);
+            total = resp?.total || 0;
+            ret = agents.map(convertDataIntoTableFormat);
         } catch (error) {
             console.error("Error fetching MCP Endpoint Shield metadata:", error);
         } finally {
             setLoading(false);
         }
         return { value: ret, total };
-    }, [endpointShieldData, startTimestamp, endTimestamp]);
+    }, [startTimestamp, endTimestamp]);
 
     const allowBulkActions = window.USER_NAME && window.USER_NAME.endsWith("@akto.io");
 
@@ -344,10 +267,10 @@ function EndpointShieldMetadata() {
     };
 
     const handleRowClick = useCallback((agent) => {
-        const freshAgent = endpointShieldData?.agents?.find(a => a.agentId === agent.agentId) || agent;
-        setSelectedAgent(freshAgent);
+        // the row already carries the full module (_moduleData) from the paginated fetch
+        setSelectedAgent(agent);
         setShowFlyout(true);
-    }, [endpointShieldData]);
+    }, []);
 
     const primaryActions = (
         <HorizontalStack gap={"2"}>
@@ -375,7 +298,7 @@ function EndpointShieldMetadata() {
                 primaryAction={primaryActions}
                 components={[
                     <GithubServerTable
-                        key={startTimestamp + endTimestamp + (endpointShieldData ? "loaded" : "loading") + filters[0]?.choices?.length}
+                        key={startTimestamp + endTimestamp + "-" + refreshKey + "-" + (filters[0]?.choices?.length || 0)}
                         headers={headings}
                         resourceName={resourceName}
                         appliedFilters={[]}

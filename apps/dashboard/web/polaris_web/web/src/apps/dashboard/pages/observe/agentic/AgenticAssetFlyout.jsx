@@ -85,7 +85,10 @@ export default function AgenticAssetFlyout({
     agenticFlatData = [],
     assetDevices = {},
     collections = [],
-    agenticViolationRows = [],
+    // Left undefined (not defaulted to []) when the parent hasn't loaded raw violation rows yet, so
+    // ViolationsTab can tell "not loaded" apart from "confirmed zero violations" via Array.isArray.
+    // selectConfigViolationRows below has its own internal default and handles undefined safely.
+    agenticViolationRows,
     startTimestamp,
     endTimestamp,
 }) {
@@ -267,7 +270,7 @@ export default function AgenticAssetFlyout({
                         />
                     </div>
                 )}
-                {selectedTab === 2 && <ViolationsTab asset={asset} collections={collections} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onViolationClick={asset?.type === "Skill" ? () => handleTabSelect(1) : undefined} />}
+                {selectedTab === 2 && <ViolationsTab asset={asset} collections={collections} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onViolationClick={asset?.type === "Skill" ? () => handleTabSelect(1) : undefined} allViolationRows={agenticViolationRows} />}
                 {selectedTab === 3 && <DevicesTab asset={asset} assetDevices={assetDevices} />}
             </Box>
         </AgenticFlyoutShell>

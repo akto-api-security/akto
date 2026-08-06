@@ -39,6 +39,37 @@ export async function fetchAgenticViolations({ startTimestamp, endTimestamp, hos
     return (resp?.maliciousEvents || []).map(normalizeEvent);
 }
 
+// Per-host severity counts for the whole date range, server-aggregated — returns a
+// {[host]: {critical, high, medium, low}} map instead of every raw event doc. Use this wherever only
+// COUNTS are needed (list-page violation columns, severity totals); fetchAgenticViolations is still
+// needed for actual per-event detail (flyout tables, timestamps for trend sparklines).
+export async function fetchAgenticViolationCountsByHost({ startTimestamp, endTimestamp } = {}) {
+    // Unlike fetchAgenticViolations (always called outside the blocking Promise.all, with its own
+    // .catch() at the call site), this is called INSIDE the blocking Promise.all on every agentic list
+    // page's mount — so a failure here must not propagate, or it takes down collections/risk/traffic/
+    // everything else in the same batch via Promise.all's all-or-nothing semantics. Degrade to "no
+    // violation counts yet" instead.
+    let rows;
+    try {
+        rows = await observeApi.fetchHostSeverityCounts(startTimestamp, endTimestamp);
+    } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("fetchAgenticViolationCountsByHost failed:", e);
+        rows = [];
+    }
+    const byHost = {};
+    (rows || []).forEach((r) => {
+        if (!r?.host) return;
+        byHost[r.host] = {
+            critical: r.critical || 0,
+            high: r.high || 0,
+            medium: r.medium || 0,
+            low: r.low || 0,
+        };
+    });
+    return byHost;
+}
+
 // LatestAPICollectionID in events is set to time.Now().Unix() (a fake timestamp),
 // so apiCollectionId cannot be used to match events to collections.
 // The real join key is the host: agentic traffic events and their collections are both
@@ -61,7 +92,10 @@ export function isClaudeConfigHost(hostName) {
     return service === "claude-settings" || service === "claude";
 }
 
-export function aggregateViolationsByCollectionId(violationRows = [], collections = []) {
+// Builds the host → [collectionId] attribution maps shared by both aggregateViolationsByCollectionId
+// (raw rows) and aggregateViolationCountsByCollectionId (pre-aggregated host counts), so the exact/loose/
+// claude-config matching rules stay in one place.
+function buildHostAttributionMaps(collections = []) {
     const hostToIds        = {};  // exact hostName → [collectionId]
     const looseToIds       = {};  // device+service key → [collectionId]
     const claudeDeviceToIds = {}; // deviceId → [collectionId] for collections whose last segment is "claude"
@@ -89,17 +123,30 @@ export function aggregateViolationsByCollectionId(violationRows = [], collection
         }
     });
 
+    return { hostToIds, looseToIds, claudeDeviceToIds, allClaudeIds };
+}
+
+// Resolves a single event/count host to the collection IDs it should be attributed to, using the same
+// exact → loose → claude-config fallback tiers for both raw-row and pre-aggregated-count callers.
+function resolveHostToCollectionIds(host, { hostToIds, looseToIds, claudeDeviceToIds, allClaudeIds }) {
+    let ids = hostToIds[host];
+    if (!ids?.length) ids = looseToIds[deviceServiceKey(host)];
+    if (!ids?.length && isClaudeConfigHost(host)) {
+        const deviceId = host.split(".")[0];
+        // Attribute to ONE canonical collection (first found) so the same event isn't counted
+        // multiple times when there are several claude collections in the tenant.
+        const pool = claudeDeviceToIds[deviceId]?.length ? claudeDeviceToIds[deviceId] : allClaudeIds;
+        ids = pool.length ? [pool[0]] : undefined;
+    }
+    return ids;
+}
+
+export function aggregateViolationsByCollectionId(violationRows = [], collections = []) {
+    const maps = buildHostAttributionMaps(collections);
+
     const byCollection = {};
     violationRows.forEach((row) => {
-        let ids = hostToIds[row.host];
-        if (!ids?.length) ids = looseToIds[deviceServiceKey(row.host)];
-        if (!ids?.length && isClaudeConfigHost(row.host)) {
-            const deviceId = row.host.split(".")[0];
-            // Attribute to ONE canonical collection (first found) so the same event isn't
-            // counted multiple times when there are several claude collections in the tenant.
-            const pool = claudeDeviceToIds[deviceId]?.length ? claudeDeviceToIds[deviceId] : allClaudeIds;
-            ids = pool.length ? [pool[0]] : undefined;
-        }
+        const ids = resolveHostToCollectionIds(row.host, maps);
         if (!ids?.length) return;
 
         const sev = normalizeSeverity(row.severity);
@@ -108,6 +155,28 @@ export function aggregateViolationsByCollectionId(violationRows = [], collection
         ids.forEach((id) => {
             if (!byCollection[id]) byCollection[id] = { critical: 0, high: 0, medium: 0, low: 0 };
             byCollection[id][key] += 1;
+        });
+    });
+    return byCollection;
+}
+
+// Same host→collection attribution as aggregateViolationsByCollectionId, but sums server-pre-aggregated
+// per-host severity counts (from fetchAgenticViolationCountsByHost) instead of incrementing per raw row —
+// avoids fetching every raw violation event just to compute this rollup.
+export function aggregateViolationCountsByCollectionId(hostCounts = {}, collections = []) {
+    const maps = buildHostAttributionMaps(collections);
+
+    const byCollection = {};
+    Object.entries(hostCounts).forEach(([host, counts]) => {
+        const ids = resolveHostToCollectionIds(host, maps);
+        if (!ids?.length) return;
+
+        ids.forEach((id) => {
+            if (!byCollection[id]) byCollection[id] = { critical: 0, high: 0, medium: 0, low: 0 };
+            byCollection[id].critical += counts.critical || 0;
+            byCollection[id].high     += counts.high || 0;
+            byCollection[id].medium   += counts.medium || 0;
+            byCollection[id].low      += counts.low || 0;
         });
     });
     return byCollection;

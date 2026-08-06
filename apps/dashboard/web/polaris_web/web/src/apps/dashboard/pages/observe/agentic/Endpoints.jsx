@@ -29,6 +29,8 @@ import {
     buildAgenticInventoryFilterForRow,
     fetchAndCacheSkillApiData,
     skillCollectionKey,
+    fetchAndCacheAgenticCollectionsBundle,
+    fetchAndCacheAgenticSensitiveInfo,
 } from "./constants";
 import { CLIENT_TYPES, ROW_TYPES, hasPersonalAccountTag } from "./mcpClientHelper";
 
@@ -218,14 +220,9 @@ function Endpoints() {
     const enrichSkillsWithApiRiskScores = useCallback(async (skillRows, isMountedRef = { current: true }) => {
         if (!skillRows.length) return;
 
-        const allCollectionIds = [];
-        skillRows.forEach((row) => {
-            (row.collections || []).forEach((c) => {
-                if (!allCollectionIds.includes(c.id)) allCollectionIds.push(c.id);
-            });
-        });
-
-        const { skillScoreMap, maliciousSkillKeys, misconfiguredSkills } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
+        // Single account-wide call (no per-collection N+1) — maliciousSkillKeys is pre-aggregated
+        // server-side (collection-scoped), see fetchAndCacheSkillApiData in constants.js.
+        const { skillScoreMap, maliciousSkillKeys, misconfiguredSkills } = await fetchAndCacheSkillApiData([], { api, PersistStore });
 
         if (!isMountedRef.current) return;
         applySkillRiskScores(skillScoreMap, maliciousSkillKeys || new Set(), misconfiguredSkills || new Set(), isMountedRef);
@@ -235,26 +232,18 @@ function Endpoints() {
         try {
             setLoading(true);
 
-            const [
-                apiCollectionsResp,
-                trafficInfoResp,
-                riskScoreResp,
-                sensitiveInfoResp,
-            ] = await Promise.all([
-                api.getAllCollectionsBasic(),
-                api.getLastTrafficSeen(),
-                api.getRiskScoreInfo(),
-                api.getSensitiveInfoForCollections(),
+            // getAllCollectionsBasic/traffic/risk are cached (PersistStore, 2-min TTL, in-flight-deduped)
+            // and shared with AgenticAssetsPage/UsersAndDevices/DeviceEndpoints/EndpointPosture. Sensitive
+            // info is cached separately since only this page + UsersAndDevices.jsx render that column.
+            const [collectionsBundle, sensitiveMap] = await Promise.all([
+                fetchAndCacheAgenticCollectionsBundle({ api, PersistStore }),
+                fetchAndCacheAgenticSensitiveInfo({ api, PersistStore }),
             ]);
 
             if (!isMountedRef.current) return;
 
-            const collections = apiCollectionsResp.apiCollections || [];
+            const { collections = [], trafficMap = {}, riskScoreMap = {} } = collectionsBundle || {};
             setAllCollections(collections);
-
-            const trafficMap = trafficInfoResp || {};
-            const riskScoreMap = riskScoreResp?.riskScoreOfCollectionsMap || {};
-            const sensitiveMap = sensitiveInfoResp?.sensitiveSubtypesInCollection || {};
 
             const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap, riskScoreMap);
             const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);

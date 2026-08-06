@@ -38,8 +38,11 @@ public final class AgenticObserveUtil {
         if (StringUtils.isBlank(hostName)) {
             return null;
         }
-        String[] parts = hostName.split("\\.");
-        return parts.length > 0 ? parts[0] : null;
+        // Equivalent to hostName.split("\\.")[0] but without the regex-Pattern-compile-per-call cost
+        // String.split() carries — matters for any caller running this per-collection at real
+        // account scale (tens of thousands of collections).
+        int dotIdx = hostName.indexOf('.');
+        return dotIdx >= 0 ? hostName.substring(0, dotIdx) : hostName;
     }
 
     public static String extractServiceName(String hostName) {
@@ -151,6 +154,8 @@ public final class AgenticObserveUtil {
         return Math.round(score * 10.0) / 10.0;
     }
 
+    public static final String NOT_ATTACHED_VALUE = "not-attached";
+
     public static CollectionTags findAssetTag(ApiCollection collection) {
         List<CollectionTags> envType = collection != null ? collection.getEnvType() : null;
         if (envType == null) {
@@ -161,7 +166,11 @@ public final class AgenticObserveUtil {
                 continue;
             }
             String key = tag.getKeyName();
-            if (Constants.AKTO_MCP_CLIENT_TAG.equals(key) || Constants.AKTO_AI_AGENT_TAG.equals(key) || Constants.AKTO_BROWSER_LLM_AGENT_TAG.equals(key)) {
+            // Matches mcpClientHelper.js's findAssetTag — a tag present with value "not-attached"
+            // means the asset-owner slot exists but isn't actually bound to anything yet, so it
+            // must not be treated as agent-owned.
+            if ((Constants.AKTO_MCP_CLIENT_TAG.equals(key) || Constants.AKTO_AI_AGENT_TAG.equals(key) || Constants.AKTO_BROWSER_LLM_AGENT_TAG.equals(key))
+                    && !NOT_ATTACHED_VALUE.equals(tag.getValue())) {
                 return tag;
             }
         }

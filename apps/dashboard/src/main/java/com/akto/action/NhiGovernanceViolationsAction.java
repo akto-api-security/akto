@@ -16,10 +16,13 @@ import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.utils.jira.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Facet;
 import com.mongodb.client.model.Field;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.Variable;
 import com.opensymphony.xwork2.Action;
@@ -37,6 +40,7 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 public class NhiGovernanceViolationsAction extends UserAction {
 
@@ -61,6 +65,19 @@ public class NhiGovernanceViolationsAction extends UserAction {
     @Setter
     private int endTimestamp;
 
+    // ---- Server-side pagination / stats (ATLAS NHI Governance) ----
+    @Setter private int skip;
+    @Setter private int limit;
+    @Setter private String sortKey;
+    @Setter private int sortOrder;      // 1 asc, -1 desc (Mongo convention)
+    @Setter private String queryValue;  // search on agentName / violationType
+    @Setter private String status;      // tab filter: "Open" (!= Fixed) / "Fixed" / null-or-"All"
+    @Setter private String identityId;  // hex id, for fetchViolationsByIdentity
+    @Getter private long total;
+    @Getter private Map<String, Object> stats;
+    @Getter private List<Map<String, Object>> identityViolationCounts;
+    @Getter private List<Map<String, Object>> policyViolationCounts;
+
     @Setter
     private String projId;
 
@@ -79,63 +96,114 @@ public class NhiGovernanceViolationsAction extends UserAction {
     @Getter
     private String errorMessage;
 
+    // Aggregation bypasses AccountsContextDaoWithContextSource — apply contextSource + date-range
+    // filters explicitly. Shared by every violations query below so all of them scope consistently.
+    private List<Bson> buildBaseMatchConditions() {
+        List<Bson> matchConditions = new ArrayList<>();
+        if (Context.contextSource.get() != null) {
+            matchConditions.add(Filters.eq(NhiViolation.CONTEXT_SOURCE, Context.contextSource.get().name()));
+        }
+        if (startTimestamp > 0 && endTimestamp > 0) {
+            matchConditions.add(Filters.gte(NhiViolation.DISCOVERED_AT, startTimestamp));
+            matchConditions.add(Filters.lte(NhiViolation.DISCOVERED_AT, endTimestamp));
+        }
+        return matchConditions;
+    }
+
+    private static Bson combineMatch(List<Bson> conditions) {
+        if (conditions.isEmpty()) return Filters.empty();
+        return conditions.size() == 1 ? conditions.get(0) : Filters.and(conditions);
+    }
+
+    private static String mapSortField(String key) {
+        if (key == null) return NhiViolation.DISCOVERED_AT;
+        switch (key) {
+            case "severity": return NhiViolation.SEVERITY;
+            case "status": return NhiViolation.STATUS;
+            case "agent": return NhiViolation.AGENT_NAME;
+            case "violationType": return NhiViolation.VIOLATION_TYPE;
+            case "detected":
+            default: return NhiViolation.DISCOVERED_AT;
+        }
+    }
+
+    // Join nhi_policies (policyIds is List<String>, _id is ObjectId — match via $toString), replace the
+    // policy field with the resolved name list, and drop heavy fields no UI consumer reads on the list view.
+    private static List<Bson> policyLookupAndProjectStages() {
+        List<Bson> stages = new ArrayList<>();
+        stages.add(Aggregates.lookup(
+                NhiPolicy.COLLECTION_NAME,
+                Arrays.asList(new Variable<>("vPolicyIds", "$" + NhiViolation.POLICY_IDS)),
+                Arrays.asList(
+                        Aggregates.match(Filters.expr(new Document("$in", Arrays.asList(
+                                new Document("$toString", "$_id"),
+                                new Document("$ifNull", Arrays.asList("$$vPolicyIds", Collections.emptyList()))
+                        )))),
+                        Aggregates.project(Projections.fields(
+                                Projections.excludeId(),
+                                Projections.include(NhiPolicy.POLICY_NAME)
+                        ))
+                ),
+                "policyDocs"
+        ));
+        stages.add(Aggregates.addFields(new Field<>(
+                NhiViolation.POLICY,
+                new Document("$map", new Document("input", "$policyDocs")
+                        .append("as", "p")
+                        .append("in", "$$p." + NhiPolicy.POLICY_NAME))
+        )));
+        stages.add(Aggregates.project(Projections.fields(
+                Projections.exclude(
+                        NhiViolation.ACKNOWLEDGED_AT, NhiViolation.ACKNOWLEDGED_BY,
+                        NhiViolation.RESOLVED_AT, NhiViolation.RESOLVED_BY,
+                        NhiViolation.AGENT_TYPE,
+                        NhiViolation.ACKNOWLEDGMENT_NOTES,
+                        NhiViolation.RESOLUTION_NOTES,
+                        NhiViolation.RESOLUTION_TYPE,
+                        NhiViolation.METADATA,
+                        "policyDocs"
+                )
+        )));
+        return stages;
+    }
+
+    /**
+     * Server-side paginated violations list (ATLAS NHI Governance). Replaces the old load-all behaviour
+     * that pulled every violation in the date range (an unbounded, usage-scaled collection) into the
+     * browser for the table AND the severity donut AND the trend chart AND the tab counts — see
+     * fetchViolationsStats() for those, which are now computed server-side instead.
+     */
     public String fetchAllViolations() {
         try {
+            List<Bson> matchConditions = buildBaseMatchConditions();
+            if (status != null && !status.isEmpty() && !"All".equalsIgnoreCase(status)) {
+                if ("Fixed".equalsIgnoreCase(status)) {
+                    matchConditions.add(Filters.eq(NhiViolation.STATUS, "Fixed"));
+                } else if ("Open".equalsIgnoreCase(status)) {
+                    matchConditions.add(Filters.ne(NhiViolation.STATUS, "Fixed"));
+                }
+            }
+            if (queryValue != null && !queryValue.trim().isEmpty()) {
+                String q = Pattern.quote(queryValue.trim());
+                matchConditions.add(Filters.or(
+                        Filters.regex(NhiViolation.AGENT_NAME, q, "i"),
+                        Filters.regex(NhiViolation.VIOLATION_TYPE, q, "i")
+                ));
+            }
+            Bson matchFilter = combineMatch(matchConditions);
+
+            total = NhiViolationDao.instance.count(matchFilter);
+
+            String sortField = mapSortField(sortKey);
+            int lim = (limit <= 0) ? 50 : Math.min(limit, 500);
+            int sk = Math.max(skip, 0);
+
             List<Bson> pipeline = new ArrayList<>();
-
-            // Aggregation bypasses AccountsContextDaoWithContextSource — apply contextSource filter explicitly.
-            List<Bson> matchConditions = new ArrayList<>();
-            if (Context.contextSource.get() != null) {
-                matchConditions.add(Filters.eq(NhiViolation.CONTEXT_SOURCE, Context.contextSource.get().name()));
-            }
-            if (startTimestamp > 0 && endTimestamp > 0) {
-                matchConditions.add(Filters.gte(NhiViolation.DISCOVERED_AT, startTimestamp));
-                matchConditions.add(Filters.lte(NhiViolation.DISCOVERED_AT, endTimestamp));
-            }
-            if (!matchConditions.isEmpty()) {
-                pipeline.add(Aggregates.match(matchConditions.size() == 1
-                        ? matchConditions.get(0)
-                        : Filters.and(matchConditions)));
-            }
-
-            // Join nhi_policies. policyIds is List<String>, _id is ObjectId — match via $toString.
-            pipeline.add(Aggregates.lookup(
-                    NhiPolicy.COLLECTION_NAME,
-                    Arrays.asList(new Variable<>("vPolicyIds", "$" + NhiViolation.POLICY_IDS)),
-                    Arrays.asList(
-                            Aggregates.match(Filters.expr(new Document("$in", Arrays.asList(
-                                    new Document("$toString", "$_id"),
-                                    new Document("$ifNull", Arrays.asList("$$vPolicyIds", Collections.emptyList()))
-                            )))),
-                            Aggregates.project(Projections.fields(
-                                    Projections.excludeId(),
-                                    Projections.include(NhiPolicy.POLICY_NAME)
-                            ))
-                    ),
-                    "policyDocs"
-            ));
-
-            // Replace policy field with the resolved name list.
-            pipeline.add(Aggregates.addFields(new Field<>(
-                    NhiViolation.POLICY,
-                    new Document("$map", new Document("input", "$policyDocs")
-                            .append("as", "p")
-                            .append("in", "$$p." + NhiPolicy.POLICY_NAME))
-            )));
-
-            // Drop heavy fields no UI consumer reads, plus temporary join fields.
-            pipeline.add(Aggregates.project(Projections.fields(
-                    Projections.exclude(
-                            NhiViolation.ACKNOWLEDGED_AT, NhiViolation.ACKNOWLEDGED_BY,
-                            NhiViolation.RESOLVED_AT, NhiViolation.RESOLVED_BY,
-                            NhiViolation.AGENT_TYPE,
-                            NhiViolation.ACKNOWLEDGMENT_NOTES,
-                            NhiViolation.RESOLUTION_NOTES,
-                            NhiViolation.RESOLUTION_TYPE,
-                            NhiViolation.METADATA,
-                            "policyDocs"
-                    )
-            )));
+            pipeline.add(Aggregates.match(matchFilter));
+            pipeline.add(Aggregates.sort((sortOrder < 0) ? Sorts.descending(sortField) : Sorts.ascending(sortField)));
+            pipeline.add(Aggregates.skip(sk));
+            pipeline.add(Aggregates.limit(lim));
+            pipeline.addAll(policyLookupAndProjectStages());
 
             MongoCursor<NhiViolation> cursor = NhiViolationDao.instance.getMCollection()
                     .aggregate(pipeline, NhiViolation.class).cursor();
@@ -154,18 +222,171 @@ public class NhiGovernanceViolationsAction extends UserAction {
         }
     }
 
-    public String fetchViolationCountsByIdentity() {
+    /**
+     * Server-computed aggregates for the Violations page: severity breakdown (open violations only,
+     * matching what the donut showed before), day-bucketed counts (for the trend chart), and open/fixed
+     * totals (for the tab badges). Replaces client-side reduction over the full violations array.
+     */
+    public String fetchViolationsStats() {
         try {
-            violations = NhiViolationDao.instance.findAll(
-                    Filters.ne(NhiViolation.STATUS, "Fixed"),
-                    Projections.fields(
-                            Projections.excludeId(),
-                            Projections.include(NhiViolation.SEVERITY, NhiViolation.IDENTITIES + ".identityName")
+            Bson matchFilter = combineMatch(buildBaseMatchConditions());
+
+            Document dayKeyExpr = new Document("$dateToString", new Document("format", "%Y-%m-%d")
+                    .append("date", new Document("$toDate", new Document("$multiply",
+                            Arrays.asList("$" + NhiViolation.DISCOVERED_AT, 1000)))));
+
+            List<Bson> pipeline = Arrays.asList(
+                    Aggregates.match(matchFilter),
+                    Aggregates.facet(
+                            new Facet("bySeverityOpen",
+                                    Aggregates.match(Filters.ne(NhiViolation.STATUS, "Fixed")),
+                                    Aggregates.group("$" + NhiViolation.SEVERITY, Accumulators.sum("count", 1))),
+                            new Facet("byStatus",
+                                    Aggregates.group("$" + NhiViolation.STATUS, Accumulators.sum("count", 1))),
+                            new Facet("byDay",
+                                    Aggregates.group(dayKeyExpr, Accumulators.sum("count", 1)))
                     )
             );
+
+            Document result = NhiViolationDao.instance.getMCollection()
+                    .aggregate(pipeline, Document.class).allowDiskUse(true).first();
+
+            stats = new HashMap<>();
+            stats.put("bySeverityOpen", groupToMap(result, "bySeverityOpen"));
+            stats.put("byStatus", groupToMap(result, "byStatus"));
+            stats.put("byDay", groupToMap(result, "byDay"));
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching NHI violation stats: " + e.getMessage());
+            addActionError(e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> groupToMap(Document facetResult, String facetName) {
+        Map<String, Object> out = new HashMap<>();
+        if (facetResult == null) return out;
+        List<Document> docs = (List<Document>) facetResult.get(facetName);
+        if (docs == null) return out;
+        for (Document d : docs) {
+            Object key = d.get("_id");
+            out.put(key != null ? String.valueOf(key) : "unknown", d.get("count"));
+        }
+        return out;
+    }
+
+    /**
+     * Per-identity violation counts, grouped server-side (one row per identityName x severity) instead of
+     * shipping every non-fixed violation document to the browser for client-side grouping.
+     */
+    public String fetchViolationCountsByIdentity() {
+        try {
+            List<Bson> pipeline = Arrays.asList(
+                    Aggregates.match(Filters.ne(NhiViolation.STATUS, "Fixed")),
+                    Aggregates.unwind("$" + NhiViolation.IDENTITIES),
+                    Aggregates.group(
+                            new Document("identityName", "$" + NhiViolation.IDENTITIES + ".identityName")
+                                    .append("severity", "$" + NhiViolation.SEVERITY),
+                            Accumulators.sum("count", 1))
+            );
+            identityViolationCounts = groupPairsToList(pipeline, "identityName");
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching violation counts: " + e.getMessage());
+            addActionError(e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    // Per-policy violation counts for the NHI Policies page, grouped server-side (one row per
+    // policyId x severity) instead of shipping every non-fixed violation projected doc to the browser.
+    public String fetchViolationCountsByPolicy() {
+        try {
+            List<Bson> pipeline = Arrays.asList(
+                    Aggregates.match(Filters.ne(NhiViolation.STATUS, "Fixed")),
+                    Aggregates.unwind("$" + NhiViolation.POLICY_IDS),
+                    Aggregates.group(
+                            new Document("policyId", "$" + NhiViolation.POLICY_IDS)
+                                    .append("severity", "$" + NhiViolation.SEVERITY),
+                            Accumulators.sum("count", 1))
+            );
+            policyViolationCounts = groupPairsToList(pipeline, "policyId");
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching violation counts by policy: " + e.getMessage());
+            addActionError(e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    private List<Map<String, Object>> groupPairsToList(List<Bson> pipeline, String keyField) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        MongoCursor<Document> cursor = NhiViolationDao.instance.getMCollection()
+                .aggregate(pipeline, Document.class).cursor();
+        while (cursor.hasNext()) {
+            Document d = cursor.next();
+            Document id = (Document) d.get("_id");
+            Map<String, Object> row = new HashMap<>();
+            row.put(keyField, id != null ? id.get(keyField) : null);
+            row.put("severity", id != null ? id.get("severity") : null);
+            row.put("count", d.get("count"));
+            out.add(row);
+        }
+        return out;
+    }
+
+    /**
+     * Scoped, paginated violations for ONE identity (ATLAS NHI Governance identity-details flyout).
+     * Replaces the previous pattern of fetching every violation account-wide with no time bound just to
+     * client-side-filter down to a single identity on every panel open.
+     */
+    public String fetchViolationsByIdentity() {
+        try {
+            if (identityId == null || identityId.isEmpty()) {
+                addActionError("Identity ID is required");
+                return Action.ERROR.toUpperCase();
+            }
+
+            Bson identityFilter = Filters.eq(NhiViolation.IDENTITIES + ".id", new ObjectId(identityId));
+            total = NhiViolationDao.instance.count(identityFilter);
+
+            int lim = (limit <= 0) ? 50 : Math.min(limit, 500);
+            int sk = Math.max(skip, 0);
+
+            List<Bson> pipeline = new ArrayList<>();
+            pipeline.add(Aggregates.match(identityFilter));
+            pipeline.add(Aggregates.sort(Sorts.descending(NhiViolation.DISCOVERED_AT)));
+            pipeline.add(Aggregates.skip(sk));
+            pipeline.add(Aggregates.limit(lim));
+            pipeline.addAll(policyLookupAndProjectStages());
+
+            MongoCursor<NhiViolation> cursor = NhiViolationDao.instance.getMCollection()
+                    .aggregate(pipeline, NhiViolation.class).cursor();
+            violations = new ArrayList<>();
+            while (cursor.hasNext()) {
+                violations.add(cursor.next());
+            }
+
+            // Severity counts across ALL of this identity's violations (not just the current page).
+            List<Bson> sevPipeline = Arrays.asList(
+                    Aggregates.match(Filters.and(identityFilter, Filters.ne(NhiViolation.STATUS, "Fixed"))),
+                    Aggregates.group("$" + NhiViolation.SEVERITY, Accumulators.sum("count", 1))
+            );
+            Map<String, Object> sevMap = new HashMap<>();
+            MongoCursor<Document> sevCursor = NhiViolationDao.instance.getMCollection()
+                    .aggregate(sevPipeline, Document.class).cursor();
+            while (sevCursor.hasNext()) {
+                Document d = sevCursor.next();
+                sevMap.put(String.valueOf(d.get("_id")), d.get("count"));
+            }
+            stats = new HashMap<>();
+            stats.put("bySeverityOpen", sevMap);
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching violations by identity: " + e.getMessage());
             addActionError(e.getMessage());
             return Action.ERROR.toUpperCase();
         }
