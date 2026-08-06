@@ -161,6 +161,7 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 	}
 
 	validationHandler := handlers.NewValidationHandler(validatorService, logger, cfg, fileRegistry, acc)
+	copilotStudioHandler := handlers.NewCopilotStudioHandler(validatorService, logger)
 
 	var authMiddleware gin.HandlerFunc
 	if cfg.AuthEnabled {
@@ -174,7 +175,19 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 		logger.Warn("Inbound authentication disabled (set AKTO_GR_AUTHENTICATE=true to enable)")
 	}
 
-	router := setupRouter(validationHandler, authMiddleware, logger)
+	var entraAuthMiddleware gin.HandlerFunc
+	if cfg.CopilotAuthEnabled {
+		m, err := auth.NewEntraMiddleware(cfg.EntraTenantID, cfg.EntraAudience, logger)
+		if err != nil {
+			logger.Fatal("Failed to initialize Entra ID auth middleware", zap.Error(err))
+		}
+		entraAuthMiddleware = m
+		logger.Info("Entra ID authentication enabled for Copilot Studio webhook endpoints")
+	} else {
+		logger.Warn("Copilot Studio webhook authentication disabled (set AKTO_GR_COPILOT_AUTHENTICATE=true to enable)")
+	}
+
+	router := setupRouter(validationHandler, copilotStudioHandler, authMiddleware, entraAuthMiddleware, logger)
 
 	addr := fmt.Sprintf(":%d", cfg.ServerPort)
 	logger.Info("Server starting in HTTP mode", zap.String("address", addr))
@@ -219,7 +232,7 @@ func corsMiddleware() gin.HandlerFunc {
 	}
 }
 
-func setupRouter(validationHandler *handlers.ValidationHandler, authMiddleware gin.HandlerFunc, logger *zap.Logger) *gin.Engine {
+func setupRouter(validationHandler *handlers.ValidationHandler, copilotStudioHandler *handlers.CopilotStudioHandler, authMiddleware gin.HandlerFunc, entraAuthMiddleware gin.HandlerFunc, logger *zap.Logger) *gin.Engine {
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -246,6 +259,19 @@ func setupRouter(validationHandler *handlers.ValidationHandler, authMiddleware g
 		api.POST("/validate/requestWithPolicy", validationHandler.ValidateRequestWithPolicy)
 		api.POST("/validate/response", validationHandler.ValidateResponse)
 		api.POST("/validate/file", validationHandler.ValidateFile)
+	}
+
+	// Microsoft Copilot Studio external security webhook contract, under /api
+	// like every other route in this service, authenticated separately via
+	// Entra ID rather than the /api group's JWT middleware.
+	// https://learn.microsoft.com/en-us/microsoft-copilot-studio/external-security-webhooks-interface-developers
+	copilotStudio := router.Group("/api")
+	if entraAuthMiddleware != nil {
+		copilotStudio.Use(entraAuthMiddleware)
+	}
+	{
+		copilotStudio.POST("/v1/protection/validate", copilotStudioHandler.Validate)
+		copilotStudio.POST("/v1/protection/analyze-tool-execution", copilotStudioHandler.AnalyzeToolExecution)
 	}
 
 	return router

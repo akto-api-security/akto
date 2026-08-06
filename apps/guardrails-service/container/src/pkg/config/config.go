@@ -18,6 +18,13 @@ type Config struct {
 	AuthEnabled  bool
 	RSAPublicKey string
 
+	// CopilotAuthEnabled gates Microsoft Entra ID bearer-token verification on
+	// the Copilot Studio webhook endpoints (/validate, /analyze-tool-execution)
+	// — a separate concern from AuthEnabled, which covers the /api group.
+	CopilotAuthEnabled bool
+	EntraTenantID      string
+	EntraAudience      string
+
 	KafkaEnabled        bool
 	KafkaBrokerURL      string
 	KafkaTopic          string
@@ -95,6 +102,9 @@ func LoadConfig() *Config {
 		LogLevel:                         getEnv("LOG_LEVEL", "info"),
 		AuthEnabled:                      getEnvAsBool("AKTO_GR_AUTHENTICATE", false),
 		RSAPublicKey:                     getEnv("RSA_PUBLIC_KEY", ""),
+		CopilotAuthEnabled:               getEnvAsBool("AKTO_GR_COPILOT_AUTHENTICATE", false),
+		EntraTenantID:                    getEnv("AKTO_GR_ENTRA_TENANT_ID", ""),
+		EntraAudience:                    getEnv("AKTO_GR_ENTRA_AUDIENCE", ""),
 		KafkaEnabled:                     getEnvAsBool("KAFKA_ENABLED", false),
 		KafkaBrokerURL:                   getEnv("KAFKA_BROKER_URL", "localhost:29092"),
 		KafkaTopic:                       getEnv("KAFKA_TOPIC", "akto.api.logs"),
