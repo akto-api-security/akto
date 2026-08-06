@@ -15,6 +15,7 @@ public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler
     public static final String HOST_NAME = "hostName";
     public static final String ACCESS_TYPE = "accessType";
     public static final String COLLECTION_TYPE = "collectionType";
+    public static final String SKILL_NAME = "skillName";
     public static final String TAGS = "tags";
     public static final String ENDPOINTS = "endpoints";
     public static final String SAMPLE_SNIPPETS = "sampleSnippets";
@@ -69,6 +70,7 @@ public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler
         String hostName = queryData.getString(HOST_NAME);
         String accessType = queryData.getString(ACCESS_TYPE);
         String collectionType = queryData.getString(COLLECTION_TYPE);
+        String skillName = queryData.getString(SKILL_NAME);
         List<String> tags = (List<String>) queryData.getOrDefault(TAGS, null);
         List<String> endpoints = (List<String>) queryData.get(ENDPOINTS);
         List<String> sampleSnippets = (List<String>) queryData.getOrDefault(SAMPLE_SNIPPETS, null);
@@ -84,7 +86,10 @@ public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler
         if (!isBlank(collectionType)) {
             infoBlock.append("Collection type: ").append(collectionType).append("\n");
         }
-        if (!isBlank(accessType)) {
+        if (!isBlank(skillName)) {
+            infoBlock.append("Skill name: ").append(skillName).append("\n");
+        }
+        if (!isBlank(accessType) && !"unknown".equalsIgnoreCase(accessType)) {
             infoBlock.append("Access type: ").append(accessType).append("\n");
         }
         if (tags != null && !tags.isEmpty()) {
@@ -107,18 +112,39 @@ public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler
         }
 
         return
-            "You are an API security analyst. Based on the API collection's identifying info, its "
-                + "endpoints, and (if provided) sample request/response traffic, write a concise, factual "
-                + "description of what this API collection is used for.\n\n"
+            "You are an API security analyst. Based on the identifying info below, its endpoints, "
+                + "and (if provided) sample request/response traffic, write a concise, factual "
+                + "description of what this is used for.\n\n"
                 + "COLLECTION INFO:\n" + infoBlock
                 + "\nENDPOINTS:\n" + endpointsBlock
                 + (samplesBlock.length() > 0 ? "\nSAMPLE REQUEST/RESPONSE TRAFFIC:\n" + samplesBlock : "")
                 + "\nINSTRUCTIONS:\n"
-                + "- Infer the purpose of this API collection from all the info above.\n"
+                + "- Infer the purpose from all the info above. If \"Collection type\" identifies this as a "
+                + "Skill, AI agent, MCP server, or LLM, describe it in those specific terms (name the "
+                + "platform/tool from Tags/Access type if known) rather than a generic web API description.\n"
+                + "- If \"Collection type\" is set, do not use the word \"API\" anywhere in the description, "
+                + "not even in passing. It's a skill, agent, MCP server, or LLM, never an API or API "
+                + "collection. Reserve \"API\" for collections with no Collection type set.\n"
+                + "- If \"Skill name\" is set, that name is the point of the description: say what that "
+                + "specific skill actually does (use your own knowledge of what a skill with that name would "
+                + "do if the endpoints/samples don't spell it out - e.g. \"mongodb-mcp-setup\" sets up an MCP "
+                + "connection to MongoDB). Do not describe generic skill-management mechanics (listing, "
+                + "creating, or reading skill definition files) instead of the skill's actual purpose.\n"
                 + "- Do not invent details that aren't supported by the endpoints or samples.\n"
                 + "- Plain text only, no markdown formatting.\n"
+                + "- Write like a developer jotting a one-line note for a teammate, not like generated "
+                + "marketing copy. Be direct and concrete.\n"
+                + "- Do not begin every description with the same boilerplate opening like \"This API "
+                + "collection...\" or \"This is a...\" - vary it, or just start with the subject/verb.\n"
+                + "- Pick the 1-2 most defining things it does. Do not try to enumerate every endpoint or "
+                + "capability you see - a partial list read as exhaustive is worse than a tight summary.\n"
+                + "- Avoid hedging filler like \"indicating\", \"suggesting\", \"appears to\", \"likely\", "
+                + "\"designed to\", \"focus on\" - state what it does, not what the evidence implies.\n"
+                + "- Avoid generic filler verbs like \"facilitates\", \"enables\", \"leverages\", \"utilizes\" - "
+                + "use the concrete action instead (e.g. \"manages orders\" or \"reads and writes files\", "
+                + "not \"facilitates order management\" or \"facilitates file operations\").\n"
                 + "- Maximum " + maxChars + " characters.\n"
-                + "- If, and only if, you cannot confidently determine what this collection is used for from "
+                + "- If, and only if, you cannot confidently determine what this is used for from "
                 + "the given info, respond with exactly \"" + CANNOT_DECIDE_PLACEHOLDER + "\" as the "
                 + "description instead of guessing.\n\n"
                 + "OUTPUT FORMAT:\n"

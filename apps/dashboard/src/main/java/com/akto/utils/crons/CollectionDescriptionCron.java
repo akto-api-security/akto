@@ -73,25 +73,30 @@ public class CollectionDescriptionCron {
             AtomicInteger remaining = new AtomicInteger(GLOBAL_RUN_LIMIT);
             ExecutorService pool = Executors.newFixedThreadPool(CONCURRENCY);
 
-            AccountTask.instance.executeTask(account -> {
-                int accountId = account.getId();
-                for (ApiCollection collection : findPendingCollections(remaining.get())) {
-                    if (remaining.get() <= 0) {
-                        break;
-                    }
-                    if (failCountCache.getOrDefault(collection.getId(), 0) >= MAX_FAILED_ATTEMPTS) {
-                        continue;
-                    }
-                    remaining.decrementAndGet();
-                    pool.submit(() -> generateDescription(accountId, collection));
-                }
-            }, "collection-description-cron");
-
-            pool.shutdown();
             try {
-                pool.awaitTermination(55, TimeUnit.MINUTES);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+                AccountTask.instance.executeTask(account -> {
+                    int accountId = account.getId();
+                    for (ApiCollection collection : findPendingCollections(remaining.get())) {
+                        if (remaining.get() <= 0) {
+                            break;
+                        }
+                        if (failCountCache.getOrDefault(collection.getId(), 0) >= MAX_FAILED_ATTEMPTS) {
+                            continue;
+                        }
+                        remaining.decrementAndGet();
+                        pool.submit(() -> generateDescription(accountId, collection));
+                    }
+                }, "collection-description-cron");
+            } finally {
+                // Always shut the pool down, even if account iteration itself failed (e.g. the initial
+                // account fetch throwing) - otherwise these threads leak for good, since nothing else
+                // ever references this pool again.
+                pool.shutdown();
+                try {
+                    pool.awaitTermination(55, TimeUnit.MINUTES);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in collection description cron: " + e.getMessage());
@@ -134,21 +139,53 @@ public class CollectionDescriptionCron {
         );
     }
 
-    /** MCP/GenAI/DAST/guardrail collections need a very different description than a plain REST API. */
+    /**
+     * Argus/Atlas collections come in 4 flavors - Skill, MCP server, AI agent, or LLM - and tags already
+     * say which: "skill", "mcp-server", "ai-agent" tags, or a "gen-ai" tag valued "AI Agent"/"LLM".
+     * None of these labels say "API" - an agent or MCP server isn't one, and calling it that in the
+     * generated description reads wrong.
+     */
     private static String collectionTypeLabel(ApiCollection collection) {
-        if (collection.isMcpCollection()) {
-            return "MCP Server";
+        List<CollectionTags> tags = collection.getTagsList();
+        if (tags == null || tags.isEmpty()) {
+            return null;
         }
-        if (collection.isGenAICollection()) {
-            return "GenAI / LLM API";
+
+        if (tagValue(tags, "skill") != null) {
+            return "Skill";
         }
-        if (collection.isDastCollection()) {
-            return "DAST-tested application";
+        if (tagValue(tags, "mcp-server") != null) {
+            return "MCP server";
         }
-        if (collection.isGuardRailCollection()) {
-            return "Guardrail-protected API";
+        if (tagValue(tags, "ai-agent") != null) {
+            return "AI agent";
+        }
+        return genAiTypeLabel(tagValue(tags, "gen-ai"));
+    }
+
+    /** The gen-ai tag is only ever "AI Agent" or "LLM" - nothing else to handle. */
+    private static String genAiTypeLabel(String genAiValue) {
+        if ("AI Agent".equalsIgnoreCase(genAiValue)) {
+            return "AI agent";
+        }
+        if ("LLM".equalsIgnoreCase(genAiValue)) {
+            return "LLM";
         }
         return null;
+    }
+
+    private static String tagValue(List<CollectionTags> tags, String keyName) {
+        for (CollectionTags tag : tags) {
+            if (keyName.equals(tag.getKeyName())) {
+                return tag.getValue();
+            }
+        }
+        return null;
+    }
+
+    private static String skillTagValue(ApiCollection collection) {
+        List<CollectionTags> tags = collection.getTagsList();
+        return tags == null ? null : tagValue(tags, "skill");
     }
 
     private static List<String> tagStrings(ApiCollection collection) {
@@ -188,6 +225,7 @@ public class CollectionDescriptionCron {
             queryData.put(CollectionDescriptionPromptHandler.HOST_NAME, collection.getHostName());
             queryData.put(CollectionDescriptionPromptHandler.ACCESS_TYPE, collection.getAccessType());
             queryData.put(CollectionDescriptionPromptHandler.COLLECTION_TYPE, collectionTypeLabel(collection));
+            queryData.put(CollectionDescriptionPromptHandler.SKILL_NAME, skillTagValue(collection));
             queryData.put(CollectionDescriptionPromptHandler.TAGS, tagStrings(collection));
             queryData.put(CollectionDescriptionPromptHandler.ENDPOINTS, endpointStrings(apiInfos));
             queryData.put(CollectionDescriptionPromptHandler.SAMPLE_SNIPPETS, sampleSnippets(collectionId, apiInfos));
