@@ -45,7 +45,7 @@ public class CopilotStudioInventoryPublisher {
     /** Kept at "{}" on purpose — over 3 chars triggers an unwanted AgentQueryRecord write downstream. */
     private static final String EMPTY_REQUEST_PAYLOAD = "{}";
 
-    /** Builds one sample per (agent, known user) pair — reaches every user who talks to a bot, not just its owner. Agents without a usable name are skipped. */
+    /** Builds one sample per (agent, known user) pair — reaches every user who talks to a bot, not just its owner. Agents with no usable name or no resolved owner/chatter are skipped. */
     public List<Map<String, Object>> buildSamples(List<JsonNode> agents, String environmentId,
                                                    Map<String, String> botIdToDataverseName, int accountId,
                                                    Map<String, String> ownerIdToUserId,
@@ -77,18 +77,13 @@ public class CopilotStudioInventoryPublisher {
                 userIds.addAll(knownUsers);
             }
 
-            List<String> hosts = new ArrayList<>();
             if (userIds.isEmpty()) {
-                // Nobody resolved (new agent, no chatters yet, or Graph lookup failed) — single unresolved-owner-style collection, same fallback the binary uses.
-                hosts.add(botName);
-            } else {
-                for (String userId : userIds) {
-                    hosts.add(userId + AI_AGENT_HOST_INFIX + botName);
-                }
+                logger.warn("CopilotStudioInventory: skipping agent, no resolved owner or known chatter, agentId={}", agentId);
+                continue;
             }
 
-            for (String host : hosts) {
-                samples.add(buildSample(agent, agentId, host, environmentId, accountId));
+            for (String userId : userIds) {
+                samples.add(buildSample(agent, agentId, userId + AI_AGENT_HOST_INFIX + botName, environmentId, accountId));
             }
         }
 
@@ -174,9 +169,9 @@ public class CopilotStudioInventoryPublisher {
         return published;
     }
 
-    /** Scopes a bot name to its environment — keeps same-named bots in different environments from sharing chatters. */
+    /** Scopes a bot name to its environment — keeps same-named bots in different environments from sharing chatters. Lowercased: Power Platform's environment-listing API and the inventory API disagree on casing ("Default-..." vs "default-...") for the same environment. */
     public static String botKey(String environmentId, String botName) {
-        return (environmentId != null ? environmentId : "") + "::" + botName;
+        return (environmentId != null ? environmentId.toLowerCase(Locale.ROOT) : "") + "::" + botName;
     }
 
     /** Port of extractor.go's sanitizeBotName + its callers' strings.ToLower(...); must stay identical or one agent yields two collections. */
