@@ -1,6 +1,8 @@
 import { Badge, Box, Button, ChoiceList, Divider, HorizontalStack, Modal, Text, TextField, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
+import SampleData from "../../../components/shared/SampleData";
+import { EvidenceBlock } from "@/apps/dashboard/pages/guardrails/violations/ViolationFlyoutSections";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import func from "@/util/func";
 import { useEffect, useState } from "react";
@@ -24,6 +26,41 @@ import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig"
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import OwaspTag from "../../guardrails/components/OwaspTag";
 import ComplianceTags from "../../guardrails/components/ComplianceTags";
+
+// For config-scan events: pull evidence/message/config_content out of the sample's raw orig.
+// config_content may be an object or a (JSON-escaped) string, and redaction can corrupt the JSON,
+// so parse leniently. Returns null for non-config samples.
+function _configFromOrig(orig) {
+    if (typeof orig !== "string") return null;
+    let outer; try { outer = JSON.parse(orig); } catch (e) { return null; }
+    const rp = outer && outer.requestPayload;
+    if (typeof rp !== "string" || rp.indexOf('"config_content"') === -1) return null;
+
+    let evidence = null, message = null, cc = null, wrapper = null;
+    try { wrapper = JSON.parse(rp); } catch (e) { wrapper = null; }
+    if (wrapper && typeof wrapper === "object") {
+        evidence = wrapper.evidence != null ? String(wrapper.evidence) : null;
+        message = wrapper.message != null ? String(wrapper.message) : null;
+        cc = wrapper.config_content;
+    } else {
+        const decode = (s) => {
+            try { return JSON.parse('"' + s + '"'); } catch (e) { }
+            return String(s).replace(/\\(u[0-9a-fA-F]{4}|.)/g, (_m, g) => g[0] === "u" ? String.fromCharCode(parseInt(g.slice(1), 16)) : ({ n: "\n", r: "\r", t: "\t", '"': '"', "\\": "\\", "/": "/" }[g] || g));
+        };
+        const grab = (key) => { const m = rp.match(new RegExp('"' + key + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"')); return m ? decode(m[1]) : null; };
+        evidence = grab("evidence");
+        message = grab("message");
+        const i = rp.indexOf('"config_content"');
+        let rest = rp.slice(i + '"config_content"'.length).replace(/^\s*:\s*/, "");
+        if (rest[0] === '"') { rest = rest.slice(1).replace(/"\s*\}\s*$/, "").replace(/"\s*$/, ""); cc = decode(rest); }
+        else { cc = rest.replace(/\s*\}\s*$/, ""); }
+    }
+
+    let configContent;
+    if (cc != null && typeof cc === "object") configContent = JSON.stringify(cc, null, 2);
+    else { configContent = String(cc == null ? "" : cc); try { configContent = JSON.stringify(JSON.parse(configContent), null, 2); } catch (e) { } }
+    return { evidence, message, configContent };
+}
 
 // Self-contained approve button + modal. Kept as its own component so typing the duration
 // re-renders only this small tree, not the whole SampleDetails flyout (which caused a flash).
@@ -391,10 +428,38 @@ function SampleDetails(props) {
         component: <ActivityTracker latestActivity={latestActivity} />
     }
 
+    const configValues = data.length > 0 ? _configFromOrig(data[0]?.orig) : null;
+
     const ValuesTab = data.length > 0 && {
         id: 'values',
         content: "Values",
-        component: (
+        component: configValues ? (
+            <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
+                <VerticalStack gap="4">
+                    <Box padding="4" background="bg-critical-subdued" borderRadius="2">
+                        <VerticalStack gap="3">
+                            <EvidenceBlock evidence={{ title: "Guardrail Violation", text: configValues.evidence || configValues.message, mono: true }} />
+                            {configValues.message && configValues.evidence && (
+                                <Text variant="bodyMd">
+                                    {`Triggered by the "${moreInfoData?.templateId || "guardrail"}" policy. ${configValues.message}`}
+                                </Text>
+                            )}
+                        </VerticalStack>
+                    </Box>
+                    <VerticalStack gap="2">
+                        <Text variant="headingSm">Config content</Text>
+                        <SampleData
+                            data={{ message: configValues.configContent }}
+                            editorLanguage="json"
+                            minHeight="300px"
+                            useDynamicHeight
+                            readOnly
+                            wordWrap
+                        />
+                    </VerticalStack>
+                </VerticalStack>
+            </Box>
+        ) : (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
                 <SampleDataList
                     key={`Sample values-${eventId || 'default'}`}
