@@ -66,9 +66,10 @@ export const HARMFUL_CATEGORY_INFO = {
         ]
     },
     insults: {
-        description: "Controls how aggressively insulting language is caught.",
+        description: "Controls how aggressively insulting or vulgar language is caught.",
         examples: [
-            { label: "Low", text: "You're an idiot and everyone around you knows it." }
+            { label: "Low", text: "You're an idiot and everyone around you knows it." },
+            { label: "High", text: "For fuck's sake just do what I asked already." }
         ]
     },
     sexual: {
@@ -106,10 +107,6 @@ export const LANGUAGE_SAFETY_DESCRIPTIONS = {
     sentimentConfidenceThreshold: {
         description: "Higher values are more permissive (fewer prompts blocked); lower values are stricter.",
         examples: []
-    },
-    profanity: {
-        description: "Automatically redacts common swear words from prompts and responses before they reach the model. Add your own words below to extend the built-in list.",
-        examples: [{ text: "This f***ing thing is broken." }]
     }
 };
 
