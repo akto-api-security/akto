@@ -70,13 +70,21 @@ public class CollectionDescriptionCron {
                 return;
             }
 
+            loggerMaker.infoAndAddToDb("Collection description cron starting, budget=" + GLOBAL_RUN_LIMIT);
+
             AtomicInteger remaining = new AtomicInteger(GLOBAL_RUN_LIMIT);
             ExecutorService pool = Executors.newFixedThreadPool(CONCURRENCY);
 
             try {
                 AccountTask.instance.executeTask(account -> {
                     int accountId = account.getId();
-                    for (ApiCollection collection : findPendingCollections(remaining.get())) {
+                    List<ApiCollection> pending = findPendingCollections(remaining.get());
+                    if (pending.isEmpty()) {
+                        return;
+                    }
+                    loggerMaker.infoAndAddToDb("Collection description cron processing accountId="
+                        + accountId + ", pending=" + pending.size());
+                    for (ApiCollection collection : pending) {
                         if (remaining.get() <= 0) {
                             break;
                         }
@@ -97,6 +105,9 @@ public class CollectionDescriptionCron {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
+                int submitted = GLOBAL_RUN_LIMIT - remaining.get();
+                loggerMaker.infoAndAddToDb("Collection description cron finished: submitted="
+                    + submitted + "/" + GLOBAL_RUN_LIMIT);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in collection description cron: " + e.getMessage());
@@ -248,6 +259,10 @@ public class CollectionDescriptionCron {
                 Updates.set(ApiCollection.DESCRIPTION, description)
             );
             failCountCache.remove(collectionId);
+            // Best-effort provenance trail so a bad batch can be found/audited later - this cron never
+            // overwrites a description that was already set, so this only ever fires for new ones.
+            loggerMaker.infoAndAddToDb("Set description for collectionId=" + collectionId
+                + ", accountId=" + accountId + ": " + description);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error generating description for collection " + collectionId + ": " + e.getMessage());
             markFailed(collectionId, e.getMessage());
