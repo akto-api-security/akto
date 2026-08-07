@@ -17,13 +17,37 @@ import settingFunctions from "../../settings/module";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal";
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
-import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN, SETTINGS_RISK_CONFIGS } from "../constants/guardrailDescriptions";
+import { GUARDRAIL_REMEDIATION_MARKDOWN, SETTINGS_RISK_CONFIGS } from "../constants/guardrailDescriptions";
 import { extractOverviewAndRemediation, extractBehaviour } from "../utils/formatUtils";
 import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import OwaspTag from "../../guardrails/components/OwaspTag";
 import ComplianceTags from "../../guardrails/components/ComplianceTags";
+import { parseConfigEvidence } from "../../guardrails/violations/violationsData";
+
+// Unwraps a JSON config_content (TOML stays a string) and builds the highlight segment for it.
+function buildConfigScanSample(orig) {
+    try {
+        const outer = JSON.parse(orig);
+        const req = JSON.parse(outer.requestPayload);
+
+        if (typeof req?.config_content === "string") {
+            try { req.config_content = JSON.parse(req.config_content); } catch (e) { /* TOML, not JSON */ }
+        }
+        outer.requestPayload = JSON.stringify(req);
+
+        const { field, value } = parseConfigEvidence(req?.evidence);
+        return {
+            message: JSON.stringify(outer),
+            vulnerabilitySegments: field && value
+                ? [{ phrase: value, field, location: "REQUEST", includeKeyInHighlight: true }]
+                : undefined,
+        };
+    } catch (e) {
+        return { message: orig, vulnerabilitySegments: undefined };
+    }
+}
 
 // Self-contained approve button + modal. Kept as its own component so typing the duration
 // re-renders only this small tree, not the whole SampleDetails flyout (which caused a flash).
@@ -132,10 +156,14 @@ function SampleDetails(props) {
         ? getGuardrailRuleInfo(moreInfoData?.ruleViolated, moreInfoData?.templateId)
         : null;
 
-    // Build guardrail sections: use matched rule's overview if found, else fall back to all generic sections
+    // Build guardrail sections from the matched rule's overview. If no rule matched, show NO
+    // sections - we deliberately do NOT fall back to a generic guardrail catalogue, which isn't
+    // specific to the event that fired (e.g. a block_host_test event showing "Content Filters /
+    // Denied Topics" filler). The Overview tab itself is hidden below when there's nothing
+    // meaningful left to show.
     const guardrailSectionsToShow = guardrailRuleInfo
         ? [{ heading: guardrailRuleInfo.heading, description: null, subSections: guardrailRuleInfo.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
-        : GUARDRAIL_SECTIONS;
+        : [];
 
     // Resolve the specific settings-risk entry (used for both overview and remediation tabs)
     const getSettingsRiskKey = (urlPrefix) => {
@@ -350,7 +378,13 @@ function SampleDetails(props) {
     // guardrailRuleDefinitions.js template adds no extra context, so hide the tab instead.
     const isSkillEvent = (moreInfoData?.url || '').includes('skills/');
 
-    const overviewTab = (isSkillEvent && !hasLiveOverview) ? false : {
+    // Guardrail event with no matched rule and no per-event live overview: there are no
+    // event-specific sections to show (we no longer fall back to a generic catalogue), so hide the
+    // Overview tab entirely rather than render an empty/filler tab. Settings-risk and live-overview
+    // events have their own content and are excluded.
+    const isGenericGuardrailFallback = useGuardrailDescription && !isSettingsRisk && !guardrailRuleInfo && !hasLiveOverview;
+
+    const overviewTab = ((isSkillEvent && !hasLiveOverview) || isGenericGuardrailFallback) ? false : {
         id: "overview",
         content: 'Overview',
         component: currentTemplateObj && overviewComp
@@ -393,7 +427,10 @@ function SampleDetails(props) {
                     vertical={true}
                     isWebSocket={func.isWebSocketApiType(moreInfoData?.apiType)}
                     sampleData={data && Array.isArray(data) && data.length > 0 ? data.map((result) => {
-                        return { message: result.orig, highlightPaths: [], metadata: result.metadata }
+                        const { message, vulnerabilitySegments } = isSettingsRisk
+                            ? buildConfigScanSample(result.orig)
+                            : { message: result.orig, vulnerabilitySegments: undefined };
+                        return { message, highlightPaths: [], metadata: result.metadata, vulnerabilitySegments }
                     }) : []}
                     redactHeaders={window.ACTIVE_ACCOUNT === 1758787662 ? ['authorization'] : []}
                 />

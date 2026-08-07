@@ -7,7 +7,6 @@ import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
 import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, VerticalStack } from "@shopify/polaris";
-import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap } from "../utils/formatUtils";
@@ -120,22 +119,26 @@ const getHeaders = () => {
   return baseHeaders;
 };
 
-const sortOptions = [
-  {
-    label: "Discovered time",
-    value: "detectedAt asc",
-    directionLabel: "Newest",
-    sortKey: "detectedAt",
-    columnIndex: 5,
-  },
-  {
-    label: "Discovered time",
-    value: "detectedAt desc",
-    directionLabel: "Oldest",
-    sortKey: "detectedAt",
-    columnIndex: 5,
-  },
-];
+const getSortOptions = (headers) => {
+  const columnIndex = headers.findIndex((h) => h.value === "discoveredTs") + 1;
+  if (columnIndex === 0) return [];
+  return [
+    {
+      label: "Discovered time",
+      value: "detectedAt asc",
+      directionLabel: "Newest",
+      sortKey: "detectedAt",
+      columnIndex,
+    },
+    {
+      label: "Discovered time",
+      value: "detectedAt desc",
+      directionLabel: "Oldest",
+      sortKey: "detectedAt",
+      columnIndex,
+    },
+  ];
+};
 
 let filters = [];
 
@@ -749,7 +752,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         ...x,
         id: x.id,
         actorComp: isEndpointSecurityCategory()
-          ? getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap)
+          ? getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap, x.actor)
           : formatActorId(x.actor),
         host: x.host || "-",
         endpointComp: String(x?.url || "").includes('/skills/') ? (
@@ -775,7 +778,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           />
         ),
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
-        discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),
+        discoveredTs: func.prettifyEpoch(x.timestamp || 0),
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
         severityComp: (<div className={`badge-wrapper-${severity}`}>
@@ -989,6 +992,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   if (currentTab === 'needs_approval') {
     headers.push({ text: "Action", value: "approveAction", title: "Action" });
   }
+  const sortOptions = getSortOptions(headers);
   return (
     <>
       <GithubServerTable

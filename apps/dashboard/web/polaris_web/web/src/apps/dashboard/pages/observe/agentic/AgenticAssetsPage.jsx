@@ -36,6 +36,7 @@ import {
   buildAgenticAssetsPageData,
   buildUserAnalysisLookup,
   fetchAndCacheSkillApiData,
+  skillCollectionKey,
 } from "./constants";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
@@ -328,9 +329,12 @@ export default function AgenticAssetsPage() {
   }, [navigate]);
 
   // Date range — scopes inventory (last-seen), violations, and charts page-wide
+  // Defaults to "All time" so this matches the legacy (unfiltered) Agentic assets page on
+  // first load; MCP servers/LLMs are often detected via tags without directly-attributed
+  // traffic, so a narrower default (e.g. Last 1 year) would silently drop them.
   const [currDateRange, dispatchCurrDateRange] = useReducer(
     produce((draft, action) => func.dateRangeReducer(draft, action)),
-    values.ranges[4],
+    values.ranges[5],
   );
   const rawStart = Math.floor(Date.parse(currDateRange.period.since) / 1000);
   // values.ranges "allTime" uses since=new Date(1000) → rawStart=1; treat as 0 (data-min mode)
@@ -424,11 +428,13 @@ export default function AgenticAssetsPage() {
         });
         if (skillCollectionIds.length) {
           fetchAndCacheSkillApiData(skillCollectionIds, { api, PersistStore })
-            .then(({ maliciousSkills }) => {
-              if (!isMountedRef.current || !maliciousSkills?.size) return;
+            .then(({ maliciousSkillKeys }) => {
+              if (!isMountedRef.current || !maliciousSkillKeys?.size) return;
+              // Scoped to the asset's own collections so a same-named skill belonging to a
+              // different user/agent doesn't mark this one malicious.
               const markMalicious = (rows) =>
                 rows.map((r) =>
-                  r.type === "Skill" && maliciousSkills.has(r.name)
+                  r.type === "Skill" && (r.collectionIds || []).some((cid) => maliciousSkillKeys.has(skillCollectionKey(cid, r.name)))
                     ? { ...r, isMalicious: true }
                     : r,
                 );

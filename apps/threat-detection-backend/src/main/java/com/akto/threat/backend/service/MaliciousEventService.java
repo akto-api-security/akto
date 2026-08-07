@@ -41,6 +41,7 @@ import org.bson.conversions.Bson;
 
 import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.mongodb.client.model.Updates;
@@ -519,7 +520,7 @@ public class MaliciousEventService {
     }
 
     // Skills Evaluations partition — Atlas (ENDPOINT) only. An event belongs to Skills
-    // Evaluations iff filterId == "skill_evaluation".
+    // Evaluations iff latestApiEndpoint starts with "/skills/".
     //   "only"    → return just those events (Skills Evaluations tab)
     //   "exclude" → return everything except them (Active tab)
     // Done server-side so the total count and pagination stay correct.
@@ -527,10 +528,11 @@ public class MaliciousEventService {
         && "ENDPOINT".equalsIgnoreCase(contextSource)) {
       Document existing = new Document(query);
       query.clear();
+      Pattern skillsEndpointPattern = Pattern.compile("^/skills/");
       if ("only".equalsIgnoreCase(skillEvalMode)) {
-        query.append("$and", Arrays.asList(existing, new Document("filterId", "skill_evaluation")));
+        query.append("$and", Arrays.asList(existing, new Document("latestApiEndpoint", skillsEndpointPattern)));
       } else if ("exclude".equalsIgnoreCase(skillEvalMode)) {
-        query.append("$and", Arrays.asList(existing, new Document("filterId", new Document("$ne", "skill_evaluation"))));
+        query.append("$and", Arrays.asList(existing, new Document("latestApiEndpoint", new Document("$not", skillsEndpointPattern))));
       } else {
         query.putAll(existing);
       }
