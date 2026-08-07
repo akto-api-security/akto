@@ -874,6 +874,30 @@ const settingRequests = {
             data: { filter }
         })
     },
+    // ATLAS: server-side paginated Endpoint Shield agents (replaces the load-all fetchModuleInfo on that page)
+    async fetchEndpointShieldAgents({ skip = 0, limit = 20, sortKey = "lastHeartbeat", sortOrder = -1, hostnames = [], usernames = [], deviceIds = [], oses = [], queryValue = "", startTimestamp = 0, endTimestamp = 0 } = {}) {
+        return await request({
+            url: '/api/fetchEndpointShieldAgents',
+            method: 'post',
+            data: { skip, limit, sortKey, sortOrder, hostnames, usernames, deviceIds, oses, queryValue, startTimestamp, endTimestamp }
+        })
+    },
+    async fetchEndpointShieldFilterOptions() {
+        return await request({
+            url: '/api/fetchEndpointShieldFilterOptions',
+            method: 'post',
+            data: {}
+        })
+    },
+    // ATLAS: username/team lookup only — projected fields, not every device's full module doc
+    // (replaces fetchModuleInfo(MCP_ENDPOINT_SHIELD) as the source for endpointShieldHelper.js)
+    async fetchEndpointShieldUserMetadata() {
+        return await request({
+            url: '/api/fetchEndpointShieldUserMetadata',
+            method: 'post',
+            data: {}
+        })
+    },
     async deleteModuleInfo(moduleIds) {
         return await request({
             url: '/api/deleteModuleInfo',

@@ -52,3 +52,4 @@ run-embedder.sh
 .python-version
 *logs.txt
 data-adhoc/**
+.playwright-mcp/

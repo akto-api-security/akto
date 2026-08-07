@@ -60,11 +60,11 @@ const buildUsernameMapFromModuleInfos = (moduleInfos = []) => {
             ad.endpointId,
         ]);
 
-        const mcpServers = ad.mcpServers || {};
-        Object.values(mcpServers).forEach((server) => {
-            if (server.collectionName) {
-                usernameMap[server.collectionName.toLowerCase()] = username;
-            }
+        // Server sends just the collection-name list (endpointShieldHelper's only use of the
+        // mcpServers sub-object) instead of the full per-server clientType/url/updatedTs data —
+        // see ModuleInfoAction.fetchEndpointShieldUserMetadata.
+        (ad.mcpServerCollectionNames || []).forEach((name) => {
+            if (name) usernameMap[name.toLowerCase()] = username;
         });
     });
     return usernameMap;
@@ -93,41 +93,62 @@ const buildUserAnalysisKeysByDeviceId = (moduleInfos = []) => {
  */
 const fetchEndpointShieldUsernameMap = async () => {
     try {
-        const response = await settingRequests.fetchModuleInfo({ moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD });
+        const response = await settingRequests.fetchEndpointShieldUserMetadata();
         return buildUsernameMapFromModuleInfos(response?.moduleInfos || []);
     } catch (e) {
         return {};
     }
 };
 
+// The Agentic-assets / Users-and-devices / Device-endpoints pages redirect-chain into each other on
+// mount (agenticNewLayout), so each landing fires this twice+ (each = fetchEndpointShieldUserMetadata +
+// fetchAgenticUsers). Collapse that burst with an in-flight promise dedup + a short TTL cache. The TTL is
+// small enough that a genuine re-navigation after a few seconds still refetches.
+let _shieldMetaCache = { ts: 0, data: null };
+let _shieldMetaInflight = null;
+const SHIELD_META_TTL_MS = 3000;
+
 const fetchEndpointShieldUserMetadata = async () => {
-    try {
-        const [moduleResp, agenticUsersResp] = await Promise.all([
-            settingRequests.fetchModuleInfo({ moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD }),
-            settingRequests.fetchAgenticUsers().catch(() => ({ agenticUsers: [] })),
-        ]);
+    const now = Date.now();
+    if (_shieldMetaCache.data && now - _shieldMetaCache.ts <= SHIELD_META_TTL_MS) return _shieldMetaCache.data;
+    if (_shieldMetaInflight) return _shieldMetaInflight;
 
-        const moduleInfos = moduleResp?.moduleInfos || [];
-        const usernameMap = buildUsernameMapFromModuleInfos(moduleInfos);
-        const userAnalysisKeysByDeviceId = buildUserAnalysisKeysByDeviceId(moduleInfos);
+    _shieldMetaInflight = (async () => {
+        try {
+            const [moduleResp, agenticUsersResp] = await Promise.all([
+                settingRequests.fetchEndpointShieldUserMetadata(),
+                settingRequests.fetchAgenticUsers().catch(() => ({ agenticUsers: [] })),
+            ]);
 
-        const userMetadataMap = {};
-        const agenticUsers = agenticUsersResp?.agenticUsers || [];
-        agenticUsers.forEach((u) => {
-            if (!u?.userName) return;
-            userMetadataMap[u.userName] = {
-                team: u.teamName || '',
-                userRole: u.userRole || '',
-                userEmail: u.userEmail || '',
-                teamSource: u.teamSource || 'sso',
-                roleSource: u.roleSource || 'sso',
-            };
-        });
+            const moduleInfos = moduleResp?.moduleInfos || [];
+            const usernameMap = buildUsernameMapFromModuleInfos(moduleInfos);
+            const userAnalysisKeysByDeviceId = buildUserAnalysisKeysByDeviceId(moduleInfos);
 
-        return { usernameMap, userMetadataMap, userAnalysisKeysByDeviceId, moduleInfos };
-    } catch (e) {
-        return { usernameMap: {}, userMetadataMap: {}, userAnalysisKeysByDeviceId: new Map(), moduleInfos: [] };
-    }
+            const userMetadataMap = {};
+            const agenticUsers = agenticUsersResp?.agenticUsers || [];
+            agenticUsers.forEach((u) => {
+                if (!u?.userName) return;
+                userMetadataMap[u.userName] = {
+                    team: u.teamName || '',
+                    userRole: u.userRole || '',
+                    userEmail: u.userEmail || '',
+                    teamSource: u.teamSource || 'sso',
+                    roleSource: u.roleSource || 'sso',
+                };
+            });
+
+            const result = { usernameMap, userMetadataMap, userAnalysisKeysByDeviceId, moduleInfos };
+            _shieldMetaCache = { ts: Date.now(), data: result };
+            return result;
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error("fetchEndpointShieldUserMetadata failed:", e);
+            return { usernameMap: {}, userMetadataMap: {}, userAnalysisKeysByDeviceId: new Map(), moduleInfos: [] };
+        } finally {
+            _shieldMetaInflight = null;
+        }
+    })();
+    return _shieldMetaInflight;
 };
 
 const PLACEHOLDER_ACTORS = new Set(['', '-', '127.0.0.1', '0.0.0.0']);
@@ -157,8 +178,15 @@ const coworkActorFallback = (collection, actor) => {
  * @param {string} [actor] - Optional threat-event actor (e.g. user.email for Cowork)
  * @returns {string} - Username or "-" if not found
  */
+// Cheap presence check — avoids Object.keys(usernameMap) allocating/copying every key just to test
+// emptiness. Matters here because this runs once per collection (thousands of calls per page).
+const hasAnyKey = (obj) => {
+    for (const _ in obj) return true;
+    return false;
+};
+
 const getUsernameForCollection = (collection, usernameMap, actor) => {
-    if (!usernameMap || Object.keys(usernameMap).length === 0 || !collection) return DEFAULT_VALUE;
+    if (!usernameMap || !collection || !hasAnyKey(usernameMap)) return DEFAULT_VALUE;
 
     const displayName = collection.displayName?.toLowerCase();
     const name = collection.name?.toLowerCase();

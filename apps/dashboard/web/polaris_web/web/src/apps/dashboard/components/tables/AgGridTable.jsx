@@ -272,6 +272,10 @@ export default function AgGridTable({
     useEffect(() => {
         if (!useSSRM) return;
         if (firstSearchRun.current) { firstSearchRun.current = false; return; }
+        // Without this, a user on page N whose search narrows the result set below N pages lands
+        // on a blank page with no indication why — refreshServerSide alone re-fetches the current
+        // page index against the new filter, it doesn't reset it.
+        gridRef.current?.api?.paginationGoToFirstPage();
         gridRef.current?.api?.refreshServerSide({ purge: true });
     }, [debouncedSearchValue]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -287,7 +291,11 @@ export default function AgGridTable({
                 const skip = startRow;
                 const limit = (endRow ?? (startRow + paginationPageSize)) - startRow;
                 const searchString = searchRef.current.length >= 3 ? searchRef.current : "";
-                Promise.resolve(onServerFetchRef.current({ filters, sortKey, sortOrder, skip, limit, searchString }))
+                // groupKeys is [] at the top level; for SSRM tree-data callers (isServerSideGroup/
+                // getServerSideGroupKey passed via ...rest) it holds the expand path when a parent
+                // row's children are being fetched — e.g. [deviceId] for that device's children.
+                const groupKeys = params.request.groupKeys || [];
+                Promise.resolve(onServerFetchRef.current({ filters, sortKey, sortOrder, skip, limit, searchString, groupKeys }))
                     .then(r => params.success({ rowData: r?.value || [], rowCount: r?.total ?? undefined }))
                     .catch(() => params.fail());
             },

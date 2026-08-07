@@ -949,18 +949,17 @@ function AuditData() {
     }
 
     const fillFilters = async () => {
-        // Always populate the default-mode filter choices: the Skills tab uses them in both modes.
+        // markedBy dropdown choices via a lightweight distinct endpoint (was: pull up to 1000 full audit rows)
         try {
-            const res = await api.fetchAuditData('lastDetected', -1, 0, 1000, { lastDetected: [startTimestamp, endTimestamp] }, {}, '', false)
-            const markedByUsers = new Set()
-            if (res && Array.isArray(res.auditData)) {
-                res.auditData.forEach((rec) => { if (rec?.markedBy) markedByUsers.add(rec.markedBy) })
-            }
-            filtersDefault[1].choices = Array.from(markedByUsers).sort().map(u => ({ label: u, value: u }))
+            const opts = await api.fetchAuditDataFilterOptions()
+            const markedBy = (opts?.auditFilterOptions?.markedBy || []).map(u => ({ label: u, value: u }))
+            filtersDefault[1].choices = markedBy
+            filtersEndpointSecurity[0].choices = markedBy
         } catch (e) {}
         filtersDefault[3].choices = Object.entries(collectionsMap).map(([id, name]) => ({ label: name, value: id }));
 
         if (isEndpointSecurity) {
+            // agent/server names are derived from the merged aggregation, so still sourced from a page here
             try {
                 const serversRes = await api.fetchAuditData(
                     'lastDetected', -1, 0, 1000,
@@ -969,15 +968,12 @@ function AuditData() {
                 )
                 const agents = new Set()
                 const servers = new Set()
-                const markedByUsers = new Set()
                 if (serversRes && Array.isArray(serversRes.auditData)) {
                     serversRes.auditData.forEach((rec) => {
                         if (rec?.agentName) agents.add(rec.agentName)
                         if (rec?.serverName) servers.add(rec.serverName)
-                        if (rec?.markedBy) markedByUsers.add(rec.markedBy)
                     })
                 }
-                filtersEndpointSecurity[0].choices = Array.from(markedByUsers).sort().map(u => ({ label: u, value: u }))
                 filtersEndpointSecurity[2].choices = Array.from(agents).sort().map(a => ({ label: a, value: a }))
                 filtersEndpointSecurity[3].choices = Array.from(servers).sort().map(s => ({ label: s, value: s }))
             } catch (e) {}

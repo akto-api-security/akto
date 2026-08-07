@@ -188,17 +188,17 @@ export default function IdentitiesPage() {
         fetchData();
     }, [startTimestamp, endTimestamp]);
 
-    // Build violation index from API violations
+    // Build violation index from the server-grouped counts (one row per identityName x severity,
+    // not one row per violation document).
     const violationIndex = useMemo(() => {
-        return rawViolations.reduce((acc, v) => {
-            if (!v.identities || !Array.isArray(v.identities)) return acc;
-            v.identities.forEach((identity) => {
-                const identityName = identity.identityName;
-                if (!acc[identityName]) acc[identityName] = { violCrit: 0, violHigh: 0, violMed: 0 };
-                if (v.severity === "Critical")     acc[identityName].violCrit++;
-                else if (v.severity === "High")    acc[identityName].violHigh++;
-                else if (v.severity === "Medium")  acc[identityName].violMed++;
-            });
+        return rawViolations.reduce((acc, row) => {
+            const identityName = row.identityName;
+            if (!identityName) return acc;
+            if (!acc[identityName]) acc[identityName] = { violCrit: 0, violHigh: 0, violMed: 0 };
+            const count = row.count || 0;
+            if (row.severity === "Critical")     acc[identityName].violCrit += count;
+            else if (row.severity === "High")    acc[identityName].violHigh += count;
+            else if (row.severity === "Medium")  acc[identityName].violMed += count;
             return acc;
         }, {});
     }, [rawViolations]);

@@ -531,7 +531,7 @@ function AgenticsTab({ agents, onAgentClick, agentRiskData = {} }) {
 
 // ─── Violations tab ───────────────────────────────────────────────────────────
 
-function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp }) {
+function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp, allViolationRows }) {
     const [violations, setViolations] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -548,21 +548,40 @@ function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp 
 
         if (!hostNames.length && !claudeDeviceIds.size) { setViolations([]); setLoading(false); return; }
 
-        let cancelled = false;
         const hostSet = new Set(hostNames);
         const looseHostSet = new Set(hostNames.map(h => deviceServiceKey(h)).filter(Boolean));
-        fetchAgenticViolations({ startTimestamp, endTimestamp })
+        const applyFilter = (rows) => rows.filter(r =>
+            hostSet.has(r.host) ||
+            looseHostSet.has(deviceServiceKey(r.host)) ||
+            (isClaudeConfigHost(r.host) && claudeDeviceIds.has(r.host.split(".")[0]))
+        ).map((r) => ({ ...r, time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "" }));
+
+        // The parent (DeviceEndpoints) already fetched every account-wide violation once to build its
+        // own summary cards — reuse that in-memory set instead of re-fetching it over the network on
+        // every flyout open.
+        if (Array.isArray(allViolationRows)) {
+            setViolations(applyFilter(allViolationRows));
+            setLoading(false);
+            return;
+        }
+
+        // Fallback for any caller that doesn't have the rows already in memory: server-side host
+        // scoping. The server does an exact match, so we send a best-effort expanded set covering the
+        // same 3 tiers applyFilter checks above — collection hostnames as-is (exact tier), their
+        // 2-segment device.service reduction (loose tier: events are always 2-segment even when the
+        // collection hostname has a middle "source" segment), and this device's claude-config host
+        // variants — instead of pulling every account event (up to 100k rows) unfiltered.
+        let cancelled = false;
+        const looseHostNames = hostNames.map(h => {
+            const parts = h.split(".");
+            return parts.length > 1 ? `${parts[0]}.${parts[parts.length - 1]}` : null;
+        }).filter(Boolean);
+        const claudeHostNames = deviceId ? [`${deviceId}.claude`, `${deviceId}.claude-settings`] : [];
+        const scopedHosts = Array.from(new Set([...hostNames, ...looseHostNames, ...claudeHostNames]));
+
+        fetchAgenticViolations({ startTimestamp, endTimestamp, hosts: scopedHosts })
             .then((rows) => {
-                if (cancelled) return;
-                const filtered = rows.filter(r =>
-                    hostSet.has(r.host) ||
-                    looseHostSet.has(deviceServiceKey(r.host)) ||
-                    (isClaudeConfigHost(r.host) && claudeDeviceIds.has(r.host.split(".")[0]))
-                );
-                setViolations(filtered.map((r) => ({
-                    ...r,
-                    time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
-                })));
+                if (!cancelled) setViolations(applyFilter(rows));
             })
             .catch(() => {
                 if (!cancelled) setViolations([]);
@@ -571,7 +590,7 @@ function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp 
                 if (!cancelled) setLoading(false);
             });
         return () => { cancelled = true; };
-    }, [hostNames, deviceId, startTimestamp, endTimestamp]);
+    }, [hostNames, deviceId, startTimestamp, endTimestamp, allViolationRows]);
 
     const handleViolationClick = useCallback((e) => {
         if (!e.data) return;
@@ -619,7 +638,7 @@ function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp 
 
 // ─── Main DeviceFlyout ────────────────────────────────────────────────────────
 
-export default function DeviceFlyout({ device, agents, show, onClose, onAgentClick, agentRiskData = {}, deviceHostNames = [], collections = [], startTimestamp, endTimestamp }) {
+export default function DeviceFlyout({ device, agents, show, onClose, onAgentClick, agentRiskData = {}, deviceHostNames = [], collections = [], startTimestamp, endTimestamp, violationRows }) {
     const [selectedTab, setSelectedTab] = useState(0);
 
     // Minimal identity only — the MCP agent resolves this device's collections and fetches
@@ -669,7 +688,7 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
             <Box padding="2" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
                 {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} collections={collections} onTabChange={setSelectedTab} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
                 {selectedTab === 1 && <AgenticsTab agents={agents || []} onAgentClick={onAgentClick} agentRiskData={agentRiskData} />}
-                {selectedTab === 2 && <ViolationsTab hostNames={deviceHostNames} deviceId={device?.path?.[0] || device?.deviceId} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
+                {selectedTab === 2 && <ViolationsTab hostNames={deviceHostNames} deviceId={device?.path?.[0] || device?.deviceId} startTimestamp={startTimestamp} endTimestamp={endTimestamp} allViolationRows={violationRows} />}
             </Box>
         </AgenticFlyoutShell>
     );

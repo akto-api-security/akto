@@ -36,16 +36,35 @@ export const createGzipStorage = (storage) => ({
         }
     },
     setItem: (name, value) => {
-        try {
+        const write = (v) => {
             // Stringify, Gzip compress, then convert to Base64
-            const jsonString = JSON.stringify(value);
+            const jsonString = JSON.stringify(v);
             const compressed = pako.deflate(jsonString, { level: 9 });
             const binaryString = Array.from(compressed)
                 .map((byte) => String.fromCharCode(byte))
                 .join("");
             const base64Encoded = btoa(binaryString);
             storage.setItem(name, base64Encoded);
+        };
+        try {
+            write(value);
         } catch (error) {
+            // allCollections is the only persisted field large enough to blow sessionStorage's quota
+            // (real accounts can have tens of thousands of collections, each carrying a urls array) —
+            // on a large account, EVERY subsequent state change re-attempts compressing that same
+            // oversized blob and fails again, wasting a full stringify+gzip pass each time for nothing.
+            // Retry once with allCollections dropped from just this persisted write; the in-memory
+            // state (and thus the app's current behavior) is untouched, and the next full page load
+            // simply refetches collections fresh — the same cold-start path a first-ever visit takes.
+            if (error?.name === "QuotaExceededError" && value?.state?.allCollections?.length) {
+                try {
+                    write({ ...value, state: { ...value.state, allCollections: [] } });
+                    return;
+                } catch (retryError) {
+                    console.error("Error compressing state (retry without allCollections also failed):", retryError);
+                    return;
+                }
+            }
             console.error("Error compressing state:", error);
         }
     },
@@ -65,6 +84,8 @@ const initialState = {
     tagCollectionsMap: {},// Keep in memory (not persisted)
     hostNameMap: {}, // Keep in memory (not persisted)
     skillRiskScoreCache: { data: {}, ts: 0 }, // skillName -> maxRiskScore, in-memory only
+    agenticCollectionsCache: { data: null, ts: 0 }, // {collections, trafficMap, riskScoreMap}, in-memory only
+    agenticSensitiveInfoCache: { data: null, ts: 0 }, // sensitiveMap, in-memory only
     guardrailPolicyNames: { data: [], ts: 0 },
     lastFetchedInfo: { lastRiskScoreInfo: 0, lastSensitiveInfo: 0 },
     lastFetchedResp: { criticalUrls: 0, riskScoreMap: {} },
@@ -166,6 +187,20 @@ let persistStore = (set, get) => ({
             set({ skillRiskScoreCache });
         } catch (error) {
             console.error("Error setting skillRiskScoreCache:", error);
+        }
+    },
+    setAgenticCollectionsCache: (agenticCollectionsCache) => {
+        try {
+            set({ agenticCollectionsCache });
+        } catch (error) {
+            console.error("Error setting agenticCollectionsCache:", error);
+        }
+    },
+    setAgenticSensitiveInfoCache: (agenticSensitiveInfoCache) => {
+        try {
+            set({ agenticSensitiveInfoCache });
+        } catch (error) {
+            console.error("Error setting agenticSensitiveInfoCache:", error);
         }
     },
     setGuardrailPolicyNames: (data) => {

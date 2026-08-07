@@ -203,6 +203,36 @@ public class AuditDataAction extends UserAction {
         }
     }
 
+    @Getter
+    private BasicDBObject auditFilterOptions;
+
+    /**
+     * Distinct filter-dropdown values for the Audit Data page (currently markedBy). Replaces the old
+     * fillFilters approach that pulled up to 1000 full audit rows just to derive the distinct set.
+     */
+    public String fetchAuditDataFilterOptions() {
+        try {
+            Bson base = Filters.and(
+                    Filters.ne(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL),
+                    Filters.or(
+                            Filters.eq(McpAuditInfo.CONTEXT_SOURCE, Context.contextSource.get().name()),
+                            Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false)
+                    )
+            );
+            List<String> markedByUsers = new ArrayList<>();
+            for (String m : McpAuditInfoDao.instance.getMCollection().distinct(McpAuditInfo.MARKED_BY, base, String.class)) {
+                if (m != null && !m.isEmpty()) markedByUsers.add(m);
+            }
+            Collections.sort(markedByUsers);
+            auditFilterOptions = new BasicDBObject();
+            auditFilterOptions.put("markedBy", markedByUsers);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching audit filter options: " + e.getMessage(), LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+    }
+
     public String fetchAuditData() {
         try {
             if (sortKey == null || sortKey.isEmpty()) {

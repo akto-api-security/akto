@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Badge, HorizontalStack, Text, Modal, FormLayout, Banner, VerticalStack, Autocomplete } from "@shopify/polaris";
+import { Badge, HorizontalStack, Text, Modal, FormLayout, Banner, VerticalStack, Autocomplete, IndexFiltersMode } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
-import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
+import GithubServerTable from "@/apps/dashboard/components/tables/GithubServerTable";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo";
@@ -11,21 +11,24 @@ import func from "@/util/func";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
-import useTable from "@/apps/dashboard/components/tables/TableContext";
 import settingRequests from "../../settings/api";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 import NewLayoutTooltip from "./NewLayoutTooltip";
 import {
     getHeaders,
     getSortOptionsWithoutIconColumn,
+    PAGE_LIMIT,
     INVENTORY_PATH,
     INVENTORY_FILTER_KEY,
-    PAGE_LIMIT,
-    groupCollectionsByUser,
-    groupCollectionsByDevice,
     buildAgenticInventoryFilterForRow,
     fetchAndCacheSkillApiData,
-    hasMaliciousSkillInCollections,
+    // Note: this page's malicious-skill badge stays name-only (enrichRef.maliciousSkills), not the
+    // collection-scoped hasMaliciousSkillInCollections/maliciousSkillKeys AgenticAssetsPage.jsx now
+    // uses — HostGroupSummary only tracks a flat skill-name set per group, not per-collection skill
+    // keys. Slightly less precise (a same-named skill on a different user could false-positive this
+    // badge); a real fix would need a small Java-side addition, not done here to bound this change.
+    fetchAndCacheAgenticCollectionsBundle,
+    fetchAndCacheAgenticSensitiveInfo,
 } from "./constants";
 
 const definedTableTabs = ["Users", "Devices"];
@@ -35,9 +38,20 @@ const usersAndDevicesCountColumnOpts = {
     endpointsColumnBoxWidth: "120px",
 };
 
+// AG Grid/GithubServerTable field name -> backend sortKey (AgenticObserveAction.buildHostGroupComparator).
+const SORT_FIELD_MAP = { groupName: "name", riskScore: "riskScore", endpointsCount: "endpointsCount", detectedTimestamp: "lastSeenEpoch" };
+
+const getRiskScoreStatus = (riskScore) => {
+    if (riskScore >= 4.5) return "critical";
+    if (riskScore >= 4) return "attention";
+    if (riskScore >= 2.5) return "warning";
+    if (riskScore > 0) return "info";
+    return "success";
+};
+
 function UsersAndDevices() {
     const navigate = useNavigate();
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const agenticNewLayout = LocalStore((state) => state.agenticNewLayout);
     const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
 
@@ -46,322 +60,252 @@ function UsersAndDevices() {
             navigate("/dashboard/observe/endpoints", { replace: true });
         }
     }, [navigate, agenticNewLayout]);
-    const [data, setData] = useState({ users: [], devices: [] });
-    const [userEnrichVersion, setUserEnrichVersion] = useState(0);
-    const [summaryData, setSummaryData] = useState({ profileCount: 0, collectionCount: 0 });
-    const [editTagModal, setEditTagModal] = useState({ active: false, usernames: [], team: '', userRole: '', teamSource: 'sso', roleSource: 'sso', ssoHintTeam: '', ssoHintRole: '', saving: false });
 
-    const { tabsInfo } = useTable();
     const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
     const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
     const initialSelectedTab = tableSelectedTab[window.location.pathname] || "users";
     const [selectedTab, setSelectedTab] = useState(initialSelectedTab);
     const [selected, setSelected] = useState(func.getTableTabIndexById(0, definedTableTabs, initialSelectedTab));
+    const isUsersTab = selectedTab === "users";
 
     const filtersMap = PersistStore((state) => state.filtersMap);
     const setFiltersMap = PersistStore((state) => state.setFiltersMap);
 
-    const dataRef = useRef(data);
-    useEffect(() => { dataRef.current = data; }, [data]);
+    const [stats, setStats] = useState({ usersCount: 0, devicesCount: 0, usersAgenticAssetsTotal: 0, devicesAgenticAssetsTotal: 0, teams: [], roles: [] });
+    const [refreshKey, setRefreshKey] = useState(0);
+    const [editTagModal, setEditTagModal] = useState({ active: false, rows: [], team: '', userRole: '', teamSource: 'sso', roleSource: 'sso', ssoHintTeam: '', ssoHintRole: '', saving: false });
 
-    const tableCountObj = func.getTabsCount(definedTableTabs, data);
-    const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo);
+    // Everything the paginated fetch needs but the row itself doesn't carry, plus a stash of the
+    // most-recently-fetched page's full row objects (for the bulk "Edit team & role" action, which
+    // only gets selected IDs from GithubServerTable — selection is only ever made on currently
+    // rendered rows, so this is always in sync).
+    const enrichRef = useRef({
+        trafficMap: {}, riskScoreMap: {}, sensitiveMap: {}, usernameMap: {}, userMetadataMap: {},
+        maliciousSkills: new Set(),
+    });
+    const lastRowsRef = useRef([]);
 
-    const handleSelectedTab = (selectedIndex) => {
-        setSelected(selectedIndex);
-    };
+    useEffect(() => {
+        const isMountedRef = { current: true };
+        (async () => {
+            try {
+                const [collectionsBundle, sensitiveMap, shieldResult] = await Promise.all([
+                    fetchAndCacheAgenticCollectionsBundle({ api, PersistStore }),
+                    fetchAndCacheAgenticSensitiveInfo({ api, PersistStore }),
+                    fetchEndpointShieldUserMetadata(),
+                ]);
+                if (!isMountedRef.current) return;
+
+                const { trafficMap = {}, riskScoreMap = {} } = collectionsBundle || {};
+                const { usernameMap = {}, userMetadataMap = {} } = shieldResult || {};
+
+                enrichRef.current = {
+                    ...enrichRef.current,
+                    trafficMap, riskScoreMap, sensitiveMap: sensitiveMap || {}, usernameMap, userMetadataMap,
+                };
+                setLoading(false);
+                setRefreshKey((k) => k + 1);
+
+                fetchAndCacheSkillApiData([], { api, PersistStore })
+                    .then(({ maliciousSkills }) => {
+                        if (!isMountedRef.current || !maliciousSkills?.size) return;
+                        enrichRef.current = { ...enrichRef.current, maliciousSkills };
+                    })
+                    .catch(() => {});
+            } catch (e) {
+                // eslint-disable-next-line no-console
+                console.error("UsersAndDevices mount fetch failed:", e);
+                if (isMountedRef.current) setLoading(false);
+            }
+        })();
+        return () => { isMountedRef.current = false; };
+    }, []);
+
+    const loadStats = useCallback(async () => {
+        try {
+            const { trafficMap, riskScoreMap, usernameMap, userMetadataMap } = enrichRef.current;
+            const result = await api.fetchUsersAndDevicesStats({ trafficMap, riskScoreMap, usernameMap, userMetadataMap });
+            setStats(result);
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error("fetchUsersAndDevicesStats failed:", e);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (refreshKey === 0) return;
+        loadStats();
+    }, [loadStats, refreshKey]);
+
+    const buildGroupNameDisplay = useCallback((row, extraBadges = []) => {
+        const badges = [...extraBadges];
+        if (row.hasPersonalAccount) badges.push(<Badge key="personal" size="small" status="warning">Contains personal account</Badge>);
+        if (row.hasLocalMcpServer) badges.push(<Badge key="local-mcp" size="small" status="critical">Local MCP Server</Badge>);
+        if (!badges.length) return row.groupName;
+        return (
+            <HorizontalStack gap="2" align="start" wrap={false}>
+                <Text>{row.groupName}</Text>
+                {badges}
+            </HorizontalStack>
+        );
+    }, []);
+
+    // Mirrors the original prettifyGroupData/buildGroupNameDisplay pipeline, operating on one
+    // server-paginated page of rows instead of the full in-memory array.
+    const prettifyRows = useCallback((rows) => {
+        const maliciousSkills = enrichRef.current.maliciousSkills;
+        return rows.map((row) => {
+            const hasMalicious = (row.uniqueSkillNames || []).some((s) => maliciousSkills.has(s));
+            const extraBadges = hasMalicious ? [<Badge key="malicious" size="small" status="critical">Malicious Skills</Badge>] : [];
+            return {
+                ...row,
+                groupNameDisplay: buildGroupNameDisplay(row, extraBadges),
+                sensitiveSubTypes: transform.prettifySubtypes(row.sensitiveInRespTypes || [], false),
+                sensitiveSubTypesVal: (row.sensitiveInRespTypes || []).join(" ") || "-",
+                riskScoreComp: row.riskScore != null ? (
+                    <Badge status={getRiskScoreStatus(row.riskScore)} size="small">{row.riskScore}</Badge>
+                ) : "-",
+                detectedTimestamp: row.lastSeenEpoch,
+                lastTraffic: func.prettifyEpoch(row.lastSeenEpoch),
+            };
+        });
+    }, [buildGroupNameDisplay]);
+
+    const fetchData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
+        const { trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap } = enrichRef.current;
+        const mappedSortKey = SORT_FIELD_MAP[sortKey] || "riskScore";
+        const mongoSortOrder = sortOrder === -1 ? 1 : -1; // GithubServerTable: asc=-1/desc=1, inverted vs Mongo
+        const filters = {};
+        if (filtersObj?.team?.length) filters.team = filtersObj.team;
+        if (filtersObj?.userRole?.length) filters.userRole = filtersObj.userRole;
+        const res = await api.fetchUsersAndDevicesSummary({
+            groupBy: isUsersTab ? "user" : "device",
+            skip, limit, sortKey: mappedSortKey, sortOrder: mongoSortOrder, queryValue, filters,
+            trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap,
+        });
+        const prettified = prettifyRows(res.rows || []);
+        lastRowsRef.current = prettified;
+        return { value: prettified, total: res.total || 0 };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isUsersTab, prettifyRows]);
 
     const headers = useMemo(() => {
         const h = getHeaders({
-            primaryColumnTitle: selectedTab === "users" ? "User" : "Device",
-            primaryColumnText: selectedTab === "users" ? "User" : "Device",
+            primaryColumnTitle: isUsersTab ? "User" : "Device",
+            primaryColumnText: isUsersTab ? "User" : "Device",
             includeIconColumn: false,
-            includeUserColumns: selectedTab === "users",
+            includeUserColumns: isUsersTab,
             ...usersAndDevicesCountColumnOpts,
         });
         h[0] = { ...h[0], value: "groupNameDisplay" };
         return h;
-    }, [selectedTab]);
+    }, [isUsersTab]);
 
     const sortOptionsNoIcon = useMemo(
         () => getSortOptionsWithoutIconColumn(usersAndDevicesCountColumnOpts),
         [],
     );
 
-    const getRiskScoreStatus = useCallback((riskScore) => {
-        if (riskScore >= 4.5) return "critical";
-        if (riskScore >= 4) return "attention";
-        if (riskScore >= 2.5) return "warning";
-        if (riskScore > 0) return "info";
-        return "success";
-    }, []);
+    const filtersDef = useMemo(() => (isUsersTab ? [
+        { key: "team", label: "Team", choices: (stats.teams || []).map((t) => ({ label: t, value: t })) },
+        { key: "userRole", label: "User role", choices: (stats.roles || []).map((r) => ({ label: r, value: r })) },
+    ] : []), [isUsersTab, stats.teams, stats.roles]);
 
-    const buildGroupNameDisplay = useCallback((group, extraBadges = []) => {
-        const badges = [...extraBadges];
-        if (group.hasPersonalAccount) badges.push(<Badge key="personal" size="small" status="warning">Contains personal account</Badge>);
-        if (group.hasLocalMcpServer) badges.push(<Badge key="local-mcp" size="small" status="critical">Local MCP Server</Badge>);
-        if (badges.length === 0) return group.groupName;
-        return (
-            <HorizontalStack gap="2" align="start" wrap={false}>
-                <Text>{group.groupName}</Text>
-                {badges}
-            </HorizontalStack>
-        );
-    }, []);
+    const disambiguateLabel = useCallback((key, value) => func.convertToDisambiguateLabelObj(value, null, 2), []);
 
-    const prettifyGroupData = useCallback(
-        (groups) => {
-            return groups.map((group) => ({
-                ...group,
-                groupNameDisplay: buildGroupNameDisplay(group),
-                sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes || [], false),
-                riskScoreComp:
-                    group.riskScore !== null ? (
-                        <Badge status={getRiskScoreStatus(group.riskScore)} size="small">
-                            {group.riskScore}
-                        </Badge>
-                    ) : (
-                        "-"
-                    ),
-            }));
-        },
-        [getRiskScoreStatus, buildGroupNameDisplay],
-    );
+    const handleSelectedTab = useCallback((selectedIndex) => {
+        setSelected(selectedIndex);
+        const tab = selectedIndex === 0 ? "users" : "devices";
+        setSelectedTab(tab);
+        setTableSelectedTab({ ...tableSelectedTab, [window.location.pathname]: tab });
+    }, [tableSelectedTab, setTableSelectedTab]);
 
-    const applyMaliciousBadgeToUsers = useCallback((maliciousSkillKeys, misconfiguredCollectionIdsSet, isMountedRef) => {
-        if (!isMountedRef.current) return;
-        const enrichRow = (row) => {
-            // Scoped to each collection's own tagged skills: a same-named skill owned by another
-            // user/agent must not mark this row as malicious.
-            const hasMalicious = hasMaliciousSkillInCollections(maliciousSkillKeys, row.collections);
-            const collectionIds = (row.collections || []).map((c) => c.id);
-            const hasMisconfigured = collectionIds.some((id) => misconfiguredCollectionIdsSet.has(id));
-            const extraBadges = [];
-            if (hasMalicious) extraBadges.push(<Badge key="malicious" size="small" status="critical">Malicious Skills</Badge>);
-            return { ...row, hasMaliciousSkill: hasMalicious, hasMisconfiguredConfig: hasMisconfigured, groupNameDisplay: buildGroupNameDisplay(row, extraBadges) };
-        };
-        setData((prev) => ({
-            users: prev.users.map(enrichRow),
-            devices: prev.devices.map(enrichRow),
-        }));
-        setUserEnrichVersion((v) => v + 1);
-    }, [buildGroupNameDisplay]);
-
-    const enrichUsersWithMaliciousSkills = useCallback(async (userRows, isMountedRef = { current: true }) => {
-        const allCollectionIds = [];
-        userRows.forEach((row) => {
-            (row.collections || []).forEach((c) => {
-                if (!allCollectionIds.includes(c.id)) allCollectionIds.push(c.id);
-            });
-        });
-        if (!allCollectionIds.length) return;
-
-        const { maliciousSkillKeys, misconfiguredCollectionIds } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
-
-        if (!isMountedRef.current) return;
-        applyMaliciousBadgeToUsers(maliciousSkillKeys || new Set(), misconfiguredCollectionIds || new Set(), isMountedRef);
-    }, [applyMaliciousBadgeToUsers]);
-
-    async function fetchData(isMountedRef = { current: true }) {
-        try {
-            setLoading(true);
-
-            const [apiCollectionsResp, trafficInfoResp, riskScoreResp, sensitiveInfoResp, shieldResult] =
-                await Promise.all([
-                    api.getAllCollectionsBasic(),
-                    api.getLastTrafficSeen(),
-                    api.getRiskScoreInfo(),
-                    api.getSensitiveInfoForCollections(),
-                    fetchEndpointShieldUserMetadata(),
-                ]);
-
-            if (!isMountedRef.current) return;
-
-            const collections = apiCollectionsResp.apiCollections || [];
-            const trafficMap = trafficInfoResp || {};
-            const riskScoreMap = riskScoreResp?.riskScoreOfCollectionsMap || {};
-            const sensitiveMap = sensitiveInfoResp?.sensitiveSubtypesInCollection || {};
-            const { usernameMap = {}, userMetadataMap = {} } = shieldResult || {};
-
-            const userGroups = prettifyGroupData(
-                groupCollectionsByUser(collections, trafficMap, sensitiveMap, riskScoreMap, usernameMap, userMetadataMap),
-            );
-            const deviceGroups = prettifyGroupData(
-                groupCollectionsByDevice(collections, trafficMap, sensitiveMap, riskScoreMap),
-            );
-
-            setData({
-                users: userGroups,
-                devices: deviceGroups,
-            });
-            setLoading(false);
-
-            enrichUsersWithMaliciousSkills([...userGroups, ...deviceGroups], isMountedRef);
-        } catch {
-            setLoading(false);
+    const handleRowClick = useCallback((row) => {
+        const updatedFiltersMap = { ...filtersMap };
+        const filterPayload = buildAgenticInventoryFilterForRow(row);
+        if (filterPayload) {
+            updatedFiltersMap[INVENTORY_FILTER_KEY] = filterPayload;
+        } else {
+            delete updatedFiltersMap[INVENTORY_FILTER_KEY];
         }
-    }
-
-    useEffect(() => {
-        const isMountedRef = { current: true };
-        fetchData(isMountedRef);
-        return () => {
-            isMountedRef.current = false;
-        };
-    }, []);
-
-    useEffect(() => {
-        const userLen = data.users.length;
-        const deviceLen = data.devices.length;
-        const rows = selectedTab === "users" ? data.users : data.devices;
-        setSummaryData({
-            profileCount: selectedTab === "users" ? userLen : deviceLen,
-            collectionCount: rows.reduce((sum, row) => sum + (row.endpointsCount ?? row.hostNames?.length ?? 0), 0),
-        });
-    }, [selectedTab, data.users, data.devices]);
-
-    const disambiguateLabel = useCallback((key, value) => {
-        return func.convertToDisambiguateLabelObj(value, null, 2);
-    }, []);
+        delete updatedFiltersMap[`${INVENTORY_FILTER_KEY}agent-tree/`];
+        setFiltersMap(updatedFiltersMap);
+        setTableSelectedTab({ ...tableSelectedTab, [INVENTORY_PATH]: "hostname" });
+        setTimeout(() => navigate(INVENTORY_PATH), 0);
+    }, [filtersMap, setFiltersMap, navigate, tableSelectedTab, setTableSelectedTab]);
 
     const openEditTagModal = useCallback((usernames) => {
-        const firstUser = data.users.find((u) => usernames.includes(u.id));
-        const teamSrc = firstUser?.teamSource || 'sso';
-        const roleSrc = firstUser?.roleSource || 'sso';
+        const rows = lastRowsRef.current.filter((r) => usernames.includes(r.id));
+        if (!rows.length) return;
+        const first = rows[0];
+        const teamSrc = first?.teamSource || 'sso';
+        const roleSrc = first?.roleSource || 'sso';
         setEditTagModal({
             active: true,
-            usernames,
-            team: teamSrc === 'manual' ? (firstUser?.team || '') : '',
-            userRole: roleSrc === 'manual' ? (firstUser?.userRole || '') : '',
+            rows,
+            team: teamSrc === 'manual' ? (first?.team || '') : '',
+            userRole: roleSrc === 'manual' ? (first?.userRole || '') : '',
             teamSource: teamSrc,
             roleSource: roleSrc,
-            // firstUser.team for SSO users is already the SSO value (post-processed by Java)
-            ssoHintTeam: teamSrc === 'sso' ? (firstUser?.team || '') : '',
-            ssoHintRole: roleSrc === 'sso' ? (firstUser?.userRole || '') : '',
+            ssoHintTeam: teamSrc === 'sso' ? (first?.team || '') : '',
+            ssoHintRole: roleSrc === 'sso' ? (first?.userRole || '') : '',
             saving: false,
         });
-    }, [data.users]);
+    }, []);
 
     const closeEditTagModal = useCallback(() => {
-        setEditTagModal({ active: false, usernames: [], team: '', userRole: '', teamSource: 'sso', roleSource: 'sso', ssoHintTeam: '', ssoHintRole: '', saving: false });
+        setEditTagModal({ active: false, rows: [], team: '', userRole: '', teamSource: 'sso', roleSource: 'sso', ssoHintTeam: '', ssoHintRole: '', saving: false });
     }, []);
 
     const saveEditTag = useCallback(async () => {
         setEditTagModal((prev) => ({ ...prev, saving: true }));
         try {
-            const selectedUsers = data.users.filter((u) => editTagModal.usernames.includes(u.id));
-            const groupNames = selectedUsers.map((u) => u.groupName).filter(Boolean);
+            const groupNames = editTagModal.rows.map((r) => r.groupName).filter(Boolean);
             await settingRequests.bulkUpdateUserDeviceTag(groupNames, editTagModal.team, editTagModal.userRole);
-            setData((prev) => ({
-                ...prev,
-                users: prev.users.map((u) =>
-                    editTagModal.usernames.includes(u.id)
-                        ? { ...u, team: editTagModal.team, userRole: editTagModal.userRole }
-                        : u
-                ),
-            }));
-            setUserEnrichVersion((v) => v + 1);
             func.setToast(true, false, "Team and role updated successfully");
             closeEditTagModal();
+            setRefreshKey((k) => k + 1);
         } catch {
             func.setToast(true, true, "Failed to update team and role");
             setEditTagModal((prev) => ({ ...prev, saving: false }));
         }
-    }, [editTagModal, data.users, closeEditTagModal]);
+    }, [editTagModal, closeEditTagModal]);
 
-    const handleRowClick = useCallback(
-        (row) => {
-            const updatedFiltersMap = { ...filtersMap };
-            const filterPayload = buildAgenticInventoryFilterForRow(row);
-            if (filterPayload) {
-                updatedFiltersMap[INVENTORY_FILTER_KEY] = filterPayload;
-            } else {
-                delete updatedFiltersMap[INVENTORY_FILTER_KEY];
-            }
-            // The agent-tree subview keeps its own filter slot; clear it so the
-            // previous user's hostnames don't leak into this user's view.
-            delete updatedFiltersMap[`${INVENTORY_FILTER_KEY}agent-tree/`];
+    const promotedBulkActions = useCallback((selectedIds) => {
+        if (!isUsersTab) return [];
+        return [{ content: 'Edit team & role', onAction: () => openEditTagModal(selectedIds) }];
+    }, [isUsersTab, openEditTagModal]);
 
-            setFiltersMap(updatedFiltersMap);
-
-            setTableSelectedTab({
-                ...tableSelectedTab,
-                [INVENTORY_PATH]: "hostname",
-            });
-
-            setTimeout(() => navigate(INVENTORY_PATH), 0);
+    const summaryItems = useMemo(() => [
+        {
+            title: isUsersTab ? "Users" : "Devices",
+            data: transform.formatNumberWithCommas(isUsersTab ? stats.usersCount : stats.devicesCount),
         },
-        [filtersMap, setFiltersMap, navigate, tableSelectedTab, setTableSelectedTab],
-    );
-
-    const summaryItems = useMemo(
-        () => [
-            {
-                title: selectedTab === "users" ? "Users" : "Devices",
-                data: transform.formatNumberWithCommas(summaryData.profileCount),
-            },
-            {
-                title: "Agentic assets",
-                data: transform.formatNumberWithCommas(summaryData.collectionCount),
-            },
-        ],
-        [summaryData, selectedTab],
-    );
+        {
+            title: "Agentic assets",
+            data: transform.formatNumberWithCommas(isUsersTab ? stats.usersAgenticAssetsTotal : stats.devicesAgenticAssetsTotal),
+        },
+    ], [isUsersTab, stats]);
 
     const summaryComponent = useMemo(() => <SummaryCardInfo summaryItems={summaryItems} key="summary" />, [summaryItems]);
 
     const resourceName = useMemo(
-        () =>
-            selectedTab === "users"
-                ? { singular: "user", plural: "users" }
-                : { singular: "device", plural: "devices" },
-        [selectedTab],
+        () => (isUsersTab ? { singular: "user", plural: "users" } : { singular: "device", plural: "devices" }),
+        [isUsersTab],
     );
 
-    const promotedBulkActions = useCallback((selectedIds) => {
-        if (selectedTab !== 'users') return [];
-        return [{
-            content: 'Edit team & role',
-            onAction: () => openEditTagModal(selectedIds),
-        }];
-    }, [selectedTab, openEditTagModal]);
+    const tableTabs = useMemo(() => ([
+        { id: "users", content: `Users (${transform.formatNumberWithCommas(stats.usersCount)})` },
+        { id: "devices", content: `Devices (${transform.formatNumberWithCommas(stats.devicesCount)})` },
+    ]), [stats]);
 
-    const tableComponent = useMemo(() => {
-        const commonTabProps = { tableTabs, onSelect: handleSelectedTab, selected };
-        const tableKey = selectedTab === "users" ? `table-users-${userEnrichVersion}` : "table";
-        return (
-            <GithubSimpleTable
-                key={tableKey}
-                pageLimit={PAGE_LIMIT}
-                data={data[selectedTab]}
-                sortOptions={sortOptionsNoIcon}
-                resourceName={resourceName}
-                filters={[]}
-                headers={headers}
-                selectable={selectedTab === 'users'}
-                mode={IndexFiltersMode.Filtering}
-                headings={headers}
-                useNewRow={true}
-                condensedHeight={true}
-                disambiguateLabel={disambiguateLabel}
-                prettifyPageData={(pageData) => pageData}
-                onRowClick={handleRowClick}
-                promotedBulkActions={promotedBulkActions}
-                {...commonTabProps}
-            />
-        );
-    }, [data, selectedTab, userEnrichVersion, headers, disambiguateLabel, handleRowClick, promotedBulkActions, tableTabs, selected, resourceName]);
-
-    const pageTitle = useMemo(
-        () => (
-            <TitleWithInfo
-                tooltipContent="View agentic activity by user or device; open inventory with the same filters as Agentic assets."
-                titleText="Users and devices"
-                docsUrl="https://ai-security-docs.akto.io/agentic-ai-discovery/get-started"
-            />
-        ),
-        [],
-    );
+    const pageTitle = useMemo(() => (
+        <TitleWithInfo
+            tooltipContent="View agentic activity by user or device; open inventory with the same filters as Agentic assets."
+            titleText="Users and devices"
+            docsUrl="https://ai-security-docs.akto.io/agentic-ai-discovery/get-started"
+        />
+    ), []);
 
     const layoutToggle = (
         <NewLayoutTooltip checked={false} onChange={() => { setAgenticNewLayout(true); navigate("/dashboard/observe/endpoints"); }} />
@@ -382,7 +326,7 @@ function UsersAndDevices() {
         <Modal
             open={editTagModal.active}
             onClose={closeEditTagModal}
-            title={`Edit team & role \u2014 ${editTagModal.usernames?.length > 1 ? `${editTagModal.usernames.length} users` : (data.users.find((u) => editTagModal.usernames?.[0] === u.id)?.groupName || '')}`}
+            title={`Edit team & role — ${editTagModal.rows.length > 1 ? `${editTagModal.rows.length} users` : (editTagModal.rows[0]?.groupName || '')}`}
             primaryAction={{ content: 'Save', onAction: saveEditTag, loading: editTagModal.saving }}
             secondaryActions={[{ content: 'Cancel', onAction: closeEditTagModal }]}
         >
@@ -404,7 +348,7 @@ function UsersAndDevices() {
                         <Autocomplete
                             options={(() => {
                                 const query = (editTagModal.team || '').toLowerCase();
-                                const all = [...new Set(data.users.map(u => u.team).filter(Boolean))].sort();
+                                const all = stats.teams || [];
                                 return (query ? all.filter(t => t.toLowerCase().includes(query)) : all).map(t => ({ label: t, value: t }));
                             })()}
                             selected={editTagModal.team ? [editTagModal.team] : []}
@@ -423,7 +367,7 @@ function UsersAndDevices() {
                         <Autocomplete
                             options={(() => {
                                 const query = (editTagModal.userRole || '').toLowerCase();
-                                const all = [...new Set(data.users.map(u => u.userRole).filter(Boolean))].sort();
+                                const all = stats.roles || [];
                                 return (query ? all.filter(r => r.toLowerCase().includes(query)) : all).map(r => ({ label: r, value: r }));
                             })()}
                             selected={editTagModal.userRole ? [editTagModal.userRole] : []}
@@ -451,7 +395,30 @@ function UsersAndDevices() {
                 title={pageTitle}
                 isFirstPage={true}
                 secondaryActions={layoutToggle}
-                components={[summaryComponent, tableComponent]}
+                components={[
+                    summaryComponent,
+                    <GithubServerTable
+                        key={`users-and-devices-${selectedTab}-${refreshKey}`}
+                        pageLimit={PAGE_LIMIT}
+                        fetchData={fetchData}
+                        sortOptions={sortOptionsNoIcon}
+                        resourceName={resourceName}
+                        filters={filtersDef}
+                        headers={headers}
+                        headings={headers}
+                        selectable={isUsersTab}
+                        mode={IndexFiltersMode.Filtering}
+                        useNewRow={true}
+                        condensedHeight={true}
+                        disambiguateLabel={disambiguateLabel}
+                        onRowClick={handleRowClick}
+                        promotedBulkActions={promotedBulkActions}
+                        tableTabs={tableTabs}
+                        selected={selected}
+                        onSelect={handleSelectedTab}
+                        supportsNegationFilter={false}
+                    />,
+                ]}
             />
             {editTagModalComp}
         </>
