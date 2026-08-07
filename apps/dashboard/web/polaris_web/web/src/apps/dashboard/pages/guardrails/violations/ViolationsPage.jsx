@@ -635,19 +635,20 @@ function Violations() {
         });
     }, [applyGridFilter]);
 
+    // Top Policies filter is driven straight into the server fetch (see onServerFetch), NOT the
+    // policyName set-filter: the policy names come from a different endpoint than the set filter's
+    // known values, so setColumnFilterModel would silently drop them and the table wouldn't filter.
     const handlePolicyClick = useCallback((name) => {
         setActivePolicyFilter(prev => {
             const next = new Set(prev);
             if (next.has(name)) next.delete(name); else next.add(name);
-            applyGridFilter("policyName", [...next]);
             return next;
         });
-    }, [applyGridFilter]);
+    }, []);
 
     const handleClearPolicySelection = useCallback(() => {
         setActivePolicyFilter(new Set());
-        applyGridFilter("policyName", []);
-    }, [applyGridFilter]);
+    }, []);
 
     const [activeHostFilter, setActiveHostFilter] = useState(new Set());
 
@@ -833,7 +834,9 @@ function Violations() {
         const pageSize = limit || 50;
         const severityFilter = filters?.severity || [];
         const hostFilter = filters?.user || [];
-        const policyFilter = filters?.policyName || [];
+        // Union the column filter with the "Top Policies" card selection (driven via React state,
+        // not the set-filter, so its values aren't dropped). Both map to the backend latestAttack.
+        const policyFilter = [...new Set([...(filters?.policyName || []), ...activePolicyFilter])];
         const statusFilter = activeStatusValue;
 
         // AgGridTable sends sortOrder: -1 for asc, 1 for desc (opposite of MongoDB convention)
@@ -867,7 +870,14 @@ function Violations() {
             setRows(transformed);
             return { value: transformed, total: result?.total || 0 };
         });
-    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue]);
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activePolicyFilter]);
+
+    // Reload the grid when the Top Policies card selection changes (skip the initial mount).
+    const policyFilterFirstRun = useRef(true);
+    useEffect(() => {
+        if (policyFilterFirstRun.current) { policyFilterFirstRun.current = false; return; }
+        gridRef.current?.api?.refreshServerSide({ purge: true });
+    }, [activePolicyFilter]);
 
     // ─── Bulk actions ──────────────────────────────────────────────────────────
     // Under Server-Side Row Model, "select all" tracks selection as an abstract
