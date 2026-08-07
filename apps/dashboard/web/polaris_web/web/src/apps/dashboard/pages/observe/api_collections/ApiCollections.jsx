@@ -1151,7 +1151,12 @@ function ApiCollections(props) {
 
     useEffect(() => {
         if (!activeFilterType) return;
-        const collectionIds = normalData.map(c => c.id).filter(Boolean);
+        // Only collections that actually have skills need this lookup; querying every visible
+        // collection fires one request per collection for no benefit on the rest.
+        const collectionIds = normalData
+            .filter(c => Array.isArray(c.skills) && c.skills.length > 0)
+            .map(c => c.id)
+            .filter(Boolean);
         if (!collectionIds.length) return;
         const alreadyCached = !!PersistStore.getState().skillRiskScoreCache?.ts;
         fetchAndCacheSkillApiData(collectionIds, { api, PersistStore })
