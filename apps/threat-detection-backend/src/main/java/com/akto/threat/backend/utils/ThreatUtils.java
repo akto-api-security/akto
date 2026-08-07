@@ -4,6 +4,10 @@ import com.akto.ProtoMessageUtils;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.protobuf.TextFormat;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
@@ -13,6 +17,8 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class ThreatUtils {
 
@@ -100,6 +106,118 @@ public class ThreatUtils {
         Metadata metadataProto = metadataBuilder.build();
         metadataStr = ProtoMessageUtils.toString(metadataProto).orElse("");
         return metadataStr;
+    }
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    private static final Pattern CONFIG_CONTENT_TAIL = Pattern.compile("\"config_content\"\\s*:\\s*\"([\\s\\S]*)\"\\s*}\\s*$");
+    private static final Pattern EVIDENCE_FIELD = Pattern.compile("\"evidence\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
+    private static final Pattern MESSAGE_FIELD = Pattern.compile("\"message\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
+
+    public static String repairConfigScanPayload(String requestPayload) {
+        if (requestPayload == null || requestPayload.isEmpty()) {
+            return requestPayload;
+        }
+
+        try {
+            OBJECT_MAPPER.readTree(requestPayload);
+            return requestPayload;
+        } catch (Exception e) {
+            // fall through to repair
+        }
+
+        Map<String, Object> repaired = new LinkedHashMap<>();
+        tryExtractField(EVIDENCE_FIELD, requestPayload).ifPresent(v -> repaired.put("evidence", v));
+        tryExtractField(MESSAGE_FIELD, requestPayload).ifPresent(v -> repaired.put("message", v));
+        extractConfigContentTail(requestPayload).ifPresent(v -> repaired.put("config_content", v));
+
+        if (repaired.isEmpty()) {
+            return requestPayload;
+        }
+
+        try {
+            return OBJECT_MAPPER.writeValueAsString(repaired);
+        } catch (Exception e) {
+            return requestPayload;
+        }
+    }
+
+    private static Optional<String> extractConfigContentTail(String text) {
+        Matcher m = CONFIG_CONTENT_TAIL.matcher(text);
+        if (!m.find()) {
+            return Optional.empty();
+        }
+        String rawTail = m.group(1);
+        Optional<String> exact = readFullJsonString(rawTail);
+        if (exact.isPresent()) {
+            return exact;
+        }
+        // rawTail may contain a bare (unescaped) " left behind by a redaction
+        // marker. Escape every such quote so the whole tail reads as one
+        // string again, then try the strict parse a second time.
+        String reescaped = rawTail.replaceAll("(?<!\\\\)\"", "\\\\\"");
+        return readFullJsonString(reescaped);
+    }
+
+    // Parses rawTail as a JSON string value, but only succeeds if rawTail is
+    // ENTIRELY consumed by that one string. Plain readValue(json, String.class)
+    // stops at the first closing quote and ignores anything after it, so a bare
+    // quote mid-string makes it return a truncated prefix instead of failing.
+    private static Optional<String> readFullJsonString(String rawTail) {
+        try (JsonParser parser = OBJECT_MAPPER.getFactory().createParser("\"" + rawTail + "\"")) {
+            if (parser.nextToken() != JsonToken.VALUE_STRING) {
+                return Optional.empty();
+            }
+            String value = parser.getValueAsString();
+            if (parser.nextToken() != null) {
+                return Optional.empty(); // something remains after the string closed, reject instead of truncating
+            }
+            return Optional.ofNullable(value);
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    private static Optional<String> tryExtractField(Pattern pattern, String text) {
+        Matcher m = pattern.matcher(text);
+        if (!m.find()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(OBJECT_MAPPER.readValue("\"" + m.group(1) + "\"", String.class));
+        } catch (Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    public static String repairConfigScanEnvelope(String envelope) {
+        if (envelope == null || envelope.isEmpty()) {
+            return envelope;
+        }
+
+        Map<String, Object> fields;
+        try {
+            fields = OBJECT_MAPPER.readValue(envelope, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            return envelope;   
+        }
+
+        Object requestPayload = fields.get("requestPayload");
+        if (!(requestPayload instanceof String)) {
+            return envelope;
+        }
+
+        String repairedRequestPayload = repairConfigScanPayload((String) requestPayload);
+        if (repairedRequestPayload.equals(requestPayload)) {
+            return envelope;
+        }
+
+        fields.put("requestPayload", repairedRequestPayload);
+        try {
+            return OBJECT_MAPPER.writeValueAsString(fields);
+        } catch (Exception e) {
+            return envelope;
+        }
     }
 
     public static void createIndexIfAbsent(String accountId, MaliciousEventDao maliciousEventDao) {
