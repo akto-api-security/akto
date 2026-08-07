@@ -27,8 +27,11 @@ import values from "@/util/values";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import PersistStore from "@/apps/main/PersistStore";
 import LocalStore from "@/apps/main/LocalStorageStore";
+import SessionStore from "@/apps/main/SessionStore";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
 import { isEndpointSecurityCategory } from "@/apps/main/labelHelper";
+import guardrailsApi from "@/apps/dashboard/pages/guardrails/api";
+import { buildApprovedByPolicy, isServerApproved } from "@/apps/dashboard/pages/guardrails/utils";
 
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "@/apps/dashboard/pages/observe/api_collections/endpointShieldHelper";
 import { formatDisplayName } from "@/apps/dashboard/pages/observe/agentic/mcpClientHelper";
@@ -349,6 +352,10 @@ function transformEvent(event, collectionsMap, usernameMap) {
         agenticAssetTag: skillOrToolName ? (typeLabel === "Skill" ? "skill" : typeLabel === "Tool" ? "tool" : agenticAssetTag) : agenticAssetTag,
         action,
         policyName: meta.policy_name || meta.npolicy_name || event.filterId || "-",
+        // filterId is the policy identity used for server-approval; behaviour flags the
+        // "Needs Approval" (human-approval) violations. Both mirror the Guardrail Activity table.
+        filterId: event.filterId || null,
+        behaviour: rawBehaviour ? String(rawBehaviour).toLowerCase() : null,
         _status: event.status || "ACTIVE",
         payload: event.payload || null,
         metadata: event.metadata || null,
@@ -359,7 +366,7 @@ function transformEvent(event, collectionsMap, usernameMap) {
 
 // ─── Dashboard summary section ───────────────────────────────────────────────────
 
-function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, latencyData, startTimestamp, endTimestamp }) {
+function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, needsApprovalCount = 0, needsApprovalEnabled = false, latencyData, startTimestamp, endTimestamp }) {
     if (summaryLoading) return <SpinnerCentered />;
     if (!summaryData) return null;
 
@@ -375,7 +382,10 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
     const otherBreakdown = [
         { label: "Under Review", count: statusCounts.UNDER_REVIEW || 0, color: STATUS_COLORS.UNDER_REVIEW || "#F5A623", key: "UNDER_REVIEW" },
         { label: "Ignored",      count: statusCounts.IGNORED || 0,      color: STATUS_COLORS.IGNORED, key: "IGNORED" },
-    ];
+        // Needs Approval (Endpoint/Atlas only) — pending human-approval violations.
+        ...(needsApprovalEnabled ? [{ label: "Needs Approval", count: needsApprovalCount, color: "#9C6ADE", key: "NEEDS_APPROVAL" }] : []),
+    ].sort((a, b) => b.count - a.count);
+    const otherTotal = otherBreakdown.reduce((sum, b) => sum + b.count, 0);
 
     const policyRows = topPolicies.map((item, i) => ({
         id: `p${i}`,
@@ -427,8 +437,8 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
         >
             <AgenticStatsCard
                 title="Other Violations"
-                titleTooltip="Violations that are under review or ignored. Click a status to filter the table."
-                total={(statusCounts.UNDER_REVIEW || 0) + (statusCounts.IGNORED || 0)}
+                titleTooltip="Violations that are under review, ignored, or awaiting approval. Click a status to filter the table."
+                total={otherTotal}
                 delta={0}
                 deltaColor="subdued"
                 breakdown={otherBreakdown}
@@ -568,6 +578,14 @@ function Violations() {
     const collectionsMap = PersistStore((state) => state.collectionsMap);
     const usernameMapRef = useRef({});
 
+    // ─── Needs Approval (Endpoint/Atlas only, mirrors Guardrail Activity) ─────
+    // A client-side view over ACTIVE events filtered to human-approval behaviour that
+    // aren't yet approved. approvedByPolicy comes from the guardrail policies' approved servers.
+    const needsApprovalEnabled = isEndpointSecurityCategory();
+    const guardrailApprovedByPolicy = SessionStore((state) => state.guardrailApprovedByPolicy);
+    const setGuardrailApprovedByPolicy = SessionStore((state) => state.setGuardrailApprovedByPolicy);
+    const [needsApprovalRows, setNeedsApprovalRows] = useState([]);
+
     useEffect(() => {
         const key = gridFilterKey.current;
         const oldKey = window.location.pathname + "/ag-grid";
@@ -605,6 +623,30 @@ function Violations() {
             usernameMapRef.current = map;
         });
     }, []);
+
+    // ─── Needs Approval: approved-servers map, then the pending-approval events ──
+    const refreshApprovedServers = useCallback(() => {
+        if (!needsApprovalEnabled) return;
+        guardrailsApi.fetchGuardrailPolicies()
+            .then(res => setGuardrailApprovedByPolicy(buildApprovedByPolicy(res?.guardrailPolicies)))
+            .catch(() => {});
+    }, [needsApprovalEnabled, setGuardrailApprovedByPolicy]);
+
+    useEffect(() => { refreshApprovedServers(); }, [refreshApprovedServers]);
+
+    useEffect(() => {
+        if (!needsApprovalEnabled) { setNeedsApprovalRows([]); return; }
+        // Fetch ACTIVE events (bounded, like Guardrail Activity) and keep only unapproved
+        // human-approval violations. This is a client-side view — no server pagination.
+        threatDetectionApi.fetchSuspectSampleData(
+            0, [], [], [], [], { detectedAt: -1 }, startTimestamp, endTimestamp, [], 200, "ACTIVE",
+        ).then(result => {
+            const pending = (result?.maliciousEvents || [])
+                .map(e => transformEvent(e, collectionsMap, usernameMapRef.current))
+                .filter(r => r.behaviour === "approval" && !isServerApproved(guardrailApprovedByPolicy, r.filterId, r.deviceId));
+            setNeedsApprovalRows(pending);
+        }).catch(() => setNeedsApprovalRows([]));
+    }, [needsApprovalEnabled, startTimestamp, endTimestamp, collectionsMap, guardrailApprovedByPolicy]);
 
     // ─── Fetch filter values from backend ────────────────────────────────────
     useEffect(() => {
@@ -831,6 +873,13 @@ function Violations() {
     // AgGridTable's onServerFetch mode handles pagination, sort, and search automatically.
     const onServerFetch = useCallback(({ filters, sortKey, sortOrder, skip, limit, searchString }) => {
         const pageSize = limit || 50;
+        // Needs Approval is a client-side view over the pre-fetched pending-approval rows.
+        if (activeStatusValue === "NEEDS_APPROVAL") {
+            const start = skip || 0;
+            const page = needsApprovalRows.slice(start, start + pageSize);
+            setRows(page);
+            return Promise.resolve({ value: page, total: needsApprovalRows.length });
+        }
         const severityFilter = filters?.severity || [];
         const hostFilter = filters?.user || [];
         const policyFilter = filters?.policyName || [];
@@ -867,7 +916,12 @@ function Violations() {
             setRows(transformed);
             return { value: transformed, total: result?.total || 0 };
         });
-    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue]);
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, needsApprovalRows]);
+
+    // Reload the grid when the pending-approval set changes while viewing it.
+    useEffect(() => {
+        if (activeStatusValue === "NEEDS_APPROVAL") gridRef.current?.api?.refreshServerSide({ purge: true });
+    }, [needsApprovalRows, activeStatusValue]);
 
     // ─── Bulk actions ──────────────────────────────────────────────────────────
     // Under Server-Side Row Model, "select all" tracks selection as an abstract
@@ -951,9 +1005,11 @@ function Violations() {
 
     const tableHeading = selectedCard === "open"
         ? "All Open Violations"
-        : activeStatusValue === "IGNORED"
-            ? "All Ignored Violations"
-            : "All Under Review Violations";
+        : activeStatusValue === "NEEDS_APPROVAL"
+            ? "All Needs Approval Violations"
+            : activeStatusValue === "IGNORED"
+                ? "All Ignored Violations"
+                : "All Under Review Violations";
 
     const tableComponent = (
         <Box key="table" className="violations-table-wrap">
@@ -1026,6 +1082,8 @@ function Violations() {
             onOtherCardClick={handleOtherCardClick}
             onOtherBreakdownClick={handleOtherBreakdownClick}
             activeStatusValue={activeStatusValue}
+            needsApprovalCount={needsApprovalRows.length}
+            needsApprovalEnabled={needsApprovalEnabled}
             latencyData={latencyData}
             startTimestamp={startTimestamp}
             endTimestamp={endTimestamp}
@@ -1036,6 +1094,7 @@ function Violations() {
             violation={selectedViolation}
             show={selectedViolation !== null}
             onClose={() => setSelectedViolation(null)}
+            onApproved={() => { refreshApprovedServers(); setSelectedViolation(null); }}
         />,
         <Modal
             key="delete-confirm"
