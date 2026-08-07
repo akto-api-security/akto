@@ -35,12 +35,23 @@ func TestHTTPSinkEmit(t *testing.T) {
 	err := sink.Emit(context.Background(), Batch{
 		AccountID: 42,
 		AuthToken: "jwt-token",
-		Events: []model.OtelIngestEvent{{
-			AccountID:  42,
-			Source:     "claude_code",
-			EventName:  "claude_code.user_prompt",
-			Attributes: map[string]string{"service.name": "cowork", "prompt.id": "p1"},
-		}},
+		Events: []model.OtelIngestEvent{
+			{
+				AccountID:  42,
+				Source:     "claude_code",
+				EventName:  "claude_code.user_prompt",
+				Attributes: map[string]string{"service.name": "cowork", "prompt.id": "http-sink-test"},
+			},
+			{
+				// Completes the turn in this same export so it is emitted immediately —
+				// a lone user_prompt is now held pending until its api_request arrives
+				// (see TestMergePromptTurnEventsAcrossBatches).
+				AccountID:  42,
+				Source:     "claude_code",
+				EventName:  "claude_code.api_request",
+				Attributes: map[string]string{"service.name": "cowork", "prompt.id": "http-sink-test", "model": "claude-sonnet-4-6"},
+			},
+		},
 	})
 	if err != nil {
 		t.Fatal(err)

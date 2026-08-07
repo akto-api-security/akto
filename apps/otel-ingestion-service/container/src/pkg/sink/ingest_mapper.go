@@ -101,20 +101,34 @@ func skipsPromptMerge(hookName string) bool {
 	}
 }
 
+// promptTurn accumulates the pieces of a single Cowork prompt (same prompt.id) as its
+// user_prompt / api_request / assistant_response events arrive, possibly across more
+// than one OTLP export — see pendingTurnCache in pending_turns.go.
+type promptTurn struct {
+	base          model.OtelIngestEvent
+	prompt        string
+	response      string
+	model         string
+	inputTokens   int
+	outputTokens  int
+	hasUserPrompt bool
+}
+
+// isComplete reports whether the turn has an LLM result (model, response text, or token
+// counts) worth merging into the eventual /v1/messages row.
+func (t *promptTurn) isComplete() bool {
+	return t.model != "" || t.response != "" || t.inputTokens > 0 || t.outputTokens > 0
+}
+
 // mergePromptTurnEvents collapses user_prompt + api_request + assistant_response for the
 // same prompt.id into one /v1/messages ingest row. Internal hook/api_request telemetry
 // must not become inventory endpoints or pollute LLM Observability sessions.
+//
+// Cowork can flush user_prompt and api_request in separate OTLP exports for long-running
+// (async) turns, so a turn that only has a prompt so far is held in pendingTurns instead
+// of being emitted immediately — otherwise the prompt row would ship without a model, and
+// the api_request would become a second, unlinked row.
 func mergePromptTurnEvents(events []model.OtelIngestEvent) []model.OtelIngestEvent {
-	type promptTurn struct {
-		base          model.OtelIngestEvent
-		prompt        string
-		response      string
-		model         string
-		inputTokens   int
-		outputTokens  int
-		hasUserPrompt bool
-	}
-
 	byPrompt := make(map[string]*promptTurn)
 	var out []model.OtelIngestEvent
 
@@ -138,7 +152,13 @@ func mergePromptTurnEvents(events []model.OtelIngestEvent) []model.OtelIngestEve
 
 		turn := byPrompt[promptID]
 		if turn == nil {
-			turn = &promptTurn{base: e}
+			// Resume a turn left over from an earlier export (e.g. a bare user_prompt
+			// still waiting for its api_request) before starting a fresh one.
+			if resumed := pendingTurns.get(promptID); resumed != nil {
+				turn = resumed
+			} else {
+				turn = &promptTurn{base: e}
+			}
 			byPrompt[promptID] = turn
 		}
 
@@ -180,46 +200,66 @@ func mergePromptTurnEvents(events []model.OtelIngestEvent) []model.OtelIngestEve
 	}
 
 	for promptID, turn := range byPrompt {
-		attrs := make(map[string]string, len(turn.base.Attributes)+8)
-		for k, v := range turn.base.Attributes {
-			attrs[k] = v
+		switch {
+		case turn.isComplete():
+			// Model/response/tokens are in — emit the single merged row now.
+			out = append(out, buildMergedPromptEvent(promptID, turn))
+		case turn.hasUserPrompt:
+			// Prompt only so far; hold it for a later export instead of shipping a
+			// model-less row (the common Cowork async case — see mergePromptTurnEvents).
+			pendingTurns.put(promptID, turn)
+		default:
+			// Neither a prompt nor an LLM result — nothing worth keeping or emitting.
 		}
-		attrs["prompt.id"] = promptID
-		if turn.prompt != "" {
-			attrs["prompt"] = turn.prompt
-		}
-		if turn.response != "" {
-			attrs["response"] = turn.response
-		}
-		if turn.model != "" {
-			attrs["model"] = turn.model
-		}
-		if turn.inputTokens > 0 {
-			attrs["input_tokens"] = strconv.Itoa(turn.inputTokens)
-		}
-		if turn.outputTokens > 0 {
-			attrs["output_tokens"] = strconv.Itoa(turn.outputTokens)
-		}
+	}
 
-		eventName := "claude_code.user_prompt"
-		if turn.response != "" || turn.model != "" || turn.inputTokens > 0 || turn.outputTokens > 0 {
-			eventName = "claude_code.assistant_response"
-		} else if !turn.hasUserPrompt {
-			continue
-		}
-
-		out = append(out, model.OtelIngestEvent{
-			AccountID:     turn.base.AccountID,
-			Source:        turn.base.Source,
-			SignalType:    turn.base.SignalType,
-			EventName:     eventName,
-			Timestamp:     turn.base.Timestamp,
-			CorrelationID: turn.base.CorrelationID,
-			Attributes:    attrs,
-		})
+	// Turns that never got completed (api_request never arrived) still ship as
+	// prompt-only rows once their TTL passes, so a prompt is never silently dropped.
+	for promptID, turn := range pendingTurns.takeExpired() {
+		out = append(out, buildMergedPromptEvent(promptID, turn))
 	}
 
 	return out
+}
+
+// buildMergedPromptEvent turns an accumulated promptTurn into the single OTLP event that
+// eventToIngestRecord will map to one /v1/messages ingest row.
+func buildMergedPromptEvent(promptID string, turn *promptTurn) model.OtelIngestEvent {
+	attrs := make(map[string]string, len(turn.base.Attributes)+8)
+	for k, v := range turn.base.Attributes {
+		attrs[k] = v
+	}
+	attrs["prompt.id"] = promptID
+	if turn.prompt != "" {
+		attrs["prompt"] = turn.prompt
+	}
+	if turn.response != "" {
+		attrs["response"] = turn.response
+	}
+	if turn.model != "" {
+		attrs["model"] = turn.model
+	}
+	if turn.inputTokens > 0 {
+		attrs["input_tokens"] = strconv.Itoa(turn.inputTokens)
+	}
+	if turn.outputTokens > 0 {
+		attrs["output_tokens"] = strconv.Itoa(turn.outputTokens)
+	}
+
+	eventName := "claude_code.user_prompt"
+	if turn.isComplete() {
+		eventName = "claude_code.assistant_response"
+	}
+
+	return model.OtelIngestEvent{
+		AccountID:     turn.base.AccountID,
+		Source:        turn.base.Source,
+		SignalType:    turn.base.SignalType,
+		EventName:     eventName,
+		Timestamp:     turn.base.Timestamp,
+		CorrelationID: turn.base.CorrelationID,
+		Attributes:    attrs,
+	}
 }
 
 func eventToIngestRecord(e model.OtelIngestEvent) (ingestDataRecord, error) {
