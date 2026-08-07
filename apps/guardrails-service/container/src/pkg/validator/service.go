@@ -633,12 +633,19 @@ func (s *Service) getLoginUserEmailType(reqHeaders map[string]string) string {
 	s.collectionTagsCache.mu.RLock()
 	tags, ok := s.collectionTagsCache.byHostName[host]
 	cacheSize := len(s.collectionTagsCache.byHostName)
+	// DIAGNOSTIC: collect every hostName currently in the cache so we can see
+	// whether the request host matches any stored collection (mismatch => "").
+	cacheKeys := make([]string, 0, cacheSize)
+	for k := range s.collectionTagsCache.byHostName {
+		cacheKeys = append(cacheKeys, k)
+	}
 	s.collectionTagsCache.mu.RUnlock()
 
 	s.logger.Info("getLoginUserEmailType - cache lookup",
 		zap.String("host", host),
 		zap.Bool("found", ok),
 		zap.Int("cacheSize", cacheSize),
+		zap.Strings("cacheHostNames", cacheKeys),
 		zap.Any("tags", tags))
 
 	if !ok {
@@ -711,6 +718,17 @@ func (s *Service) resolvePersonalAccountBlock(policies []types.Policy, tag strin
 	if !ok {
 		return "", false
 	}
+
+	// DIAGNOSTIC: dump everything we use to resolve the account type so we can see
+	// why an endpoint/CLI personal account is (or is not) being blocked.
+	s.logger.Info("resolvePersonalAccountBlock - inputs",
+		zap.String("path", path),
+		zap.String("sessionID", sessionID),
+		zap.String("policyName", policyName),
+		zap.String("rawTag", tag),
+		zap.Bool("isBrowserExtension", mcp.IsBrowserExtensionRequest(tag)),
+		zap.String("hostFromHeaders", extractHostHeader(reqHeaders)),
+		zap.Any("reqHeaders", reqHeaders))
 
 	var accountType, accountTypeSource string
 	// Resolve the account type from the source appropriate to the request origin:
@@ -1121,9 +1139,10 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		return nil, nil, nil, false, nil, nil, nil, err
 	}
 
-	s.logger.Debug("Raw guardrail policies response",
-		zap.Int("size", len(rawGuardrailPolicies)),
-		zap.String("raw", string(rawGuardrailPolicies)))
+	// Commented out: logs the entire raw policies response, which is very large.
+	// s.logger.Debug("Raw guardrail policies response",
+	// 	zap.Int("size", len(rawGuardrailPolicies)),
+	// 	zap.String("raw", string(rawGuardrailPolicies)))
 
 	// Parse the wrapper object containing guardrailPolicies array
 	var response struct {
