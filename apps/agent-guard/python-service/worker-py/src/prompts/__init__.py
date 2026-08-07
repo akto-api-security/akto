@@ -17,7 +17,7 @@ def build_scan_prompt(
     if scanner_name == "BanTopics":
         return ban_topics.build(config, provider_name, text)
     if scanner_name == "Toxicity":
-        return toxicity.build(text)
+        return toxicity.build(config, text)
     if scanner_name == "Gibberish":
         return gibberish.build(text)
     if scanner_name == "BanCode":
