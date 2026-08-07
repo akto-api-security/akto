@@ -49,7 +49,7 @@ public class CrowdStrikeIntegrationAction extends UserAction {
 
     private static final String JOB_TYPE = "CROWDSTRIKE_AH";
     private static final String JOB_SUB_TYPE = "FALCON_DISCOVER";
-    private static final int DEFAULT_INTERVAL = 3600;
+    private static final int DEFAULT_INTERVAL = 14400;
     private static final int CONNECT_TIMEOUT_MS = 30_000;
     private static final int SOCKET_TIMEOUT_MS  = 60_000;
     private static final long GUARDRAIL_RTR_MAX_WAIT_MS = 60_000;
@@ -69,6 +69,10 @@ public class CrowdStrikeIntegrationAction extends UserAction {
     private List<String> guardrailDeviceIds;
     private List<Map<String, Object>> guardrailTypes;
     private Map<String, Object> guardrailExecution;
+
+    // Discovery job targeting fields
+    private String discoveryTargetMode;
+    private List<String> discoveryDeviceIds;
 
     // In-memory dedup for script uploads within one request
     private static final Set<String> uploadedGuardrailScripts = ConcurrentHashMap.newKeySet();
@@ -139,7 +143,34 @@ public class CrowdStrikeIntegrationAction extends UserAction {
         );
         CrowdStrikeIntegrationDao.instance.updateOne(new BasicDBObject(), updates);
 
-        // Create or update AccountJob
+        loggerMaker.info("CrowdStrike integration saved successfully", LogDb.DASHBOARD);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Schedules (or reschedules) the CrowdStrike discovery AccountJob, scoped to the selected
+     * devices. This is the explicit trigger for discovery — saving credentials no longer does this.
+     */
+    public String scheduleCrowdStrikeDiscovery() {
+        CrowdStrikeIntegration integration = CrowdStrikeIntegrationDao.instance.findOne(new BasicDBObject());
+        if (integration == null) {
+            addActionError("CrowdStrike integration not configured.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        String targetMode = ("select".equals(discoveryTargetMode)) ? "select" : "all";
+        List<String> deviceIds = "select".equals(targetMode) && discoveryDeviceIds != null
+            ? discoveryDeviceIds : new ArrayList<>();
+
+        if ("select".equals(targetMode) && deviceIds.isEmpty()) {
+            addActionError("Please select at least one device.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        int now = Context.now();
+        int interval = integration.getRecurringIntervalSeconds() > 0
+            ? integration.getRecurringIntervalSeconds() : DEFAULT_INTERVAL;
+
         AccountJob existingJob = AccountJobDao.instance.findOne(
             Filters.and(
                 Filters.eq(AccountJob.JOB_TYPE, JOB_TYPE),
@@ -149,10 +180,12 @@ public class CrowdStrikeIntegrationAction extends UserAction {
 
         if (existingJob == null) {
             Map<String, Object> jobConfig = new HashMap<>();
-            jobConfig.put(CrowdStrikeIntegration.CLIENT_ID, clientId);
-            jobConfig.put(CrowdStrikeIntegration.CLIENT_SECRET, resolvedClientSecret);
-            jobConfig.put(CrowdStrikeIntegration.BASE_URL, resolvedBaseUrl);
-            jobConfig.put(CrowdStrikeIntegration.DATA_INGESTION_URL, normalizedIngestUrl);
+            jobConfig.put(CrowdStrikeIntegration.CLIENT_ID, integration.getClientId());
+            jobConfig.put(CrowdStrikeIntegration.CLIENT_SECRET, integration.getClientSecret());
+            jobConfig.put(CrowdStrikeIntegration.BASE_URL, integration.getBaseUrl());
+            jobConfig.put(CrowdStrikeIntegration.DATA_INGESTION_URL, integration.getDataIngestionUrl());
+            jobConfig.put("targetMode", targetMode);
+            jobConfig.put("deviceIds", deviceIds);
 
             AccountJob accountJob = new AccountJob(
                 Context.accountId.get(), JOB_TYPE, JOB_SUB_TYPE,
@@ -165,23 +198,24 @@ public class CrowdStrikeIntegrationAction extends UserAction {
             accountJob.setStartedAt(0);
             accountJob.setFinishedAt(0);
             AccountJobDao.instance.insertOne(accountJob);
-            loggerMaker.info("Created CrowdStrike account job", LogDb.DASHBOARD);
+            loggerMaker.info("Created CrowdStrike discovery account job", LogDb.DASHBOARD);
         } else {
             org.bson.conversions.Bson jobUpdates = Updates.combine(
-                Updates.set("config." + CrowdStrikeIntegration.CLIENT_ID, clientId),
-                Updates.set("config." + CrowdStrikeIntegration.CLIENT_SECRET, resolvedClientSecret),
-                Updates.set("config." + CrowdStrikeIntegration.BASE_URL, resolvedBaseUrl),
-                Updates.set("config." + CrowdStrikeIntegration.DATA_INGESTION_URL, normalizedIngestUrl),
+                Updates.set("config." + CrowdStrikeIntegration.CLIENT_ID, integration.getClientId()),
+                Updates.set("config." + CrowdStrikeIntegration.CLIENT_SECRET, integration.getClientSecret()),
+                Updates.set("config." + CrowdStrikeIntegration.BASE_URL, integration.getBaseUrl()),
+                Updates.set("config." + CrowdStrikeIntegration.DATA_INGESTION_URL, integration.getDataIngestionUrl()),
+                Updates.set("config.targetMode", targetMode),
+                Updates.set("config.deviceIds", deviceIds),
                 Updates.set(AccountJob.RECURRING_INTERVAL_SECONDS, interval),
                 Updates.set(AccountJob.LAST_UPDATED_AT, now),
                 Updates.set(AccountJob.JOB_STATUS, JobStatus.SCHEDULED.name()),
                 Updates.set(AccountJob.SCHEDULED_AT, now)
             );
             AccountJobDao.instance.updateOneNoUpsert(Filters.eq(AccountJob.ID, existingJob.getId()), jobUpdates);
-            loggerMaker.info("Updated CrowdStrike account job", LogDb.DASHBOARD);
+            loggerMaker.info("Updated CrowdStrike discovery account job", LogDb.DASHBOARD);
         }
 
-        loggerMaker.info("CrowdStrike integration saved successfully", LogDb.DASHBOARD);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -291,6 +325,7 @@ public class CrowdStrikeIntegrationAction extends UserAction {
                             device.put("platform", node.path("platform_name").asText(""));
                             device.put("osVersion", node.path("os_version").asText(""));
                             device.put("lastSeen", node.path("last_seen").asText(""));
+                            device.put("username", node.path("last_login_user").asText(""));
                             result.add(device);
                         }
                     }
