@@ -106,6 +106,12 @@ function AgentSkillsCellRenderer({ data }) {
         : <Text variant="bodySm" color="subdued">-</Text>;
 }
 
+function AgentTotalComponentsCellRenderer({ value }) {
+    return value
+        ? <Text variant="bodySm" fontWeight="medium">{value}</Text>
+        : <Text variant="bodySm" color="subdued">-</Text>;
+}
+
 function ViolSeverityCellRenderer({ data }) {
     if (!data) return null;
     return <SeverityBadge severity={data.severity} />;
@@ -122,7 +128,7 @@ function ViolTitleCellRenderer({ data }) {
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
-function buildAgentsColDefs(agentRiskData) {
+function buildAgentsColDefs(agentRiskData, totalComponentsData) {
     return [
     { field: "endpoint", headerName: "Agentic Asset", flex: 1, minWidth: 160, cellRenderer: AgentNameCellRenderer, cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL" })[p.data?.type] || "", cellStyle: { display: "flex", alignItems: "center" } },
     {
@@ -151,6 +157,16 @@ function buildAgentsColDefs(agentRiskData) {
         },
     },
     { field: "skillCount", headerName: "Skills", width: 80, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: AgentSkillsCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
+    {
+        field: "totalComponents", headerName: "Total Components", width: 150,
+        suppressHeaderMenuButton: true, suppressHeaderFilterButton: true,
+        cellRenderer: AgentTotalComponentsCellRenderer,
+        cellStyle: { display: "flex", alignItems: "center" },
+        valueGetter: (p) => {
+            if (!p.data) return null;
+            return totalComponentsData[p.data.path?.join("/")] ?? null;
+        },
+    },
 ];
 }
 
@@ -234,8 +250,8 @@ function TopologyGraph({ device, agents, collections = [], agentTools = {} }) {
         const es = [];
 
         if (hasAgents) {
-            // Build col3 items for all agents, tagged with agentIdx
-            const col3Items = aiAgents.flatMap((a, ai) => buildAgentCol3Items(a, collections, ai, agentTools[ai] || []));
+            // agentTools is keyed by agent path, shared with AgenticsTab's Total Components column.
+            const col3Items = aiAgents.flatMap((a, ai) => buildAgentCol3Items(a, collections, ai, agentTools[a.path?.join("/")] || []));
             const maxRows = Math.max(aiAgents.length, col3Items.length, 1);
             const totalH  = maxRows * NODE_H;
             const devY    = (totalH - 44) / 2;
@@ -346,36 +362,8 @@ function UserAnalysisSection({ username, startTimestamp, endTimestamp }) {
 
 const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 
-function OverviewTab({ device, agents, collections, onTabChange, startTimestamp, endTimestamp }) {
-    const [agentTools, setAgentTools] = useState({});
-
+function OverviewTab({ device, agents, collections, onTabChange, startTimestamp, endTimestamp, agentTools = {} }) {
     const aiAgents = useMemo(() => agents.filter(a => a.type === "AI Agent"), [agents]);
-
-    useEffect(() => {
-        if (!aiAgents.length) { setAgentTools({}); return; }
-        let cancelled = false;
-        (async () => {
-            try {
-                const entries = await Promise.all(aiAgents.map(async (agent, idx) => {
-                    const ids = agent.collectionIds || [];
-                    if (!ids.length) return [idx, []];
-                    const bundles = await Promise.all(ids.map(id => agenticObserveApi.fetchAgentBuiltinToolsData(id)));
-                    const seen = new Set();
-                    const tools = [];
-                    bundles.flat().forEach((tool) => {
-                        if (!tool?.name || seen.has(tool.name)) return;
-                        seen.add(tool.name);
-                        tools.push(tool);
-                    });
-                    return [idx, tools];
-                }));
-                if (!cancelled) setAgentTools(Object.fromEntries(entries));
-            } catch {
-                if (!cancelled) setAgentTools({});
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [aiAgents]);
 
     const inlineToolCount = useMemo(
         () => Object.values(agentTools).reduce((n, tools) => n + (tools?.length || 0), 0),
@@ -500,8 +488,38 @@ function isAgentNavigable(data) {
     return !!data.type; // all typed assets are navigable
 }
 
-function AgenticsTab({ agents, onAgentClick, agentRiskData = {} }) {
-    const agentsColDefs = useMemo(() => buildAgentsColDefs(agentRiskData), [agentRiskData]);
+// Distinct MCP/LLM services + skills for an agent — unlike buildAgentCol3Items, skips its synthetic "inline LLM" node.
+function countRealAgentComponents(agent, collections) {
+    const agentIdSet = new Set((agent.collectionIds || []).map(Number));
+    const deviceId = agent.path?.[0];
+    const agentServiceKey = agent.rawServiceName?.toLowerCase();
+    const linkedServices = new Set();
+    collections.forEach((c) => {
+        if (!agentIdSet.has(Number(c.id))) return;
+        const hostName = c.hostName || c.displayName || c.name;
+        if (!hostName) return;
+        if (extractEndpointId(hostName) !== deviceId) return;
+        const svc = extractServiceName(hostName);
+        if (!svc || svc.toLowerCase() === agentServiceKey) return;
+        linkedServices.add(svc);
+    });
+    return linkedServices.size + (agent.skillCount || 0);
+}
+
+function AgenticsTab({ agents, onAgentClick, agentRiskData = {}, collections = [], agentTools = {} }) {
+    // Total components = MCP/LLM services + skills + builtin tools; only meaningful for AI Agent rows.
+    const totalComponentsData = useMemo(() => {
+        const map = {};
+        agents.forEach((a) => {
+            if (a.type === "AI Agent") {
+                const path = a.path?.join("/");
+                map[path] = countRealAgentComponents(a, collections) + (agentTools[path]?.length || 0);
+            }
+        });
+        return map;
+    }, [agents, collections, agentTools]);
+
+    const agentsColDefs = useMemo(() => buildAgentsColDefs(agentRiskData, totalComponentsData), [agentRiskData, totalComponentsData]);
 
     const handleRowClick = useCallback((e) => {
         if (!e.data) return;
@@ -629,6 +647,35 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
         deviceId: device?.path?.[0],
     }), [device]);
 
+    // Builtin tools per AI Agent, keyed by agent path — fetched once here, shared by both tabs.
+    const [agentTools, setAgentTools] = useState({});
+    useEffect(() => {
+        const aiAgents = (agents || []).filter(a => a.type === "AI Agent");
+        if (!aiAgents.length) { setAgentTools({}); return; }
+        let cancelled = false;
+        (async () => {
+            try {
+                const entries = await Promise.all(aiAgents.map(async (agent) => {
+                    const ids = agent.collectionIds || [];
+                    if (!ids.length) return [agent.path?.join("/"), []];
+                    const bundles = await Promise.all(ids.map(id => agenticObserveApi.fetchAgentBuiltinToolsData(id)));
+                    const seen = new Set();
+                    const tools = [];
+                    bundles.flat().forEach((tool) => {
+                        if (!tool?.name || seen.has(tool.name)) return;
+                        seen.add(tool.name);
+                        tools.push(tool);
+                    });
+                    return [agent.path?.join("/"), tools];
+                }));
+                if (!cancelled) setAgentTools(Object.fromEntries(entries));
+            } catch {
+                if (!cancelled) setAgentTools({});
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [agents]);
+
     const tabs = useMemo(() => {
         if (!device) return [];
         const totalV = (device.violations?.critical || 0) + (device.violations?.high || 0) + (device.violations?.medium || 0) + (device.violations?.low || 0);
@@ -667,8 +714,8 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
             }
         >
             <Box padding="2" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-                {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} collections={collections} onTabChange={setSelectedTab} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
-                {selectedTab === 1 && <AgenticsTab agents={agents || []} onAgentClick={onAgentClick} agentRiskData={agentRiskData} />}
+                {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} collections={collections} onTabChange={setSelectedTab} startTimestamp={startTimestamp} endTimestamp={endTimestamp} agentTools={agentTools} />}
+                {selectedTab === 1 && <AgenticsTab agents={agents || []} onAgentClick={onAgentClick} agentRiskData={agentRiskData} collections={collections} agentTools={agentTools} />}
                 {selectedTab === 2 && <ViolationsTab hostNames={deviceHostNames} deviceId={device?.path?.[0] || device?.deviceId} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
             </Box>
         </AgenticFlyoutShell>
