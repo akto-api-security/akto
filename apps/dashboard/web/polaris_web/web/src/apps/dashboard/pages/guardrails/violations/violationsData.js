@@ -91,6 +91,17 @@ export function normalizeReasonPunctuation(reason) {
     return reason.slice(idx + 2);
 }
 
+// Splits evidence ("sandbox.enabled:false") into { field, value } so value can be located in the file.
+export function parseConfigEvidence(evidence) {
+    const raw = evidence ? String(evidence) : "";
+    const separator = raw.lastIndexOf(":");
+    if (separator < 0) return { field: "", value: "" };
+    return {
+        field: raw.slice(0, separator).split(".").pop().trim(),
+        value: raw.slice(separator + 1).trim().replace(/^"|"$/g, ""),
+    };
+}
+
 function _extractGuardrailReason(resp, req) {
     const respReason = resp?.error?.data?.reason || resp?.error?.message || resp?.message || resp?.reason;
     if (respReason) {
@@ -110,6 +121,7 @@ export function buildFallbackDetail(row) {
     let chatSession = null;
     let fileContent = null;
     let fileTabLabel = null;
+    let fileHighlights = null;
     let guardrailReason = null;
     let skillName = null;
 
@@ -149,11 +161,11 @@ export function buildFallbackDetail(row) {
                     }));
                 }
             } else if (row.type === "Config") {
-                // Show the actual config file content (config_content), pretty-printed —
-                // not the whole diagnostic wrapper (path/field/evidence/title/message) around it.
                 const { text: prettyConfig } = prettyPrintIfJson(req?.config_content);
                 fileContent = prettyConfig || req?.config_content || (req ? JSON.stringify(req, null, 2) : outer.requestPayload);
                 fileTabLabel = "Config.json";
+                const { field, value } = parseConfigEvidence(req?.evidence);
+                if (field && value) fileHighlights = [{ field, phrase: value }];
             } else if (row.type === "Skill" || row.type === "Tool") {
                 if (row.type === "Skill") skillName = req?.skill_name || null;
                 if (req?.skill_name || req?.skill_description) {
@@ -264,6 +276,7 @@ export function buildFallbackDetail(row) {
         chatSession: chatSession || undefined,
         fileContent: fileContent || undefined,
         fileTabLabel: fileTabLabel || undefined,
+        fileHighlights: fileHighlights || undefined,
         skillName: skillName || undefined,
         overview: row.type === "Config" ? (metaOverview || undefined) : undefined,
         remediation: metaRemediation || undefined,
