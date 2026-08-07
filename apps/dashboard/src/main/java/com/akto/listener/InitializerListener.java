@@ -189,6 +189,7 @@ public class InitializerListener implements ServletContextListener {
     private static Map<String, String> piiFileMap;
     Crons crons = new Crons();
     TestingAlertsCron testingAlertsCron = new TestingAlertsCron();
+    CollectionDescriptionCron collectionDescriptionCron = new CollectionDescriptionCron();
 
     public static String getDomain() {
         if (domain == null) {
@@ -2562,6 +2563,7 @@ public class InitializerListener implements ServletContextListener {
                         setUpDependencyFlowScheduler();
                         tokenGeneratorCron.tokenGeneratorScheduler();
                         crons.deleteTestRunsScheduler();
+                        collectionDescriptionCron.setUpCollectionDescriptionCronScheduler();
                         setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
 
