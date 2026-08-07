@@ -2549,6 +2549,7 @@ public class InitializerListener implements ServletContextListener {
                 if (runJobFunctions > 0 || runJobFunctionsAnyway) {
 
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
+                    collectionDescriptionCron.setUpCollectionDescriptionCronScheduler();
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
                         crons.insertHistoricalDataJob();
@@ -2563,7 +2564,6 @@ public class InitializerListener implements ServletContextListener {
                         setUpDependencyFlowScheduler();
                         tokenGeneratorCron.tokenGeneratorScheduler();
                         crons.deleteTestRunsScheduler();
-                        collectionDescriptionCron.setUpCollectionDescriptionCronScheduler();
                         setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
 
