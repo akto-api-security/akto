@@ -713,18 +713,16 @@ func (s *Service) resolvePersonalAccountBlock(policies []types.Policy, tag strin
 	}
 
 	var accountType, accountTypeSource string
-	// Browser-extension requests carry the account-type tag on the request itself
-	// (the extension host is usually absent from the collection cache), so read it
-	// straight from the request tag when present.
+	// Resolve the account type from the source appropriate to the request origin:
+	//   - Browser-extension requests carry the account-type tag on the request itself
+	//     (the extension host is absent from the collection cache), so read it from
+	//     the request tag.
+	//   - Everything else (endpoint / CLI / MCP, source=ENDPOINT, e.g. codex) resolves
+	//     from the collection-tag cache, where the login-user-email-type tag lives.
 	if mcp.IsBrowserExtensionRequest(tag) {
-		if at := accountTypeFromRequestTag(tag); at != "" {
-			accountType = at
-			accountTypeSource = "requestTag"
-		}
-	}
-	// Fall back to the collection-tag lookup (existing behaviour) when the request
-	// tag did not supply an account type.
-	if accountType == "" {
+		accountType = accountTypeFromRequestTag(tag)
+		accountTypeSource = "requestTag"
+	} else {
 		s.refreshCollectionTagsIfNeeded()
 		accountType = s.getLoginUserEmailType(reqHeaders)
 		accountTypeSource = "collection"
