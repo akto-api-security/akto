@@ -5,6 +5,15 @@ import { deviceServiceKey } from "./constants";
 
 export { deviceServiceKey };
 
+// Collapses concurrent calls for the same key into one request; no TTL, so nothing ever goes stale.
+const inflightRequests = new Map();
+function dedupeInflight(key, fn) {
+    if (!inflightRequests.has(key)) {
+        inflightRequests.set(key, fn().finally(() => inflightRequests.delete(key)));
+    }
+    return inflightRequests.get(key);
+}
+
 function extractRuleViolated(metadata) {
     if (!metadata) return "-";
     try {
@@ -202,21 +211,23 @@ const agenticObserveApi = {
 
     async fetchCollectionStiBundle(apiCollectionId) {
         const id = typeof apiCollectionId === "string" ? parseInt(apiCollectionId, 10) : apiCollectionId;
-        const [stiResp, apiResp, auditRows] = await Promise.all([
-            observeApi.fetchApisFromStis(id),
-            observeApi.fetchApiInfosForCollection(id),
-            observeApi.fetchMcpAuditInfoByCollection(id),
-        ]);
-        const stiEndpoints = (stiResp?.list || []).map((x) => ({
-            method: x?._id?.method,
-            url: x?._id?.url,
-        }));
-        return {
-            id,
-            stiEndpoints,
-            apiInfoList: apiResp?.apiInfoList || [],
-            auditRows: auditRows || [],
-        };
+        return dedupeInflight(`sti-bundle:${id}`, async () => {
+            const [stiResp, apiResp, auditRows] = await Promise.all([
+                observeApi.fetchApisFromStis(id),
+                observeApi.fetchApiInfosForCollection(id),
+                observeApi.fetchMcpAuditInfoByCollection(id),
+            ]);
+            const stiEndpoints = (stiResp?.list || []).map((x) => ({
+                method: x?._id?.method,
+                url: x?._id?.url,
+            }));
+            return {
+                id,
+                stiEndpoints,
+                apiInfoList: apiResp?.apiInfoList || [],
+                auditRows: auditRows || [],
+            };
+        });
     },
 
     // Tools/resources/prompts sourced from the collection's STI endpoints (for real url+method, used
@@ -235,17 +246,19 @@ const agenticObserveApi = {
 
     async fetchSkillsFlyoutData(apiCollectionId, collection = null) {
         const id = typeof apiCollectionId === "string" ? parseInt(apiCollectionId, 10) : apiCollectionId;
-        let coll = collection;
-        const [apiResp, stiResp] = await Promise.all([
-            observeApi.fetchApiInfosForCollection(id),
-            observeApi.fetchApisFromStis(id),
-        ]);
-        if (!coll) {
-            const resp = await observeApi.getAllCollectionsBasic();
-            coll = (resp?.apiCollections || []).find((c) => c.id === id);
-        }
-        const stiEndpoints = (stiResp?.list || []).map((x) => ({ method: x?._id?.method, url: x?._id?.url }));
-        return buildSkillsFlyoutData(coll, apiResp?.apiInfoList || [], stiEndpoints, id);
+        return dedupeInflight(`skills-flyout:${id}:${collection ? "withColl" : "noColl"}`, async () => {
+            let coll = collection;
+            const [apiResp, stiResp] = await Promise.all([
+                observeApi.fetchApiInfosForCollection(id),
+                observeApi.fetchApisFromStis(id),
+            ]);
+            if (!coll) {
+                const resp = await observeApi.getAllCollectionsBasic();
+                coll = (resp?.apiCollections || []).find((c) => c.id === id);
+            }
+            const stiEndpoints = (stiResp?.list || []).map((x) => ({ method: x?._id?.method, url: x?._id?.url }));
+            return buildSkillsFlyoutData(coll, apiResp?.apiInfoList || [], stiEndpoints, id);
+        });
     },
 
 };
