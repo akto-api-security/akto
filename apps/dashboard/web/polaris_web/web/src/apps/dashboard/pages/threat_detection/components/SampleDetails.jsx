@@ -1,6 +1,8 @@
 import { Badge, Box, Button, ChoiceList, Divider, HorizontalStack, Modal, Text, TextField, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
+import SampleData from "../../../components/shared/SampleData";
+import { EvidenceBlock } from "@/apps/dashboard/pages/guardrails/violations/ViolationFlyoutSections";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import func from "@/util/func";
 import { useEffect, useState } from "react";
@@ -26,27 +28,48 @@ import OwaspTag from "../../guardrails/components/OwaspTag";
 import ComplianceTags from "../../guardrails/components/ComplianceTags";
 import { parseConfigEvidence } from "../../guardrails/violations/violationsData";
 
-// Unwraps a JSON config_content (TOML stays a string) and builds the highlight segment for it.
-function buildConfigScanSample(orig) {
+// For config-scan events: pull evidence/message/config_content out of the sample's raw orig.
+// requestPayload is normally valid JSON (repaired server-side if PII redaction corrupted it);
+// the regex fallback below only matters for older, unrepaired data. Returns null for non-config samples.
+function _configFromOrig(orig, ruleViolated) {
+    if (typeof orig !== "string") return null;
+    let outer; try { outer = JSON.parse(orig); } catch (e) { return null; }
+    const rp = outer && outer.requestPayload;
+    if (typeof rp !== "string" || rp.indexOf('"config_content"') === -1) return null;
+
+    let wrapper;
     try {
-        const outer = JSON.parse(orig);
-        const req = JSON.parse(outer.requestPayload);
-
-        if (typeof req?.config_content === "string") {
-            try { req.config_content = JSON.parse(req.config_content); } catch (e) { /* TOML, not JSON */ }
-        }
-        outer.requestPayload = JSON.stringify(req);
-
-        const { field, value } = parseConfigEvidence(req?.evidence);
-        return {
-            message: JSON.stringify(outer),
-            vulnerabilitySegments: field && value
-                ? [{ phrase: value, field, location: "REQUEST", includeKeyInHighlight: true }]
-                : undefined,
-        };
+        wrapper = JSON.parse(rp);
     } catch (e) {
-        return { message: orig, vulnerabilitySegments: undefined };
+        const grab = (key) => {
+            const m = rp.match(new RegExp('"' + key + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"'));
+            if (!m) return null;
+            try { return JSON.parse('"' + m[1] + '"'); } catch (e2) { return m[1]; }
+        };
+        const ccMatch = rp.match(/"config_content"\s*:\s*"([\s\S]*)"\s*}\s*$/);
+        let cc = null;
+        if (ccMatch) { try { cc = JSON.parse('"' + ccMatch[1] + '"'); } catch (e2) { cc = ccMatch[1]; } }
+        wrapper = { evidence: grab("evidence"), message: grab("message"), config_content: cc };
     }
+
+    const evidence = wrapper.evidence != null ? String(wrapper.evidence) : null;
+    const message = wrapper.message != null ? String(wrapper.message) : null;
+    const cc = wrapper.config_content;
+
+    let configContent;
+    if (cc != null && typeof cc === "object") configContent = JSON.stringify(cc, null, 2);
+    else { configContent = String(cc == null ? "" : cc); try { configContent = JSON.stringify(JSON.parse(configContent), null, 2); } catch (e) { } }
+
+    // The flagged field's leaf key, its value, and the 1-based line where the field appears
+    // in configContent (JSON "key" or TOML key =), for the label + highlight.
+    const { field, value } = parseConfigEvidence(evidence, ruleViolated);
+    let fieldLine = 0;
+    if (field) {
+        const re = new RegExp('(^|[^A-Za-z0-9_])' + field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^A-Za-z0-9_]|$)');
+        const idx = configContent.split("\n").findIndex(l => re.test(l));
+        fieldLine = idx === -1 ? 0 : idx + 1;
+    }
+    return { evidence, message, configContent, field, value, fieldLine };
 }
 
 // Self-contained approve button + modal. Kept as its own component so typing the duration
@@ -415,10 +438,51 @@ function SampleDetails(props) {
         component: <ActivityTracker latestActivity={latestActivity} />
     }
 
+    const configValues = data.length > 0 ? _configFromOrig(data[0]?.orig, moreInfoData?.ruleViolated) : null;
+
     const ValuesTab = data.length > 0 && {
         id: 'values',
         content: "Values",
-        component: (
+        component: configValues ? (
+            <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
+                <VerticalStack gap="4">
+                    <Box padding="4" background="bg-critical-subdued" borderRadius="2">
+                        <VerticalStack gap="3">
+                            <EvidenceBlock evidence={{ title: "Guardrail Violation", text: configValues.evidence || configValues.message, mono: true }} />
+                            {configValues.message && configValues.evidence && (
+                                <Text variant="bodyMd">
+                                    {`Triggered by the "${moreInfoData?.templateId || "guardrail"}" policy. ${configValues.message}`}
+                                </Text>
+                            )}
+                        </VerticalStack>
+                    </Box>
+                    <VerticalStack gap="2">
+                        <HorizontalStack gap="2" blockAlign="center">
+                            <Text variant="headingSm">Config content</Text>
+                            {configValues.fieldLine > 0 && (
+                                <Badge status="critical" size="small">{`Line ${configValues.fieldLine}`}</Badge>
+                            )}
+                        </HorizontalStack>
+                        <SampleData
+                            data={{
+                                message: configValues.configContent,
+                                vulnerabilitySegments: configValues.value
+                                    ? [configValues.field
+                                        ? { field: configValues.field, phrase: configValues.value, includeKeyInHighlight: true }
+                                        : { phrase: configValues.value }]
+                                    : [],
+                            }}
+                            editorLanguage="json"
+                            minHeight="300px"
+                            useDynamicHeight
+                            currLine={configValues.fieldLine || undefined}
+                            readOnly
+                            wordWrap
+                        />
+                    </VerticalStack>
+                </VerticalStack>
+            </Box>
+        ) : (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
                 <SampleDataList
                     key={`Sample values-${eventId || 'default'}`}
@@ -427,10 +491,7 @@ function SampleDetails(props) {
                     vertical={true}
                     isWebSocket={func.isWebSocketApiType(moreInfoData?.apiType)}
                     sampleData={data && Array.isArray(data) && data.length > 0 ? data.map((result) => {
-                        const { message, vulnerabilitySegments } = isSettingsRisk
-                            ? buildConfigScanSample(result.orig)
-                            : { message: result.orig, vulnerabilitySegments: undefined };
-                        return { message, highlightPaths: [], metadata: result.metadata, vulnerabilitySegments }
+                        return { message: result.orig, highlightPaths: [], metadata: result.metadata }
                     }) : []}
                     redactHeaders={window.ACTIVE_ACCOUNT === 1758787662 ? ['authorization'] : []}
                 />
