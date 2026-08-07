@@ -59,7 +59,19 @@ function _configFromOrig(orig) {
     let configContent;
     if (cc != null && typeof cc === "object") configContent = JSON.stringify(cc, null, 2);
     else { configContent = String(cc == null ? "" : cc); try { configContent = JSON.stringify(JSON.parse(configContent), null, 2); } catch (e) { } }
-    return { evidence, message, configContent };
+
+    // The flagged field's leaf key (e.g. sandbox_workspace_write.writable_roots[1] -> writable_roots)
+    // and the 1-based line where it appears in configContent (JSON "key" or TOML key =), for the
+    // label + highlight. Evidence is "<fieldPath>:<value>", so the key is everything before the 1st colon.
+    const keyPath = (evidence != null ? String(evidence) : "").split(":")[0].replace(/\[\d+\]/g, "").replace(/"/g, "").trim();
+    const field = keyPath ? keyPath.split(".").pop() : null;
+    let fieldLine = 0;
+    if (field) {
+        const re = new RegExp('(^|[^A-Za-z0-9_])' + field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^A-Za-z0-9_]|$)');
+        const idx = configContent.split("\n").findIndex(l => re.test(l));
+        fieldLine = idx === -1 ? 0 : idx + 1;
+    }
+    return { evidence, message, configContent, field, fieldLine };
 }
 
 // Self-contained approve button + modal. Kept as its own component so typing the duration
@@ -447,12 +459,18 @@ function SampleDetails(props) {
                         </VerticalStack>
                     </Box>
                     <VerticalStack gap="2">
-                        <Text variant="headingSm">Config content</Text>
+                        <HorizontalStack gap="2" blockAlign="center">
+                            <Text variant="headingSm">Config content</Text>
+                            {configValues.fieldLine > 0 && (
+                                <Badge status="critical" size="small">{`Line ${configValues.fieldLine}`}</Badge>
+                            )}
+                        </HorizontalStack>
                         <SampleData
-                            data={{ message: configValues.configContent }}
+                            data={{ message: configValues.configContent, vulnerabilitySegments: configValues.field ? [{ phrase: configValues.field }] : [] }}
                             editorLanguage="json"
                             minHeight="300px"
                             useDynamicHeight
+                            currLine={configValues.fieldLine || undefined}
                             readOnly
                             wordWrap
                         />
