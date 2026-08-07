@@ -91,15 +91,33 @@ export function normalizeReasonPunctuation(reason) {
     return reason.slice(idx + 2);
 }
 
-// Splits evidence ("sandbox.enabled:false") into { field, value } so value can be located in the file.
-export function parseConfigEvidence(evidence) {
-    const raw = evidence ? String(evidence) : "";
-    const separator = raw.lastIndexOf(":");
-    if (separator < 0) return { field: "", value: "" };
-    return {
-        field: raw.slice(0, separator).split(".").pop().trim(),
-        value: raw.slice(separator + 1).trim().replace(/^"|"$/g, ""),
-    };
+// Strips a leading "key": or key: prefix and returns { key, rest }, or null if the text
+// doesn't start with one (e.g. it's just a bare value like "Bash(gh api *)").
+function stripLeadingKey(text) {
+    const m = text.match(/^"?([\w.[\]*]+)"?\s*:\s*([\s\S]*)$/);
+    if (!m) return null;
+    return { key: m[1], rest: m[2].trim() };
+}
+
+export function parseConfigEvidence(evidence, ruleViolated) {
+    let rest = evidence ? String(evidence).trim() : "";
+    let field = "";
+
+    const first = stripLeadingKey(rest);
+    if (first) {
+        field = first.key;
+        rest = first.rest;
+        const second = stripLeadingKey(rest);
+        if (second) rest = second.rest;
+    }
+
+    const value = rest.replace(/^"|"$/g, "");
+    field = field.replace(/\[\d+\]/g, "").split(".").pop().trim();
+
+    if (ruleViolated && ruleViolated !== "-") {
+        return { field: String(ruleViolated).replace(/\[\d+\]/g, "").split(".").pop().trim(), value };
+    }
+    return { field, value };
 }
 
 function _extractGuardrailReason(resp, req) {
@@ -164,8 +182,8 @@ export function buildFallbackDetail(row) {
                 const { text: prettyConfig } = prettyPrintIfJson(req?.config_content);
                 fileContent = prettyConfig || req?.config_content || (req ? JSON.stringify(req, null, 2) : outer.requestPayload);
                 fileTabLabel = "Config.json";
-                const { field, value } = parseConfigEvidence(req?.evidence);
-                if (field && value) fileHighlights = [{ field, phrase: value }];
+                const { field, value } = parseConfigEvidence(req?.evidence, row.violation);
+                if (value) fileHighlights = [field ? { field, phrase: value } : { phrase: value }];
             } else if (row.type === "Skill" || row.type === "Tool") {
                 if (row.type === "Skill") skillName = req?.skill_name || null;
                 if (req?.skill_name || req?.skill_description) {

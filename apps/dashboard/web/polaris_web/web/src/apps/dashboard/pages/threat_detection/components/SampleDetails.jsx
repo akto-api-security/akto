@@ -28,74 +28,48 @@ import OwaspTag from "../../guardrails/components/OwaspTag";
 import ComplianceTags from "../../guardrails/components/ComplianceTags";
 import { parseConfigEvidence } from "../../guardrails/violations/violationsData";
 
-// Unwraps a JSON config_content (TOML stays a string) and builds the highlight segment for it.
-function buildConfigScanSample(orig) {
-    try {
-        const outer = JSON.parse(orig);
-        const req = JSON.parse(outer.requestPayload);
-
-        if (typeof req?.config_content === "string") {
-            try { req.config_content = JSON.parse(req.config_content); } catch (e) { /* TOML, not JSON */ }
-        }
-        outer.requestPayload = JSON.stringify(req);
-
-        const { field, value } = parseConfigEvidence(req?.evidence);
-        return {
-            message: JSON.stringify(outer),
-            vulnerabilitySegments: field && value
-                ? [{ phrase: value, field, location: "REQUEST", includeKeyInHighlight: true }]
-                : undefined,
-        };
-    } catch (e) {
-        return { message: orig, vulnerabilitySegments: undefined };
-    }
-}
-
 // For config-scan events: pull evidence/message/config_content out of the sample's raw orig.
-// config_content may be an object or a (JSON-escaped) string, and redaction can corrupt the JSON,
-// so parse leniently. Returns null for non-config samples.
-function _configFromOrig(orig) {
+// requestPayload is normally valid JSON (repaired server-side if PII redaction corrupted it);
+// the regex fallback below only matters for older, unrepaired data. Returns null for non-config samples.
+function _configFromOrig(orig, ruleViolated) {
     if (typeof orig !== "string") return null;
     let outer; try { outer = JSON.parse(orig); } catch (e) { return null; }
     const rp = outer && outer.requestPayload;
     if (typeof rp !== "string" || rp.indexOf('"config_content"') === -1) return null;
 
-    let evidence = null, message = null, cc = null, wrapper = null;
-    try { wrapper = JSON.parse(rp); } catch (e) { wrapper = null; }
-    if (wrapper && typeof wrapper === "object") {
-        evidence = wrapper.evidence != null ? String(wrapper.evidence) : null;
-        message = wrapper.message != null ? String(wrapper.message) : null;
-        cc = wrapper.config_content;
-    } else {
-        const decode = (s) => {
-            try { return JSON.parse('"' + s + '"'); } catch (e) { }
-            return String(s).replace(/\\(u[0-9a-fA-F]{4}|.)/g, (_m, g) => g[0] === "u" ? String.fromCharCode(parseInt(g.slice(1), 16)) : ({ n: "\n", r: "\r", t: "\t", '"': '"', "\\": "\\", "/": "/" }[g] || g));
+    let wrapper;
+    try {
+        wrapper = JSON.parse(rp);
+    } catch (e) {
+        const grab = (key) => {
+            const m = rp.match(new RegExp('"' + key + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"'));
+            if (!m) return null;
+            try { return JSON.parse('"' + m[1] + '"'); } catch (e2) { return m[1]; }
         };
-        const grab = (key) => { const m = rp.match(new RegExp('"' + key + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"')); return m ? decode(m[1]) : null; };
-        evidence = grab("evidence");
-        message = grab("message");
-        const i = rp.indexOf('"config_content"');
-        let rest = rp.slice(i + '"config_content"'.length).replace(/^\s*:\s*/, "");
-        if (rest[0] === '"') { rest = rest.slice(1).replace(/"\s*\}\s*$/, "").replace(/"\s*$/, ""); cc = decode(rest); }
-        else { cc = rest.replace(/\s*\}\s*$/, ""); }
+        const ccMatch = rp.match(/"config_content"\s*:\s*"([\s\S]*)"\s*}\s*$/);
+        let cc = null;
+        if (ccMatch) { try { cc = JSON.parse('"' + ccMatch[1] + '"'); } catch (e2) { cc = ccMatch[1]; } }
+        wrapper = { evidence: grab("evidence"), message: grab("message"), config_content: cc };
     }
+
+    const evidence = wrapper.evidence != null ? String(wrapper.evidence) : null;
+    const message = wrapper.message != null ? String(wrapper.message) : null;
+    const cc = wrapper.config_content;
 
     let configContent;
     if (cc != null && typeof cc === "object") configContent = JSON.stringify(cc, null, 2);
     else { configContent = String(cc == null ? "" : cc); try { configContent = JSON.stringify(JSON.parse(configContent), null, 2); } catch (e) { } }
 
-    // The flagged field's leaf key (e.g. sandbox_workspace_write.writable_roots[1] -> writable_roots)
-    // and the 1-based line where it appears in configContent (JSON "key" or TOML key =), for the
-    // label + highlight. Evidence is "<fieldPath>:<value>", so the key is everything before the 1st colon.
-    const keyPath = (evidence != null ? String(evidence) : "").split(":")[0].replace(/\[\d+\]/g, "").replace(/"/g, "").trim();
-    const field = keyPath ? keyPath.split(".").pop() : null;
+    // The flagged field's leaf key, its value, and the 1-based line where the field appears
+    // in configContent (JSON "key" or TOML key =), for the label + highlight.
+    const { field, value } = parseConfigEvidence(evidence, ruleViolated);
     let fieldLine = 0;
     if (field) {
         const re = new RegExp('(^|[^A-Za-z0-9_])' + field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^A-Za-z0-9_]|$)');
         const idx = configContent.split("\n").findIndex(l => re.test(l));
         fieldLine = idx === -1 ? 0 : idx + 1;
     }
-    return { evidence, message, configContent, field, fieldLine };
+    return { evidence, message, configContent, field, value, fieldLine };
 }
 
 // Self-contained approve button + modal. Kept as its own component so typing the duration
@@ -464,7 +438,7 @@ function SampleDetails(props) {
         component: <ActivityTracker latestActivity={latestActivity} />
     }
 
-    const configValues = data.length > 0 ? _configFromOrig(data[0]?.orig) : null;
+    const configValues = data.length > 0 ? _configFromOrig(data[0]?.orig, moreInfoData?.ruleViolated) : null;
 
     const ValuesTab = data.length > 0 && {
         id: 'values',
@@ -490,7 +464,14 @@ function SampleDetails(props) {
                             )}
                         </HorizontalStack>
                         <SampleData
-                            data={{ message: configValues.configContent, vulnerabilitySegments: configValues.field ? [{ phrase: configValues.field }] : [] }}
+                            data={{
+                                message: configValues.configContent,
+                                vulnerabilitySegments: configValues.value
+                                    ? [configValues.field
+                                        ? { field: configValues.field, phrase: configValues.value, includeKeyInHighlight: true }
+                                        : { phrase: configValues.value }]
+                                    : [],
+                            }}
                             editorLanguage="json"
                             minHeight="300px"
                             useDynamicHeight
@@ -510,10 +491,7 @@ function SampleDetails(props) {
                     vertical={true}
                     isWebSocket={func.isWebSocketApiType(moreInfoData?.apiType)}
                     sampleData={data && Array.isArray(data) && data.length > 0 ? data.map((result) => {
-                        const { message, vulnerabilitySegments } = isSettingsRisk
-                            ? buildConfigScanSample(result.orig)
-                            : { message: result.orig, vulnerabilitySegments: undefined };
-                        return { message, highlightPaths: [], metadata: result.metadata, vulnerabilitySegments }
+                        return { message: result.orig, highlightPaths: [], metadata: result.metadata }
                     }) : []}
                     redactHeaders={window.ACTIVE_ACCOUNT === 1758787662 ? ['authorization'] : []}
                 />
