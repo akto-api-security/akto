@@ -308,11 +308,27 @@ function deriveAgenticType(url, method) {
     return METHOD_TO_TYPE[m] || "Prompt";
 }
 
+// Classify a violation by its POLICY name. This is the grouping used by the "Violations by Type"
+// pie, and the table's Type column uses it too so the two stay consistent (a policy like
+// "llm-test" is LLM in both). Distinct from deriveAgenticType, which classifies by request shape.
+function classifyPolicyType(name) {
+    const lower = (name || "").toLowerCase();
+    if (lower.includes("prompt") || lower.includes("injection"))       return "Prompt";
+    if (lower.includes("skill") || lower.includes("malicious_skill"))  return "Skill";
+    if (lower.includes("config") || lower.includes("setting"))         return "Config";
+    if (lower.includes("tool") || lower.includes("mcp"))               return "Tool";
+    if (lower.includes("llm"))                                         return "LLM";
+    return "Other";
+}
+
 // Transform a single backend event into a table row.
 // Kept lightweight — runs only on the current page of results (not all data).
 function transformEvent(event, collectionsMap, usernameMap) {
     const meta = parseMetadata(event.metadata);
+    // typeLabel (request-shape) still drives evidence/asset-tag logic below;
+    // the Type column itself uses the policy classification so it matches the pie.
     const typeLabel = deriveAgenticType(event.url, event.method);
+    const policyName = meta.policy_name || meta.npolicy_name || event.filterId || "-";
 
     const { req: reqPayload, resp: respPayload } = parseAktoPayload(event.payload);
     const rawBehaviour = respPayload?.error?.data?.behaviour || meta.behaviour || meta.nbehaviour || null;
@@ -338,7 +354,7 @@ function transformEvent(event, collectionsMap, usernameMap) {
         id: event.id,
         apiCollectionId: event.apiCollectionId,
         detected: event.timestamp,
-        type: typeLabel,
+        type: classifyPolicyType(policyName),
         violation: meta.rule_violated || meta.nrule_violated || meta.nruleViolated || event.subCategory || event.filterId || "-",
         severity: (event.severity || "HIGH").toUpperCase(),
         evidenceText: primaryValue || normalizeReasonPunctuation(meta.reason) || "-",
@@ -348,7 +364,7 @@ function transformEvent(event, collectionsMap, usernameMap) {
         agenticAssetRaw: rawAsset,
         agenticAssetTag: skillOrToolName ? (typeLabel === "Skill" ? "skill" : typeLabel === "Tool" ? "tool" : agenticAssetTag) : agenticAssetTag,
         action,
-        policyName: meta.policy_name || meta.npolicy_name || event.filterId || "-",
+        policyName,
         _status: event.status || "ACTIVE",
         payload: event.payload || null,
         metadata: event.metadata || null,
@@ -560,6 +576,10 @@ function Violations() {
     const [activeSeverityFilter, setActiveSeverityFilter] = useState(new Set());
     const [activePolicyFilter, setActivePolicyFilter] = useState(new Set());
     const [activeTypeFilter, setActiveTypeFilter] = useState(null);
+    // Type (pie) filter is driven straight into the server fetch instead of the policyName
+    // set-filter: the pie's subcategory names come from a different endpoint than the set
+    // filter's known values, so setColumnFilterModel would silently drop them.
+    const [activeTypeSubCategories, setActiveTypeSubCategories] = useState([]);
     const [selectedCard, setSelectedCard] = useState("open");          // "open" or "other"
     const [activeStatusValue, setActiveStatusValue] = useState("ACTIVE"); // drives backend statusFilter
     const gridRef = useRef(null);
@@ -670,12 +690,19 @@ function Violations() {
         const subCategories = mapping[typeName] || [];
         if (activeTypeFilter === typeName) {
             setActiveTypeFilter(null);
-            applyGridFilter("policyName", []);
+            setActiveTypeSubCategories([]);
         } else {
             setActiveTypeFilter(typeName);
-            applyGridFilter("policyName", subCategories);
+            setActiveTypeSubCategories(subCategories);
         }
-    }, [applyGridFilter, summaryData, activeTypeFilter]);
+    }, [summaryData, activeTypeFilter]);
+
+    // Re-fetch the server-side rows whenever the pie's type filter changes (skip the initial mount).
+    const typeFilterFirstRun = useRef(true);
+    useEffect(() => {
+        if (typeFilterFirstRun.current) { typeFilterFirstRun.current = false; return; }
+        gridRef.current?.api?.refreshServerSide({ purge: true });
+    }, [activeTypeSubCategories]);
 
     // ─── Card selection (Open vs Other) ─────────────────────────────────────
     const [tableKey, setTableKey] = useState(0);
@@ -755,13 +782,7 @@ function Violations() {
                 const byType = {};
                 const typeToSubCategories = {};
                 Object.entries(subcategoryMap).forEach(([name, count]) => {
-                    const lower = name.toLowerCase();
-                    let type = "Other";
-                    if (lower.includes("prompt") || lower.includes("injection")) type = "Prompt";
-                    else if (lower.includes("skill") || lower.includes("malicious_skill")) type = "Skill";
-                    else if (lower.includes("config") || lower.includes("setting")) type = "Config";
-                    else if (lower.includes("tool") || lower.includes("mcp")) type = "Tool";
-                    else if (lower.includes("llm")) type = "LLM";
+                    const type = classifyPolicyType(name);
 
                     if (!byType[type]) byType[type] = { text: 0, color: TYPE_COLORS[type] || "#999", filterKey: type };
                     byType[type].text += count;
@@ -833,7 +854,11 @@ function Violations() {
         const pageSize = limit || 50;
         const severityFilter = filters?.severity || [];
         const hostFilter = filters?.user || [];
-        const policyFilter = filters?.policyName || [];
+        const columnPolicyFilter = filters?.policyName || [];
+        // Union the column/top-policies filter with the pie's type filter (both map to latestAttack).
+        const policyFilter = activeTypeSubCategories.length > 0
+            ? [...new Set([...columnPolicyFilter, ...activeTypeSubCategories])]
+            : columnPolicyFilter;
         const statusFilter = activeStatusValue;
 
         // AgGridTable sends sortOrder: -1 for asc, 1 for desc (opposite of MongoDB convention)
@@ -867,7 +892,7 @@ function Violations() {
             setRows(transformed);
             return { value: transformed, total: result?.total || 0 };
         });
-    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue]);
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories]);
 
     // ─── Bulk actions ──────────────────────────────────────────────────────────
     // Under Server-Side Row Model, "select all" tracks selection as an abstract
