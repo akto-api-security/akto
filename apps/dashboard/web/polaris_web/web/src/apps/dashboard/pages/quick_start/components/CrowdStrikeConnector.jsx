@@ -147,9 +147,11 @@ function CrowdStrikeConnector() {
             .then((result) => {
                 const execution = result.guardrailExecution || {}
                 const s = execution.successCount || 0
+                const d = execution.dispatchedCount || 0
                 const f = execution.failCount || 0
                 const t = execution.totalCount || 0
-                func.setToast(true, false, `Guardrails executed: ${s}/${t} successful, ${f} failed`)
+                const dispatched = s + d
+                func.setToast(true, f > 0, `Guardrails: ${dispatched}/${t} dispatched${f > 0 ? `, ${f} failed` : ''}`)
             })
             .catch(() => func.setToast(true, true, 'Failed to save and execute guardrails'))
             .finally(() => setExecutingGuardrails(false))

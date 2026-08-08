@@ -534,34 +534,43 @@ public class CrowdStrikeIntegrationAction extends UserAction {
             }
 
             int totalSuccess = 0;
+            int totalDispatched = 0;
             int totalFail = 0;
 
             for (Map.Entry<String, String> entry : scriptBaseNames.entrySet()) {
                 String scriptBaseName = entry.getValue();
-                Map<String, Boolean> shResults = unixDeviceIds.isEmpty()
+                Map<String, GuardrailOutcome> shResults = unixDeviceIds.isEmpty()
                     ? new HashMap<>()
                     : batchAdminCommand(accessToken, resolvedBase, batchId, unixDeviceIds,
                         scriptBaseName + ".sh", inputParams);
-                Map<String, Boolean> ps1Results = windowsDeviceIds.isEmpty()
+                Map<String, GuardrailOutcome> ps1Results = windowsDeviceIds.isEmpty()
                     ? new HashMap<>()
                     : batchAdminCommand(accessToken, resolvedBase, batchId, windowsDeviceIds,
                         scriptBaseName + ".ps1", inputParams);
 
                 for (String deviceId : unixDeviceIds) {
-                    if (Boolean.TRUE.equals(shResults.get(deviceId))) totalSuccess++; else totalFail++;
+                    GuardrailOutcome outcome = shResults.get(deviceId);
+                    if (outcome == GuardrailOutcome.SUCCESS) totalSuccess++;
+                    else if (outcome == GuardrailOutcome.DISPATCHED) totalDispatched++;
+                    else totalFail++;
                 }
                 for (String deviceId : windowsDeviceIds) {
-                    if (Boolean.TRUE.equals(ps1Results.get(deviceId))) totalSuccess++; else totalFail++;
+                    GuardrailOutcome outcome = ps1Results.get(deviceId);
+                    if (outcome == GuardrailOutcome.SUCCESS) totalSuccess++;
+                    else if (outcome == GuardrailOutcome.DISPATCHED) totalDispatched++;
+                    else totalFail++;
                 }
             }
 
             String finalStatus = totalFail == 0 ? "completed" : "partial";
             guardrailExecution = new HashMap<>();
             guardrailExecution.put("successCount", totalSuccess);
+            guardrailExecution.put("dispatchedCount", totalDispatched);
             guardrailExecution.put("failCount", totalFail);
             guardrailExecution.put("totalCount", targetDeviceIds.size() * scriptBaseNames.size());
             guardrailExecution.put("status", finalStatus);
-            loggerMaker.info("CrowdStrike guardrails: " + totalSuccess + " success, " + totalFail + " failed", LogDb.DASHBOARD);
+            loggerMaker.info("CrowdStrike guardrails: " + totalSuccess + " confirmed, " + totalDispatched
+                + " dispatched (still installing), " + totalFail + " failed", LogDb.DASHBOARD);
             return Action.SUCCESS.toUpperCase();
 
         } catch (IOException e) {
@@ -601,18 +610,23 @@ public class CrowdStrikeIntegrationAction extends UserAction {
         }
     }
 
+  
+    private static final int RTR_READ_TIMEOUT_ERROR_CODE = 50401;
+
+    private enum GuardrailOutcome { SUCCESS, DISPATCHED, FAILED }
+
     /**
      * Dispatches a runscript command for the given script to every device in the batch,
      * in one API call — this is what lets a fleet-wide guardrail install stay inside a
      * single synchronous dashboard request instead of one RTR session per device.
-     * Returns a map of deviceId -> whether that device's command completed without error.
-     * Devices that are still incomplete in the initial response are polled via
-     * BatchGetCmdStatus until done or the timeout elapses.
+     * Returns a map of deviceId -> outcome: SUCCESS (confirmed complete, no stderr), DISPATCHED
+     * (command was accepted but we didn't wait for completion — e.g. hit the RTR read-timeout, or
+     * queued offline), or FAILED (a real error, or completed with stderr output).
      */
-    private Map<String, Boolean> batchAdminCommand(String accessToken, String baseUrl, String batchId,
+    private Map<String, GuardrailOutcome> batchAdminCommand(String accessToken, String baseUrl, String batchId,
             List<String> optionalHostIds,
             String scriptName, String inputParams) throws IOException {
-        Map<String, Boolean> results = new HashMap<>();
+        Map<String, GuardrailOutcome> results = new HashMap<>();
         RequestConfig cfg = buildRequestConfig();
 
         // CrowdStrike's RTR command parser rejects single-quoted args — use double quotes.
@@ -649,32 +663,43 @@ public class CrowdStrikeIntegrationAction extends UserAction {
                     JsonNode errors = deviceResult.path("errors");
                     boolean hasErrors = errors.isArray() && errors.size() > 0;
                     boolean complete = deviceResult.path("complete").asBoolean(false);
-                    if (hasErrors) {
+                    boolean isOnlyReadTimeout = hasErrors && errors.size() == 1
+                        && errors.get(0).path("code").asInt(0) == RTR_READ_TIMEOUT_ERROR_CODE;
+
+                    if (isOnlyReadTimeout) {
+                        loggerMaker.info("Guardrail " + scriptName + " on device " + deviceId
+                            + " dispatched — still running past the RTR read-timeout window", LogDb.DASHBOARD);
+                        results.put(deviceId, GuardrailOutcome.DISPATCHED);
+                    } else if (hasErrors) {
                         loggerMaker.error("Guardrail " + scriptName + " on device " + deviceId
                             + " error: " + errors.toString(), LogDb.DASHBOARD);
-                        results.put(deviceId, false);
+                        results.put(deviceId, GuardrailOutcome.FAILED);
                     } else if (complete) {
                         String stderr = deviceResult.path("stderr").asText("");
-                        results.put(deviceId, stderr.isEmpty());
+                        results.put(deviceId, stderr.isEmpty() ? GuardrailOutcome.SUCCESS : GuardrailOutcome.FAILED);
                         if (!stderr.isEmpty()) {
                             loggerMaker.error("Guardrail " + scriptName + " on device " + deviceId + " stderr=" + stderr, LogDb.DASHBOARD);
                         }
                     } else {
-                        // Not finished yet — poll for this specific device below.
+                        // Not finished yet (e.g. queued offline) — poll for this specific device below.
                         results.put(deviceId, null);
                     }
                 }
             }
         }
 
-        // Poll any devices still pending (e.g. queued offline, or slow to complete).
+        // Poll any devices still pending (e.g. queued offline) — but NOT devices that already hit
+        // the read-timeout above, since those were already dispatched successfully and a same-command
+        // retry would just restart the script from scratch on an already-running device.
         List<String> pendingDeviceIds = new ArrayList<>();
-        for (Map.Entry<String, Boolean> e : results.entrySet()) {
+        for (Map.Entry<String, GuardrailOutcome> e : results.entrySet()) {
             if (e.getValue() == null) pendingDeviceIds.add(e.getKey());
         }
         if (!pendingDeviceIds.isEmpty()) {
             Map<String, Boolean> polled = batchPollPendingDevices(accessToken, baseUrl, batchId, pendingDeviceIds, command);
-            results.putAll(polled);
+            for (Map.Entry<String, Boolean> e : polled.entrySet()) {
+                results.put(e.getKey(), Boolean.TRUE.equals(e.getValue()) ? GuardrailOutcome.SUCCESS : GuardrailOutcome.FAILED);
+            }
         }
 
         return results;

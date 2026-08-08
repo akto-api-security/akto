@@ -283,19 +283,21 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
     // are skipped — CrowdStrike queues the command and a later run collects them.
     //
     // Any device still incomplete after the initial dispatch (e.g. momentarily slow, not just offline)
-    // gets ONE retry, scoped via optional_hosts to just that subset. Confirmed empirically that a retry
-    // restarts the script from scratch rather than resuming — cheap and safe here because these are the
-    // fast scripts (apps/MCP config), which finish in seconds; skills uses a poll-the-task_id
-    // fallback instead of a blind retry, since a retry restarts the script from scratch and
-    // skills is slow enough that redoing it wastefully would be expensive (see runSkills).
+    // is recovered the same way skills recovers stragglers: its task_id (captured by
+    // dispatchBatchAdminCommand even on timeout) is polled via pollAdminCommandStatus instead of being
+    // retried blind. A blind retry would restart the script from scratch on the same slow device and
+    // likely time out again for the same reason; polling the in-flight task_id instead lets CrowdStrike
+    // finish the run it already started. Confirmed live: apps discovery (fixed, cheap path checks)
+    // reliably finishes inline, but MCP config discovery can blow the ~29.3s RTR ceiling on a device
+    // when its RTR session's working directory sits atop a large/deep folder tree (the project-level
+    // settings.json/settings.local.json scan in scan_mcp_configs.* has no size gate on that path).
     private void runScriptOnDevices(String accessToken, String baseUrl, String scriptId, String scriptName,
             List<String> deviceIds, Map<String, String> deviceNames, String description,
             String ingestUrl, int scanKind, AccountJob job) {
         if (deviceIds.isEmpty()) return;
 
-        // batch-admin-command returns each device's full stdout inline and synchronously, so a
-        // chunk's results are complete the moment the call returns — there is nothing to poll after.
-        Map<String, String> deviceToStdout = new HashMap<>();
+        Map<String, String> deviceToStdout = new java.util.concurrent.ConcurrentHashMap<>();
+        Map<String, String> pendingTaskIds = new HashMap<>();
         for (int i = 0; i < deviceIds.size(); i += RTR_BATCH_MAX_HOSTS) {
             List<String> chunk = deviceIds.subList(i, Math.min(i + RTR_BATCH_MAX_HOSTS, deviceIds.size()));
             String batchId = batchInitSessions(accessToken, baseUrl, chunk);
@@ -303,28 +305,44 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                 loggerMaker.error(description + ": could not init RTR batch session for " + chunk.size() + " device(s)", LogDb.DASHBOARD);
                 continue;
             }
-            Map<String, String> chunkResults = batchDispatchRunScript(accessToken, baseUrl, batchId, scriptName, description);
-            deviceToStdout.putAll(chunkResults);
+            DispatchResult chunkResult = batchDispatchRunScriptCapturingTaskId(accessToken, baseUrl, batchId, scriptName, description);
+            deviceToStdout.putAll(chunkResult.stdout);
+            pendingTaskIds.putAll(chunkResult.pendingTaskIds);
             if (job != null) {
                 try { CyborgApiClient.updateJobHeartbeat(job.getId()); } catch (Exception ignored) {}
             }
+        }
 
-            // Devices in this chunk that didn't come back with output at all (as opposed to
-            // being intentionally skipped because they're offline_queued) get one retry.
-            List<String> incomplete = chunk.stream()
-                .filter(id -> !chunkResults.containsKey(id))
-                .collect(Collectors.toList());
-            if (!incomplete.isEmpty()) {
-                loggerMaker.info(description + ": retrying " + incomplete.size() + " incomplete device(s) once", LogDb.DASHBOARD);
-                Map<String, String> retryResults = batchDispatchRunScript(accessToken, baseUrl, batchId, scriptName, description, incomplete);
-                deviceToStdout.putAll(retryResults);
-                int stillIncomplete = incomplete.size() - retryResults.size();
-                if (stillIncomplete > 0) {
-                    loggerMaker.error(description + ": " + stillIncomplete + " device(s) still incomplete after retry, dropped for this cycle", LogDb.DASHBOARD);
+        // Poll stragglers concurrently by their captured task_id — same recovery path skills uses.
+        if (!pendingTaskIds.isEmpty()) {
+            loggerMaker.info(description + ": " + pendingTaskIds.size() + " device(s) not done within initial window, polling task_id for result", LogDb.DASHBOARD);
+            ExecutorService pollPool = Executors.newFixedThreadPool(Math.min(SKILLS_DEVICE_CONCURRENCY, pendingTaskIds.size()));
+            try {
+                List<Future<?>> pollFutures = new ArrayList<>();
+                for (Map.Entry<String, String> entry : pendingTaskIds.entrySet()) {
+                    String deviceId = entry.getKey();
+                    String taskId = entry.getValue();
+                    String deviceName = deviceNames.getOrDefault(deviceId, deviceId);
+                    pollFutures.add(pollPool.submit(() -> {
+                        String stdout = pollAdminCommandStatus(accessToken, baseUrl, taskId, deviceName, job);
+                        if (stdout != null) deviceToStdout.put(deviceId, stdout);
+                    }));
                 }
-                if (job != null) {
-                    try { CyborgApiClient.updateJobHeartbeat(job.getId()); } catch (Exception ignored) {}
+                for (Future<?> f : pollFutures) {
+                    try { f.get(); } catch (Exception e) {
+                        loggerMaker.error(description + ": poll future error: " + e.getMessage(), LogDb.DASHBOARD);
+                    }
                 }
+            } finally {
+                pollPool.shutdown();
+            }
+            long recoveredCount = pendingTaskIds.keySet().stream().filter(deviceToStdout::containsKey).count();
+            long stillIncomplete = pendingTaskIds.size() - recoveredCount;
+            if (stillIncomplete > 0) {
+                loggerMaker.error(description + ": " + stillIncomplete + " device(s) still incomplete after poll, dropped for this cycle", LogDb.DASHBOARD);
+            }
+            if (job != null) {
+                try { CyborgApiClient.updateJobHeartbeat(job.getId()); } catch (Exception ignored) {}
             }
         }
 
