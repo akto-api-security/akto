@@ -87,24 +87,40 @@ function Get-GuardrailsUrl {
 }
 
 function Get-DeviceId {
+    $hostname = $env:COMPUTERNAME
+    if (-not $hostname) {
+        try { $hostname = [System.Net.Dns]::GetHostName() } catch {}
+    }
+    $deviceName = ""
+    if ($hostname) {
+        $deviceName = $hostname.ToLower() -replace '[^a-z0-9]', '-'
+    }
+
+    $machineId = ""
     try {
         $uuid = (Get-WmiObject -Class Win32_ComputerSystemProduct).UUID
-        if ($uuid) {
-            return $uuid.Replace("-", "").ToLower()
-        }
-    } catch {
-        # Fallback
+        if ($uuid) { $machineId = $uuid.Replace("-", "").ToLower() }
+    } catch {}
+
+    if (-not $machineId) {
+        try {
+            $machineGuid = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Cryptography" -Name MachineGuid -ErrorAction Stop).MachineGuid
+            if ($machineGuid) { $machineId = $machineGuid.Replace("-", "").ToLower() }
+        } catch {}
     }
 
-    try {
-        $machineGuid = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Cryptography" -Name MachineGuid).MachineGuid
-        if ($machineGuid) {
-            return $machineGuid
-        }
-    } catch {
-        # Fallback
+    if (-not $machineId) {
+        try {
+            $mac = (Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq "Up" } | Select-Object -First 1).MacAddress
+            if ($mac) { $machineId = $mac.Replace("-", "").Replace(":", "").ToLower() }
+        } catch {}
     }
 
+    $shortId = if ($machineId.Length -ge 8) { $machineId.Substring(0, 8) } else { $machineId }
+
+    if ($deviceName -and $shortId) { return "$deviceName-$shortId" }
+    if ($deviceName)               { return $deviceName }
+    if ($machineId)                { return $machineId }
     return "unknown-device-$(Get-Date -Format 'yyyyMMddHHmmss')"
 }
 

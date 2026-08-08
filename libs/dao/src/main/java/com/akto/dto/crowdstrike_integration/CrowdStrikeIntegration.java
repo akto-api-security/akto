@@ -23,7 +23,7 @@ public class CrowdStrikeIntegration {
     private String aktoApiToken;
 
     public static final String RECURRING_INTERVAL_SECONDS = "recurringIntervalSeconds";
-    private int recurringIntervalSeconds = 3600;
+    private int recurringIntervalSeconds = 21600;
 
     public static final String CREATED_TS = "createdTs";
     private int createdTs;
