@@ -7,7 +7,8 @@
 
 param(
     [string]$TargetUserHome = "",
-    [string]$AktoDataIngestionUrl = ""
+    [string]$AktoDataIngestionUrl = "",
+    [string]$AktoApiToken = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,15 +19,19 @@ foreach ($arg in $args) {
     switch -Wildcard ($arg) {
         "TARGET_USER_HOME=*" { $TargetUserHome = $arg -replace "TARGET_USER_HOME=", "" }
         "AKTO_DATA_INGESTION_URL=*" { $AktoDataIngestionUrl = $arg -replace "AKTO_DATA_INGESTION_URL=", "" }
+        "AKTO_API_TOKEN=*" { $AktoApiToken = $arg -replace "AKTO_API_TOKEN=", "" }
     }
 }
 
 if ($AktoDataIngestionUrl) {
-    # Strip KEY=VALUE prefix if caller passed the full env var line (e.g. "AKTO_DATA_INGESTION_URL=https://...")
     if ($AktoDataIngestionUrl -match "^[A-Z_]+=(.+)$") {
         $AktoDataIngestionUrl = $Matches[1].Trim()
     }
     $env:AKTO_DATA_INGESTION_URL = $AktoDataIngestionUrl
+}
+
+if ($AktoApiToken -and $AktoApiToken -match "^[A-Z_]+=(.+)$") {
+    $AktoApiToken = $Matches[1].Trim()
 }
 
 function Write-Log {
@@ -84,6 +89,26 @@ function Get-GuardrailsUrl {
     }
 
     return "https://1764882677-guardrails.akto.io"
+}
+
+function Get-ApiToken {
+    param(
+        [string]$ConfigFile,
+        [string]$EnvVar
+    )
+
+    if ($EnvVar) {
+        return $EnvVar
+    }
+
+    if (Test-Path $ConfigFile) {
+        $content = Get-Content $ConfigFile -Raw
+        if ($content -match 'AKTO_API_TOKEN=(.+)') {
+            return $Matches[1].Trim()
+        }
+    }
+
+    return ""
 }
 
 function Get-DeviceId {
@@ -158,6 +183,7 @@ function New-WrapperScript {
     param(
         [string]$HookType,
         [string]$IngestionUrl,
+        [string]$ApiToken,
         [string]$DeviceId,
         [string]$HooksDir
     )
@@ -171,14 +197,15 @@ function New-WrapperScript {
 
 `$env:MODE = "atlas"
 `$env:AKTO_DATA_INGESTION_URL = "$IngestionUrl"
+`$env:AKTO_API_TOKEN = "$ApiToken"
 `$env:AKTO_SYNC_MODE = "true"
 `$env:AKTO_TIMEOUT = "5"
 `$env:AKTO_CONNECTOR = "claude_code_cli"
 `$env:CONTEXT_SOURCE = "ENDPOINT"
 `$env:DEVICE_ID = "$DeviceId"
 
-Write-Host "[Claude Hook] Data Ingestion URL: `$env:AKTO_DATA_INGESTION_URL" -ForegroundColor Gray
-Write-Host "[Claude Hook] Device ID: `$env:DEVICE_ID" -ForegroundColor Gray
+Write-Output "[Claude Hook] Data Ingestion URL: `$env:AKTO_DATA_INGESTION_URL"
+Write-Output "[Claude Hook] Device ID: `$env:DEVICE_ID"
 
 & python "$pythonScript" `$args
 "@
@@ -270,6 +297,11 @@ function Install-ForUser {
         $GuardrailsUrl = "https://guardrails.akto.io"
     }
 
+    $ApiToken = Get-ApiToken -ConfigFile $ConfigFile -EnvVar $AktoApiToken
+    if (-not $ApiToken) {
+        Write-Log "Warning: AKTO_API_TOKEN not configured"
+    }
+
     $DeviceId = Get-DeviceId
     if (-not $DeviceId) {
         Write-Log "Warning: Could not generate device ID"
@@ -317,10 +349,10 @@ function Install-ForUser {
     Write-Log "Downloaded akto_machine_id.py"
 
     Write-Log "Creating wrapper scripts with environment variables..."
-    New-WrapperScript -HookType "prompt" -IngestionUrl $GuardrailsUrl -DeviceId $DeviceId -HooksDir $ClaudeHooksDir
+    New-WrapperScript -HookType "prompt" -IngestionUrl $GuardrailsUrl -ApiToken $ApiToken -DeviceId $DeviceId -HooksDir $ClaudeHooksDir
     Write-Log "Created akto-validate-prompt-wrapper.ps1"
 
-    New-WrapperScript -HookType "response" -IngestionUrl $GuardrailsUrl -DeviceId $DeviceId -HooksDir $ClaudeHooksDir
+    New-WrapperScript -HookType "response" -IngestionUrl $GuardrailsUrl -ApiToken $ApiToken -DeviceId $DeviceId -HooksDir $ClaudeHooksDir
     Write-Log "Created akto-validate-response-wrapper.ps1"
 
     Write-Log "Updating Claude CLI settings..."
