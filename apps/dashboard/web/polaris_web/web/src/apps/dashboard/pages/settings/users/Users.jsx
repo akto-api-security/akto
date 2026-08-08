@@ -63,7 +63,14 @@ const Users = () => {
     let rbacAccess = func.checkForRbacFeatureBasic();
     let rbacAccessAdvanced =  func.checkForRbacFeature()
 
-    const collectionsMap = PersistStore(state => state.collectionsMap)
+    // allCollections (unlike collectionsMap) retains deactivated collections, which are
+    // still genuinely accessible and so must stay both countable and visible in the picker
+    const storeCollections = PersistStore(state => state.allCollections)
+
+    const existingCollectionIds = useMemo(
+        () => new Set((storeCollections || []).map((c) => c.id)),
+        [storeCollections]
+    )
 
     const [selectedItems, setSelectedItems] = useState({})
 
@@ -241,12 +248,15 @@ const Users = () => {
             getTeamData();
         }
         getRoleHierarchy()
-
-        setAllCollections(Object.entries(collectionsMap).map(([id, collectionName]) => ({
-            id: parseInt(id, 10),
-            collectionName
-        })));
     }, [])
+
+    // collections load asynchronously, so this cannot be a mount-only effect
+    useEffect(() => {
+        setAllCollections((storeCollections || []).map((c) => ({
+            id: c.id,
+            collectionName: c.displayName ?? c.name
+        })));
+    }, [storeCollections])
 
     const getRoleDisplayName = (role) => {
         for(let section of rolesOptions) {
@@ -387,6 +397,14 @@ const Users = () => {
         return usersCollection[userId] || [];
     };
 
+    /*
+     * Stored ids can point at collections that were since deleted. Those can never render
+     * a row in the picker, so counting them makes the label disagree with the list.
+     */
+    const countAccessibleCollections = (userId) => {
+        return getUserApiCollectionIds(userId).filter((id) => existingCollectionIds.has(id)).length
+    };
+
     const handleRemoveInvitations = async (data) => {
         await settingRequests.removeInvitation(data.login)
         func.setToast(true, false, "Invitation removed successfully")
@@ -491,7 +509,7 @@ const Users = () => {
                                                 { (role === 'ADMIN' || userRole !== 'ADMIN' || !rbacAccessAdvanced) ? undefined :
                                                     <ResourceListModal
                                                         title={"Collection list"}
-                                                        activatorPlaceaholder={`${(usersCollection[id] || []).length} collections accessible`}
+                                                        activatorPlaceaholder={`${countAccessibleCollections(id)} collections accessible`}
                                                         isColoredActivator={true}
                                                         component={userCollectionsModalComp}
                                                         primaryAction={userCollectionsHandler}

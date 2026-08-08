@@ -1,5 +1,5 @@
 import { Box, HorizontalStack, LegacyCard, Page, ResourceItem, ResourceList, Text, Modal, TextField, VerticalStack, Checkbox } from "@shopify/polaris"
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import func from "@/util/func";
 import settingRequests from "../api";
 import ResourceListModal from "../../../components/shared/ResourceListModal";
@@ -54,7 +54,9 @@ const Roles = () => {
     const [tempRoles, setTempRoles] = useState([])
     const [allCollections, setAllCollections] = useState([])
     const [loading, setLoading] = useState(false)
-    const collectionsMap = PersistStore(state => state.collectionsMap)
+    // allCollections (unlike collectionsMap) retains deactivated collections, which are
+    // still genuinely accessible and so must stay both countable and visible in the picker
+    const storeCollections = PersistStore(state => state.allCollections)
     const [createNewRoleModalActive, setCreateNewRoleModalActive] = useState(false)
     const [allowedFeatures, setAllowedFeatures] = useState([])
 
@@ -90,16 +92,33 @@ const Roles = () => {
         if (userRole !== 'GUEST') {
             getRoleData();
         }
-        setAllCollections(Object.entries(collectionsMap).map(([id, collectionName]) => ({
-            id: parseInt(id, 10),
-            collectionName
-        })));
         getAllAllowedFeatures();
 
     }, [])
 
+    // collections load asynchronously, so this cannot be a mount-only effect
+    useEffect(() => {
+        setAllCollections((storeCollections || []).map((c) => ({
+            id: c.id,
+            collectionName: c.displayName ?? c.name
+        })));
+    }, [storeCollections])
+
+    const existingCollectionIds = useMemo(
+        () => new Set((storeCollections || []).map((c) => c.id)),
+        [storeCollections]
+    )
+
     const getRoleItems = (role, key) => {
         return roles.filter(r => r.name === role)[0][key] || []
+    };
+
+    /*
+     * Stored ids can point at collections that were since deleted. Those can never render
+     * a row in the picker, so counting them makes the label disagree with the list.
+     */
+    const countAccessibleCollections = (role) => {
+        return getRoleItems(role, "apiCollectionsId").filter((id) => existingCollectionIds.has(id)).length
     };
 
     const handleSelectedItemsChange = (role, items, key) => {
@@ -208,7 +227,7 @@ const Roles = () => {
                                 content: (
                                     <ResourceListModal
                                         title={`Update ${name} role`}
-                                        activatorPlaceaholder={`${(getRoleItems(name, "apiCollectionsId") || []).length} collections accessible, ${getRoleDisplayName(baseRole)} permissions${defaultInviteRole ? ', Default invite role' : ''}`}
+                                        activatorPlaceaholder={`${countAccessibleCollections(name)} collections accessible, ${getRoleDisplayName(baseRole)} permissions${defaultInviteRole ? ', Default invite role' : ''}`}
                                         isColoredActivator={true}
                                         component={<VerticalStack gap={4}>
                                             <Box paddingBlockStart={4}>
