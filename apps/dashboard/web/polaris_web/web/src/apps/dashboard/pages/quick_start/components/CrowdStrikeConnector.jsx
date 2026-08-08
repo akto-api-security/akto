@@ -12,7 +12,7 @@ function CrowdStrikeConnector() {
     const [baseUrl, setBaseUrl] = useState('')
     const [dataIngestionUrl, setDataIngestionUrl] = useState('')
     const [aktoApiToken, setAktoApiToken] = useState('')
-    const [recurringIntervalSeconds, setRecurringIntervalSeconds] = useState('14400')
+    const [recurringIntervalSeconds, setRecurringIntervalSeconds] = useState('21600')
     const [isSaved, setIsSaved] = useState(false)
 
     // Guardrails
@@ -88,7 +88,7 @@ function CrowdStrikeConnector() {
                 setClientId(integration.clientId || '')
                 setBaseUrl(integration.baseUrl || '')
                 setDataIngestionUrl(integration.dataIngestionUrl || '')
-                setRecurringIntervalSeconds(String(integration.recurringIntervalSeconds || 14400))
+                setRecurringIntervalSeconds(String(integration.recurringIntervalSeconds || 21600))
                 setIsSaved(true)
 
                 api.fetchCrowdStrikeDevices().then((devRes) => {
@@ -103,7 +103,7 @@ function CrowdStrikeConnector() {
     const handleSave = () => {
         api.addCrowdStrikeIntegration(
             clientId, clientSecret || null, baseUrl || null,
-            dataIngestionUrl, aktoApiToken || null, parseInt(recurringIntervalSeconds) || 14400
+            dataIngestionUrl, aktoApiToken || null, parseInt(recurringIntervalSeconds) || 21600
         ).then(() => {
             setClientSecret('')
             setAktoApiToken('')
@@ -115,7 +115,7 @@ function CrowdStrikeConnector() {
     const handleRemove = () => {
         api.removeCrowdStrikeIntegration().then(() => {
             setClientId(''); setClientSecret(''); setBaseUrl('')
-            setDataIngestionUrl(''); setAktoApiToken(''); setRecurringIntervalSeconds('14400'); setIsSaved(false)
+            setDataIngestionUrl(''); setAktoApiToken(''); setRecurringIntervalSeconds('21600'); setIsSaved(false)
             func.setToast(true, false, 'CrowdStrike integration removed successfully')
         }).catch(() => func.setToast(true, true, 'Failed to remove CrowdStrike integration'))
     }

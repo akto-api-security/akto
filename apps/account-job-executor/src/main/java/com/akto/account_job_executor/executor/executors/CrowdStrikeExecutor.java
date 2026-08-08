@@ -41,7 +41,13 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
     public static final CrowdStrikeExecutor INSTANCE = new CrowdStrikeExecutor();
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(CrowdStrikeExecutor.class, LogDb.DASHBOARD);
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    // FAIL_ON_UNKNOWN_PROPERTIES disabled: job.getConfig() (converted to CrowdStrikeIntegration
+    // below in runJob) holds targetMode/deviceIds alongside the integration credentials — those
+    // are job-scoping fields the discovery-selection feature added to the same config map, not
+    // part of CrowdStrikeIntegration itself, and convertValue would otherwise throw
+    // UnrecognizedPropertyException on every job run that has a device selection.
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+        .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private static final int CONNECT_TIMEOUT_MS = 30_000;
     private static final int SOCKET_TIMEOUT_MS  = 60_000;
@@ -211,34 +217,30 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         final String mcpPs1Id = uploadScriptIfNeeded("scan_mcp_configs.ps1", accessToken, baseUrl);
        
         // Skills discovery
-        final String sklShId  = uploadScriptIfNeeded("scan_skills_cs.sh",    accessToken, baseUrl);
-        final String sklPs1Id = uploadScriptIfNeeded("scan_skills.ps1",      accessToken, baseUrl);
+        final String sklShId  = uploadScriptIfNeeded("scan_skills_cs.sh", accessToken, baseUrl);
+        final String sklPs1Id = uploadScriptIfNeeded("scan_skills.ps1",  accessToken, baseUrl);
 
-        // Wave 1: installed-apps (AI agent discovery) — must fully complete on all devices
-        // before MCP/skills scans start, so agent discovery is guaranteed to land first.
-        ExecutorService pool = Executors.newFixedThreadPool(6);
-        List<Future<?>> appsFutures = new ArrayList<>();
+        // All three scans dispatch concurrently — apps/MCP/skills write to disjoint collection
+        // keys (device.ai-agent.<agent> for apps/skills tagging, device.<client>.<server> for MCP
+        // servers), so there's no shared-state ordering requirement between them; the previous
+        // apps-then-MCP-then-skills waves existed only for a "agent discovery lands first"
+        // display preference, not correctness, and cost real wall-clock at fleet scale (each
+        // batch-admin-command call can take up to CrowdStrike's ~30s ceiling, so two sequential
+        // waves before skills even started added up to ~60s of pure waiting per cron cycle for no
+        // functional benefit).
+        ExecutorService pool = Executors.newFixedThreadPool(7);
+        List<Future<?>> futures = new ArrayList<>();
 
         if (appsShId != null && !unixDeviceIds.isEmpty()) {
-            appsFutures.add(pool.submit(() ->
+            futures.add(pool.submit(() ->
                 runScriptOnDevices(accessToken, baseUrl, appsShId, "scan_installed_apps.sh",
                     unixDeviceIds, deviceNames, "Installed Apps (Unix)", ingestUrl, SCAN_KIND_INSTALLED_APPS, job)));
         }
         if (appsPs1Id != null && !windowsDeviceIds.isEmpty()) {
-            appsFutures.add(pool.submit(() ->
+            futures.add(pool.submit(() ->
                 runScriptOnDevices(accessToken, baseUrl, appsPs1Id, "scan_installed_apps.ps1",
                     windowsDeviceIds, deviceNames, "Installed Apps (Windows)", ingestUrl, SCAN_KIND_INSTALLED_APPS, job)));
         }
-        for (Future<?> f : appsFutures) {
-            try { f.get(); } catch (Exception e) {
-                loggerMaker.error("CrowdStrike: installed-apps phase future error: " + e.getMessage(), LogDb.DASHBOARD);
-            }
-        }
-        loggerMaker.info("CrowdStrike: installed-apps discovery complete, jobId=" + job.getId(), LogDb.DASHBOARD);
-
-        // Wave 2: MCP config + skills discovery, run concurrently with each other (but only after Wave 1).
-        List<Future<?>> futures = new ArrayList<>();
-
         if (mcpShId != null && !unixDeviceIds.isEmpty()) {
             futures.add(pool.submit(() ->
                 runScriptOnDevices(accessToken, baseUrl, mcpShId, "scan_mcp_configs_cs.sh",
@@ -249,25 +251,27 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                 runScriptOnDevices(accessToken, baseUrl, mcpPs1Id, "scan_mcp_configs.ps1",
                     windowsDeviceIds, deviceNames, "MCP Config (Windows)", ingestUrl, SCAN_KIND_MCP_CONFIG, job)));
         }
-        if (sklShId != null && !unixDeviceIds.isEmpty()) {
+
+        Map<String, String> skillsScriptByPlatform = new HashMap<>();
+        if (sklShId != null) skillsScriptByPlatform.put("unix", "scan_skills_cs.sh");
+        if (sklPs1Id != null) skillsScriptByPlatform.put("windows", "scan_skills.ps1");
+        if (!skillsScriptByPlatform.isEmpty()) {
+            List<String> allSkillsDeviceIds = new ArrayList<>();
+            allSkillsDeviceIds.addAll(unixDeviceIds);
+            allSkillsDeviceIds.addAll(windowsDeviceIds);
             futures.add(pool.submit(() ->
-                runScriptOnDevices(accessToken, baseUrl, sklShId, "scan_skills_cs.sh",
-                    unixDeviceIds, deviceNames, "Skills (Unix)", ingestUrl, SCAN_KIND_SKILLS, job)));
-        }
-        if (sklPs1Id != null && !windowsDeviceIds.isEmpty()) {
-            futures.add(pool.submit(() ->
-                runScriptOnDevices(accessToken, baseUrl, sklPs1Id, "scan_skills.ps1",
-                    windowsDeviceIds, deviceNames, "Skills (Windows)", ingestUrl, SCAN_KIND_SKILLS, job)));
+                runSkills(accessToken, baseUrl, allSkillsDeviceIds, windowsDeviceIds,
+                    skillsScriptByPlatform, deviceNames, ingestUrl, job)));
         }
 
         for (Future<?> f : futures) {
             try { f.get(); } catch (Exception e) {
-                loggerMaker.error("CrowdStrike: phase future error: " + e.getMessage(), LogDb.DASHBOARD);
+                loggerMaker.error("CrowdStrike: discovery phase future error: " + e.getMessage(), LogDb.DASHBOARD);
             }
         }
         pool.shutdown();
 
-        loggerMaker.info("CrowdStrike: MCP discovery complete, jobId=" + job.getId(), LogDb.DASHBOARD);
+        loggerMaker.info("CrowdStrike: discovery complete (apps, MCP, skills), jobId=" + job.getId(), LogDb.DASHBOARD);
     }
 
     private static final int SCAN_KIND_MCP_CONFIG   = 0;
@@ -277,6 +281,13 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
     // Runs scriptName across every device via one batch call per <=10k chunk, then parses and ingests
     // each device's returned output in parallel. Devices offline at dispatch time produce no output and
     // are skipped — CrowdStrike queues the command and a later run collects them.
+    //
+    // Any device still incomplete after the initial dispatch (e.g. momentarily slow, not just offline)
+    // gets ONE retry, scoped via optional_hosts to just that subset. Confirmed empirically that a retry
+    // restarts the script from scratch rather than resuming — cheap and safe here because these are the
+    // fast scripts (apps/MCP config), which finish in seconds; skills uses a poll-the-task_id
+    // fallback instead of a blind retry, since a retry restarts the script from scratch and
+    // skills is slow enough that redoing it wastefully would be expensive (see runSkills).
     private void runScriptOnDevices(String accessToken, String baseUrl, String scriptId, String scriptName,
             List<String> deviceIds, Map<String, String> deviceNames, String description,
             String ingestUrl, int scanKind, AccountJob job) {
@@ -292,9 +303,28 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                 loggerMaker.error(description + ": could not init RTR batch session for " + chunk.size() + " device(s)", LogDb.DASHBOARD);
                 continue;
             }
-            deviceToStdout.putAll(batchDispatchRunScript(accessToken, baseUrl, batchId, scriptName, description));
+            Map<String, String> chunkResults = batchDispatchRunScript(accessToken, baseUrl, batchId, scriptName, description);
+            deviceToStdout.putAll(chunkResults);
             if (job != null) {
                 try { CyborgApiClient.updateJobHeartbeat(job.getId()); } catch (Exception ignored) {}
+            }
+
+            // Devices in this chunk that didn't come back with output at all (as opposed to
+            // being intentionally skipped because they're offline_queued) get one retry.
+            List<String> incomplete = chunk.stream()
+                .filter(id -> !chunkResults.containsKey(id))
+                .collect(Collectors.toList());
+            if (!incomplete.isEmpty()) {
+                loggerMaker.info(description + ": retrying " + incomplete.size() + " incomplete device(s) once", LogDb.DASHBOARD);
+                Map<String, String> retryResults = batchDispatchRunScript(accessToken, baseUrl, batchId, scriptName, description, incomplete);
+                deviceToStdout.putAll(retryResults);
+                int stillIncomplete = incomplete.size() - retryResults.size();
+                if (stillIncomplete > 0) {
+                    loggerMaker.error(description + ": " + stillIncomplete + " device(s) still incomplete after retry, dropped for this cycle", LogDb.DASHBOARD);
+                }
+                if (job != null) {
+                    try { CyborgApiClient.updateJobHeartbeat(job.getId()); } catch (Exception ignored) {}
+                }
             }
         }
 
@@ -349,6 +379,186 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         }
     }
 
+    // Devices processed concurrently for skills discovery. Each device gets its own
+    // batch-init-session + batch-admin-command call (not one shared batch across the fleet), so
+    // this is real RTR API concurrency, not just local thread concurrency — sized to stay well
+    // under CrowdStrike's documented ~100 req/sec (6000/min) rate limit: at ~30s per device call,
+    // sustained rate ≈ 100 devices / 30s ≈ 3.3 req/sec, far below the ceiling even with headroom
+    // for apps/MCP calls earlier in the same job run.
+    private static final int SKILLS_DEVICE_CONCURRENCY = 100;
+
+    // Skills discovery: ONE batch-admin-command call covers every device (like apps/MCP —
+    // batch-init-session's host_ids can hold up to RTR_BATCH_MAX_HOSTS), using the original,
+    // unmodified scan_skills_cs.sh/scan_skills.ps1 (full scan + content read in one script). Any
+    // device that doesn't finish within the ~30s ceiling on that one call is NOT dropped: its
+    // task_id (present per-device even when incomplete) is captured and polled individually
+    // afterward, concurrently across stragglers via SKILLS_DEVICE_CONCURRENCY threads. This
+    // pattern — dispatch-all, then poll only what didn't finish inline, using each device's own
+    // id — mirrors CrowdStrike's own official sample (falconpy samples/rtr/queued_execute.py) and
+    // is confirmed directly against a real device: the batch response's per-device task_id works
+    // as cloud_request_id on the single-host status endpoint and returns the complete result.
+    private void runSkills(String accessToken, String baseUrl, List<String> deviceIds,
+            List<String> windowsDeviceIds, Map<String, String> skillsScriptByPlatform,
+            Map<String, String> deviceNames, String ingestUrl, AccountJob job) {
+        if (deviceIds.isEmpty()) return;
+        Set<String> windowsSet = new HashSet<>(windowsDeviceIds);
+
+        // Group by script (Unix vs Windows) since command_string differs per platform, but each
+        // group still gets ONE batch call covering every device in that group.
+        List<String> unixIds = deviceIds.stream().filter(id -> !windowsSet.contains(id)).collect(Collectors.toList());
+        List<String> winIds  = deviceIds.stream().filter(windowsSet::contains).collect(Collectors.toList());
+
+        Map<String, String> resolvedStdout = new java.util.concurrent.ConcurrentHashMap<>();
+        Map<String, String> pendingTaskIds = new HashMap<>();
+
+        if (!unixIds.isEmpty() && skillsScriptByPlatform.get("unix") != null) {
+            dispatchSkillsBatch(accessToken, baseUrl, unixIds, skillsScriptByPlatform.get("unix"),
+                "Skills (Unix)", job, resolvedStdout, pendingTaskIds);
+        }
+        if (!winIds.isEmpty() && skillsScriptByPlatform.get("windows") != null) {
+            dispatchSkillsBatch(accessToken, baseUrl, winIds, skillsScriptByPlatform.get("windows"),
+                "Skills (Windows)", job, resolvedStdout, pendingTaskIds);
+        }
+
+        loggerMaker.info("CrowdStrike: skills — " + resolvedStdout.size() + " device(s) complete inline, "
+            + pendingTaskIds.size() + " pending poll", LogDb.DASHBOARD);
+
+        // Poll stragglers concurrently — each poll is independent (different task_id, different
+        // device), so this is safe to parallelize the same way the apps/MCP ingest step already does.
+        if (!pendingTaskIds.isEmpty()) {
+            ExecutorService pollPool = Executors.newFixedThreadPool(Math.min(SKILLS_DEVICE_CONCURRENCY, pendingTaskIds.size()));
+            try {
+                List<Future<?>> pollFutures = new ArrayList<>();
+                for (Map.Entry<String, String> entry : pendingTaskIds.entrySet()) {
+                    String deviceId = entry.getKey();
+                    String taskId = entry.getValue();
+                    String deviceName = deviceNames.getOrDefault(deviceId, deviceId);
+                    pollFutures.add(pollPool.submit(() -> {
+                        String stdout = pollAdminCommandStatus(accessToken, baseUrl, taskId, deviceName, job);
+                        if (stdout != null) resolvedStdout.put(deviceId, stdout);
+                    }));
+                }
+                for (Future<?> f : pollFutures) {
+                    try { f.get(); } catch (Exception e) {
+                        loggerMaker.error("CrowdStrike: skills poll future error: " + e.getMessage(), LogDb.DASHBOARD);
+                    }
+                }
+            } finally {
+                pollPool.shutdown();
+            }
+        }
+
+        if (resolvedStdout.isEmpty()) {
+            loggerMaker.error("CrowdStrike: skills — no device returned output this cycle", LogDb.DASHBOARD);
+            return;
+        }
+        loggerMaker.info("CrowdStrike: skills — " + resolvedStdout.size() + "/" + deviceIds.size()
+            + " device(s) resolved, ingesting", LogDb.DASHBOARD);
+
+        for (Map.Entry<String, String> entry : resolvedStdout.entrySet()) {
+            String deviceId = entry.getKey();
+            String deviceName = deviceNames.getOrDefault(deviceId, deviceId);
+            JsonNode output = parseScriptOutput(entry.getValue(), deviceId);
+            if (output == null) {
+                loggerMaker.error("Skills: unparseable output for device " + deviceName, LogDb.DASHBOARD);
+                continue;
+            }
+            Map<String, JsonNode> singleDevice = new HashMap<>();
+            singleDevice.put(deviceId, output);
+            Map<String, String> singleName = new HashMap<>();
+            singleName.put(deviceId, deviceName);
+            ingestSkillDiscoveries(singleDevice, ingestUrl, singleName, job.getAccountId());
+        }
+    }
+
+    // Dispatches one batch-init-session + batch-admin-command per <=10k chunk covering every
+    // device in deviceIds, via the shared dispatchBatchAdminCommand, merging each chunk's
+    // DispatchResult into resolvedStdout (devices complete:true inline) and pendingTaskIds
+    // (devices not yet complete, keyed by their own task_id for the caller to poll afterward).
+    private void dispatchSkillsBatch(String accessToken, String baseUrl, List<String> deviceIds, String scriptName,
+            String description, AccountJob job, Map<String, String> resolvedStdout, Map<String, String> pendingTaskIds) {
+        for (int i = 0; i < deviceIds.size(); i += RTR_BATCH_MAX_HOSTS) {
+            List<String> chunk = deviceIds.subList(i, Math.min(i + RTR_BATCH_MAX_HOSTS, deviceIds.size()));
+            String batchId = batchInitSessions(accessToken, baseUrl, chunk);
+            if (batchId == null) {
+                loggerMaker.error(description + ": could not init RTR batch session for " + chunk.size() + " device(s)", LogDb.DASHBOARD);
+                continue;
+            }
+            DispatchResult chunkResult = batchDispatchRunScriptCapturingTaskId(accessToken, baseUrl, batchId, scriptName, description);
+            resolvedStdout.putAll(chunkResult.stdout);
+            pendingTaskIds.putAll(chunkResult.pendingTaskIds);
+            if (job != null) {
+                try { CyborgApiClient.updateJobHeartbeat(job.getId()); } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    // Poll interval/budget for recovering a timed-out skills dispatch via task_id. 5s matches the
+    // interval master branch's pre-batching code used for the equivalent single-device poll;
+    // budget capped at 2 minutes — comfortably below CrowdStrike's RTR session lifetime and short
+    // enough that a genuinely stuck device doesn't hold a thread-pool slot indefinitely at scale.
+    private static final int SKILLS_POLL_INTERVAL_MS = 5_000;
+    private static final int SKILLS_POLL_MAX_WAIT_MS  = 2 * 60 * 1000;
+
+    // Polls GET .../admin-command/v1?cloud_request_id=<taskId>&sequence_id=0 until complete:true,
+    // a terminal error_code, or the budget elapses. Heartbeats every poll — this can run for up to
+    // SKILLS_POLL_MAX_WAIT_MS per device, which must not go silent between heartbeats given
+    // AccountJobsCron's stale-job reclaim threshold.
+    private String pollAdminCommandStatus(String accessToken, String baseUrl, String taskId, String deviceName, AccountJob job) {
+        long deadline = System.currentTimeMillis() + SKILLS_POLL_MAX_WAIT_MS;
+        RequestConfig cfg = buildRequestConfig();
+
+        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+            while (System.currentTimeMillis() < deadline) {
+                if (job != null) {
+                    try { CyborgApiClient.updateJobHeartbeat(job.getId()); } catch (Exception ignored) {}
+                }
+                try { Thread.sleep(SKILLS_POLL_INTERVAL_MS); } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return null;
+                }
+
+                String url = baseUrl + "/real-time-response/entities/admin-command/v1"
+                    + "?cloud_request_id=" + urlEncode(taskId) + "&sequence_id=0";
+                HttpGet get = new HttpGet(url);
+                get.setHeader("Authorization", "Bearer " + accessToken);
+
+                try (CloseableHttpResponse resp = client.execute(get)) {
+                    int status = resp.getStatusLine().getStatusCode();
+                    String body = EntityUtils.toString(resp.getEntity());
+                    if (status != 200) {
+                        loggerMaker.error("Skills: poll HTTP " + status + " for device " + deviceName + " taskId=" + taskId, LogDb.DASHBOARD);
+                        return null;
+                    }
+                    JsonNode json = OBJECT_MAPPER.readTree(body);
+                    JsonNode resources = json.path("resources");
+                    if (resources.isArray() && resources.size() > 0) {
+                        JsonNode resource = resources.get(0);
+                        boolean complete = resource.path("complete").asBoolean(false);
+                        int errorCode = resource.path("error_code").asInt(0);
+                        if (errorCode != 0) {
+                            loggerMaker.error("Skills: poll for device " + deviceName + " failed error_code=" + errorCode, LogDb.DASHBOARD);
+                            return null;
+                        }
+                        if (complete) {
+                            String stdout = resource.path("stdout").asText("");
+                            loggerMaker.info("Skills: recovered device " + deviceName + " via poll after initial dispatch timed out", LogDb.DASHBOARD);
+                            return stdout.isEmpty() ? null : stdout;
+                        }
+                    }
+                } catch (Exception e) {
+                    loggerMaker.error("Skills: poll error for device " + deviceName + ": " + e.getMessage(), LogDb.DASHBOARD);
+                    return null;
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.error("Skills: could not create HTTP client for polling device " + deviceName + ": " + e.getMessage(), LogDb.DASHBOARD);
+        }
+
+        loggerMaker.error("Skills: poll timed out for device " + deviceName + " after " + SKILLS_POLL_MAX_WAIT_MS / 1000 + "s", LogDb.DASHBOARD);
+        return null;
+    }
+
     // Parses a device's raw script stdout into JSON, tolerating any transcript preamble around it.
     private JsonNode parseScriptOutput(String stdout, String deviceId) {
         if (stdout == null || stdout.isEmpty()) return null;
@@ -401,19 +611,55 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         }
     }
 
-    // Runs the script across the whole batch in one call, returning deviceId -> raw stdout. This
-    // endpoint executes synchronously and returns each host's full output inline, so there is no
-    // cloud_request_id to poll afterwards. -CloudFile must be double-quoted: it rejects single quotes.
     private Map<String, String> batchDispatchRunScript(String accessToken, String baseUrl, String batchId,
             String scriptName, String description) {
-        Map<String, String> results = new HashMap<>();
+        String commandString = "runscript -CloudFile=\"" + scriptName + "\"";
+        return dispatchBatchAdminCommand(accessToken, baseUrl, batchId, commandString, description, null).stdout;
+    }
+
+    // Runs the script across the batch in one call, returning deviceId -> raw stdout. This endpoint
+    // executes synchronously and returns each host's full output inline, so there is no
+    // cloud_request_id to poll afterwards. -CloudFile must be double-quoted: it rejects single quotes.
+    // optionalHosts, when non-null, scopes the dispatch to just that subset of the batch (used for the
+    // one-retry-on-incomplete path in runScriptOnDevices) instead of every host in batchId.
+    private Map<String, String> batchDispatchRunScript(String accessToken, String baseUrl, String batchId,
+            String scriptName, String description, List<String> optionalHosts) {
+        String commandString = "runscript -CloudFile=\"" + scriptName + "\"";
+        return dispatchBatchAdminCommand(accessToken, baseUrl, batchId, commandString, description, optionalHosts).stdout;
+    }
+
+    // Same dispatch as batchDispatchRunScript, but also surfaces each incomplete device's task_id
+    // (dropped by the two methods above, which have no use for it) — used by runSkills, which polls
+    // stragglers instead of retrying them.
+    private DispatchResult batchDispatchRunScriptCapturingTaskId(String accessToken, String baseUrl, String batchId,
+            String scriptName, String description) {
+        String commandString = "runscript -CloudFile=\"" + scriptName + "\"";
+        return dispatchBatchAdminCommand(accessToken, baseUrl, batchId, commandString, description, null);
+    }
+
+    private static class DispatchResult {
+        final Map<String, String> stdout = new HashMap<>();     // deviceId -> stdout, complete:true only
+        final Map<String, String> pendingTaskIds = new HashMap<>(); // deviceId -> task_id, incomplete only
+    }
+
+    // One shared implementation for every batch-admin-command dispatch in this class (apps, MCP,
+    // and skills all funnel through here) — the mechanics (init a batch, POST the command, walk
+    // combined.resources) are identical regardless of caller; only what a caller DOES with an
+    // incomplete device differs (runScriptOnDevices retries once via optionalHosts; runSkills
+    // polls the captured task_id instead — see DispatchResult.pendingTaskIds).
+    private DispatchResult dispatchBatchAdminCommand(String accessToken, String baseUrl, String batchId,
+            String commandString, String description, List<String> optionalHosts) {
+        DispatchResult result = new DispatchResult();
         RequestConfig cfg = buildRequestConfig();
         try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
             Map<String, Object> body = new HashMap<>();
             body.put("batch_id", batchId);
             body.put("base_command", "runscript");
-            body.put("command_string", "runscript -CloudFile=\"" + scriptName + "\"");
+            body.put("command_string", commandString);
             body.put("persist_all", false);
+            if (optionalHosts != null && !optionalHosts.isEmpty()) {
+                body.put("optional_hosts", optionalHosts);
+            }
 
             HttpPost post = new HttpPost(baseUrl + "/real-time-response/combined/batch-admin-command/v1");
             post.setHeader("Authorization", "Bearer " + accessToken);
@@ -424,8 +670,8 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                 int status = resp.getStatusLine().getStatusCode();
                 String respBody = EntityUtils.toString(resp.getEntity());
                 if (status != 200 && status != 201) {
-                    loggerMaker.error("CrowdStrike: batch admin command HTTP " + status + " script=" + scriptName + ": " + respBody, LogDb.DASHBOARD);
-                    return results;
+                    loggerMaker.error("CrowdStrike: batch admin command HTTP " + status + " command=" + commandString + ": " + respBody, LogDb.DASHBOARD);
+                    return result;
                 }
                 JsonNode json = OBJECT_MAPPER.readTree(respBody);
                 java.util.Iterator<Map.Entry<String, JsonNode>> fields = json.path("combined").path("resources").fields();
@@ -434,11 +680,6 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                     String deviceId = entry.getKey();
                     JsonNode deviceResult = entry.getValue();
 
-                    JsonNode errors = deviceResult.path("errors");
-                    if (errors.isArray() && errors.size() > 0) {
-                        loggerMaker.error(description + ": dispatch error on device " + deviceId + ": " + errors.toString(), LogDb.DASHBOARD);
-                        continue;
-                    }
                     // Offline hosts are queued by CrowdStrike and produce no output now; a later run collects them.
                     if (deviceResult.path("offline_queued").asBoolean(false)) {
                         loggerMaker.info(description + ": device " + deviceId + " offline, command queued for reconnect", LogDb.DASHBOARD);
@@ -448,22 +689,46 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                     // Script log_debug trace lands on stderr; keep it available when stdout looks wrong.
                     String stderr = deviceResult.path("stderr").asText("");
                     if (!stderr.isEmpty()) {
-                        loggerMaker.debug("CrowdStrike: stderr for device " + deviceId + " script=" + scriptName + ": " + stderr);
+                        loggerMaker.debug("CrowdStrike: stderr for device " + deviceId + " command=" + commandString + ": " + stderr);
                     }
 
+                    boolean complete = deviceResult.path("complete").asBoolean(false);
                     String stdout = deviceResult.path("stdout").asText("");
-                    if (stdout.isEmpty()) {
-                        loggerMaker.error(description + ": empty stdout from device " + deviceId
-                            + (stderr.isEmpty() ? "" : " stderr=" + stderr), LogDb.DASHBOARD);
+                    if (complete && !stdout.isEmpty()) {
+                        result.stdout.put(deviceId, stdout);
                         continue;
                     }
-                    results.put(deviceId, stdout);
+
+                    // Incomplete — this commonly includes CrowdStrike's own read-timeout error
+                    // (code 50401, "Exceeded maximum read timeout: ~29-30s") for the skills script,
+                    // which does NOT mean the command failed on the device: it's still running
+                    // there, and CrowdStrike still assigns a task_id for it. Confirmed directly
+                    // against a real device: polling that task_id via
+                    // admin-command/v1?cloud_request_id=... after this timeout returns the
+                    // complete, correct result — so this is an expected, recoverable case, not a
+                    // failure, whenever a task_id comes back alongside the error.
+                    JsonNode errors = deviceResult.path("errors");
+                    boolean hasErrors = errors.isArray() && errors.size() > 0;
+                    String taskId = deviceResult.path("task_id").asText(null);
+                    boolean hasTaskId = taskId != null && !taskId.isEmpty();
+
+                    if (hasTaskId) {
+                        result.pendingTaskIds.put(deviceId, taskId);
+                        if (hasErrors) {
+                            loggerMaker.info(description + ": device " + deviceId + " not done within initial window ("
+                                + errors.toString() + ") — will poll task_id for result", LogDb.DASHBOARD);
+                        }
+                    } else if (hasErrors) {
+                        loggerMaker.error(description + ": dispatch error on device " + deviceId + " with no task_id to recover: " + errors.toString(), LogDb.DASHBOARD);
+                    } else {
+                        loggerMaker.error(description + ": device " + deviceId + " incomplete with no task_id — cannot poll, dropped this cycle", LogDb.DASHBOARD);
+                    }
                 }
             }
         } catch (Exception e) {
-            loggerMaker.error("CrowdStrike: batch admin command error script=" + scriptName + ": " + e.getMessage(), LogDb.DASHBOARD);
+            loggerMaker.error("CrowdStrike: batch admin command error command=" + commandString + ": " + e.getMessage(), LogDb.DASHBOARD);
         }
-        return results;
+        return result;
     }
 
 

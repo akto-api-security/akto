@@ -49,7 +49,7 @@ public class CrowdStrikeIntegrationAction extends UserAction {
 
     private static final String JOB_TYPE = "CROWDSTRIKE_AH";
     private static final String JOB_SUB_TYPE = "FALCON_DISCOVER";
-    private static final int DEFAULT_INTERVAL = 14400;
+    private static final int DEFAULT_INTERVAL = 21600;
     private static final int CONNECT_TIMEOUT_MS = 30_000;
     private static final int SOCKET_TIMEOUT_MS  = 60_000;
     private static final long GUARDRAIL_RTR_MAX_WAIT_MS = 60_000;
