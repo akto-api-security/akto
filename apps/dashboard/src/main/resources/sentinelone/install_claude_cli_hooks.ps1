@@ -31,12 +31,12 @@ if ($AktoDataIngestionUrl) {
 
 function Write-Log {
     param([string]$Message)
-    Write-Host "[Claude CLI Hooks] $Message"
+    Write-Output "[Claude CLI Hooks] $Message"
 }
 
 function Write-ErrorLog {
     param([string]$Message)
-    Write-Host "[Claude CLI Hooks] ERROR: $Message" -ForegroundColor Red
+    Write-Output "[Claude CLI Hooks] ERROR: $Message"
 }
 
 function Test-ClaudeCliInstalled {
@@ -285,7 +285,10 @@ function Install-ForUser {
 
     New-Item -ItemType Directory -Force -Path $claudeDir | Out-Null
     New-Item -ItemType Directory -Force -Path $ClaudeHooksDir | Out-Null
-    icacls "$claudeDir" /grant "Users:(OI)(CI)F" /T /C /Q | Out-Null
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    icacls "$claudeDir" /grant "Users:(OI)(CI)F" /T /C /Q 2>&1 | Out-Null
+    $ErrorActionPreference = $prevEap
     Write-Log "Created hooks directory: $ClaudeHooksDir"
 
     Write-Log "Downloading hook scripts from GitHub..."
