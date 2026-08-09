@@ -38,12 +38,26 @@ public class SettingsScanAction extends ActionSupport {
         "- An allowlist entry scoped to a destructive or exfil-capable command (rm, sudo, curl, wget, chmod, dd, eval) or a bare wildcard covering an entire tool.\n" +
         "What is normal and must NOT be flagged: ordinary command-scoped dev allowlists (git, npm, go, make, docker, etc. with wildcarded arguments only), bare tool-name grants, standard dev domains (npmjs.com, pypi.org, github.com, githubusercontent.com, docker.com), credential-manager/helper fields that store credentials safely, and any field whose value keeps a protection ON or keeps access restricted.\n" +
         "\n" +
+        "OUTPUT FORMAT — read this even if you found multiple findings:\n" +
+        "Return exactly ONE raw JSON array, starting with '[' and ending with ']', containing every finding as\n" +
+        "an element of that SAME array. Never return more than one array. Never return separate\n" +
+        "```json { ... } ``` blocks side by side, one per finding — that is a formatting error, not valid\n" +
+        "output, even if each block is individually valid JSON. No prose before, between, or after the array.\n" +
+        "No code fences around it. Found nothing? Return exactly: []\n" +
+        "\n" +
         "Each finding: {\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"|\"CRITICAL\", \"category\":\"risky\"|\"malicious\", \"fieldPath\":\"...\", \"title\":\"...\", \"message\":\"...\", \"evidence\":\"...\", \"overview\":\"...\", \"remediation\":\"...\"}\n" +
         "\n" +
         "message: one direct sentence (add a second only if needed) naming the exact field and its actual value, then stating exactly what that value lets happen — no hedging, no abstraction.\n" +
-        "  GOOD: \"bypassPermissionsMode is set to true. This lets the agent run any command or edit any file with no user confirmation, so a prompt-injected instruction executes immediately instead of waiting for approval.\"\n" +
+        "  GOOD: \"permissions.defaultMode is set to bypassPermissions. This lets the agent run any command or edit any file with no user confirmation, so a prompt-injected instruction executes immediately instead of waiting for approval.\"\n" +
         "  GOOD: \"disableAllHooks is set to true. Every hook in this file stops running, including monitoring or security-validation hooks, so nothing is checking or logging what the agent does.\"\n" +
         "  BAD (never write like this): \"This field may pose a security risk if misconfigured.\" / \"could allow unauthorized execution.\" / \"can be quite risky.\"\n" +
+        "\n" +
+        "COMPLETENESS — do not stop after your first finding: after drafting your findings, re-scan the input\n" +
+        "top to bottom one more time against every risk category above, independently of what you already\n" +
+        "found. Config files routinely carry more than one issue at once (e.g. an unsafe approval mode AND a\n" +
+        "disabled-hooks flag AND a broad allowlist entry, all in the same file) — finding one is not a signal\n" +
+        "to stop, and every category above must be checked against this specific input regardless of how many\n" +
+        "findings you already have.\n" +
         "evidence: the single offending \"key\":value pair exactly as it appears in the input — never the bare value, never a whole array or section.\n" +
         "overview: markdown, two \"## \" sections separated by a blank line — \"## What is this?\" (what the field controls and what this value enables, in plain terms) and \"## Why is it dangerous?\" (the concrete attack chain: how prompt injection, a malicious tool/skill, or a poisoned file abuses this specific value, ending with the impact).\n" +
         "remediation: markdown, a numbered list (1., 2., 3.) naming the exact field and safe value and how to enforce it, followed by a fenced corrected-config snippet. No other sections.\n" +
