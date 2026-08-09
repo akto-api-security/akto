@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider } from "@shopify/polaris";
+import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider, Spinner } from "@shopify/polaris";
 import TopicsGuardrailList from "../../guardrails/components/TopicsGuardrailList";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
@@ -533,8 +533,9 @@ function AgenticsTab({ agents, onAgentClick, agentRiskData = {} }) {
 
 function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp }) {
     const [violations, setViolations] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    useEffect(() => { setViolations([]); }, [hostNames, deviceId]);
+    useEffect(() => { setViolations([]); setLoading(true); }, [hostNames, deviceId]);
 
     useEffect(() => {
         const claudeDeviceIds = new Set(
@@ -545,7 +546,7 @@ function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp 
         );
         if (deviceId) claudeDeviceIds.add(deviceId);
 
-        if (!hostNames.length && !claudeDeviceIds.size) { setViolations([]); return; }
+        if (!hostNames.length && !claudeDeviceIds.size) { setViolations([]); setLoading(false); return; }
 
         let cancelled = false;
         const hostSet = new Set(hostNames);
@@ -565,6 +566,9 @@ function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp 
             })
             .catch(() => {
                 if (!cancelled) setViolations([]);
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
             });
         return () => { cancelled = true; };
     }, [hostNames, deviceId, startTimestamp, endTimestamp]);
@@ -573,6 +577,16 @@ function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp 
         if (!e.data) return;
         openViolationInThreatActivity(e.data);
     }, []);
+
+    if (loading) {
+        return (
+            <Box padding="8">
+                <VerticalStack gap="2" inlineAlign="center">
+                    <Spinner accessibilityLabel="Loading violations" size="small" />
+                </VerticalStack>
+            </Box>
+        );
+    }
 
     if (violations.length === 0) {
         return (
