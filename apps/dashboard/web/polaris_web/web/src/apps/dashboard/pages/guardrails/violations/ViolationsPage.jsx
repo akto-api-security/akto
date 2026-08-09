@@ -359,7 +359,7 @@ function transformEvent(event, collectionsMap, usernameMap) {
 
 // ─── Dashboard summary section ───────────────────────────────────────────────────
 
-function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, latencyData, startTimestamp, endTimestamp }) {
+function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, latencyData, startTimestamp, endTimestamp }) {
     if (summaryLoading) return <SpinnerCentered />;
     if (!summaryData) return null;
 
@@ -385,14 +385,18 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
         renderValue: () => <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>,
     }));
 
-    const hostRows = (topHosts || []).slice(0, 5).map((item, i) => ({
+    const hostRows = (topHosts || []).slice(0, 5).map((item, i) => {
+        const resolvedUser = getUsernameForCollection({ displayName: item.host }, usernameMap || {});
+        const displayName = (resolvedUser && resolvedUser !== "-") ? resolvedUser : (item.host ? item.host.split('.')[0] : item.name);
+        return {
         id: `h${i}`,
-        name: item.name,
+        name: displayName,
         count: item.count,
         os: detectOs(item.host),
         onClick: () => onHostClick?.(item.host),
         renderValue: () => <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>,
-    }));
+        };
+    });
 
     // Latency graph is Akto-internal only (matches the same gate on ThreatDetectionPage.jsx).
     // Everyone else gets Open/Other Violations side by side instead of stacked, since there's
@@ -567,6 +571,7 @@ function Violations() {
     const gridFilterKey = useRef(`violations-${Date.now()}`);
     const collectionsMap = PersistStore((state) => state.collectionsMap);
     const usernameMapRef = useRef({});
+    const [usernameMap, setUsernameMap] = useState({});
 
     useEffect(() => {
         const key = gridFilterKey.current;
@@ -603,6 +608,7 @@ function Violations() {
     useEffect(() => {
         fetchEndpointShieldUsernameMap().then(map => {
             usernameMapRef.current = map;
+            setUsernameMap(map);
         });
     }, []);
 
@@ -1010,6 +1016,7 @@ function Violations() {
         <ViolationsDashboard
             key="dashboard"
             summaryData={summaryData}
+            usernameMap={usernameMap}
             loading={summaryLoading}
             onSeverityClick={handleSeverityClick}
             activeSeverityFilter={activeSeverityFilter}
