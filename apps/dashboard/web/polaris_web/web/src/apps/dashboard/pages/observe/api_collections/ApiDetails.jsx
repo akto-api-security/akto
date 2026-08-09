@@ -24,6 +24,7 @@ import Dropdown from "../../../components/layouts/Dropdown";
 import ApiIssuesTab from "./ApiIssuesTab";
 import ForbiddenRole from "../../../components/shared/ForbiddenRole";
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
+import { stripMarkdownLinks } from "../../../components/shared/markdownUtils";
 
 import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
@@ -648,9 +649,9 @@ function ApiDetails(props) {
             const bodyStr = parsedMsg?.request?.body || parsedMsg?.requestPayload || '{}'
             const body = JSON.parse(bodyStr)
             if (body.skill_name) {
-                skillMarkdown = `# ${body.skill_name}\n\n` +
-                    (body.skill_description ? `**${body.skill_description}**\n\n` : '') +
-                    (body.skill_content || '')
+                skillMarkdown = `# ${stripMarkdownLinks(body.skill_name)}\n\n` +
+                    (body.skill_description ? `**${stripMarkdownLinks(body.skill_description)}**\n\n` : '') +
+                    stripMarkdownLinks(body.skill_content || '')
             }
         } catch (_) {}
     }

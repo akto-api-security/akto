@@ -41,6 +41,7 @@ import org.bson.conversions.Bson;
 
 import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.mongodb.client.model.Updates;
@@ -167,7 +168,7 @@ public class MaliciousEventService {
         .setFilterId(filterId)
         .setLatestApiEndpoint(evt.getLatestApiEndpoint())
         .setLatestApiMethod(URLMethods.Method.fromString(evt.getLatestApiMethod()))
-        .setLatestApiOrig(evt.getLatestApiPayload())
+        .setLatestApiOrig("settings-scanner".equals(actor) ? ThreatUtils.repairConfigScanEnvelope(evt.getLatestApiPayload()) : evt.getLatestApiPayload())
         .setLatestApiCollectionId(evt.getLatestApiCollectionId())
         .setEventType(maliciousEventType)
         .setLatestApiIp(evt.getLatestApiIp())
@@ -413,7 +414,7 @@ public class MaliciousEventService {
   }
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
-      String accountId, ListMaliciousRequestsRequest request, String contextSource) {
+      String accountId, ListMaliciousRequestsRequest request, String contextSource, String skillEvalMode) {
 
     if(!shouldNotCreateIndexes.getOrDefault(accountId, false)) {
       createIndexIfAbsent(accountId);
@@ -516,6 +517,25 @@ public class MaliciousEventService {
     Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
     if (!contextFilter.isEmpty()) {
       query.putAll(contextFilter);
+    }
+
+    // Skills Evaluations partition — Atlas (ENDPOINT) only. An event belongs to Skills
+    // Evaluations iff latestApiEndpoint starts with "/skills/".
+    //   "only"    → return just those events (Skills Evaluations tab)
+    //   "exclude" → return everything except them (Active tab)
+    // Done server-side so the total count and pagination stay correct.
+    if (skillEvalMode != null && !skillEvalMode.isEmpty()
+        && "ENDPOINT".equalsIgnoreCase(contextSource)) {
+      Document existing = new Document(query);
+      query.clear();
+      Pattern skillsEndpointPattern = Pattern.compile("^/skills/");
+      if ("only".equalsIgnoreCase(skillEvalMode)) {
+        query.append("$and", Arrays.asList(existing, new Document("latestApiEndpoint", skillsEndpointPattern)));
+      } else if ("exclude".equalsIgnoreCase(skillEvalMode)) {
+        query.append("$and", Arrays.asList(existing, new Document("latestApiEndpoint", new Document("$not", skillsEndpointPattern))));
+      } else {
+        query.putAll(existing);
+      }
     }
 
     // Check if sortBySeverity flag is set

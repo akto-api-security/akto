@@ -7,7 +7,6 @@ import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
 import { Badge, IndexFiltersMode, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, VerticalStack } from "@shopify/polaris";
-import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, fetchGuardrailComplianceMap } from "../utils/formatUtils";
@@ -121,22 +120,26 @@ const getHeaders = () => {
   return baseHeaders;
 };
 
-const sortOptions = [
-  {
-    label: "Discovered time",
-    value: "detectedAt asc",
-    directionLabel: "Newest",
-    sortKey: "detectedAt",
-    columnIndex: 5,
-  },
-  {
-    label: "Discovered time",
-    value: "detectedAt desc",
-    directionLabel: "Oldest",
-    sortKey: "detectedAt",
-    columnIndex: 5,
-  },
-];
+const getSortOptions = (headers) => {
+  const columnIndex = headers.findIndex((h) => h.value === "discoveredTs") + 1;
+  if (columnIndex === 0) return [];
+  return [
+    {
+      label: "Discovered time",
+      value: "detectedAt asc",
+      directionLabel: "Newest",
+      sortKey: "detectedAt",
+      columnIndex,
+    },
+    {
+      label: "Discovered time",
+      value: "detectedAt desc",
+      directionLabel: "Oldest",
+      sortKey: "detectedAt",
+      columnIndex,
+    },
+  ];
+};
 
 let filters = [];
 
@@ -150,13 +153,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   const [loading, setLoading] = useState(true);
   const collectionsMap = PersistStore((state) => state.collectionsMap);
+  const hostNameMap = PersistStore((state) => state.hostNameMap);
   const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
   const guardrailComplianceMap = SessionStore((state) => state.guardrailComplianceMap);
   const setGuardrailComplianceMap = SessionStore((state) => state.setGuardrailComplianceMap);
   const guardrailApprovedByPolicy = SessionStore((state) => state.guardrailApprovedByPolicy);
   const setGuardrailApprovedByPolicy = SessionStore((state) => state.setGuardrailApprovedByPolicy);
   const needsGuardrailCompliance = label === LABELS.GUARDRAIL || isAgenticSecurityCategory() || isEndpointSecurityCategory();
-  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, needs_approval: 3, training: 4 };
+  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, needs_approval: 3, training: 4, skills_evaluations: 4 };
   const resolvedInitialTab = initialTab || 'active';
   const [currentTab, setCurrentTab] = useState(resolvedInitialTab);
   const [selected, setSelected] = useState(tabIndexMap[resolvedInitialTab] || 0)
@@ -175,6 +179,32 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     setApproveMode("ALWAYS");
     setApproveDays("7");
     setApproveRow(x);
+  };
+
+  // Threat events for skills carry the threat/traffic collection id in `apiCollectionId`, which is
+  // NOT the inventory collection that renders the skill content. That inventory collection is keyed
+  // by host, so resolve it by reverse-looking up the host in hostNameMap / collectionsMap.
+  const resolveSkillCollectionId = (host) => {
+    if (!host || host === '-') return null;
+    const match = (map) => Object.keys(map || {}).find((id) => map[id] === host);
+    return match(hostNameMap) || match(collectionsMap) || null;
+  };
+
+  // Open the skill-content page (inventory ApiDetails flyout, Values tab) for a skill threat row.
+  const openSkillContent = (x) => {
+    const collectionId = resolveSkillCollectionId(x?.host);
+    if (!collectionId) {
+      func.setToast(true, true, "Could not find the skill collection for this host");
+      return;
+    }
+    // Inventory endpoints are stored path-only; strip any host prefix before matching selected_url.
+    const pathOnlyUrl = String(x?.url || "").replace(/^https?:\/\/[^/]+/, "");
+    const params = new URLSearchParams();
+    params.set("selected_url", pathOnlyUrl);
+    params.set("selected_method", x?.method || "POST");
+    params.set("agentic_view", "skills");
+    const navigateUrl = `${window.location.origin}/dashboard/observe/inventory/${collectionId}?${params.toString()}`;
+    window.open(navigateUrl, "_blank");
   };
 
   const submitInlineApprove = async () => {
@@ -284,7 +314,19 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       index: 4
     });
   }
-  const tableTabs = [...baseTabs, ...guardrailExtraTabs]
+  // "Skills Evaluations" — events with filterId == "skill_evaluation", filtered server-side.
+  // Endpoint (Atlas) only. Positioned after the guardrail extra tabs.
+  const skillsExtraTabs = [];
+  if (isEndpointSecurityCategory()) {
+    skillsExtraTabs.push({
+      content: 'Skills Evaluations',
+      badge: 'Beta',
+      onAction: () => { setCurrentTab('skills_evaluations'); },
+      id: 'skills_evaluations',
+      index: baseTabs.length + guardrailExtraTabs.length
+    });
+  }
+  const tableTabs = [...baseTabs, ...guardrailExtraTabs, ...skillsExtraTabs]
 
   const handleSelectedTab = (selectedIndex) => {
     setLoading(true)
@@ -578,9 +620,19 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     // "Needs Approval" is a client-side view over ACTIVE events filtered to behaviour==="approval".
     // Fetch active events with a high limit (single page) and filter after mapping.
     const isNeedsApproval = currentTab === 'needs_approval';
-    const effectiveStatus = isNeedsApproval ? 'ACTIVE' : currentTab.toUpperCase();
-    const effectiveSkip = isNeedsApproval ? 0 : skip;
-    const effectiveLimit = isNeedsApproval ? 200 : limit;
+    const isSkillsEvaluations = currentTab === 'skills_evaluations';
+    // Needs Approval is a client-side view (fetch a big page, filter after mapping). Skills
+    // Evaluations is now SERVER-paginated: it shows ACTIVE events narrowed to the skill-evaluation
+    // set by the backend (x-skill-eval-mode header), so totals/pagination are correct.
+    const isClientSideView = isNeedsApproval;
+    const effectiveStatus = (isNeedsApproval || isSkillsEvaluations) ? 'ACTIVE' : currentTab.toUpperCase();
+    const effectiveSkip = isClientSideView ? 0 : skip;
+    const effectiveLimit = isClientSideView ? 200 : limit;
+    // Skills Evaluations partition (Atlas only): "only" on the Skills Evaluations tab, "exclude" on
+    // the Active tab. Backend applies it (gated to contextSource=ENDPOINT); undefined elsewhere.
+    const skillEvaluationMode = isEndpointSecurityCategory()
+      ? (isSkillsEvaluations ? 'only' : (currentTab === 'active' ? 'exclude' : undefined))
+      : undefined;
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
       matchingUrlFilter = [],
@@ -651,7 +703,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       latestApiOrigRegex,
       undefined,
       undefined,
-      severityFilter
+      severityFilter,
+      skillEvaluationMode
     );
 
     // Store the total count for filtered results
@@ -688,10 +741,24 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         ...x,
         id: x.id,
         actorComp: isEndpointSecurityCategory()
-          ? getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap)
+          ? getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap, x.actor)
           : formatActorId(x.actor),
         host: x.host || "-",
-        endpointComp: (
+        endpointComp: String(x?.url || "").includes('/skills/') ? (
+          // Skill rows link to the skill-content page (Values tab markdown) for this host.
+          // preventDefault/stopPropagation stops the row's <a href=nextUrl> and onRowClick.
+          <div
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); openSkillContent(x); }}
+            style={{ cursor: "pointer" }}
+          >
+            <GetPrettifyEndpoint
+              maxWidth="300px"
+              method={x.method}
+              url={x.url}
+              isNew={false}
+            />
+          </div>
+        ) : (
           <GetPrettifyEndpoint
             maxWidth="300px"
             method={x.method}
@@ -700,7 +767,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           />
         ),
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
-        discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),
+        discoveredTs: func.prettifyEpoch(x.timestamp || 0),
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
         severityComp: (<div className={`badge-wrapper-${severity}`}>
@@ -765,6 +832,10 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       );
       total = ret.length;
     }
+    // Skills Evaluations tab: rows are already the skill-evaluation set (filtered server-side via
+    // x-skill-eval-mode: filterId == "skill_evaluation"), so total/pagination come straight from
+    // the backend. Active applies the complementary "exclude" mode, so skill-evaluation rows don't
+    // also appear there.
     setLoading(false);
     return { value: ret, total: total };
   }
@@ -894,7 +965,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   if (currentTab === 'needs_approval') {
     headers.push({ text: "Action", value: "approveAction", title: "Action" });
   }
-
+  const sortOptions = getSortOptions(headers);
   return (
     <>
       <GithubServerTable

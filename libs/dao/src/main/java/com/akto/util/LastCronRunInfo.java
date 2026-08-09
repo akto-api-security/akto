@@ -19,6 +19,9 @@ public class LastCronRunInfo {
     public static final String LAST_ATLAS_THREAT_SCORE_SYNC = "lastAtlasThreatScoreSync";
     private int lastAtlasThreatScoreSync;
 
+    public static final String LAST_NON_SKILL_THREAT_SCORE_SYNC = "lastNonSkillThreatScoreSync";
+    private int lastNonSkillThreatScoreSync;
+
     public static final String LAST_USER_ANALYSIS_CRON = "lastUserAnalysisCron";
     private int lastUserAnalysisCron;
 
@@ -81,6 +84,14 @@ public class LastCronRunInfo {
 
     public void setLastAtlasThreatScoreSync(int lastAtlasThreatScoreSync) {
         this.lastAtlasThreatScoreSync = lastAtlasThreatScoreSync;
+    }
+
+    public int getLastNonSkillThreatScoreSync() {
+        return lastNonSkillThreatScoreSync;
+    }
+
+    public void setLastNonSkillThreatScoreSync(int lastNonSkillThreatScoreSync) {
+        this.lastNonSkillThreatScoreSync = lastNonSkillThreatScoreSync;
     }
 
     public int getLastUserAnalysisCron() {

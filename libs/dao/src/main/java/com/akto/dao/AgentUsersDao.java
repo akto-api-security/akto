@@ -18,6 +18,9 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[]{AgenticUsers.USER_NAME}, false);
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[]{AgenticUsers.USER_EMAIL}, false);
     }
 
     /**
@@ -88,38 +91,55 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         }
     }
 
-    /** SSO write — skips teamName/userRole if already pinned as "manual" by a dashboard override. */
+    /**
+     * SSO write — skips teamName/userRole if already pinned as "manual" by a dashboard override.
+     */
     public void upsertTagFromSso(String userName, String userEmail, String teamName, String userRole, String lastUpdatedBy) {
         if (userName == null || userName.trim().isEmpty()) return;
         String trimmedName = userName.trim();
-        AgenticUsers existing = instance.findOne(Filters.eq(AgenticUsers.USER_NAME, trimmedName));
+        String trimmedEmail = userEmail == null ? "" : userEmail.trim();
+        String derivedUsername = deriveUsernameFromEmail(trimmedEmail);
 
-        List<Bson> updates = new ArrayList<>();
-        updates.add(Updates.set(AgenticUsers.USER_NAME, trimmedName));
-        updates.add(Updates.set(AgenticUsers.USER_EMAIL, userEmail == null ? "" : userEmail.trim()));
-        updates.add(Updates.set(AgenticUsers.LAST_UPDATED_AT, Context.now()));
-        updates.add(Updates.set(AgenticUsers.LAST_UPDATED_BY, lastUpdatedBy));
+        List<Bson> identityMatchers = new ArrayList<>();
+        identityMatchers.add(Filters.eq(AgenticUsers.USER_NAME, trimmedName));
+        if (!trimmedEmail.isEmpty()) identityMatchers.add(Filters.eq(AgenticUsers.USER_EMAIL, trimmedEmail));
+        if (derivedUsername != null) identityMatchers.add(Filters.eq(AgenticUsers.USER_NAME, derivedUsername));
+
+        AgenticUsers existing = instance.findOne(Filters.or(identityMatchers));
+        String identityUserName = existing != null ? existing.getUserName()
+                : (derivedUsername != null ? derivedUsername : trimmedName);
 
         String ssoTeam = teamName == null ? "" : teamName.trim();
         String ssoRole = userRole == null ? "" : userRole.trim();
 
+        List<Bson> updates = new ArrayList<>();
+        updates.add(Updates.set(AgenticUsers.USER_NAME, identityUserName));
+        updates.add(Updates.set(AgenticUsers.USER_EMAIL, trimmedEmail));
+        updates.add(Updates.set(AgenticUsers.LAST_UPDATED_AT, Context.now()));
+        updates.add(Updates.set(AgenticUsers.LAST_UPDATED_BY, lastUpdatedBy));
         // Always keep shadow fields current so admins can restore SSO values immediately.
         updates.add(Updates.set(AgenticUsers.SSO_TEAM_NAME, ssoTeam));
         updates.add(Updates.set(AgenticUsers.SSO_USER_ROLE, ssoRole));
 
-        boolean teamPinned = existing != null && AgenticUsers.SOURCE_MANUAL.equals(existing.getTeamSource());
-        boolean rolePinned = existing != null && AgenticUsers.SOURCE_MANUAL.equals(existing.getRoleSource());
+        addSsoValueUnlessPinned(updates, existing == null ? null : existing.getTeamSource(),
+                AgenticUsers.TEAM_NAME, AgenticUsers.TEAM_SOURCE, ssoTeam);
+        addSsoValueUnlessPinned(updates, existing == null ? null : existing.getRoleSource(),
+                AgenticUsers.USER_ROLE, AgenticUsers.ROLE_SOURCE, ssoRole);
 
-        if (!teamPinned) {
-            updates.add(Updates.set(AgenticUsers.TEAM_NAME, ssoTeam));
-            updates.add(Updates.set(AgenticUsers.TEAM_SOURCE, AgenticUsers.SOURCE_SSO));
-        }
-        if (!rolePinned) {
-            updates.add(Updates.set(AgenticUsers.USER_ROLE, ssoRole));
-            updates.add(Updates.set(AgenticUsers.ROLE_SOURCE, AgenticUsers.SOURCE_SSO));
-        }
+        instance.updateOne(Filters.eq(AgenticUsers.USER_NAME, identityUserName), Updates.combine(updates));
+    }
 
-        instance.updateOne(Filters.eq(AgenticUsers.USER_NAME, trimmedName), Updates.combine(updates));
+    /** Skips the write entirely if a dashboard admin has manually pinned this field. */
+    private static void addSsoValueUnlessPinned(List<Bson> updates, String currentSource, String field, String sourceField, String ssoValue) {
+        if (AgenticUsers.SOURCE_MANUAL.equals(currentSource)) return;
+        updates.add(Updates.set(field, ssoValue));
+        updates.add(Updates.set(sourceField, AgenticUsers.SOURCE_SSO));
+    }
+
+    private static String deriveUsernameFromEmail(String email) {
+        if (email == null || email.isEmpty() || !email.contains("@")) return null;
+        String local = email.substring(0, email.indexOf('@')).trim();
+        return local.isEmpty() ? null : local;
     }
 
     public List<String> findDeviceIdsByTeamsAndRoles(List<String> teams, List<String> roles) {
