@@ -313,6 +313,7 @@ export default {
             devicesAgenticAssetsTotal: resp?.devicesAgenticAssetsTotal || 0,
             teams: resp?.teams || [],
             roles: resp?.roles || [],
+            usernames: resp?.usernames || [],
         }
     },
     // Paginated top-level device rows for Endpoints' tree grid, or (when parentDeviceId is set) one
@@ -345,6 +346,7 @@ export default {
             deltaBrowsers: resp?.deltaBrowsers || 0,
             deltaUsers: resp?.deltaUsers || 0,
             deltaViolations: resp?.deltaViolations || 0,
+            deviceIds: resp?.deviceIds || [],
         }
     },
     async createCollection(name) {

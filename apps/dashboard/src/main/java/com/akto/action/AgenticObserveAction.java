@@ -1571,6 +1571,13 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     String q = nameFilter.get(0).toLowerCase(Locale.ROOT);
                     all.removeIf(g -> g.groupName == null || !g.groupName.toLowerCase(Locale.ROOT).contains(q));
                 }
+                // Devices tab's "User" filter (choices sourced from fetchUsersAndDevicesStats'
+                // usernames list) — matches each device row's already-resolved owner username.
+                List<String> usernameFilter = filters.get("username");
+                if (usernameFilter != null && !usernameFilter.isEmpty()) {
+                    Set<String> allowed = new HashSet<>(usernameFilter);
+                    all.removeIf(g -> !allowed.contains(g.username));
+                }
             }
 
             long total = all.size();
@@ -1649,12 +1656,23 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Collections.sort(teamList);
             Collections.sort(roleList);
 
+            // Distinct device-owner usernames — feeds the Devices tab's "User" filter (GithubServerTable
+            // choices, UsersAndDevices.jsx). deviceGroups already resolved each device's username
+            // (Endpoint Shield first, device-module fallback), so this is free/complete, not a guess.
+            Set<String> deviceUsernames = new HashSet<>();
+            for (HostGroupSummary g : deviceGroups.values()) {
+                if (StringUtils.isNotBlank(g.username) && !"-".equals(g.username)) deviceUsernames.add(g.username);
+            }
+            List<String> deviceUsernameList = new ArrayList<>(deviceUsernames);
+            Collections.sort(deviceUsernameList);
+
             response.put("usersCount", userGroups.size());
             response.put("devicesCount", deviceGroups.size());
             response.put("usersAgenticAssetsTotal", usersAgenticAssetsTotal);
             response.put("devicesAgenticAssetsTotal", devicesAgenticAssetsTotal);
             response.put("teams", teamList);
             response.put("roles", roleList);
+            response.put("usernames", deviceUsernameList);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching users and devices stats: " + e.getMessage());
@@ -1834,6 +1852,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // value, which must match zero rows (real Set Filter semantics) — containsKey (not
             // null-and-nonempty) is what distinguishes that from "filter untouched".
             if (filters != null) {
+                if (filters.containsKey("deviceId")) {
+                    Set<String> allowed = new HashSet<>(filters.get("deviceId"));
+                    all.removeIf(g -> !allowed.contains(g.groupKey));
+                }
                 if (filters.containsKey("os")) {
                     Set<String> allowed = new HashSet<>(filters.get("os"));
                     all.removeIf(g -> !allowed.contains(g.os));
@@ -2088,9 +2110,17 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             sparklines.put("endpoints", endpointCounts); sparklines.put("browsers", browserCounts); sparklines.put("users", userCounts);
             sparklines.put("violations", violationsCounts);
 
+            // Distinct device ids for the "Endpoint" column's Set Filter on DeviceEndpoints.jsx —
+            // deviceFirstSeen.keySet() is the same extractEndpointId(hostName) grouping key the grid's
+            // own rows use, so this is guaranteed complete/consistent (not an approximation), and free
+            // since it's already computed above for the trend charts.
+            List<String> deviceIds = new ArrayList<>(deviceFirstSeen.keySet());
+            Collections.sort(deviceIds);
+
             response.put("deviceCount", endpointDeviceIds.size());
             response.put("browserDeviceCount", browserDeviceIds.size());
             response.put("totalUsers", userFirstSeen.size());
+            response.put("deviceIds", deviceIds);
             response.put("monthLabels", monthLabels);
             response.put("osTrend", osTrend);
             response.put("browserTrend", browserTrend);

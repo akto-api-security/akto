@@ -224,14 +224,15 @@ function UsernameCellInner({ data, node }) {
 const DASH_FORMATTER = (params) => (params.value && params.value !== "-" ? params.value : "-");
 
 // Set Filter values must be supplied up front under SSRM — AG Grid can't auto-derive them from a
-// partial/paginated dataset the way it does in client-side row model. os/group/role are enumerable
-// (small, known set), so they get real filters; deviceId/lastTraffic aren't (near-unique per row /
-// a timestamp), so they stay unfiltered — deviceId already has the grid's own search box.
+// partial/paginated dataset the way it does in client-side row model. deviceId/os/group/role are
+// all enumerable (known, server-computed lists — see filterOptions below), so they get real
+// filters; lastTraffic doesn't (a timestamp, no sensible Set Filter shape).
 function buildDeviceColDefs(filterOptions) {
     return [
         { field: "riskScore", headerName: "Risk score", width: 110, sort: "desc", filter: false, cellRenderer: RiskScoreCellRenderer },
         {
-            field: "deviceId", headerName: "Endpoint", flex: 1.6, minWidth: 240, sortable: true, filter: false,
+            field: "deviceId", headerName: "Endpoint", flex: 1.6, minWidth: 240, sortable: true,
+            filter: "agSetColumnFilter", filterParams: { values: filterOptions.deviceId },
             valueFormatter: (params) => params.value || "-",
         },
         {
@@ -390,7 +391,7 @@ export default function DeviceEndpoints() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [collections, setCollections] = useState([]);
-    const [stats, setStats] = useState({ deviceCount: 0, browserDeviceCount: 0, totalUsers: 0, monthLabels: [], osTrend: {}, browserTrend: {}, sparklines: {} });
+    const [stats, setStats] = useState({ deviceCount: 0, browserDeviceCount: 0, totalUsers: 0, deviceIds: [], monthLabels: [], osTrend: {}, browserTrend: {}, sparklines: {} });
     const [violationsBySeverity, setViolationsBySeverity] = useState([]);
     const totalViolations = useMemo(
         () => violationsBySeverity.reduce((sum, s) => sum + (s.y || 0), 0),
@@ -488,9 +489,13 @@ export default function DeviceEndpoints() {
         loadStats();
     }, [loadStats, refreshKey]);
 
-    // Distinct os/team/role values for the grid's Set Filters — deviceMetadataMap is already the
-    // full, unpaginated account-wide map (fetched once at mount via fetchEndpointShieldUserMetadata),
-    // so these can be derived client-side with no extra network call.
+    // Distinct deviceId/os/team/role values for the grid's Set Filters. os/team/role come from
+    // deviceMetadataMap — already the full, unpaginated account-wide map (fetched once at mount via
+    // fetchEndpointShieldUserMetadata) — so no extra network call. deviceId comes from
+    // fetchDeviceEndpointsStats's own deviceIds list (arrives slightly later, once loadStats
+    // resolves) rather than being derived client-side, since it must match the grid's own
+    // extractEndpointId(hostName) grouping key exactly — safer to reuse the server's computation
+    // than re-derive it in the browser and risk drift.
     const filterOptions = useMemo(() => {
         const meta = Object.values(enrichRef.current.deviceMetadataMap || {});
         const os = new Set(), group = new Set(), role = new Set();
@@ -499,8 +504,11 @@ export default function DeviceEndpoints() {
             if (m.team) group.add(m.team);
             if (m.role) role.add(m.role);
         });
-        return { os: Array.from(os).sort(), group: Array.from(group).sort(), role: Array.from(role).sort() };
-    }, [refreshKey]);
+        return {
+            deviceId: stats.deviceIds || [],
+            os: Array.from(os).sort(), group: Array.from(group).sort(), role: Array.from(role).sort(),
+        };
+    }, [refreshKey, stats.deviceIds]);
 
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString, groupKeys, filters }) => {
         const { trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId } = enrichRef.current;

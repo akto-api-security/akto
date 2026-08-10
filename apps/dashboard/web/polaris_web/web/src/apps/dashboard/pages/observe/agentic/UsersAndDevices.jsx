@@ -71,7 +71,7 @@ function UsersAndDevices() {
     const filtersMap = PersistStore((state) => state.filtersMap);
     const setFiltersMap = PersistStore((state) => state.setFiltersMap);
 
-    const [stats, setStats] = useState({ usersCount: 0, devicesCount: 0, usersAgenticAssetsTotal: 0, devicesAgenticAssetsTotal: 0, teams: [], roles: [] });
+    const [stats, setStats] = useState({ usersCount: 0, devicesCount: 0, usersAgenticAssetsTotal: 0, devicesAgenticAssetsTotal: 0, teams: [], roles: [], usernames: [] });
     const [refreshKey, setRefreshKey] = useState(0);
     const [editTagModal, setEditTagModal] = useState({ active: false, rows: [], team: '', userRole: '', teamSource: 'sso', roleSource: 'sso', ssoHintTeam: '', ssoHintRole: '', saving: false });
 
@@ -178,6 +178,7 @@ function UsersAndDevices() {
         const filters = {};
         if (filtersObj?.team?.length) filters.team = filtersObj.team;
         if (filtersObj?.userRole?.length) filters.userRole = filtersObj.userRole;
+        if (filtersObj?.username?.length) filters.username = filtersObj.username;
         const res = await api.fetchUsersAndDevicesSummary({
             groupBy: isUsersTab ? "user" : "device",
             skip, limit, sortKey: mappedSortKey, sortOrder: mongoSortOrder, queryValue, filters,
@@ -209,7 +210,12 @@ function UsersAndDevices() {
     const filtersDef = useMemo(() => (isUsersTab ? [
         { key: "team", label: "Team", choices: (stats.teams || []).map((t) => ({ label: t, value: t })) },
         { key: "userRole", label: "User role", choices: (stats.roles || []).map((r) => ({ label: r, value: r })) },
-    ] : []), [isUsersTab, stats.teams, stats.roles]);
+    ] : [
+        // Devices tab has no Team/User role columns (includeUserColumns=false above), but each row's
+        // owner username is already resolved server-side (HostGroupSummary.username) — filterable even
+        // without a dedicated visible column, same as searching by it already implicitly works via groupName.
+        { key: "username", label: "User", choices: (stats.usernames || []).map((u) => ({ label: u, value: u })) },
+    ]), [isUsersTab, stats.teams, stats.roles, stats.usernames]);
 
     const disambiguateLabel = useCallback((key, value) => func.convertToDisambiguateLabelObj(value, null, 2), []);
 
