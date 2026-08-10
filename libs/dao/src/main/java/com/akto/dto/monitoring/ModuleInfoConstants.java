@@ -61,6 +61,12 @@ public class ModuleInfoConstants {
             put("AKTO_LOG_LEVEL", "Log Level");
         }});
 
+        put(ModuleInfo.ModuleType.MINI_RUNTIME, new HashMap<String, String>() {{
+            put("AKTO_LOG_LEVEL", "Log Level");
+            put("DEBUG_URLS", "Debug URLs (url1,url2,url3)");
+            put("DEBUG_HOSTS", "Debug Hosts (host1,host2,host3)");
+        }});
+
         put(ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD, new java.util.LinkedHashMap<String, String>() {{
             put("AKTO_API_TOKEN", "Akto API Token");
             put("DATABASE_ABSTRACTOR_SERVICE_URL", "Database Abstractor Service URL");

@@ -1,4 +1,4 @@
-import { Button, LegacyCard, DataTable, Checkbox, Modal, Text, Tooltip, Icon, HorizontalStack } from "@shopify/polaris"
+import { Button, LegacyCard, DataTable, Checkbox, Modal, Text, Tooltip, Icon, HorizontalStack, Banner } from "@shopify/polaris"
 import { AlertMinor } from "@shopify/polaris-icons"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
@@ -12,13 +12,16 @@ const ModuleInfo = () => {
     const [ selectedModules, setSelectedModules ] = useState([])
     const [ modalActive, setModalActive ] = useState(false)
     const [ selectedModule, setSelectedModule ] = useState(null)
+    const [ runtimeEnvOverrides, setRuntimeEnvOverrides ] = useState({})
 
-    const CONFIGURABLE_MODULE_TYPES = ['TRAFFIC_COLLECTOR', 'AKTO_AGENT_GATEWAY', 'THREAT_DETECTION'];
+    const CONFIGURABLE_MODULE_TYPES = ['TRAFFIC_COLLECTOR', 'AKTO_AGENT_GATEWAY', 'THREAT_DETECTION', 'MINI_RUNTIME'];
 
     const fetchModuleInfo = async () => {
         const response = await settingRequests.fetchModuleInfo();
         setModuleInfos(response.moduleInfos || []);
         setAllowedEnvFields(response.allowedEnvFields || []);
+        const adminSettings = await settingRequests.fetchAdminSettings();
+        setRuntimeEnvOverrides(adminSettings?.accountSettings?.runtimeEnvOverrides || {});
     }
 
     useEffect(() => {
@@ -70,8 +73,19 @@ const ModuleInfo = () => {
 
     const handleSaveEnv = async (moduleId, moduleName, envData) => {
         try {
-            await settingRequests.updateModuleEnvAndReboot(moduleId, moduleName, envData);
-            func.setToast(true, false, "Environment config saved successfully. Module will reboot.");
+            if (selectedModule?.moduleType === 'MINI_RUNTIME') {
+                await settingRequests.updateRuntimeEnvOverrides(envData);
+                const activeMiniRuntimeIds = moduleInfos
+                    .filter(m => m.moduleType === 'MINI_RUNTIME' && canRebootModule(m))
+                    .map(m => m.id);
+                if (activeMiniRuntimeIds.length > 0) {
+                    await settingRequests.rebootModules(activeMiniRuntimeIds, false);
+                }
+                func.setToast(true, false, `Env overrides saved. Restarting ${activeMiniRuntimeIds.length} active mini-runtime instance(s).`);
+            } else {
+                await settingRequests.updateModuleEnvAndReboot(moduleId, moduleName, envData);
+                func.setToast(true, false, "Environment config saved successfully. Module will reboot.");
+            }
             handleModalClose();
             await fetchModuleInfo();
         } catch (error) {
@@ -176,10 +190,17 @@ const ModuleInfo = () => {
                 large
             >
                 <Modal.Section>
+                    {selectedModule?.moduleType === 'MINI_RUNTIME' && (
+                        <Banner tone="warning" title="Applies to all instances">
+                            These values are account-wide - saving here changes them for every mini-runtime instance on this account, not just {selectedModule?.name || 'this one'}.
+                        </Banner>
+                    )}
                     <ModuleEnvConfigComponent
                         title="Environment Variables"
                         description={`Configure environment variables for ${selectedModule?.name || 'module'}`}
-                        module={selectedModule}
+                        module={selectedModule?.moduleType === 'MINI_RUNTIME'
+                            ? { ...selectedModule, additionalData: { env: runtimeEnvOverrides } }
+                            : selectedModule}
                         allowedEnvFields={allowedEnvFields}
                         onSaveEnv={handleSaveEnv}
                     />

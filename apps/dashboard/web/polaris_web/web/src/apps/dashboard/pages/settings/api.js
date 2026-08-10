@@ -1082,6 +1082,13 @@ const settingRequests = {
             data: {filterLogPolicy}
         })
     },
+    updateRuntimeEnvOverrides(runtimeEnvOverrides) {
+        return request({
+            url: '/api/updateRuntimeEnvOverrides',
+            method: 'post',
+            data: {runtimeEnvOverrides}
+        })
+    },
     rebootModules(moduleIds, deleteTopicAndReboot = false) {
         return request({
             url: '/api/rebootModules',
