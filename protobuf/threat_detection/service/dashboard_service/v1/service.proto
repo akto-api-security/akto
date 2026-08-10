@@ -450,6 +450,10 @@ message FetchTopNDataResponse {
 message FetchHostSeverityCountsRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  // Ascending epoch-second month-start boundaries. When non-empty, the response's monthly_totals is
+  // populated with one count per boundary (per-month, not cumulative), bucketed via a cheap
+  // server-side aggregation — no per-event data leaves this service.
+  repeated uint32 month_boundaries = 3;
 }
 
 message FetchHostSeverityCountsResponse {
@@ -462,6 +466,9 @@ message FetchHostSeverityCountsResponse {
   }
 
   repeated HostSeverityCount host_counts = 1;
+  // Parallel to the request's month_boundaries — count of events in [boundary[i], boundary[i+1]) for
+  // all but the last entry, and [boundary[i], end_ts] for the last. Empty when month_boundaries wasn't set.
+  repeated uint32 monthly_totals = 2;
 }
 
 message FetchDashboardTopDataRequest {

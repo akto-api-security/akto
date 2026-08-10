@@ -150,4 +150,50 @@ public class AbstractThreatDetectionAction extends UserAction {
     }
     return result;
   }
+
+  /**
+   * Per-month violation totals for the account, bucketed server-side by the threat-detection-backend
+   * (a single cheap $bucket aggregation, not a raw-event fetch) — lets a caller build a trend
+   * sparkline without pulling every malicious-event doc to compute it locally.
+   * @param monthBoundaries ascending epoch-second month-start boundaries (see AgenticObserveAction's
+   *     buildWindowSlots) — index i of the returned list is the count for boundary i.
+   * @return one count per monthBoundaries entry, or an empty list on any error/empty input.
+   */
+  protected List<Integer> fetchViolationsMonthlyTotals(
+      int startTimestamp, int endTimestamp, List<Integer> monthBoundaries) {
+    if (monthBoundaries == null || monthBoundaries.isEmpty()) return new ArrayList<>();
+    try {
+      String url = String.format("%s/api/dashboard/get_host_severity_counts", this.getBackendUrl());
+      MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+
+      Map<String, Object> body = new HashMap<String, Object>() {
+        {
+          put("start_ts", startTimestamp);
+          put("end_ts", endTimestamp);
+          put("month_boundaries", monthBoundaries);
+        }
+      };
+      String msg = objectMapper.valueToTree(body).toString();
+      String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+
+      RequestBody requestBody = RequestBody.create(msg, JSON);
+      Request request = new Request.Builder()
+          .url(url)
+          .post(requestBody)
+          .addHeader("Authorization", "Bearer " + this.getApiToken())
+          .addHeader("Content-Type", "application/json")
+          .addHeader("x-context-source", contextSourceValue)
+          .build();
+
+      try (Response resp = httpClient.newCall(request).execute()) {
+        String responseBody = resp.body() != null ? resp.body().string() : "";
+        return ProtoMessageUtils.<com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsResponse>toProtoMessage(
+            com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsResponse.class,
+            responseBody
+        ).map(m -> new ArrayList<>(m.getMonthlyTotalsList())).orElse(new ArrayList<>());
+      }
+    } catch (Exception e) {
+      return new ArrayList<>();
+    }
+  }
 }

@@ -1320,6 +1320,19 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return Math.max(0, counts[counts.length - 1] - counts[0]);
     }
 
+    // Running total from already-bucketed per-month counts (as opposed to cumulativeCounts, which
+    // buckets raw per-item timestamps) — the threat-detection-backend does the bucketing, this just
+    // accumulates it into the same cumulative-trend shape the other sparklines use.
+    private static int[] cumulativeFromMonthlyCounts(List<Integer> monthlyCounts, int n) {
+        int[] counts = new int[n];
+        int acc = 0;
+        for (int i = 0; i < n; i++) {
+            acc += (monthlyCounts != null && i < monthlyCounts.size() && monthlyCounts.get(i) != null) ? monthlyCounts.get(i) : 0;
+            counts[i] = acc;
+        }
+        return counts;
+    }
+
     public String fetchDeviceEndpointsStats() {
         response = new BasicDBObject();
         try {
@@ -1429,8 +1442,16 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             BasicDBObject browserTrend = new BasicDBObject();
             browserTrend.put("chrome", chromeCounts); browserTrend.put("firefox", firefoxCounts);
             browserTrend.put("edge", edgeCounts); browserTrend.put("safari", safariCounts);
+            // Server-side $bucket aggregation in threat-detection-backend — one more cheap call, no
+            // raw violation events fetched — mirrors the endpoint/browser/user trends above.
+            List<Integer> monthBoundaries = new ArrayList<>();
+            for (MonthSlot s : slots) monthBoundaries.add(s.boundary);
+            List<Integer> monthlyViolations = fetchViolationsMonthlyTotals(startTimestamp, endTimestamp, monthBoundaries);
+            int[] violationsCounts = cumulativeFromMonthlyCounts(monthlyViolations, slots.size());
+
             BasicDBObject sparklines = new BasicDBObject();
             sparklines.put("endpoints", endpointCounts); sparklines.put("browsers", browserCounts); sparklines.put("users", userCounts);
+            sparklines.put("violations", violationsCounts);
 
             response.put("deviceCount", endpointDeviceIds.size());
             response.put("browserDeviceCount", browserDeviceIds.size());
@@ -1442,6 +1463,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             response.put("deltaEndpoints", windowDelta(endpointCounts));
             response.put("deltaBrowsers", windowDelta(browserCounts));
             response.put("deltaUsers", windowDelta(userCounts));
+            response.put("deltaViolations", windowDelta(violationsCounts));
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching device endpoints stats: " + e.getMessage());

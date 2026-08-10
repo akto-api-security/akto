@@ -687,7 +687,8 @@ public class DashboardRouter implements ARouter {
                         ctx.get("accountId"),
                         req.getStartTs(),
                         req.getEndTs(),
-                        contextSource
+                        contextSource,
+                        req.getMonthBoundariesList()
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });

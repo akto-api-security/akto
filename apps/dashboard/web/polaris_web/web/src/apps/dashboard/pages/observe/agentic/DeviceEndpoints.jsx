@@ -85,6 +85,10 @@ function TopSection({ stats, violationsBySeverity, totalViolations }) {
                         title="Total Violations"
                         total={totalViolations ?? 0}
                         totalColor="critical"
+                        delta={stats?.deltaViolations ?? 0}
+                        sparklineCounts={sparklines.violations}
+                        sparklineColor="#DC2626"
+                        sparklineLabels={stats?.monthLabels}
                         noCard
                     />
                 </VerticalStack>

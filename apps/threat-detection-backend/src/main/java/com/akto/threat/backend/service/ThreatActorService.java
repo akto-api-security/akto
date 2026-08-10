@@ -1441,7 +1441,7 @@ public class ThreatActorService {
   // browser just to run a per-row severity tally. Mirrors fetchTopNData's hostPipeline above, but groups
   // by {host, severity} instead of host alone, and has no result-count limit.
   public FetchHostSeverityCountsResponse fetchHostSeverityCounts(
-      String accountId, long startTs, long endTs, String contextSource) {
+      String accountId, long startTs, long endTs, String contextSource, List<Integer> monthBoundaries) {
 
     Document match = new Document();
     if (startTs > 0 || endTs > 0) {
@@ -1493,6 +1493,44 @@ public class ThreatActorService {
     for (FetchHostSeverityCountsResponse.HostSeverityCount.Builder b : byHost.values()) {
       resp.addHostCounts(b.build());
     }
+
+    if (monthBoundaries != null && !monthBoundaries.isEmpty()) {
+      // Boundary value -> index, keyed as long so lookups below aren't tripped up by Integer/Long
+      // autoboxing mismatches against the bucket ids Mongo hands back.
+      Map<Long, Integer> boundaryIndex = new HashMap<>();
+      List<Long> bucketBoundaries = new ArrayList<>();
+      for (int i = 0; i < monthBoundaries.size(); i++) {
+        long boundary = monthBoundaries.get(i).longValue();
+        boundaryIndex.put(boundary, i);
+        bucketBoundaries.add(boundary);
+      }
+      // One extra boundary past the last month-start so $bucket's exclusive upper bound still
+      // captures events landing on endTs itself, keeping this a single cheap aggregation instead of
+      // pulling per-event timestamps to compute the trend client- or dashboard-side.
+      bucketBoundaries.add(Math.max(endTs + 1, bucketBoundaries.get(bucketBoundaries.size() - 1) + 1));
+
+      List<Document> bucketPipeline = new ArrayList<>();
+      if (!match.isEmpty()) {
+        bucketPipeline.add(new Document("$match", match));
+      }
+      bucketPipeline.add(new Document("$bucket",
+          new Document("groupBy", "$detectedAt")
+              .append("boundaries", bucketBoundaries)
+              .append("default", "__out_of_range__")));
+
+      int[] monthlyCounts = new int[monthBoundaries.size()];
+      try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, bucketPipeline).cursor()) {
+        while (cursor.hasNext()) {
+          Document doc = cursor.next();
+          Object bucketId = doc.get("_id");
+          if (!(bucketId instanceof Number)) continue; // "__out_of_range__" default bucket
+          Integer idx = boundaryIndex.get(((Number) bucketId).longValue());
+          if (idx != null) monthlyCounts[idx] = doc.getInteger("count", 0);
+        }
+      }
+      for (int count : monthlyCounts) resp.addMonthlyTotals(count);
+    }
+
     return resp.build();
   }
 
