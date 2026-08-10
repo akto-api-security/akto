@@ -112,12 +112,11 @@ const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 
 // ── MCP tools drill-down ──────────────────────────────────────────────────────
 
-function AgentMcpToolsView({ asset, selectedMcp, agenticFlatData, goToList, onNavChange, setSelectedTool, setView }) {
+function AgentMcpToolsView({ asset, selectedMcp, goToList, onNavChange, setSelectedTool, setView }) {
     const [mcpTools, setMcpTools] = useState([]);
 
     useEffect(() => {
-        const flat = agenticFlatData.find((a) => a.name === selectedMcp.name || a.id === selectedMcp.name);
-        const collectionIds = flat?.collectionIds;
+        const collectionIds = selectedMcp?.collectionIds;
         if (!collectionIds?.length) { setMcpTools([]); return; }
         let cancelled = false;
         (async () => {
@@ -137,7 +136,7 @@ function AgentMcpToolsView({ asset, selectedMcp, agenticFlatData, goToList, onNa
             }
         })();
         return () => { cancelled = true; };
-    }, [selectedMcp?.name, agenticFlatData]);
+    }, [selectedMcp?.name, selectedMcp?.collectionIds]);
 
     return (
         <Box className="agentic-flex-fill">
@@ -235,7 +234,7 @@ function ConfigViolationsView({ configRows = [] }) {
 
 // ── Main view ─────────────────────────────────────────────────────────────────
 
-export default function AgentComponentsView({ asset, onNavChange, onNavigateToAsset, agenticFlatData = [], configViolations = null, configRows = [] }) {
+export default function AgentComponentsView({ asset, onNavChange, onNavigateToAsset, configViolations = null, configRows = [] }) {
     const [view,          setView]          = useState("list");
     const [selectedMcp,   setSelectedMcp]   = useState(null);
     const [selectedTool,  setSelectedTool]  = useState(null);
@@ -257,8 +256,14 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
                 seen.add(key);
                 return true;
             })
-            .map((mcpName) => ({ id: mcpName, name: mcpName, endpoint: mcpName, toolCount: 0 }));
-    }, [asset.mcpServers]);
+            .map((mcpName) => ({
+                id: mcpName,
+                name: mcpName,
+                endpoint: mcpName,
+                toolCount: 0,
+                collectionIds: asset.mcpServerCollectionIds?.[mcpName] || [],
+            }));
+    }, [asset.mcpServers, asset.mcpServerCollectionIds]);
 
     useEffect(() => {
         const collectionIds = asset?.collectionIds;
@@ -391,7 +396,6 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
             <AgentMcpToolsView
                 asset={asset}
                 selectedMcp={selectedMcp}
-                agenticFlatData={agenticFlatData}
                 goToList={goToList}
                 onNavChange={onNavChange}
                 setSelectedTool={setSelectedTool}

@@ -370,6 +370,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         // represent, mirrors constants.js's mcpServers derivation exactly (extractServiceName over
         // non-connector-ingested collections, excluding the agent's own name).
         final Set<String> serviceNames = new HashSet<>();
+        // Agent rows only — serviceNames' own collection ids, so the flyout's MCP-server tools
+        // drill-down (AgentMcpToolsView) can fetch a specific server's tools without needing the
+        // account-wide agenticFlatData this rebuild deliberately doesn't send.
+        final Map<String, Set<Integer>> serviceCollectionIds = new HashMap<>();
         final List<Integer> collectionIds = new ArrayList<>();
         double maxRiskScore = 0;
         int maxTrafficTimestamp = 0;
@@ -395,6 +399,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 String serviceName = extractServiceNameForGrouping(hostName);
                 if (serviceName != null && !serviceName.equalsIgnoreCase(groupKey)) {
                     serviceNames.add(serviceName);
+                    serviceCollectionIds.computeIfAbsent(serviceName, k -> new HashSet<>()).add(c.getId());
                 }
             }
             if (envType != null) {
@@ -432,7 +437,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             g.put("hasPersonalAccount", hasPersonalAccount);
             g.put("hasLocalMcpServer", hasLocalMcpServer);
             g.put("hasMisconfiguredConfig", hasMisconfiguredConfig);
-            if (!serviceNames.isEmpty()) g.put("mcpServers", new ArrayList<>(serviceNames));
+            if (!serviceNames.isEmpty()) {
+                g.put("mcpServers", new ArrayList<>(serviceNames));
+                BasicDBObject mcpServerCollectionIds = new BasicDBObject();
+                for (Map.Entry<String, Set<Integer>> e : serviceCollectionIds.entrySet()) {
+                    mcpServerCollectionIds.put(e.getKey(), new ArrayList<>(e.getValue()));
+                }
+                g.put("mcpServerCollectionIds", mcpServerCollectionIds);
+            }
             return g;
         }
     }
