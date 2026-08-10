@@ -114,7 +114,7 @@ export function parseConfigEvidence(evidence, ruleViolated) {
     const value = rest.replace(/^"|"$/g, "");
     field = field.replace(/\[\d+\]/g, "").split(".").pop().trim();
 
-    if (ruleViolated && ruleViolated !== "-") {
+    if (!field && ruleViolated && ruleViolated !== "-") {
         return { field: String(ruleViolated).replace(/\[\d+\]/g, "").split(".").pop().trim(), value };
     }
     return { field, value };

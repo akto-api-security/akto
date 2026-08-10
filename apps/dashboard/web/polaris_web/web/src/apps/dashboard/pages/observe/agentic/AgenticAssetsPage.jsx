@@ -362,7 +362,7 @@ export default function AgenticAssetsPage() {
           riskScoreResp,
           sensitiveInfoResp,
           shieldResult,
-          violationRows,
+          rawViolationRows,
           userAnalysisList,
         ] = await Promise.all([
           api.getAllCollectionsBasic(),
@@ -375,6 +375,12 @@ export default function AgenticAssetsPage() {
         ]);
 
         if (!isMountedRef.current) return;
+
+        // Skill invocations fire their own /skills/<name> violation events distinct from the
+        // agent/service traffic that triggered them — exclude those here so every violation
+        // count and chart on this page (stat card, sparkline, Top Assets with Violations, the
+        // per-row Violations column) reflects only agent/service/LLM-attributable violations.
+        const violationRows = rawViolationRows.filter((row) => !row.url?.startsWith("/skills/"));
 
         const collections = apiCollectionsResp?.apiCollections || [];
         const trafficMap = trafficInfoResp || {};
@@ -399,6 +405,7 @@ export default function AgenticAssetsPage() {
             usernameMap,
             userMetadataMap,
             violationsByCollectionId,
+            violationRows,
             analysisByKey,
             userAnalysisKeysByDeviceId,
           },
@@ -421,10 +428,14 @@ export default function AgenticAssetsPage() {
         setAgenticViolationRows(violationRows);
         setCollections(collections);
 
-        // Enrich Skill rows with malicious flag (same source as old UI) — async, non-blocking
+        // Enrich Skill rows with malicious flag (same source as old UI) — async, non-blocking.
+        // Only collections that actually have skills need this lookup; querying every collection
+        // fires one request per collection account-wide for no benefit on the rest.
         const skillCollectionIds = [];
         collections.forEach((c) => {
-          if (!skillCollectionIds.includes(c.id)) skillCollectionIds.push(c.id);
+          if (Array.isArray(c.skills) && c.skills.length > 0 && !skillCollectionIds.includes(c.id)) {
+            skillCollectionIds.push(c.id);
+          }
         });
         if (skillCollectionIds.length) {
           fetchAndCacheSkillApiData(skillCollectionIds, { api, PersistStore })

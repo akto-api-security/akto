@@ -502,6 +502,14 @@ const api = {
         })
     },
 
+    scheduleCrowdStrikeDiscovery(discoveryTargetMode, discoveryDeviceIds) {
+        return request({
+            url: '/api/scheduleCrowdStrikeDiscovery',
+            method: 'post',
+            data: { discoveryTargetMode, discoveryDeviceIds }
+        })
+    },
+
     initiateCopilotStudioMultiEnvSetup(tenantId, clientId, clientSecret, dataIngestionUrl) {
         return request({
             url: '/api/copilotStudio/multiEnv/initiate',
