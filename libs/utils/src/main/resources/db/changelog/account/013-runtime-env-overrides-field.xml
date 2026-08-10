@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        AccountSettingsDao gained an updateRuntimeEnvOverrides helper (new
+        runtimeEnvOverrides field on the accounts_settings document, mini-runtime
+        env var overrides). No-op: MongoDB is schema-less, the field is written via
+        a dotted-path $set which creates it on demand, and the read path already
+        treats a missing/null field as "no overrides". This changeset exists only
+        to satisfy prod.yml's DAO-migration-required check for the DAO file touched
+        by that change.
+    -->
+
+    <changeSet id="013-account-runtime-env-overrides-field" author="akto">
+        <empty/>
+    </changeSet>
+
+</databaseChangeLog>

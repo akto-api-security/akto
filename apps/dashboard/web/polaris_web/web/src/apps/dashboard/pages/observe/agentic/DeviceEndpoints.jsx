@@ -500,7 +500,10 @@ export default function DeviceEndpoints() {
                     fetchAgenticViolations({ startTimestamp, endTimestamp }),
                 ]);
                 if (!isMountedRef.current) return;
-                const violationRows = violationsResp || [];
+                // Exclude skill-invocation events (/skills/<name> endpoint) - same exclusion as
+                // AgenticAssetsPage.jsx, so every violation count/chart on this page (stat card,
+                // severity donut, per-user Violations column) reflects only agent/device traffic.
+                const violationRows = (violationsResp || []).filter((row) => !row.url?.startsWith("/skills/"));
                 const { usernameMap = {}, userMetadataMap = {}, moduleInfos = [] } = shieldResult || {};
                 const collections = apiCollectionsResp?.apiCollections || [];
                 const pageData = buildDeviceEndpointsPageData(
