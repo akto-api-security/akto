@@ -184,7 +184,6 @@ const ModuleInfo = () => {
                 <Modal.Section>
                     {selectedModule?.moduleType === 'MINI_RUNTIME' && (
                         <Banner tone="warning" title="Applies to all instances">
-                            Applies to all instances.
                         </Banner>
                     )}
                     <ModuleEnvConfigComponent
