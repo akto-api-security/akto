@@ -97,7 +97,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Setter private String parentDeviceId; // blank => paginated top-level device rows; set => that device's (device,service) children
     @Setter private Map<String, Map<String, String>> deviceMetadataMap; // deviceId -> {username, team, role, os}
     @Setter private Map<String, Map<String, Integer>> violationsByCollectionId; // collection id (string) -> {critical, high, medium, low}
-    @Setter private Map<String, Integer> deviceAiInteractionsMap; // deviceId -> total AI-interaction tokens (see constants.js's buildDeviceAiInteractionsMap)
+    @Setter private Map<String, Integer> userAnalysisFlatMap; // "serviceId|deviceId" -> total AI-interaction tokens (see constants.js's buildUserAnalysisFlatMap)
 
     /**
      * ATLAS skill enrichment in a SINGLE query. Skill (/skills/&lt;name&gt;) and agent-config (/config/)
@@ -761,17 +761,29 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
             response.put("topAssetsWithViolations", topViol);
 
-            // "Top Used Applications" — per-group AI-interaction totals from deviceAiInteractionsMap
-            // (see constants.js's buildDeviceAiInteractionsMap), summed over each group's own
-            // endpointIds. Same Endpoint Shield deviceId match tier already used for the per-row
-            // column — documented tradeoff, not the full hostname-fallback matching the pre-rebuild
-            // client-side version had (would need per-collection hostnames this endpoint doesn't fetch).
-            Map<String, Integer> deviceInteractions = deviceAiInteractionsMap != null ? deviceAiInteractionsMap : Collections.emptyMap();
+            // "Top Used Applications" — per-group AI-interaction totals from userAnalysisFlatMap (see
+            // constants.js's buildUserAnalysisFlatMap). UserAnalysisData's serviceId is a readable
+            // client name ("claudecli", "codexcli", ...) matching the SECOND segment of the
+            // collection's own hostname (<deviceId>.<serviceId>.<host>) — mirrors
+            // analysisKeysForCollection's hostname-segment candidates, not module_info's own id/name
+            // (which never actually matches UserAnalysisData's key scheme).
+            Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
             List<BasicDBObject> topApps = new ArrayList<>();
             for (GroupSummary g : groups.values()) {
                 int groupTotal = 0;
-                for (String deviceId : g.endpointIds) {
-                    groupTotal += deviceInteractions.getOrDefault(deviceId, 0);
+                Set<String> seenKeys = new HashSet<>();
+                for (String hostName : g.hostNames) {
+                    String[] parts = DOT_SPLIT.split(hostName);
+                    if (parts.length < 2) continue;
+                    String deviceId = parts[0];
+                    List<String> candidates = new ArrayList<>();
+                    candidates.add(parts[1]);
+                    if (parts.length >= 3) candidates.add(String.join(".", Arrays.asList(parts).subList(2, parts.length)));
+                    for (String serviceId : candidates) {
+                        String key = serviceId + "|" + deviceId;
+                        if (!seenKeys.add(key)) continue;
+                        groupTotal += userAnalysis.getOrDefault(key, 0);
+                    }
                 }
                 if (groupTotal > 0) {
                     BasicDBObject row = new BasicDBObject();

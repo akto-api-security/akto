@@ -31,7 +31,7 @@ import agenticObserveApi, {
 } from "./agenticObserveApi";
 import {
   buildUserAnalysisLookup,
-  buildDeviceAiInteractionsMap,
+  buildUserAnalysisFlatMap,
   getRowViolations,
   buildTeamGroupsFromDevices,
   computeAiInteractionsFromDevices,
@@ -307,7 +307,7 @@ export default function AgenticAssetsPage() {
     userMetadataMap: {},
     analysisByKey: new Map(),
     userAnalysisKeysByDeviceId: new Map(),
-    deviceAiInteractionsMap: {},
+    userAnalysisFlatMap: {},
     maliciousSkillKeys: new Set(),
     trafficMap: {},
     riskScoreMap: {},
@@ -343,9 +343,9 @@ export default function AgenticAssetsPage() {
 
   const loadStats = useCallback(async () => {
     try {
-      const { trafficMap, riskScoreMap, violationsByCollectionId, deviceAiInteractionsMap } = enrichRef.current;
+      const { trafficMap, riskScoreMap, violationsByCollectionId, userAnalysisFlatMap } = enrichRef.current;
       const result = await api.fetchAgenticAssetsStats({
-        trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, deviceAiInteractionsMap,
+        trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, userAnalysisFlatMap,
       });
       setStats(result);
     } catch (e) {
@@ -418,7 +418,7 @@ export default function AgenticAssetsPage() {
               ...enrichRef.current,
               violationsByCollectionId,
               analysisByKey,
-              deviceAiInteractionsMap: buildDeviceAiInteractionsMap(enrichRef.current.userAnalysisKeysByDeviceId, analysisByKey),
+              userAnalysisFlatMap: buildUserAnalysisFlatMap(analysisByKey),
             };
             setHostSeverityCounts(hostCounts);
             setRefreshKey((k) => k + 1); // re-run loadStats now that Top Used Applications' data is ready

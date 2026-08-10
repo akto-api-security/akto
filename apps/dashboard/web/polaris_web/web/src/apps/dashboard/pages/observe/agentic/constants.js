@@ -893,18 +893,19 @@ export function computeAiInteractionsFromDevices(devices, analysisByKey, userAna
     return total > 0 ? { totalInputTokens, totalOutputTokens, total } : null;
 }
 
-// Account-wide deviceId -> total AI-interaction tokens, same Endpoint Shield deviceId match tier as
-// computeAiInteractionsFromDevices (not the per-collection hostname-fallback tiers — same documented
-// tradeoff). Built once from data already fetched at mount, then sent server-side so
-// fetchAgenticAssetsStats can rank "Top Used Applications" across every group, not just the current
-// page — no new API call, no per-collection data sent back to the browser.
-export function buildDeviceAiInteractionsMap(userAnalysisKeysByDeviceId, analysisByKey) {
+// Flat "serviceId|deviceId" -> total-tokens lookup, straight from analysisByKey's own rows — sent
+// server-side so fetchAgenticAssetsStats can rank "Top Used Applications" across every group, not
+// just the current page. Deliberately NOT keyed by the Endpoint Shield deviceId (the tier
+// computeAiInteractionsFromDevices uses): for real data, UserAnalysisData's serviceId is a readable
+// client name ("claudecli", "codexcli", ...) matching the SECOND segment of the collection's own
+// hostname (device.<serviceId>.<host>), not module_info's own UUID _id — that shield-entry tier
+// never actually matches production data, it only looked like it worked because it fails silently.
+// The server reconstructs the same candidate keys from each group's hostNames and looks them up here.
+export function buildUserAnalysisFlatMap(analysisByKey) {
     const result = {};
-    (userAnalysisKeysByDeviceId || new Map()).forEach((shieldEntry, deviceId) => {
-        const row = lookupUserAnalysisRow(analysisByKey, shieldEntry.serviceId, shieldEntry.deviceId);
-        if (!row) return;
+    (analysisByKey || new Map()).forEach((row, key) => {
         const total = (Number(row.totalInputTokens) || 0) + (Number(row.totalOutputTokens) || 0);
-        if (total > 0) result[deviceId] = total;
+        if (total > 0) result[key] = total;
     });
     return result;
 }
