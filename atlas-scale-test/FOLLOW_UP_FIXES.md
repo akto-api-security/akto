@@ -101,6 +101,43 @@ pick up cold.
   demo dataset has no captured MCP tool-call traffic anywhere — confirmed by checking a standalone
   MCP Server asset ("default") through the separate, untouched `McpComponentsView` path, which
   shows 0 components too. The fix corrects the wiring; the empty result is real data, not a bug.
+- Agentic Assets flyout's three data-heavy tabs (Components, Violations, Devices) fetched their
+  *entire* dataset once per open and paginated client-side in AG-Grid, instead of the true
+  server-side skip/limit the top-level 777-row grid already had. Not a regression from this
+  rebuild (master's client-side pipeline did the same), but flagged directly: an agent with
+  hundreds of skills/violations, or a large device fleet, would load everything on every flyout
+  open. Also flagged: `AgentComponentsView.jsx`'s `fetchSkillsFlyoutData` fired a full-account
+  `getAllCollectionsBasic()` scan (unfiltered, unpaginated dump of every `ApiCollection`) once per
+  collection id in the asset — for an agent with N collections, N redundant full-account scans
+  just to look up one collection by id each time, on top of `3N` other per-collection round trips.
+  All three tabs converted to genuine server-side pagination:
+  - **Devices**: new `AgenticObserveAction.fetchAgenticAssetDevicesPage`, scoped to just the
+    asset's own `apiCollectionIds` (cheap — one `Filters.in()` query, not the account-wide
+    `classifyAllGroups` walk), resolving `username` via the same Endpoint Shield `usernameMap` so
+    search/sort work against the person's name.
+  - **Components**: new `AgenticObserveAction.fetchAgenticComponentsPage` — a Java port of
+    `buildSkillsFlyoutData`/`buildMcpComponentsFromStis`/`buildAgentBuiltinToolsFromStis`, batched
+    across the asset's whole `collectionIds` (3 total queries instead of `3N+N`). MCP-server rows
+    fold in from the already-known `mcpServers`/`mcpServerCollectionIds` (no re-derivation); the
+    synthetic "Config" row stays client-side via `pinnedTopRowData` since it's derived from
+    violations data this endpoint has no reason to touch.
+  - **Violations**: `SuspectSampleDataAction`/threat-detection-backend's
+    `MaliciousEventService.listMaliciousRequests` already had real skip/limit/hosts-filter/sort —
+    just never exercised for pagination (`fetchAgenticViolations` always pulled `limit=100000`).
+    Wired the existing capability through, and extended threat-detection-backend's
+    `ListMaliciousRequestsRequest.Filter` proto with `search_text`/`loose_host_keys`/
+    `claude_device_ids`/`match_claude_config` so the exact three-tier host attribution
+    `ViolationsTab.jsx` always did client-side (exact host / loose device+service key / claude-config
+    scanner events) now happens server-side too, keeping pagination boundaries correct. Kept a
+    separate `fetchAgenticViolationsPage` function rather than changing `fetchAgenticViolations`'s
+    return shape, since `DeviceFlyout.jsx` still calls the latter expecting a plain array.
+  All three verified live end-to-end against Cursor (73 violations / 28 components / 4 devices):
+  correct page counts, working search (including a non-matching term correctly returning zero,
+  and a host-only match on "rakshak" still returning all 73), and no new console errors. The
+  Violations tab's threat-detection-backend change required a `--full` rebuild
+  (`./run-tbs.sh --full`) to pick up the new proto fields — a quick `mvn package` alone reuses
+  already-installed `.m2` artifacts and silently keeps the old proto, causing every request to
+  fail proto parsing with a 400 until the full rebuild ran.
 
 ## High priority — wrong output today
 
