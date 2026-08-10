@@ -489,6 +489,10 @@ public class DbLayer {
         return AccountSettingsDao.instance.findOne(filters);
     }
 
+    public static void updateRuntimeEnvOverrides(int accountId, Map<String, String> envOverrides) {
+        AccountSettingsDao.instance.updateRuntimeEnvOverrides(accountId, envOverrides);
+    }
+
     public static Config.AutomatedAiTestingKeyConfig fetchModelApiKey() {
         return (Config.AutomatedAiTestingKeyConfig) ConfigsDao.instance.findOne(
             Filters.eq("_id", Config.AutomatedAiTestingKeyConfig.CONFIG_ID)

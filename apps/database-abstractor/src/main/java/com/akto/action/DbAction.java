@@ -139,6 +139,7 @@ public class DbAction extends ActionSupport {
     List<AktoDataType> aktoDataTypes;
     List<CustomAuthTypeMapper> customAuthTypes;
     AccountSettings accountSettings;
+    Map<String, String> runtimeEnvOverrides;
     Config.DatadogForwarderConfig datadogForwarderConfig;
     Config.AutomatedAiTestingKeyConfig modelApiKeyConfig;
     List<ApiInfo> apiInfos;
@@ -662,6 +663,25 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateRuntimeEnvOverrides() {
+        try {
+            int accountId = Context.accountId.get();
+            DbLayer.updateRuntimeEnvOverrides(accountId, runtimeEnvOverrides);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in updateRuntimeEnvOverrides " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public Map<String, String> getRuntimeEnvOverrides() {
+        return runtimeEnvOverrides;
+    }
+
+    public void setRuntimeEnvOverrides(Map<String, String> runtimeEnvOverrides) {
+        this.runtimeEnvOverrides = runtimeEnvOverrides;
     }
 
     EndpointShieldSettings endpointShieldSettings;
