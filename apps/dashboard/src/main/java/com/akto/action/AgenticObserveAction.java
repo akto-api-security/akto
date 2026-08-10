@@ -1817,11 +1817,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     // (buildWindowSlots/cumulativeCounts/cumulativeByMonth/cumulativeSeriesByMonth) exactly, computed
     // server-side rather than client-side: bucketing ~26k collections' first-seen timestamps by month
     // is real O(n) work, and redoing it in the browser on every load would reintroduce a meaningful
-    // chunk of the cost this whole rebuild moved off the client. Violations delta/sparkline is the one
-    // piece NOT restored here — it needs the full raw violation-event history (up to 100k rows), which
-    // is exactly the fetch Stage 4/5 eliminated from the blocking path; the "Total Violations" tile
-    // shows the current aggregate total only (already available from the host-severity-count call the
-    // page already makes), not a historical trend line.
+    // chunk of the cost this whole rebuild moved off the client. Violations delta/sparkline (below,
+    // deltaViolations/sparklines.violations) comes from fetchViolationsMonthlyTotals's cheap $bucket
+    // aggregation on threat-detection-backend, not the raw up-to-100k-row event fetch — no full
+    // violation history is pulled here.
 
     private static final String[] MONTH_ABBR = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
 

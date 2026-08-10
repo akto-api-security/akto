@@ -344,6 +344,7 @@ export default {
             deltaEndpoints: resp?.deltaEndpoints || 0,
             deltaBrowsers: resp?.deltaBrowsers || 0,
             deltaUsers: resp?.deltaUsers || 0,
+            deltaViolations: resp?.deltaViolations || 0,
         }
     },
     async createCollection(name) {
