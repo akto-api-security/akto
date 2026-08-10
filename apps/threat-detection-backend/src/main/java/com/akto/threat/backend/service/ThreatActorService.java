@@ -1442,6 +1442,12 @@ public class ThreatActorService {
   // by {host, severity} instead of host alone, and has no result-count limit.
   public FetchHostSeverityCountsResponse fetchHostSeverityCounts(
       String accountId, long startTs, long endTs, String contextSource, List<Integer> monthBoundaries) {
+    return fetchHostSeverityCounts(accountId, startTs, endTs, contextSource, monthBoundaries, Collections.emptyList());
+  }
+
+  public FetchHostSeverityCountsResponse fetchHostSeverityCounts(
+      String accountId, long startTs, long endTs, String contextSource, List<Integer> monthBoundaries,
+      List<String> hostFilter) {
 
     Document match = new Document();
     if (startTs > 0 || endTs > 0) {
@@ -1449,6 +1455,9 @@ public class ThreatActorService {
       if (startTs > 0) tsRange.append("$gte", startTs);
       if (endTs > 0) tsRange.append("$lte", endTs);
       match.append("detectedAt", tsRange);
+    }
+    if (hostFilter != null && !hostFilter.isEmpty()) {
+      match.append("host", new Document("$in", hostFilter));
     }
 
     Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId);

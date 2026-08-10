@@ -47,6 +47,7 @@ import values from "@/util/values";
 import func from "@/util/func";
 import AgenticStatsCard from "./AgenticStatsCard";
 import AgenticTopListCard from "./AgenticTopListCard";
+import SmoothAreaChart from "@/apps/dashboard/pages/dashboard/new_components/SmoothChart";
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
@@ -543,13 +544,19 @@ export default function AgenticAssetsPage() {
     (stats.topAssetsWithViolations || []).map((row) => ({
       ...row,
       renderValue: (r) => (
-        <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
-          <Box minHeight="28px">
-            <Text variant="bodyMd" alignment="end" color="critical">{func.prettifyShort(r.violations)}</Text>
-          </Box>
+        <HorizontalStack align="end" blockAlign="center" gap="3" wrap={false}>
+          <Text variant="bodyMd">{func.prettifyShort(r.violations)}</Text>
+          <SmoothAreaChart
+            tickPositions={r.sparkline}
+            color="#EF4444"
+            height={28}
+            width={100}
+            labels={stats.monthLabels}
+            enableHover
+          />
         </HorizontalStack>
       ),
-    })), [stats.topAssetsWithViolations]);
+    })), [stats.topAssetsWithViolations, stats.monthLabels]);
 
   const topCards = useMemo(() => (
     <HorizontalGrid key="top-row" columns={3} gap="4">

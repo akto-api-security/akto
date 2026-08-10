@@ -152,15 +152,17 @@ public class AbstractThreatDetectionAction extends UserAction {
   }
 
   /**
-   * Per-month violation totals for the account, bucketed server-side by the threat-detection-backend
-   * (a single cheap $bucket aggregation, not a raw-event fetch) — lets a caller build a trend
-   * sparkline without pulling every malicious-event doc to compute it locally.
+   * Per-month violation totals, bucketed server-side by the threat-detection-backend (a single
+   * cheap $bucket aggregation, not a raw-event fetch) — lets a caller build a trend sparkline
+   * without pulling every malicious-event doc to compute it locally.
    * @param monthBoundaries ascending epoch-second month-start boundaries (see AgenticObserveAction's
    *     buildWindowSlots) — index i of the returned list is the count for boundary i.
+   * @param hostFilter optional — when non-empty, scopes the trend to just these hosts (e.g. one
+   *     asset's hostNames) instead of the whole account.
    * @return one count per monthBoundaries entry, or an empty list on any error/empty input.
    */
   protected List<Integer> fetchViolationsMonthlyTotals(
-      int startTimestamp, int endTimestamp, List<Integer> monthBoundaries) {
+      int startTimestamp, int endTimestamp, List<Integer> monthBoundaries, List<String> hostFilter) {
     if (monthBoundaries == null || monthBoundaries.isEmpty()) return new ArrayList<>();
     try {
       String url = String.format("%s/api/dashboard/get_host_severity_counts", this.getBackendUrl());
@@ -171,6 +173,7 @@ public class AbstractThreatDetectionAction extends UserAction {
           put("start_ts", startTimestamp);
           put("end_ts", endTimestamp);
           put("month_boundaries", monthBoundaries);
+          if (hostFilter != null && !hostFilter.isEmpty()) put("host_filter", hostFilter);
         }
       };
       String msg = objectMapper.valueToTree(body).toString();

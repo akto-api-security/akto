@@ -454,6 +454,10 @@ message FetchHostSeverityCountsRequest {
   // populated with one count per boundary (per-month, not cumulative), bucketed via a cheap
   // server-side aggregation — no per-event data leaves this service.
   repeated uint32 month_boundaries = 3;
+  // Optional — when non-empty, scopes both host_counts and monthly_totals to just these hosts
+  // instead of the whole account. Used to get a per-asset monthly trend for a small, already-known
+  // set of hosts (e.g. one Agentic Assets group's hostNames) without a second full-account scan.
+  repeated string host_filter = 4;
 }
 
 message FetchHostSeverityCountsResponse {

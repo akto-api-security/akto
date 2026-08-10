@@ -688,7 +688,8 @@ public class DashboardRouter implements ARouter {
                         req.getStartTs(),
                         req.getEndTs(),
                         contextSource,
-                        req.getMonthBoundariesList()
+                        req.getMonthBoundariesList(),
+                        req.getHostFilterList()
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });

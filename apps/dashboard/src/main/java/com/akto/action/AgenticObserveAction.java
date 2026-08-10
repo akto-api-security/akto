@@ -31,6 +31,7 @@ import org.bson.conversions.Bson;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -721,7 +722,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // breakdown stays client-side (hostSeverityCounts, already cheap — see class comment above).
             List<Integer> monthBoundaries = new ArrayList<>();
             for (MonthSlot s : slots) monthBoundaries.add(s.boundary);
-            List<Integer> monthlyViolations = fetchViolationsMonthlyTotals(startTimestamp, endTimestamp, monthBoundaries);
+            List<Integer> monthlyViolations = fetchViolationsMonthlyTotals(startTimestamp, endTimestamp, monthBoundaries, null);
             int[] violationsCounts = cumulativeFromMonthlyCounts(monthlyViolations, slots.size());
             response.put("violationsSparkline", violationsCounts);
             response.put("violationsDelta", windowDelta(violationsCounts));
@@ -729,7 +730,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // "Top Assets with Violations" — per-group totals from the violationsByCollectionId map the
             // frontend already fetched once at mount (aggregateViolationCountsByCollectionId), summed
             // over each group's own collectionIds. No new data source; top-N of what's already available.
-            List<BasicDBObject> topViol = new ArrayList<>();
+            List<Map.Entry<GroupSummary, Integer>> violRanked = new ArrayList<>();
             for (GroupSummary g : groups.values()) {
                 int groupTotal = 0;
                 for (Integer cid : g.collectionIds) {
@@ -738,17 +739,27 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     groupTotal += v.getOrDefault("critical", 0) + v.getOrDefault("high", 0)
                             + v.getOrDefault("medium", 0) + v.getOrDefault("low", 0);
                 }
-                if (groupTotal > 0) {
-                    BasicDBObject row = new BasicDBObject();
-                    row.put("id", g.rowType + "-" + g.groupKey);
-                    row.put("name", g.name);
-                    row.put("type", g.clientType);
-                    row.put("violations", groupTotal);
-                    topViol.add(row);
-                }
+                if (groupTotal > 0) violRanked.add(new AbstractMap.SimpleEntry<>(g, groupTotal));
             }
-            topViol.sort((a, b) -> Integer.compare(b.getInt("violations"), a.getInt("violations")));
-            response.put("topAssetsWithViolations", topViol.subList(0, Math.min(5, topViol.size())));
+            violRanked.sort((a, b) -> Integer.compare(b.getValue(), a.getValue()));
+            List<Map.Entry<GroupSummary, Integer>> topViolPage = violRanked.subList(0, Math.min(5, violRanked.size()));
+
+            // Per-asset monthly trend, scoped to just this asset's own hostNames via host_filter — one
+            // small targeted $bucket aggregation per top-5 row (bounded, not per-group for all ~800).
+            List<BasicDBObject> topViol = new ArrayList<>();
+            for (Map.Entry<GroupSummary, Integer> entry : topViolPage) {
+                GroupSummary g = entry.getKey();
+                BasicDBObject row = new BasicDBObject();
+                row.put("id", g.rowType + "-" + g.groupKey);
+                row.put("name", g.name);
+                row.put("type", g.clientType);
+                row.put("violations", entry.getValue());
+                List<Integer> assetMonthly = fetchViolationsMonthlyTotals(
+                        startTimestamp, endTimestamp, monthBoundaries, new ArrayList<>(g.hostNames));
+                row.put("sparkline", cumulativeFromMonthlyCounts(assetMonthly, slots.size()));
+                topViol.add(row);
+            }
+            response.put("topAssetsWithViolations", topViol);
 
             // "Top Used Applications" — per-group AI-interaction totals from deviceAiInteractionsMap
             // (see constants.js's buildDeviceAiInteractionsMap), summed over each group's own
@@ -1528,7 +1539,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // raw violation events fetched — mirrors the endpoint/browser/user trends above.
             List<Integer> monthBoundaries = new ArrayList<>();
             for (MonthSlot s : slots) monthBoundaries.add(s.boundary);
-            List<Integer> monthlyViolations = fetchViolationsMonthlyTotals(startTimestamp, endTimestamp, monthBoundaries);
+            List<Integer> monthlyViolations = fetchViolationsMonthlyTotals(startTimestamp, endTimestamp, monthBoundaries, null);
             int[] violationsCounts = cumulativeFromMonthlyCounts(monthlyViolations, slots.size());
 
             BasicDBObject sparklines = new BasicDBObject();
