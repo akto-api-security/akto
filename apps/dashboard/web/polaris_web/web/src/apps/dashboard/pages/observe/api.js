@@ -243,14 +243,26 @@ export default {
         return { rows: resp?.rows || [], total: resp?.total || 0 }
     },
     // Header-tile stats (asset counts by type) for the Agentic Assets page — same classification
-    // pass as fetchAgenticAssetsSummary, aggregated rather than paginated.
-    async fetchAgenticAssetsStats({ trafficMap, riskScoreMap, startTimestamp, endTimestamp } = {}) {
+    // pass as fetchAgenticAssetsSummary, aggregated rather than paginated. Also returns trend/delta
+    // for the Agentic Assets + Violations cards and the Top Used Applications / Top Assets with
+    // Violations lists — all derived server-side from data already fetched at mount, no new fetch.
+    async fetchAgenticAssetsStats({ trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, deviceAiInteractionsMap } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsStats',
             method: 'post',
-            data: { trafficMap, riskScoreMap, startTimestamp, endTimestamp },
+            data: { trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, deviceAiInteractionsMap },
         })
-        return { totalAssets: resp?.totalAssets || 0, countsByType: resp?.countsByType || {} }
+        return {
+            totalAssets: resp?.totalAssets || 0,
+            countsByType: resp?.countsByType || {},
+            monthLabels: resp?.monthLabels || [],
+            assetSparkline: resp?.assetSparkline || [],
+            assetDelta: resp?.assetDelta || 0,
+            violationsSparkline: resp?.violationsSparkline || [],
+            violationsDelta: resp?.violationsDelta || 0,
+            topAssetsWithViolations: resp?.topAssetsWithViolations || [],
+            topUsedApplications: resp?.topUsedApplications || [],
+        }
     },
     // Paginated, sorted, searchable user/device rows for Users-and-Devices / Endpoints — same
     // lightweight-summary-first-then-slice shape as fetchAgenticAssetsSummary. groupBy: "user"|"device".

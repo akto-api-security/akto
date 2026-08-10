@@ -96,6 +96,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Setter private String parentDeviceId; // blank => paginated top-level device rows; set => that device's (device,service) children
     @Setter private Map<String, Map<String, String>> deviceMetadataMap; // deviceId -> {username, team, role, os}
     @Setter private Map<String, Map<String, Integer>> violationsByCollectionId; // collection id (string) -> {critical, high, medium, low}
+    @Setter private Map<String, Integer> deviceAiInteractionsMap; // deviceId -> total AI-interaction tokens (see constants.js's buildDeviceAiInteractionsMap)
 
     /**
      * ATLAS skill enrichment in a SINGLE query. Skill (/skills/&lt;name&gt;) and agent-config (/config/)
@@ -677,6 +678,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         try {
             Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
+            Map<String, Map<String, Integer>> violations = violationsByCollectionId != null ? violationsByCollectionId : Collections.emptyMap();
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
@@ -692,11 +694,86 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
 
             Map<String, Integer> countsByType = new LinkedHashMap<>();
+            List<Integer> assetTs = new ArrayList<>();
             for (GroupSummary g : counted) {
                 countsByType.merge(g.clientType, 1, Integer::sum);
+                assetTs.add(g.maxTrafficTimestamp);
             }
             response.put("totalAssets", counted.size());
             response.put("countsByType", countsByType);
+
+            // Asset-count trend for the "Agentic Assets" card — same buildWindowSlots/cumulativeCounts
+            // pattern already used for Endpoints/Users-and-Devices; bucketing ~800 group timestamps is
+            // cheap, no extra query. Mirrors the pre-rebuild client-side cumulativeByMonth(..., r =>
+            // r.lastSeenEpoch, ...) exactly — bucketed by each asset's own last-traffic timestamp.
+            int nowSec = (int) (System.currentTimeMillis() / 1000);
+            int end = endTimestamp > 0 ? endTimestamp : nowSec;
+            List<MonthSlot> slots = buildWindowSlots(startTimestamp, endTimestamp, earliestTs(assetTs));
+            List<String> monthLabels = new ArrayList<>();
+            for (MonthSlot s : slots) monthLabels.add(s.label);
+            int[] assetCounts = cumulativeCounts(assetTs, slots, end);
+            response.put("monthLabels", monthLabels);
+            response.put("assetSparkline", assetCounts);
+            response.put("assetDelta", windowDelta(assetCounts));
+
+            // Violations trend for the "Violations" card — reuses the same cheap server-side $bucket
+            // aggregation built for Endpoints (fetchViolationsMonthlyTotals); the current total/severity
+            // breakdown stays client-side (hostSeverityCounts, already cheap — see class comment above).
+            List<Integer> monthBoundaries = new ArrayList<>();
+            for (MonthSlot s : slots) monthBoundaries.add(s.boundary);
+            List<Integer> monthlyViolations = fetchViolationsMonthlyTotals(startTimestamp, endTimestamp, monthBoundaries);
+            int[] violationsCounts = cumulativeFromMonthlyCounts(monthlyViolations, slots.size());
+            response.put("violationsSparkline", violationsCounts);
+            response.put("violationsDelta", windowDelta(violationsCounts));
+
+            // "Top Assets with Violations" — per-group totals from the violationsByCollectionId map the
+            // frontend already fetched once at mount (aggregateViolationCountsByCollectionId), summed
+            // over each group's own collectionIds. No new data source; top-N of what's already available.
+            List<BasicDBObject> topViol = new ArrayList<>();
+            for (GroupSummary g : groups.values()) {
+                int groupTotal = 0;
+                for (Integer cid : g.collectionIds) {
+                    Map<String, Integer> v = violations.get(String.valueOf(cid));
+                    if (v == null) continue;
+                    groupTotal += v.getOrDefault("critical", 0) + v.getOrDefault("high", 0)
+                            + v.getOrDefault("medium", 0) + v.getOrDefault("low", 0);
+                }
+                if (groupTotal > 0) {
+                    BasicDBObject row = new BasicDBObject();
+                    row.put("id", g.rowType + "-" + g.groupKey);
+                    row.put("name", g.name);
+                    row.put("type", g.clientType);
+                    row.put("violations", groupTotal);
+                    topViol.add(row);
+                }
+            }
+            topViol.sort((a, b) -> Integer.compare(b.getInt("violations"), a.getInt("violations")));
+            response.put("topAssetsWithViolations", topViol.subList(0, Math.min(5, topViol.size())));
+
+            // "Top Used Applications" — per-group AI-interaction totals from deviceAiInteractionsMap
+            // (see constants.js's buildDeviceAiInteractionsMap), summed over each group's own
+            // endpointIds. Same Endpoint Shield deviceId match tier already used for the per-row
+            // column — documented tradeoff, not the full hostname-fallback matching the pre-rebuild
+            // client-side version had (would need per-collection hostnames this endpoint doesn't fetch).
+            Map<String, Integer> deviceInteractions = deviceAiInteractionsMap != null ? deviceAiInteractionsMap : Collections.emptyMap();
+            List<BasicDBObject> topApps = new ArrayList<>();
+            for (GroupSummary g : groups.values()) {
+                int groupTotal = 0;
+                for (String deviceId : g.endpointIds) {
+                    groupTotal += deviceInteractions.getOrDefault(deviceId, 0);
+                }
+                if (groupTotal > 0) {
+                    BasicDBObject row = new BasicDBObject();
+                    row.put("id", g.rowType + "-" + g.groupKey);
+                    row.put("name", g.name);
+                    row.put("type", g.clientType);
+                    row.put("aiInteractions", groupTotal);
+                    topApps.add(row);
+                }
+            }
+            topApps.sort((a, b) -> Integer.compare(b.getInt("aiInteractions"), a.getInt("aiInteractions")));
+            response.put("topUsedApplications", topApps.subList(0, Math.min(5, topApps.size())));
+
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching agentic assets stats: " + e.getMessage());

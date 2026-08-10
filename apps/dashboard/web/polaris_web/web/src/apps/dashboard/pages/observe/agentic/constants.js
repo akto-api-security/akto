@@ -893,6 +893,22 @@ export function computeAiInteractionsFromDevices(devices, analysisByKey, userAna
     return total > 0 ? { totalInputTokens, totalOutputTokens, total } : null;
 }
 
+// Account-wide deviceId -> total AI-interaction tokens, same Endpoint Shield deviceId match tier as
+// computeAiInteractionsFromDevices (not the per-collection hostname-fallback tiers — same documented
+// tradeoff). Built once from data already fetched at mount, then sent server-side so
+// fetchAgenticAssetsStats can rank "Top Used Applications" across every group, not just the current
+// page — no new API call, no per-collection data sent back to the browser.
+export function buildDeviceAiInteractionsMap(userAnalysisKeysByDeviceId, analysisByKey) {
+    const result = {};
+    (userAnalysisKeysByDeviceId || new Map()).forEach((shieldEntry, deviceId) => {
+        const row = lookupUserAnalysisRow(analysisByKey, shieldEntry.serviceId, shieldEntry.deviceId);
+        if (!row) return;
+        const total = (Number(row.totalInputTokens) || 0) + (Number(row.totalOutputTokens) || 0);
+        if (total > 0) result[deviceId] = total;
+    });
+    return result;
+}
+
 // Combines what used to be three separate (group.collections || []).forEach passes —
 // buildDevicesForGroup, uniqueSkillNamesForGroup, aggregateAiInteractionsForGroup — into one. Each
 // collection can belong to many overlapping groups (a collection with N skill tags is a member of N

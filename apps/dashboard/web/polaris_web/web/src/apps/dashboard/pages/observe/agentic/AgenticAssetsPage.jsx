@@ -31,6 +31,7 @@ import agenticObserveApi, {
 } from "./agenticObserveApi";
 import {
   buildUserAnalysisLookup,
+  buildDeviceAiInteractionsMap,
   getRowViolations,
   buildTeamGroupsFromDevices,
   computeAiInteractionsFromDevices,
@@ -45,6 +46,7 @@ import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter
 import values from "@/util/values";
 import func from "@/util/func";
 import AgenticStatsCard from "./AgenticStatsCard";
+import AgenticTopListCard from "./AgenticTopListCard";
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
@@ -304,6 +306,7 @@ export default function AgenticAssetsPage() {
     userMetadataMap: {},
     analysisByKey: new Map(),
     userAnalysisKeysByDeviceId: new Map(),
+    deviceAiInteractionsMap: {},
     maliciousSkillKeys: new Set(),
     trafficMap: {},
     riskScoreMap: {},
@@ -339,8 +342,10 @@ export default function AgenticAssetsPage() {
 
   const loadStats = useCallback(async () => {
     try {
-      const { trafficMap, riskScoreMap } = enrichRef.current;
-      const result = await api.fetchAgenticAssetsStats({ trafficMap, riskScoreMap, startTimestamp, endTimestamp });
+      const { trafficMap, riskScoreMap, violationsByCollectionId, deviceAiInteractionsMap } = enrichRef.current;
+      const result = await api.fetchAgenticAssetsStats({
+        trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, deviceAiInteractionsMap,
+      });
       setStats(result);
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -407,12 +412,15 @@ export default function AgenticAssetsPage() {
           .then(([hostCounts, userAnalysisList]) => {
             if (!isMountedRef.current) return;
             const violationsByCollectionId = aggregateViolationCountsByCollectionId(hostCounts, collections);
+            const analysisByKey = buildUserAnalysisLookup(userAnalysisList);
             enrichRef.current = {
               ...enrichRef.current,
               violationsByCollectionId,
-              analysisByKey: buildUserAnalysisLookup(userAnalysisList),
+              analysisByKey,
+              deviceAiInteractionsMap: buildDeviceAiInteractionsMap(enrichRef.current.userAnalysisKeysByDeviceId, analysisByKey),
             };
             setHostSeverityCounts(hostCounts);
+            setRefreshKey((k) => k + 1); // re-run loadStats now that Top Used Applications' data is ready
           })
           .catch((e) => {
             // eslint-disable-next-line no-console
@@ -519,14 +527,41 @@ export default function AgenticAssetsPage() {
     { label: "Low",      key: "low",      count: violationTotals.low,  color: "#D1D5DB" },
   ], [violationTotals]);
 
+  const topAppsRows = useMemo(() =>
+    (stats.topUsedApplications || []).map((row) => ({
+      ...row,
+      renderValue: (r) => (
+        <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
+          <Box minHeight="28px">
+            <Text variant="bodyMd" alignment="end">{func.prettifyShort(r.aiInteractions)}</Text>
+          </Box>
+        </HorizontalStack>
+      ),
+    })), [stats.topUsedApplications]);
+
+  const topViolRows = useMemo(() =>
+    (stats.topAssetsWithViolations || []).map((row) => ({
+      ...row,
+      renderValue: (r) => (
+        <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
+          <Box minHeight="28px">
+            <Text variant="bodyMd" alignment="end" color="critical">{func.prettifyShort(r.violations)}</Text>
+          </Box>
+        </HorizontalStack>
+      ),
+    })), [stats.topAssetsWithViolations]);
+
   const topCards = useMemo(() => (
-    <HorizontalGrid key="top-row" columns={2} gap="4">
+    <HorizontalGrid key="top-row" columns={3} gap="4">
       <Card padding="0">
         <Box className="agentic-stats-card-fill">
           <Box className="agentic-stats-card-item">
             <AgenticStatsCard
               title="Agentic Assets"
               total={totalAssets}
+              delta={stats.assetDelta}
+              sparklineCounts={stats.assetSparkline}
+              sparklineLabels={stats.monthLabels}
               breakdown={assetTypeBreakdown}
               noCard
             />
@@ -537,14 +572,30 @@ export default function AgenticAssetsPage() {
               title="Violations"
               total={violationTotals.total}
               totalColor="critical"
+              delta={stats.violationsDelta}
+              sparklineCounts={stats.violationsSparkline}
+              sparklineColor="#DC2626"
+              sparklineLabels={stats.monthLabels}
               breakdown={violBreakdown}
               noCard
             />
           </Box>
         </Box>
       </Card>
+      <AgenticTopListCard
+        title="Top Used Applications"
+        columns={[{ label: "Agentic Asset" }, { label: "AI Interactions" }]}
+        rows={topAppsRows}
+        emptyStateText="No AI interaction data yet."
+      />
+      <AgenticTopListCard
+        title="Top Assets with Violations"
+        columns={[{ label: "Agentic Asset" }, { label: "Violations" }]}
+        rows={topViolRows}
+        emptyStateText="No violations"
+      />
     </HorizontalGrid>
-  ), [totalAssets, assetTypeBreakdown, violationTotals, violBreakdown]);
+  ), [totalAssets, assetTypeBreakdown, violationTotals, violBreakdown, stats, topAppsRows, topViolRows]);
 
   if (loading) {
     return (
