@@ -65,6 +65,16 @@ message ListMaliciousRequestsRequest {
       repeated string method = 14;  // Filter by HTTP methods (GET, POST, etc.)
       optional bool sort_by_severity = 15;  // Sort results by severity (CRITICAL > HIGH > MEDIUM > LOW)
       repeated string severity = 16;  // Filter by severity (CRITICAL, HIGH, MEDIUM, LOW)
+      optional string search_text = 17;  // Free-text match across filterId/host/actor
+      // Loose device+service host match ("<firstSegment> <lastSegment>", computed client-side from
+      // hostName the same way constants.js's deviceServiceKey does) — matched alongside `hosts` (OR),
+      // not instead of it, for 2-vs-3-segment hostname format mismatches between an event's own host
+      // and its owning collection's hostName.
+      repeated string loose_host_keys = 18;
+      // Claude-config scanner events (2-segment host ending in ".claude"/".claude-settings") have no
+      // matching collection of their own — attributed via device id instead. See match_claude_config.
+      repeated string claude_device_ids = 19;
+      optional bool match_claude_config = 20;  // true: match ANY claude-config host (the queried asset IS a Claude agent)
     }
 
     // The number of alerts to return

@@ -39,6 +39,20 @@ export async function fetchAgenticViolations({ startTimestamp, endTimestamp, hos
     return (resp?.maliciousEvents || []).map(normalizeEvent);
 }
 
+// Server-side paginated/searchable violations page for the flyout's Violations tab (see
+// AgGridTable's SSRM contract) — a separate function from fetchAgenticViolations (which several
+// other callers, e.g. DeviceFlyout.jsx, still use expecting a plain unpaginated array) so this
+// tab's pagination/search/sort additions can't affect them.
+export async function fetchAgenticViolationsPage({ startTimestamp, endTimestamp, hosts = [], looseHostKeys = [], claudeDeviceIds = [], matchClaudeConfig, skip = 0, limit = 20, sort, sortBySeverity, searchText } = {}) {
+    const resp = await observeApi.fetchSuspectSampleData({
+        startTimestamp, endTimestamp, hosts, looseHostKeys, claudeDeviceIds, matchClaudeConfig, skip, limit, sort, sortBySeverity, searchText,
+    });
+    return {
+        violations: (resp?.maliciousEvents || []).map(normalizeEvent),
+        total: resp?.total || 0,
+    };
+}
+
 // Per-host severity counts for the whole date range, server-aggregated — returns a
 // {[host]: {critical, high, medium, low}} map instead of every raw event doc. Use this wherever only
 // COUNTS are needed (list-page violation columns, severity totals); fetchAgenticViolations is still

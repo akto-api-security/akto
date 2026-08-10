@@ -1409,18 +1409,23 @@ export default {
         return resp?.success || false
     },
 
-    async fetchSuspectSampleData({ skip = 0, startTimestamp, endTimestamp, hosts = [], limit = 100000 } = {}) {
+    async fetchSuspectSampleData({ skip = 0, startTimestamp, endTimestamp, hosts = [], limit = 100000, sort, sortBySeverity, searchText, looseHostKeys = [], claudeDeviceIds = [], matchClaudeConfig } = {}) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
             data: {
                 skip, ips: [], urls: [], types: [], apiCollectionIds: [],
-                sort: { detectedAt: -1 },
+                sort: sort || { detectedAt: -1 },
                 ...(startTimestamp ? { startTimestamp } : {}),
                 ...(endTimestamp   ? { endTimestamp }   : {}),
                 latestAttack: [],
                 limit,
                 ...(hosts?.length  ? { hosts }          : {}),
+                ...(sortBySeverity ? { sortBySeverity }  : {}),
+                ...(searchText     ? { searchText }     : {}),
+                ...(looseHostKeys?.length ? { looseHostKeys } : {}),
+                ...(claudeDeviceIds?.length ? { claudeDeviceIds } : {}),
+                ...(matchClaudeConfig ? { matchClaudeConfig } : {}),
             },
         })
     },
