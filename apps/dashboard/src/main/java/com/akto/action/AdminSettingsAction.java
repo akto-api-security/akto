@@ -614,10 +614,17 @@ public class AdminSettingsAction extends UserAction {
     }
 
     public String updateRuntimeEnvOverrides() {
+        if (this.runtimeEnvOverrides == null || this.runtimeEnvOverrides.isEmpty()) {
+            return SUCCESS.toUpperCase();
+        }
         try {
+            List<Bson> updates = new ArrayList<>();
+            for (Map.Entry<String, String> entry : this.runtimeEnvOverrides.entrySet()) {
+                updates.add(Updates.set(AccountSettings.RUNTIME_ENV_OVERRIDES + "." + entry.getKey(), entry.getValue()));
+            }
             AccountSettingsDao.instance.updateOne(
                 AccountSettingsDao.generateFilter(),
-                Updates.set(AccountSettings.RUNTIME_ENV_OVERRIDES, this.runtimeEnvOverrides)
+                Updates.combine(updates)
             );
             return SUCCESS.toUpperCase();
         } catch (Exception e) {

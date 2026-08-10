@@ -75,17 +75,12 @@ const ModuleInfo = () => {
         try {
             if (selectedModule?.moduleType === 'MINI_RUNTIME') {
                 await settingRequests.updateRuntimeEnvOverrides(envData);
-                const activeMiniRuntimeIds = moduleInfos
-                    .filter(m => m.moduleType === 'MINI_RUNTIME' && canRebootModule(m))
-                    .map(m => m.id);
-                if (activeMiniRuntimeIds.length > 0) {
-                    await settingRequests.rebootModules(activeMiniRuntimeIds, false);
-                }
-                func.setToast(true, false, `Env overrides saved. Restarting ${activeMiniRuntimeIds.length} active mini-runtime instance(s).`);
+                const miniRuntimeIds = moduleInfos.filter(m => m.moduleType === 'MINI_RUNTIME' && canRebootModule(m)).map(m => m.id);
+                await settingRequests.rebootModules(miniRuntimeIds, false);
             } else {
                 await settingRequests.updateModuleEnvAndReboot(moduleId, moduleName, envData);
-                func.setToast(true, false, "Environment config saved successfully. Module will reboot.");
             }
+            func.setToast(true, false, "Environment config saved successfully. Module will reboot.");
             handleModalClose();
             await fetchModuleInfo();
         } catch (error) {
