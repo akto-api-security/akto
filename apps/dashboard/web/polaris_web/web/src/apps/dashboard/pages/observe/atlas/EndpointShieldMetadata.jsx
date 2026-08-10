@@ -68,7 +68,7 @@ const resourceName = {
     plural: 'agents',
 };
 
-const OS_ICON_MAP = { darwin: '/public/os-mac.svg', mac: '/public/os-mac.svg', windows: '/public/os-windows.svg', linux: '/public/os-linux.svg' };
+const OS_ICON_MAP = { darwin: '/public/os-mac.svg', mac: '/public/os-mac.svg', windows: '/public/os-windows.svg', linux: '/public/linux.svg' };
 const BROWSER_ICON_MAP = { chrome: '/public/chrome.svg', firefox: '/public/firefox.svg', safari: '/public/safari.svg', brave: '/public/brave.svg', edge: '/public/edge.svg' };
 const GENERIC_BROWSER_ICON = '/public/Globe_icon.svg';
 
