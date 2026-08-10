@@ -594,8 +594,14 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
 
             shouldLogin = "true";
-            String resolvedRole = fetchOktaRole(oktaConfig, oktaUserId, accessToken);
-            enrichAgenticUserFromSso(username, email, extractOktaTeamName(oktaConfig, oktaUserId), resolvedRole, "okta");
+            List<String> oktaGroups = resolveOktaGroups(oktaConfig, oktaUserId, accessToken);
+            Map<String, String> oktaGroupToAktoUserRoleMap = oktaConfig.getOktaGroupToAktoUserRoleMap();
+            String resolvedRole = fetchOktaRole(oktaGroups, oktaGroupToAktoUserRoleMap);
+            String actualOktaRole = extractOktaRoleGroupName(oktaGroups, oktaGroupToAktoUserRoleMap);
+            String team = extractOktaTeamName(oktaGroups, oktaGroupToAktoUserRoleMap);
+            logger.infoAndAddToDb("[Okta SSO] email=" + email + ", username=" + username + ", oktaGroups=" + oktaGroups
+                    + ", team=" + team + ", actualOktaRole=" + actualOktaRole + ", dashboardRole=" + resolvedRole);
+            enrichAgenticUserFromSso(username, email, team, actualOktaRole, "okta");
             createUserAndRedirect(email, username, new SignupInfo.OktaSignupInfo(accessToken, username), accountId, Config.ConfigType.OKTA.toString(), resolvedRole, this.scopeRoleMapping);
             code = "";
         } catch (Exception e) {
@@ -702,17 +708,49 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     }
 
     /**
-     * Uses JWT {@code groups} first; if empty and an API token is configured, loads groups from Okta Management API.
+     * Resolves the caller's Okta group names once per login: uses the {@code groups} claim
+     * already present in the access token JWT if Okta's authorization server was configured to
+     * include it, and only falls back to a Management API call (extra network round-trip, needs
+     * an API token) when that claim is absent or empty.
      */
-    private String fetchOktaRole(Config.OktaConfig oktaConfig, String oktaUserId, String accessToken) {
-        Map<String, String> oktaGroupToAktoUserRoleMap = oktaConfig.getOktaGroupToAktoUserRoleMap();
-
+    private List<String> resolveOktaGroups(Config.OktaConfig oktaConfig, String oktaUserId, String accessToken) {
+        List<String> groupsFromJwt = extractGroupsFromAccessTokenJwt(accessToken);
+        if (!groupsFromJwt.isEmpty()) {
+            return groupsFromJwt;
+        }
         if (StringUtils.isEmpty(oktaConfig.getManagementApiToken()) || oktaUserId == null) {
+            return Collections.emptyList();
+        }
+        return fetchOktaGroupsFromManagementApi(
+                oktaConfig.getManagementBaseUrl(), oktaConfig.getManagementApiToken(), oktaUserId);
+    }
+
+    /** Reads the {@code groups} claim out of a JWT access token's payload, if present. */
+    private static List<String> extractGroupsFromAccessTokenJwt(String accessToken) {
+        if (StringUtils.isEmpty(accessToken)) return Collections.emptyList();
+        String[] parts = accessToken.split("\\.");
+        if (parts.length < 2) return Collections.emptyList();
+        try {
+            String payloadJson = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
+            JSONObject payload = new JSONObject(payloadJson);
+            if (!payload.has("groups")) return Collections.emptyList();
+            org.json.JSONArray groupsArray = payload.getJSONArray("groups");
+            List<String> groups = new ArrayList<>();
+            for (int i = 0; i < groupsArray.length(); i++) {
+                groups.add(groupsArray.getString(i));
+            }
+            return groups;
+        } catch (Exception e) {
+            logger.errorAndAddToDb("[Okta SSO] Failed to parse groups claim from access token: " + e.getMessage(), LogDb.DASHBOARD);
+            return Collections.emptyList();
+        }
+    }
+
+    private String fetchOktaRole(List<String> groups, Map<String, String> oktaGroupToAktoUserRoleMap) {
+        if (groups.isEmpty()) {
             return RBAC.Role.MEMBER.name();
         }
-        List<String> groupsFromApi = fetchOktaGroupsFromManagementApi(
-                oktaConfig.getManagementBaseUrl(), oktaConfig.getManagementApiToken(), oktaUserId);
-        return resolveAktoRoleFromOktaGroupNames(groupsFromApi, oktaGroupToAktoUserRoleMap);
+        return resolveAktoRoleFromOktaGroupNames(groups, oktaGroupToAktoUserRoleMap);
     }
 
     /**
@@ -720,13 +758,21 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
      * Groups mapped to an Akto role in {@code oktaGroupToAktoUserRoleMap} are skipped —
      * the first remaining group is the team.
      */
-    private String extractOktaTeamName(Config.OktaConfig oktaConfig, String oktaUserId) {
-        if (StringUtils.isEmpty(oktaConfig.getManagementApiToken()) || oktaUserId == null) return "";
-        List<String> groups = fetchOktaGroupsFromManagementApi(
-                oktaConfig.getManagementBaseUrl(), oktaConfig.getManagementApiToken(), oktaUserId);
-        Map<String, String> roleMap = oktaConfig.getOktaGroupToAktoUserRoleMap();
+    private String extractOktaTeamName(List<String> groups, Map<String, String> oktaGroupToAktoUserRoleMap) {
         return groups.stream()
-                .filter(g -> roleMap == null || !roleMap.containsKey(g))
+                .filter(g -> oktaGroupToAktoUserRoleMap == null || !oktaGroupToAktoUserRoleMap.containsKey(g))
+                .findFirst()
+                .orElse("");
+    }
+
+    /**
+     * Raw Okta group that this user's role is coming from — the first group present in
+     * {@code oktaGroupToAktoUserRoleMap} — passed to AgenticUsers as-is, with no RBAC mapping.
+     */
+    private String extractOktaRoleGroupName(List<String> groups, Map<String, String> oktaGroupToAktoUserRoleMap) {
+        if (oktaGroupToAktoUserRoleMap == null || oktaGroupToAktoUserRoleMap.isEmpty()) return "";
+        return groups.stream()
+                .filter(oktaGroupToAktoUserRoleMap::containsKey)
                 .findFirst()
                 .orElse("");
     }

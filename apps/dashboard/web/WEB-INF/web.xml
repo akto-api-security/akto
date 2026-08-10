@@ -16,12 +16,24 @@
         <location>/pages/error.jsp</location>
     </error-page>
 
+    <!-- Build-time webpack configs must never be HTTP-served (also excluded from WAR).
+         Covers jetty:run which serves from web/ on disk. -->
+    <security-constraint>
+        <web-resource-collection>
+            <web-resource-name>BuildConfigFiles</web-resource-name>
+            <url-pattern>/webpack.config.js</url-pattern>
+            <url-pattern>/polaris_web/web/webpack.config.js</url-pattern>
+            <url-pattern>/polaris_web/web/webpack.config.dev.js</url-pattern>
+        </web-resource-collection>
+        <auth-constraint/>
+    </security-constraint>
+
     <filter>
         <filter-name>cross-origin</filter-name>
         <filter-class>org.eclipse.jetty.ee8.servlets.CrossOriginFilter</filter-class>
         <init-param>
             <param-name>allowedOrigins</param-name>
-            <param-value>*</param-value>
+            <param-value>https://*.akto.io</param-value>
         </init-param>
         <init-param>
             <param-name>allowedMethods</param-name>
@@ -32,8 +44,8 @@
             <param-value>*</param-value>
         </init-param>
         <init-param>
-            <param-name>supportsCredentials</param-name>
-            <param-value>true</param-value>
+            <param-name>allowCredentials</param-name>
+            <param-value>false</param-value>
         </init-param>
         <init-param>
             <param-name>chainPreflight</param-name>

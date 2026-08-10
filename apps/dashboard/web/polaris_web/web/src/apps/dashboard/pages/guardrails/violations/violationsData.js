@@ -5,6 +5,13 @@ function _parseAktoOuter(payloadStr) {
     try { return JSON.parse(payloadStr); } catch { return null; }
 }
 
+function _metaField(metadata, key) {
+    if (!metadata || typeof metadata !== "string") return null;
+    const m = metadata.match(new RegExp('(?:^|\\n)\\s*' + key + '\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"'));
+    if (!m) return null;
+    try { return JSON.parse('"' + m[1] + '"'); } catch (e) { return m[1]; }
+}
+
 function _parseJson(str) {
     if (!str) return null;
     try { return JSON.parse(str); } catch { return null; }
@@ -84,6 +91,35 @@ export function normalizeReasonPunctuation(reason) {
     return reason.slice(idx + 2);
 }
 
+// Strips a leading "key": or key: prefix and returns { key, rest }, or null if the text
+// doesn't start with one (e.g. it's just a bare value like "Bash(gh api *)").
+function stripLeadingKey(text) {
+    const m = text.match(/^"?([\w.[\]*]+)"?\s*:\s*([\s\S]*)$/);
+    if (!m) return null;
+    return { key: m[1], rest: m[2].trim() };
+}
+
+export function parseConfigEvidence(evidence, ruleViolated) {
+    let rest = evidence ? String(evidence).trim() : "";
+    let field = "";
+
+    const first = stripLeadingKey(rest);
+    if (first) {
+        field = first.key;
+        rest = first.rest;
+        const second = stripLeadingKey(rest);
+        if (second) rest = second.rest;
+    }
+
+    const value = rest.replace(/^"|"$/g, "");
+    field = field.replace(/\[\d+\]/g, "").split(".").pop().trim();
+
+    if (!field && ruleViolated && ruleViolated !== "-") {
+        return { field: String(ruleViolated).replace(/\[\d+\]/g, "").split(".").pop().trim(), value };
+    }
+    return { field, value };
+}
+
 function _extractGuardrailReason(resp, req) {
     const respReason = resp?.error?.data?.reason || resp?.error?.message || resp?.message || resp?.reason;
     if (respReason) {
@@ -103,6 +139,7 @@ export function buildFallbackDetail(row) {
     let chatSession = null;
     let fileContent = null;
     let fileTabLabel = null;
+    let fileHighlights = null;
     let guardrailReason = null;
     let skillName = null;
 
@@ -142,11 +179,11 @@ export function buildFallbackDetail(row) {
                     }));
                 }
             } else if (row.type === "Config") {
-                // Show the actual config file content (config_content), pretty-printed —
-                // not the whole diagnostic wrapper (path/field/evidence/title/message) around it.
                 const { text: prettyConfig } = prettyPrintIfJson(req?.config_content);
                 fileContent = prettyConfig || req?.config_content || (req ? JSON.stringify(req, null, 2) : outer.requestPayload);
                 fileTabLabel = "Config.json";
+                const { field, value } = parseConfigEvidence(req?.evidence, row.violation);
+                if (value) fileHighlights = [field ? { field, phrase: value } : { phrase: value }];
             } else if (row.type === "Skill" || row.type === "Tool") {
                 if (row.type === "Skill") skillName = req?.skill_name || null;
                 if (req?.skill_name || req?.skill_description) {
@@ -206,6 +243,8 @@ export function buildFallbackDetail(row) {
     // requestPayload.evidence for Config, responsePayload.evidence for Skill — plus
     // metadata.reason and the policy name.
     const meta = _parseJson(row.metadata) || {};
+    const metaOverview = meta.overview || _metaField(row.metadata, "overview");
+    const metaRemediation = meta.remediation || _metaField(row.metadata, "remediation");
     const outer = _parseAktoOuter(row.payload) || {};
     const req = _parseJson(outer.requestPayload);
     const resp = _parseJson(outer.responsePayload);
@@ -255,7 +294,9 @@ export function buildFallbackDetail(row) {
         chatSession: chatSession || undefined,
         fileContent: fileContent || undefined,
         fileTabLabel: fileTabLabel || undefined,
+        fileHighlights: fileHighlights || undefined,
         skillName: skillName || undefined,
-        remediation: `### Recommended actions\n\n1. Review the ${row.type} activity on **${row.agenticAsset || row.user}**.\n2. Confirm whether **${row.user}** is authorized for this action.\n3. Update the relevant guardrail policy if this should be blocked going forward.`,
+        overview: row.type === "Config" ? (metaOverview || undefined) : undefined,
+        remediation: metaRemediation || undefined,
     };
 }

@@ -10,6 +10,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.ahocorasick.trie.Trie;
 import org.bson.conversions.Bson;
@@ -100,14 +101,12 @@ public class RiskScoreSyncCron {
                         MongoCursor<BasicDBObject> cursor = MaliciousEventDao.instance.getCollection(String.valueOf(accountId)).aggregate(pipeline, BasicDBObject.class).cursor();
 
                         Map<String, List<String>> apiInfoKeyToSeverities = new HashMap<>();
-                        Set<Integer> apiCollectionIdsFromEvents = new HashSet<>();
                         while(cursor.hasNext()){
                             BasicDBObject document = cursor.next();
                             BasicDBObject id = (BasicDBObject) document.get("_id");
                             int apiCollectionIdFromDoc = id.getInt("apiCollectionId");
                             String method = id.getString("method");
                             String endpoint = id.getString("endpoint");
-                            apiCollectionIdsFromEvents.add(apiCollectionIdFromDoc);
                             List<String> severities = (List<String>) document.get("severities");
                             String key = apiCollectionIdFromDoc + " " + endpoint + " " + method;
                             apiInfoKeyToSeverities.put(key, severities);
@@ -115,35 +114,9 @@ public class RiskScoreSyncCron {
 
                         loggerMaker.warnAndAddToDb("Malicious events count: " + apiInfoKeyToSeverities.size());
 
-                        List<ApiInfo> apiInfos = ApiInfoDao.instance.getMCollection().find(Filters.in(ApiInfo.ID_API_COLLECTION_ID, apiCollectionIdsFromEvents)).into(new ArrayList<>());
-                        Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = new HashMap<>();
-                        Map<String, ApiInfoKey> apiInfoKeyToApiInfo = new HashMap<>();
-
-                        RuntimeUtil.fillURLTemplatesMap(apiInfos, null, apiCollectionUrlTemplates, apiInfoKeyToApiInfo);
+                        Map<ApiInfoKey, Float> apiInfoKeyToThreatScore = resolveThreatScores(apiInfoKeyToSeverities, MaliciousEventDao::getThreatScoreFromSeverities);
                         List<WriteModel<ApiInfo>> updates = new ArrayList<>();
-                        Map<ApiInfoKey, Float> apiInfoKeyToThreatScore = new HashMap<>();
 
-                        for(String apiInfoKey : apiInfoKeyToSeverities.keySet()){
-                            String[] parts = apiInfoKey.split(" ");
-                            int apiCollectionId = Integer.parseInt(parts[0]);
-                            String url = parts[1];
-                            String method = parts[2];
-                            URLTemplate urlTemplate = isMatchingUrl(apiCollectionId, url, method, apiCollectionUrlTemplates, lfiTrie, osCommandInjectionTrie, ssrfTrie);
-                            List<String> severities = apiInfoKeyToSeverities.get(apiInfoKey);
-                            float threatScore = MaliciousEventDao.getThreatScoreFromSeverities(severities);
-                            if(urlTemplate != null || apiInfoKeyToApiInfo.containsKey(apiInfoKey)){
-                                ApiInfoKey apiInfoKeyObj = null;
-                                if(urlTemplate != null){
-                                    apiInfoKeyObj = new ApiInfoKey(apiCollectionId, urlTemplate.getTemplateString(), urlTemplate.getMethod());
-                                    loggerMaker.warnAndAddToDb("Updating risk score for " + urlTemplate.getTemplateString() + " " + urlTemplate.getMethod().name() + " " + apiCollectionId + " to " + threatScore);
-                                }else{
-                                    apiInfoKeyObj = apiInfoKeyToApiInfo.get(apiInfoKey);
-                                    loggerMaker.warnAndAddToDb("Updating risk score for from normal api info " + url + " " + method + " " + apiCollectionId + " to " + threatScore);
-                                }
-                                apiInfoKeyToThreatScore.put(apiInfoKeyObj, Math.max(apiInfoKeyToThreatScore.getOrDefault(apiInfoKeyObj, 0.0f), threatScore));
-                            }
-                        }
-                            
                         if(apiInfoKeyToThreatScore.size() > 0){
                             for(ApiInfoKey apiInfoKey : apiInfoKeyToThreatScore.keySet()){
                                 float threatScore = apiInfoKeyToThreatScore.get(apiInfoKey);
@@ -161,5 +134,50 @@ public class RiskScoreSyncCron {
                 }, "risk-score-sync-cron");
             }
         }, 0, 15, TimeUnit.MINUTES);
+    }
+
+    // shared with SkillsRiskScoreSyncCron's non-skill endpoint events: resolves each event's literal
+    // (apiCollectionId, url, method) against ApiInfo's stored template/literal urls and scores it via
+    // the caller-supplied severity->score formula (each cron scores on its own scale).
+    // apiInfoKeyToSeverities keys are formatted as "apiCollectionId url method".
+    public static Map<ApiInfoKey, Float> resolveThreatScores(Map<String, List<String>> apiInfoKeyToSeverities,
+            Function<List<String>, Float> severityScorer) {
+        Map<ApiInfoKey, Float> apiInfoKeyToThreatScore = new HashMap<>();
+        if (apiInfoKeyToSeverities.isEmpty()) {
+            return apiInfoKeyToThreatScore;
+        }
+
+        Set<Integer> apiCollectionIdsFromEvents = new HashSet<>();
+        for (String apiInfoKey : apiInfoKeyToSeverities.keySet()) {
+            apiCollectionIdsFromEvents.add(Integer.parseInt(apiInfoKey.split(" ")[0]));
+        }
+
+        List<ApiInfo> apiInfos = ApiInfoDao.instance.getMCollection().find(Filters.in(ApiInfo.ID_API_COLLECTION_ID, apiCollectionIdsFromEvents)).into(new ArrayList<>());
+        Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = new HashMap<>();
+        Map<String, ApiInfoKey> apiInfoKeyToApiInfo = new HashMap<>();
+        RuntimeUtil.fillURLTemplatesMap(apiInfos, null, apiCollectionUrlTemplates, apiInfoKeyToApiInfo);
+
+        for(String apiInfoKey : apiInfoKeyToSeverities.keySet()){
+            String[] parts = apiInfoKey.split(" ");
+            int apiCollectionId = Integer.parseInt(parts[0]);
+            String url = parts[1];
+            String method = parts[2];
+            URLTemplate urlTemplate = isMatchingUrl(apiCollectionId, url, method, apiCollectionUrlTemplates, lfiTrie, osCommandInjectionTrie, ssrfTrie);
+            List<String> severities = apiInfoKeyToSeverities.get(apiInfoKey);
+            float threatScore = severityScorer.apply(severities);
+            if(urlTemplate != null || apiInfoKeyToApiInfo.containsKey(apiInfoKey)){
+                ApiInfoKey apiInfoKeyObj = null;
+                if(urlTemplate != null){
+                    apiInfoKeyObj = new ApiInfoKey(apiCollectionId, urlTemplate.getTemplateString(), urlTemplate.getMethod());
+                    loggerMaker.warnAndAddToDb("Updating risk score for " + urlTemplate.getTemplateString() + " " + urlTemplate.getMethod().name() + " " + apiCollectionId + " to " + threatScore);
+                }else{
+                    apiInfoKeyObj = apiInfoKeyToApiInfo.get(apiInfoKey);
+                    loggerMaker.warnAndAddToDb("Updating risk score for from normal api info " + url + " " + method + " " + apiCollectionId + " to " + threatScore);
+                }
+                apiInfoKeyToThreatScore.put(apiInfoKeyObj, Math.max(apiInfoKeyToThreatScore.getOrDefault(apiInfoKeyObj, 0.0f), threatScore));
+            }
+        }
+
+        return apiInfoKeyToThreatScore;
     }
 }

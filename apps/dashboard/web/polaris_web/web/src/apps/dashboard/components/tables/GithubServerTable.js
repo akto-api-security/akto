@@ -259,7 +259,7 @@ function GithubServerTable(props) {
   useEffect(() => {
     if (props?.callFromOutside) {
       fetchData(queryValue);
-    }    
+    }
   },[props?.callFromOutside])
 
   useEffect(() => {
@@ -338,19 +338,26 @@ function GithubServerTable(props) {
     setAppliedFilters(temp);
   }, [appliedFilters, props.disambiguateLabel, handleRemoveAppliedFilter, setFiltersMap, currentPageKey, pageFiltersMap]);
 
-  const debouncedSearch = debounce((searchQuery) => {
-      fetchData(searchQuery)
-  }, 500);
+  // Always call the latest fetchData. Without this ref the handlers below (useCallback([])) freeze
+  // the first-render fetchData/props.data, so searching/clearing re-filters a stale snapshot — e.g.
+  // dropping async-enriched badges when the source has since been enriched but the table isn't
+  // remounting.
+  const fetchDataRef = useRef(fetchData);
+  fetchDataRef.current = fetchData;
+
+  const debouncedSearch = useMemo(() => debounce((searchQuery) => {
+      fetchDataRef.current(searchQuery)
+  }, 500), []);
 
   const handleFiltersQueryChange = useCallback((val) => {
     setQueryValue(val);
     debouncedSearch(val);
-  }, []);
+  }, [debouncedSearch]);
 
   const handleFiltersQueryClear = useCallback(
     () => {setQueryValue("");
     debouncedSearch("")},
-    [],
+    [debouncedSearch],
   );
 
   const handleFilterStatusChange = (key, value) => {
