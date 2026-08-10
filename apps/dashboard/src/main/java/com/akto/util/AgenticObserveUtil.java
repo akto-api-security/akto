@@ -209,7 +209,11 @@ public final class AgenticObserveUtil {
             if (Constants.AKTO_SKILL_TAG.equals(tag.getKeyName())) {
                 hasSkill = true;
             }
-            if (Constants.AKTO_AI_AGENT_TAG.equals(tag.getKeyName())) {
+            // Matches mcpClientHelper.js's getTypeFromTags — a tag present with value "not-attached"
+            // means the agent-owner slot exists but isn't actually bound, so it doesn't count as
+            // "has an AI agent" (this is what lets a skill with only a not-attached ai-agent tag
+            // still classify as Skill below, instead of falling through to MCP Server).
+            if (Constants.AKTO_AI_AGENT_TAG.equals(tag.getKeyName()) && !NOT_ATTACHED_VALUE.equals(tag.getValue())) {
                 hasAiAgent = true;
             }
             if (Constants.AKTO_MCP_SERVER_TAG.equals(tag.getKeyName())) {

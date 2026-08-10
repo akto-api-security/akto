@@ -486,7 +486,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         for (ApiCollection c : collections) {
             if (c.isDeactivated()) continue;
             String hostName = c.getHostName();
-            if (StringUtils.isBlank(hostName) || hostName.contains(AgenticObserveUtil.NOT_ATTACHED_VALUE)) continue;
+            if (StringUtils.isBlank(hostName)) continue;
 
             List<CollectionTags> envType = c.getEnvType();
             String idStr = String.valueOf(c.getId());
@@ -497,7 +497,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             String deviceId = AgenticObserveUtil.extractEndpointId(hostName);
 
             // Skill fan-out — a collection with multiple skills is a member of multiple skill
-            // groups, independent of its agent/service/llm classification below.
+            // groups, independent of its agent/service/llm classification below. Counted even for a
+            // "not-attached" hostname (an orphan skill bucket, not a real agent/service/llm) —
+            // matches constants.js's groupCollectionsBySkill, which never checks
+            // isNotAttachedHostName, unlike its Agent/Service/LLM siblings below.
             if (c.getSkills() != null) {
                 for (String skill : c.getSkills()) {
                     if (StringUtils.isBlank(skill)) continue;
@@ -510,6 +513,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     g.accumulateCheap(c, hostName, envType, collRisk, collTraffic, deviceId);
                 }
             }
+
+            if (hostName.contains(AgenticObserveUtil.NOT_ATTACHED_VALUE)) continue; // orphan bucket — not a real agent/service/llm
 
             boolean hasBrowserLlm = hasTagKey(envType, Constants.AKTO_BROWSER_LLM_TAG);
             if (hasBrowserLlm) {
