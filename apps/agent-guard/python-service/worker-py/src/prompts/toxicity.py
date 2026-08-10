@@ -132,9 +132,7 @@ def _format_categories(categories: Any) -> str:
         "Content that is toxic in a category NOT listed here is out of scope for this scan: "
         "score it as not toxic and leave matchedCategory empty. "
         "When a listed category's sensitivity guidance expands or narrows the base "
-        "definition above, prefer that guidance over any conflicting few-shot.\n"
-        + "\n".join(lines)
-        + "\n"
+        "definition above, prefer that guidance over any conflicting few-shot.\n" + "\n".join(lines) + "\n"
     )
 
 

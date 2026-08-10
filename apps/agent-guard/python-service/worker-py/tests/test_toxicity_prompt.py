@@ -33,10 +33,7 @@ def test_no_config_keeps_conservative_base_for_old_deployments():
     assert "EXPAND insults" not in prompt
     assert "Only an idiot would design analytics dashboards this badly" not in prompt
     # Base few-shot: unaimed swearing is benign without insults HIGH.
-    assert (
-        'Input: "For fuck\'s sake just show me the top 10 users"\n'
-        'Output: {"isToxic": false'
-    ) in prompt
+    assert ('Input: "For fuck\'s sake just show me the top 10 users"\nOutput: {"isToxic": false') in prompt
 
 
 def test_insults_low_does_not_inject_high_examples():
