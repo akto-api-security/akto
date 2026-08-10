@@ -63,14 +63,7 @@ const Users = () => {
     let rbacAccess = func.checkForRbacFeatureBasic();
     let rbacAccessAdvanced =  func.checkForRbacFeature()
 
-    // allCollections (unlike collectionsMap) retains deactivated collections, which are
-    // still genuinely accessible and so must stay both countable and visible in the picker
-    const storeCollections = PersistStore(state => state.allCollections)
-
-    const existingCollectionIds = useMemo(
-        () => new Set((storeCollections || []).map((c) => c.id)),
-        [storeCollections]
-    )
+    const collectionsMap = PersistStore(state => state.collectionsMap)
 
     const [selectedItems, setSelectedItems] = useState({})
 
@@ -250,13 +243,13 @@ const Users = () => {
         getRoleHierarchy()
     }, [])
 
-    // collections load asynchronously, so this cannot be a mount-only effect
+    // collectionsMap loads asynchronously, so this cannot be a mount-only effect
     useEffect(() => {
-        setAllCollections((storeCollections || []).map((c) => ({
-            id: c.id,
-            collectionName: c.displayName ?? c.name
+        setAllCollections(Object.entries(collectionsMap).map(([id, collectionName]) => ({
+            id: parseInt(id, 10),
+            collectionName
         })));
-    }, [storeCollections])
+    }, [collectionsMap])
 
     const getRoleDisplayName = (role) => {
         for(let section of rolesOptions) {
@@ -397,13 +390,8 @@ const Users = () => {
         return usersCollection[userId] || [];
     };
 
-    /*
-     * Stored ids can point at collections that were since deleted. Those can never render
-     * a row in the picker, so counting them makes the label disagree with the list.
-     */
-    const countAccessibleCollections = (userId) => {
-        return getUserApiCollectionIds(userId).filter((id) => existingCollectionIds.has(id)).length
-    };
+    // drop ids for collections that are deleted or deactivated; the picker cannot list them
+    const selectable = (ids) => ids.filter((id) => id in collectionsMap);
 
     const handleRemoveInvitations = async (data) => {
         await settingRequests.removeInvitation(data.login)
@@ -496,7 +484,7 @@ const Users = () => {
                                         isFilterControlEnabale={userRole === 'ADMIN'}
                                         selectable={userRole === 'ADMIN'}
                                         onSelectedItemsChange={handleSelectedItemsChange}
-                                        alreadySelectedItems={getUserApiCollectionIds(id)}
+                                        alreadySelectedItems={selectable(getUserApiCollectionIds(id))}
                                     />
                                 </Box>
                             )
@@ -509,7 +497,7 @@ const Users = () => {
                                                 { (role === 'ADMIN' || userRole !== 'ADMIN' || !rbacAccessAdvanced) ? undefined :
                                                     <ResourceListModal
                                                         title={"Collection list"}
-                                                        activatorPlaceaholder={`${countAccessibleCollections(id)} collections accessible`}
+                                                        activatorPlaceaholder={`${selectable(getUserApiCollectionIds(id)).length} collections accessible`}
                                                         isColoredActivator={true}
                                                         component={userCollectionsModalComp}
                                                         primaryAction={userCollectionsHandler}

@@ -1,5 +1,5 @@
 import { Box, HorizontalStack, LegacyCard, Page, ResourceItem, ResourceList, Text, Modal, TextField, VerticalStack, Checkbox } from "@shopify/polaris"
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import func from "@/util/func";
 import settingRequests from "../api";
 import ResourceListModal from "../../../components/shared/ResourceListModal";
@@ -54,9 +54,7 @@ const Roles = () => {
     const [tempRoles, setTempRoles] = useState([])
     const [allCollections, setAllCollections] = useState([])
     const [loading, setLoading] = useState(false)
-    // allCollections (unlike collectionsMap) retains deactivated collections, which are
-    // still genuinely accessible and so must stay both countable and visible in the picker
-    const storeCollections = PersistStore(state => state.allCollections)
+    const collectionsMap = PersistStore(state => state.collectionsMap)
     const [createNewRoleModalActive, setCreateNewRoleModalActive] = useState(false)
     const [allowedFeatures, setAllowedFeatures] = useState([])
 
@@ -96,30 +94,20 @@ const Roles = () => {
 
     }, [])
 
-    // collections load asynchronously, so this cannot be a mount-only effect
+    // collectionsMap loads asynchronously, so this cannot be a mount-only effect
     useEffect(() => {
-        setAllCollections((storeCollections || []).map((c) => ({
-            id: c.id,
-            collectionName: c.displayName ?? c.name
+        setAllCollections(Object.entries(collectionsMap).map(([id, collectionName]) => ({
+            id: parseInt(id, 10),
+            collectionName
         })));
-    }, [storeCollections])
-
-    const existingCollectionIds = useMemo(
-        () => new Set((storeCollections || []).map((c) => c.id)),
-        [storeCollections]
-    )
+    }, [collectionsMap])
 
     const getRoleItems = (role, key) => {
         return roles.filter(r => r.name === role)[0][key] || []
     };
 
-    /*
-     * Stored ids can point at collections that were since deleted. Those can never render
-     * a row in the picker, so counting them makes the label disagree with the list.
-     */
-    const countAccessibleCollections = (role) => {
-        return getRoleItems(role, "apiCollectionsId").filter((id) => existingCollectionIds.has(id)).length
-    };
+    // drop ids for collections that are deleted or deactivated; the picker cannot list them
+    const selectable = (ids) => ids.filter((id) => id in collectionsMap);
 
     const handleSelectedItemsChange = (role, items, key) => {
         setRoles(prevRoles => {
@@ -227,7 +215,7 @@ const Roles = () => {
                                 content: (
                                     <ResourceListModal
                                         title={`Update ${name} role`}
-                                        activatorPlaceaholder={`${countAccessibleCollections(name)} collections accessible, ${getRoleDisplayName(baseRole)} permissions${defaultInviteRole ? ', Default invite role' : ''}`}
+                                        activatorPlaceaholder={`${selectable(getRoleItems(name, "apiCollectionsId")).length} collections accessible, ${getRoleDisplayName(baseRole)} permissions${defaultInviteRole ? ', Default invite role' : ''}`}
                                         isColoredActivator={true}
                                         component={<VerticalStack gap={4}>
                                             <Box paddingBlockStart={4}>
@@ -269,7 +257,7 @@ const Roles = () => {
                                                     isFilterControlEnabale={userRole === 'ADMIN'}
                                                     selectable={userRole === 'ADMIN'}
                                                     onSelectedItemsChange={(items) => handleSelectedItemsChange(name, items, 'apiCollectionsId')}
-                                                    alreadySelectedItems={getRoleItems(name, "apiCollectionsId")}
+                                                    alreadySelectedItems={selectable(getRoleItems(name, "apiCollectionsId"))}
                                                 />
                                             </Box>
                                         </VerticalStack>}
