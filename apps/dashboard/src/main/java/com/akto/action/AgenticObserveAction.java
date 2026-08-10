@@ -1670,6 +1670,28 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     // computed when that row is expanded (parentDeviceId set), scoped to just that device's
     // collections — never a full second pass over the whole account.
 
+    // Sorts the flyout's own "Agentic Assets" tab / the main grid's tree-expand children rows —
+    // reads riskScore/violations/skillCount straight off the row (buildDeviceChildren already
+    // computed them), no separate lookup map needed.
+    private static Comparator<BasicDBObject> buildDeviceChildComparator(String key) {
+        if ("riskScore".equals(key)) {
+            return Comparator.comparingDouble(r -> {
+                Object v = r.get("riskScore");
+                return v == null ? 0.0 : ((Number) v).doubleValue();
+            });
+        } else if ("violations".equals(key)) {
+            return Comparator.comparingInt(r -> {
+                Object v = r.get("violations");
+                if (!(v instanceof BasicDBObject)) return 0;
+                BasicDBObject vo = (BasicDBObject) v;
+                return vo.getInt("critical", 0) + vo.getInt("high", 0) + vo.getInt("medium", 0) + vo.getInt("low", 0);
+            });
+        } else if ("skillCount".equals(key)) {
+            return Comparator.comparingInt(r -> ((Number) r.getOrDefault("skillCount", 0)).intValue());
+        }
+        return Comparator.comparing((BasicDBObject r) -> String.valueOf(r.get("endpoint")), String.CASE_INSENSITIVE_ORDER);
+    }
+
     // Mirrors agenticPageBuilders.js's child row shape within one device, grouped by service name
     // (toChildPathKey(extractServiceName(hostName))) rather than across the whole account.
     private BasicDBObject buildDeviceChildren(String deviceId, List<ApiCollection> collections,
@@ -1767,7 +1789,30 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             );
 
             if (StringUtils.isNotBlank(parentDeviceId)) {
-                response = buildDeviceChildren(parentDeviceId, collections, traffic, risk, violations);
+                BasicDBObject childrenResp = buildDeviceChildren(parentDeviceId, collections, traffic, risk, violations);
+                @SuppressWarnings("unchecked")
+                List<BasicDBObject> childRows = (List<BasicDBObject>) childrenResp.get("rows");
+
+                if (StringUtils.isNotBlank(queryValue)) {
+                    String q = queryValue.toLowerCase(Locale.ROOT);
+                    childRows.removeIf(r -> {
+                        Object name = r.get("endpoint");
+                        return name == null || !name.toString().toLowerCase(Locale.ROOT).contains(q);
+                    });
+                }
+
+                Comparator<BasicDBObject> cmp = buildDeviceChildComparator(sortKey);
+                if (sortOrder < 0) cmp = cmp.reversed();
+                childRows.sort(cmp);
+
+                int childTotal = childRows.size();
+                int effectiveLimit = limit > 0 ? Math.min(limit, 500) : 20;
+                int from = Math.max(0, skip);
+                int to = Math.min(childRows.size(), from + effectiveLimit);
+                List<BasicDBObject> page = from < to ? childRows.subList(from, to) : Collections.emptyList();
+
+                response.put("rows", page);
+                response.put("total", childTotal);
                 return SUCCESS.toUpperCase();
             }
 

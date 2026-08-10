@@ -275,15 +275,13 @@ function TableSection({ onServerFetch, fetchDeviceChildren, collections, startTi
 
     const openDeviceFlyout = useCallback(async (deviceData) => {
         const deviceId = deviceData.deviceId;
+        // Full, unpaginated — needed for the Overview tab's topology graph/counts. The flyout's own
+        // "Agentic Assets" tab fetches its own paginated page independently (AgenticsTab's
+        // onServerFetch in DeviceFlyout.jsx), same as the main grid's tree-expand rows.
         const children = await fetchDeviceChildren(deviceId);
-        const agentRiskData = {};
-        children.forEach((c) => {
-            agentRiskData[(c.path || []).join("/")] = { riskScore: c.riskScore, violations: c.violations };
-        });
         setDeviceFlyout({
             device: deviceData,
             agents: children,
-            agentRiskData,
             hostNames: getHostNamesForDevice(deviceId, collections),
         });
     }, [fetchDeviceChildren, collections]);
@@ -361,7 +359,6 @@ function TableSection({ onServerFetch, fetchDeviceChildren, collections, startTi
                 agents={deviceFlyout?.agents}
                 show={deviceFlyout !== null}
                 onClose={closeAll}
-                agentRiskData={deviceFlyout?.agentRiskData || {}}
                 deviceHostNames={deviceFlyout?.hostNames || []}
                 collections={collections}
                 startTimestamp={startTimestamp}
@@ -488,7 +485,12 @@ export default function DeviceEndpoints() {
 
     const fetchDeviceChildren = useCallback(async (deviceId) => {
         const { trafficMap, riskScoreMap, violationsByCollectionId } = enrichRef.current;
-        const res = await api.fetchDeviceEndpointsSummary({ parentDeviceId: deviceId, trafficMap, riskScoreMap, violationsByCollectionId });
+        // This caller wants the device's WHOLE children list (Overview tab's topology graph/counts,
+        // and the flyout's own tab-count label) — explicitly ask for the server's max page size
+        // (fetchDeviceEndpointsSummary's parentDeviceId branch now paginates; a device's own
+        // accessible assets are bounded well under 500 in practice, unlike AgenticsTab's own grid
+        // fetch, which intentionally pages 20 at a time).
+        const res = await api.fetchDeviceEndpointsSummary({ parentDeviceId: deviceId, limit: 500, trafficMap, riskScoreMap, violationsByCollectionId });
         return (res.rows || []).map(shapeRow);
     }, []);
 

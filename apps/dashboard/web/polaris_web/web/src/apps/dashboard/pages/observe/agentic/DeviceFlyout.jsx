@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider, Spinner } from "@shopify/polaris";
+import { Tabs, Box, VerticalStack, HorizontalStack, HorizontalGrid, Text, Divider } from "@shopify/polaris";
 import TopicsGuardrailList from "../../guardrails/components/TopicsGuardrailList";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
@@ -10,7 +10,8 @@ import { TypeBadge, SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import AssetTopologyGraph from "./AssetTopologyGraph";
 import { RiskFactorRow } from "./RiskFactorRow";
 import DetailGrid from "./DetailGrid";
-import agenticObserveApi, { buildAgenticObserveChatMetadata, fetchAgenticViolations, openViolationInThreatActivity, deviceServiceKey, isClaudeConfigHost } from "./agenticObserveApi";
+import agenticObserveApi, { buildAgenticObserveChatMetadata, fetchAgenticViolationsPage, openViolationInThreatActivity, deviceServiceKey } from "./agenticObserveApi";
+import api from "../api";
 import { extractServiceName, extractEndpointId } from "./constants";
 import { getFriendlyLlmName } from "./mcpClientHelper";
 import func from "@/util/func";
@@ -122,7 +123,10 @@ function ViolTitleCellRenderer({ data }) {
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
-function buildAgentsColDefs(agentRiskData) {
+// Reads riskScore/violations straight off each row — buildDeviceChildren (Java) already computes
+// them there, so no separate agentRiskData side-map/lookup is needed (it used to just re-derive
+// the exact same values from the same rows).
+function buildAgentsColDefs() {
     return [
     { field: "endpoint", headerName: "Agentic Asset", flex: 1, minWidth: 160, cellRenderer: AgentNameCellRenderer, cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL" })[p.data?.type] || "", cellStyle: { display: "flex", alignItems: "center" } },
     {
@@ -131,35 +135,23 @@ function buildAgentsColDefs(agentRiskData) {
         suppressHeaderMenuButton: true, suppressHeaderFilterButton: true,
         cellRenderer: AgentRiskCellRenderer,
         cellStyle: { display: "flex", alignItems: "center" },
-        valueGetter: (p) => {
-            if (!p.data) return null;
-            return agentRiskData[p.data.path?.join("/")]?.riskScore ?? null;
-        },
     },
     {
         field: "violations", headerName: "Violations", width: 130,
         suppressHeaderMenuButton: true, suppressHeaderFilterButton: true,
         cellRenderer: AgentViolationsCellRenderer,
         cellStyle: { display: "flex", alignItems: "center" },
-        valueGetter: (p) => {
-            if (!p.data) return null;
-            return agentRiskData[p.data.path?.join("/")]?.violations ?? null;
-        },
-        comparator: (a, b) => {
-            const sum = (v) => v ? (v.critical || 0) + (v.high || 0) + (v.medium || 0) + (v.low || 0) : 0;
-            return sum(a) - sum(b);
-        },
     },
     { field: "skillCount", headerName: "Skills", width: 80, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: AgentSkillsCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
 ];
 }
 
-const SEVERITY_ORDER = { low: 1, medium: 2, high: 3, critical: 4 };
-
+// Only "time" (-> detectedAt) and "severity" have a server-side sort mapping (see
+// ViolationsTab's onServerFetch) — "title" isn't a real backend field (it's filterId).
 const VIOLATIONS_COL_DEFS = [
-    { field: "time",     headerName: "Time",      width: 120, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.timeEpoch || 0) - (nodeB?.data?.timeEpoch || 0) },
-    { field: "title",    headerName: "Violation", flex: 1, minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "severity", headerName: "Severity",  width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, comparator: (a, b) => (SEVERITY_ORDER[a] || 0) - (SEVERITY_ORDER[b] || 0) },
+    { field: "time",     headerName: "Time",      width: 120, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" } },
+    { field: "title",    headerName: "Violation", flex: 1, minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, sortable: false },
+    { field: "severity", headerName: "Severity",  width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
 ];
 
 const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
@@ -500,8 +492,26 @@ function isAgentNavigable(data) {
     return !!data.type; // all typed assets are navigable
 }
 
-function AgenticsTab({ agents, onAgentClick, agentRiskData = {} }) {
-    const agentsColDefs = useMemo(() => buildAgentsColDefs(agentRiskData), [agentRiskData]);
+const AGENTS_COL_DEFS = buildAgentsColDefs();
+
+// Server-side paginated — reuses the same fetchDeviceEndpointsSummary(parentDeviceId) endpoint
+// the main Endpoints grid's own tree-expand rows already call (AgenticObserveAction.java's
+// buildDeviceChildren, now paginated/sorted/searched there too, so both call sites benefit).
+function AgenticsTab({ deviceId }) {
+    const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
+        const mongoOrder = sortOrder ? -sortOrder : -1; // AG-Grid asc/desc convention is inverted vs Mongo
+        return api.fetchDeviceEndpointsSummary({
+            parentDeviceId: deviceId,
+            skip,
+            limit: limit || 20,
+            sortKey,
+            sortOrder: mongoOrder,
+            queryValue: searchString || undefined,
+        }).then((res) => ({
+            value: res.rows || [],
+            total: res.total || 0,
+        }));
+    }, [deviceId]);
 
     const handleRowClick = useCallback((e) => {
         if (!e.data) return;
@@ -513,15 +523,16 @@ function AgenticsTab({ agents, onAgentClick, agentRiskData = {} }) {
 
     return (
         <AgGridTable
-            rowData={agents}
-            columnDefs={agentsColDefs}
+            key={deviceId}
+            columnDefs={AGENTS_COL_DEFS}
             defaultColDef={GRID_DEFAULT_COL}
+            onServerFetch={onServerFetch}
+            serverSideRowModel
+            getRowId={(params) => params.data.id}
             onRowClicked={handleRowClick}
             getRowStyle={({ data }) => isAgentNavigable(data) ? { cursor: "pointer" } : { cursor: "default" }}
-            fillHeight
             noOuterBorder
             searchPlaceholder="Search assets..."
-            pagination
             paginationPageSize={20}
             paginationPageSizeSelector={[20, 50, 100]}
             sideBar={{ toolPanels: ["columns", "filters"], defaultToolPanel: null }}
@@ -531,13 +542,17 @@ function AgenticsTab({ agents, onAgentClick, agentRiskData = {} }) {
 
 // ─── Violations tab ───────────────────────────────────────────────────────────
 
-function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp, allViolationRows }) {
-    const [violations, setViolations] = useState([]);
-    const [loading, setLoading] = useState(true);
+// Server-side paginated/searched/sorted — mirrors ViolationsTab.jsx's (Agentic Assets flyout)
+// onServerFetch exactly, scoped by this device's own hostNames/deviceId instead of an asset's.
+// claudeDeviceIds always includes this device's own id (not just hosts already seen ending in
+// ".claude") so an orphan claude-config-scanner event still attributes correctly even if no real
+// Claude collection has been seen for this device yet — matches the original client-side filter.
+function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp }) {
+    const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
+        if (!hostNames.length && !deviceId) {
+            return Promise.resolve({ value: [], total: 0 });
+        }
 
-    useEffect(() => { setViolations([]); setLoading(true); }, [hostNames, deviceId]);
-
-    useEffect(() => {
         const claudeDeviceIds = new Set(
             hostNames
                 .filter(h => { const parts = h.split("."); return parts[parts.length - 1]?.toLowerCase() === "claude"; })
@@ -545,90 +560,47 @@ function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp,
                 .filter(Boolean)
         );
         if (deviceId) claudeDeviceIds.add(deviceId);
+        const looseHostKeys = hostNames.map(h => deviceServiceKey(h)).filter(Boolean);
 
-        if (!hostNames.length && !claudeDeviceIds.size) { setViolations([]); setLoading(false); return; }
+        const mongoOrder = sortOrder ? -sortOrder : -1;
+        const sortBySeverity = sortKey === "severity";
 
-        const hostSet = new Set(hostNames);
-        const looseHostSet = new Set(hostNames.map(h => deviceServiceKey(h)).filter(Boolean));
-        const applyFilter = (rows) => rows.filter(r =>
-            hostSet.has(r.host) ||
-            looseHostSet.has(deviceServiceKey(r.host)) ||
-            (isClaudeConfigHost(r.host) && claudeDeviceIds.has(r.host.split(".")[0]))
-        ).map((r) => ({ ...r, time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "" }));
-
-        // The parent (DeviceEndpoints) already fetched every account-wide violation once to build its
-        // own summary cards — reuse that in-memory set instead of re-fetching it over the network on
-        // every flyout open.
-        if (Array.isArray(allViolationRows)) {
-            setViolations(applyFilter(allViolationRows));
-            setLoading(false);
-            return;
-        }
-
-        // Fallback for any caller that doesn't have the rows already in memory: server-side host
-        // scoping. The server does an exact match, so we send a best-effort expanded set covering the
-        // same 3 tiers applyFilter checks above — collection hostnames as-is (exact tier), their
-        // 2-segment device.service reduction (loose tier: events are always 2-segment even when the
-        // collection hostname has a middle "source" segment), and this device's claude-config host
-        // variants — instead of pulling every account event (up to 100k rows) unfiltered.
-        let cancelled = false;
-        const looseHostNames = hostNames.map(h => {
-            const parts = h.split(".");
-            return parts.length > 1 ? `${parts[0]}.${parts[parts.length - 1]}` : null;
-        }).filter(Boolean);
-        const claudeHostNames = deviceId ? [`${deviceId}.claude`, `${deviceId}.claude-settings`] : [];
-        const scopedHosts = Array.from(new Set([...hostNames, ...looseHostNames, ...claudeHostNames]));
-
-        fetchAgenticViolations({ startTimestamp, endTimestamp, hosts: scopedHosts })
-            .then((rows) => {
-                if (!cancelled) setViolations(applyFilter(rows));
-            })
-            .catch(() => {
-                if (!cancelled) setViolations([]);
-            })
-            .finally(() => {
-                if (!cancelled) setLoading(false);
-            });
-        return () => { cancelled = true; };
-    }, [hostNames, deviceId, startTimestamp, endTimestamp, allViolationRows]);
+        return fetchAgenticViolationsPage({
+            startTimestamp, endTimestamp,
+            hosts: hostNames,
+            looseHostKeys,
+            claudeDeviceIds: Array.from(claudeDeviceIds),
+            skip,
+            limit: limit || 20,
+            sort: sortBySeverity ? { severity: mongoOrder } : { detectedAt: mongoOrder },
+            sortBySeverity,
+            searchText: searchString || undefined,
+        }).then((res) => ({
+            value: res.violations.map((r) => ({
+                ...r,
+                time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
+            })),
+            total: res.total,
+        }));
+    }, [hostNames, deviceId, startTimestamp, endTimestamp]);
 
     const handleViolationClick = useCallback((e) => {
         if (!e.data) return;
         openViolationInThreatActivity(e.data);
     }, []);
 
-    if (loading) {
-        return (
-            <Box padding="8">
-                <VerticalStack gap="2" inlineAlign="center">
-                    <Spinner accessibilityLabel="Loading violations" size="small" />
-                </VerticalStack>
-            </Box>
-        );
-    }
-
-    if (violations.length === 0) {
-        return (
-            <Box padding="8">
-                <VerticalStack gap="1" inlineAlign="center">
-                    <Text variant="bodySm" fontWeight="semibold">No violations</Text>
-                    <Text variant="bodySm" color="subdued">This device is operating within policy.</Text>
-                </VerticalStack>
-            </Box>
-        );
-    }
-
     return (
         <AgGridTable
-            rowData={violations}
+            key={deviceId}
             columnDefs={VIOLATIONS_COL_DEFS}
             defaultColDef={GRID_DEFAULT_COL}
+            onServerFetch={onServerFetch}
+            serverSideRowModel
+            getRowId={(params) => params.data.refId || `${params.data.host}-${params.data.timeEpoch}-${params.data.title}`}
             onRowClicked={handleViolationClick}
             getRowStyle={() => ({ cursor: "pointer" })}
-            fillHeight
             noOuterBorder
             searchPlaceholder="Search violations..."
-            pagination
             paginationPageSize={20}
             paginationPageSizeSelector={[20, 50, 100]}
             sideBar={{ toolPanels: ["columns", "filters"], defaultToolPanel: null }}
@@ -638,8 +610,9 @@ function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp,
 
 // ─── Main DeviceFlyout ────────────────────────────────────────────────────────
 
-export default function DeviceFlyout({ device, agents, show, onClose, onAgentClick, agentRiskData = {}, deviceHostNames = [], collections = [], startTimestamp, endTimestamp, violationRows }) {
+export default function DeviceFlyout({ device, agents, show, onClose, onAgentClick, deviceHostNames = [], collections = [], startTimestamp, endTimestamp }) {
     const [selectedTab, setSelectedTab] = useState(0);
+    const deviceId = device?.path?.[0] || device?.deviceId;
 
     // Minimal identity only — the MCP agent resolves this device's collections and fetches
     // its endpoints/components/violations on demand via akto_agentic_asset_details (deviceId).
@@ -687,8 +660,8 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
         >
             <Box padding="2" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
                 {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} collections={collections} onTabChange={setSelectedTab} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
-                {selectedTab === 1 && <AgenticsTab agents={agents || []} onAgentClick={onAgentClick} agentRiskData={agentRiskData} />}
-                {selectedTab === 2 && <ViolationsTab hostNames={deviceHostNames} deviceId={device?.path?.[0] || device?.deviceId} startTimestamp={startTimestamp} endTimestamp={endTimestamp} allViolationRows={violationRows} />}
+                {selectedTab === 1 && <AgenticsTab deviceId={deviceId} />}
+                {selectedTab === 2 && <ViolationsTab hostNames={deviceHostNames} deviceId={deviceId} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
             </Box>
         </AgenticFlyoutShell>
     );
