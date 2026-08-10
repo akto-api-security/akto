@@ -95,7 +95,10 @@ function TopStatisticsSidebar({ startTimestamp, endTimestamp }) {
                 const [topResp, countryResp, recentResp] = await Promise.all([
                     api.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5),
                     api.getActorsCountPerCounty(startTimestamp, endTimestamp),
-                    api.fetchSuspectSampleData(0, [], [], [], [], { detectedAt: -1 }, startTimestamp, endTimestamp, [], 5),
+                    // "exclude" skillEvaluationMode drops /skills/<name> events - same server-side
+                    // mode the Active tab already uses (MaliciousEventService.listMaliciousRequests).
+                    // ENDPOINT context only; a no-op for AGENTIC accounts.
+                    api.fetchSuspectSampleData(0, [], [], [], [], { detectedAt: -1 }, startTimestamp, endTimestamp, [], 5, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, "exclude"),
                 ]);
 
                 if (topResp?.topHosts) {
