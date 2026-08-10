@@ -666,6 +666,10 @@ public class DbAction extends ActionSupport {
     }
 
     public String updateRuntimeEnvOverrides() {
+        if (runtimeEnvOverrides == null) {
+            addActionError("runtimeEnvOverrides is required");
+            return Action.ERROR.toUpperCase();
+        }
         try {
             int accountId = Context.accountId.get();
             DbLayer.updateRuntimeEnvOverrides(accountId, runtimeEnvOverrides);
