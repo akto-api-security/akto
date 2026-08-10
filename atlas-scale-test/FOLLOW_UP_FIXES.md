@@ -199,6 +199,18 @@ pick up cold.
   and narrows the grid when one is excluded; old layout's Devices tab now shows a "User" filter
   pill listing all 4 real usernames, and selecting "jane.doe" narrows "Showing 1-5 of 5" to
   "Showing 1-1 of 1" (her one device).
+- Old layout's Users/Devices tab switcher was invisible on a fresh page load — found as a side
+  effect while adding the Devices tab's "User" filter above, not something this branch introduced.
+  `UsersAndDevices.jsx` passed `mode={IndexFiltersMode.Filtering}` to `GithubServerTable`, the only
+  caller among 15+ pages using this shared component to do so (every other page passes
+  `IndexFiltersMode.Default`). Polaris's `IndexFilters` renders a completely different UI in
+  Filtering mode (a "Cancel" + sort-icon row, mid-edit-looking) instead of its normal tab-bar +
+  search + filter-icon layout, so the `tabs={props.tableTabs}` prop (correctly wired to
+  `["Users (N)", "Devices (N)"]`) never rendered until a user happened to click "Cancel" first,
+  which switched to Default mode and revealed the tabs. Fixed by passing
+  `IndexFiltersMode.Default`, matching every other caller. Verified live: fresh load of
+  `/dashboard/observe/users-and-devices` now immediately shows "Users (4) / Devices (5)" tabs and
+  the normal search+filter-icon layout, and switching between tabs still works correctly.
 
 ## High priority — wrong output today
 
@@ -218,24 +230,6 @@ pick up cold.
   **Fix:** swap the order — try `resolveUsername()` first, fall back to `deviceMeta`'s username
   only if that's blank/`"-"`, matching the comment and `agenticPageBuilders.js`'s original
   `resolvedUsername !== DEFAULT_VALUE ? resolvedUsername : mod.username`.
-
-- [ ] **Old layout's Users/Devices tab switcher is invisible by default — "Devices" tab is
-  effectively unreachable without already knowing to click "Cancel" first.** Found as a side effect
-  while adding the Devices tab's "User" filter (see above) — not something this branch introduced,
-  reproduces on a fresh page load. `UsersAndDevices.jsx` passes `mode={IndexFiltersMode.Filtering}`
-  to `GithubServerTable`, and `GithubServerTable.js`'s `filterMode` (~line 89) falls back to that
-  prop whenever `pageFiltersMap?.filters?.length` is 0 — i.e. on a normal fresh visit, before any
-  filter has ever been set. Polaris's `IndexFilters` renders a completely different UI in Filtering
-  mode (a "Cancel" + sort-icon row, mid-edit-looking) instead of its normal tab-bar + search + filter
-  icon layout — so the `tabs={props.tableTabs}` prop (`GithubServerTable.js:743`, correctly wired to
-  `["Users (N)", "Devices (N)"]`) never actually renders until the user happens to click "Cancel"
-  first, which switches to Default mode and reveals the tabs. Confirmed live: fresh load of
-  `/dashboard/observe/users-and-devices` shows "Search in N users … Cancel [sort icon]" with no tab
-  pills anywhere; clicking "Cancel" makes "Users (4) / Devices (5)" tabs appear immediately.
-  **Fix:** don't force `IndexFiltersMode.Filtering` as the default mode for this page — either omit
-  the `mode` prop (let `GithubServerTable` default to `IndexFiltersMode.Default`) or pass
-  `IndexFiltersMode.Default` explicitly, reserving Filtering mode for after the user actually opens
-  a filter.
 
 - [ ] **A new pagination-reset behavior in the shared grid reaches an untouched, untested page.**
   `AgGridTable.jsx:271-279` — the new "jump to page 1 on search" effect fires for any
