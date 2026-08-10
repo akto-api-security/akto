@@ -39,6 +39,15 @@ pick up cold.
   segments, not from `module_info`. Fixed by deriving the same hostname-segment candidates
   server-side from each group's own `hostNames`. Verified live: matches production exactly (Claude
   CLI 82.1K, razorpay-home 55.8K, etc.).
+- Agentic Assets table's per-row "AI Interactions" column had the exact same `module_info`-vs-
+  hostname-segment bug (was always "-", including for assets already proven to have real
+  interaction data via the fixed card above). Moved the computation server-side —
+  `buildDevicesForGroup` already iterates each collection's `hostName`, so it now derives the same
+  hostname-segment candidates there and looks them up in `userAnalysisFlatMap`, accumulating per
+  device; `shapeRow` just sums `devices[].aiInteractions`. Dropped the input/output token tooltip
+  breakdown in the process (server only tracks totals per device) — small, deliberate scope cut.
+  Verified live: Claude CLI's row shows 82.1K, matching the card; several skill rows show real
+  counts while others correctly show "-" where no matching data exists.
 
 ## High priority — wrong output today
 
@@ -66,17 +75,6 @@ pick up cold.
   **Fix:** not necessarily wrong (the behavior is arguably a UX improvement), but needs an
   explicit look — either add e2e coverage for Guardrails Violations, or gate the new effect
   behind an opt-in prop so it doesn't silently apply to callers this PR never reviewed.
-
-- [ ] **Agentic Assets table's per-row "AI Interactions" column likely has the same
-  `module_info`-vs-hostname-segment bug just fixed for the "Top Used Applications" card.**
-  `AgenticAssetsPage.jsx`'s `shapeRow` → `computeAiInteractionsFromDevices` (`constants.js`) still
-  matches via `userAnalysisKeysByDeviceId` (Endpoint Shield's `module_info.id`/`module_info.name`),
-  the same scheme just confirmed to never match real `UserAnalysisData` records (see "Already
-  fixed" above — its `serviceId` is a hostname-segment-derived readable name, not `module_info`'s
-  UUID). Not fixed here since it's page-scoped (needs per-collection hostnames, which the
-  paginated row shape doesn't carry) rather than a simple account-wide lookup swap.
-  **Fix:** thread each row's `devices[].hostNames` (or equivalent) back from the server, and reuse
-  the same hostname-segment candidate derivation now living in `fetchAgenticAssetsStats`.
 
 ## Medium priority — feature regressions / data correctness
 
