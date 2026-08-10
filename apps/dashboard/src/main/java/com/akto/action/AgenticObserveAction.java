@@ -4,17 +4,22 @@ import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
+import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ComponentRiskAnalysis;
+import com.akto.dto.McpAuditInfo;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.AgenticObserveUtil;
 import com.akto.util.Constants;
@@ -40,6 +45,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -58,6 +64,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AgenticObserveAction.class, LogDb.DASHBOARD);
     private static final int MAX_THREAT_FETCH_LIMIT = 100_000;
+    // Matches com.akto.action.observe.Utils.DELTA_PERIOD_VALUE — duplicated locally rather than
+    // importing a same-named-but-different-package "Utils" class for one constant.
+    private static final int DELTA_PERIOD_VALUE = 60 * 24 * 60 * 60;
 
     @Getter
     private BasicDBObject response = new BasicDBObject();
@@ -98,6 +107,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Setter private Map<String, Map<String, String>> deviceMetadataMap; // deviceId -> {username, team, role, os}
     @Setter private Map<String, Map<String, Integer>> violationsByCollectionId; // collection id (string) -> {critical, high, medium, low}
     @Setter private Map<String, Integer> userAnalysisFlatMap; // "serviceId|deviceId" -> total AI-interaction tokens (see constants.js's buildUserAnalysisFlatMap)
+
+    // ---- Server-side pagination for fetchAgenticComponentsPage ----
+    @Setter private List<String> mcpServerNames; // asset.mcpServers, already known/cheap client-side — passed through rather than re-derived
+    @Setter private Map<String, List<Integer>> mcpServerCollectionIds; // asset.mcpServerCollectionIds — needed on each MCP-server row so AgentMcpToolsView's drill-down keeps working
 
     /**
      * ATLAS skill enrichment in a SINGLE query. Skill (/skills/&lt;name&gt;) and agent-config (/config/)
@@ -610,6 +623,317 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching agentic asset devices page: " + e.getMessage());
             addActionError("Error fetching agentic asset devices page: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    // ---- fetchAgenticComponentsPage helpers — Java port of agenticPageBuilders.js's
+    // buildSkillsFlyoutData/buildMcpComponentsFromStis/buildAgentBuiltinToolsFromStis, batched
+    // across an asset's whole collectionIds set instead of one collection at a time. ----
+
+    private static String skillNameFromUrl(String url) {
+        if (StringUtils.isBlank(url)) return null;
+        int idx = url.indexOf("skills/");
+        if (idx < 0) return null;
+        String name = url.substring(idx + "skills/".length());
+        return StringUtils.isNotBlank(name) ? name : null;
+    }
+
+    // Last non-empty path segment — mirrors agenticPageBuilders.js's mcpDisplayName.
+    private static String mcpDisplayName(String url) {
+        if (url == null) return null;
+        String trimmed = url.replaceAll("/+$", "");
+        String[] parts = trimmed.split("/");
+        for (int i = parts.length - 1; i >= 0; i--) {
+            if (StringUtils.isNotBlank(parts[i])) return parts[i];
+        }
+        return StringUtils.isNotBlank(trimmed) ? trimmed : url;
+    }
+
+    // Authoritative classification from McpAuditInfo's own `type` — mirrors bucketFromAuditType.
+    private static String bucketFromAuditType(String type) {
+        if (type == null) return null;
+        String t = type.toLowerCase(Locale.ROOT);
+        if (t.contains("skill")) return "Skill";
+        if (t.contains("resource")) return "Resource";
+        if (t.contains("prompt")) return "Prompt";
+        if (t.contains("server")) return "Server";
+        if (t.contains("tool")) return "Tool";
+        return null;
+    }
+
+    // Fallback when no audit record matches — mirrors bucketFromUrl.
+    private static String bucketFromUrl(String url) {
+        String u = url == null ? "" : url.toLowerCase(Locale.ROOT);
+        if (u.contains("skill")) return "Skill";
+        if (u.contains("resource")) return "Resource";
+        if (u.contains("prompt")) return "Prompt";
+        if (u.contains("server")) return "Server";
+        if (u.matches("^/mcp\\b.*") || "initialize".equals(u) || "ping".equals(u)) return "Server";
+        return "Tool";
+    }
+
+    private static boolean isAgentBuiltinToolUrl(String url) {
+        return url != null && url.startsWith("/tool/") && url.length() > "/tool/".length();
+    }
+
+    // Split-and-capitalize fallback only — mirrors mcpClientHelper.js's formatDisplayName minus its
+    // MCP-client-keyword branch (that branch matches known client/service names like "cursor", not
+    // skill/tool names, so it never fires for this endpoint's inputs in practice).
+    private static String formatComponentDisplayName(String raw) {
+        if (StringUtils.isBlank(raw)) return "Unknown";
+        if (raw.contains(".")) return raw;
+        StringBuilder sb = new StringBuilder();
+        for (String w : raw.split("[-_\\s]+")) {
+            if (StringUtils.isBlank(w)) continue;
+            if (sb.length() > 0) sb.append(' ');
+            String lower = w.toLowerCase(Locale.ROOT);
+            if ("cli".equals(lower) || "mcp".equals(lower)) sb.append(w.toUpperCase(Locale.ROOT));
+            else sb.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1).toLowerCase(Locale.ROOT));
+        }
+        return sb.length() > 0 ? sb.toString() : raw;
+    }
+
+    private static int sumViolations(Map<String, Integer> violations) {
+        if (violations == null) return 0;
+        int total = 0;
+        for (Integer v : violations.values()) total += v != null ? v : 0;
+        return total;
+    }
+
+    private static final class SkillAcc {
+        final String name;
+        String url;
+        String method;
+        String description = "";
+        double riskScore = 0;
+        int violations = 0;
+        double threatScore = 0;
+        boolean hasThreatTag = false;
+        Integer apiCollectionId;
+        SkillAcc(String name) { this.name = name; }
+    }
+
+    private static Comparator<BasicDBObject> buildComponentComparator(String key) {
+        if ("violations".equals(key)) {
+            return Comparator.comparingInt(r -> ((Number) r.getOrDefault("violations", 0)).intValue());
+        } else if ("riskScore".equals(key)) {
+            return Comparator.comparingDouble(r -> {
+                Object v = r.get("riskScore");
+                return v == null ? 0.0 : ((Number) v).doubleValue();
+            });
+        } else if ("_type".equals(key) || "type".equals(key)) {
+            return Comparator.comparing((BasicDBObject r) -> String.valueOf(r.get("_type")), String.CASE_INSENSITIVE_ORDER);
+        }
+        return Comparator.comparing((BasicDBObject r) -> String.valueOf(r.get("name")), String.CASE_INSENSITIVE_ORDER);
+    }
+
+    /**
+     * Server-side paginated Components list for ONE AI-Agent asset's flyout — merges skills
+     * (collection.skills ∪ /skills/&lt;name&gt; apiInfo/STI matches, mirrors buildSkillsFlyoutData),
+     * built-in tools (STI /tool/* endpoints, audit-type/url-bucket classified, mirrors
+     * buildAgentBuiltinToolsFromStis), and connected MCP servers (passed through from the
+     * already-known mcpServerNames — cheap, no re-derivation) into one sorted, paginated list.
+     * Batches what the old per-collection-id JS pipeline fired as 3N+N round trips
+     * (fetchApisFromStis/fetchApiInfosForCollection/fetchMcpAuditInfoByCollection × N collections,
+     * plus a full-account getAllCollectionsBasic() scan per collection just to look up one
+     * ApiCollection by id) into 3 total queries. The synthetic "Config" row stays client-side
+     * (AgentComponentsView.jsx pins it above this list) — it's derived from violation rows this
+     * endpoint has no reason to touch.
+     */
+    public String fetchAgenticComponentsPage() {
+        response = new BasicDBObject();
+        try {
+            List<Integer> ids = apiCollectionIds != null ? apiCollectionIds : Collections.emptyList();
+            if (ids.isEmpty()) {
+                response.put("components", new ArrayList<>());
+                response.put("total", 0);
+                return SUCCESS.toUpperCase();
+            }
+
+            List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
+                    Filters.in(Constants.ID, ids),
+                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.SKILLS)
+            );
+
+            Set<String> skillNamesFromCollections = new LinkedHashSet<>();
+            Set<String> mcpHostNames = new HashSet<>();
+            for (ApiCollection c : collections) {
+                if (c.getSkills() != null) {
+                    for (String s : c.getSkills()) if (StringUtils.isNotBlank(s)) skillNamesFromCollections.add(s);
+                }
+                String mcpHost = McpRequestResponseUtils.extractServiceNameFromHost(c.getHostName());
+                if (StringUtils.isNotBlank(mcpHost)) mcpHostNames.add(mcpHost);
+            }
+
+            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.in(SingleTypeInfo._COLLECTION_IDS, ids));
+
+            List<BasicDBObject> stiRows = ApiCollectionsDao.fetchEndpointsInCollection(
+                    Filters.in(SingleTypeInfo._COLLECTION_IDS, ids), 0, -1, DELTA_PERIOD_VALUE);
+
+            List<McpAuditInfo> auditRows = mcpHostNames.isEmpty() ? Collections.emptyList() :
+                    McpAuditInfoDao.instance.findAll(
+                            Filters.and(Filters.in(McpAuditInfo.MCP_HOST, mcpHostNames), Filters.ne(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL)),
+                            0, 1000, null);
+
+            // "method url" -> [riskScore, violationCount], shared by both skills and tools.
+            Map<String, double[]> infoByKey = new HashMap<>();
+            for (ApiInfo info : apiInfos) {
+                if (info.getId() == null || info.getId().getMethod() == null || info.getId().getUrl() == null) continue;
+                infoByKey.put(info.getId().getMethod().name() + " " + info.getId().getUrl(),
+                        new double[]{ info.getRiskScore(), sumViolations(info.getViolations()) });
+            }
+
+            // resourceName -> type/malicious/privileged/evidence from McpAuditInfo (server-type rows excluded).
+            Map<String, String> typeByName = new HashMap<>();
+            Map<String, Boolean> maliciousByName = new HashMap<>();
+            Map<String, Boolean> privilegedByName = new HashMap<>();
+            Map<String, String> riskDescByName = new HashMap<>();
+            for (McpAuditInfo row : auditRows) {
+                if (StringUtils.isBlank(row.getType()) || StringUtils.isBlank(row.getResourceName())) continue;
+                if (row.getType().toLowerCase(Locale.ROOT).contains("server")) continue;
+                typeByName.put(row.getResourceName(), row.getType());
+                ComponentRiskAnalysis cra = row.getComponentRiskAnalysis();
+                if (cra != null) {
+                    if (cra.getIsComponentMalicious()) maliciousByName.put(row.getResourceName(), true);
+                    if (cra.getHasPrivilegedAccess()) privilegedByName.put(row.getResourceName(), true);
+                    if (StringUtils.isNotBlank(cra.getEvidence())) riskDescByName.put(row.getResourceName(), cra.getEvidence());
+                    else if (StringUtils.isNotBlank(row.getRemarks())) riskDescByName.put(row.getResourceName(), row.getRemarks());
+                } else if (StringUtils.isNotBlank(row.getRemarks())) {
+                    riskDescByName.put(row.getResourceName(), row.getRemarks());
+                }
+            }
+
+            // ---- Skills: collection.skills ∪ apiInfo "/skills/<name>" matches ∪ STI fallback ----
+            Map<String, SkillAcc> skillAcc = new LinkedHashMap<>();
+            for (String s : skillNamesFromCollections) skillAcc.computeIfAbsent(s, SkillAcc::new);
+            for (ApiInfo info : apiInfos) {
+                if (info.getId() == null) continue;
+                String skillName = skillNameFromUrl(info.getId().getUrl());
+                if (skillName == null) continue;
+                SkillAcc acc = skillAcc.computeIfAbsent(skillName, SkillAcc::new);
+                acc.url = info.getId().getUrl();
+                if (info.getId().getMethod() != null) acc.method = info.getId().getMethod().name();
+                acc.apiCollectionId = info.getId().getApiCollectionId();
+                if (StringUtils.isNotBlank(info.getDescription())) acc.description = info.getDescription();
+                acc.riskScore = Math.max(acc.riskScore, info.getRiskScore());
+                int vCount = sumViolations(info.getViolations());
+                if (vCount > 0) acc.violations = vCount;
+                acc.threatScore = Math.max(acc.threatScore, info.getThreatScore());
+                if (info.getTagsList() != null) {
+                    for (CollectionTags t : info.getTagsList()) {
+                        if (t == null) continue;
+                        String key = t.getKeyName();
+                        String value = t.getValue();
+                        if ("skill-tags".equals(key) && StringUtils.isNotBlank(value) && !value.toLowerCase(Locale.ROOT).startsWith("version=")) acc.hasThreatTag = true;
+                        if ("malicious-skill-tag".equals(key) && "true".equals(value)) acc.hasThreatTag = true;
+                    }
+                }
+            }
+            for (BasicDBObject sti : stiRows) {
+                Object idObj = sti.get("_id");
+                if (!(idObj instanceof BasicDBObject)) continue;
+                BasicDBObject stiId = (BasicDBObject) idObj;
+                String skillName = skillNameFromUrl(stiId.getString("url"));
+                if (skillName == null) continue;
+                SkillAcc acc = skillAcc.computeIfAbsent(skillName, SkillAcc::new);
+                if (acc.url == null) acc.url = stiId.getString("url");
+                if (acc.method == null) acc.method = stiId.getString("method");
+                if (acc.apiCollectionId == null) acc.apiCollectionId = stiId.getInt("apiCollectionId", -1);
+            }
+
+            List<BasicDBObject> rows = new ArrayList<>();
+            for (SkillAcc acc : skillAcc.values()) {
+                BasicDBObject row = new BasicDBObject();
+                row.put("_type", "Skill");
+                row.put("name", formatComponentDisplayName(acc.name));
+                row.put("rawName", acc.name);
+                row.put("isNew", false);
+                row.put("violations", acc.violations);
+                row.put("blocked", false);
+                row.put("riskScore", acc.riskScore);
+                row.put("url", acc.url != null ? acc.url : "/skills/" + acc.name);
+                row.put("method", acc.method != null ? acc.method : "SKILL");
+                row.put("apiCollectionId", acc.apiCollectionId);
+                row.put("description", acc.description);
+                row.put("threatScore", acc.threatScore);
+                row.put("isThreatEnabled", acc.threatScore > 0 || acc.hasThreatTag);
+                rows.add(row);
+            }
+
+            // ---- Built-in tools: STI /tool/* endpoints only, Tool/Server buckets only (matches
+            // buildAgentBuiltinToolsFromStis returning just .tools) ----
+            for (BasicDBObject sti : stiRows) {
+                Object idObj = sti.get("_id");
+                if (!(idObj instanceof BasicDBObject)) continue;
+                BasicDBObject stiId = (BasicDBObject) idObj;
+                String method = stiId.getString("method");
+                String url = stiId.getString("url");
+                if (method == null || url == null || !isAgentBuiltinToolUrl(url)) continue;
+                String name = mcpDisplayName(url);
+                String bucketType = bucketFromAuditType(typeByName.get(name));
+                if (bucketType == null) bucketType = bucketFromUrl(url);
+                if (!"Tool".equals(bucketType) && !"Server".equals(bucketType)) continue;
+                double[] info = infoByKey.getOrDefault(method + " " + url, new double[]{0, 0});
+                boolean isMalicious = maliciousByName.getOrDefault(name, false);
+                BasicDBObject row = new BasicDBObject();
+                row.put("_type", "Tool");
+                row.put("name", name);
+                row.put("url", url);
+                row.put("method", method);
+                row.put("apiCollectionId", stiId.getInt("apiCollectionId", -1));
+                row.put("description", "");
+                row.put("riskScore", info[0]);
+                row.put("riskLevel", isMalicious ? "critical" : null);
+                row.put("isMalicious", isMalicious);
+                row.put("hasPrivilegedAccess", privilegedByName.getOrDefault(name, false));
+                row.put("riskDescription", riskDescByName.getOrDefault(name, ""));
+                row.put("params", new ArrayList<>());
+                row.put("violations", (int) info[1]);
+                row.put("_serverType", "Server".equals(bucketType));
+                rows.add(row);
+            }
+
+            // ---- Connected MCP servers — already known/cheap, no re-derivation ----
+            if (mcpServerNames != null) {
+                Set<String> seen = new HashSet<>();
+                for (String mcpName : mcpServerNames) {
+                    if (StringUtils.isBlank(mcpName) || !seen.add(mcpName.toLowerCase(Locale.ROOT))) continue;
+                    BasicDBObject row = new BasicDBObject();
+                    row.put("_type", "MCP Server");
+                    row.put("name", mcpName);
+                    row.put("endpoint", mcpName);
+                    row.put("toolCount", 0);
+                    List<Integer> mcpCollectionIds = mcpServerCollectionIds != null ? mcpServerCollectionIds.get(mcpName) : null;
+                    row.put("collectionIds", mcpCollectionIds != null ? mcpCollectionIds : Collections.emptyList());
+                    rows.add(row);
+                }
+            }
+
+            if (StringUtils.isNotBlank(queryValue)) {
+                String q = queryValue.toLowerCase(Locale.ROOT);
+                rows.removeIf(r -> {
+                    Object n = r.get("name");
+                    return n == null || !n.toString().toLowerCase(Locale.ROOT).contains(q);
+                });
+            }
+
+            Comparator<BasicDBObject> cmp = buildComponentComparator(sortKey);
+            if (sortOrder < 0) cmp = cmp.reversed();
+            rows.sort(cmp);
+
+            int total = rows.size();
+            int effectiveLimit = limit > 0 ? Math.min(limit, 500) : 20;
+            int from = Math.max(0, skip);
+            int to = Math.min(rows.size(), from + effectiveLimit);
+            List<BasicDBObject> page = from < to ? rows.subList(from, to) : Collections.emptyList();
+
+            response.put("components", page);
+            response.put("total", total);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching agentic components page: " + e.getMessage());
+            addActionError("Error fetching agentic components page: " + e.getMessage());
             return ERROR.toUpperCase();
         }
     }

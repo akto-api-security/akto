@@ -254,6 +254,18 @@ export default {
         })
         return { devices: resp?.devices || [], total: resp?.total || 0 }
     },
+    // Server-side paginated Components list for ONE AI-Agent asset's flyout — merges skills,
+    // built-in tools, and connected MCP servers into one batched, server-sorted/paginated list.
+    // mcpServerNames is asset.mcpServers, already known/cheap client-side, passed through rather
+    // than re-derived server-side.
+    async fetchAgenticComponentsPage({ apiCollectionIds, mcpServerNames, mcpServerCollectionIds, skip, limit, sortKey, sortOrder, queryValue } = {}) {
+        const resp = await request({
+            url: '/api/fetchAgenticComponentsPage',
+            method: 'post',
+            data: { apiCollectionIds, mcpServerNames, mcpServerCollectionIds, skip, limit, sortKey, sortOrder, queryValue },
+        })
+        return { components: resp?.components || [], total: resp?.total || 0 }
+    },
     // Header-tile stats (asset counts by type) for the Agentic Assets page — same classification
     // pass as fetchAgenticAssetsSummary, aggregated rather than paginated. Also returns trend/delta
     // for the Agentic Assets + Violations cards and the Top Used Applications / Top Assets with
