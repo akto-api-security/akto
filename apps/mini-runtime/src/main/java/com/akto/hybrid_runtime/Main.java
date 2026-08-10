@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 
 import com.akto.DaoInit;
 import com.akto.RuntimeMode;
+import com.akto.config.ConfigHandler;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
@@ -94,7 +95,7 @@ public class Main {
 
     public static boolean isOnprem = false;
     static long lastLogSyncOffsetMRS;
-    static boolean syncImmediately = false;
+    static boolean syncImmediately = true;
     static boolean fetchAllSTI = true;
     private static final String NON_API_FILTER_ORG_ID = "2651c8f0-cf6b-416a-a304-b8d8adc573d7";
     static boolean isNonApiContentTypeFilterEnabled = false;
@@ -259,9 +260,9 @@ public class Main {
 
 
     public static String customMiniRuntimeServiceName;
-    private static final String podName = System.getenv().getOrDefault("POD_NAME", "");
-    private static final String nodeName = System.getenv().getOrDefault("NODE_NAME", "");
-    private static final String miniRuntimeName = System.getenv().getOrDefault("MINI_RUNTIME_NAME", "");
+    private static final String podName = ConfigHandler.readEnv("POD_NAME", "");
+    private static final String nodeName = ConfigHandler.readEnv("NODE_NAME", "");
+    private static final String miniRuntimeName = ConfigHandler.readEnv("MINI_RUNTIME_NAME", "");
     static {
         if (!miniRuntimeName.isEmpty()) {
             // Highest priority: explicit MINI_RUNTIME_NAME
@@ -316,18 +317,16 @@ public class Main {
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
-        String configName = System.getenv("AKTO_CONFIG_NAME");
+        String configName = ConfigHandler.readEnv("AKTO_CONFIG_NAME", null);
         String topicName = KafkaConfig.getTopicName();
-        String kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL","kafka1:19092");
+        String kafkaBrokerUrl = ConfigHandler.readEnv("AKTO_KAFKA_BROKER_URL", "localhost:29092");
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
             loggerMaker.infoAndAddToDb("is_kubernetes: true");
-            kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "127.0.0.1:29092");
+            kafkaBrokerUrl = ConfigHandler.readEnv("AKTO_KAFKA_BROKER_URL", "127.0.0.1:29092");
         }
         final String brokerUrlFinal = kafkaBrokerUrl;
-        String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG") != null
-                ? System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG")
-                : "asdf";
+        String groupIdConfig = ConfigHandler.readEnv("AKTO_KAFKA_GROUP_ID_CONFIG", "asdf");
         boolean syncImmediately = false;
         boolean fetchAllSTI = true;
         Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
@@ -340,9 +339,7 @@ public class Main {
             syncImmediately = true;
             fetchAllSTI = false;
         }
-        int maxPollRecordsConfigTemp = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG") != null
-                ? System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG")
-                : "100");
+        int maxPollRecordsConfigTemp = Integer.parseInt(ConfigHandler.readEnv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG", "100"));
 
         AccountSettings aSettings = dataActor.fetchAccountSettings();
         if (aSettings == null) {
@@ -1499,7 +1496,7 @@ public class Main {
         }
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
         Map<String, SessionAnalyzer> sessionAnalyzerMap = new HashMap<>();
-        String configName = System.getenv("AKTO_CONFIG_NAME");
+        String configName = ConfigHandler.readEnv("AKTO_CONFIG_NAME", null);
         APIConfig apiConfig = dataActor.fetchApiConfig(configName);
         if (apiConfig == null) {
             apiConfig = new APIConfig(configName,"access-token", 1, 10_000_000, sync_threshold_time); // this sync threshold time is used for deleting sample data

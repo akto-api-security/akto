@@ -181,6 +181,7 @@ public class Utils {
                             lastFileUrls = new HashSet<>(fileUrls);
                         }
                     }
+                    logger.debug("DEBUG_URLS: " + DEBUG_URLS_SET + ", DEBUG_HOSTS: " + DEBUG_HOSTS_SET);
                 } catch (Exception e) {
                     logger.errorAndAddToDb(e, "Failed to read debug URLs from file: " + e.getMessage());
                 }
