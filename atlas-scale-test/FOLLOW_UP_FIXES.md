@@ -138,6 +138,35 @@ pick up cold.
   (`./run-tbs.sh --full`) to pick up the new proto fields — a quick `mvn package` alone reuses
   already-installed `.m2` artifacts and silently keeps the old proto, causing every request to
   fail proto parsing with a 400 until the full rebuild ran.
+- Endpoints page's "Total Violations" stat card was missing its "+N" delta badge, even though the
+  raw API response and the consuming `AgenticStatsCard` were both already correctly wired —
+  `fetchDeviceEndpointsStats` in `api.js` whitelisted `deviceCount`/`browserDeviceCount`/
+  `totalUsers`/etc. off the raw response but omitted `deltaViolations`, silently dropping it before
+  it ever reached the component. Fixed by adding the missing field to the wrapper's return object.
+  Verified live: card now shows "107 +107" matching the raw network response.
+- Endpoints page's device flyout ("Agentic Assets" and "Violations" tabs) was on the same
+  fetch-everything-then-paginate-client-side pattern the main Agentic Assets flyout tabs were
+  fixed from earlier in this branch — converted both to true server-side pagination, matching that
+  same pattern. "Agentic Assets" reuses `fetchDeviceEndpointsSummary`'s existing `parentDeviceId`
+  branch (`AgenticObserveAction.java`), which previously returned every child row unpaginated;
+  now applies search/sort/skip/limit there. "Violations" reuses `fetchAgenticViolationsPage`
+  (already built for the asset flyout), scoped to the device's own hostNames/deviceId instead of
+  an asset's. Also dropped the `agentRiskData` side-map in `DeviceFlyout.jsx`/`DeviceEndpoints.jsx`
+  — it only re-derived `riskScore`/`violations` already present on each row, so the grid now reads
+  them directly (matches `AgentComponentsView.jsx`'s existing pattern).
+  **Regression caught and fixed during live verification**: making `fetchDeviceEndpointsSummary`'s
+  `parentDeviceId` branch unconditionally paginate broke `DeviceEndpoints.jsx`'s own
+  `fetchDeviceChildren` helper (used for the Overview tab + tab-count label), which had never
+  needed to pass `skip`/`limit` since the old code path ignored them — after the change it was
+  silently truncated to the new endpoint's fallback default of 20 rows, producing a visible
+  "Agentic Assets (20)" tab label against a grid correctly showing "1 to 20 of 48". Root cause: a
+  Java `int limit` field defaults to `0` when the caller's JSON omits it, and `effectiveLimit =
+  limit > 0 ? ... : 20` can't distinguish "caller wants everything" from "caller wants the default
+  page size." Fixed by having `fetchDeviceChildren` explicitly pass `limit: 500`. Verified live by
+  closing/reopening the flyout twice to rule out a background-cron timing artifact before
+  concluding it was a genuine regression, then confirming the tab label and grid total both read
+  48 after the fix. Also verified both tabs' search boxes (a non-matching term correctly returns
+  "0 to 0 of 0", a real term correctly narrows results) and no new console errors.
 
 ## High priority — wrong output today
 
