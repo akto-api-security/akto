@@ -2,6 +2,10 @@ import {
     extractEndpointId,
     extractServiceName,
     deviceServiceKey,
+    groupCollectionsByAgent,
+    groupCollectionsByService,
+    groupCollectionsByLLM,
+    groupCollectionsBySkill,
 } from "./constants";
 import {
     formatDisplayName,
@@ -663,13 +667,21 @@ export function buildDeviceEndpointsPageData(
     const deviceCount = nonBrowserDeviceEntries.length;
     const browserDeviceCount = browserDeviceEntries.length;
     const users = new Set(deviceEntries.map((d) => d.username).filter((u) => u && u !== "-"));
-    let agentChildCount = 0;
     const violationsBySeverity = emptyViolations();
 
     deviceEntries.forEach((d) => {
         mergeViolations(violationsBySeverity, d.violations);
-        agentChildCount += Object.keys(d.children).length;
     });
+
+    // De-duplicated org-wide asset count (same grouping as AgenticAssetsPage), so this page's
+    // total matches the Agentic Assets page instead of summing each device's own child count.
+    const agentGroups = groupCollectionsByAgent(agenticCollections, trafficMap, {}, riskScoreMap);
+    const serviceGroups = groupCollectionsByService(agenticCollections, trafficMap, {}, riskScoreMap);
+    const llmGroups = groupCollectionsByLLM(agenticCollections, trafficMap, {}, riskScoreMap);
+    const skillGroups = groupCollectionsBySkill(agenticCollections, trafficMap, {}, riskScoreMap);
+    const agentGroupKeys = new Set(agentGroups.map((a) => a.groupKey));
+    const servicesToShow = serviceGroups.filter((s) => !agentGroupKeys.has(s.groupKey));
+    const totalEndpoints = agentGroups.length + servicesToShow.length + llmGroups.length + skillGroups.length;
 
     // Compute totals from raw events so the count matches ViolationsPage (all events, not just device-attributed ones)
     const rawViolationsBySeverity = emptyViolations();
@@ -798,7 +810,7 @@ export function buildDeviceEndpointsPageData(
     }
 
     const summary = {
-        totalEndpoints: agentChildCount,
+        totalEndpoints,
         totalUsers: users.size,
         totalViolations,
         deviceCount,

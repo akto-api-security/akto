@@ -23,6 +23,10 @@ import {
     PAGE_LIMIT,
     groupCollectionsByUser,
     groupCollectionsByDevice,
+    groupCollectionsByAgent,
+    groupCollectionsByService,
+    groupCollectionsByLLM,
+    groupCollectionsBySkill,
     buildAgenticInventoryFilterForRow,
     fetchAndCacheSkillApiData,
     hasMaliciousSkillInCollections,
@@ -50,6 +54,9 @@ function UsersAndDevices() {
     const [data, setData] = useState({ users: [], devices: [] });
     const [userEnrichVersion, setUserEnrichVersion] = useState(0);
     const [summaryData, setSummaryData] = useState({ profileCount: 0, collectionCount: 0 });
+    // De-duplicated org-wide agentic asset total (same grouping as the Agentic Assets page) —
+    // not scoped to the Users/Devices tab, unlike profileCount.
+    const [totalAgenticAssets, setTotalAgenticAssets] = useState(0);
     const [editTagModal, setEditTagModal] = useState({ active: false, usernames: [], team: '', userRole: '', teamSource: 'sso', roleSource: 'sso', ssoHintTeam: '', ssoHintRole: '', saving: false });
 
     const { tabsInfo } = useTable();
@@ -199,6 +206,18 @@ function UsersAndDevices() {
                 groupCollectionsByDevice(collections, trafficMap, sensitiveMap, riskScoreMap),
             );
 
+            // De-duplicated org-wide asset count — same grouping as the Agentic Assets page
+            // (Endpoints.jsx), so the "Agentic assets" stat here matches that page's total
+            // instead of summing each user/device's own asset count (which double-counts
+            // assets shared across users/devices).
+            const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap, riskScoreMap);
+            const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);
+            const llmGroups = groupCollectionsByLLM(collections, trafficMap, sensitiveMap, riskScoreMap);
+            const skillGroups = groupCollectionsBySkill(collections, trafficMap, sensitiveMap, riskScoreMap);
+            const agentGroupKeys = new Set(agentGroups.map((a) => a.groupKey));
+            const servicesToShow = serviceGroups.filter((s) => !agentGroupKeys.has(s.groupKey));
+            setTotalAgenticAssets(agentGroups.length + servicesToShow.length + llmGroups.length + skillGroups.length);
+
             setData({
                 users: userGroups,
                 devices: deviceGroups,
@@ -222,12 +241,14 @@ function UsersAndDevices() {
     useEffect(() => {
         const userLen = data.users.length;
         const deviceLen = data.devices.length;
-        const rows = selectedTab === "users" ? data.users : data.devices;
         setSummaryData({
             profileCount: selectedTab === "users" ? userLen : deviceLen,
-            collectionCount: rows.reduce((sum, row) => sum + (row.endpointsCount ?? row.hostNames?.length ?? 0), 0),
+            // Org-wide de-duplicated total (matches the Agentic Assets page) — intentionally
+            // not derived from `rows`, since summing each row's own asset count double-counts
+            // assets shared across multiple users/devices.
+            collectionCount: totalAgenticAssets,
         });
-    }, [selectedTab, data.users, data.devices]);
+    }, [selectedTab, data.users, data.devices, totalAgenticAssets]);
 
     const disambiguateLabel = useCallback((key, value) => {
         return func.convertToDisambiguateLabelObj(value, null, 2);

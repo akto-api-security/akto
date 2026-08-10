@@ -52,7 +52,7 @@ function TopSection({ summary }) {
                 <VerticalStack>
                     <AgenticStatsCard
                         title="Total Endpoints"
-                        total={summary?.deviceCount ?? 0}
+                        total={summary?.totalEndpoints ?? 0}
                         delta={summary?.deltaEndpoints ?? 0}
                         sparklineCounts={sparklines.endpoints}
                         sparklineColor="#7C3AED"
