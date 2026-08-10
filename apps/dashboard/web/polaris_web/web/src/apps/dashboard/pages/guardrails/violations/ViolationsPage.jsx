@@ -747,10 +747,12 @@ function Violations() {
                     FIXED: 0,
                 };
 
-                // Top policies from category counts
+                // Top policies from category counts. category over subCategory - subCategory can
+                // be a raw config-path string (e.g. "mcp_servers.computer-use.command" for a
+                // config-risk finding), not a name meant to stand alone as a policy label.
                 const subcategoryMap = {};
                 (categoryResp?.categoryCounts || []).forEach(item => {
-                    const sub = item.subCategory || item.category || "Unknown";
+                    const sub = item.category || item.subCategory || "Unknown";
                     subcategoryMap[sub] = (subcategoryMap[sub] || 0) + (item.count || 0);
                 });
                 const topPolicies = Object.entries(subcategoryMap)
