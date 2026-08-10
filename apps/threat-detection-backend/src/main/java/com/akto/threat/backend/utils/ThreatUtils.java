@@ -83,6 +83,19 @@ public class ThreatUtils {
         return new Document("$and", Arrays.asList(nullOrNotExistsCondition, filterIdCondition));
     }
 
+    private static final Pattern SKILLS_ENDPOINT_PATTERN = Pattern.compile("^/skills/");
+
+    // Excludes /skills/<name> endpoint events (skill invocations) from dashboard-level violation
+    // aggregations - same partition MaliciousEventService.listMaliciousRequests already applies
+    // for the Active tab via skillEvalMode="exclude". ENDPOINT (Atlas) only, matching that
+    // existing convention; a no-op Document for other contexts.
+    public static Document excludeSkillEndpointFilter(String contextSource) {
+        if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
+            return new Document();
+        }
+        return new Document("latestApiEndpoint", new Document("$not", SKILLS_ENDPOINT_PATTERN));
+    }
+
     public static boolean isAgenticOrEndpointContext(String contextSource) {
         if (contextSource == null || contextSource.isEmpty()) {
             return false;
