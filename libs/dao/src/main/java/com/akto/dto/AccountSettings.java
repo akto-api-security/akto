@@ -67,6 +67,11 @@ public class AccountSettings {
     private Map<String, String> filterHeaderValueMap;
     public static final String FILTER_HEADER_VALUE_MAP = "filterHeaderValueMap";
 
+    public static final String RUNTIME_ENV_OVERRIDES = "runtimeEnvOverrides";
+    @Getter
+    @Setter
+    private Map<String, String> runtimeEnvOverrides;
+
     private Map<String, CollectionReplaceDetails> apiCollectionNameMapper;
     public static final String API_COLLECTION_NAME_MAPPER = "apiCollectionNameMapper";
     public static final String GLOBAL_RATE_LIMIT = "globalRateLimit";

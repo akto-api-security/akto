@@ -61,6 +61,17 @@ public class ModuleInfoConstants {
             put("AKTO_LOG_LEVEL", "Log Level");
         }});
 
+        put(ModuleInfo.ModuleType.MINI_RUNTIME, new HashMap<String, String>() {{
+            put("AKTO_LOG_LEVEL", "Log Level");
+            put("DEBUG_URLS", "Debug URLs (url1,url2,url3)");
+            put("DEBUG_HOSTS", "Debug Hosts (host1,host2,host3)");
+            put("MINI_RUNTIME_NAME", "Mini Runtime Name");
+            put("AKTO_CONFIG_NAME", "Config Name");
+            put("AKTO_KAFKA_BROKER_URL", "Kafka Broker URL");
+            put("AKTO_KAFKA_GROUP_ID_CONFIG", "Kafka Group ID Config");
+            put("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG", "Kafka Max Poll Records Config");
+        }});
+
         put(ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD, new java.util.LinkedHashMap<String, String>() {{
             put("AKTO_API_TOKEN", "Akto API Token");
             put("DATABASE_ABSTRACTOR_SERVICE_URL", "Database Abstractor Service URL");
