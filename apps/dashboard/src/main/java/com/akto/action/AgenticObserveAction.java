@@ -82,7 +82,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Setter private int limit;
     @Setter private String sortKey;
     @Setter private int sortOrder; // 1 asc, -1 desc (Mongo convention, matches NhiGovernanceViolationsAction)
-    @Setter private String queryValue; // search on asset/group name
+    @Setter private String queryValue; // free-text search — asset/group name (summary), or username/deviceId (fetchAgenticAssetDevicesPage)
     @Setter private Map<String, Integer> trafficMap;
     @Setter private Map<String, Double> riskScoreMap;
     @Setter private Map<String, List<String>> filters; // AG Grid column filters, keyed by field name (e.g. "team", "userRole")
@@ -492,10 +492,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         }
     }
 
-    private static List<BasicDBObject> buildDevicesForGroup(GroupSummary g, Map<Integer, ApiCollection> byId,
+    // Shared by buildDevicesForGroup (bulk summary, scoped to a GroupSummary's own
+    // collectionIds) and fetchAgenticAssetDevicesPage (the flyout's paginated Devices tab,
+    // scoped to the same collectionIds fetched fresh via apiCollectionIds) — same
+    // accumulation, two different callers/scopes.
+    private static Map<String, DeviceAcc> accumulateDevices(Collection<Integer> collectionIds, Map<Integer, ApiCollection> byId,
             Map<String, Integer> traffic, Map<String, Double> risk, Map<String, Integer> userAnalysisMap) {
         Map<String, DeviceAcc> devices = new LinkedHashMap<>();
-        for (Integer cid : g.collectionIds) {
+        for (Integer cid : collectionIds) {
             ApiCollection c = byId.get(cid);
             if (c == null) continue;
             String hostName = c.getHostName();
@@ -513,9 +517,101 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (serviceName != null) d.services.add(serviceName);
             accumulateAiInteractions(d, hostName, userAnalysisMap);
         }
+        return devices;
+    }
+
+    private static List<BasicDBObject> buildDevicesForGroup(GroupSummary g, Map<Integer, ApiCollection> byId,
+            Map<String, Integer> traffic, Map<String, Double> risk, Map<String, Integer> userAnalysisMap) {
+        Map<String, DeviceAcc> devices = accumulateDevices(g.collectionIds, byId, traffic, risk, userAnalysisMap);
         List<BasicDBObject> out = new ArrayList<>();
         for (DeviceAcc d : devices.values()) out.add(d.toResponse());
         return out;
+    }
+
+    private static String resolveUsernameByDeviceId(String deviceId, Map<String, String> usernameMap) {
+        if (usernameMap == null || usernameMap.isEmpty() || deviceId == null) return "-";
+        String v = usernameMap.get("__deviceId__" + deviceId.toLowerCase(Locale.ROOT));
+        return StringUtils.isNotBlank(v) ? v : "-";
+    }
+
+    private static Comparator<BasicDBObject> buildDeviceComparator(String key) {
+        if ("username".equals(key)) {
+            return Comparator.comparing((BasicDBObject r) -> String.valueOf(r.get("username")), String.CASE_INSENSITIVE_ORDER);
+        } else if ("lastSeenEpoch".equals(key) || "lastSeen".equals(key)) {
+            return Comparator.comparingInt(r -> ((Number) r.get("lastSeenEpoch")).intValue());
+        }
+        return Comparator.comparingDouble(r -> {
+            Object v = r.get("riskScore");
+            return v == null ? 0.0 : ((Number) v).doubleValue();
+        });
+    }
+
+    /**
+     * Server-side paginated device list for ONE asset's flyout Devices tab — scoped to just
+     * this asset's own collectionIds (sent as apiCollectionIds, already known client-side),
+     * cheap unlike classifyAllGroups which walks every collection in the account. Resolves
+     * username via the same Endpoint Shield usernameMap fetchUsersAndDevicesSummary already
+     * accepts, so search/sort can work against the person's name, not just the raw deviceId —
+     * matches constants.js's enrichDevicesWithUsername lookup key format exactly
+     * ("__deviceId__" + lowercased deviceId).
+     */
+    public String fetchAgenticAssetDevicesPage() {
+        response = new BasicDBObject();
+        try {
+            List<Integer> ids = apiCollectionIds != null ? apiCollectionIds : Collections.emptyList();
+            if (ids.isEmpty()) {
+                response.put("devices", new ArrayList<>());
+                response.put("total", 0);
+                return SUCCESS.toUpperCase();
+            }
+
+            List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
+                    Filters.in(Constants.ID, ids),
+                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)
+            );
+            Map<Integer, ApiCollection> byId = new HashMap<>();
+            for (ApiCollection c : collections) byId.put(c.getId(), c);
+
+            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
+            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
+            Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
+
+            Map<String, DeviceAcc> devices = accumulateDevices(ids, byId, traffic, risk, userAnalysis);
+
+            List<BasicDBObject> rows = new ArrayList<>();
+            for (DeviceAcc d : devices.values()) {
+                BasicDBObject row = d.toResponse();
+                row.put("username", resolveUsernameByDeviceId(d.deviceId, usernameMap));
+                rows.add(row);
+            }
+
+            if (StringUtils.isNotBlank(queryValue)) {
+                String q = queryValue.toLowerCase(Locale.ROOT);
+                rows.removeIf(r -> {
+                    String u = String.valueOf(r.get("username")).toLowerCase(Locale.ROOT);
+                    String did = String.valueOf(r.get("deviceId")).toLowerCase(Locale.ROOT);
+                    return !u.contains(q) && !did.contains(q);
+                });
+            }
+
+            Comparator<BasicDBObject> cmp = buildDeviceComparator(sortKey);
+            if (sortOrder < 0) cmp = cmp.reversed();
+            rows.sort(cmp);
+
+            int total = rows.size();
+            int effectiveLimit = limit > 0 ? Math.min(limit, 500) : 20;
+            int from = Math.max(0, skip);
+            int to = Math.min(rows.size(), from + effectiveLimit);
+            List<BasicDBObject> page = from < to ? rows.subList(from, to) : Collections.emptyList();
+
+            response.put("devices", page);
+            response.put("total", total);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching agentic asset devices page: " + e.getMessage());
+            addActionError("Error fetching agentic asset devices page: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
     }
 
     /**

@@ -204,6 +204,7 @@ function TableSection({
   startTimestamp,
   endTimestamp,
   refreshKey,
+  enrichMaps,
 }) {
   const gridRef = useRef(null);
   const didAutoOpenRef = useRef(false);
@@ -276,6 +277,7 @@ function TableSection({
         agenticTreeData={[]}
         agenticFlatData={[]}
         assetDevices={flyout ? { [flyout.id]: flyout.devices || [] } : {}}
+        enrichMaps={enrichMaps}
         collections={collections}
         agenticViolationRows={undefined}
         startTimestamp={startTimestamp}
@@ -630,6 +632,7 @@ export default function AgenticAssetsPage() {
           startTimestamp={startTimestamp}
           endTimestamp={endTimestamp}
           refreshKey={refreshKey}
+          enrichMaps={enrichRef.current}
         />,
       ]}
     />

@@ -242,6 +242,18 @@ export default {
         })
         return { rows: resp?.rows || [], total: resp?.total || 0 }
     },
+    // Server-side paginated device list for ONE asset's flyout Devices tab — scoped to just
+    // that asset's own apiCollectionIds (cheap), not the whole account. usernameMap is the
+    // same Endpoint Shield map already fetched once for the main grid (fetchEndpointShieldUserMetadata),
+    // reused here so search/sort can work against the resolved person's name, not just deviceId.
+    async fetchAgenticAssetDevicesPage({ apiCollectionIds, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, userAnalysisFlatMap, usernameMap } = {}) {
+        const resp = await request({
+            url: '/api/fetchAgenticAssetDevicesPage',
+            method: 'post',
+            data: { apiCollectionIds, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, userAnalysisFlatMap, usernameMap },
+        })
+        return { devices: resp?.devices || [], total: resp?.total || 0 }
+    },
     // Header-tile stats (asset counts by type) for the Agentic Assets page — same classification
     // pass as fetchAgenticAssetsSummary, aggregated rather than paginated. Also returns trend/delta
     // for the Agentic Assets + Violations cards and the Top Used Applications / Top Assets with

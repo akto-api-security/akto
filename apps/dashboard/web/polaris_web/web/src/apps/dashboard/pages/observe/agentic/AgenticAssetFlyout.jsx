@@ -7,6 +7,8 @@ import AiChatSection from "./AiChatSection";
 import { buildAgentInlineTopologyComponents, buildAgentBuiltinToolsFromStis, countAgentComponentsTab } from "./agenticPageBuilders";
 import { RiskScoreCellRenderer } from "./AgenticCellRenderers";
 import agenticObserveApi, { buildAgenticObserveChatMetadata, selectConfigViolationRows, summarizeViolations } from "./agenticObserveApi";
+import api from "../api";
+import func from "@/util/func";
 import OverviewTab from "./OverviewTab";
 import ViolationsTab from "./ViolationsTab";
 import McpComponentsView from "./McpComponentsView";
@@ -24,37 +26,46 @@ const DEVICES_COL_DEFS = [
 
 const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 
-function DevicesTab({ asset, assetDevices = {} }) {
-    const devices = useMemo(() => assetDevices[asset.id] || [], [asset.id, assetDevices]);
-
+function DevicesTab({ asset, enrichMaps = {} }) {
     const handleRowClick = useCallback((e) => {
         if (!e.data) return;
         const deviceId = e.data.deviceId || e.data.endpoint;
         window.open(`/dashboard/observe/endpoints?device=${encodeURIComponent(deviceId)}`, "_blank");
     }, []);
 
-    if (devices.length === 0) {
-        return (
-            <Box padding="8">
-                <VerticalStack gap="1" inlineAlign="center">
-                    <Text variant="bodySm" fontWeight="semibold">No devices found</Text>
-                    <Text variant="bodySm" color="subdued">This asset hasn't been observed on any device.</Text>
-                </VerticalStack>
-            </Box>
-        );
-    }
+    // Server-side paginated — scoped to this one asset's own apiCollectionIds (cheap), never the
+    // whole account. See AgenticObserveAction.fetchAgenticAssetDevicesPage.
+    const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
+        const { trafficMap, riskScoreMap, userAnalysisFlatMap, usernameMap } = enrichMaps;
+        return api.fetchAgenticAssetDevicesPage({
+            apiCollectionIds: asset.collectionIds || [],
+            skip,
+            limit: limit || 20,
+            sortKey,
+            sortOrder: sortOrder ? -sortOrder : -1,
+            queryValue: searchString || undefined,
+            trafficMap, riskScoreMap, userAnalysisFlatMap, usernameMap,
+        }).then((res) => ({
+            value: (res.devices || []).map((d) => ({
+                ...d,
+                lastSeen: d.lastSeenEpoch > 0 ? func.prettifyEpoch(d.lastSeenEpoch) : "-",
+            })),
+            total: res.total || 0,
+        }));
+    }, [asset.collectionIds, enrichMaps]);
 
     return (
         <AgGridTable
-            rowData={devices}
+            key={asset.id}
             columnDefs={DEVICES_COL_DEFS}
             defaultColDef={GRID_DEFAULT_COL}
+            onServerFetch={onServerFetch}
+            serverSideRowModel
+            getRowId={(params) => params.data.deviceId}
             onRowClicked={handleRowClick}
             getRowStyle={() => ({ cursor: "pointer" })}
-            fillHeight
             noOuterBorder
             searchPlaceholder="Search devices..."
-            pagination
             paginationPageSize={20}
             sideBar={{ toolPanels: ["columns", "filters"], defaultToolPanel: null }}
             domLayout="normal"
@@ -84,6 +95,7 @@ export default function AgenticAssetFlyout({
     agenticTreeData = [],
     agenticFlatData = [],
     assetDevices = {},
+    enrichMaps = {},
     collections = [],
     // Left undefined (not defaulted to []) when the parent hasn't loaded raw violation rows yet, so
     // ViolationsTab can tell "not loaded" apart from "confirmed zero violations" via Array.isArray.
@@ -270,7 +282,7 @@ export default function AgenticAssetFlyout({
                     </div>
                 )}
                 {selectedTab === 2 && <ViolationsTab asset={asset} collections={collections} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onViolationClick={asset?.type === "Skill" ? () => handleTabSelect(1) : undefined} allViolationRows={agenticViolationRows} />}
-                {selectedTab === 3 && <DevicesTab asset={asset} assetDevices={assetDevices} />}
+                {selectedTab === 3 && <DevicesTab asset={asset} enrichMaps={enrichMaps} />}
             </Box>
         </AgenticFlyoutShell>
     );
