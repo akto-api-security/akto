@@ -34,6 +34,7 @@ import {
   buildUserAnalysisFlatMap,
   getRowViolations,
   buildTeamGroupsFromDevices,
+  enrichDevicesWithUsername,
   fetchAndCacheSkillApiData,
   skillCollectionKey,
   fetchAndCacheAgenticCollectionsBundle,
@@ -161,7 +162,7 @@ const DEFAULT_COL_DEF = {
 // atlas-scale-test/DASHBOARD_OPTIMIZATION.md's "paginated server-side aggregation rebuild" entry for
 // why that distinction is the whole point).
 function shapeRow(row, { violationsByCollectionId, usernameMap, userMetadataMap, maliciousSkillKeys }) {
-  const devices = row.devices || [];
+  const devices = enrichDevicesWithUsername(row.devices || [], usernameMap);
   const violations = getRowViolations(row.collectionIds, violationsByCollectionId);
   const groups = buildTeamGroupsFromDevices(devices, usernameMap, userMetadataMap);
   // Server-computed per device (see AgenticObserveAction.buildDevicesForGroup/accumulateAiInteractions)

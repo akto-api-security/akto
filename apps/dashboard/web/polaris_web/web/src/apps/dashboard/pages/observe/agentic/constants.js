@@ -867,6 +867,23 @@ export function buildTeamGroupsFromDevices(devices, usernameMap, userMetadataMap
     return Object.entries(teamCounts).map(([name, count]) => ({ name, count }));
 }
 
+// Fills in the two display fields the flyout's Devices tab (AgenticAssetFlyout.jsx's DevicesTab,
+// unchanged since master) reads straight off each device row — username and a formatted lastSeen
+// string — which AgenticObserveAction.buildDevicesForGroup/DeviceAcc don't send back, same
+// deviceId-keyed lookup tier tradeoff as buildTeamGroupsFromDevices above.
+export function enrichDevicesWithUsername(devices, usernameMap) {
+    return (devices || []).map((d) => {
+        const key = `__deviceId__${String(d.deviceId).toLowerCase()}`;
+        const resolved = usernameMap?.[key];
+        const username = resolved && resolved !== DEFAULT_VALUE ? resolved : "-";
+        return {
+            ...d,
+            username,
+            lastSeen: d.lastSeenEpoch > 0 ? func.prettifyEpoch(d.lastSeenEpoch) : "-",
+        };
+    });
+}
+
 // AI-interaction tally for a server-computed row's device list — same tradeoff as
 // buildTeamGroupsFromDevices: only the Endpoint Shield deviceId mapping (the primary,
 // highest-coverage match tier), not the hostname-parts-based fallback tiers
