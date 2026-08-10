@@ -428,10 +428,14 @@ export default function AgenticAssetsPage() {
         setAgenticViolationRows(violationRows);
         setCollections(collections);
 
-        // Enrich Skill rows with malicious flag (same source as old UI) — async, non-blocking
+        // Enrich Skill rows with malicious flag (same source as old UI) — async, non-blocking.
+        // Only collections that actually have skills need this lookup; querying every collection
+        // fires one request per collection account-wide for no benefit on the rest.
         const skillCollectionIds = [];
         collections.forEach((c) => {
-          if (!skillCollectionIds.includes(c.id)) skillCollectionIds.push(c.id);
+          if (Array.isArray(c.skills) && c.skills.length > 0 && !skillCollectionIds.includes(c.id)) {
+            skillCollectionIds.push(c.id);
+          }
         });
         if (skillCollectionIds.length) {
           fetchAndCacheSkillApiData(skillCollectionIds, { api, PersistStore })
