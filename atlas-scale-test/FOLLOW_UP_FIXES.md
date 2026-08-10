@@ -1,13 +1,24 @@
 # ATLAS rebuild — follow-up fixes (deferred from PR #6002)
 
 Findings from the PR #6002 code review (8-angle static review + live cross-environment
-verification) that are **not yet fixed**. The one confirmed issue that was fixed directly in
-this branch — the `DeviceEndpoints.jsx` Group/Role/Last-Traffic field-name mismatch, plus two
-related dead/redundant-state cleanups in the same file — is not repeated here.
+verification) that are **not yet fixed**. Everything below is intentionally left for a separate
+PR. Ordered by severity; each item has enough detail (file:line, root cause, suggested fix) to
+pick up cold.
 
-Everything below touches files outside `DeviceEndpoints.jsx` (or is a broader architectural
-concern) and is intentionally left for a separate PR. Ordered by severity; each item has enough
-detail (file:line, root cause, suggested fix) to pick up cold.
+## Already fixed on this branch (not repeated below)
+
+- `DeviceEndpoints.jsx` Group/Role/Last-Traffic field-name mismatch, plus two related
+  dead/redundant-state cleanups in the same file.
+- Endpoints page's Total Violations stat card was missing its trend sparkline/delta entirely —
+  restored by extending `FetchHostSeverityCountsRequest`/`Response` (proto) with month-bucketed
+  totals via a cheap `$bucket` aggregation in threat-detection-backend, no raw-event fetch needed.
+- `classifyAllGroups`'s "not-attached" hostname check ran before skill fan-out, undercounting
+  Skills by excluding orphan-hostname collections entirely (Agentic Assets new layout reported
+  782/Skills:745 vs legacy/prod's 795/Skills:758 for the same account) — moved the check to only
+  gate the agent/service/llm branches, matching `groupCollectionsBySkill`'s reference behavior.
+- `getTypeFromCollection`'s missing NOT_ATTACHED exclusion for `hasAiAgent` (was listed below as
+  unfixed; folded into the skill-undercount fix above since both touch the same classification
+  path).
 
 ## High priority — wrong output today
 
@@ -55,14 +66,6 @@ detail (file:line, root cause, suggested fix) to pick up cold.
   **Fix:** add `Aggregates.match(combineMatch(buildBaseMatchConditions()))` (or equivalent) as the
   first stage in all three pipelines.
 
-- [ ] **Server-side asset classification is missing the NOT_ATTACHED exclusion the JS version has.**
-  `AgenticObserveUtil.java:212-214` (`getTypeFromCollection`) sets `hasAiAgent = true` on any
-  `ai-agent` tag presence; `mcpClientHelper.js:154` excludes tags whose value is
-  `NOT_ATTACHED_VALUE` (`"not-attached"`) — the constant already exists in this same Java file,
-  just not applied here.
-  **Fix:** `if (Constants.AKTO_AI_AGENT_TAG.equals(tag.getKeyName()) &&
-  !AgenticObserveUtil.NOT_ATTACHED_VALUE.equals(tag.getValue())) hasAiAgent = true;`
-
 - [ ] **Agentic Assets lost Type/Tags column filters and violation-count sort, no replacement.**
   `AgenticAssetsPage.jsx` — old table supported one-click filter by Type, by Tags, and sort by
   total violations; new summary endpoint has no equivalent params, only free-text name search.
@@ -76,6 +79,32 @@ detail (file:line, root cause, suggested fix) to pick up cold.
   selections made on an earlier page silently vanish once the ref is overwritten by a later fetch.
   **Fix:** accumulate selected *row objects* (not just ids) in a ref/map keyed by id, updated
   incrementally as pages are fetched and as selection changes — not wholesale-replaced per fetch.
+
+- [ ] **Agentic Assets' main stat cards and top-list cards are a large, pre-existing (pre-dates
+  this whole rebuild PR) feature gap vs. production — confirmed via prod-vs-localhost screenshot
+  comparison, not caused by the two fixes above.** The pre-rebuild page (`git show
+  3800232044~1:.../AgenticAssetsPage.jsx`) had, and prod still has:
+  - Sparkline + delta on the "Agentic Assets" card and the "Violations" card (current
+    `fetchAgenticAssetsStats` only returns `totalAssets`/`countsByType` — no trend, no violations
+    total either, per its own comment: "Violation totals stay client-side").
+  - Two entire cards this account's layout is currently missing: **"Top Used Applications"**
+    (top-N assets by AI-interaction count) and **"Top Assets with Violations"** (top-N by
+    violation count), both via a dedicated `AgenticTopListCard` component that still exists in the
+    codebase but is unused by the new layout.
+  - The table's own "AI Interactions" column is present in the header but unpopulated (`-`) for
+    every row in the new layout; prod populates it with real per-asset interaction counts.
+  **Scope note:** the asset-count trend is cheap to add (same `buildWindowSlots`/`cumulativeCounts`
+  pattern already used for Endpoints, pure Mongo/Java, no cross-service call). The violations
+  trend can reuse `fetchViolationsMonthlyTotals` (added for the Endpoints fix) directly. "Top Used
+  Applications" and the "AI Interactions" column need a new usage/interaction-count data source —
+  not yet identified where the reference implementation sourced this from. This is comparable in
+  size to (likely larger than) the Endpoints violations-sparkline fix — worth scoping as its own
+  piece of work rather than folding into a quick fix.
+
+- [ ] **Endpoints page: Users delta differs between prod and localhost by a couple of users
+  (+18 vs +20 observed on one account) — likely the already-known timezone-bucketing tradeoff
+  below, not a new bug**, but not conclusively confirmed. If it recurs after that's fixed, treat as
+  a separate issue.
 
 ## Low priority — edge cases
 
