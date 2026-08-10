@@ -23,8 +23,22 @@ pick up cold.
   missing "Top Used Applications"/"Top Assets with Violations" cards — restored server-side using
   data already fetched at mount (no new API calls, no per-collection payload growth). Verified
   live against Acorns Demo: numbers match production exactly (795/+56 assets, 617/+1 violations,
-  identical top-5 violations ranking). "Top Used Applications" correctly shows empty state on
-  accounts with no `UserAnalysisData` telemetry — not a bug, same as prod would show.
+  identical top-5 violations ranking).
+- "Top Assets with Violations" was missing its per-asset trend mini-chart (prod shows one next to
+  each row, not just the number) — extended `FetchHostSeverityCountsRequest` with an optional
+  `host_filter` so the same cheap `$bucket` aggregation can be scoped to one asset's own hostNames,
+  one small targeted call per top-5 row.
+- "Top Used Applications" showed "No AI interaction data yet." even against a real production data
+  dump with genuine `UserAnalysisData` records — **initially misdiagnosed as a data-seeding gap;
+  it wasn't.** Root cause: `UserAnalysisData.serviceId` is a readable client name ("claudecli",
+  "codexcli", ...) matching the second segment of the collection's own hostname
+  (`<deviceId>.<serviceId>.<host>`), not `module_info`'s own UUID `_id` — the account-wide matching
+  originally used `module_info.id` as serviceId, which never appears in `UserAnalysisData` at all,
+  so it silently matched nothing regardless of real data volume. Confirmed against origin/master's
+  still-current (unmigrated) `analysisKeysForCollection`, which derives serviceId from hostname
+  segments, not from `module_info`. Fixed by deriving the same hostname-segment candidates
+  server-side from each group's own `hostNames`. Verified live: matches production exactly (Claude
+  CLI 82.1K, razorpay-home 55.8K, etc.).
 
 ## High priority — wrong output today
 
@@ -52,6 +66,17 @@ pick up cold.
   **Fix:** not necessarily wrong (the behavior is arguably a UX improvement), but needs an
   explicit look — either add e2e coverage for Guardrails Violations, or gate the new effect
   behind an opt-in prop so it doesn't silently apply to callers this PR never reviewed.
+
+- [ ] **Agentic Assets table's per-row "AI Interactions" column likely has the same
+  `module_info`-vs-hostname-segment bug just fixed for the "Top Used Applications" card.**
+  `AgenticAssetsPage.jsx`'s `shapeRow` → `computeAiInteractionsFromDevices` (`constants.js`) still
+  matches via `userAnalysisKeysByDeviceId` (Endpoint Shield's `module_info.id`/`module_info.name`),
+  the same scheme just confirmed to never match real `UserAnalysisData` records (see "Already
+  fixed" above — its `serviceId` is a hostname-segment-derived readable name, not `module_info`'s
+  UUID). Not fixed here since it's page-scoped (needs per-collection hostnames, which the
+  paginated row shape doesn't carry) rather than a simple account-wide lookup swap.
+  **Fix:** thread each row's `devices[].hostNames` (or equivalent) back from the server, and reuse
+  the same hostname-segment candidate derivation now living in `fetchAgenticAssetsStats`.
 
 ## Medium priority — feature regressions / data correctness
 
