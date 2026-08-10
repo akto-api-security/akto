@@ -34,7 +34,6 @@ import {
   buildUserAnalysisFlatMap,
   getRowViolations,
   buildTeamGroupsFromDevices,
-  computeAiInteractionsFromDevices,
   fetchAndCacheSkillApiData,
   skillCollectionKey,
   fetchAndCacheAgenticCollectionsBundle,
@@ -161,11 +160,14 @@ const DEFAULT_COL_DEF = {
 // it's bounded by however many rows are on the current page, not the account's full ~800 groups (see
 // atlas-scale-test/DASHBOARD_OPTIMIZATION.md's "paginated server-side aggregation rebuild" entry for
 // why that distinction is the whole point).
-function shapeRow(row, { violationsByCollectionId, usernameMap, userMetadataMap, analysisByKey, userAnalysisKeysByDeviceId, maliciousSkillKeys }) {
+function shapeRow(row, { violationsByCollectionId, usernameMap, userMetadataMap, maliciousSkillKeys }) {
   const devices = row.devices || [];
   const violations = getRowViolations(row.collectionIds, violationsByCollectionId);
   const groups = buildTeamGroupsFromDevices(devices, usernameMap, userMetadataMap);
-  const aiInteractions = computeAiInteractionsFromDevices(devices, analysisByKey, userAnalysisKeysByDeviceId);
+  // Server-computed per device (see AgenticObserveAction.buildDevicesForGroup/accumulateAiInteractions)
+  // — matches UserAnalysisData's own serviceId scheme (hostname-segment-derived), not
+  // Endpoint Shield's module_info id/name, which never actually matches real interaction data.
+  const aiInteractionsTotal = devices.reduce((sum, d) => sum + (d.aiInteractions || 0), 0);
   const isSkill = row.rowType === "skill";
   const tags = [];
   if (row.hasPersonalAccount && !isSkill) tags.push("Contains personal account");
@@ -185,10 +187,7 @@ function shapeRow(row, { violationsByCollectionId, usernameMap, userMetadataMap,
     isMalicious,
     violations,
     groups: groups.length ? groups : undefined,
-    aiInteractions: aiInteractions?.total,
-    aiInteractionsDetail: aiInteractions
-      ? { totalInputTokens: aiInteractions.totalInputTokens, totalOutputTokens: aiInteractions.totalOutputTokens }
-      : undefined,
+    aiInteractions: aiInteractionsTotal > 0 ? aiInteractionsTotal : undefined,
     devices,
     tags: tags.length ? tags : undefined,
   };
@@ -306,7 +305,6 @@ export default function AgenticAssetsPage() {
     usernameMap: {},
     userMetadataMap: {},
     analysisByKey: new Map(),
-    userAnalysisKeysByDeviceId: new Map(),
     userAnalysisFlatMap: {},
     maliciousSkillKeys: new Set(),
     trafficMap: {},
@@ -378,13 +376,12 @@ export default function AgenticAssetsPage() {
         if (!isMountedRef.current) return;
 
         const { collections = [], trafficMap = {}, riskScoreMap = {} } = collectionsBundle || {};
-        const { usernameMap = {}, userMetadataMap = {}, userAnalysisKeysByDeviceId = new Map() } = shieldResult || {};
+        const { usernameMap = {}, userMetadataMap = {} } = shieldResult || {};
 
         enrichRef.current = {
           ...enrichRef.current,
           usernameMap,
           userMetadataMap,
-          userAnalysisKeysByDeviceId,
           trafficMap,
           riskScoreMap,
         };
@@ -457,7 +454,7 @@ export default function AgenticAssetsPage() {
     // AG Grid SSRM sends sortOrder: -1 for asc, 1 for desc — opposite of the backend's Mongo
     // convention (1 asc / -1 desc, matching NhiGovernanceViolationsAction's own onServerFetch).
     const mongoSortOrder = sortOrder ? -sortOrder : -1;
-    const { trafficMap, riskScoreMap } = enrichRef.current;
+    const { trafficMap, riskScoreMap, userAnalysisFlatMap } = enrichRef.current;
 
     return api.fetchAgenticAssetsSummary({
       skip,
@@ -469,6 +466,7 @@ export default function AgenticAssetsPage() {
       riskScoreMap,
       startTimestamp,
       endTimestamp,
+      userAnalysisFlatMap,
     }).then((res) => ({
       value: (res.rows || []).map((row) => shapeRow(row, enrichRef.current)),
       total: res.total || 0,

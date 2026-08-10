@@ -433,7 +433,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         final String deviceId;
         double riskScore;
         int lastSeenEpoch;
+        int aiInteractions;
         final Set<String> services = new HashSet<>();
+        final Set<String> seenAnalysisKeys = new HashSet<>();
 
         DeviceAcc(String deviceId) { this.deviceId = deviceId; }
 
@@ -444,12 +446,31 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             d.put("riskScore", riskScore > 0 ? AgenticObserveUtil.roundRiskScore(riskScore) : null);
             d.put("lastSeenEpoch", lastSeenEpoch);
             d.put("services", new ArrayList<>(services));
+            d.put("aiInteractions", aiInteractions);
             return d;
         }
     }
 
+    // Same hostname-segment candidate derivation as fetchAgenticAssetsStats' "Top Used Applications"
+    // ranking (see buildUserAnalysisFlatMap) — UserAnalysisData's serviceId is a readable client name
+    // matching the collection's own hostname's second segment, not module_info's id/name.
+    private static void accumulateAiInteractions(DeviceAcc d, String hostName, Map<String, Integer> userAnalysisMap) {
+        if (userAnalysisMap == null || userAnalysisMap.isEmpty()) return;
+        String[] parts = DOT_SPLIT.split(hostName);
+        if (parts.length < 2) return;
+        String deviceId = parts[0];
+        List<String> candidates = new ArrayList<>();
+        candidates.add(parts[1]);
+        if (parts.length >= 3) candidates.add(String.join(".", Arrays.asList(parts).subList(2, parts.length)));
+        for (String serviceId : candidates) {
+            String key = serviceId + "|" + deviceId;
+            if (!d.seenAnalysisKeys.add(key)) continue;
+            d.aiInteractions += userAnalysisMap.getOrDefault(key, 0);
+        }
+    }
+
     private static List<BasicDBObject> buildDevicesForGroup(GroupSummary g, Map<Integer, ApiCollection> byId,
-            Map<String, Integer> traffic, Map<String, Double> risk) {
+            Map<String, Integer> traffic, Map<String, Double> risk, Map<String, Integer> userAnalysisMap) {
         Map<String, DeviceAcc> devices = new LinkedHashMap<>();
         for (Integer cid : g.collectionIds) {
             ApiCollection c = byId.get(cid);
@@ -467,6 +488,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (collRisk > d.riskScore) d.riskScore = collRisk;
             if (collTraffic > d.lastSeenEpoch) d.lastSeenEpoch = collTraffic;
             if (serviceName != null) d.services.add(serviceName);
+            accumulateAiInteractions(d, hostName, userAnalysisMap);
         }
         List<BasicDBObject> out = new ArrayList<>();
         for (DeviceAcc d : devices.values()) out.add(d.toResponse());
@@ -651,10 +673,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<Integer, ApiCollection> byId = new HashMap<>();
             for (ApiCollection c : collections) byId.put(c.getId(), c);
 
+            Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
             List<BasicDBObject> rowsOut = new ArrayList<>();
             for (GroupSummary g : page) {
                 BasicDBObject row = g.toSummaryResponse();
-                row.put("devices", buildDevicesForGroup(g, byId, traffic, risk));
+                row.put("devices", buildDevicesForGroup(g, byId, traffic, risk, userAnalysis));
                 rowsOut.add(row);
             }
 
