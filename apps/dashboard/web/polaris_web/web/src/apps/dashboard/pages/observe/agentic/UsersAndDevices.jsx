@@ -27,7 +27,6 @@ import {
     fetchAndCacheSkillApiData,
     hasMaliciousSkillInCollections,
 } from "./constants";
-import { hasMisconfiguredConfigTag } from "./mcpClientHelper";
 
 const definedTableTabs = ["Users", "Devices"];
 
@@ -129,14 +128,14 @@ function UsersAndDevices() {
         [getRiskScoreStatus, buildGroupNameDisplay],
     );
 
-    const applyMaliciousBadgeToUsers = useCallback((maliciousSkillKeys, isMountedRef) => {
+    const applyMaliciousBadgeToUsers = useCallback((maliciousSkillKeys, misconfiguredCollectionIdsSet, isMountedRef) => {
         if (!isMountedRef.current) return;
         const enrichRow = (row) => {
             // Scoped to each collection's own tagged skills: a same-named skill owned by another
             // user/agent must not mark this row as malicious.
             const hasMalicious = hasMaliciousSkillInCollections(maliciousSkillKeys, row.collections);
-            // Tag-based, same signal groupCollectionsByDevice already uses — no extra API call needed.
-            const hasMisconfigured = (row.collections || []).some((c) => hasMisconfiguredConfigTag(c.envType));
+            const collectionIds = (row.collections || []).map((c) => c.id);
+            const hasMisconfigured = collectionIds.some((id) => misconfiguredCollectionIdsSet.has(id));
             const extraBadges = [];
             if (hasMalicious) extraBadges.push(<Badge key="malicious" size="small" status="critical">Malicious Skills</Badge>);
             return { ...row, hasMaliciousSkill: hasMalicious, hasMisconfiguredConfig: hasMisconfigured, groupNameDisplay: buildGroupNameDisplay(row, extraBadges) };
@@ -149,26 +148,18 @@ function UsersAndDevices() {
     }, [buildGroupNameDisplay]);
 
     const enrichUsersWithMaliciousSkills = useCallback(async (userRows, isMountedRef = { current: true }) => {
-        // Misconfigured badge is tag-based (applyMaliciousBadgeToUsers) and needs no fetch, so it's
-        // applied unconditionally. Only collections that actually have skills need the malicious-skill
-        // lookup; querying every collection fires one request per collection for no benefit on the rest.
         const allCollectionIds = [];
         userRows.forEach((row) => {
             (row.collections || []).forEach((c) => {
-                if (Array.isArray(c.skills) && c.skills.length > 0 && !allCollectionIds.includes(c.id)) {
-                    allCollectionIds.push(c.id);
-                }
+                if (!allCollectionIds.includes(c.id)) allCollectionIds.push(c.id);
             });
         });
-        if (!allCollectionIds.length) {
-            applyMaliciousBadgeToUsers(new Set(), isMountedRef);
-            return;
-        }
+        if (!allCollectionIds.length) return;
 
-        const { maliciousSkillKeys } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
+        const { maliciousSkillKeys, misconfiguredCollectionIds } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
 
         if (!isMountedRef.current) return;
-        applyMaliciousBadgeToUsers(maliciousSkillKeys || new Set(), isMountedRef);
+        applyMaliciousBadgeToUsers(maliciousSkillKeys || new Set(), misconfiguredCollectionIds || new Set(), isMountedRef);
     }, [applyMaliciousBadgeToUsers]);
 
     async function fetchData(isMountedRef = { current: true }) {
