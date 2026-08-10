@@ -16,6 +16,13 @@ public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler
     public static final String ACCESS_TYPE = "accessType";
     public static final String COLLECTION_TYPE = "collectionType";
     public static final String SKILL_NAME = "skillName";
+    // Set (>1) when the collection has many distinct items (skills, MCP tools, or plain endpoints) -
+    // "Endpoints" then holds only a sample, not the full set, and the model needs to know the true count
+    // to avoid describing the whole collection as if it were only about the few shown.
+    public static final String ITEM_LIBRARY_SIZE = "itemLibrarySize";
+    // What each entry in "Endpoints" represents when ITEM_LIBRARY_SIZE is set - "skill", "tool", or
+    // "endpoint". Only used for phrasing that one instruction; irrelevant otherwise.
+    public static final String ITEM_WORD = "itemWord";
     public static final String TAGS = "tags";
     public static final String ENDPOINTS = "endpoints";
     public static final String SAMPLE_SNIPPETS = "sampleSnippets";
@@ -49,17 +56,16 @@ public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler
 
     @Override
     protected void validate(BasicDBObject queryData) throws ValidationException {
-        if (!queryData.containsKey(ENDPOINTS)) {
-            throw new ValidationException("Missing mandatory param: " + ENDPOINTS);
-        }
-
-        Object endpointsObj = queryData.get(ENDPOINTS);
-        if (!(endpointsObj instanceof List) || ((List<?>) endpointsObj).isEmpty()) {
-            throw new ValidationException(ENDPOINTS + " must be a non-empty list.");
-        }
-
         if (isBlank(queryData.getString(COLLECTION_NAME)) && isBlank(queryData.getString(HOST_NAME))) {
             throw new ValidationException("At least one of " + COLLECTION_NAME + " or " + HOST_NAME + " is required.");
+        }
+
+        // Endpoints are the usual basis for a description, but a collection with none yet can still get
+        // one from its type/tags alone (e.g. "MCP server via cursor") - only reject when there's neither.
+        Object endpointsObj = queryData.get(ENDPOINTS);
+        boolean hasEndpoints = endpointsObj instanceof List && !((List<?>) endpointsObj).isEmpty();
+        if (!hasEndpoints && isBlank(queryData.getString(COLLECTION_TYPE))) {
+            throw new ValidationException("Need either a non-empty " + ENDPOINTS + " list or a " + COLLECTION_TYPE + " to go on.");
         }
     }
 
@@ -71,6 +77,8 @@ public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler
         String accessType = queryData.getString(ACCESS_TYPE);
         String collectionType = queryData.getString(COLLECTION_TYPE);
         String skillName = queryData.getString(SKILL_NAME);
+        int itemLibrarySize = queryData.getInt(ITEM_LIBRARY_SIZE, 0);
+        String itemWord = queryData.getString(ITEM_WORD);
         List<String> tags = (List<String>) queryData.getOrDefault(TAGS, null);
         List<String> endpoints = (List<String>) queryData.get(ENDPOINTS);
         List<String> sampleSnippets = (List<String>) queryData.getOrDefault(SAMPLE_SNIPPETS, null);
@@ -96,9 +104,12 @@ public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler
             infoBlock.append("Tags: ").append(String.join(", ", tags)).append("\n");
         }
 
+        boolean hasEndpoints = endpoints != null && !endpoints.isEmpty();
         StringBuilder endpointsBlock = new StringBuilder();
-        for (String endpoint : endpoints) {
-            endpointsBlock.append("- ").append(endpoint).append("\n");
+        if (hasEndpoints) {
+            for (String endpoint : endpoints) {
+                endpointsBlock.append("- ").append(endpoint).append("\n");
+            }
         }
 
         StringBuilder samplesBlock = new StringBuilder();
@@ -112,13 +123,20 @@ public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler
         }
 
         return
-            "You are an API security analyst. Based on the identifying info below, its endpoints, "
-                + "and (if provided) sample request/response traffic, write a concise, factual "
-                + "description of what this is used for.\n\n"
+            "You are an API security analyst. Based on the identifying info below"
+                + (hasEndpoints ? ", its endpoints, and (if provided) sample request/response traffic, "
+                    : " (no traffic observed for this collection yet, so no endpoints or samples), ")
+                + "write a concise, factual description of what this is used for.\n\n"
                 + "COLLECTION INFO:\n" + infoBlock
-                + "\nENDPOINTS:\n" + endpointsBlock
+                + (hasEndpoints ? "\nENDPOINTS:\n" + endpointsBlock : "")
                 + (samplesBlock.length() > 0 ? "\nSAMPLE REQUEST/RESPONSE TRAFFIC:\n" + samplesBlock : "")
                 + "\nINSTRUCTIONS:\n"
+                + (!hasEndpoints
+                    ? "- No endpoints have been observed yet - infer purpose from \"Collection type\", the "
+                        + "platform/tool named in Tags/Access type/Host, and your own general knowledge of "
+                        + "that platform. Keep it general and plausible, not falsely specific about "
+                        + "capabilities you have no evidence for.\n"
+                    : "")
                 + "- Infer the purpose from all the info above. If \"Collection type\" identifies this as a "
                 + "Skill, AI agent, MCP server, or LLM, describe it in those specific terms (name the "
                 + "platform/tool from Tags/Access type if known) rather than a generic web API description.\n"
@@ -130,6 +148,12 @@ public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler
                 + "do if the endpoints/samples don't spell it out - e.g. \"mongodb-mcp-setup\" sets up an MCP "
                 + "connection to MongoDB). Do not describe generic skill-management mechanics (listing, "
                 + "creating, or reading skill definition files) instead of the skill's actual purpose.\n"
+                + (itemLibrarySize > 1
+                    ? "- This collection has " + itemLibrarySize + " distinct " + itemWord + "s - "
+                        + "\"Endpoints\" below only samples some of them. Describe it as a library/toolkit "
+                        + "spanning that many " + itemWord + "s (optionally naming 2-3 as examples), never "
+                        + "as if it were only about the few shown.\n"
+                    : "")
                 + "- Do not invent details that aren't supported by the endpoints or samples.\n"
                 + "- Plain text only, no markdown formatting.\n"
                 + "- Write like a developer jotting a one-line note for a teammate, not like generated "

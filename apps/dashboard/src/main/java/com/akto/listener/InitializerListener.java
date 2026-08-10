@@ -190,6 +190,7 @@ public class InitializerListener implements ServletContextListener {
     Crons crons = new Crons();
     TestingAlertsCron testingAlertsCron = new TestingAlertsCron();
     CollectionDescriptionCron collectionDescriptionCron = new CollectionDescriptionCron();
+    EndpointDescriptionCron endpointDescriptionCron = new EndpointDescriptionCron();
 
     public static String getDomain() {
         if (domain == null) {
@@ -2550,6 +2551,7 @@ public class InitializerListener implements ServletContextListener {
 
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     collectionDescriptionCron.setUpCollectionDescriptionCronScheduler();
+                    endpointDescriptionCron.setUpEndpointDescriptionCronScheduler();
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
                         crons.insertHistoricalDataJob();
