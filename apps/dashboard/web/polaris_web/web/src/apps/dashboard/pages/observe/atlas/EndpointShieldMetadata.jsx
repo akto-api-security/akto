@@ -28,7 +28,7 @@ const headings = [
     createHeading("Hostname", "hostname"),
     createHeading("Device ID", "deviceId"),
     createHeading("Agent Version", "agentVersion"),
-    createHeading("OS/Extension", "osComp", "os"),
+    createHeading("OS/Browser", "osComp", "os"),
     createHeading("Username", "username"),
     createHeading("Last Heartbeat", "lastHeartbeatComp", "lastHeartbeat"),
     createHeading("Last Deployed", "lastDeployedComp", "lastDeployed")
