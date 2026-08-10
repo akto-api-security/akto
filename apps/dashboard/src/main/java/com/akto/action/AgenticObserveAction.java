@@ -1828,6 +1828,26 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 });
             }
 
+            // AG Grid column filters (agSetColumnFilter on "os"/"group"/"role") — extractFilterModel
+            // (AgGridTable.jsx) keys these by colDef field name, matching DEVICE_COL_DEFS in
+            // DeviceEndpoints.jsx. A key present with an empty list means the user unchecked every
+            // value, which must match zero rows (real Set Filter semantics) — containsKey (not
+            // null-and-nonempty) is what distinguishes that from "filter untouched".
+            if (filters != null) {
+                if (filters.containsKey("os")) {
+                    Set<String> allowed = new HashSet<>(filters.get("os"));
+                    all.removeIf(g -> !allowed.contains(g.os));
+                }
+                if (filters.containsKey("group")) {
+                    Set<String> allowed = new HashSet<>(filters.get("group"));
+                    all.removeIf(g -> !allowed.contains(g.team));
+                }
+                if (filters.containsKey("role")) {
+                    Set<String> allowed = new HashSet<>(filters.get("role"));
+                    all.removeIf(g -> !allowed.contains(g.userRole));
+                }
+            }
+
             long total = all.size();
 
             Comparator<HostGroupSummary> cmp = buildHostGroupComparator(sortKey);

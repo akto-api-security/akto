@@ -317,11 +317,11 @@ export default {
     },
     // Paginated top-level device rows for Endpoints' tree grid, or (when parentDeviceId is set) one
     // device's (device,service) children — see AgenticObserveAction.fetchDeviceEndpointsSummary.
-    async fetchDeviceEndpointsSummary({ parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId } = {}) {
+    async fetchDeviceEndpointsSummary({ parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters } = {}) {
         const resp = await request({
             url: '/api/fetchDeviceEndpointsSummary',
             method: 'post',
-            data: { parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId },
+            data: { parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0 }
     },

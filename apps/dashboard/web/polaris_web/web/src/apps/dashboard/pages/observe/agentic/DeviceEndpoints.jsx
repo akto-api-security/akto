@@ -223,18 +223,33 @@ function UsernameCellInner({ data, node }) {
 
 const DASH_FORMATTER = (params) => (params.value && params.value !== "-" ? params.value : "-");
 
-const DEVICE_COL_DEFS = [
-    { field: "riskScore", headerName: "Risk score", width: 110, sort: "desc", filter: false, cellRenderer: RiskScoreCellRenderer },
-    {
-        field: "deviceId", headerName: "Endpoint", flex: 1.6, minWidth: 240, sortable: true,
-        valueFormatter: (params) => params.value || "-",
-    },
-    { field: "os", headerName: "OS", width: 100, hide: true, sortable: false, filter: false },
-    { field: "group", headerName: "Group", flex: 1, minWidth: 120, sortable: false, valueFormatter: (p) => p.value || "-" },
-    { field: "role", headerName: "Role", flex: 1.2, minWidth: 150, sortable: false, valueFormatter: (p) => p.value || "-" },
-    { field: "violations", headerName: "Violations", width: 200, sortable: false, filter: false, cellRenderer: ViolationsCellRenderer },
-    { field: "lastTraffic", headerName: "Last Traffic", width: 130, valueFormatter: DASH_FORMATTER },
-];
+// Set Filter values must be supplied up front under SSRM — AG Grid can't auto-derive them from a
+// partial/paginated dataset the way it does in client-side row model. os/group/role are enumerable
+// (small, known set), so they get real filters; deviceId/lastTraffic aren't (near-unique per row /
+// a timestamp), so they stay unfiltered — deviceId already has the grid's own search box.
+function buildDeviceColDefs(filterOptions) {
+    return [
+        { field: "riskScore", headerName: "Risk score", width: 110, sort: "desc", filter: false, cellRenderer: RiskScoreCellRenderer },
+        {
+            field: "deviceId", headerName: "Endpoint", flex: 1.6, minWidth: 240, sortable: true, filter: false,
+            valueFormatter: (params) => params.value || "-",
+        },
+        {
+            field: "os", headerName: "OS", width: 100, hide: true, sortable: false,
+            filter: "agSetColumnFilter", filterParams: { values: filterOptions.os },
+        },
+        {
+            field: "group", headerName: "Group", flex: 1, minWidth: 120, sortable: false, valueFormatter: (p) => p.value || "-",
+            filter: "agSetColumnFilter", filterParams: { values: filterOptions.group },
+        },
+        {
+            field: "role", headerName: "Role", flex: 1.2, minWidth: 150, sortable: false, valueFormatter: (p) => p.value || "-",
+            filter: "agSetColumnFilter", filterParams: { values: filterOptions.role },
+        },
+        { field: "violations", headerName: "Violations", width: 200, sortable: false, filter: false, cellRenderer: ViolationsCellRenderer },
+        { field: "lastTraffic", headerName: "Last Traffic", width: 130, filter: false, valueFormatter: DASH_FORMATTER },
+    ];
+}
 
 const DEFAULT_COL_DEF = {
     sortable: true,
@@ -266,8 +281,9 @@ function getHostNamesForDevice(deviceId, collections) {
 
 // ─── Table section ────────────────────────────────────────────────────────────
 
-function TableSection({ onServerFetch, fetchDeviceChildren, collections, startTimestamp, endTimestamp, refreshKey }) {
+function TableSection({ onServerFetch, fetchDeviceChildren, collections, startTimestamp, endTimestamp, refreshKey, filterOptions }) {
     const [selectedCount, setSelectedCount] = useState(0);
+    const deviceColDefs = useMemo(() => buildDeviceColDefs(filterOptions), [filterOptions]);
     const [deviceFlyout, setDeviceFlyout] = useState(null);
     const gridRef = useRef(null);
 
@@ -329,7 +345,7 @@ function TableSection({ onServerFetch, fetchDeviceChildren, collections, startTi
             <AgGridTable
                 key={`device-endpoints-grid-${startTimestamp}-${endTimestamp}-${refreshKey}`}
                 gridRef={gridRef}
-                columnDefs={DEVICE_COL_DEFS}
+                columnDefs={deviceColDefs}
                 defaultColDef={DEFAULT_COL_DEF}
                 autoGroupColumnDef={autoGroupColumnDef}
                 treeData
@@ -472,14 +488,28 @@ export default function DeviceEndpoints() {
         loadStats();
     }, [loadStats, refreshKey]);
 
-    const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString, groupKeys }) => {
+    // Distinct os/team/role values for the grid's Set Filters — deviceMetadataMap is already the
+    // full, unpaginated account-wide map (fetched once at mount via fetchEndpointShieldUserMetadata),
+    // so these can be derived client-side with no extra network call.
+    const filterOptions = useMemo(() => {
+        const meta = Object.values(enrichRef.current.deviceMetadataMap || {});
+        const os = new Set(), group = new Set(), role = new Set();
+        meta.forEach((m) => {
+            if (m.os) os.add(m.os);
+            if (m.team) group.add(m.team);
+            if (m.role) role.add(m.role);
+        });
+        return { os: Array.from(os).sort(), group: Array.from(group).sort(), role: Array.from(role).sort() };
+    }, [refreshKey]);
+
+    const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString, groupKeys, filters }) => {
         const { trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId } = enrichRef.current;
         const mappedSortKey = SORT_FIELD_MAP[sortKey] || "riskScore";
         const mongoSortOrder = sortOrder === -1 ? 1 : -1; // AG Grid asc=-1/desc=1 is inverted vs Mongo
         const parentDeviceId = groupKeys && groupKeys.length === 1 ? groupKeys[0] : undefined;
         return api.fetchDeviceEndpointsSummary({
             parentDeviceId, skip, limit, sortKey: mappedSortKey, sortOrder: mongoSortOrder, queryValue: searchString,
-            trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId,
+            trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters,
         }).then((res) => ({ value: (res.rows || []).map(shapeRow), total: res.total || 0 }));
     }, []);
 
@@ -538,6 +568,7 @@ export default function DeviceEndpoints() {
                     startTimestamp={startTimestamp}
                     endTimestamp={endTimestamp}
                     refreshKey={refreshKey}
+                    filterOptions={filterOptions}
                 />,
             ]}
         />
