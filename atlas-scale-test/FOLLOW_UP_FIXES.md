@@ -211,6 +211,25 @@ pick up cold.
   `IndexFiltersMode.Default`, matching every other caller. Verified live: fresh load of
   `/dashboard/observe/users-and-devices` now immediately shows "Users (4) / Devices (5)" tabs and
   the normal search+filter-icon layout, and switching between tabs still works correctly.
+- Agentic Assets' new layout page had every column's filter disabled (`filter: false`), including
+  "Type" and a "Tags" column that had been dropped entirely — both existed as working Set Filters
+  on origin/master's pre-SSRM-rewrite client-side version (client-side row model auto-derives Set
+  Filter values from the full loaded dataset for free; SSRM can't, and nothing filled the gap).
+  Restored both with hardcoded value lists, since each is a small fixed enum rather than something
+  to derive from data: `["AI Agent", "MCP Server", "LLM", "Skill"]` for Type
+  (`AgenticObserveUtil.CLIENT_TYPE_*`), `["Contains personal account", "Local MCP Server",
+  "Malicious Skill", "Misconfigured"]` for Tags (matching `shapeRow`'s own tag derivation exactly)
+  — same pattern `guardrails/violations/ViolationsPage.jsx` already uses for its severity filter.
+  Tags is an array-valued field (Set Filter semantics: a row matches if ANY selected tag is
+  present); its "Malicious Skill" branch needed `maliciousSkillKeys` threaded from the client
+  (account-wide `<collectionId>|<skillName>` set, already fetched once there, otherwise unknown to
+  the Java action). The old `agTextColumnFilter` on the "Agentic Assets" name column was
+  deliberately not restored — the grid's own search box already does the same substring match
+  server-side, so it wouldn't add real capability, just a duplicate entry point. Verified live:
+  Type filter unchecking "Skill" narrows 777 → 44 (exactly Agents + MCP Servers, no Skills);
+  unchecking "Contains personal account" from Tags (leaving Local MCP Server/Malicious
+  Skill/Misconfigured) narrows 777 → 20, and all 20 visible rows correctly show the "Local MCP
+  Server" badge.
 
 ## High priority — wrong output today
 
