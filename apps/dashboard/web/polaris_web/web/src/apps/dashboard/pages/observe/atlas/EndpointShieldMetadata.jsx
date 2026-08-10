@@ -82,7 +82,7 @@ const getIconFromMap = (value, map) => {
 };
 
 // Installer device IDs are raw hex (no hyphens); extension IDs are hyphenated UUIDs or missing ("-").
-// Newer extension builds also suffix their version with "-extension" — checked as a second signal.
+// Newer extension builds also suffix their version with "-extension" 
 const isExtensionAgent = (deviceId, agentVersion) =>
     !deviceId || deviceId.includes('-') || !!agentVersion?.toLowerCase().includes('extension');
 
