@@ -366,6 +366,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         final Set<String> hostNames = new HashSet<>();
         final Set<String> endpointIds = new HashSet<>();
         final Set<String> skillNames = new HashSet<>();
+        // Agent rows only — the distinct services (MCP servers) this agent's own collections
+        // represent, mirrors constants.js's mcpServers derivation exactly (extractServiceName over
+        // non-connector-ingested collections, excluding the agent's own name).
+        final Set<String> serviceNames = new HashSet<>();
         final List<Integer> collectionIds = new ArrayList<>();
         double maxRiskScore = 0;
         int maxTrafficTimestamp = 0;
@@ -385,6 +389,12 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (c.getSkills() != null) {
                 for (String s : c.getSkills()) {
                     if (StringUtils.isNotBlank(s)) skillNames.add(s);
+                }
+            }
+            if ("agent".equals(rowType) && !isConnectorIngested(envType)) {
+                String serviceName = extractServiceNameForGrouping(hostName);
+                if (serviceName != null && !serviceName.equalsIgnoreCase(groupKey)) {
+                    serviceNames.add(serviceName);
                 }
             }
             if (envType != null) {
@@ -422,6 +432,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             g.put("hasPersonalAccount", hasPersonalAccount);
             g.put("hasLocalMcpServer", hasLocalMcpServer);
             g.put("hasMisconfiguredConfig", hasMisconfiguredConfig);
+            if (!serviceNames.isEmpty()) g.put("mcpServers", new ArrayList<>(serviceNames));
             return g;
         }
     }
