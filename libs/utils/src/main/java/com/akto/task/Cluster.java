@@ -28,6 +28,7 @@ public class Cluster {
     public static final String DELETE_TESTING_RUN_RESULTS = "delete-testing-run-results";
     public static final String ALERTS_CRON = "alerts-cron";
     public static final String COLLECTION_DESCRIPTION_CRON = "collection-description-cron";
+    public static final String ENDPOINT_DESCRIPTION_CRON = "endpoint-description-cron";
 
     public static final String winnerId = UUID.randomUUID().toString();
 

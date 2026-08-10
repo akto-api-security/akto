@@ -3,6 +3,7 @@ package com.akto.utils.crons;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -10,6 +11,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.bson.conversions.Bson;
 
@@ -40,6 +43,8 @@ import static com.akto.task.Cluster.callDibs;
  * Backfills a short, LLM-generated {@code description} for API collections that don't have one yet.
  * Runs hourly, capped at GLOBAL_RUN_LIMIT collections per run, up to CONCURRENCY LLM calls at a time.
  * Failed attempts are capped via an in-memory counter (resets on restart - acceptable, that's rare).
+ * Per-endpoint descriptions (skills/MCP tools/agent-LLM endpoints) are a separate concern, handled by
+ * {@link EndpointDescriptionCron} on its own schedule and budget.
  */
 public class CollectionDescriptionCron {
 
@@ -52,6 +57,17 @@ public class CollectionDescriptionCron {
     private static final int MAX_ENDPOINTS_FOR_CONTEXT = 15;
     private static final int MAX_SAMPLE_ENDPOINTS = 2;
     private static final int MAX_SAMPLE_CHARS = 600;
+
+    // Gets first crack at the budget each run, before the normal account sweep - everyone else still
+    // gets processed after, just with whatever budget this account didn't use.
+    private static final int PRIORITY_ACCOUNT_ID = 1779231193;
+
+    // Skill/MCP-server collections can have hundreds of distinct skills or tools - sampled wide enough
+    // to report the true count, but only a slice of names is ever put in a prompt.
+    private static final int MAX_LIBRARY_SAMPLE_QUERY = 1000;
+    private static final int MAX_LIBRARY_NAMES_IN_PROMPT = 40;
+    static final Pattern SKILL_NAME_PATTERN = Pattern.compile("/skills/([^/?]+)");
+    private static final Pattern MCP_TOOL_NAME_PATTERN = Pattern.compile("tools/call/([^/?]+)");
 
     // collectionId -> consecutive failed attempts.
     private static final Map<Integer, Integer> failCountCache = Collections.synchronizedMap(new HashMap<>());
@@ -76,24 +92,14 @@ public class CollectionDescriptionCron {
             ExecutorService pool = Executors.newFixedThreadPool(CONCURRENCY);
 
             try {
+                processAccountCollections(PRIORITY_ACCOUNT_ID, remaining, pool);
+
                 AccountTask.instance.executeTask(account -> {
                     int accountId = account.getId();
-                    List<ApiCollection> pending = findPendingCollections(remaining.get());
-                    if (pending.isEmpty()) {
-                        return;
+                    if (accountId == PRIORITY_ACCOUNT_ID) {
+                        return; // already handled above, ahead of the rest of this run
                     }
-                    loggerMaker.infoAndAddToDb("Collection description cron processing accountId="
-                        + accountId + ", pending=" + pending.size());
-                    for (ApiCollection collection : pending) {
-                        if (remaining.get() <= 0) {
-                            break;
-                        }
-                        if (failCountCache.getOrDefault(collection.getId(), 0) >= MAX_FAILED_ATTEMPTS) {
-                            continue;
-                        }
-                        remaining.decrementAndGet();
-                        pool.submit(() -> generateDescription(accountId, collection));
-                    }
+                    processAccountCollections(accountId, remaining, pool);
                 }, "collection-description-cron");
             } finally {
                 // Always shut the pool down, even if account iteration itself failed (e.g. the initial
@@ -114,6 +120,49 @@ public class CollectionDescriptionCron {
         }
     }
 
+    /** Sets Context.accountId itself - called both directly (priority account) and from inside
+     *  AccountTask.executeTask (which already sets it, but doing it again here is harmless). */
+    private void processAccountCollections(int accountId, AtomicInteger remaining, ExecutorService pool) {
+        Context.accountId.set(accountId);
+        List<ApiCollection> pending = findPendingCollections(remaining.get());
+        if (pending.isEmpty()) {
+            return;
+        }
+        loggerMaker.infoAndAddToDb("Collection description cron processing accountId="
+            + accountId + ", pending=" + pending.size());
+        for (ApiCollection collection : pending) {
+            if (remaining.get() <= 0) {
+                break;
+            }
+            if (failCountCache.getOrDefault(collection.getId(), 0) >= MAX_FAILED_ATTEMPTS) {
+                continue;
+            }
+            remaining.decrementAndGet();
+            pool.submit(() -> generateDescription(accountId, collection));
+        }
+    }
+
+    /**
+     * One-time, manually-triggered backfill/reset for a single account: regenerates the description for
+     * every Atlas collection in it, overwriting whatever's already there (unlike the regular hourly run,
+     * which only ever fills in collections that have none). Not wired into any scheduler - call this
+     * directly when needed.
+     */
+    public void forceRefreshAtlasAccount(int accountId) {
+        Context.accountId.set(accountId);
+        Bson filter = Filters.and(atlasOnlyTypeFilter(), UsageMetricCalculator.excludeDemosAndDeactivated(ApiCollection.ID));
+        List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
+            filter, 0, Integer.MAX_VALUE, Sorts.descending(ApiCollection.START_TS),
+            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.START_TS,
+                ApiCollection.HOST_NAME, ApiCollection.ACCESS_TYPE, ApiCollection.TAGS_STRING)
+        );
+        loggerMaker.infoAndAddToDb("Force-refreshing collection descriptions for accountId=" + accountId
+            + ", collections=" + collections.size());
+        for (ApiCollection collection : collections) {
+            generateDescription(accountId, collection);
+        }
+    }
+
     /** Assumes Context.accountId is already set (true inside AccountTask.executeTask's callback). */
     private List<ApiCollection> findPendingCollections(int limit) {
         if (limit <= 0) {
@@ -124,22 +173,9 @@ public class CollectionDescriptionCron {
             Filters.exists(ApiCollection.DESCRIPTION, false),
             Filters.eq(ApiCollection.DESCRIPTION, "")
         );
-        // Argus (agentic: mcp-server/gen-ai tags) or Atlas (endpoint security: source=ENDPOINT tag)
-        // collections only - excludes plain API Security collections for now.
-        Bson argusOrAtlasFilter = Filters.and(
-            Filters.exists(ApiCollection.TAGS_STRING),
-            Filters.or(
-                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
-                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
-                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
-                    Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_ENDPOINT_SOURCE_TAG),
-                    Filters.eq(CollectionTags.VALUE, Constants.AKTO_ENDPOINT_SOURCE_VALUE)
-                ))
-            )
-        );
         Bson filter = Filters.and(
             noDescriptionFilter,
-            argusOrAtlasFilter,
+            argusOrAtlasTypeFilter(),
             UsageMetricCalculator.excludeDemosAndDeactivated(ApiCollection.ID)
         );
 
@@ -150,13 +186,38 @@ public class CollectionDescriptionCron {
         );
     }
 
+    // Argus (agentic: mcp-server/gen-ai tags) or Atlas (endpoint security: source=ENDPOINT tag)
+    // collections only - excludes plain API Security collections for now.
+    static Bson argusOrAtlasTypeFilter() {
+        return Filters.and(
+            Filters.exists(ApiCollection.TAGS_STRING),
+            Filters.or(
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
+                    Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_ENDPOINT_SOURCE_TAG),
+                    Filters.eq(CollectionTags.VALUE, Constants.AKTO_ENDPOINT_SOURCE_VALUE)
+                ))
+            )
+        );
+    }
+
+    // Atlas (endpoint security: source=ENDPOINT tag) only - narrower than argusOrAtlasTypeFilter, used
+    // for the account-scoped force-refresh which is explicitly Atlas-only.
+    static Bson atlasOnlyTypeFilter() {
+        return Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
+            Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_ENDPOINT_SOURCE_TAG),
+            Filters.eq(CollectionTags.VALUE, Constants.AKTO_ENDPOINT_SOURCE_VALUE)
+        ));
+    }
+
     /**
      * Argus/Atlas collections come in 4 flavors - Skill, MCP server, AI agent, or LLM - and tags already
      * say which: "skill", "mcp-server", "ai-agent" tags, or a "gen-ai" tag valued "AI Agent"/"LLM".
      * None of these labels say "API" - an agent or MCP server isn't one, and calling it that in the
      * generated description reads wrong.
      */
-    private static String collectionTypeLabel(ApiCollection collection) {
+    static String collectionTypeLabel(ApiCollection collection) {
         List<CollectionTags> tags = collection.getTagsList();
         if (tags == null || tags.isEmpty()) {
             return null;
@@ -185,7 +246,7 @@ public class CollectionDescriptionCron {
         return null;
     }
 
-    private static String tagValue(List<CollectionTags> tags, String keyName) {
+    static String tagValue(List<CollectionTags> tags, String keyName) {
         for (CollectionTags tag : tags) {
             if (keyName.equals(tag.getKeyName())) {
                 return tag.getValue();
@@ -197,6 +258,63 @@ public class CollectionDescriptionCron {
     private static String skillTagValue(ApiCollection collection) {
         List<CollectionTags> tags = collection.getTagsList();
         return tags == null ? null : tagValue(tags, "skill");
+    }
+
+    private static final class NamedItemLibrary {
+        final int distinctCount;
+        final List<String> sampleNames;
+
+        NamedItemLibrary(int distinctCount, List<String> sampleNames) {
+            this.distinctCount = distinctCount;
+            this.sampleNames = sampleNames;
+        }
+    }
+
+    /**
+     * Names (skill/tool) are short, so a much wider sample than MAX_ENDPOINTS_FOR_CONTEXT can be
+     * afforded here just to count and name them - the 15-endpoint context used elsewhere made a
+     * 500+ skill/tool collection's description read as if it were about only the couple of items that
+     * happened to be sampled.
+     */
+    private NamedItemLibrary sampleNamedItemLibrary(int collectionId, Pattern namePattern) {
+        List<ApiInfo> wideSample = ApiInfoDao.instance.findAll(
+            Filters.eq(ApiInfo.ID_API_COLLECTION_ID, collectionId),
+            0, MAX_LIBRARY_SAMPLE_QUERY, Sorts.descending(ApiInfo.LAST_SEEN),
+            Projections.include(ApiInfo.ID_URL)
+        );
+
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        for (ApiInfo apiInfo : wideSample) {
+            String name = extractName(namePattern, apiInfo.getId().getUrl());
+            if (name != null) {
+                names.add(name);
+            }
+        }
+
+        List<String> sample = new ArrayList<>();
+        for (String name : names) {
+            if (sample.size() >= MAX_LIBRARY_NAMES_IN_PROMPT) {
+                break;
+            }
+            sample.add(name);
+        }
+        return new NamedItemLibrary(names.size(), sample);
+    }
+
+    /**
+     * Plain AI agent/LLM endpoints have no extractable name, so breadth-awareness here is just a total
+     * count vs. the sampled MAX_ENDPOINTS_FOR_CONTEXT - cheap count query, no need to fetch the URLs.
+     */
+    private long countEndpoints(int collectionId) {
+        return ApiInfoDao.instance.count(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, collectionId));
+    }
+
+    static String extractName(Pattern pattern, String url) {
+        if (url == null) {
+            return null;
+        }
+        Matcher m = pattern.matcher(url);
+        return m.find() ? m.group(1) : null;
     }
 
     private static List<String> tagStrings(ApiCollection collection) {
@@ -225,21 +343,62 @@ public class CollectionDescriptionCron {
                 0, MAX_ENDPOINTS_FOR_CONTEXT, Sorts.descending(ApiInfo.LAST_SEEN),
                 Projections.include(ApiInfo.ID_URL, ApiInfo.ID_METHOD)
             );
+            boolean hasEndpoints = apiInfos != null && !apiInfos.isEmpty();
 
-            if (apiInfos == null || apiInfos.isEmpty()) {
-                markFailed(collectionId, "No endpoints found for collection");
+            String collectionType = collectionTypeLabel(collection);
+
+            if (!hasEndpoints && collectionType == null) {
+                // Genuinely nothing to go on - no traffic yet, and tags don't even say what kind of
+                // collection this is. Not a failure, just not enough info yet - don't count it toward
+                // MAX_FAILED_ATTEMPTS (see markFailed), or a collection that starts like this and later
+                // gets real endpoints/tags would already have burned its retry budget by the time it
+                // actually has something to describe.
+                loggerMaker.debugAndAddToDb("Skipping collection " + collectionId + ": no endpoints and no recognized type yet");
                 return;
             }
+
+            // Skill/MCP-tool collections can have hundreds of distinct items named right in the URL;
+            // plain AI agent/LLM endpoints have no such name, but can still have more endpoints than the
+            // MAX_ENDPOINTS_FOR_CONTEXT sample shows. Either way, a narrow sample presented as if it were
+            // the whole collection reads as "this is about the 1-2 things I happened to see" - wrong.
+            Pattern namePattern = "Skill".equals(collectionType) ? SKILL_NAME_PATTERN
+                : "MCP server".equals(collectionType) ? MCP_TOOL_NAME_PATTERN
+                : null;
+
+            List<String> endpointsForPrompt = hasEndpoints ? endpointStrings(apiInfos) : null;
+            int itemLibrarySize = 0;
+            String itemWord = null;
+
+            if (hasEndpoints && namePattern != null) {
+                NamedItemLibrary library = sampleNamedItemLibrary(collectionId, namePattern);
+                if (library.distinctCount > 1) {
+                    itemLibrarySize = library.distinctCount;
+                    itemWord = "Skill".equals(collectionType) ? "skill" : "tool";
+                    endpointsForPrompt = library.sampleNames;
+                }
+            } else if (hasEndpoints && ("AI agent".equals(collectionType) || "LLM".equals(collectionType))) {
+                long totalEndpoints = countEndpoints(collectionId);
+                if (totalEndpoints > apiInfos.size()) {
+                    itemLibrarySize = (int) totalEndpoints;
+                    itemWord = "endpoint";
+                }
+            }
+            boolean isLibrary = itemLibrarySize > 1;
 
             BasicDBObject queryData = new BasicDBObject();
             queryData.put(CollectionDescriptionPromptHandler.COLLECTION_NAME, collection.getName());
             queryData.put(CollectionDescriptionPromptHandler.HOST_NAME, collection.getHostName());
             queryData.put(CollectionDescriptionPromptHandler.ACCESS_TYPE, collection.getAccessType());
-            queryData.put(CollectionDescriptionPromptHandler.COLLECTION_TYPE, collectionTypeLabel(collection));
-            queryData.put(CollectionDescriptionPromptHandler.SKILL_NAME, skillTagValue(collection));
+            queryData.put(CollectionDescriptionPromptHandler.COLLECTION_TYPE, collectionType);
+            // A single-skill collection's "skill" tag names the point of the description; a library with
+            // many items has no one name that represents the whole thing, so it's left unset there.
+            queryData.put(CollectionDescriptionPromptHandler.SKILL_NAME, isLibrary ? null : skillTagValue(collection));
             queryData.put(CollectionDescriptionPromptHandler.TAGS, tagStrings(collection));
-            queryData.put(CollectionDescriptionPromptHandler.ENDPOINTS, endpointStrings(apiInfos));
-            queryData.put(CollectionDescriptionPromptHandler.SAMPLE_SNIPPETS, sampleSnippets(collectionId, apiInfos));
+            queryData.put(CollectionDescriptionPromptHandler.ENDPOINTS, endpointsForPrompt);
+            queryData.put(CollectionDescriptionPromptHandler.ITEM_LIBRARY_SIZE, itemLibrarySize);
+            queryData.put(CollectionDescriptionPromptHandler.ITEM_WORD, itemWord);
+            queryData.put(CollectionDescriptionPromptHandler.SAMPLE_SNIPPETS,
+                hasEndpoints ? sampleSnippets(collectionId, apiInfos) : null);
             queryData.put(CollectionDescriptionPromptHandler.MAX_CHARS, MAX_DESCRIPTION_CHARS);
 
             BasicDBObject resp = new CollectionDescriptionPromptHandler().handle(queryData);
