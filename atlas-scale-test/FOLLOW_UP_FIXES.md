@@ -65,6 +65,25 @@ pick up cold.
   `agenticFlatData={[]}` into the flyout; `AgentMcpToolsView` (reached by drilling into one MCP
   Server component to see its own tools) does a `.find()` against that empty array and will
   always come up empty. Separate issue, same general area — needs its own fix.
+- Every asset flyout's Devices tab showed "-" for User and Last Seen on every single row, for
+  every asset type — not just Cursor. Same bug class as the mcpServers fix above: the rebuilt
+  server-side `AgenticObserveAction.buildDevicesForGroup`/`DeviceAcc.toResponse()` only sends
+  `deviceId`/`riskScore`/`lastSeenEpoch`/`services`/`aiInteractions` per device, never `username`
+  or a formatted `lastSeen` string, while `AgenticAssetFlyout.jsx`'s `DevicesTab` (unchanged since
+  master) reads both straight off each device row. Master's client-side `buildDevicesForGroup`
+  (`constants.js`) always populated both via `getResolvedUsernameForCollection`/
+  `func.formatChatTimestamp`. The account's Endpoint Shield `usernameMap` was already fetched
+  client-side and used for the aggregate team-count rollup (`buildTeamGroupsFromDevices`), just
+  never attached to the individual device rows `DevicesTab` renders. Fixed by adding
+  `enrichDevicesWithUsername` (`constants.js`), reusing `buildTeamGroupsFromDevices`'s own
+  deviceId-keyed `usernameMap` lookup tier, wired into `shapeRow` in `AgenticAssetsPage.jsx`.
+  Verified live: Cursor's Devices tab now shows real usernames (rakshaksatsangi, jane.doe,
+  john.smith, liam.patel) and real Last Seen values (11 days ago, 1 week ago) instead of "-"
+  across the board. Risk Score is still "-" for all 4 of Cursor's devices — left as-is since the
+  field genuinely is populated by `DeviceAcc.toResponse()` (only nulled when `riskScore <= 0`), so
+  this looks like real zero-risk data for this asset's devices rather than a missing-field bug;
+  worth a second look if a different asset's devices turn out to have real risk scores but still
+  show "-".
 
 ## High priority — wrong output today
 
