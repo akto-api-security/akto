@@ -12,7 +12,6 @@ const ModuleInfo = () => {
     const [ selectedModules, setSelectedModules ] = useState([])
     const [ modalActive, setModalActive ] = useState(false)
     const [ selectedModule, setSelectedModule ] = useState(null)
-    const [ runtimeEnvOverrides, setRuntimeEnvOverrides ] = useState({})
 
     const CONFIGURABLE_MODULE_TYPES = ['TRAFFIC_COLLECTOR', 'AKTO_AGENT_GATEWAY', 'THREAT_DETECTION', 'MINI_RUNTIME'];
 
@@ -20,8 +19,6 @@ const ModuleInfo = () => {
         const response = await settingRequests.fetchModuleInfo();
         setModuleInfos(response.moduleInfos || []);
         setAllowedEnvFields(response.allowedEnvFields || []);
-        const adminSettings = await settingRequests.fetchAdminSettings();
-        setRuntimeEnvOverrides(adminSettings?.accountSettings?.runtimeEnvOverrides || {});
     }
 
     useEffect(() => {
@@ -187,15 +184,13 @@ const ModuleInfo = () => {
                 <Modal.Section>
                     {selectedModule?.moduleType === 'MINI_RUNTIME' && (
                         <Banner tone="warning" title="Applies to all instances">
-                            These values are account-wide - saving here changes them for every mini-runtime instance on this account, not just {selectedModule?.name || 'this one'}.
+                            Applies to all instances.
                         </Banner>
                     )}
                     <ModuleEnvConfigComponent
                         title="Environment Variables"
                         description={`Configure environment variables for ${selectedModule?.name || 'module'}`}
-                        module={selectedModule?.moduleType === 'MINI_RUNTIME'
-                            ? { ...selectedModule, additionalData: { env: runtimeEnvOverrides } }
-                            : selectedModule}
+                        module={selectedModule}
                         allowedEnvFields={allowedEnvFields}
                         onSaveEnv={handleSaveEnv}
                     />
