@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { Box, Card, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import api from "../api";
 import observeFunc from "../../observe/transform";
-import { formatCategoryName, getFlagSrc, countryCodeToName, openThreatActivityPage, openThreatActorsPage } from "../utils/threatDashboardUtils";
+import { getRecentActivityLabel, parseHostForDisplay, getFlagSrc, countryCodeToName, openThreatActivityPage, openThreatActorsPage } from "../utils/threatDashboardUtils";
+import { fetchEndpointShieldUsernameMap, getUsernameForCollection, DEFAULT_VALUE } from "../../observe/api_collections/endpointShieldHelper";
+import { isEndpointSecurityCategory } from "../../../../main/labelHelper";
 
 function timeAgo(epochSeconds) {
     if (!epochSeconds) return "";
@@ -11,6 +13,17 @@ function timeAgo(epochSeconds) {
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     return `${Math.floor(diff / 86400)}d ago`;
+}
+
+// Who a Recent Activity event is for: the Endpoint Shield username for the event's host (same
+// mapping Top Endpoints with Violations uses), falling back to the device-id segment of the
+// host, then the raw actor (often just an IP) when nothing else resolves.
+function getEventUsername(event, usernameMap) {
+    if (!event?.host) return event?.actor || "Unknown actor";
+    const shieldUsername = getUsernameForCollection({ displayName: event.host, name: event.host }, usernameMap);
+    if (shieldUsername !== DEFAULT_VALUE) return shieldUsername;
+    const { username: deviceId } = parseHostForDisplay(event.host);
+    return deviceId || event.actor || "Unknown actor";
 }
 
 const sidebarStyles = `
@@ -68,6 +81,13 @@ function TopStatisticsSidebar({ startTimestamp, endTimestamp }) {
     const [topHosts, setTopHosts] = useState([]);
     const [countries, setCountries] = useState([]);
     const [recentActivity, setRecentActivity] = useState([]);
+    const [usernameMap, setUsernameMap] = useState({});
+
+    useEffect(() => {
+        if (isEndpointSecurityCategory()) {
+            fetchEndpointShieldUsernameMap().then(setUsernameMap);
+        }
+    }, []);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -121,14 +141,14 @@ function TopStatisticsSidebar({ startTimestamp, endTimestamp }) {
                                 <VerticalStack gap="1">
                                     <HorizontalStack align="space-between" blockAlign="center">
                                         <Text variant="bodySm" fontWeight="semibold">
-                                            {formatCategoryName(event.subCategory || event.filterId)}
+                                            {getRecentActivityLabel(event)}
                                         </Text>
                                         <Text variant="bodySm" color="subdued">
                                             {timeAgo(event.timestamp)}
                                         </Text>
                                     </HorizontalStack>
                                     <Text variant="bodySm" color="subdued" truncate>
-                                        {event.actor || "Unknown actor"}
+                                        {getEventUsername(event, usernameMap)}
                                     </Text>
                                 </VerticalStack>
                             </div>
@@ -137,21 +157,26 @@ function TopStatisticsSidebar({ startTimestamp, endTimestamp }) {
                 </VerticalStack>
             </SidebarSection>
 
-            <SidebarSection title="Top Attacked Hosts">
+            <SidebarSection title="Top Endpoints with Violations">
                 <VerticalStack gap="2">
                     {topHosts.length === 0 ? (
                         <Text variant="bodySm" color="subdued">No data</Text>
                     ) : (
-                        topHosts.map((host, idx) => (
-                            <SidebarListItem
-                                key={idx}
-                                icon={<HostFavicon host={host.host} />}
-                                label={host.host}
-                                count={host.attacks}
-                                onClick={() => openThreatActivityPage({ host: host.host, startTimestamp, endTimestamp })}
-                                isLast={idx === topHosts.length - 1}
-                            />
-                        ))
+                        topHosts.map((host, idx) => {
+                            const { username: deviceId, agent } = parseHostForDisplay(host.host);
+                            const shieldUsername = getUsernameForCollection({ displayName: host.host, name: host.host }, usernameMap);
+                            const username = shieldUsername !== DEFAULT_VALUE ? shieldUsername : deviceId;
+                            return (
+                                <SidebarListItem
+                                    key={idx}
+                                    icon={<HostFavicon host={host.host} />}
+                                    label={agent ? `${username} · ${agent}` : username}
+                                    count={host.attacks}
+                                    onClick={() => openThreatActivityPage({ host: host.host, startTimestamp, endTimestamp })}
+                                    isLast={idx === topHosts.length - 1}
+                                />
+                            );
+                        })
                     )}
                 </VerticalStack>
             </SidebarSection>

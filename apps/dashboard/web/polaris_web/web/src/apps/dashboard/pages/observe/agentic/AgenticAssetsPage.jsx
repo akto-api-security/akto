@@ -362,7 +362,7 @@ export default function AgenticAssetsPage() {
           riskScoreResp,
           sensitiveInfoResp,
           shieldResult,
-          violationRows,
+          rawViolationRows,
           userAnalysisList,
         ] = await Promise.all([
           api.getAllCollectionsBasic(),
@@ -375,6 +375,12 @@ export default function AgenticAssetsPage() {
         ]);
 
         if (!isMountedRef.current) return;
+
+        // Skill invocations fire their own /skills/<name> violation events distinct from the
+        // agent/service traffic that triggered them — exclude those here so every violation
+        // count and chart on this page (stat card, sparkline, Top Assets with Violations, the
+        // per-row Violations column) reflects only agent/service/LLM-attributable violations.
+        const violationRows = rawViolationRows.filter((row) => !row.url?.startsWith("/skills/"));
 
         const collections = apiCollectionsResp?.apiCollections || [];
         const trafficMap = trafficInfoResp || {};
@@ -399,6 +405,7 @@ export default function AgenticAssetsPage() {
             usernameMap,
             userMetadataMap,
             violationsByCollectionId,
+            violationRows,
             analysisByKey,
             userAnalysisKeysByDeviceId,
           },
