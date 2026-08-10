@@ -3,6 +3,8 @@ import SessionStore from "../../../../main/SessionStore";
 import PersistStore from "../../../../main/PersistStore";
 import { getDashboardCategory, categoryToShortName } from "../../../../main/labelHelper";
 import values from "@/util/values";
+import GUARDRAIL_RULE_DEFINITIONS from "../constants/guardrailRuleDefinitions";
+import { formatDisplayName } from "../../observe/agentic/mcpClientHelper";
 
 // New tab starts with a fresh PersistStore, so carry the category via ?category= (see ThreatReport.jsx).
 const getCategoryParam = () => categoryToShortName[getDashboardCategory()];
@@ -26,6 +28,57 @@ const setTimeRangeParams = (params, filters, startKey, endKey) => {
 export const formatCategoryName = (name) => {
     if (!name) return "Unknown";
     return name.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase());
+};
+
+// Same prefix list the guardrail detail dialog uses to recognize malicious-skill events
+// (getGuardrailRuleInfo in guardrailRuleDefinitions.js) - single source of truth so the
+// sidebar label and the detail dialog agree on what counts as a skill-detection event.
+const SKILL_DETECTION_PREFIXES =
+    GUARDRAIL_RULE_DEFINITIONS.find((def) => def.heading === "Malicious Skill Detected")?.prefixes || [];
+
+const isSkillDetectionValue = (value) => {
+    if (!value || typeof value !== "string") return false;
+    const v = value.trim().toLowerCase();
+    return SKILL_DETECTION_PREFIXES.some((p) => {
+        const pfx = p.toLowerCase();
+        return v.startsWith(pfx) || v.includes(pfx);
+    });
+};
+
+// Label for a Recent Activity row: "Category : SubCategory" (e.g. "Sensitive Data Disclosure :
+// PII Email"), collapsing to a single name when both are the same or only one is present.
+// Skill-related events (filterId "skill_evaluation", or a malicious-skill rule id like
+// "malicious_skill_detected") always show "Skill Evaluation" as the category - e.g.
+// "Skill Evaluation : Sensitive Data Disclosure" - since the raw category on those events is
+// whatever violation the skill scan found, not something meaningful on its own without knowing
+// it came from a skill evaluation.
+export const getRecentActivityLabel = (event) => {
+    const isSkillEvent = event?.filterId === "skill_evaluation"
+        || isSkillDetectionValue(event?.subCategory || event?.filterId);
+
+    const category = isSkillEvent
+        ? "Skill Evaluation"
+        : (event?.category?.trim() ? formatCategoryName(event.category) : null);
+    const subCategory = event?.subCategory?.trim() ? formatCategoryName(event.subCategory) : null;
+
+    if (category && subCategory && category !== subCategory) return `${category} : ${subCategory}`;
+    return category || subCategory || formatCategoryName(event?.filterId);
+};
+
+// Split a guardrail host into { username, agent } for the Top Endpoints with Violations list.
+// Hosts come in two shapes:
+//   <id>.ai-agent.<agent>        e.g. usmbskxhjd93xcjhf-3b129dde.ai-agent.codex
+//   <id>.<source>.<service...>   e.g. saianvithalolla.chrome.chatgpt.com
+// The username is always the first segment; the agent label is the segment after the literal
+// "ai-agent" marker when present, otherwise the second segment - run through formatDisplayName
+// so raw connector values (codex, claudecli, ...) render as their branded names.
+export const parseHostForDisplay = (host) => {
+    if (!host) return { username: "Unknown", agent: null };
+    const clean = host.replace(/:\d+$/, "");
+    const parts = clean.split(".");
+    if (parts.length < 2) return { username: clean, agent: null };
+    const agentSegment = parts[1]?.toLowerCase() === "ai-agent" ? (parts[2] || parts[1]) : parts[1];
+    return { username: parts[0], agent: formatDisplayName(agentSegment) };
 };
 
 /**

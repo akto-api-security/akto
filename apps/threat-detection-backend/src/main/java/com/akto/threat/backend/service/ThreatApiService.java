@@ -63,6 +63,7 @@ public class ThreatApiService {
     if (!contextFilter.isEmpty()) {
       match.putAll(contextFilter);
     }
+    match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
     if (!match.isEmpty()) {
       base.add(new Document("$match", match));
@@ -167,6 +168,7 @@ public class ThreatApiService {
     if (!contextFilter.isEmpty()) {
       match.putAll(contextFilter);
     }
+    match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
     pipeline.add(new Document("$match", match));
 
@@ -228,6 +230,7 @@ public class ThreatApiService {
       if (!contextFilter.isEmpty()) {
           match.putAll(contextFilter);
       }
+      match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
       List<Document> pipeline = new ArrayList<>();
       pipeline.add(new Document("$match", match));
