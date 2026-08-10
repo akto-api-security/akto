@@ -19,6 +19,12 @@ pick up cold.
 - `getTypeFromCollection`'s missing NOT_ATTACHED exclusion for `hasAiAgent` (was listed below as
   unfixed; folded into the skill-undercount fix above since both touch the same classification
   path).
+- Agentic Assets' missing sparklines/deltas on the two main stat cards, and its two entirely
+  missing "Top Used Applications"/"Top Assets with Violations" cards — restored server-side using
+  data already fetched at mount (no new API calls, no per-collection payload growth). Verified
+  live against Acorns Demo: numbers match production exactly (795/+56 assets, 617/+1 violations,
+  identical top-5 violations ranking). "Top Used Applications" correctly shows empty state on
+  accounts with no `UserAnalysisData` telemetry — not a bug, same as prod would show.
 
 ## High priority — wrong output today
 
@@ -79,27 +85,6 @@ pick up cold.
   selections made on an earlier page silently vanish once the ref is overwritten by a later fetch.
   **Fix:** accumulate selected *row objects* (not just ids) in a ref/map keyed by id, updated
   incrementally as pages are fetched and as selection changes — not wholesale-replaced per fetch.
-
-- [ ] **Agentic Assets' main stat cards and top-list cards are a large, pre-existing (pre-dates
-  this whole rebuild PR) feature gap vs. production — confirmed via prod-vs-localhost screenshot
-  comparison, not caused by the two fixes above.** The pre-rebuild page (`git show
-  3800232044~1:.../AgenticAssetsPage.jsx`) had, and prod still has:
-  - Sparkline + delta on the "Agentic Assets" card and the "Violations" card (current
-    `fetchAgenticAssetsStats` only returns `totalAssets`/`countsByType` — no trend, no violations
-    total either, per its own comment: "Violation totals stay client-side").
-  - Two entire cards this account's layout is currently missing: **"Top Used Applications"**
-    (top-N assets by AI-interaction count) and **"Top Assets with Violations"** (top-N by
-    violation count), both via a dedicated `AgenticTopListCard` component that still exists in the
-    codebase but is unused by the new layout.
-  - The table's own "AI Interactions" column is present in the header but unpopulated (`-`) for
-    every row in the new layout; prod populates it with real per-asset interaction counts.
-  **Scope note:** the asset-count trend is cheap to add (same `buildWindowSlots`/`cumulativeCounts`
-  pattern already used for Endpoints, pure Mongo/Java, no cross-service call). The violations
-  trend can reuse `fetchViolationsMonthlyTotals` (added for the Endpoints fix) directly. "Top Used
-  Applications" and the "AI Interactions" column need a new usage/interaction-count data source —
-  not yet identified where the reference implementation sourced this from. This is comparable in
-  size to (likely larger than) the Endpoints violations-sparkline fix — worth scoping as its own
-  piece of work rather than folding into a quick fix.
 
 - [ ] **Endpoints page: Users delta differs between prod and localhost by a couple of users
   (+18 vs +20 observed on one account) — likely the already-known timezone-bucketing tradeoff
