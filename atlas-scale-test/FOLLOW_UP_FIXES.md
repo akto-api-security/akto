@@ -61,10 +61,8 @@ pick up cold.
   carries it straight through to the flyout. Verified live: Cursor's Components tab now lists all
   8 MCP Server rows (default, api.githubcopilot.com, localhost:9876, test,
   ai-security-docs.akto.io, mcp.razorpay.com, notion-mcp, server-github) alongside its 20 skills.
-  **Known related gap, not yet fixed:** `AgenticAssetsPage.jsx` passes a hardcoded
-  `agenticFlatData={[]}` into the flyout; `AgentMcpToolsView` (reached by drilling into one MCP
-  Server component to see its own tools) does a `.find()` against that empty array and will
-  always come up empty. Separate issue, same general area — needs its own fix.
+  Related gap (`agenticFlatData={[]}` breaking the MCP-server tools drill-down) fixed separately,
+  see below.
 - Every asset flyout's Devices tab showed "-" for User and Last Seen on every single row, for
   every asset type — not just Cursor. Same bug class as the mcpServers fix above: the rebuilt
   server-side `AgenticObserveAction.buildDevicesForGroup`/`DeviceAcc.toResponse()` only sends
@@ -84,6 +82,25 @@ pick up cold.
   this looks like real zero-risk data for this asset's devices rather than a missing-field bug;
   worth a second look if a different asset's devices turn out to have real risk scores but still
   show "-".
+- MCP-server tools drill-down (click an MCP Server component inside an AI Agent's Components tab
+  to see its own tools) always showed "No tools found.", for every server, every agent. Root
+  cause: `AgentMcpToolsView` (`AgentComponentsView.jsx`) looked up the clicked server's
+  `collectionIds` via `agenticFlatData.find(a => a.name === selectedMcp.name)`, but
+  `AgenticAssetsPage.jsx` hardcodes `agenticFlatData={[]}` in the rebuilt architecture (the
+  account-wide flat array master's client-side pipeline built is deliberately not sent), so the
+  lookup always missed. Extended the mcpServers fix: `GroupSummary` now also tracks
+  `serviceCollectionIds` (agent rows only) and emits it as `mcpServerCollectionIds`;
+  `connectedMcps` attaches each server's own `collectionIds` directly onto the row so
+  `AgentMcpToolsView` reads `selectedMcp.collectionIds` straight off the clicked row instead of
+  searching the always-empty `agenticFlatData` — which was then removed as dead plumbing from
+  `AgenticComponentsTab`/`AgentComponentsView`/`AgentMcpToolsView` (still used elsewhere for
+  `OverviewTab`'s topology graph, untouched). Verified live: the API now returns real per-server
+  collectionIds (e.g. `mcp.razorpay.com: [726319791, 312535445, 2070401825]`) and
+  `AgentMcpToolsView` correctly calls `fetchMcpComponentsData` with those exact ids (confirmed via
+  network tab) instead of never firing meaningfully. Still shows "No tools found." because this
+  demo dataset has no captured MCP tool-call traffic anywhere — confirmed by checking a standalone
+  MCP Server asset ("default") through the separate, untouched `McpComponentsView` path, which
+  shows 0 components too. The fix corrects the wiring; the empty result is real data, not a bug.
 
 ## High priority — wrong output today
 
