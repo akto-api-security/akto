@@ -167,6 +167,25 @@ pick up cold.
   concluding it was a genuine regression, then confirming the tab label and grid total both read
   48 after the fix. Also verified both tabs' search boxes (a non-matching term correctly returns
   "0 to 0 of 0", a real term correctly narrows results) and no new console errors.
+- Endpoints page's main grid Filters side panel rendered broken: "Endpoint"/"Group"/"Role"/
+  "Last Traffic" showed a Set Filter (checkbox list + "(Select All)") with no actual values
+  underneath, and "OS" was missing entirely. Root cause: under AG Grid's server-side row model,
+  `filter: true` always resolves to a Set Filter, but SSRM can't auto-derive checkbox values from
+  a partial/paginated dataset the way client-side row model does — nothing was supplying
+  `filterParams.values`. `os` had in fact been a real, working `agSetColumnFilter` on
+  origin/master's pre-SSRM-rewrite client-side version (client-side mode derives values from the
+  full loaded dataset for free) but got disabled (`filter: false`) somewhere in the rewrite with no
+  replacement. Fixed by populating Set Filter values for `os`/`group`/`role` from
+  `deviceMetadataMap` — already fully loaded client-side at mount, no new network call — and wiring
+  the selected values through `onServerFetch` into `fetchDeviceEndpointsSummary`, mirroring the
+  filter-application pattern the sibling `fetchUsersAndDevicesSummary` method already had.
+  `deviceId`/`lastTraffic` (non-enumerable: near-unique per row / a timestamp) got `filter: false`
+  instead — `deviceId` already has the grid's own search box. Caught and fixed a second bug during
+  verification: unchecking the *only* available value sent `filters.os: []`, which a naive
+  null-or-empty check would treat as "filter not applied" (showing everything) instead of "match
+  zero rows" (real Set Filter semantics) — fixed by checking `containsKey` instead. Verified live:
+  OS filter now shows real values ("mac"), unchecking it narrows the grid to zero rows, and
+  re-checking restores all 5.
 
 ## High priority — wrong output today
 
