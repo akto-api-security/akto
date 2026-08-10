@@ -48,6 +48,23 @@ pick up cold.
   breakdown in the process (server only tracks totals per device) — small, deliberate scope cut.
   Verified live: Claude CLI's row shows 82.1K, matching the card; several skill rows show real
   counts while others correctly show "-" where no matching data exists.
+- AI-Agent asset flyout's Components tab was missing MCP Server rows entirely — e.g. "Cursor"
+  showed 25 Skill rows and zero MCP Servers, despite its Overview tab's own dependency graph
+  showing 8. Root cause: `AgentComponentsView.jsx`'s `connectedMcps` reads `asset.mcpServers`, a
+  field the rebuilt server-side `GroupSummary` (`AgenticObserveAction.java`) never populated
+  anywhere (confirmed via grep — zero occurrences before this fix), unlike master's still-current
+  client-side `constants.js`, which derives it from each agent's own non-connector-ingested
+  collection hostnames via `extractServiceName`. Fixed by adding a `serviceNames` set to
+  `GroupSummary`, populated in `accumulateCheap` (agent rows only) using the already-existing
+  `isConnectorIngested`/`extractServiceNameForGrouping` helpers, and emitted as `mcpServers` in
+  `toSummaryResponse()`. No new Mongo queries or API calls — `shapeRow`'s existing `...row` spread
+  carries it straight through to the flyout. Verified live: Cursor's Components tab now lists all
+  8 MCP Server rows (default, api.githubcopilot.com, localhost:9876, test,
+  ai-security-docs.akto.io, mcp.razorpay.com, notion-mcp, server-github) alongside its 20 skills.
+  **Known related gap, not yet fixed:** `AgenticAssetsPage.jsx` passes a hardcoded
+  `agenticFlatData={[]}` into the flyout; `AgentMcpToolsView` (reached by drilling into one MCP
+  Server component to see its own tools) does a `.find()` against that empty array and will
+  always come up empty. Separate issue, same general area — needs its own fix.
 
 ## High priority — wrong output today
 
