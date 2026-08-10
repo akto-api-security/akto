@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
@@ -45,9 +44,10 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
 
     private static final int CONNECT_TIMEOUT_MS = 30_000;
     private static final int SOCKET_TIMEOUT_MS  = 60_000;
-    private static final int RTR_POLL_INTERVAL_MS = 5_000;
-    private static final int RTR_MAX_WAIT_MS      = 5 * 60 * 1000; // 5 minutes
-    private static final int RTR_SESSION_TIMEOUT_S = 600;           // 10 minute RTR session
+    // Max host_ids CrowdStrike accepts in one batch-init-session call.
+    private static final int RTR_BATCH_MAX_HOSTS = 10_000;
+    // Devices whose output is polled concurrently after a batch dispatch.
+    private static final int RTR_POLL_CONCURRENCY = 10;
 
     private static final String DEFAULT_BASE_URL = "https://api.crowdstrike.com";
 
@@ -260,87 +260,85 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
     private static final int SCAN_KIND_SKILLS       = 1;
     private static final int SCAN_KIND_INSTALLED_APPS = 2;
 
+    // Runs scriptName across every device via one batch call per <=10k chunk, then parses and ingests
+    // each device's returned output in parallel. Devices offline at dispatch time produce no output and
+    // are skipped — CrowdStrike queues the command and a later run collects them.
     private void runScriptOnDevices(String accessToken, String baseUrl, String scriptId, String scriptName,
             List<String> deviceIds, Map<String, String> deviceNames, String description,
             String ingestUrl, int scanKind, AccountJob job) {
-        for (String deviceId : deviceIds) {
-            String deviceName = deviceNames.getOrDefault(deviceId, deviceId);
-            try {
-                JsonNode output = runScriptOnDevice(accessToken, baseUrl, deviceId, scriptName, job);
-                if (output == null) {
-                    loggerMaker.error(description + ": no output from device " + deviceName, LogDb.DASHBOARD);
-                    continue;
-                }
-                loggerMaker.info(description + ": collected output from device " + deviceName, LogDb.DASHBOARD);
-                Map<String, JsonNode> singleDevice = new HashMap<>();
-                singleDevice.put(deviceId, output);
-                Map<String, String> singleName = new HashMap<>();
-                singleName.put(deviceId, deviceName);
-                switch (scanKind) {
-                    case SCAN_KIND_MCP_CONFIG:
-                        ingestMCPDiscoveries(singleDevice, ingestUrl, singleName, job.getAccountId());
-                        break;
-                    case SCAN_KIND_INSTALLED_APPS:
-                        ingestInstalledAppsDiscoveries(singleDevice, ingestUrl, singleName, job.getAccountId());
-                        break;
-                    default:
-                        ingestSkillDiscoveries(singleDevice, ingestUrl, singleName, job.getAccountId());
-                }
-            } catch (Exception e) {
-                loggerMaker.error(description + ": error on device " + deviceName + ": " + e.getMessage(), LogDb.DASHBOARD);
+        if (deviceIds.isEmpty()) return;
+
+        // batch-admin-command returns each device's full stdout inline and synchronously, so a
+        // chunk's results are complete the moment the call returns — there is nothing to poll after.
+        Map<String, String> deviceToStdout = new HashMap<>();
+        for (int i = 0; i < deviceIds.size(); i += RTR_BATCH_MAX_HOSTS) {
+            List<String> chunk = deviceIds.subList(i, Math.min(i + RTR_BATCH_MAX_HOSTS, deviceIds.size()));
+            String batchId = batchInitSessions(accessToken, baseUrl, chunk);
+            if (batchId == null) {
+                loggerMaker.error(description + ": could not init RTR batch session for " + chunk.size() + " device(s)", LogDb.DASHBOARD);
+                continue;
             }
+            deviceToStdout.putAll(batchDispatchRunScript(accessToken, baseUrl, batchId, scriptName, description));
+            if (job != null) {
+                try { CyborgApiClient.updateJobHeartbeat(job.getId()); } catch (Exception ignored) {}
+            }
+        }
+
+        if (deviceToStdout.isEmpty()) {
+            loggerMaker.error(description + ": no device returned output (all offline, errored, or empty stdout)", LogDb.DASHBOARD);
+            return;
+        }
+        loggerMaker.info(description + ": collected output from " + deviceToStdout.size() + "/" + deviceIds.size() + " device(s), ingesting", LogDb.DASHBOARD);
+
+        // Parse + ingest per device in parallel; every ingest call builds only thread-local state,
+        // so these run without shared-state locking.
+        ExecutorService pollPool = Executors.newFixedThreadPool(Math.min(RTR_POLL_CONCURRENCY, deviceToStdout.size()));
+        try {
+            List<Future<?>> pollFutures = new ArrayList<>();
+            for (Map.Entry<String, String> entry : deviceToStdout.entrySet()) {
+                String deviceId = entry.getKey();
+                String stdout = entry.getValue();
+                String deviceName = deviceNames.getOrDefault(deviceId, deviceId);
+                pollFutures.add(pollPool.submit(() -> {
+                    try {
+                        JsonNode output = parseScriptOutput(stdout, deviceId);
+                        if (output == null) {
+                            loggerMaker.error(description + ": unparseable output from device " + deviceName, LogDb.DASHBOARD);
+                            return;
+                        }
+                        Map<String, JsonNode> singleDevice = new HashMap<>();
+                        singleDevice.put(deviceId, output);
+                        Map<String, String> singleName = new HashMap<>();
+                        singleName.put(deviceId, deviceName);
+                        switch (scanKind) {
+                            case SCAN_KIND_MCP_CONFIG:
+                                ingestMCPDiscoveries(singleDevice, ingestUrl, singleName, job.getAccountId());
+                                break;
+                            case SCAN_KIND_INSTALLED_APPS:
+                                ingestInstalledAppsDiscoveries(singleDevice, ingestUrl, singleName, job.getAccountId());
+                                break;
+                            default:
+                                ingestSkillDiscoveries(singleDevice, ingestUrl, singleName, job.getAccountId());
+                        }
+                    } catch (Exception e) {
+                        loggerMaker.error(description + ": error on device " + deviceName + ": " + e.getMessage(), LogDb.DASHBOARD);
+                    }
+                }));
+            }
+            for (Future<?> f : pollFutures) {
+                try { f.get(); } catch (Exception e) {
+                    loggerMaker.error(description + ": poll future error: " + e.getMessage(), LogDb.DASHBOARD);
+                }
+            }
+        } finally {
+            pollPool.shutdown();
         }
     }
 
-    // Runs a script on a single device via CrowdStrike RTR: init session, runscript -CloudFile, poll, parse stdout, delete session.
-    private JsonNode runScriptOnDevice(String accessToken, String baseUrl, String deviceId, String scriptName, AccountJob job) {
-        String sessionId = null;
+    // Parses a device's raw script stdout into JSON, tolerating any transcript preamble around it.
+    private JsonNode parseScriptOutput(String stdout, String deviceId) {
+        if (stdout == null || stdout.isEmpty()) return null;
         try {
-            sessionId = initRtrSession(accessToken, baseUrl, deviceId);
-            if (sessionId == null) {
-                loggerMaker.error("CrowdStrike: could not init RTR session for device " + deviceId, LogDb.DASHBOARD);
-                return null;
-            }
-
-            String cloudRequestId = submitRunScript(accessToken, baseUrl, sessionId, deviceId, scriptName);
-            if (cloudRequestId == null) {
-                loggerMaker.error("CrowdStrike: could not submit runscript for device " + deviceId, LogDb.DASHBOARD);
-                return null;
-            }
-
-            // Heartbeat while polling
-            Map<String, Object> commandResult = pollCommandUntilDone(accessToken, baseUrl, cloudRequestId, job);
-            if (commandResult == null) {
-                loggerMaker.error("CrowdStrike: command timed out or failed for device " + deviceId, LogDb.DASHBOARD);
-                return null;
-            }
-
-            String stdout = getStringOrDefault(commandResult, "stdout", "");
-            String stderr = getStringOrDefault(commandResult, "stderr", "");
-
-            // RTR chunks large command output across sequence_id values (CrowdStrike RTR admin-command
-            // docs: "Command responses are chunked across sequences"). pollCommandUntilDone only ever reads
-            // sequence_id=0, so scripts with large output (e.g. many skills' full content, verbose MCP configs)
-            // were silently truncated. Page through subsequent sequence_ids and concatenate until a chunk
-            // comes back empty. NOTE: the exact stop condition isn't documented publicly; this follows the
-            // common client pattern (increment sequence_id while stdout keeps returning non-empty) and is
-            // unverified against a real multi-chunk response — validate against an actual large-output device.
-            stdout = fetchAdditionalStdoutChunks(accessToken, baseUrl, cloudRequestId, stdout);
-
-            // Script-side log_debug trace is normally discarded once stdout succeeds; surface it at
-            // debug level so it's available when investigating empty-skill_content / zero-MCP-server reports.
-            if (!stderr.isEmpty()) {
-                loggerMaker.debug("CrowdStrike: script stderr for device " + deviceId + " script=" + scriptName
-                    + ": " + stderr);
-            }
-
-            if (stdout.isEmpty()) {
-                if (!stderr.isEmpty()) {
-                    loggerMaker.error("CrowdStrike: script stderr for device " + deviceId + ": " + stderr, LogDb.DASHBOARD);
-                }
-                return null;
-            }
-
             String sanitized = sanitizeJson(stdout);
             // Trim to first JSON object in case PowerShell adds transcript headers
             int firstBrace = sanitized.indexOf('{');
@@ -349,30 +347,21 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                 sanitized = sanitized.substring(firstBrace, lastBrace + 1);
             }
             return OBJECT_MAPPER.readTree(sanitized);
-
         } catch (Exception e) {
-            loggerMaker.error("CrowdStrike: runScriptOnDevice error for device " + deviceId + ": " + e.getMessage(), LogDb.DASHBOARD);
+            loggerMaker.error("CrowdStrike: could not parse script output for device " + deviceId + ": " + e.getMessage(), LogDb.DASHBOARD);
             return null;
-        } finally {
-            if (sessionId != null) {
-                deleteRtrSession(accessToken, baseUrl, sessionId);
-            }
         }
     }
 
-
-    // ── RTR helpers ───────────────────────────────────────────────────────────
-
-    private String initRtrSession(String accessToken, String baseUrl, String deviceId) throws IOException {
+    // Opens one RTR batch session over the whole chunk; queue_offline lets offline hosts run it on reconnect.
+    private String batchInitSessions(String accessToken, String baseUrl, List<String> deviceIds) {
         RequestConfig cfg = buildRequestConfig();
         try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
             Map<String, Object> body = new HashMap<>();
-            body.put("device_id", deviceId);
-            body.put("queue_offline", false);
-            body.put("timeout", RTR_SESSION_TIMEOUT_S);
-            body.put("timeout_duration", RTR_SESSION_TIMEOUT_S + "s");
+            body.put("host_ids", deviceIds);
+            body.put("queue_offline", true);
 
-            HttpPost post = new HttpPost(baseUrl + "/real-time-response/entities/sessions/v1");
+            HttpPost post = new HttpPost(baseUrl + "/real-time-response/combined/batch-init-session/v1");
             post.setHeader("Authorization", "Bearer " + accessToken);
             post.setHeader("Content-Type", "application/json");
             post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(body), ContentType.APPLICATION_JSON));
@@ -381,169 +370,88 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                 int status = resp.getStatusLine().getStatusCode();
                 String respBody = EntityUtils.toString(resp.getEntity());
                 if (status != 200 && status != 201) {
-                    loggerMaker.error("CrowdStrike: init RTR session HTTP " + status + " for device " + deviceId + ": " + respBody, LogDb.DASHBOARD);
+                    loggerMaker.error("CrowdStrike: batch init session HTTP " + status + ": " + respBody, LogDb.DASHBOARD);
                     return null;
                 }
                 JsonNode json = OBJECT_MAPPER.readTree(respBody);
-                JsonNode resources = json.path("resources");
-                if (resources.isArray() && resources.size() > 0) {
-                    return resources.get(0).path("session_id").asText(null);
-                }
-                return null;
-            }
-        }
-    }
-
-    // Submits runscript -CloudFile='<scriptName>' via the admin-command endpoint, returns cloud_request_id for polling.
-    private String submitRunScript(String accessToken, String baseUrl, String sessionId, String deviceId, String scriptName) throws IOException {
-        RequestConfig cfg = buildRequestConfig();
-        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-            Map<String, Object> body = new HashMap<>();
-            body.put("session_id", sessionId);
-            body.put("device_id", deviceId);
-            body.put("base_command", "runscript");
-            body.put("command_string", "runscript -CloudFile='" + scriptName + "'");
-            body.put("persist", false);
-            body.put("id", 0);
-
-            HttpPost post = new HttpPost(baseUrl + "/real-time-response/entities/admin-command/v1");
-            post.setHeader("Authorization", "Bearer " + accessToken);
-            post.setHeader("Content-Type", "application/json");
-            post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(body), ContentType.APPLICATION_JSON));
-
-            try (CloseableHttpResponse resp = client.execute(post)) {
-                int status = resp.getStatusLine().getStatusCode();
-                String respBody = EntityUtils.toString(resp.getEntity());
-                if (status != 200 && status != 201) {
-                    loggerMaker.error("CrowdStrike: submit runscript HTTP " + status + " device=" + deviceId + ": " + respBody, LogDb.DASHBOARD);
+                String batchId = json.path("batch_id").asText(null);
+                if (batchId == null || batchId.isEmpty()) {
+                    loggerMaker.error("CrowdStrike: batch init session returned no batch_id: " + respBody, LogDb.DASHBOARD);
                     return null;
                 }
-                JsonNode json = OBJECT_MAPPER.readTree(respBody);
-                JsonNode resources = json.path("resources");
-                if (resources.isArray() && resources.size() > 0) {
-                    return resources.get(0).path("cloud_request_id").asText(null);
-                }
-                return null;
-            }
-        }
-    }
-
-    // Polls GET /real-time-response/entities/admin-command/v1?cloud_request_id=<id>&sequence_id=0 until complete=true or timeout.
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> pollCommandUntilDone(String accessToken, String baseUrl, String cloudRequestId, AccountJob job) {
-        long deadline = System.currentTimeMillis() + RTR_MAX_WAIT_MS;
-        int pollCount = 0;
-        RequestConfig cfg = buildRequestConfig();
-
-        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-            while (System.currentTimeMillis() < deadline) {
-                // AccountJobsCron.MAX_HEARTBEAT_THRESHOLD_SECONDS is 5s — heartbeating every 10th
-                // poll (every 50s at RTR_POLL_INTERVAL_MS=5s) left this job looking abandoned and
-                // re-claimable for most of its run. Heartbeat on every poll instead.
-                if (job != null) {
-                    try { CyborgApiClient.updateJobHeartbeat(job.getId()); } catch (Exception ignored) {}
-                }
-
-                String url = baseUrl + "/real-time-response/entities/admin-command/v1"
-                    + "?cloud_request_id=" + urlEncode(cloudRequestId) + "&sequence_id=0";
-                HttpGet get = new HttpGet(url);
-                get.setHeader("Authorization", "Bearer " + accessToken);
-
-                try (CloseableHttpResponse resp = client.execute(get)) {
-                    int status = resp.getStatusLine().getStatusCode();
-                    String body = EntityUtils.toString(resp.getEntity());
-                    if (status != 200) {
-                        loggerMaker.error("CrowdStrike: poll command HTTP " + status + " cloudRequestId=" + cloudRequestId, LogDb.DASHBOARD);
-                        return null;
-                    }
-                    JsonNode json = OBJECT_MAPPER.readTree(body);
-                    JsonNode resources = json.path("resources");
-                    if (resources.isArray() && resources.size() > 0) {
-                        JsonNode resource = resources.get(0);
-                        boolean complete = resource.path("complete").asBoolean(false);
-                        if (complete) {
-                            return OBJECT_MAPPER.convertValue(resource, Map.class);
-                        }
-                        // Non-zero error code means terminal failure
-                        int errorCode = resource.path("error_code").asInt(0);
-                        if (errorCode != 0) {
-                            loggerMaker.error("CrowdStrike: command failed with error_code=" + errorCode
-                                + " stderr=" + resource.path("stderr").asText(""), LogDb.DASHBOARD);
-                            return null;
-                        }
-                    }
-                } catch (Exception e) {
-                    loggerMaker.error("CrowdStrike: poll error for cloudRequestId=" + cloudRequestId + ": " + e.getMessage(), LogDb.DASHBOARD);
-                    return null;
-                }
-
-                try { Thread.sleep(RTR_POLL_INTERVAL_MS); } catch (InterruptedException ignored) {}
-                pollCount++;
-            }
-        } catch (IOException e) {
-            loggerMaker.error("CrowdStrike: could not create HTTP client for polling: " + e.getMessage(), LogDb.DASHBOARD);
-        }
-
-        loggerMaker.error("CrowdStrike: command timed out for cloudRequestId=" + cloudRequestId, LogDb.DASHBOARD);
-        return null;
-    }
-
-    // Safety cap on chunk count — bounds worst-case pagination if CrowdStrike's chunking behaves
-    // unexpectedly (e.g. never signals completion the way we assume). Large enough for realistic
-    // script output (each chunk is typically several KB), small enough to not hang indefinitely.
-    private static final int RTR_MAX_STDOUT_CHUNKS = 50;
-
-    // Pages through sequence_id=1,2,3,... after the initial (sequence_id=0) response already captured by
-    // pollCommandUntilDone, concatenating stdout until a chunk comes back empty/absent. See caller comment
-    // for why this exists and the caveat that CrowdStrike's exact multi-chunk stop signal isn't verified.
-    private String fetchAdditionalStdoutChunks(String accessToken, String baseUrl, String cloudRequestId, String firstChunk) {
-        StringBuilder combined = new StringBuilder(firstChunk);
-        RequestConfig cfg = buildRequestConfig();
-
-        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-            for (int seq = 1; seq <= RTR_MAX_STDOUT_CHUNKS; seq++) {
-                String url = baseUrl + "/real-time-response/entities/admin-command/v1"
-                    + "?cloud_request_id=" + urlEncode(cloudRequestId) + "&sequence_id=" + seq;
-                HttpGet get = new HttpGet(url);
-                get.setHeader("Authorization", "Bearer " + accessToken);
-
-                try (CloseableHttpResponse resp = client.execute(get)) {
-                    int status = resp.getStatusLine().getStatusCode();
-                    String body = EntityUtils.toString(resp.getEntity());
-                    if (status != 200) break;
-
-                    JsonNode json = OBJECT_MAPPER.readTree(body);
-                    JsonNode resources = json.path("resources");
-                    if (!resources.isArray() || resources.size() == 0) break;
-
-                    String chunk = resources.get(0).path("stdout").asText("");
-                    if (chunk.isEmpty()) break;
-                    combined.append(chunk);
-                } catch (Exception e) {
-                    loggerMaker.error("CrowdStrike: error fetching stdout chunk seq=" + seq
-                        + " for cloudRequestId=" + cloudRequestId + ": " + e.getMessage(), LogDb.DASHBOARD);
-                    break;
-                }
-            }
-        } catch (IOException e) {
-            loggerMaker.error("CrowdStrike: could not create HTTP client for chunk fetch: " + e.getMessage(), LogDb.DASHBOARD);
-        }
-
-        return combined.toString();
-    }
-
-    private void deleteRtrSession(String accessToken, String baseUrl, String sessionId) {
-        RequestConfig cfg = buildRequestConfig();
-        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-            HttpDelete delete = new HttpDelete(baseUrl + "/real-time-response/entities/sessions/v1?session_id=" + urlEncode(sessionId));
-            delete.setHeader("Authorization", "Bearer " + accessToken);
-            try (CloseableHttpResponse resp = client.execute(delete)) {
-                EntityUtils.consumeQuietly(resp.getEntity());
+                return batchId;
             }
         } catch (Exception e) {
-            loggerMaker.error("CrowdStrike: failed to delete RTR session " + sessionId + ": " + e.getMessage(), LogDb.DASHBOARD);
+            loggerMaker.error("CrowdStrike: batch init session error: " + e.getMessage(), LogDb.DASHBOARD);
+            return null;
         }
     }
+
+    // Runs the script across the whole batch in one call, returning deviceId -> raw stdout. This
+    // endpoint executes synchronously and returns each host's full output inline, so there is no
+    // cloud_request_id to poll afterwards. -CloudFile must be double-quoted: it rejects single quotes.
+    private Map<String, String> batchDispatchRunScript(String accessToken, String baseUrl, String batchId,
+            String scriptName, String description) {
+        Map<String, String> results = new HashMap<>();
+        RequestConfig cfg = buildRequestConfig();
+        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+            Map<String, Object> body = new HashMap<>();
+            body.put("batch_id", batchId);
+            body.put("base_command", "runscript");
+            body.put("command_string", "runscript -CloudFile=\"" + scriptName + "\"");
+            body.put("persist_all", false);
+
+            HttpPost post = new HttpPost(baseUrl + "/real-time-response/combined/batch-admin-command/v1");
+            post.setHeader("Authorization", "Bearer " + accessToken);
+            post.setHeader("Content-Type", "application/json");
+            post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(body), ContentType.APPLICATION_JSON));
+
+            try (CloseableHttpResponse resp = client.execute(post)) {
+                int status = resp.getStatusLine().getStatusCode();
+                String respBody = EntityUtils.toString(resp.getEntity());
+                if (status != 200 && status != 201) {
+                    loggerMaker.error("CrowdStrike: batch admin command HTTP " + status + " script=" + scriptName + ": " + respBody, LogDb.DASHBOARD);
+                    return results;
+                }
+                JsonNode json = OBJECT_MAPPER.readTree(respBody);
+                java.util.Iterator<Map.Entry<String, JsonNode>> fields = json.path("combined").path("resources").fields();
+                while (fields.hasNext()) {
+                    Map.Entry<String, JsonNode> entry = fields.next();
+                    String deviceId = entry.getKey();
+                    JsonNode deviceResult = entry.getValue();
+
+                    JsonNode errors = deviceResult.path("errors");
+                    if (errors.isArray() && errors.size() > 0) {
+                        loggerMaker.error(description + ": dispatch error on device " + deviceId + ": " + errors.toString(), LogDb.DASHBOARD);
+                        continue;
+                    }
+                    // Offline hosts are queued by CrowdStrike and produce no output now; a later run collects them.
+                    if (deviceResult.path("offline_queued").asBoolean(false)) {
+                        loggerMaker.info(description + ": device " + deviceId + " offline, command queued for reconnect", LogDb.DASHBOARD);
+                        continue;
+                    }
+
+                    // Script log_debug trace lands on stderr; keep it available when stdout looks wrong.
+                    String stderr = deviceResult.path("stderr").asText("");
+                    if (!stderr.isEmpty()) {
+                        loggerMaker.debug("CrowdStrike: stderr for device " + deviceId + " script=" + scriptName + ": " + stderr);
+                    }
+
+                    String stdout = deviceResult.path("stdout").asText("");
+                    if (stdout.isEmpty()) {
+                        loggerMaker.error(description + ": empty stdout from device " + deviceId
+                            + (stderr.isEmpty() ? "" : " stderr=" + stderr), LogDb.DASHBOARD);
+                        continue;
+                    }
+                    results.put(deviceId, stdout);
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.error("CrowdStrike: batch admin command error script=" + scriptName + ": " + e.getMessage(), LogDb.DASHBOARD);
+        }
+        return results;
+    }
+
 
     // ── Script management ─────────────────────────────────────────────────────
 
@@ -595,15 +503,16 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
                     int status = resp.getStatusLine().getStatusCode();
                     String body = EntityUtils.toString(resp.getEntity());
                     if (status == 409) {
-                        // "file with given name already exists" — a concurrent executor run raced
-                        // findExistingScriptMeta's check above and won the upload first. The script is
-                        // present under this name either way, so treat this exactly like the
-                        // existingMeta != null branch: reuse it. Returning null here (as any other
-                        // non-2xx does) would make the caller skip this scan entirely for the whole
-                        // job run, since callers guard on `scriptId != null` before submitting work.
-                        loggerMaker.info("CrowdStrike: script " + scriptResourceName + " already exists (409, concurrent upload race) — reusing", LogDb.DASHBOARD);
-                        uploadedScripts.put(scriptResourceName, scriptResourceName);
-                        return scriptResourceName;
+                        // Name uniqueness is enforced tenant-wide, but findExistingScriptMeta above
+                        // found nothing — so the name is taken by a script this API client cannot see,
+                        // i.e. another client uploaded it as permission_type=private. Reusing the name
+                        // would dispatch runscript against a script we have no access to, which RTR
+                        // rejects per-device with an opaque 40412 "file could not be found". Fail the
+                        // scan here with an actionable message instead.
+                        loggerMaker.error("CrowdStrike: script " + scriptResourceName + " exists but is owned by another"
+                            + " API client (private) — delete it in Falcon (Host setup and management > Response"
+                            + " scripts and files) so this client can own it, or re-run with the owning client", LogDb.DASHBOARD);
+                        return null;
                     }
                     if (status != 200 && status != 201) {
                         loggerMaker.error("CrowdStrike: script upload failed HTTP " + status + " for " + scriptResourceName + ": " + body, LogDb.DASHBOARD);
@@ -624,7 +533,9 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
         MultipartEntityBuilder builder = MultipartEntityBuilder.create();
         builder.addTextBody("name", scriptResourceName);
         builder.addTextBody("description", "Akto MCP/Skill discovery script");
-        builder.addTextBody("permission_type", "private");
+        // "group", not "private": private scopes a script to the uploading API client, so a second
+        // Akto client in the same tenant can neither see nor run it (409 on upload, 40412 on dispatch).
+        builder.addTextBody("permission_type", "group");
         for (String p : platform) {
             builder.addTextBody("platform", p);
         }
@@ -680,7 +591,8 @@ public class CrowdStrikeExecutor extends AccountJobExecutor {
             builder.addTextBody("id", scriptId);
             builder.addTextBody("name", scriptResourceName);
             builder.addTextBody("description", "Akto MCP/Skill discovery script");
-            builder.addTextBody("permission_type", "private");
+            // Must match the upload's permission_type, else a PATCH silently re-scopes it to private.
+            builder.addTextBody("permission_type", "group");
             for (String p : platform) {
                 builder.addTextBody("platform", p);
             }
