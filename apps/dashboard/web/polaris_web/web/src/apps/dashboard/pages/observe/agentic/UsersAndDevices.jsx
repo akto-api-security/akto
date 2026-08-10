@@ -413,7 +413,7 @@ function UsersAndDevices() {
                         headers={headers}
                         headings={headers}
                         selectable={isUsersTab}
-                        mode={IndexFiltersMode.Filtering}
+                        mode={IndexFiltersMode.Default}
                         useNewRow={true}
                         condensedHeight={true}
                         disambiguateLabel={disambiguateLabel}
