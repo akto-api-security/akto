@@ -95,7 +95,7 @@ public class Main {
 
     public static boolean isOnprem = false;
     static long lastLogSyncOffsetMRS;
-    static boolean syncImmediately = true;
+    static boolean syncImmediately = false;
     static boolean fetchAllSTI = true;
     private static final String NON_API_FILTER_ORG_ID = "2651c8f0-cf6b-416a-a304-b8d8adc573d7";
     static boolean isNonApiContentTypeFilterEnabled = false;
