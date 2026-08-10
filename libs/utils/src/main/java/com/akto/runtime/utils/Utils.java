@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
+import com.akto.config.ConfigHandler;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
@@ -208,7 +209,7 @@ public class Utils {
     }
 
     private static Set<String> initializeDebugHostsSet() {
-        String debugHosts = System.getenv("DEBUG_HOSTS");
+        String debugHosts = ConfigHandler.readEnv("DEBUG_HOSTS", null);
         if (debugHosts == null || debugHosts.isEmpty()) {
             return new HashSet<>();
         }
@@ -225,7 +226,7 @@ public class Utils {
     private static Set<String> initializeDebugUrlsSet() {
         Set<String> ret = new HashSet<>();
 
-        String debugUrls = System.getenv("DEBUG_URLS");
+        String debugUrls = ConfigHandler.readEnv("DEBUG_URLS", null);
         if (debugUrls == null || debugUrls.isEmpty()) {
             ret = new HashSet<>();
         } else {

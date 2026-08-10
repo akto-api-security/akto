@@ -1,6 +1,7 @@
 package com.akto.log;
 
 import com.akto.RuntimeMode;
+import com.akto.config.ConfigHandler;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
@@ -28,7 +29,8 @@ import com.slack.api.Slack;
 public class LoggerMaker {
     
     static {
-        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN"));
+        ConfigHandler.poll(); // explicit fetch so the log level below reflects the DB override, not just System.getenv
+        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, ConfigHandler.readEnv("AKTO_LOG_LEVEL", "WARN"));
         System.out.printf("AKTO_LOG_LEVEL is set to: %s \n", System.getProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY));
         System.setProperty("org.slf4j.simpleLogger.log.org.apache.kafka", "INFO");
         System.setProperty("org.slf4j.simpleLogger.log.io.lettuce", "ERROR");
