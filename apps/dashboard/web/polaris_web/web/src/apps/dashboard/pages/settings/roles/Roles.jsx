@@ -90,17 +90,24 @@ const Roles = () => {
         if (userRole !== 'GUEST') {
             getRoleData();
         }
-        setAllCollections(Object.entries(collectionsMap).map(([id, collectionName]) => ({
-            id: parseInt(id, 10),
-            collectionName
-        })));
         getAllAllowedFeatures();
 
     }, [])
 
+    // collectionsMap loads asynchronously, so this cannot be a mount-only effect
+    useEffect(() => {
+        setAllCollections(Object.entries(collectionsMap).map(([id, collectionName]) => ({
+            id: parseInt(id, 10),
+            collectionName
+        })));
+    }, [collectionsMap])
+
     const getRoleItems = (role, key) => {
         return roles.filter(r => r.name === role)[0][key] || []
     };
+
+    // drop ids for collections that are deleted or deactivated; the picker cannot list them
+    const selectable = (ids) => ids.filter((id) => id in collectionsMap);
 
     const handleSelectedItemsChange = (role, items, key) => {
         setRoles(prevRoles => {
@@ -208,7 +215,7 @@ const Roles = () => {
                                 content: (
                                     <ResourceListModal
                                         title={`Update ${name} role`}
-                                        activatorPlaceaholder={`${(getRoleItems(name, "apiCollectionsId") || []).length} collections accessible, ${getRoleDisplayName(baseRole)} permissions${defaultInviteRole ? ', Default invite role' : ''}`}
+                                        activatorPlaceaholder={`${selectable(getRoleItems(name, "apiCollectionsId")).length} collections accessible, ${getRoleDisplayName(baseRole)} permissions${defaultInviteRole ? ', Default invite role' : ''}`}
                                         isColoredActivator={true}
                                         component={<VerticalStack gap={4}>
                                             <Box paddingBlockStart={4}>
@@ -250,7 +257,7 @@ const Roles = () => {
                                                     isFilterControlEnabale={userRole === 'ADMIN'}
                                                     selectable={userRole === 'ADMIN'}
                                                     onSelectedItemsChange={(items) => handleSelectedItemsChange(name, items, 'apiCollectionsId')}
-                                                    alreadySelectedItems={getRoleItems(name, "apiCollectionsId")}
+                                                    alreadySelectedItems={selectable(getRoleItems(name, "apiCollectionsId"))}
                                                 />
                                             </Box>
                                         </VerticalStack>}

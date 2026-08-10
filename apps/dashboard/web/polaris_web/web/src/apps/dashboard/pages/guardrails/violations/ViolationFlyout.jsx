@@ -401,7 +401,7 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
         else if (detail?.fileContent && violation?.type !== "Skill") middle = "file";
         if (middle === "chat") tabs.push({ id: "chat", content: "Chat Session" });
         if (middle === "file") tabs.push({ id: "file", content: detail.fileTabLabel || "File" });
-        tabs.push({ id: "remediation", content: "Remediation" });
+        if (detail?.remediation) tabs.push({ id: "remediation", content: "Remediation" });
         tabs.push({ id: "timeline", content: "Timeline" });
         return { tabs, middle };
     }, [detail, violation]);

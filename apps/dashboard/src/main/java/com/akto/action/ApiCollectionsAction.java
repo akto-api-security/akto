@@ -36,6 +36,10 @@ import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.audit_logs.Operation;
 import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dao.RBACDao;
+import com.akto.dao.CustomRoleDao;
+import com.akto.dto.RBAC;
+import com.akto.dto.CustomRole;
 import com.mongodb.MongoCommandException;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.RuntimeListener;
@@ -663,6 +667,34 @@ public class ApiCollectionsAction extends UserAction {
         SensitiveParamInfoDao.instance.updateMany(filter, update);
 
         /*
+         * Access grants reference collections by id. Without pulling the deleted ids out
+         * here they stay in the role/user documents forever, inflating the collection
+         * counts shown in settings and leaving stale grants behind.
+         * rbac is a common (cross-account) collection, so it must be scoped by accountId.
+         */
+        int accountIdForRbac = Context.accountId.get();
+        List<Integer> affectedUserIds = new ArrayList<>();
+        try {
+            for (RBAC rbac : RBACDao.instance.findAll(Filters.and(
+                    Filters.eq(RBAC.ACCOUNT_ID, accountIdForRbac),
+                    Filters.in(RBAC.API_COLLECTIONS_ID, apiCollectionIds)))) {
+                affectedUserIds.add(rbac.getUserId());
+            }
+
+            CustomRoleDao.instance.updateMany(
+                    Filters.in(CustomRole.API_COLLECTIONS_ID, apiCollectionIds),
+                    Updates.pullAll(CustomRole.API_COLLECTIONS_ID, apiCollectionIds));
+
+            RBACDao.instance.updateMany(
+                    Filters.and(
+                            Filters.eq(RBAC.ACCOUNT_ID, accountIdForRbac),
+                            Filters.in(RBAC.API_COLLECTIONS_ID, apiCollectionIds)),
+                    Updates.pullAll(RBAC.API_COLLECTIONS_ID, apiCollectionIds));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error pruning deleted collections from access grants");
+        }
+
+        /*
          * This delta might not be accurate, since it may also include deletions from
          * deactivated/demo collections or old collections, which were not being used
          * for usage calculation
@@ -692,6 +724,12 @@ public class ApiCollectionsAction extends UserAction {
             int userId = Context.userId.get();
             int accountId = Context.accountId.get();
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
+
+            // grants changed above for these users, so their cached lists are stale too
+            for (int affectedUserId : affectedUserIds) {
+                UsersCollectionsList.deleteCollectionIdsFromCache(affectedUserId, accountIdForRbac);
+                RBACDao.instance.deleteUserEntryFromCache(new Pair<>(affectedUserId, accountIdForRbac));
+            }
 
             // remove the cache of context collections for account
             UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
@@ -1551,6 +1589,12 @@ public class ApiCollectionsAction extends UserAction {
 
             RBACDao.updateApiCollectionAccess(userId, accountId, apiCollections);
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
+            /*
+             * The collection list is read back through getCurrentRBACForUser, which caches
+             * the whole RBAC document. Without this the caller keeps seeing the pre-save
+             * list until that cache expires.
+             */
+            RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userId, accountId));
         }
 
         return SUCCESS.toUpperCase();
