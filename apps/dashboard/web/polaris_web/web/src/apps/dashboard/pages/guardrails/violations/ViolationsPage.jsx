@@ -375,7 +375,7 @@ function transformEvent(event, collectionsMap, usernameMap) {
 
 // ─── Dashboard summary section ───────────────────────────────────────────────────
 
-function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, latencyData, startTimestamp, endTimestamp }) {
+function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, latencyData, startTimestamp, endTimestamp }) {
     if (summaryLoading) return <SpinnerCentered />;
     if (!summaryData) return null;
 
@@ -401,14 +401,18 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
         renderValue: () => <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>,
     }));
 
-    const hostRows = (topHosts || []).slice(0, 5).map((item, i) => ({
+    const hostRows = (topHosts || []).slice(0, 5).map((item, i) => {
+        const resolvedUser = getUsernameForCollection({ displayName: item.host }, usernameMap || {});
+        const displayName = (resolvedUser && resolvedUser !== "-") ? resolvedUser : (item.host ? item.host.split('.')[0] : item.name);
+        return {
         id: `h${i}`,
-        name: item.name,
+        name: displayName,
         count: item.count,
         os: detectOs(item.host),
         onClick: () => onHostClick?.(item.host),
         renderValue: () => <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>,
-    }));
+        };
+    });
 
     // Latency graph is Akto-internal only (matches the same gate on ThreatDetectionPage.jsx).
     // Everyone else gets Open/Other Violations side by side instead of stacked, since there's
@@ -551,7 +555,7 @@ function Violations() {
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
     const legacyPath = isEndpointSecurityCategory() ? "/dashboard/protection/threat-activity" : "/dashboard/guardrails/activity";
-    const canUseNewLayout = func.isDemoAccount() || [1726615470, 1779231193].includes(window.ACTIVE_ACCOUNT);
+    const canUseNewLayout = func.isDemoAccount() || [1000000, 1726615470, 1779231193].includes(window.ACTIVE_ACCOUNT);
 
     useEffect(() => {
         if (!canUseNewLayout || !newLayout) {
@@ -587,6 +591,7 @@ function Violations() {
     const gridFilterKey = useRef(`violations-${Date.now()}`);
     const collectionsMap = PersistStore((state) => state.collectionsMap);
     const usernameMapRef = useRef({});
+    const [usernameMap, setUsernameMap] = useState({});
 
     useEffect(() => {
         const key = gridFilterKey.current;
@@ -623,6 +628,7 @@ function Violations() {
     useEffect(() => {
         fetchEndpointShieldUsernameMap().then(map => {
             usernameMapRef.current = map;
+            setUsernameMap(map);
         });
     }, []);
 
@@ -655,19 +661,20 @@ function Violations() {
         });
     }, [applyGridFilter]);
 
+    // Top Policies filter is driven straight into the server fetch (see onServerFetch), NOT the
+    // policyName set-filter: the policy names come from a different endpoint than the set filter's
+    // known values, so setColumnFilterModel would silently drop them and the table wouldn't filter.
     const handlePolicyClick = useCallback((name) => {
         setActivePolicyFilter(prev => {
             const next = new Set(prev);
             if (next.has(name)) next.delete(name); else next.add(name);
-            applyGridFilter("policyName", [...next]);
             return next;
         });
-    }, [applyGridFilter]);
+    }, []);
 
     const handleClearPolicySelection = useCallback(() => {
         setActivePolicyFilter(new Set());
-        applyGridFilter("policyName", []);
-    }, [applyGridFilter]);
+    }, []);
 
     const [activeHostFilter, setActiveHostFilter] = useState(new Set());
 
@@ -854,11 +861,9 @@ function Violations() {
         const pageSize = limit || 50;
         const severityFilter = filters?.severity || [];
         const hostFilter = filters?.user || [];
-        const columnPolicyFilter = filters?.policyName || [];
-        // Union the column/top-policies filter with the pie's type filter (both map to latestAttack).
-        const policyFilter = activeTypeSubCategories.length > 0
-            ? [...new Set([...columnPolicyFilter, ...activeTypeSubCategories])]
-            : columnPolicyFilter;
+        // Union the column filter, the "Top Policies" card selection, and the pie's type filter
+        // (all map to the backend latestAttack).
+        const policyFilter = [...new Set([...(filters?.policyName || []), ...activePolicyFilter, ...activeTypeSubCategories])];
         const statusFilter = activeStatusValue;
 
         // AgGridTable sends sortOrder: -1 for asc, 1 for desc (opposite of MongoDB convention)
@@ -892,7 +897,14 @@ function Violations() {
             setRows(transformed);
             return { value: transformed, total: result?.total || 0 };
         });
-    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories]);
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter]);
+
+    // Reload the grid when the Top Policies card selection changes (skip the initial mount).
+    const policyFilterFirstRun = useRef(true);
+    useEffect(() => {
+        if (policyFilterFirstRun.current) { policyFilterFirstRun.current = false; return; }
+        gridRef.current?.api?.refreshServerSide({ purge: true });
+    }, [activePolicyFilter]);
 
     // ─── Bulk actions ──────────────────────────────────────────────────────────
     // Under Server-Side Row Model, "select all" tracks selection as an abstract
@@ -1035,6 +1047,7 @@ function Violations() {
         <ViolationsDashboard
             key="dashboard"
             summaryData={summaryData}
+            usernameMap={usernameMap}
             loading={summaryLoading}
             onSeverityClick={handleSeverityClick}
             activeSeverityFilter={activeSeverityFilter}

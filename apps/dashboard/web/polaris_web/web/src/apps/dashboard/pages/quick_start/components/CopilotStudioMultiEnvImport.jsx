@@ -1,4 +1,4 @@
-import { Badge, Banner, Box, Button, Divider, HorizontalStack, Link, Scrollable, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Badge, Banner, Box, Button, Checkbox, Divider, HorizontalStack, Link, Scrollable, Text, TextField, VerticalStack } from '@shopify/polaris'
 import { useEffect, useState } from 'react'
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
 import api from '../api'
@@ -17,6 +17,8 @@ const CopilotStudioMultiEnvImport = ({ docsUrl }) => {
     const [dataIngestionUrl, setDataIngestionUrl] = useState('')
     const [redirecting, setRedirecting] = useState(false)
     const [removing, setRemoving] = useState(false)
+    const [reconnecting, setReconnecting] = useState(false)
+    const [enablingAgentGraph, setEnablingAgentGraph] = useState(false)
 
     const [integration, setIntegration] = useState(null)
     const [confirming, setConfirming] = useState(false)
@@ -65,6 +67,32 @@ const CopilotStudioMultiEnvImport = ({ docsUrl }) => {
             .finally(() => setConfirming(false))
     }
 
+    const handleReconnect = () => {
+        setReconnecting(true)
+        api.reconnectCopilotStudioMultiEnvIntegration()
+            .then((res) => {
+                window.location.href = res.authorizationUrl
+            })
+            .catch((err) => {
+                func.setToast(true, true, err?.response?.data?.actionErrors?.[0] || 'Failed to start reconnect. Please try again.')
+                setReconnecting(false)
+            })
+    }
+
+    // One-way opt-in: enable, then immediately reconnect so the stored token actually gains the new scope.
+    const handleEnableAgentGraph = () => {
+        setEnablingAgentGraph(true)
+        api.enableCopilotStudioMultiEnvAgentGraph()
+            .then(() => api.reconnectCopilotStudioMultiEnvIntegration())
+            .then((res) => {
+                window.location.href = res.authorizationUrl
+            })
+            .catch((err) => {
+                func.setToast(true, true, err?.response?.data?.actionErrors?.[0] || 'Failed to enable agent graphs. Please try again.')
+                setEnablingAgentGraph(false)
+            })
+    }
+
     const handleRemove = () => {
         setRemoving(true)
         api.removeCopilotStudioMultiEnvIntegration()
@@ -101,6 +129,19 @@ const CopilotStudioMultiEnvImport = ({ docsUrl }) => {
             {integration && integration.lastError && (
                 <Box paddingBlockStart="3">
                     <Banner status="critical" title={integration.lastError} />
+                </Box>
+            )}
+
+            {/* One-time upgrade prompt for integrations that predate agent graphs; new connections never see this. */}
+            {integration && integration.jobId && integration.agentGraphEnabled !== true && (
+                <Box paddingBlockStart="3">
+                    <Checkbox
+                        label="Enable agent graphs"
+                        helpText="Pulls the agent/tool inventory to build agent graphs. Requires reconnecting once to grant the Power Platform API permission."
+                        checked={false}
+                        disabled={enablingAgentGraph}
+                        onChange={handleEnableAgentGraph}
+                    />
                 </Box>
             )}
 
@@ -143,9 +184,15 @@ const CopilotStudioMultiEnvImport = ({ docsUrl }) => {
                     disabled={isReadOnly}
                 />
 
-                <HorizontalStack align='end'>
+                <HorizontalStack align='end' gap="2">
                     {isReadOnly ? (
-                        <Button destructive onClick={handleRemove} loading={removing}>Remove Integration</Button>
+                        <>
+                            {/* Only meaningful once confirmMultiEnvIntegration has created the recurring job — matches the backend's own gate. */}
+                            {integration.jobId && (
+                                <Button onClick={handleReconnect} loading={reconnecting}>Reconnect</Button>
+                            )}
+                            <Button destructive onClick={handleRemove} loading={removing}>Remove Integration</Button>
+                        </>
                     ) : (
                         <Button primary onClick={handleConnect} disabled={!isFormValid} loading={redirecting}>
                             Connect

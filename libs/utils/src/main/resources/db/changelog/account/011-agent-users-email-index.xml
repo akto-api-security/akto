@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Mirrors AgentUsersDao.createIndicesIfAbsent. upsertTagFromSso now matches existing
+        AgenticUsers documents by userEmail (in addition to userName) so that an SSO login can
+        find a user record created under a different username but the same email. Without an
+        index, that lookup falls back to a full collection scan.
+
+        Index name matches MCollection.generateIndexName so this is a no-op if DaoInit already
+        built it.
+    -->
+
+    <changeSet id="011-account-agent-users-email-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="agent_users"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="agent_users">
+            <mongodb:keys>{ "userEmail": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "userEmail_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="agent_users">
+                <mongodb:keys>{ "userEmail": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

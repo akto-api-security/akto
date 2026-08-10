@@ -36,6 +36,10 @@ public class BrowserExtensionConfigCommon {
     public static final String HOST = "host";
     private String host;
 
+    // optional friendly product name (e.g. "ChatGPT" for openai.com); falls back to host in the UI
+    public static final String NAME = "name";
+    private String name;
+
     public static final String ACTIVE = "active";
     // absent in the document means enabled
     private boolean active = true;
@@ -62,12 +66,23 @@ public class BrowserExtensionConfigCommon {
     public static final String FRAME_MATCH = "frameMatch";
     private Map<String, Object> frameMatch;
 
-    public static final String TAG = "tag";
-    private String tag;
-
     // stored as `icon_url` in the document, used as the host's icon
     public static final String ICON_URL = "icon_url";
     private String iconUrl;
+
+    // e.g. ["chat","code"] — used by the dashboard to filter the Add-hosts catalogue by type
+    public static final String CATEGORIES = "categories";
+    private List<String> categories;
+
+    public static final String RESPONSE_FORMAT = "responseFormat";
+    private String responseFormat;
+
+    // like path: a single json path or a list of candidate paths, mirrored as stored
+    public static final String RESPONSE_PATH = "responsePath";
+    private Object responsePath;
+
+    public static final String MODEL_PATH = "modelPath";
+    private Object modelPath;
 
     public String getHexId() {
         if (this.id != null) {
@@ -91,6 +106,7 @@ public class BrowserExtensionConfigCommon {
 
         BrowserExtensionConfigCommon config = new BrowserExtensionConfigCommon();
         config.host = host.trim();
+        config.name = asString(doc.get(NAME));
 
         Object id = doc.get("_id");
         if (id instanceof ObjectId) {
@@ -107,8 +123,11 @@ public class BrowserExtensionConfigCommon {
         config.format = asString(doc.get(FORMAT));
         config.path = asPath(doc.get(PATH));
         config.frameMatch = asMap(doc.get(FRAME_MATCH));
-        config.tag = asString(doc.get(TAG));
         config.iconUrl = asString(doc.get(ICON_URL));
+        config.categories = asStringList(doc.get(CATEGORIES));
+        config.responseFormat = asString(doc.get(RESPONSE_FORMAT));
+        config.responsePath = asPath(doc.get(RESPONSE_PATH));
+        config.modelPath = asPath(doc.get(MODEL_PATH));
 
         return config;
     }

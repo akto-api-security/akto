@@ -2219,6 +2219,36 @@
             </result>
         </action>
 
+        <action name="api/setBrowserExtensionConfigActive" class="com.akto.action.BrowserExtensionConfigAction" method="setBrowserExtensionConfigActive">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+            </interceptor-ref>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User toggled browser extension config</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/saveBrowserExtensionConfig" class="com.akto.action.BrowserExtensionConfigAction" method="saveBrowserExtensionConfig">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -8840,6 +8870,68 @@
             </result>
         </action>
 
+        <action name="api/copilotStudio/multiEnv/reconnect" class="com.akto.action.CopilotStudioAction" method="initiateReconnect">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User started Copilot Studio (Multi Environment) reconnect</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">COPILOT_STUDIO_MULTI_ENV_CONNECTOR</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="ignoreHierarchy">false</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/copilotStudio/multiEnv/enableAgentGraph" class="com.akto.action.CopilotStudioAction" method="enableAgentGraph">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User enabled Copilot Studio (Multi Environment) agent graphs</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">COPILOT_STUDIO_MULTI_ENV_CONNECTOR</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="ignoreHierarchy">false</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/copilotStudio/multiEnv/remove" class="com.akto.action.CopilotStudioAction" method="removeMultiEnvIntegration">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -15312,6 +15404,15 @@
         <action name="api/executeCrowdStrikeGuardrails" class="com.akto.action.CrowdStrikeIntegrationAction" method="executeCrowdStrikeGuardrails">
             <interceptor-ref name="json"/><interceptor-ref name="defaultStack"/>
             <interceptor-ref name="roleAccessInterceptor"><param name="featureLabel">INTEGRATIONS</param><param name="accessType">READ_WRITE</param><param name="actionDescription">User executed CrowdStrike guardrails</param></interceptor-ref>
+            <result name="FORBIDDEN" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json"><param name="statusCode">422</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="UNAUTHORIZED" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+        </action>
+
+        <action name="api/scheduleCrowdStrikeDiscovery" class="com.akto.action.CrowdStrikeIntegrationAction" method="scheduleCrowdStrikeDiscovery">
+            <interceptor-ref name="json"/><interceptor-ref name="defaultStack"/>
+            <interceptor-ref name="roleAccessInterceptor"><param name="featureLabel">INTEGRATIONS</param><param name="accessType">READ_WRITE</param><param name="actionDescription">User scheduled CrowdStrike discovery job</param></interceptor-ref>
             <result name="FORBIDDEN" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
             <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json"><param name="statusCode">422</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>

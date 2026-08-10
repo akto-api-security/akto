@@ -520,6 +520,7 @@ public class ThreatActorService {
         if (!contextFilter.isEmpty()) {
             match.putAll(contextFilter);
         }
+        match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
         List<Document> pipeline = new ArrayList<>();
         if (!match.isEmpty()) pipeline.add(new Document("$match", match));
@@ -616,6 +617,7 @@ public class ThreatActorService {
     if (!contextFilter.isEmpty()) {
         matchConditions.putAll(contextFilter);
     }
+    matchConditions.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
         pipeline.add(new Document("$match", matchConditions));
     
@@ -933,6 +935,7 @@ public class ThreatActorService {
     if (!contextFilter.isEmpty()) {
         match.putAll(contextFilter);
     }
+    match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
       List<Document> pipeline = Arrays.asList(
         new Document("$match", match),
@@ -1161,6 +1164,7 @@ public class ThreatActorService {
     if (!contextFilter.isEmpty()) {
         match.putAll(contextFilter);
     }
+    match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
   pipeline.add(new Document("$match", match));
 
@@ -1344,6 +1348,7 @@ public class ThreatActorService {
         if (!contextFilter.isEmpty()) {
             match.putAll(contextFilter);
         }
+        match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
         if (!match.isEmpty()) {
             pipeline.add(new Document("$match", match));
@@ -1450,6 +1455,7 @@ public class ThreatActorService {
     if (!contextFilter.isEmpty()) {
       match.putAll(contextFilter);
     }
+    match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
     // --- Top Actors (use malicious_events for accurate time-range filtering) ---
     List<FetchDashboardTopDataResponse.TopActorData> topActors = new ArrayList<>();
