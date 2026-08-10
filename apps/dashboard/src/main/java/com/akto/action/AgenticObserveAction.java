@@ -95,6 +95,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Setter private Map<String, Integer> trafficMap;
     @Setter private Map<String, Double> riskScoreMap;
     @Setter private Map<String, List<String>> filters; // AG Grid column filters, keyed by field name (e.g. "team", "userRole")
+    @Setter private List<String> maliciousSkillKeys; // account-wide "<collectionId>|<skillName>" set, see constants.js's skillCollectionKey — only needed for the "tags" Set Filter's "Malicious Skill" branch
 
     // ---- Server-side pagination for fetchUsersAndDevicesSummary ----
     @Setter private String groupBy; // "user" | "device"
@@ -1100,6 +1101,36 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (StringUtils.isNotBlank(queryValue)) {
                 String q = queryValue.toLowerCase(Locale.ROOT);
                 all.removeIf(g -> g.name == null || !g.name.toLowerCase(Locale.ROOT).contains(q));
+            }
+
+            // AG Grid column filters. "type" is a small fixed enum (AgenticObserveUtil.CLIENT_TYPE_*),
+            // matched directly. "tags" mirrors AgenticAssetsPage.jsx's shapeRow tag derivation exactly
+            // (an array-valued field — Set Filter semantics: match if ANY selected tag is present),
+            // including the "Malicious Skill" branch, which needs maliciousSkillKeys threaded from the
+            // client (account-wide, already fetched once there — see skillCollectionKey).
+            if (filters != null) {
+                if (filters.containsKey("type")) {
+                    Set<String> allowed = new HashSet<>(filters.get("type"));
+                    all.removeIf(g -> !allowed.contains(g.clientType));
+                }
+                if (filters.containsKey("tags")) {
+                    Set<String> allowedTags = new HashSet<>(filters.get("tags"));
+                    Set<String> maliciousKeys = maliciousSkillKeys != null ? new HashSet<>(maliciousSkillKeys) : Collections.emptySet();
+                    all.removeIf(g -> {
+                        boolean isSkill = "skill".equals(g.rowType);
+                        Set<String> groupTags = new HashSet<>();
+                        if (g.hasPersonalAccount && !isSkill) groupTags.add("Contains personal account");
+                        if (g.hasLocalMcpServer && !isSkill) groupTags.add("Local MCP Server");
+                        if (g.hasMisconfiguredConfig && !isSkill) groupTags.add("Misconfigured");
+                        if (isSkill && StringUtils.isNotBlank(g.name)) {
+                            String lname = g.name.toLowerCase(Locale.ROOT);
+                            boolean malicious = g.collectionIds.stream()
+                                    .anyMatch(cid -> maliciousKeys.contains(cid + "|" + lname));
+                            if (malicious) groupTags.add("Malicious Skill");
+                        }
+                        return groupTags.stream().noneMatch(allowedTags::contains);
+                    });
+                }
             }
 
             long total = all.size();

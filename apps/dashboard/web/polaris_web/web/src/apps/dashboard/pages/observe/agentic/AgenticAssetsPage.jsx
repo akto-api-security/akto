@@ -73,7 +73,9 @@ const COL_DEFS = [
     field: "type",
     headerName: "Type",
     width: 140,
-    filter: false,
+    // Fixed, small enum (AgenticObserveUtil.CLIENT_TYPE_*) — no need to derive values from data.
+    filter: "agSetColumnFilter",
+    filterParams: { values: ["AI Agent", "MCP Server", "LLM", "Skill"] },
     sortable: false,
     cellRenderer: TypeBadgeCellRenderer,
     cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL" })[p.value] || "agentic-type-DEFAULT",
@@ -144,6 +146,16 @@ const COL_DEFS = [
       fontSize: 12,
       color: "#6D7175",
     },
+  },
+  {
+    field: "tags",
+    headerName: "Tags",
+    hide: true,
+    // Fixed set — matches shapeRow's own tag derivation below exactly. Values are pre-computed
+    // string arrays on each row (array-valued field: a row matches if ANY selected tag is present).
+    filter: "agSetColumnFilter",
+    filterParams: { values: ["Contains personal account", "Local MCP Server", "Misconfigured", "Malicious Skill"] },
+    sortable: false,
   },
 ];
 
@@ -451,13 +463,13 @@ export default function AgenticAssetsPage() {
   }, [loadStats, refreshKey]);
 
   // ─── Server-side data fetch for AG Grid ─────────────────────────────────────
-  const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
+  const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString, filters }) => {
     const pageSize = limit || 50;
     const mappedSortKey = SORT_FIELD_MAP[sortKey] || sortKey || "riskScore";
     // AG Grid SSRM sends sortOrder: -1 for asc, 1 for desc — opposite of the backend's Mongo
     // convention (1 asc / -1 desc, matching NhiGovernanceViolationsAction's own onServerFetch).
     const mongoSortOrder = sortOrder ? -sortOrder : -1;
-    const { trafficMap, riskScoreMap, userAnalysisFlatMap } = enrichRef.current;
+    const { trafficMap, riskScoreMap, userAnalysisFlatMap, maliciousSkillKeys } = enrichRef.current;
 
     return api.fetchAgenticAssetsSummary({
       skip,
@@ -470,6 +482,8 @@ export default function AgenticAssetsPage() {
       startTimestamp,
       endTimestamp,
       userAnalysisFlatMap,
+      filters,
+      maliciousSkillKeys: Array.from(maliciousSkillKeys || []),
     }).then((res) => ({
       value: (res.rows || []).map((row) => shapeRow(row, enrichRef.current)),
       total: res.total || 0,

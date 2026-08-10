@@ -234,11 +234,11 @@ export default {
     // atlas-scale-test/DASHBOARD_OPTIMIZATION.md's "paginated server-side aggregation rebuild").
     // trafficMap/riskScoreMap are the same maps AgenticAssetsPage.jsx already fetches via
     // fetchAndCacheAgenticCollectionsBundle.
-    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, startTimestamp, endTimestamp, userAnalysisFlatMap } = {}) {
+    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, maliciousSkillKeys } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsSummary',
             method: 'post',
-            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, startTimestamp, endTimestamp, userAnalysisFlatMap },
+            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, maliciousSkillKeys },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0 }
     },
