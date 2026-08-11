@@ -1126,7 +1126,7 @@ function ApiCollections(props) {
     }
 
     // Use custom hook for Agentic filter detection and summary calculation
-    const { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections, activeFilterPlainTitle } = useAgenticFilter(normalData);
+    const { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections, activeFilterPlainTitle, activeFilterDescription } = useAgenticFilter(normalData);
 
     // Persist tag filters whenever they change (same pattern as existing filters)
     useEffect(() => {
@@ -1151,7 +1151,12 @@ function ApiCollections(props) {
 
     useEffect(() => {
         if (!activeFilterType) return;
-        const collectionIds = normalData.map(c => c.id).filter(Boolean);
+        // Only collections that actually have skills need this lookup; querying every visible
+        // collection fires one request per collection for no benefit on the rest.
+        const collectionIds = normalData
+            .filter(c => Array.isArray(c.skills) && c.skills.length > 0)
+            .map(c => c.id)
+            .filter(Boolean);
         if (!collectionIds.length) return;
         const alreadyCached = !!PersistStore.getState().skillRiskScoreCache?.ts;
         fetchAndCacheSkillApiData(collectionIds, { api, PersistStore })
@@ -1490,8 +1495,8 @@ function ApiCollections(props) {
             )
         }
 
-        // Add Run Test button for multi-collection testing
-        if (selectedResources.length > 1) {
+        // Add Run Test button for multi-collection testing (hidden for Atlas / Endpoint Security)
+        if (selectedResources.length > 1 && !isEndpointSecurityCategory()) {
             actions.push({
                 content: <Button id="bulk-run-test-button" primary>Run test</Button>,
                 onAction: () => {
@@ -2176,13 +2181,16 @@ function ApiCollections(props) {
         <>
             <PageWithMultipleCards
                 title={
-                    <TitleWithInfo
-                        tooltipContent={activeFilterTitle
-                            ? `Viewing collections filtered by ${activeFilterTitle}`
-                            : "Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
-                        titleText={pageTitle}
-                        docsUrl={"https://docs.akto.io/api-inventory/concepts"}
-                    />
+                    <VerticalStack gap="1">
+                        <TitleWithInfo
+                            tooltipContent={activeFilterTitle
+                                ? `Viewing collections filtered by ${activeFilterTitle}`
+                                : "Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
+                            titleText={pageTitle}
+                            docsUrl={"https://docs.akto.io/api-inventory/concepts"}
+                        />
+                        {activeFilterDescription && <Text variant="bodySm">{activeFilterDescription}</Text>}
+                    </VerticalStack>
                 }
                 primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
                 isFirstPage={!agenticObserveBackUrl}

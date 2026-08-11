@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PersistStore from '../../../../main/PersistStore';
 import { formatDisplayName, ASSET_TAG_KEYS } from '../agentic/mcpClientHelper';
-import { INVENTORY_FILTER_KEY, ASSET_TAG_KEY_VALUES, SKILL_TAG_KEY, extractServiceName } from '../agentic/constants';
+import { INVENTORY_FILTER_KEY, ASSET_TAG_KEY_VALUES, SKILL_TAG_KEY, extractServiceName, groupDescription } from '../agentic/constants';
 
 /** Agent tag keys that represent the same agent (gen-ai + mcp-server for one click) */
 const AGENT_TAG_KEYS_FOR_FILTER = [ASSET_TAG_KEYS.AI_AGENT, ASSET_TAG_KEYS.MCP_CLIENT];
@@ -97,6 +97,7 @@ const useAgenticFilter = (normalData) => {
     const [activeFilterType, setActiveFilterType] = useState(null);
     const [filteredCollections, setFilteredCollections] = useState([]);
     const [activeFilterPlainTitle, setActiveFilterPlainTitle] = useState(false);
+    const [activeFilterDescription, setActiveFilterDescription] = useState("");
 
     const filtersMap = PersistStore(state => state.filtersMap);
     const [searchParams] = useSearchParams();
@@ -121,6 +122,7 @@ const useAgenticFilter = (normalData) => {
             setActiveFilterType(null);
             setFilteredCollections([]);
             setActiveFilterPlainTitle(false);
+            setActiveFilterDescription("");
             return;
         }
 
@@ -128,10 +130,14 @@ const useAgenticFilter = (normalData) => {
         let filterType = null;
         let filteredCollections = [];
         let plainTitle = false;
+        // Raw group key (matches the group's hostname service segment, e.g. "cursor") used to
+        // find the group's own "self" collection for groupDescription — not the prettified title.
+        let filterGroupKey = null;
 
         if (hasHostnameFilter) {
             const hostNames = hostNameFilter.value.values;
             filteredCollections = normalData.filter(collection => hostNames.includes(collection.hostName));
+            filterGroupKey = extractServiceName(hostNames[0]) || hostNames[0];
 
             if (inventoryScopeLabel) {
                 filterTitle = inventoryScopeLabel;
@@ -164,6 +170,7 @@ const useAgenticFilter = (normalData) => {
                 if (parts.length === 2) {
                     if (ASSET_TAG_KEY_VALUES.includes(parts[0])) {
                         filterTitle = envTypeFilter.value.displayName || formatDisplayName(parts[1]);
+                        filterGroupKey = parts[1];
                         if (parts[0] === ASSET_TAG_KEYS.BROWSER_LLM_AGENT) {
                             filterType = FILTER_TYPES.BROWSER_LLM;
                         } else if (parts[0] === ASSET_TAG_KEYS.AI_AGENT) {
@@ -173,6 +180,7 @@ const useAgenticFilter = (normalData) => {
                         }
                     } else if (parts[0] === SKILL_TAG_KEY) {
                         filterTitle = envTypeFilter.value.displayName || formatDisplayName(parts[1]);
+                        filterGroupKey = parts[1];
                         filterType = FILTER_TYPES.SKILL;
                     }
                 }
@@ -204,6 +212,7 @@ const useAgenticFilter = (normalData) => {
             setActiveFilterTitle(filterTitle);
             setActiveFilterType(filterType);
             setActiveFilterPlainTitle(plainTitle);
+            setActiveFilterDescription(groupDescription(filteredCollections, filterGroupKey));
 
             const transformedCollections = filteredCollections.map(ensureCollectionFields);
             setFilteredCollections(transformedCollections);
@@ -238,10 +247,11 @@ const useAgenticFilter = (normalData) => {
             setActiveFilterType(null);
             setFilteredCollections([]);
             setActiveFilterPlainTitle(false);
+            setActiveFilterDescription("");
         }
     }, [filtersMap, normalData, searchParams]);
 
-    return { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections, activeFilterPlainTitle };
+    return { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections, activeFilterPlainTitle, activeFilterDescription };
 };
 
 export { FILTER_TYPES };

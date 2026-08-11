@@ -193,6 +193,31 @@ export const deviceServiceKey = (hostName) => {
     return parts[0] + " " + parts[parts.length - 1];
 };
 
+// "Last seen" timestamp for a collection: prefer its last traffic timestamp; collections that
+// were only ever discovered via a tag/config-scan (no directly-attributed traffic) have no
+// trafficMap entry, so fall back to startTs (set at collection-creation time, never absent) -
+// otherwise they'd default to 0 ("never") and get dropped by any date filter narrower than
+// "All time" even though the asset genuinely exists.
+const lastSeenOrStartTs = (c, trafficMap) => trafficMap[c.id] || c.startTs || 0;
+
+// A grouped asset (agent/service/LLM/skill) is a rollup of many collections — e.g. the "cursor"
+// agent group contains both <device>.ai_agent.cursor (the agent client itself) and
+// <device>.ai_agent.github (a service it happened to call). Prefer the description on the
+// collection whose hostname service segment matches the group's own name/key — that's the
+// canonical "self" collection, not an unrelated downstream service. Fall back to any collection
+// in the group that has a description if there's no such match (or it has none).
+export const groupDescription = (collections, groupKey) => {
+    const key = (groupKey || "").toLowerCase();
+    const list = collections || [];
+    const selfCollection = list.find((c) => {
+        const hostName = c.hostName || c.displayName || c.name;
+        const serviceName = extractServiceName(hostName);
+        return serviceName && serviceName.toLowerCase() === key;
+    });
+    if (selfCollection?.description) return selfCollection.description;
+    return list.find((c) => c.description)?.description || "";
+};
+
 // Group collections by agent identification (mcp-client, ai-agent values)
 // These are the sources that discovered the services (cursor, litellm, etc.)
 // Note: browser-llm-agent is excluded from this grouping
@@ -249,7 +274,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
         sensitive.forEach(s => agents[key].sensitiveTypes.add(s));
         
         // Track max traffic timestamp
-        const traffic = trafficMap[c.id] || 0;
+        const traffic = lastSeenOrStartTs(c, trafficMap);
         if (traffic > agents[key].maxTrafficTimestamp) {
             agents[key].maxTrafficTimestamp = traffic;
         }
@@ -271,6 +296,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore || null,
+        description: groupDescription(g.collections, g.groupKey),
     }));
 };
 
@@ -356,7 +382,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
         sensitive.forEach(s => services[key].sensitiveTypes.add(s));
         
         // Track max traffic timestamp
-        const traffic = trafficMap[c.id] || 0;
+        const traffic = lastSeenOrStartTs(c, trafficMap);
         if (traffic > services[key].maxTrafficTimestamp) {
             services[key].maxTrafficTimestamp = traffic;
         }
@@ -377,6 +403,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore,
+        description: groupDescription(g.collections, g.groupKey),
     }));
 };
 
@@ -436,7 +463,7 @@ export const groupCollectionsByLLM = (collections, trafficMap = {}, sensitiveMap
         const sensitive = sensitiveMap[c.id] || [];
         sensitive.forEach(s => llms[key].sensitiveTypes.add(s));
 
-        const traffic = trafficMap[c.id] || 0;
+        const traffic = lastSeenOrStartTs(c, trafficMap);
         if (traffic > llms[key].maxTrafficTimestamp) {
             llms[key].maxTrafficTimestamp = traffic;
         }
@@ -456,6 +483,7 @@ export const groupCollectionsByLLM = (collections, trafficMap = {}, sensitiveMap
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore,
+        description: groupDescription(g.collections, g.groupKey),
     }));
 };
 
@@ -523,7 +551,7 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
             const sensitive = sensitiveMap[c.id] || [];
             sensitive.forEach(s => skills[skillValue].sensitiveTypes.add(s));
 
-            const traffic = trafficMap[c.id] || 0;
+            const traffic = lastSeenOrStartTs(c, trafficMap);
             if (traffic > skills[skillValue].maxTrafficTimestamp) {
                 skills[skillValue].maxTrafficTimestamp = traffic;
             }
@@ -544,6 +572,7 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore || null,
+        description: groupDescription(g.collections, g.groupKey),
     }));
 };
 
@@ -557,7 +586,7 @@ const accumulateHostGroupedCollection = (group, c, trafficMap, sensitiveMap, ris
     }
     const sensitive = sensitiveMap[c.id] || [];
     sensitive.forEach((s) => group.sensitiveTypes.add(s));
-    const traffic = trafficMap[c.id] || 0;
+    const traffic = lastSeenOrStartTs(c, trafficMap);
     if (traffic > group.maxTrafficTimestamp) {
         group.maxTrafficTimestamp = traffic;
     }
@@ -737,6 +766,32 @@ function violationsForCollections(collectionIds, violationsByCollectionId) {
     return total > 0 ? merged : null;
 }
 
+// A skill's declaring collection is shared across every other skill on that same device/agent, so
+// collection-level attribution can't give a skill its own count (see violationsForCollections).
+// But violation events carry the actual endpoint that fired — for skill events this is
+// `/skills/<skillName>` (DashboardMaliciousEvent.url, sourced from latestApiEndpoint) — a genuine,
+// non-shared skill identity independent of which collection/device triggered it. Pre-aggregate by
+// that name once so every skill group can look up its own real count.
+function buildViolationsBySkillName(violationRows = []) {
+    const bySkill = {};
+    violationRows.forEach((row) => {
+        if (!row?.url?.startsWith("/skills/")) return;
+        const skillName = row.url.slice("/skills/".length);
+        if (!skillName) return;
+        const sev = (row.severity || "").toLowerCase();
+        if (!bySkill[skillName]) bySkill[skillName] = { critical: 0, high: 0, medium: 0, low: 0 };
+        if (bySkill[skillName][sev] != null) bySkill[skillName][sev] += 1;
+    });
+    return bySkill;
+}
+
+function violationsForSkill(skillName, violationsBySkillName) {
+    const counts = violationsBySkillName[skillName];
+    if (!counts) return null;
+    const total = counts.critical + counts.high + counts.medium + counts.low;
+    return total > 0 ? counts : null;
+}
+
 function buildTeamGroupsForAsset(group, usernameMap, userMetadataMap) {
     const teamCounts = {};
     const seenDevices = new Set();
@@ -762,7 +817,7 @@ function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}, traffi
         if (!deviceId) return;
         const serviceName = extractServiceName(hostName);
         const collRisk = riskScoreMap[c.id] || 0;
-        const collTraffic = trafficMap[c.id] || 0;
+        const collTraffic = lastSeenOrStartTs(c, trafficMap);
         if (!byDevice.has(deviceId)) {
             const resolved = getResolvedUsernameForCollection(c, usernameMap);
             const username = (resolved && resolved !== DEFAULT_VALUE) ? resolved : "";
@@ -895,6 +950,7 @@ export function buildAgenticAssetsPageData(
         usernameMap = {},
         userMetadataMap = {},
         violationsByCollectionId = {},
+        violationRows = [],
         analysisByKey = new Map(),
         userAnalysisKeysByDeviceId = new Map(),
     } = {},
@@ -907,6 +963,7 @@ export function buildAgenticAssetsPageData(
     const agentGroupKeys = new Set(agentGroups.map((a) => a.groupKey));
     const servicesToShow = serviceGroups.filter((s) => !agentGroupKeys.has(s.groupKey));
     const allGroups = [...agentGroups, ...servicesToShow, ...llmGroups, ...skillGroups];
+    const violationsBySkillName = buildViolationsBySkillName(violationRows);
 
     const agenticTreeData = [];
     const agenticFlatData = [];
@@ -914,9 +971,14 @@ export function buildAgenticAssetsPageData(
 
     allGroups.forEach((group) => {
         const collectionIds = (group.collections || []).map((c) => c.id);
-        // Skills are capability manifest entries — violations belong to the agent/service collection
-        // that declares them, not to the skill itself. Suppress to avoid double-counting.
-        const violations = violationsForCollections(collectionIds, violationsByCollectionId);
+        // Skills share their declaring collection with every other skill on the same device/agent,
+        // so collection-level attribution would give every sibling skill the same duplicated count.
+        // Attribute by the skill's own identity instead — violation events on a skill carry
+        // `/skills/<skillName>` as their endpoint (see buildViolationsBySkillName), independent of
+        // which collection/device triggered them.
+        const violations = group.rowType === ROW_TYPES.SKILL
+            ? violationsForSkill(group.groupKey, violationsBySkillName)
+            : violationsForCollections(collectionIds, violationsByCollectionId);
         const groups = buildTeamGroupsForAsset(group, usernameMap, userMetadataMap);
         const devices = buildDevicesForGroup(group, usernameMap, riskScoreMap, trafficMap);
         const skillNames = uniqueSkillNamesForGroup(group);
@@ -932,6 +994,8 @@ export function buildAgenticAssetsPageData(
             riskScore,
             endpointCount: group.endpointsCount,
             deviceCount: group.endpointsCount,
+            // Needed to scope the malicious-skill flag to this asset's own collections.
+            collectionIds,
             lastSeen: lastSeen > 0 ? func.prettifyEpoch(lastSeen) : "",
             lastSeenEpoch: lastSeen,
             hasPersonalAccount: group.hasPersonalAccount || false,
@@ -959,6 +1023,7 @@ export function buildAgenticAssetsPageData(
             deviceCount: group.endpointsCount,
             lastSeen: lastSeen > 0 ? func.prettifyEpoch(lastSeen) : "",
             lastSeenEpoch: lastSeen,
+            description: group.description,
             skillCount: skillNames.size,
             skillNames: skillNames.size ? [...skillNames] : undefined,
             toolCount: 0,
@@ -1001,8 +1066,29 @@ export function buildAgenticAssetsPageData(
 }
 
 /**
+ * Composite key for collection-scoped malicious-skill lookups.
+ * The malicious tag lives on a specific collection's apiInfo, so it must only mark that
+ * collection's (i.e. that user/agent/host's) copy of the skill — a same-named skill belonging
+ * to a different user must not inherit the flag.
+ */
+export function skillCollectionKey(collectionId, skillName) {
+    return `${collectionId}|${String(skillName).toLowerCase()}`;
+}
+
+/** True when any of the given collections carries the malicious tag on one of its own skills. */
+export function hasMaliciousSkillInCollections(maliciousSkillKeys, collections) {
+    if (!maliciousSkillKeys?.size || !Array.isArray(collections)) return false;
+    return collections.some((c) =>
+        (Array.isArray(c?.skills) ? c.skills : []).some((s) => maliciousSkillKeys.has(skillCollectionKey(c.id, s)))
+    );
+}
+
+/**
  * Fetch apiInfos for the given collection IDs, build and cache skillScoreMap + maliciousSkills,
  * then return { skillScoreMap, maliciousSkills }. Uses PersistStore cache; skips fetch if warm.
+ * `maliciousSkillKeys` holds `<collectionId>|<skillName>` keys so callers can scope the flag to
+ * the collection that actually owns the tagged skill; `maliciousSkills` stays name-only for
+ * callers that have no collection context.
  */
 export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistStore }) {
 
@@ -1010,7 +1096,7 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
     const cacheAge = Date.now() - (cached?.ts || 0);
 
     if (cacheAge <= SKILL_RISK_CACHE_TTL_MS && cached?.ts > 0) {
-        return { skillScoreMap: cached.data || {}, maliciousSkills: new Set(cached.maliciousSkills || []), misconfiguredSkills: new Set(cached.misconfiguredSkills || []), misconfiguredCollectionIds: new Set(cached.misconfiguredCollectionIds || []) };
+        return { skillScoreMap: cached.data || {}, maliciousSkills: new Set(cached.maliciousSkills || []), maliciousSkillKeys: new Set(cached.maliciousSkillKeys || []), misconfiguredSkills: new Set(cached.misconfiguredSkills || []), misconfiguredCollectionIds: new Set(cached.misconfiguredCollectionIds || []) };
     }
 
     const results = await Promise.all(
@@ -1026,6 +1112,7 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
 
     const skillScoreMap = {};
     const maliciousSkills = new Set();
+    const maliciousSkillKeys = new Set();
     const misconfiguredSkills = new Set();
     const misconfiguredCollectionIds = new Set();
     results.forEach(({ id: collectionId, infos }) => {
@@ -1035,8 +1122,11 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
             const skillName = splits?.[1];
             if (skillName) {
                 skillScoreMap[skillName] = info.riskScore || 0;
-                const isMalicious = (info.tagsList || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true");
-                if (isMalicious) maliciousSkills.add(skillName);
+                const isMalicious = (info.tagsList || []).some(t => (t.keyName === "malicious-skill-tag" || t.key === "malicious-skill-tag") && t.value === "true");
+                if (isMalicious) {
+                    maliciousSkills.add(skillName);
+                    maliciousSkillKeys.add(skillCollectionKey(collectionId, skillName));
+                }
                 const isMisconfigured = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
                 if (isMisconfigured) misconfiguredSkills.add(skillName);
             }
@@ -1047,6 +1137,6 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
         });
     });
 
-    PersistStore.getState().setSkillRiskScoreCache({ data: skillScoreMap, maliciousSkills: [...maliciousSkills], misconfiguredSkills: [...misconfiguredSkills], misconfiguredCollectionIds: [...misconfiguredCollectionIds], ts: Date.now() });
-    return { skillScoreMap, maliciousSkills, misconfiguredSkills, misconfiguredCollectionIds };
+    PersistStore.getState().setSkillRiskScoreCache({ data: skillScoreMap, maliciousSkills: [...maliciousSkills], maliciousSkillKeys: [...maliciousSkillKeys], misconfiguredSkills: [...misconfiguredSkills], misconfiguredCollectionIds: [...misconfiguredCollectionIds], ts: Date.now() });
+    return { skillScoreMap, maliciousSkills, maliciousSkillKeys, misconfiguredSkills, misconfiguredCollectionIds };
 }

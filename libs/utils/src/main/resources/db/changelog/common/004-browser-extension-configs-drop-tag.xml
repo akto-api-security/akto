@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        The `tag` field was dropped from BrowserExtensionConfigCommon (it was vestigial — every
+        document carried the same "beta" value and nothing reads it). Remove the stale field from
+        existing common.browser_extension_configs documents so the stored shape matches the DTO.
+        Idempotent: once unset, the filter matches nothing on a re-run.
+    -->
+
+    <changeSet id="004-common-browser-extension-configs-drop-tag" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="browser_extension_configs"/>
+        </preConditions>
+        <mongodb:runCommand>
+            <mongodb:command>{ "update": "browser_extension_configs", "updates": [ { "q": { "tag": { "$exists": true } }, "u": { "$unset": { "tag": "" } }, "multi": true } ] }</mongodb:command>
+        </mongodb:runCommand>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

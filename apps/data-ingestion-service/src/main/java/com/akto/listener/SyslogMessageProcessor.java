@@ -220,6 +220,7 @@ public class SyslogMessageProcessor {
         batch.setDaemonset_id(getString(dbObject, "daemonset_id"));
         batch.setEnabled_graph(getString(dbObject, "enabled_graph"));
         batch.setTag(getString(dbObject, "tag"));
+        batch.set_traces(getString(dbObject, "_traces"));
 
         return batch;
     }

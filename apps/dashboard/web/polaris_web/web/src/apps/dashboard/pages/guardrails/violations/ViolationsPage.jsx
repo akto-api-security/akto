@@ -308,11 +308,27 @@ function deriveAgenticType(url, method) {
     return METHOD_TO_TYPE[m] || "Prompt";
 }
 
+// Classify a violation by its POLICY name. This is the grouping used by the "Violations by Type"
+// pie, and the table's Type column uses it too so the two stay consistent (a policy like
+// "llm-test" is LLM in both). Distinct from deriveAgenticType, which classifies by request shape.
+function classifyPolicyType(name) {
+    const lower = (name || "").toLowerCase();
+    if (lower.includes("prompt") || lower.includes("injection"))       return "Prompt";
+    if (lower.includes("skill") || lower.includes("malicious_skill"))  return "Skill";
+    if (lower.includes("config") || lower.includes("setting"))         return "Config";
+    if (lower.includes("tool") || lower.includes("mcp"))               return "Tool";
+    if (lower.includes("llm"))                                         return "LLM";
+    return "Other";
+}
+
 // Transform a single backend event into a table row.
 // Kept lightweight — runs only on the current page of results (not all data).
 function transformEvent(event, collectionsMap, usernameMap) {
     const meta = parseMetadata(event.metadata);
+    // typeLabel (request-shape) still drives evidence/asset-tag logic below;
+    // the Type column itself uses the policy classification so it matches the pie.
     const typeLabel = deriveAgenticType(event.url, event.method);
+    const policyName = meta.policy_name || meta.npolicy_name || event.filterId || "-";
 
     const { req: reqPayload, resp: respPayload } = parseAktoPayload(event.payload);
     const rawBehaviour = respPayload?.error?.data?.behaviour || meta.behaviour || meta.nbehaviour || null;
@@ -338,7 +354,7 @@ function transformEvent(event, collectionsMap, usernameMap) {
         id: event.id,
         apiCollectionId: event.apiCollectionId,
         detected: event.timestamp,
-        type: typeLabel,
+        type: classifyPolicyType(policyName),
         violation: meta.rule_violated || meta.nrule_violated || meta.nruleViolated || event.subCategory || event.filterId || "-",
         severity: (event.severity || "HIGH").toUpperCase(),
         evidenceText: primaryValue || normalizeReasonPunctuation(meta.reason) || "-",
@@ -348,7 +364,7 @@ function transformEvent(event, collectionsMap, usernameMap) {
         agenticAssetRaw: rawAsset,
         agenticAssetTag: skillOrToolName ? (typeLabel === "Skill" ? "skill" : typeLabel === "Tool" ? "tool" : agenticAssetTag) : agenticAssetTag,
         action,
-        policyName: meta.policy_name || meta.npolicy_name || event.filterId || "-",
+        policyName,
         _status: event.status || "ACTIVE",
         payload: event.payload || null,
         metadata: event.metadata || null,
@@ -359,7 +375,7 @@ function transformEvent(event, collectionsMap, usernameMap) {
 
 // ─── Dashboard summary section ───────────────────────────────────────────────────
 
-function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, latencyData, startTimestamp, endTimestamp }) {
+function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, latencyData, startTimestamp, endTimestamp }) {
     if (summaryLoading) return <SpinnerCentered />;
     if (!summaryData) return null;
 
@@ -385,14 +401,18 @@ function ViolationsDashboard({ summaryData, loading: summaryLoading, onSeverityC
         renderValue: () => <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>,
     }));
 
-    const hostRows = (topHosts || []).slice(0, 5).map((item, i) => ({
+    const hostRows = (topHosts || []).slice(0, 5).map((item, i) => {
+        const resolvedUser = getUsernameForCollection({ displayName: item.host }, usernameMap || {});
+        const displayName = (resolvedUser && resolvedUser !== "-") ? resolvedUser : (item.host ? item.host.split('.')[0] : item.name);
+        return {
         id: `h${i}`,
-        name: item.name,
+        name: displayName,
         count: item.count,
         os: detectOs(item.host),
         onClick: () => onHostClick?.(item.host),
         renderValue: () => <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>,
-    }));
+        };
+    });
 
     // Latency graph is Akto-internal only (matches the same gate on ThreatDetectionPage.jsx).
     // Everyone else gets Open/Other Violations side by side instead of stacked, since there's
@@ -535,7 +555,7 @@ function Violations() {
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
     const legacyPath = isEndpointSecurityCategory() ? "/dashboard/protection/threat-activity" : "/dashboard/guardrails/activity";
-    const canUseNewLayout = func.isDemoAccount() || [1726615470, 1779231193].includes(window.ACTIVE_ACCOUNT);
+    const canUseNewLayout = func.isDemoAccount() || [1000000, 1726615470, 1779231193].includes(window.ACTIVE_ACCOUNT);
 
     useEffect(() => {
         if (!canUseNewLayout || !newLayout) {
@@ -560,6 +580,10 @@ function Violations() {
     const [activeSeverityFilter, setActiveSeverityFilter] = useState(new Set());
     const [activePolicyFilter, setActivePolicyFilter] = useState(new Set());
     const [activeTypeFilter, setActiveTypeFilter] = useState(null);
+    // Type (pie) filter is driven straight into the server fetch instead of the policyName
+    // set-filter: the pie's subcategory names come from a different endpoint than the set
+    // filter's known values, so setColumnFilterModel would silently drop them.
+    const [activeTypeSubCategories, setActiveTypeSubCategories] = useState([]);
     const [selectedCard, setSelectedCard] = useState("open");          // "open" or "other"
     const [activeStatusValue, setActiveStatusValue] = useState("ACTIVE"); // drives backend statusFilter
     const gridRef = useRef(null);
@@ -567,6 +591,7 @@ function Violations() {
     const gridFilterKey = useRef(`violations-${Date.now()}`);
     const collectionsMap = PersistStore((state) => state.collectionsMap);
     const usernameMapRef = useRef({});
+    const [usernameMap, setUsernameMap] = useState({});
 
     useEffect(() => {
         const key = gridFilterKey.current;
@@ -603,6 +628,7 @@ function Violations() {
     useEffect(() => {
         fetchEndpointShieldUsernameMap().then(map => {
             usernameMapRef.current = map;
+            setUsernameMap(map);
         });
     }, []);
 
@@ -635,19 +661,20 @@ function Violations() {
         });
     }, [applyGridFilter]);
 
+    // Top Policies filter is driven straight into the server fetch (see onServerFetch), NOT the
+    // policyName set-filter: the policy names come from a different endpoint than the set filter's
+    // known values, so setColumnFilterModel would silently drop them and the table wouldn't filter.
     const handlePolicyClick = useCallback((name) => {
         setActivePolicyFilter(prev => {
             const next = new Set(prev);
             if (next.has(name)) next.delete(name); else next.add(name);
-            applyGridFilter("policyName", [...next]);
             return next;
         });
-    }, [applyGridFilter]);
+    }, []);
 
     const handleClearPolicySelection = useCallback(() => {
         setActivePolicyFilter(new Set());
-        applyGridFilter("policyName", []);
-    }, [applyGridFilter]);
+    }, []);
 
     const [activeHostFilter, setActiveHostFilter] = useState(new Set());
 
@@ -670,12 +697,19 @@ function Violations() {
         const subCategories = mapping[typeName] || [];
         if (activeTypeFilter === typeName) {
             setActiveTypeFilter(null);
-            applyGridFilter("policyName", []);
+            setActiveTypeSubCategories([]);
         } else {
             setActiveTypeFilter(typeName);
-            applyGridFilter("policyName", subCategories);
+            setActiveTypeSubCategories(subCategories);
         }
-    }, [applyGridFilter, summaryData, activeTypeFilter]);
+    }, [summaryData, activeTypeFilter]);
+
+    // Re-fetch the server-side rows whenever the pie's type filter changes (skip the initial mount).
+    const typeFilterFirstRun = useRef(true);
+    useEffect(() => {
+        if (typeFilterFirstRun.current) { typeFilterFirstRun.current = false; return; }
+        gridRef.current?.api?.refreshServerSide({ purge: true });
+    }, [activeTypeSubCategories]);
 
     // ─── Card selection (Open vs Other) ─────────────────────────────────────
     const [tableKey, setTableKey] = useState(0);
@@ -740,10 +774,12 @@ function Violations() {
                     FIXED: 0,
                 };
 
-                // Top policies from category counts
+                // Top policies from category counts. category over subCategory - subCategory can
+                // be a raw config-path string (e.g. "mcp_servers.computer-use.command" for a
+                // config-risk finding), not a name meant to stand alone as a policy label.
                 const subcategoryMap = {};
                 (categoryResp?.categoryCounts || []).forEach(item => {
-                    const sub = item.subCategory || item.category || "Unknown";
+                    const sub = item.category || item.subCategory || "Unknown";
                     subcategoryMap[sub] = (subcategoryMap[sub] || 0) + (item.count || 0);
                 });
                 const topPolicies = Object.entries(subcategoryMap)
@@ -755,13 +791,7 @@ function Violations() {
                 const byType = {};
                 const typeToSubCategories = {};
                 Object.entries(subcategoryMap).forEach(([name, count]) => {
-                    const lower = name.toLowerCase();
-                    let type = "Other";
-                    if (lower.includes("prompt") || lower.includes("injection")) type = "Prompt";
-                    else if (lower.includes("skill") || lower.includes("malicious_skill")) type = "Skill";
-                    else if (lower.includes("config") || lower.includes("setting")) type = "Config";
-                    else if (lower.includes("tool") || lower.includes("mcp")) type = "Tool";
-                    else if (lower.includes("llm")) type = "LLM";
+                    const type = classifyPolicyType(name);
 
                     if (!byType[type]) byType[type] = { text: 0, color: TYPE_COLORS[type] || "#999", filterKey: type };
                     byType[type].text += count;
@@ -833,7 +863,9 @@ function Violations() {
         const pageSize = limit || 50;
         const severityFilter = filters?.severity || [];
         const hostFilter = filters?.user || [];
-        const policyFilter = filters?.policyName || [];
+        // Union the column filter, the "Top Policies" card selection, and the pie's type filter
+        // (all map to the backend latestAttack).
+        const policyFilter = [...new Set([...(filters?.policyName || []), ...activePolicyFilter, ...activeTypeSubCategories])];
         const statusFilter = activeStatusValue;
 
         // AgGridTable sends sortOrder: -1 for asc, 1 for desc (opposite of MongoDB convention)
@@ -867,7 +899,14 @@ function Violations() {
             setRows(transformed);
             return { value: transformed, total: result?.total || 0 };
         });
-    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue]);
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter]);
+
+    // Reload the grid when the Top Policies card selection changes (skip the initial mount).
+    const policyFilterFirstRun = useRef(true);
+    useEffect(() => {
+        if (policyFilterFirstRun.current) { policyFilterFirstRun.current = false; return; }
+        gridRef.current?.api?.refreshServerSide({ purge: true });
+    }, [activePolicyFilter]);
 
     // ─── Bulk actions ──────────────────────────────────────────────────────────
     // Under Server-Side Row Model, "select all" tracks selection as an abstract
@@ -1010,6 +1049,7 @@ function Violations() {
         <ViolationsDashboard
             key="dashboard"
             summaryData={summaryData}
+            usernameMap={usernameMap}
             loading={summaryLoading}
             onSeverityClick={handleSeverityClick}
             activeSeverityFilter={activeSeverityFilter}

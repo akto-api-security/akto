@@ -132,6 +132,9 @@ public class AdminSettingsAction extends UserAction {
     @Setter
     @Getter
     private List<String> filterLogPolicy;
+    @Setter
+    @Getter
+    private Map<String, String> runtimeEnvOverrides;
 
     public String updateSetupType() {
         if (this.setupType == null) {
@@ -606,6 +609,26 @@ public class AdminSettingsAction extends UserAction {
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.error("Error updating filter log policy", e);
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String updateRuntimeEnvOverrides() {
+        if (this.runtimeEnvOverrides == null || this.runtimeEnvOverrides.isEmpty()) {
+            return SUCCESS.toUpperCase();
+        }
+        try {
+            List<Bson> updates = new ArrayList<>();
+            for (Map.Entry<String, String> entry : this.runtimeEnvOverrides.entrySet()) {
+                updates.add(Updates.set(AccountSettings.RUNTIME_ENV_OVERRIDES + "." + entry.getKey(), entry.getValue()));
+            }
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.combine(updates)
+            );
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error updating runtime env overrides", e);
             return ERROR.toUpperCase();
         }
     }

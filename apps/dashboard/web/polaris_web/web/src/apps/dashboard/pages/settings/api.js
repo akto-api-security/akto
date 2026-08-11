@@ -655,18 +655,18 @@ const settingRequests = {
             data: {}
         })
     },
-    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, allowedFeaturesForUser) {
+    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled) {
         return request({
             url: '/api/createCustomRole',
             method: 'post',
-            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole, allowedFeaturesForUser }
+            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled }
         })
     },
-    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, allowedFeaturesForUser) {
+    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled) {
         return request({
             url: '/api/updateCustomRole',
             method: 'post',
-            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole, allowedFeaturesForUser}
+            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled}
         })
     },
     deleteCustomRole(roleName) {
@@ -958,13 +958,6 @@ const settingRequests = {
             data: {}
         })
     },
-    getAllowedFeaturesForRBAC() {
-        return request({
-            url: '/api/allowedFeaturesForRBAC',
-            method: 'post',
-            data: {}
-        })
-    },
     async deleteDuplicateEntries() {
         return await request({
             url: '/api/deleteDuplicateEntries',
@@ -1080,6 +1073,13 @@ const settingRequests = {
             url: '/api/updateFilterLogPolicy',
             method: 'post',
             data: {filterLogPolicy}
+        })
+    },
+    updateRuntimeEnvOverrides(runtimeEnvOverrides) {
+        return request({
+            url: '/api/updateRuntimeEnvOverrides',
+            method: 'post',
+            data: {runtimeEnvOverrides}
         })
     },
     rebootModules(moduleIds, deleteTopicAndReboot = false) {

@@ -397,7 +397,7 @@ jobs:
           [ "$BUILD_BILLING" = "true" ] && add_files apps/billing target/billing.war
           [ "$BUILD_INTERNAL" = "true" ] && add_files apps/internal target/internal.war
           [ "$BUILD_THREAT" = "true" ] && add_files apps/threat-detection target/threat-detection-1.0-SNAPSHOT-jar-with-dependencies.jar start.sh
-          [ "$BUILD_THREAT_BACKEND" = "true" ] && add_files apps/threat-detection-backend target/threat-detection-backend-1.0-SNAPSHOT-jar-with-dependencies.jar
+          [ "$BUILD_THREAT_BACKEND" = "true" ] && add_files apps/threat-detection-backend target/threat-detection-backend-1.0-SNAPSHOT-jar-with-dependencies.jar start.sh
           [ "$BUILD_ACCOUNT_EXECUTOR" = "true" ] && add_files apps/account-job-executor target/account-job-executor-1.0-SNAPSHOT-jar-with-dependencies.jar start.sh
           [ "$BUILD_DATA_INGESTION" = "true" ] && add_files apps/data-ingestion-service target/data-ingestion-service.war docker
           tar czf java-docker-contexts.tar.gz "${paths[@]}"

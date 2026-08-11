@@ -36,6 +36,7 @@ import {
   buildAgenticAssetsPageData,
   buildUserAnalysisLookup,
   fetchAndCacheSkillApiData,
+  skillCollectionKey,
 } from "./constants";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
@@ -328,9 +329,12 @@ export default function AgenticAssetsPage() {
   }, [navigate]);
 
   // Date range — scopes inventory (last-seen), violations, and charts page-wide
+  // Defaults to "All time" so this matches the legacy (unfiltered) Agentic assets page on
+  // first load; MCP servers/LLMs are often detected via tags without directly-attributed
+  // traffic, so a narrower default (e.g. Last 1 year) would silently drop them.
   const [currDateRange, dispatchCurrDateRange] = useReducer(
     produce((draft, action) => func.dateRangeReducer(draft, action)),
-    values.ranges[4],
+    values.ranges[5],
   );
   const rawStart = Math.floor(Date.parse(currDateRange.period.since) / 1000);
   // values.ranges "allTime" uses since=new Date(1000) → rawStart=1; treat as 0 (data-min mode)
@@ -357,20 +361,31 @@ export default function AgenticAssetsPage() {
           trafficInfoResp,
           riskScoreResp,
           sensitiveInfoResp,
-          shieldResult,
-          violationRows,
-          userAnalysisList,
         ] = await Promise.all([
           api.getAllCollectionsBasic(),
           api.getLastTrafficSeen(),
           api.getRiskScoreInfo(),
           api.getSensitiveInfoForCollections(),
-          fetchEndpointShieldUserMetadata(),
-          fetchAgenticViolations({ startTimestamp, endTimestamp }),
-          agenticObserveApi.listUserAnalysis(),
         ]);
 
         if (!isMountedRef.current) return;
+
+        // These enrich the core asset list (violations, usernames, AI-interaction counts) but
+        // live behind separate plan entitlements (e.g. Threat Detection). A denial here shouldn't
+        // sink the whole page — fall back to empty/default data so the asset inventory still loads.
+        const [shieldResult, rawViolationRows, userAnalysisList] = await Promise.all([
+          fetchEndpointShieldUserMetadata(),
+          fetchAgenticViolations({ startTimestamp, endTimestamp }).catch(() => []),
+          agenticObserveApi.listUserAnalysis().catch(() => []),
+        ]);
+
+        if (!isMountedRef.current) return;
+
+        // Skill invocations fire their own /skills/<name> violation events distinct from the
+        // agent/service traffic that triggered them — exclude those here so every violation
+        // count and chart on this page (stat card, sparkline, Top Assets with Violations, the
+        // per-row Violations column) reflects only agent/service/LLM-attributable violations.
+        const violationRows = rawViolationRows.filter((row) => !row.url?.startsWith("/skills/"));
 
         const collections = apiCollectionsResp?.apiCollections || [];
         const trafficMap = trafficInfoResp || {};
@@ -395,6 +410,7 @@ export default function AgenticAssetsPage() {
             usernameMap,
             userMetadataMap,
             violationsByCollectionId,
+            violationRows,
             analysisByKey,
             userAnalysisKeysByDeviceId,
           },
@@ -417,18 +433,24 @@ export default function AgenticAssetsPage() {
         setAgenticViolationRows(violationRows);
         setCollections(collections);
 
-        // Enrich Skill rows with malicious flag (same source as old UI) — async, non-blocking
+        // Enrich Skill rows with malicious flag (same source as old UI) — async, non-blocking.
+        // Only collections that actually have skills need this lookup; querying every collection
+        // fires one request per collection account-wide for no benefit on the rest.
         const skillCollectionIds = [];
         collections.forEach((c) => {
-          if (!skillCollectionIds.includes(c.id)) skillCollectionIds.push(c.id);
+          if (Array.isArray(c.skills) && c.skills.length > 0 && !skillCollectionIds.includes(c.id)) {
+            skillCollectionIds.push(c.id);
+          }
         });
         if (skillCollectionIds.length) {
           fetchAndCacheSkillApiData(skillCollectionIds, { api, PersistStore })
-            .then(({ maliciousSkills }) => {
-              if (!isMountedRef.current || !maliciousSkills?.size) return;
+            .then(({ maliciousSkillKeys }) => {
+              if (!isMountedRef.current || !maliciousSkillKeys?.size) return;
+              // Scoped to the asset's own collections so a same-named skill belonging to a
+              // different user/agent doesn't mark this one malicious.
               const markMalicious = (rows) =>
                 rows.map((r) =>
-                  r.type === "Skill" && maliciousSkills.has(r.name)
+                  r.type === "Skill" && (r.collectionIds || []).some((cid) => maliciousSkillKeys.has(skillCollectionKey(cid, r.name)))
                     ? { ...r, isMalicious: true }
                     : r,
                 );

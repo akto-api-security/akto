@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        CustomRole gained `threatProtectionEnabled`, which grants threat protection to a role
+        whose base role does not already have it. Roles created before the field existed do not
+        carry it at all, and the toggle treats a missing value as false, so behaviour is
+        unchanged either way — this only normalises the stored shape so every custom role holds
+        an explicit boolean, matching what RoleAction now writes on create and update.
+
+        `{ "threatProtectionEnabled": null }` matches both missing fields and explicit nulls in
+        MongoDB, so a single update covers roles from before the field existed and any written
+        while it was still nullable. Idempotent: once set, the filter matches nothing on a re-run.
+
+        No rollback: the original documents cannot be told apart afterwards, and reverting would
+        only restore an absent field that already behaved identically.
+    -->
+
+    <changeSet id="011-account-custom-roles-threat-protection-default" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="custom_roles"/>
+        </preConditions>
+        <mongodb:runCommand>
+            <mongodb:command>{ "update": "custom_roles", "updates": [ { "q": { "threatProtectionEnabled": null }, "u": { "$set": { "threatProtectionEnabled": false } }, "multi": true } ] }</mongodb:command>
+        </mongodb:runCommand>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

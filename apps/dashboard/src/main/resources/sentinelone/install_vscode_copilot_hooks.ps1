@@ -27,12 +27,12 @@ $GITHUB_RAW_BASE = "https://raw.githubusercontent.com/akto-api-security/akto/mas
 
 function Write-Log {
     param([string]$Message)
-    Write-Host "[Copilot VSCode Hooks] $Message" -ForegroundColor Cyan
+    Write-Output "[Copilot VSCode Hooks] $Message"
 }
 
 function Write-LogError {
     param([string]$Message)
-    Write-Host "[Copilot VSCode Hooks] ERROR: $Message" -ForegroundColor Red
+    Write-Output "[Copilot VSCode Hooks] ERROR: $Message"
 }
 
 # VSCode detection: check %APPDATA%\Code -- always present once VSCode has been run,

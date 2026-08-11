@@ -61,12 +61,11 @@ function Test-DirExists {
 }
 
 # Registry scan — mirrors detectWindowsAgents' Layer 1: catches any properly
-# installed app regardless of install path via HKLM/HKCU Uninstall keys.
+# installed app regardless of install path via HKLM Uninstall keys (machine-wide installs).
 function Get-InstalledAppsFromRegistry {
     $paths = @(
         "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
-        "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*",
-        "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"
+        "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*"
     )
     $names = @()
     foreach ($p in $paths) {
@@ -99,79 +98,92 @@ foreach ($agent in $registryNameMap.Keys) {
     }
 }
 
-$localAppData = $env:LOCALAPPDATA
 $programFiles = $env:PROGRAMFILES
-$userProfile  = $env:USERPROFILE
 
-# Layer 2: hardcoded path fallback for portable installs / apps without registry entries.
-$pathChecks = [ordered]@{
-    "cursor"         = @("$localAppData\Programs\cursor\Cursor.exe", "$localAppData\cursor\Cursor.exe")
-    "vscode"         = @("$programFiles\Microsoft VS Code\Code.exe", "$localAppData\Programs\Microsoft VS Code\Code.exe")
-    "windsurf"       = @("$localAppData\Programs\windsurf\Windsurf.exe", "$localAppData\windsurf\Windsurf.exe")
-    "claude-desktop" = @("$localAppData\AnthropicClaude\claude.exe", "$localAppData\Programs\claude\Claude.exe", "$localAppData\claude\Claude.exe")
-    "antigravity"    = @("$localAppData\Programs\antigravity\Antigravity.exe")
-    "codex"          = @("$localAppData\Programs\codex\Codex.exe", "$localAppData\codex\Codex.exe")
-    "kiroide"        = @("$localAppData\Programs\kiro\Kiro.exe", "$localAppData\kiro\Kiro.exe")
+
+$userProfiles = @()
+try {
+    if (Test-Path "C:\Users") {
+        $userProfiles = Get-ChildItem "C:\Users" -Directory -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notin @('Public', 'Default', 'Default User', 'All Users') } |
+            Select-Object -ExpandProperty FullName
+        Write-Log "Found $($userProfiles.Count) user profile(s)"
+    }
+} catch {
+    Write-Log "ERROR: Failed to enumerate user profiles: $_"
 }
 
-foreach ($agent in $pathChecks.Keys) {
-    if ($foundViaRegistry[$agent]) { continue }
-    Test-BinaryPaths -Agent $agent -Paths $pathChecks[$agent] | Out-Null
-}
+$foundPerAgent = $foundViaRegistry.Clone()
 
-# Claude CLI
-$claudeCLIPaths = @(
-    "$localAppData\Programs\Claude\claude.exe",
-    "$programFiles\Claude\claude.exe",
-    "$userProfile\.local\bin\claude.exe"
-)
-if (-not (Test-BinaryPaths -Agent "claude-cli-user" -Paths $claudeCLIPaths)) {
-    Test-PathLookup -Agent "claude-cli-user" -Bin "claude.exe" | Out-Null
-}
+foreach ($userProfile in $userProfiles) {
+    $localAppData = Join-Path $userProfile "AppData\Local"
 
-# GitHub Copilot config dir
-Test-DirExists -Agent "copilot" -Dir "$userProfile\.copilot" | Out-Null
+    # Layer 2: hardcoded path fallback for portable installs / apps without registry entries.
+    $pathChecks = [ordered]@{
+        "cursor"         = @("$localAppData\Programs\cursor\Cursor.exe", "$localAppData\cursor\Cursor.exe")
+        "vscode"         = @("$programFiles\Microsoft VS Code\Code.exe", "$localAppData\Programs\Microsoft VS Code\Code.exe")
+        "windsurf"       = @("$localAppData\Programs\windsurf\Windsurf.exe", "$localAppData\windsurf\Windsurf.exe")
+        "claude-desktop" = @("$localAppData\AnthropicClaude\claude.exe", "$localAppData\Programs\claude\Claude.exe", "$localAppData\claude\Claude.exe")
+        "antigravity"    = @("$localAppData\Programs\antigravity\Antigravity.exe")
+        "codex"          = @("$localAppData\Programs\codex\Codex.exe", "$localAppData\codex\Codex.exe")
+        "kiroide"        = @("$localAppData\Programs\kiro\Kiro.exe", "$localAppData\kiro\Kiro.exe")
+    }
+    foreach ($agent in $pathChecks.Keys) {
+        if ($foundPerAgent[$agent]) { continue }
+        if (Test-BinaryPaths -Agent $agent -Paths $pathChecks[$agent]) { $foundPerAgent[$agent] = $true }
+    }
 
-# Codex CLI
-$codexCLIPaths = @(
-    "$localAppData\Programs\Codex\codex.exe",
-    "$programFiles\Codex\codex.exe",
-    "$userProfile\.local\bin\codex.exe"
-)
-if (-not (Test-BinaryPaths -Agent "codex" -Paths $codexCLIPaths)) {
-    Test-PathLookup -Agent "codex" -Bin "codex.exe" | Out-Null
-}
+    # Claude CLI
+    if (-not $foundPerAgent["claude-cli-user"]) {
+        $claudeCLIPaths = @("$localAppData\Programs\Claude\claude.exe", "$programFiles\Claude\claude.exe", "$userProfile\.local\bin\claude.exe")
+        if (Test-BinaryPaths -Agent "claude-cli-user" -Paths $claudeCLIPaths) { $foundPerAgent["claude-cli-user"] = $true }
+    }
 
-# Ollama
-$ollamaPaths = @(
-    "$localAppData\Programs\Ollama\ollama.exe",
-    "$programFiles\Ollama\ollama.exe",
-    "$userProfile\.local\bin\ollama.exe"
-)
-if (-not (Test-BinaryPaths -Agent "ollama" -Paths $ollamaPaths)) {
-    Test-PathLookup -Agent "ollama" -Bin "ollama.exe" | Out-Null
-}
+    # GitHub Copilot config dir
+    if (-not $foundPerAgent["copilot"]) {
+        if (Test-DirExists -Agent "copilot" -Dir "$userProfile\.copilot") { $foundPerAgent["copilot"] = $true }
+    }
 
-# Kiro CLI (binary, PATH, or on-disk footprint)
-$kiroCLIPaths = @(
-    "$localAppData\Programs\Kiro\kiro-cli.exe",
-    "$programFiles\Kiro\kiro-cli.exe",
-    "$userProfile\.local\bin\kiro-cli.exe",
-    "$localAppData\Programs\Kiro\kiro.exe",
-    "$programFiles\Kiro\kiro.exe",
-    "$userProfile\.local\bin\kiro.exe"
-)
-$kiroFound = Test-BinaryPaths -Agent "kirocli" -Paths $kiroCLIPaths
-if (-not $kiroFound) { $kiroFound = Test-PathLookup -Agent "kirocli" -Bin "kiro-cli.exe" }
-if (-not $kiroFound) { $kiroFound = Test-PathLookup -Agent "kirocli" -Bin "kiro.exe" }
-if (-not $kiroFound) {
-    $footprint = @("$userProfile\.kiro\settings\cli.json", "$userProfile\.kiro\sessions\cli")
-    foreach ($fp in $footprint) {
-        if (Test-Path -LiteralPath $fp) {
-            Add-App -Agent "kirocli" -Path "$userProfile\.kiro" -Method "footprint"
-            break
+    # Codex CLI
+    if (-not $foundPerAgent["codex"]) {
+        $codexCLIPaths = @("$localAppData\Programs\Codex\codex.exe", "$programFiles\Codex\codex.exe", "$userProfile\.local\bin\codex.exe")
+        if (Test-BinaryPaths -Agent "codex" -Paths $codexCLIPaths) { $foundPerAgent["codex"] = $true }
+    }
+
+    # Ollama
+    if (-not $foundPerAgent["ollama"]) {
+        $ollamaPaths = @("$localAppData\Programs\Ollama\ollama.exe", "$programFiles\Ollama\ollama.exe", "$userProfile\.local\bin\ollama.exe")
+        if (Test-BinaryPaths -Agent "ollama" -Paths $ollamaPaths) { $foundPerAgent["ollama"] = $true }
+    }
+
+    # Kiro CLI (binary or on-disk footprint)
+    if (-not $foundPerAgent["kirocli"]) {
+        $kiroCLIPaths = @(
+            "$localAppData\Programs\Kiro\kiro-cli.exe", "$programFiles\Kiro\kiro-cli.exe", "$userProfile\.local\bin\kiro-cli.exe",
+            "$localAppData\Programs\Kiro\kiro.exe", "$programFiles\Kiro\kiro.exe", "$userProfile\.local\bin\kiro.exe"
+        )
+        if (Test-BinaryPaths -Agent "kirocli" -Paths $kiroCLIPaths) {
+            $foundPerAgent["kirocli"] = $true
+        } else {
+            $footprint = @("$userProfile\.kiro\settings\cli.json", "$userProfile\.kiro\sessions\cli")
+            foreach ($fp in $footprint) {
+                if (Test-Path -LiteralPath $fp) {
+                    Add-App -Agent "kirocli" -Path "$userProfile\.kiro" -Method "footprint"
+                    $foundPerAgent["kirocli"] = $true
+                    break
+                }
+            }
         }
     }
+}
+
+# PATH lookups still make sense once, globally — a PATH entry for SYSTEM's own session (e.g. a
+# machine-wide install added to the system PATH) is valid regardless of user context.
+if (-not $foundPerAgent["claude-cli-user"]) { Test-PathLookup -Agent "claude-cli-user" -Bin "claude.exe" | Out-Null }
+if (-not $foundPerAgent["codex"])           { Test-PathLookup -Agent "codex" -Bin "codex.exe" | Out-Null }
+if (-not $foundPerAgent["ollama"])          { Test-PathLookup -Agent "ollama" -Bin "ollama.exe" | Out-Null }
+if (-not $foundPerAgent["kirocli"]) {
+    if (-not (Test-PathLookup -Agent "kirocli" -Bin "kiro-cli.exe")) { Test-PathLookup -Agent "kirocli" -Bin "kiro.exe" | Out-Null }
 }
 
 Write-Log "Scan complete. Found $($results.apps_found.Count) app(s)"

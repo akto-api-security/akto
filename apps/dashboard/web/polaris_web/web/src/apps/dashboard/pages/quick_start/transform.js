@@ -1371,6 +1371,19 @@ const claudeCodeCliHookObj = {
     />
 }
 
+const claudeInferenceHookObj = {
+    icon: '/public/claude.svg',
+    label: "Claude Inference Hooks",
+    text: "Route every governed Claude prompt through Akto for an allow/deny verdict before inference runs.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-inference-hooks',
+    key: "CLAUDE_INFERENCE_HOOK",
+    badge: "Beta",
+    component: <BannerComponent
+        content="Route every governed Claude prompt through Akto for an allow/deny verdict before inference runs."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-inference-hooks'
+    />
+}
+
 const claudeCoworkObj = {
     icon: '/public/claude.svg',
     label: "Claude Cowork",
@@ -2266,7 +2279,7 @@ const quickStartFunc = {
 
         // Endpoint Agents
         const endpointAgents = [
-            cursorHookObj, claudeCodeCliHookObj, claudeCoworkObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, neovimHookObj, openCodeHookObj, ampHookObj, hermesHookObj,intellijHookObj, antigravityObj,
+            cursorHookObj, claudeCodeCliHookObj, claudeInferenceHookObj, claudeCoworkObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, neovimHookObj, openCodeHookObj, ampHookObj, hermesHookObj,intellijHookObj, antigravityObj,
         ]
 
         const localHostedModels = [

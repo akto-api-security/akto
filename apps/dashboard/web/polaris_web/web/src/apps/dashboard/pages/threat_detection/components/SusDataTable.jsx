@@ -7,7 +7,6 @@ import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
 import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, VerticalStack } from "@shopify/polaris";
-import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap } from "../utils/formatUtils";
@@ -22,17 +21,6 @@ import { buildApprovedByPolicy, isServerApproved } from "../../guardrails/utils"
 const resourceName = {
   singular: "activity",
   plural: "activities",
-};
-
-// A "Skills Evaluations" entry: a skill-endpoint event (url contains "/skills/") that is a skill
-// evaluation — either the skill_evaluation policy, or whose rule_violated (from metadata) is not a
-// "skill:<name>" rule (i.e. not a malicious-skill detection). These show under the Skills
-// Evaluations tab and are excluded from the Active tab.
-const isSkillEvaluationEntry = (r) => {
-  if (!String(r?.url || '').toLowerCase().includes('/skills/')) return false;
-  const isSkillEvalPolicy = String(r?.filterId || '').toLowerCase() === 'skill_evaluation';
-  const ruleViolated = String(extractRuleViolated(r?.metadata) || '').toLowerCase();
-  return isSkillEvalPolicy || !ruleViolated.includes('skill:');
 };
 
 const getHeaders = () => {
@@ -131,22 +119,26 @@ const getHeaders = () => {
   return baseHeaders;
 };
 
-const sortOptions = [
-  {
-    label: "Discovered time",
-    value: "detectedAt asc",
-    directionLabel: "Newest",
-    sortKey: "detectedAt",
-    columnIndex: 5,
-  },
-  {
-    label: "Discovered time",
-    value: "detectedAt desc",
-    directionLabel: "Oldest",
-    sortKey: "detectedAt",
-    columnIndex: 5,
-  },
-];
+const getSortOptions = (headers) => {
+  const columnIndex = headers.findIndex((h) => h.value === "discoveredTs") + 1;
+  if (columnIndex === 0) return [];
+  return [
+    {
+      label: "Discovered time",
+      value: "detectedAt asc",
+      directionLabel: "Newest",
+      sortKey: "detectedAt",
+      columnIndex,
+    },
+    {
+      label: "Discovered time",
+      value: "detectedAt desc",
+      directionLabel: "Oldest",
+      sortKey: "detectedAt",
+      columnIndex,
+    },
+  ];
+};
 
 let filters = [];
 
@@ -333,8 +325,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       index: 4
     });
   }
-  // "Skills Evaluations" — ACTIVE skill_evaluation policy events on skill endpoints. Client-side
-  // view like "Needs Approval". Endpoint (Atlas) only. Positioned after the guardrail extra tabs.
+  // "Skills Evaluations" — events with filterId == "skill_evaluation", filtered server-side.
+  // Endpoint (Atlas) only. Positioned after the guardrail extra tabs.
   const skillsExtraTabs = [];
   if (isEndpointSecurityCategory()) {
     skillsExtraTabs.push({
@@ -639,12 +631,19 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     // "Needs Approval" is a client-side view over ACTIVE events filtered to behaviour==="approval".
     // Fetch active events with a high limit (single page) and filter after mapping.
     const isNeedsApproval = currentTab === 'needs_approval';
-    // Skills Evaluations: client-side view over ACTIVE skill_evaluation events on skill endpoints.
     const isSkillsEvaluations = currentTab === 'skills_evaluations';
-    const isClientSideView = isNeedsApproval || isSkillsEvaluations;
-    const effectiveStatus = isClientSideView ? 'ACTIVE' : currentTab.toUpperCase();
+    // Needs Approval is a client-side view (fetch a big page, filter after mapping). Skills
+    // Evaluations is now SERVER-paginated: it shows ACTIVE events narrowed to the skill-evaluation
+    // set by the backend (x-skill-eval-mode header), so totals/pagination are correct.
+    const isClientSideView = isNeedsApproval;
+    const effectiveStatus = (isNeedsApproval || isSkillsEvaluations) ? 'ACTIVE' : currentTab.toUpperCase();
     const effectiveSkip = isClientSideView ? 0 : skip;
     const effectiveLimit = isClientSideView ? 200 : limit;
+    // Skills Evaluations partition (Atlas only): "only" on the Skills Evaluations tab, "exclude" on
+    // the Active tab. Backend applies it (gated to contextSource=ENDPOINT); undefined elsewhere.
+    const skillEvaluationMode = isEndpointSecurityCategory()
+      ? (isSkillsEvaluations ? 'only' : (currentTab === 'active' ? 'exclude' : undefined))
+      : undefined;
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
       matchingUrlFilter = [],
@@ -715,7 +714,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       latestApiOrigRegex,
       undefined,
       undefined,
-      severityFilter
+      severityFilter,
+      skillEvaluationMode
     );
 
     // Store the total count for filtered results
@@ -752,7 +752,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         ...x,
         id: x.id,
         actorComp: isEndpointSecurityCategory()
-          ? getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap)
+          ? getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap, x.actor)
           : formatActorId(x.actor),
         host: x.host || "-",
         endpointComp: String(x?.url || "").includes('/skills/') ? (
@@ -778,7 +778,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           />
         ),
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
-        discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),
+        discoveredTs: func.prettifyEpoch(x.timestamp || 0),
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
         severityComp: (<div className={`badge-wrapper-${severity}`}>
@@ -859,23 +859,10 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       );
       total = ret.length;
     }
-    // Skills Evaluations tab: keep only the skill-evaluation entries. In the Policy Triggered
-    // column, relabel malicious_skill_detected as "Skills Evaluation" (display only — the real
-    // filterId stays on the row for row-click deep-links/actions; header value swapped below).
-    if (isSkillsEvaluations) {
-      ret = ret.filter(isSkillEvaluationEntry).map(r => ({
-        ...r,
-        policyDisplay: String(r.filterId || '').toLowerCase() === 'malicious_skill_detected'
-          ? 'Skills Evaluation'
-          : r.filterId,
-      }));
-      total = ret.length;
-    }
-    // NOTE: We intentionally do NOT hide skill-evaluation entries from the Active tab here.
-    // Active is server-paginated (total comes from the backend), so removing rows client-side per
-    // page made "Showing X of N" wrong. Excluding them correctly needs a server-side filter (see
-    // subCategory-based approach); until then skill-evaluation rows appear in both Active and the
-    // Skills Evaluations tab, but pagination stays correct.
+    // Skills Evaluations tab: rows are already the skill-evaluation set (filtered server-side via
+    // x-skill-eval-mode: filterId == "skill_evaluation"), so total/pagination come straight from
+    // the backend. Active applies the complementary "exclude" mode, so skill-evaluation rows don't
+    // also appear there.
     setLoading(false);
     return { value: ret, total: total };
   }
@@ -1005,13 +992,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   if (currentTab === 'needs_approval') {
     headers.push({ text: "Action", value: "approveAction", title: "Action" });
   }
-  // Skills Evaluations tab: render the Policy Triggered column from policyDisplay (which relabels
-  // malicious_skill_detected as "Skills Evaluation") instead of the raw filterId.
-  if (currentTab === 'skills_evaluations') {
-    const idx = headers.findIndex(h => h.value === 'filterId');
-    if (idx !== -1) headers[idx] = { ...headers[idx], value: 'policyDisplay' };
-  }
-
+  const sortOptions = getSortOptions(headers);
   return (
     <>
       <GithubServerTable

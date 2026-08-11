@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Text, Badge, Divider, ActionList, Button, Spinner, VerticalStack, HorizontalStack } from "@shopify/polaris";
+import { Box, Text, Badge, Divider, ActionList, Button, Spinner, VerticalStack, HorizontalStack, Tabs } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { ParamNameCellRenderer, ParamTypeCellRenderer, ParamDescCellRenderer, SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges";
 import agenticObserveApi from "./agenticObserveApi";
 import observeApi from "../api";
 import SampleDataList from "../../../components/shared/SampleDataList";
+import ApiIssuesTab from "../api_collections/ApiIssuesTab";
+import MarkdownViewer from "../../../components/shared/MarkdownViewer";
+import { fetchSkillMarkdownFromCollections } from "./SkillComponentsView";
 
 // ── Shared detail panel helpers ───────────────────────────────────────────────
 
@@ -64,6 +67,14 @@ export function ToolDetailPanel({ tool, onBack }) {
     const { traffic, loading } = useEndpointTraffic(tool, true);
     return (
         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            {tool?.description && (
+                <>
+                    <Box paddingInlineStart="3" paddingInlineEnd="3" paddingBlockStart="3" paddingBlockEnd="2">
+                        <Text variant="bodySm" color="subdued">{tool.description}</Text>
+                    </Box>
+                    <Divider />
+                </>
+            )}
             <TrafficView traffic={traffic} loading={loading} />
         </div>
     );
@@ -74,7 +85,10 @@ function ResourcePromptDetailPanel({ item }) {
     return (
         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <Box paddingInlineStart="3" paddingInlineEnd="3" paddingBlockStart="3" paddingBlockEnd="2">
-                <Text variant="headingSm" as="h3" fontWeight="semibold">{item.name}</Text>
+                <VerticalStack gap="1">
+                    <Text variant="headingSm" as="h3" fontWeight="semibold">{item.name}</Text>
+                    {item.description && <Text variant="bodySm" color="subdued">{item.description}</Text>}
+                </VerticalStack>
             </Box>
             <Divider />
             <TrafficView traffic={traffic} loading={loading} />
@@ -82,15 +96,78 @@ function ResourcePromptDetailPanel({ item }) {
     );
 }
 
-export function SkillDetailPanel({ skill }) {
-    const { traffic, loading } = useEndpointTraffic(skill, true);
+const SKILL_VALUE_LOADING = <Box padding="4"><Spinner accessibilityLabel="Loading" size="small" /></Box>;
+const SKILL_VALUE_EMPTY = <Box padding="8"><VerticalStack gap="1" inlineAlign="center"><Text variant="bodySm" fontWeight="semibold">No content available</Text><Text variant="bodySm" color="subdued">No skill description found in captured traffic.</Text></VerticalStack></Box>;
+
+// Skill invocation traffic can land on any collection the skill is declared on (not just the one
+// this particular skill row happened to be attributed to), and the sample-storage URL format
+// varies by environment — fetchSkillMarkdownFromCollections already handles both. Falls back to
+// the skill's own apiCollectionId when the caller doesn't have the full collection set on hand.
+function useSkillMarkdown(skill, collectionIds) {
+    const [markdown, setMarkdown] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const ids = collectionIds?.length ? collectionIds : [skill?.apiCollectionId].filter(Boolean);
+    useEffect(() => {
+        if (!ids.length) { setMarkdown(""); setLoading(false); return; }
+        let cancelled = false;
+        setLoading(true);
+        fetchSkillMarkdownFromCollections(ids, skill?.rawName || skill?.name)
+            .then((found) => { if (!cancelled) setMarkdown(found || ""); })
+            .catch(() => { if (!cancelled) setMarkdown(""); })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [skill?.name, skill?.rawName, ids.join(",")]);
+    return { markdown, loading };
+}
+
+function SkillValueView({ markdown, loading }) {
+    if (loading) return SKILL_VALUE_LOADING;
+    if (!markdown) return SKILL_VALUE_EMPTY;
+    return (
+        <Box overflowY="scroll" className="agentic-flex-fill">
+            <Box paddingBlockStart="5" paddingBlockEnd="5" paddingInlineStart="5" paddingInlineEnd="5">
+                <MarkdownViewer markdown={markdown} />
+            </Box>
+        </Box>
+    );
+}
+
+export function SkillDetailPanel({ skill, collectionIds }) {
+    const { markdown, loading } = useSkillMarkdown(skill, collectionIds);
+    const [selectedTab, setSelectedTab] = useState(0);
+    const isThreatEnabled = skill?.isThreatEnabled || false;
+
+    const tabs = [
+        { id: "values", content: "Values" },
+        ...(isThreatEnabled ? [{ id: "threat-issues", content: "Threat Issues" }] : []),
+    ];
+    const activeTab = isThreatEnabled ? selectedTab : 0;
+
     return (
         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <Box paddingInlineStart="3" paddingInlineEnd="3" paddingBlockStart="3" paddingBlockEnd="2">
-                <Text variant="headingSm" as="h3" fontWeight="semibold">{skill.name}</Text>
+                <VerticalStack gap="1">
+                    <Text variant="headingSm" as="h3" fontWeight="semibold">{skill.name}</Text>
+                    {skill.description && <Text variant="bodySm" color="subdued">{skill.description}</Text>}
+                </VerticalStack>
             </Box>
             <Divider />
-            <TrafficView traffic={traffic} loading={loading} />
+            {isThreatEnabled && (
+                <Box paddingInlineStart="3" paddingInlineEnd="3">
+                    <Tabs tabs={tabs} selected={activeTab} onSelect={setSelectedTab} />
+                </Box>
+            )}
+            {activeTab === 0 ? (
+                <SkillValueView markdown={markdown} loading={loading} />
+            ) : (
+                <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "16px" }}>
+                    <ApiIssuesTab
+                        apiDetail={{ apiCollectionId: skill.apiCollectionId, endpoint: skill.url, method: skill.method }}
+                        isThreatEnabled={true}
+                    />
+                </div>
+            )}
         </div>
     );
 }
@@ -299,25 +376,37 @@ export default function McpComponentsView({ asset, onNavChange }) {
         selectItem(e.data);
     }, [selectItem]);
 
-    if (selectedItem?.type === "skill") return <SkillDetailPanel key={selectedItem.item.name} skill={selectedItem.item} />;
+    if (selectedItem?.type === "skill") return <SkillDetailPanel key={selectedItem.item.name} skill={selectedItem.item} collectionIds={asset?.collectionIds} />;
     if (selectedItem?.type === "tool")  return <ToolDetailPanel key={selectedItem.item.name} tool={selectedItem.item} />;
     if (selectedItem)                   return <ResourcePromptDetailPanel key={selectedItem.item.name} item={selectedItem.item} />;
 
-    return allRows.length === 0 ? (
-        <Box padding="4"><Text variant="bodySm" color="subdued">No tools, resources, prompts or skills found.</Text></Box>
-    ) : (
-        <AgGridTable
-            rowData={allRows}
-            columnDefs={COMBINED_MCP_COL_DEFS}
-            defaultColDef={GRID_DEFAULT_COL}
-            onRowClicked={handleRowClick}
-            getRowStyle={() => ({ cursor: "pointer" })}
-            fillHeight
-            noOuterBorder
-            searchPlaceholder="Search tools, resources, prompts..."
-            pagination={false}
-            sideBar
-            domLayout="normal"
-        />
+    return (
+        <Box className="agentic-flex-fill">
+            {asset?.description && (
+                <>
+                    <Box paddingInlineStart="3" paddingInlineEnd="3" paddingBlockStart="3" paddingBlockEnd="3">
+                        <Text variant="bodySm">{asset.description}</Text>
+                    </Box>
+                    <Divider />
+                </>
+            )}
+            {allRows.length === 0 ? (
+                <Box padding="4"><Text variant="bodySm" color="subdued">No tools, resources, prompts or skills found.</Text></Box>
+            ) : (
+                <AgGridTable
+                    rowData={allRows}
+                    columnDefs={COMBINED_MCP_COL_DEFS}
+                    defaultColDef={GRID_DEFAULT_COL}
+                    onRowClicked={handleRowClick}
+                    getRowStyle={() => ({ cursor: "pointer" })}
+                    fillHeight
+                    noOuterBorder
+                    searchPlaceholder="Search tools, resources, prompts..."
+                    pagination={false}
+                    sideBar
+                    domLayout="normal"
+                />
+            )}
+        </Box>
     );
 }

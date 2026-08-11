@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Box, Text, Badge, HorizontalStack, VerticalStack } from "@shopify/polaris";
+import { Box, Text, Badge, HorizontalStack, VerticalStack, Spinner, Divider } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { TypeBadge, RiskPill, SeverityBadge } from "./AgenticCellRenderers";
 import { ToolDetailPanel, SkillDetailPanel } from "./McpComponentsView";
@@ -115,9 +115,13 @@ const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 function AgentMcpToolsView({ asset, selectedMcp, agenticFlatData, goToList, onNavChange, setSelectedTool, setView }) {
     const [mcpTools, setMcpTools] = useState([]);
 
+    const mcpAsset = useMemo(
+        () => agenticFlatData.find((a) => a.name === selectedMcp.name || a.id === selectedMcp.name),
+        [agenticFlatData, selectedMcp?.name],
+    );
+
     useEffect(() => {
-        const flat = agenticFlatData.find((a) => a.name === selectedMcp.name || a.id === selectedMcp.name);
-        const collectionIds = flat?.collectionIds;
+        const collectionIds = mcpAsset?.collectionIds;
         if (!collectionIds?.length) { setMcpTools([]); return; }
         let cancelled = false;
         (async () => {
@@ -137,10 +141,18 @@ function AgentMcpToolsView({ asset, selectedMcp, agenticFlatData, goToList, onNa
             }
         })();
         return () => { cancelled = true; };
-    }, [selectedMcp?.name, agenticFlatData]);
+    }, [mcpAsset]);
 
     return (
         <Box className="agentic-flex-fill">
+            {mcpAsset?.description && (
+                <>
+                    <Box paddingInlineStart="3" paddingInlineEnd="3" paddingBlockStart="3" paddingBlockEnd="3">
+                        <Text variant="bodySm">{mcpAsset.description}</Text>
+                    </Box>
+                    <Divider />
+                </>
+            )}
             {mcpTools.length === 0 ? (
                 <Box padding="4"><Text variant="bodySm" color="subdued">No tools found.</Text></Box>
             ) : (
@@ -242,6 +254,10 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
     const [selectedSkill, setSelectedSkill] = useState(null);
     const [skills,        setSkills]        = useState([]);
     const [builtinTools,  setBuiltinTools]  = useState([]);
+    // Skills and built-in tools are fetched async; connectedMcps/configRow are derived
+    // synchronously. Track loading so the empty state isn't shown while a fetch is in flight.
+    const [skillsLoading,       setSkillsLoading]       = useState(true);
+    const [builtinToolsLoading, setBuiltinToolsLoading] = useState(true);
 
     const connectedMcps = useMemo(() => {
         if (!asset.mcpServers?.length) return [];
@@ -258,8 +274,9 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
 
     useEffect(() => {
         const collectionIds = asset?.collectionIds;
-        if (!collectionIds?.length) { setSkills([]); return; }
+        if (!collectionIds?.length) { setSkills([]); setSkillsLoading(false); return; }
         let cancelled = false;
+        setSkillsLoading(true);
         (async () => {
             try {
                 const results = await Promise.all(collectionIds.map(id => agenticObserveApi.fetchSkillsFlyoutData(id)));
@@ -274,6 +291,8 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
                 setSkills(merged);
             } catch {
                 if (!cancelled) setSkills([]);
+            } finally {
+                if (!cancelled) setSkillsLoading(false);
             }
         })();
         return () => { cancelled = true; };
@@ -281,8 +300,9 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
 
     useEffect(() => {
         const collectionIds = asset?.collectionIds;
-        if (!collectionIds?.length) { setBuiltinTools([]); return; }
+        if (!collectionIds?.length) { setBuiltinTools([]); setBuiltinToolsLoading(false); return; }
         let cancelled = false;
+        setBuiltinToolsLoading(true);
         (async () => {
             try {
                 const results = await Promise.all(collectionIds.map(id => agenticObserveApi.fetchAgentBuiltinToolsData(id)));
@@ -295,6 +315,8 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
                 setBuiltinTools(merged);
             } catch {
                 if (!cancelled) setBuiltinTools([]);
+            } finally {
+                if (!cancelled) setBuiltinToolsLoading(false);
             }
         })();
         return () => { cancelled = true; };
@@ -391,7 +413,7 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
     }
 
     if (view === "skill-detail" && selectedSkill) {
-        return <SkillDetailPanel skill={selectedSkill} />;
+        return <SkillDetailPanel skill={selectedSkill} collectionIds={asset?.collectionIds} />;
     }
 
     if (view === "config-detail") {
@@ -399,6 +421,9 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
     }
 
     if (allComponents.length === 0) {
+        if (skillsLoading || builtinToolsLoading) {
+            return <Box padding="4"><Spinner accessibilityLabel="Loading components" size="small" /></Box>;
+        }
         return <Box padding="4"><Text variant="bodySm" color="subdued">No components found for this agent.</Text></Box>;
     }
 
