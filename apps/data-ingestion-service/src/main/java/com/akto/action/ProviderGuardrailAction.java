@@ -52,6 +52,11 @@ public class ProviderGuardrailAction extends ActionSupport {
     private Map<String, Object> response;
 
     public String guardrail() {
+        HttpServletRequest req = ServletActionContext.getRequest();
+        loggerMaker.infoAndAddToDb("[API-TRACE] ProviderGuardrailAction.guardrail HIT - method: "
+                + req.getMethod() + ", uri: " + req.getRequestURI() + ", provider: " + provider,
+                LoggerMaker.LogDb.DATA_INGESTION);
+
         ProviderAdapter adapter = ProviderRegistry.get(provider);
         if (adapter == null) {
             loggerMaker.warn("Provider guardrail: unknown provider '" + provider + "'");

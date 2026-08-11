@@ -12,6 +12,9 @@ import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.struts2.ServletActionContext;
+
+import javax.servlet.http.HttpServletRequest;
 
 @lombok.Getter
 @lombok.Setter
@@ -26,6 +29,7 @@ public class IngestionAction extends ActionSupport {
 
     public String ingestData() {
         try {
+            logApiHit("ingestData");
             printLogs("ingestData batch size " + batchData.size());
             for (IngestDataBatch payload: batchData) {
                 printLogs("Inserting data to kafka...");
@@ -84,13 +88,25 @@ public class IngestionAction extends ActionSupport {
     }
 
     public String healthCheck() {
+        logApiHit("healthCheck");
         success = true;
         return Action.SUCCESS.toUpperCase();
     }
 
     public String authCheck() {
+        logApiHit("authCheck");
         success = true;
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private static void logApiHit(String method) {
+        try {
+            HttpServletRequest req = ServletActionContext.getRequest();
+            loggerMaker.warnAndAddToDb("[API-TRACE] IngestionAction." + method + " HIT - httpMethod: "
+                    + req.getMethod() + ", uri: " + req.getRequestURI(), LoggerMaker.LogDb.DATA_INGESTION);
+        } catch (Exception e) {
+            loggerMaker.warnAndAddToDb("[API-TRACE] IngestionAction." + method + " HIT (uri unavailable)");
+        }
     }
     
 }
