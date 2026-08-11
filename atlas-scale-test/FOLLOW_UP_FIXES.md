@@ -463,6 +463,37 @@ pick up cold.
   (`agentic-assets`/`users-and-devices`/`endpoints`, i.e. `AgenticAssetsPage`/`UsersAndDevices`/
   `DeviceEndpoints`) since they equally don't read these fields, but wasn't extended there since
   only the legacy page was in scope for this round — worth a quick follow-up.
+- **`fetchAgenticAssetsSummary` took 13-17s (up to 30s observed) for a ~5KB response on Atlas Scale
+  Test (25,890 collections)**, reported right after the two fixes above shipped. Added timing
+  instrumentation and found the culprit wasn't the Mongo query (`findAll` ~1-3s) but
+  `classifyAllGroups` — the in-memory tag/skill/type classification pass over EVERY collection in
+  the account — alone taking 30s+ under concurrent load. Root cause: `fetchAgenticAssetsSummary`,
+  `fetchAgenticAssetsStats`, and `fetchAgenticAssetDetail` each independently re-ran this same O(N)
+  pass on **every single request** — every sort click, filter change, tab switch, page turn, or
+  asset open — with zero sharing between them, and a fresh page load fires several of these calls
+  within seconds of each other (initial mount, stats card, async skill-enrichment refetch), so they
+  piled up and contended for CPU simultaneously, multiplying the already-expensive per-call cost.
+  Fixed by adding a per-account cache of the `(collections, groups)` classification result, keyed
+  by `accountId`, TTL 60s (matching the frontend's own traffic/risk/sensitive bundle caching
+  convention) — shared by all three endpoints. `ConcurrentHashMap.compute()`'s per-key locking
+  turns concurrent cache misses for the same account into one shared rebuild instead of N redundant
+  ones (the actual "thundering herd" that made the live numbers so much worse than a single
+  isolated call). `fetchAgenticAssetDetail` was changed to forward its own real
+  `trafficMap`/`riskScoreMap` into the cache lookup instead of empty maps — it never read those
+  fields itself, but since the cache is now shared, a rebuild it triggered with empty maps would
+  have poisoned the other two callers' traffic/risk data for the whole TTL window.
+  `fetchAgenticAssetsStats` has the mirror-image gap for `sensitiveMap` (it never sends/reads that
+  field either) — left as an accepted, self-healing, TTL-bounded edge case (at most 60s of blank
+  "Sensitive data" icons if its call happens to win a rebuild race) rather than plumbing an unused
+  field through a stats card that doesn't need it; flagged as a possible follow-up if it proves
+  visible in practice. Also added a cheap sweep (piggybacked on the already-slow rebuild path, no
+  extra thread) to stop the cache from growing unboundedly across many distinct accounts over a
+  long server uptime. Verified live: cold cache build ~7-9s (was 13-30s, and now shared across
+  concurrent requests instead of each paying it separately), warm-cache hits down to 20-400ms
+  depending on tab/row count; numbers and filters/sort still match exactly (795/12/25/0/758).
+  **`fetchUsersAndDevicesSummary`/`fetchDeviceEndpointsSummary` have the identical uncached
+  findAll+classify pattern and would hit the same problem at this account's scale** — not fixed
+  here (out of scope for this round), tracked under "Duplication & efficiency" below.
 
 ## High priority — wrong output today
 
@@ -571,11 +602,17 @@ angles flagged the same patterns, so they're worth batching into one cleanup pas
 - [ ] Pagination-clamp logic (`effectiveLimit`/`from`/`to`) hand-copied 6× across
   `AgenticObserveAction.java`, `NhiGovernanceViolationsAction.java`, `ModuleInfoAction.java`, with
   inconsistent default caps (50/500 vs 20/200). Extract one shared `paginate(list, skip, limit)`.
-- [ ] `fetchAgenticAssetsSummary`/`fetchUsersAndDevicesSummary`/`fetchDeviceEndpointsSummary` load
-  **every** collection via `findAll(Filters.empty())` then classify+slice in memory on every
-  request — not real DB-level pagination. Two sibling endpoints in the same PR
-  (`NhiGovernanceViolationsAction.fetchAllViolations`, `ModuleInfoAction.fetchEndpointShieldAgents`)
-  already do real `$skip`/`$limit` aggregation; worth matching that pattern here too.
+- [ ] `fetchUsersAndDevicesSummary`/`fetchDeviceEndpointsSummary` load **every** collection via
+  `findAll(Filters.empty())` then classify+slice in memory on every request — not real DB-level
+  pagination. `fetchAgenticAssetsSummary`/`fetchAgenticAssetsStats`/`fetchAgenticAssetDetail` had
+  the exact same pattern but got a per-account short-TTL cache of the findAll+classify pass instead
+  (see "Already fixed" above — a real fix for the repeat-call cost this round's user report was
+  about, but still not real DB-level pagination for a COLD cache miss, which still pays the full
+  O(N) cost once per TTL window). These two sibling methods don't share that cache yet and would
+  hit the exact same 13-30s-at-scale problem on a large account. Two sibling endpoints in the same
+  PR (`NhiGovernanceViolationsAction.fetchAllViolations`, `ModuleInfoAction.fetchEndpointShieldAgents`)
+  already do real `$skip`/`$limit` aggregation; worth matching that pattern here too, or at minimum
+  extending the same cache to these two methods first (much smaller change).
 - [ ] Client-side full-account maps (`trafficMap`/`riskScoreMap`/etc.) are re-POSTed in full on
   every grid interaction — moves the "multi-MB payload" problem this PR fixed from response to
   request. Consider computing these server-side (join/lookup) instead of round-tripping them.
