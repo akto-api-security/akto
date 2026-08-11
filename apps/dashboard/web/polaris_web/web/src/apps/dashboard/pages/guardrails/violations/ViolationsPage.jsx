@@ -8,6 +8,7 @@ import {
     HorizontalGrid,
     HorizontalStack,
     Modal,
+    Tabs,
     Text,
     VerticalStack,
 } from "@shopify/polaris";
@@ -584,8 +585,19 @@ function Violations() {
     // set-filter: the pie's subcategory names come from a different endpoint than the set
     // filter's known values, so setColumnFilterModel would silently drop them.
     const [activeTypeSubCategories, setActiveTypeSubCategories] = useState([]);
-    const [selectedCard, setSelectedCard] = useState("open");          // "open" or "other"
-    const [activeStatusValue, setActiveStatusValue] = useState("ACTIVE"); // drives backend statusFilter
+
+    // Single source of truth for the tab bar, mirroring the old UI's SusDataTable tab ids exactly:
+    // 'active' | 'under_review' | 'ignored' | 'needs_approval' | 'skills_evaluations'.
+    const [currentTab, setCurrentTab] = useState("active");
+    const isSkillsEvaluationsTab = currentTab === "skills_evaluations";
+    const isNeedsApprovalTab = currentTab === "needs_approval";
+    // Needs Approval and Skills Evaluations are both views over ACTIVE events narrowed by other
+    // means (client-side behaviour filter / skillEvaluationMode below), not their own status
+    // value - same convention as SusDataTable's effectiveStatus.
+    const activeStatusValue = (isSkillsEvaluationsTab || isNeedsApprovalTab) ? "ACTIVE" : currentTab.toUpperCase();
+    // Drives the summary cards' outline - neither "open" nor "other" card highlights on Needs
+    // Approval/Skills Evaluations, since those are orthogonal views, not a status.
+    const selectedCard = currentTab === "active" ? "open" : ((isSkillsEvaluationsTab || isNeedsApprovalTab) ? "other-view" : "other");
     const gridRef = useRef(null);
     const prevSelectedIdRef = useRef(null);
     const gridFilterKey = useRef(`violations-${Date.now()}`);
@@ -716,24 +728,28 @@ function Violations() {
     const triggerTableRefresh = useCallback(() => setTableKey(k => k + 1), []);
 
     const handleOpenCardClick = useCallback(() => {
-        if (selectedCard === "open") return;
-        setSelectedCard("open");
-        setActiveStatusValue("ACTIVE");
+        if (currentTab === "active") return;
+        setCurrentTab("active");
         triggerTableRefresh();
-    }, [selectedCard, triggerTableRefresh]);
+    }, [currentTab, triggerTableRefresh]);
 
     const handleOtherCardClick = useCallback(() => {
-        if (selectedCard === "other") return;
-        setSelectedCard("other");
-        setActiveStatusValue("UNDER_REVIEW");
+        if (currentTab === "under_review" || currentTab === "ignored") return;
+        setCurrentTab("under_review");
         triggerTableRefresh();
-    }, [selectedCard, triggerTableRefresh]);
+    }, [currentTab, triggerTableRefresh]);
 
     const handleOtherBreakdownClick = useCallback((key) => {
-        setSelectedCard("other");
-        setActiveStatusValue(prev => prev === key ? "UNDER_REVIEW" : key);
+        const target = key === "IGNORED" ? "ignored" : "under_review";
+        setCurrentTab(prev => prev === target ? "under_review" : target);
         triggerTableRefresh();
     }, [triggerTableRefresh]);
+
+    const handleTabSelect = useCallback((tabId) => {
+        if (tabId === currentTab) return;
+        setCurrentTab(tabId);
+        triggerTableRefresh();
+    }, [currentTab, triggerTableRefresh]);
 
     // ─── Fetch summary stats from existing backend APIs ─────────────────────
     // Replaces the old client-side computeSummary() that required all data loaded.
@@ -860,13 +876,19 @@ function Violations() {
     // Uses the existing fetchSuspectSampleData API that SusDataTable also uses.
     // AgGridTable's onServerFetch mode handles pagination, sort, and search automatically.
     const onServerFetch = useCallback(({ filters, sortKey, sortOrder, skip, limit, searchString }) => {
-        const pageSize = limit || 50;
         const severityFilter = filters?.severity || [];
         const hostFilter = filters?.user || [];
         // Union the column filter, the "Top Policies" card selection, and the pie's type filter
         // (all map to the backend latestAttack).
         const policyFilter = [...new Set([...(filters?.policyName || []), ...activePolicyFilter, ...activeTypeSubCategories])];
         const statusFilter = activeStatusValue;
+        // Skills Evaluations partition (Atlas/ENDPOINT only): "only" on that tab, "exclude" on
+        // Active - same convention as SusDataTable.jsx. Backend applies it only when
+        // contextSource === ENDPOINT; undefined (no-op) for Agentic accounts or the other tabs.
+        const skillEvaluationMode = isEndpointSecurityCategory()
+            ? (isSkillsEvaluationsTab ? "only" : (currentTab === "active" ? "exclude" : undefined))
+            : undefined;
+        const pageSize = limit || 50;
 
         // AgGridTable sends sortOrder: -1 for asc, 1 for desc (opposite of MongoDB convention)
         const mongoSort = sortOrder ? -sortOrder : -1;
@@ -893,13 +915,14 @@ function Violations() {
             undefined,      // method
             isSeveritySort, // sortBySeverity — triggers aggregation-based rank sort in backend
             severityFilter.length > 0 ? severityFilter : undefined,
+            skillEvaluationMode,
         ).then(result => {
             const events = result?.maliciousEvents || [];
             const transformed = events.map(e => transformEvent(e, collectionsMap, usernameMapRef.current));
             setRows(transformed);
             return { value: transformed, total: result?.total || 0 };
         });
-    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter]);
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, currentTab, isSkillsEvaluationsTab]);
 
     // Reload the grid when the Top Policies card selection changes (skip the initial mount).
     const policyFilterFirstRun = useRef(true);
@@ -988,16 +1011,42 @@ function Violations() {
         return params.data?.id === selectedViolation?.id ? "violations-row-selected" : undefined;
     }, [selectedViolation]);
 
-    const tableHeading = selectedCard === "open"
-        ? "All Open Violations"
-        : activeStatusValue === "IGNORED"
-            ? "All Ignored Violations"
-            : "All Under Review Violations";
+    // Same tab set and ids as SusDataTable.jsx (old UI) - "Skills Evaluations" gated to Endpoint
+    // Security, matching where skillEvaluationMode actually takes effect server-side.
+    const tabItems = useMemo(() => {
+        // Live counts (Active/Under Review/Ignored) come straight from the same
+        // getDailyThreatActorsCount response summaryData already holds - matching the tab-count
+        // badges GithubServerTable renders for the old UI's equivalent tabs. Skills Evaluations
+        // doesn't get a number, same as old UI (it's a "Beta" label there too, not a count).
+        const statusCounts = summaryData?.statusCounts || {};
+        const withCount = (label, key) => {
+            const count = statusCounts[key];
+            return typeof count === "number" ? `${label} (${count.toLocaleString()})` : label;
+        };
+        const items = [
+            { id: "active", content: withCount("Active", "ACTIVE") },
+            { id: "under_review", content: withCount("Under Review", "UNDER_REVIEW") },
+            { id: "ignored", content: withCount("Ignored", "IGNORED") },
+        ];
+        if (isEndpointSecurityCategory()) {
+            // Tabs' `badge` prop is declared in this Polaris version's types but not actually
+            // rendered by the component - `content` is also strictly a string, not a node, so
+            // there's no way to attach a real Badge here. Folding "(Beta)" into the label is the
+            // only thing that reliably renders.
+            items.push({ id: "skills_evaluations", content: "Skills Evaluations (Beta)" });
+        }
+        return items;
+    }, [summaryData]);
+    const selectedTabIndex = Math.max(0, tabItems.findIndex(t => t.id === currentTab));
 
     const tableComponent = (
         <Box key="table" className="violations-table-wrap">
             <Box paddingBlockEnd="3">
-                <Text variant="headingSm">{tableHeading}</Text>
+                <Tabs
+                    tabs={tabItems}
+                    selected={selectedTabIndex}
+                    onSelect={(index) => handleTabSelect(tabItems[index].id)}
+                />
             </Box>
             <AgGridTable
                 key={`violations-grid-${tableKey}-${startTimestamp}-${endTimestamp}`}
