@@ -331,7 +331,7 @@ public class Main {
         String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG") != null
                 ? System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG")
                 : "asdf";
-        boolean syncImmediately = true;
+        boolean syncImmediately = false;
         boolean fetchAllSTI = true;
         Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
 
