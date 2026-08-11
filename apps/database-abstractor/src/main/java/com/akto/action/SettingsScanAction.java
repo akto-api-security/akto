@@ -49,10 +49,11 @@ public class SettingsScanAction extends ActionSupport {
         "\n" +
         "Each finding: {\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"|\"CRITICAL\", \"category\":\"risky\"|\"malicious\", \"fieldPath\":\"...\", \"title\":\"...\", \"message\":\"...\", \"evidence\":\"...\", \"overview\":\"...\", \"remediation\":\"...\"}\n" +
         "\n" +
-        "message: one direct sentence (add a second only if needed) naming the exact field and its actual value, then stating exactly what that value lets happen — no hedging, no abstraction.\n" +
-        "  GOOD: \"permissions.defaultMode is set to bypassPermissions. This lets the agent run any command or edit any file with no user confirmation, so a prompt-injected instruction executes immediately instead of waiting for approval.\"\n" +
-        "  GOOD: \"disableAllHooks is set to true. Every hook in this file stops running, including monitoring or security-validation hooks, so nothing is checking or logging what the agent does.\"\n" +
-        "  BAD (never write like this): \"This field may pose a security risk if misconfigured.\" / \"could allow unauthorized execution.\" / \"can be quite risky.\"\n" +
+        "message: one or two sentences, written as fact about this file. Name the field, quote the value it\n" +
+        "  actually holds, and say what that value lets the agent do that it otherwise could not. Present\n" +
+        "  tense, plain words, no hedging (may, could, might, potentially) and no restating of the risk in\n" +
+        "  the abstract — a reader who knows nothing about this config should finish the sentence knowing\n" +
+        "  what changed and why it matters.\n" +
         "\n" +
         "COMPLETENESS — do not stop after your first finding: after drafting your findings, re-scan the input\n" +
         "top to bottom one more time against every risk category above, independently of what you already\n" +
@@ -66,9 +67,11 @@ public class SettingsScanAction extends ActionSupport {
         "\n" +
         "GROUNDING — DO NOT HALLUCINATE: every fieldPath, evidence, and quoted value must be copied\n" +
         "character-for-character from the JSON below. Never invent or assume a field's value — if you\n" +
-        "cannot point to its literal key/value in the input, do not report it. Before emitting a finding for\n" +
-        "a boolean/enum field, reread what its actual value does per your own \"## What is this?\" text — if\n" +
-        "that value keeps a protection ON or access restricted, it is safe and must not be a finding.";
+        "cannot point to its literal key/value in the input, do not report it. Before emitting each finding,\n" +
+        "search the input JSON below for that exact fieldPath's key — if it is not there, DELETE the finding,\n" +
+        "no matter how plausible or how closely it matches an example you've seen. Before emitting a finding\n" +
+        "for a boolean/enum field, reread what its actual value does per your own \"## What is this?\" text —\n" +
+        "if that value keeps a protection ON or access restricted, it is safe and must not be a finding.";
 
     // Field scope below is grounded in OpenAI's own Codex security/config docs:
     // https://learn.chatgpt.com/docs/security-administration
@@ -103,19 +106,19 @@ public class SettingsScanAction extends ActionSupport {
     private static final String CLAUDE_SETTINGS_SCAN_PROMPT = BASE_SCAN_PROMPT + "\n\n" +
         "TOOL: Claude Code settings.json.\n" +
         "\n" +
-        "HARD EXCLUSIONS — never flag these:\n" +
-        "- Any MCP allow/deny field: allowAllMcpServers, enabledMcpjsonServers, disabledMcpjsonServers,\n" +
-        "  enableAllProjectMcpServers, mcpServers entries. No exceptions, at any value.\n" +
-        "- statusLine and everything under it (statusLine.command, statusLine.type, etc). No exceptions, at\n" +
-        "  any value.\n" +
-        "- disableAllHooks when its value is false. Flag it when the value is true. Everything else under\n" +
-        "  \"hooks\" — hook commands, hook prompts, hook events — skip entirely regardless of value.\n" +
-        "- credentialHelper fields.\n" +
-        "- Bare grants of read-only/inert tools in permissions.allow (\"Read\", \"Grep\", \"Glob\", \"Agent\",\n" +
-        "  \"Skill\", MCP tool names, etc.) — these cannot change state, so listing them is normal, not a risk.\n" +
-        "  A bare grant of \"Write\", \"Edit\", \"Bash\", \"NotebookEdit\", or \"WebFetch\" (no command/path scoping\n" +
-        "  at all) IS a finding (HIGH / risky) — it lets every project loading this file write/execute/fetch\n" +
-        "  anything with no per-command review, which is materially riskier than a read-only grant.\n" +
+        "SCOPE — permissions.* and sandbox.* fields, plus the single field disableAllHooks: permissions.\n" +
+        "defaultMode, permissions.allow / .ask / .deny entries, permissions.additionalDirectories,\n" +
+        "sandbox.enabled, sandbox.network.*, sandbox.filesystem.*, sandbox.credentials, sandbox.\n" +
+        "autoAllowBashIfSandboxed, sandbox.excludedCommands, disableAllHooks. The audit trail for MCP fields\n" +
+        "(allowAllMcpServers, enabledMcpjsonServers, disabledMcpjsonServers, enableAllProjectMcpServers,\n" +
+        "mcpServers entries), statusLine, credentialHelper, and every other hooks field lives elsewhere and\n" +
+        "is already covered by that pass.\n" +
+        "\n" +
+        "Within scope, judge each field the same way as above: does its actual value skip approval, turn\n" +
+        "off or weaken the sandbox, or grant a bare state-changing tool (\"Write\", \"Edit\", \"Bash\",\n" +
+        "\"NotebookEdit\", \"WebFetch\") with no command/path scoping? Bare read-only/inert tools (\"Read\",\n" +
+        "\"Grep\", \"Glob\", \"Agent\", \"Skill\", MCP tool names) are expected and not a finding. disableAllHooks\n" +
+        "is a finding only when its literal value, copied from the input, is true.\n" +
         "\n" +
         "NOW SCAN THE JSON BELOW.";
 
@@ -220,6 +223,11 @@ public class SettingsScanAction extends ActionSupport {
                 logger.info("[SettingsScan] Dropping disableAllHooks finding — settingsJson has disableAllHooks: false", LogDb.DB_ABS);
                 continue;
             }
+            if (!fieldPresentInConfig(finding.get("fieldPath"))) {
+                logger.info("[SettingsScan] Dropping finding — fieldPath not present in settingsJson: "
+                        + finding.get("fieldPath"), LogDb.DB_ABS);
+                continue;
+            }
             findings.add(finding);
         }
         logger.info(String.format(
@@ -263,6 +271,15 @@ public class SettingsScanAction extends ActionSupport {
         Object content = message.get("content");
         if (content == null) throw new RuntimeException("No content in LLM message");
         return content.toString();
+    }
+
+    private boolean fieldPresentInConfig(Object fieldPath) {
+        if (!TOOL_CLAUDE.equals(tool)) return true;
+        if (fieldPath == null || settingsJson == null) return true;
+        String path = fieldPath.toString();
+        String key = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
+        if (key.isEmpty()) return true;
+        return settingsJson.contains("\"" + key + "\"");
     }
 
     private static String extractJsonArray(String raw) {
