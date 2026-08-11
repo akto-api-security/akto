@@ -13,9 +13,7 @@ import useTable from "../../components/tables/TableContext";
 import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import values from "@/util/values";
-import { IdentityIcon, AgentIcon, sevBadge, PolicyCell, SEV_ORD } from "./nhiViolationsData";
-import { getFirstIdentityName, getAllIdentityNames } from "./identityHelper";
-import { formatRelativeTime } from "./nhiUtils";
+import { mapViolationToRow, transformViolationsPage } from "./nhiViolationsData";
 import ViolationDetailsPanel from "./ViolationDetailsPanel";
 import observeRequests from "../observe/api";
 import SpinnerCentered from "../../components/progress/SpinnerCentered";
@@ -93,58 +91,6 @@ const colDefs = [
     { field: "policyComp", headerName: "Policy", minWidth: 200, sortable: false, cellRenderer: JsxCellRenderer },
     { field: "discovered", headerName: "Discovered", minWidth: 140, cellRenderer: JsxCellRenderer },
 ];
-
-// Builds one table row from a raw violation doc returned by the server. Mirrors
-// nhiViolationsData.jsx's transformApiViolations() field-for-field, but — unlike that
-// helper — does NOT re-sort the array by severity afterwards: transformApiViolations's
-// baked-in client sort is fine for its other caller (IdentityDetailsPanel, which loads a
-// small unpaginated set) but would silently scramble whatever order/page the server was
-// asked for here (e.g. sort-by-"Discovered"), so this page keeps its own thin mapper.
-function mapViolationToRow(v) {
-    const violationHexId = v.hexId || v.id;
-    const policyObj = v.policy && Array.isArray(v.policy)
-        ? {
-            primary: v.policy[0] || "N/A",
-            extra: Math.max(0, v.policy.length - 1),
-            extras: v.policy.slice(1) || [],
-          }
-        : v.policy;
-    const firstIdentityName = getFirstIdentityName(v.identities);
-    const allIdentityNames = getAllIdentityNames(v.identities);
-    const extraCount = allIdentityNames.length - 1;
-    return {
-        ...v,
-        id: violationHexId,
-        violation: v.violationType,
-        identity: firstIdentityName,
-        identities: v.identities,
-        discovered: formatRelativeTime(v.discoveredAt, "Unknown"),
-        severityOrder: SEV_ORD[v.severity] || 0,
-        policy: policyObj,
-        violationComp: <Text variant="bodyMd" fontWeight="medium">{v.violationType}</Text>,
-        identityComp: (
-            <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                <IdentityIcon name={firstIdentityName} />
-                <Text variant="bodyMd">{firstIdentityName}</Text>
-                {extraCount > 0 && (
-                    <Badge>{`+${extraCount}`}</Badge>
-                )}
-            </HorizontalStack>
-        ),
-        agentComp: (
-            <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                <AgentIcon name={v.agentName} />
-                <Text variant="bodyMd">{v.agentName}</Text>
-            </HorizontalStack>
-        ),
-        severityComp: sevBadge(v.severity),
-        policyComp: <PolicyCell policy={policyObj} />,
-    };
-}
-
-function transformViolationsPage(apiViolations) {
-    return (apiViolations || []).map(mapViolationToRow);
-}
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 const violationsPageTitle = (

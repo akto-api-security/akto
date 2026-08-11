@@ -1274,6 +1274,8 @@ export default {
         })
     },
 
+    // Unpaginated — feeds IdentityOverviewGraph's topology graph, which needs every identity.
+    // The Identities page's own table uses fetchAllNhiIdentities (below) instead.
     async fetchNhiIdentities(startTimestamp, endTimestamp) {
         const resp = await request({
             url: '/api/fetchNhiIdentities',
@@ -1281,6 +1283,17 @@ export default {
             data: { startTimestamp, endTimestamp }
         })
         return resp?.identities || []
+    },
+
+    // Server-side paginated (ATLAS NHI Governance Identities page): pass skip/limit/sortKey/sortOrder/
+    // queryValue/status ("Expired"/"Disabled"/omit-for-"All") to get one page. Returns {identities, total}.
+    async fetchAllNhiIdentities(startTimestamp, endTimestamp, { skip, limit, sortKey, sortOrder, queryValue, status } = {}) {
+        const resp = await request({
+            url: '/api/fetchAllNhiIdentities',
+            method: 'post',
+            data: { startTimestamp, endTimestamp, skip, limit, sortKey, sortOrder, queryValue, status }
+        })
+        return { identities: resp?.identities || [], total: resp?.total || 0 }
     },
 
     // Server-side paginated (ATLAS NHI Governance): pass skip/limit/sortKey/sortOrder/queryValue/status
@@ -1309,11 +1322,11 @@ export default {
 
     // Scoped, paginated violations for ONE identity (identity-details flyout) — replaces fetching every
     // violation account-wide with no time bound just to filter down to a single identity client-side.
-    async fetchViolationsByIdentity(identityId, { skip, limit } = {}) {
+    async fetchViolationsByIdentity(identityId, { skip, limit, sortKey, sortOrder, queryValue } = {}) {
         const resp = await request({
             url: '/api/fetchViolationsByIdentity',
             method: 'post',
-            data: { identityId, skip, limit }
+            data: { identityId, skip, limit, sortKey, sortOrder, queryValue }
         })
         return { violations: resp?.violations || [], total: resp?.total || 0, stats: resp?.stats || {} }
     },

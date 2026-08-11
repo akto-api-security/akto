@@ -1,65 +1,107 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { ActionList, Box, Button, HorizontalStack, Popover, Text, VerticalStack } from "@shopify/polaris";
-import { IndexFiltersMode } from "@shopify/polaris";
 import FlyLayout from "../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
-import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
-import { IdentityIcon, violationsHeaders, violationsSortOptions, transformApiViolations } from "./nhiViolationsData";
+import AgGridTable from "../../components/tables/AgGridTable";
+import { IdentityIcon, transformViolationsPage } from "./nhiViolationsData";
 import IdentityGraph from "./IdentityGraph";
 import observeRequests from "../observe/api";
 import func from "@/util/func";
 
 const NHI_VIOLATIONS_PATH = "/dashboard/nhi/violations";
-// A single identity's violations are bounded by usage against that one credential, unlike the
-// account-wide violations stream — one page comfortably covers virtually every identity.
-const IDENTITY_VIOLATIONS_LIMIT = 200;
+
+// ── AG Grid column definitions (mirrors ViolationsPage.jsx's own colDefs) ──────────
+function JsxCellRenderer({ value }) {
+    return value ?? null;
+}
+
+const DEFAULT_COL_DEF = {
+    sortable: true,
+    resizable: true,
+    filter: false,
+    cellStyle: { display: "flex", alignItems: "center" },
+};
+
+// AG Grid colId -> backend sortKey (NhiGovernanceViolationsAction.mapSortField)
+const SORT_FIELD_MAP = {
+    violationComp: "violationType",
+    agentComp: "agent",
+    severityComp: "severity",
+    discovered: "detected",
+};
+
+const colDefs = [
+    { field: "violationComp", headerName: "Violation", minWidth: 180, cellRenderer: JsxCellRenderer },
+    { field: "identityComp", headerName: "Identity", minWidth: 160, sortable: false, cellRenderer: JsxCellRenderer },
+    { field: "agentComp", headerName: "Agentic Asset", minWidth: 160, cellRenderer: JsxCellRenderer },
+    { field: "severityComp", headerName: "Severity", minWidth: 110, sort: "desc", sortIndex: 0, cellRenderer: JsxCellRenderer },
+    { field: "policyComp", headerName: "Policy", minWidth: 160, sortable: false, cellRenderer: JsxCellRenderer },
+    { field: "discovered", headerName: "Discovered", minWidth: 120, cellRenderer: JsxCellRenderer },
+];
 
 export default function IdentityDetailsPanel({ row, show, setShow, onUpdated }) {
     const [actionActive, setActionActive] = useState(false);
-    const [rawViolations, setRawViolations] = useState([]);
     const [total, setTotal] = useState(0);
     const [severityCounts, setSeverityCounts] = useState({});
-    const [loading, setLoading] = useState(true);
     const [disabling, setDisabling] = useState(false);
 
-    // Fetch violations scoped to THIS identity only (server-side filter), instead of pulling every
-    // violation account-wide with no time bound and filtering client-side on every panel open.
+    // Cheap stats-only fetch (limit: 1) — populates the title bubbles/overview description
+    // immediately on panel open, before the user ever switches to the Violations tab (whose own
+    // AgGridTable, below, only mounts once that tab is actually selected). total/severityCounts
+    // are whole-identity aggregates computed server-side regardless of page size, so a limit-1
+    // call is just as accurate as fetching everything — see fetchViolationsByIdentity.
     useEffect(() => {
-        const fetchViolations = async () => {
+        const fetchStats = async () => {
             try {
-                setLoading(true);
-                const { violations, total: totalCount, stats } = await observeRequests.fetchViolationsByIdentity(
-                    row.hexId, { limit: IDENTITY_VIOLATIONS_LIMIT }
+                const { total: totalCount, stats } = await observeRequests.fetchViolationsByIdentity(
+                    row.hexId, { limit: 1 }
                 );
-                setRawViolations(Array.isArray(violations) ? violations : []);
                 setTotal(totalCount || 0);
                 setSeverityCounts(stats?.bySeverityOpen || {});
             } catch (err) {
-                console.error("Error fetching violations:", err);
-                setRawViolations([]);
+                console.error("Error fetching violation stats:", err);
                 setTotal(0);
                 setSeverityCounts({});
-            } finally {
-                setLoading(false);
             }
         };
 
         if (show && row?.hexId) {
-            fetchViolations();
+            fetchStats();
         }
     }, [show, row?.hexId]);
 
-    const identityViolations = useMemo(() => transformApiViolations(rawViolations), [rawViolations]);
     const violCrit = severityCounts.Critical || 0;
     const violHigh = severityCounts.High || 0;
     const violMed  = severityCounts.Medium || 0;
     const totalViolations = total;
 
-    const handleViolationClick = (violationRow) => {
-        sessionStorage.setItem("nhi_pending_violation", JSON.stringify(violationRow));
+    // ─── Server-side data fetch for the Violations tab's AG Grid ────────────────
+    const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
+        const pageSize = limit || 20;
+        const mappedSortKey = SORT_FIELD_MAP[sortKey] || sortKey || "detected";
+        // AG Grid SSRM sends sortOrder: -1 for asc, 1 for desc — opposite of the backend's Mongo
+        // convention, matching ViolationsPage.jsx's own onServerFetch.
+        const mongoSortOrder = sortOrder ? -sortOrder : -1;
+
+        return observeRequests.fetchViolationsByIdentity(row.hexId, {
+            skip,
+            limit: pageSize,
+            sortKey: mappedSortKey,
+            sortOrder: mongoSortOrder,
+            queryValue: searchString || undefined,
+        }).then((res) => {
+            setTotal(res.total || 0);
+            setSeverityCounts(res.stats?.bySeverityOpen || {});
+            return { value: transformViolationsPage(res.violations), total: res.total || 0 };
+        });
+    }, [row?.hexId]);
+
+    const handleViolationClick = useCallback((e) => {
+        if (!e?.data) return;
+        sessionStorage.setItem("nhi_pending_violation", JSON.stringify(e.data));
         setShow(false);
         window.location.href = NHI_VIOLATIONS_PATH;
-    };
+    }, [setShow]);
 
     const handleDisableIdentity = async () => {
         try {
@@ -155,21 +197,23 @@ export default function IdentityDetailsPanel({ row, show, setShow, onUpdated }) 
     const violationsTab = {
         id: "violations",
         content: `Violations ${total > 0 ? total : ""}`.trim(),
-        component: identityViolations.length > 0 ? (
+        component: total > 0 ? (
             <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="4">
-                <GithubSimpleTable
-                    data={identityViolations}
-                    headers={violationsHeaders}
-                    resourceName={{ singular: "violation", plural: "violations" }}
-                    sortOptions={violationsSortOptions}
-                    filters={[]}
-                    selectable={false}
-                    mode={IndexFiltersMode.Default}
-                    headings={violationsHeaders}
-                    useNewRow={true}
-                    condensedHeight={true}
-                    onRowClick={handleViolationClick}
-                    rowClickable={true}
+                <AgGridTable
+                    key={`identity-violations-grid-${row.hexId}`}
+                    columnDefs={colDefs}
+                    defaultColDef={DEFAULT_COL_DEF}
+                    searchPlaceholder="Search violations"
+                    onRowClicked={handleViolationClick}
+                    getRowStyle={() => ({ cursor: "pointer" })}
+                    paginationPageSize={20}
+                    paginationPageSizeSelector={[20, 50, 100]}
+                    height={400}
+                    domLayout="normal"
+                    onServerFetch={onServerFetch}
+                    filterStateUrl="identity-violations-grid"
+                    serverSideRowModel
+                    getRowId={(params) => params.data.id}
                 />
             </Box>
         ) : (
