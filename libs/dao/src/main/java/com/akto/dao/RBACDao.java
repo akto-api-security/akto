@@ -50,9 +50,16 @@ public class RBACDao extends CommonContextDao<RBAC> {
     }
 
     /*
-     * Threat protection access is not fixed by the base role alone: a custom role carries
-     * an explicit toggle. Only an explicit value overrides, so roles created before the
-     * toggle existed (null) keep whatever their base role grants.
+     * Base roles whose threat access is decided by the role itself. Admin and the threat
+     * roles always keep it, guest never gets it, and a custom role built on any of them
+     * cannot override that either way.
+     */
+    private static final Set<Role> FIXED_THREAT_ACCESS_ROLES = new HashSet<>(java.util.Arrays.asList(
+            Role.ADMIN, Role.GUEST, Role.THREAT_ENGINEER, Role.THREAT_VIEWER));
+
+    /*
+     * A custom role on any other base role may be granted threat protection by its toggle.
+     * The toggle can only ever add access, never remove what the base role already gives.
      * Callers should invoke this only for Feature.THREAT_PROTECTION, since it costs a
      * custom role lookup.
      */
@@ -80,11 +87,17 @@ public class RBACDao extends CommonContextDao<RBAC> {
             }
 
             CustomRole customRole = CustomRoleDao.instance.findRoleByName(currentRole);
-            if (customRole == null || customRole.getThreatProtectionEnabled() == null) {
+            if (customRole == null || customRole.getBaseRole() == null) {
                 return baseRoleAccess;
             }
 
-            return customRole.getThreatProtectionEnabled() ? ReadWriteAccess.READ_WRITE : ReadWriteAccess.NO_ACCESS;
+            // the base role decides on its own; the toggle is not consulted
+            if (FIXED_THREAT_ACCESS_ROLES.contains(Role.valueOf(customRole.getBaseRole()))) {
+                return baseRoleAccess;
+            }
+
+            return Boolean.TRUE.equals(customRole.getThreatProtectionEnabled())
+                    ? ReadWriteAccess.READ_WRITE : baseRoleAccess;
         } catch (Exception e) {
             return baseRoleAccess;
         }

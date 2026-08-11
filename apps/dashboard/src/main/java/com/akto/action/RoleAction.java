@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -117,7 +118,7 @@ public class RoleAction extends UserAction {
     }
 
     @Setter
-    private Boolean threatProtectionEnabled;
+    private boolean threatProtectionEnabled;
 
     public String createCustomRole() {
 
@@ -145,7 +146,7 @@ public class RoleAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        CustomRole role = new CustomRole(roleName, baseRole, apiCollectionIds, defaultInviteRole, threatProtectionEnabled);
+        CustomRole role = new CustomRole(roleName, baseRole, apiCollectionIds, defaultInviteRole, threatProtectionEnabled, new ArrayList<>());
         CustomRoleDao.instance.insertOne(role);
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
         return SUCCESS.toUpperCase();

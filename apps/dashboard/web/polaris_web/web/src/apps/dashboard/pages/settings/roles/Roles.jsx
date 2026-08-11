@@ -45,29 +45,24 @@ function getRoleDisplayName(role) {
 
 export { rolesOptions, getRoleDisplayName }
 
-// base roles whose static access map already grants threat protection
-const THREAT_ENABLED_BASE_ROLES = ['ADMIN', 'THREAT_ENGINEER', 'THREAT_VIEWER']
-
 /*
- * threatProtectionEnabled is null for roles created before the toggle existed, which
- * means "no explicit choice" - those keep whatever the base role grants.
+ * Base roles that decide threat access themselves - admin and the threat roles always
+ * have it, guest never does. The backend ignores the toggle for these too, so showing
+ * it would imply a control that does not exist.
  */
-function threatEnabledFor(role) {
-    return role?.threatProtectionEnabled ?? THREAT_ENABLED_BASE_ROLES.includes(role?.baseRole)
-}
+const FIXED_THREAT_BASE_ROLES = ['ADMIN', 'GUEST', 'THREAT_ENGINEER', 'THREAT_VIEWER']
 
-// base roles that already grant threat protection have nothing to toggle
 function showThreatToggle(role) {
-    return !THREAT_ENABLED_BASE_ROLES.includes(role?.baseRole)
+    return !FIXED_THREAT_BASE_ROLES.includes(role?.baseRole)
 }
 
-/*
- * Only persist a choice while the toggle is shown. Saving one for a base role that
- * already grants threat access would leave a stale override behind if the base role
- * were later changed to one that does not.
- */
+function threatEnabledFor(role) {
+    return role?.threatProtectionEnabled === true
+}
+
+// never persist a choice for a base role that decides on its own
 function threatValueToSave(role) {
-    return showThreatToggle(role) ? threatEnabledFor(role) : null
+    return showThreatToggle(role) && threatEnabledFor(role)
 }
 
 // an empty feature map means a self-hosted deployment, where everything is granted

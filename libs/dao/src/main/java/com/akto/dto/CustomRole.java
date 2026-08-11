@@ -18,12 +18,14 @@ public class CustomRole {
     boolean defaultInviteRole;
 
     /*
-     * Whether this role may use threat protection, independent of what its base role
-     * allows. Nullable on purpose: null means "no explicit choice", so roles created
-     * before this existed keep whatever their base role grants.
+     * Grants threat protection to a base role that does not already have it. Only
+     * consulted for base roles outside FIXED_THREAT_ACCESS_ROLES, so an unset value
+     * matches what those roles grant anyway.
+     * Boxed because documents written before this field existed - and any written while
+     * it was nullable - carry an explicit null, and a primitive setter cannot take one.
+     * A single such document would otherwise fail decoding and break the whole roles API.
+     * Treat null as false; use Boolean.TRUE.equals when reading.
      */
-    @Getter
-    @Setter
     private Boolean threatProtectionEnabled;
 
     /*
@@ -38,7 +40,7 @@ public class CustomRole {
     public CustomRole() {
     }
 
-    public CustomRole(String name, String baseRole, List<Integer> apiCollectionsId, boolean defaultInviteRole, Boolean threatProtectionEnabled) {
+    public CustomRole(String name, String baseRole, List<Integer> apiCollectionsId, boolean defaultInviteRole, boolean threatProtectionEnabled, List<String> allowedFeaturesForUser) {
         switch (baseRole) {
             case "ADMIN":
             case "DEVELOPER":
@@ -56,6 +58,7 @@ public class CustomRole {
         this.apiCollectionsId = apiCollectionsId;
         this.defaultInviteRole = defaultInviteRole;
         this.threatProtectionEnabled = threatProtectionEnabled;
+        this.allowedFeaturesForUser = allowedFeaturesForUser;
     }
 
     public String getName() {
@@ -88,6 +91,14 @@ public class CustomRole {
 
     public void setDefaultInviteRole(boolean defaultInviteRole) {
         this.defaultInviteRole = defaultInviteRole;
+    }
+
+    public Boolean getThreatProtectionEnabled() {
+        return threatProtectionEnabled;
+    }
+
+    public void setThreatProtectionEnabled(Boolean threatProtectionEnabled) {
+        this.threatProtectionEnabled = threatProtectionEnabled;
     }
 
 }
