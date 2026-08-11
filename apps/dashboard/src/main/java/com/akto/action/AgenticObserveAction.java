@@ -417,6 +417,36 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return sb.toString();
     }
 
+    // Java port of transform.js's splitCollectionNameForEndpointSecurity's "sourceId" segment
+    // (parts[1]) — used by fetchAgenticAssetEndpointsPage's child rows for MCP Server/LLM assets,
+    // whose "source" column shows which agent/client called into them, not their own service name.
+    private static String extractSourceIdForGrouping(String hostName) {
+        if (StringUtils.isBlank(hostName)) return "";
+        String[] parts = DOT_SPLIT.split(hostName);
+        return parts.length >= 2 ? parts[1] : "";
+    }
+
+    // Java port of mcpClientHelper.js's hasPersonalAccountTag/hasLocalMcpServerTag/
+    // hasMisconfiguredConfigTag — extracted (unlike GroupSummary.accumulateCheap's own inline copy
+    // of this same logic) because fetchAgenticAssetEndpointsPage needs it per-child, not just once
+    // per group. {personal, localMcp, misconfigured}.
+    private static boolean[] computeAgenticTagFlags(List<CollectionTags> envType) {
+        boolean personal = false, localMcp = false, misconfigured = false;
+        if (envType != null) {
+            for (CollectionTags tag : envType) {
+                if (tag == null) continue;
+                String key = tag.getKeyName();
+                String value = tag.getValue();
+                if (("browser-llm-account-type".equals(key) || "login-user-email-type".equals(key)) && "personal".equals(value)) {
+                    personal = true;
+                }
+                if ("local-mcp-server".equals(key)) localMcp = true;
+                if ("misconfigured-config".equals(key) && "true".equals(value)) misconfigured = true;
+            }
+        }
+        return new boolean[]{personal, localMcp, misconfigured};
+    }
+
     // Cheap per-group accumulator, built for EVERY group (agent/service/llm/skill — ~800 at real
     // scale) in one pass over all collections. Deliberately does NOT build a per-device breakdown —
     // that's the expensive part (needs a Map<deviceId, ...> with its own Set<String> per device),
@@ -716,6 +746,202 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching agentic asset devices page: " + e.getMessage());
             addActionError("Error fetching agentic asset devices page: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    // Richer per-device accumulator for fetchAgenticAssetEndpointsPage — unlike DeviceAcc (which
+    // only keeps merged service NAMES for the flat devices tab), this keeps every member
+    // collection's own row (risk/sensitive/tags/skills) so the frontend can render an expandable
+    // per-device breakdown — the Java equivalent of AgentEndpointTreeTable.jsx's groupByEndpointId,
+    // scoped to one asset's own collectionIds instead of the whole account.
+    private static final class EndpointGroup {
+        final String deviceId;
+        String username = "-";
+        double riskScore = 0;
+        int lastSeenEpoch = 0;
+        int startTs = 0; // 0 == "no discovered time seen yet"; matches JS's Infinity->0 fallback
+        final Set<String> sensitiveTypes = new LinkedHashSet<>();
+        boolean hasPersonalAccount = false;
+        boolean hasLocalMcpServer = false;
+        boolean hasMisconfiguredConfig = false;
+        boolean hasMaliciousSkill = false;
+        final List<BasicDBObject> children = new ArrayList<>();
+
+        EndpointGroup(String deviceId) { this.deviceId = deviceId; }
+    }
+
+    // Java port of AgentEndpointTreeTable.jsx's groupByEndpointId — scoped to a single asset's own
+    // collectionIds (never account-wide). rowType decides each child's display name field, matching
+    // getChildColumnConfig: agent/skill rows show their own service name, service(mcp)/llm rows show
+    // the calling source's id (transform.js's splitCollectionNameForEndpointSecurity's sourceId).
+    private static Map<String, EndpointGroup> groupCollectionsByEndpointId(List<ApiCollection> collections,
+            Map<String, Integer> traffic, Map<String, Double> risk, Map<String, List<String>> sensitive,
+            Set<String> maliciousSkillKeys, Map<String, String> usernameMap, String rowType) {
+        boolean useServiceName = "agent".equals(rowType) || "skill".equals(rowType);
+        Map<String, EndpointGroup> groups = new LinkedHashMap<>();
+        for (ApiCollection c : collections) {
+            String hostName = c.getHostName();
+            if (StringUtils.isBlank(hostName)) continue;
+            String deviceId = AgenticObserveUtil.extractEndpointId(hostName);
+            if (deviceId == null) continue;
+
+            String idStr = String.valueOf(c.getId());
+            Integer t = traffic.get(idStr);
+            int collTraffic = t != null ? t : 0;
+            Double r = risk.get(idStr);
+            double collRisk = r != null ? r : 0.0;
+            List<String> collSensitive = sensitive != null ? sensitive.get(idStr) : null;
+            boolean[] flags = computeAgenticTagFlags(c.getEnvType());
+            int childStartTs = c.getStartTs();
+
+            int skillCount = 0;
+            boolean childMalicious = false;
+            if (c.getSkills() != null) {
+                skillCount = c.getSkills().size();
+                for (String s : c.getSkills()) {
+                    if (StringUtils.isNotBlank(s) && maliciousSkillKeys.contains(idStr + "|" + s.toLowerCase(Locale.ROOT))) {
+                        childMalicious = true;
+                        break;
+                    }
+                }
+            }
+
+            String displayName = useServiceName ? extractServiceNameForGrouping(hostName) : extractSourceIdForGrouping(hostName);
+
+            BasicDBObject child = new BasicDBObject();
+            child.put("id", c.getId());
+            child.put("name", StringUtils.isNotBlank(displayName) ? displayName : hostName);
+            child.put("riskScore", collRisk > 0 ? AgenticObserveUtil.roundRiskScore(collRisk) : 0);
+            child.put("sensitiveInRespTypes", collSensitive != null ? collSensitive : Collections.emptyList());
+            child.put("lastSeenEpoch", collTraffic);
+            child.put("startTs", childStartTs);
+            child.put("hasPersonalAccount", flags[0]);
+            child.put("hasLocalMcpServer", flags[1]);
+            child.put("hasMisconfiguredConfig", flags[2]);
+            child.put("hasMaliciousSkill", childMalicious);
+            child.put("skillCount", skillCount);
+
+            EndpointGroup g = groups.computeIfAbsent(deviceId, id -> {
+                EndpointGroup ng = new EndpointGroup(id);
+                ng.username = resolveUsernameByDeviceId(id, usernameMap);
+                return ng;
+            });
+            g.children.add(child);
+            if (collRisk > g.riskScore) g.riskScore = collRisk;
+            if (collTraffic > g.lastSeenEpoch) g.lastSeenEpoch = collTraffic;
+            if (childStartTs > 0 && (g.startTs == 0 || childStartTs < g.startTs)) g.startTs = childStartTs;
+            if (collSensitive != null) g.sensitiveTypes.addAll(collSensitive);
+            if (flags[0]) g.hasPersonalAccount = true;
+            if (flags[1]) g.hasLocalMcpServer = true;
+            if (flags[2]) g.hasMisconfiguredConfig = true;
+            if (childMalicious) g.hasMaliciousSkill = true;
+        }
+        return groups;
+    }
+
+    private static Comparator<BasicDBObject> buildEndpointGroupComparator(String key) {
+        if ("username".equals(key)) {
+            return Comparator.comparing((BasicDBObject r) -> String.valueOf(r.get("username")), String.CASE_INSENSITIVE_ORDER);
+        } else if ("endpointId".equals(key)) {
+            return Comparator.comparing((BasicDBObject r) -> String.valueOf(r.get("endpointId")), String.CASE_INSENSITIVE_ORDER);
+        } else if ("lastSeenEpoch".equals(key) || "detectedTimestamp".equals(key)) {
+            return Comparator.comparingInt(r -> ((Number) r.get("lastSeenEpoch")).intValue());
+        } else if ("startTs".equals(key) || "discovered".equals(key)) {
+            return Comparator.comparingInt(r -> ((Number) r.get("startTs")).intValue());
+        }
+        return Comparator.comparingDouble(r -> {
+            Object v = r.get("riskScore");
+            return v == null ? 0.0 : ((Number) v).doubleValue();
+        });
+    }
+
+    /**
+     * Server-side paginated, per-device TREE list for ONE asset's legacy-layout row-click page —
+     * the richer sibling of fetchAgenticAssetDevicesPage, matching AgentEndpointTreeTable.jsx's
+     * expandable device -> children UI, but scoped to just this asset's own collectionIds and
+     * paginated at the device-group level instead of loading the whole account's collections
+     * (getAllCollectionsBasic) into the browser to group/filter client-side.
+     */
+    public String fetchAgenticAssetEndpointsPage() {
+        response = new BasicDBObject();
+        try {
+            List<Integer> ids = apiCollectionIds != null ? apiCollectionIds : Collections.emptyList();
+            if (ids.isEmpty()) {
+                response.put("endpoints", new ArrayList<>());
+                response.put("total", 0);
+                return SUCCESS.toUpperCase();
+            }
+
+            List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
+                    Filters.in(Constants.ID, ids),
+                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING,
+                            ApiCollection.SKILLS, ApiCollection.START_TS)
+            );
+
+            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
+            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
+            Set<String> maliciousSkillKeys = getOrBuildSkillData().maliciousSkillKeys;
+            String effectiveRowType = StringUtils.isNotBlank(rowType) ? rowType : "agent";
+
+            Map<String, EndpointGroup> groups = groupCollectionsByEndpointId(
+                    collections, traffic, risk, sensitiveMap, maliciousSkillKeys, usernameMap, effectiveRowType);
+
+            List<BasicDBObject> rows = new ArrayList<>();
+            for (EndpointGroup g : groups.values()) {
+                BasicDBObject row = new BasicDBObject();
+                row.put("endpointId", g.deviceId);
+                row.put("username", g.username);
+                row.put("riskScore", g.riskScore > 0 ? AgenticObserveUtil.roundRiskScore(g.riskScore) : 0);
+                row.put("sensitiveInRespTypes", new ArrayList<>(g.sensitiveTypes));
+                row.put("lastSeenEpoch", g.lastSeenEpoch);
+                row.put("startTs", g.startTs);
+                row.put("hasPersonalAccount", g.hasPersonalAccount);
+                row.put("hasLocalMcpServer", g.hasLocalMcpServer);
+                row.put("hasMisconfiguredConfig", g.hasMisconfiguredConfig);
+                row.put("hasMaliciousSkill", g.hasMaliciousSkill);
+                row.put("childCount", g.children.size());
+                row.put("children", g.children);
+                rows.add(row);
+            }
+
+            if (StringUtils.isNotBlank(queryValue)) {
+                String q = queryValue.toLowerCase(Locale.ROOT);
+                rows.removeIf(r -> {
+                    String u = String.valueOf(r.get("username")).toLowerCase(Locale.ROOT);
+                    String eid = String.valueOf(r.get("endpointId")).toLowerCase(Locale.ROOT);
+                    return !u.contains(q) && !eid.contains(q);
+                });
+            }
+
+            List<String> endpointTagFilters = filters != null ? filters.get("endpointTags") : null;
+            if (endpointTagFilters != null && !endpointTagFilters.isEmpty()) {
+                Set<String> wanted = new HashSet<>(endpointTagFilters);
+                rows.removeIf(r -> {
+                    if (wanted.contains("Contains personal account") && Boolean.TRUE.equals(r.getBoolean("hasPersonalAccount", false))) return false;
+                    if (wanted.contains("Local MCP Server") && Boolean.TRUE.equals(r.getBoolean("hasLocalMcpServer", false))) return false;
+                    if (wanted.contains("Misconfigured") && Boolean.TRUE.equals(r.getBoolean("hasMisconfiguredConfig", false))) return false;
+                    if (wanted.contains("Malicious Skills") && Boolean.TRUE.equals(r.getBoolean("hasMaliciousSkill", false))) return false;
+                    return true;
+                });
+            }
+
+            Comparator<BasicDBObject> cmp = buildEndpointGroupComparator(sortKey);
+            if (sortOrder < 0) cmp = cmp.reversed();
+            rows.sort(cmp);
+
+            int total = rows.size();
+            int effectiveLimit = limit > 0 ? Math.min(limit, 500) : 20;
+            int from = Math.max(0, skip);
+            int to = Math.min(rows.size(), from + effectiveLimit);
+            List<BasicDBObject> page = from < to ? rows.subList(from, to) : Collections.emptyList();
+
+            response.put("endpoints", page);
+            response.put("total", total);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching agentic asset endpoints page: " + e.getMessage());
+            addActionError("Error fetching agentic asset endpoints page: " + e.getMessage());
             return ERROR.toUpperCase();
         }
     }

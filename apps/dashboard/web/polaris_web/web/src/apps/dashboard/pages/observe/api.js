@@ -301,6 +301,18 @@ export default {
         })
         return { devices: resp?.devices || [], total: resp?.total || 0 }
     },
+    // Server-side paginated, per-device TREE list for ONE asset's legacy-layout row-click page —
+    // the richer sibling of fetchAgenticAssetDevicesPage above: each row is a device with its own
+    // children[] (the individual member collections + their own risk/sensitive/tags), matching
+    // AgentEndpointTreeTable.jsx's expandable UI but scoped/paginated instead of account-wide.
+    async fetchAgenticAssetEndpointsPage({ apiCollectionIds, rowType, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, usernameMap, filters } = {}) {
+        const resp = await request({
+            url: '/api/fetchAgenticAssetEndpointsPage',
+            method: 'post',
+            data: { apiCollectionIds, rowType, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, usernameMap, filters },
+        })
+        return { endpoints: resp?.endpoints || [], total: resp?.total || 0 }
+    },
     // Server-side paginated Components list for ONE AI-Agent asset's flyout — merges skills,
     // built-in tools, and connected MCP servers into one batched, server-sorted/paginated list.
     // mcpServerNames is asset.mcpServers, already known/cheap client-side, passed through rather
