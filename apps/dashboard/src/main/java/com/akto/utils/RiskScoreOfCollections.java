@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.bson.conversions.Bson;
-
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ActivitiesDao;
 import com.akto.dao.AktoDataTypeDao;
@@ -274,9 +273,8 @@ public class RiskScoreOfCollections {
             sensitiveInResponse = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
             sensitiveInResponse.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
         }else{
-            Bson filter = Filters.gte("timestamp", timeStampFilter);
-            List<AktoDataType> updatedTypes = AktoDataTypeDao.instance.findAll(filter);
-            List<CustomDataType> updaCustomDataTypes = CustomDataTypeDao.instance.findAll(filter);
+            List<AktoDataType> updatedTypes = AktoDataTypeDao.instance.findAll(Filters.empty());
+            List<CustomDataType> updaCustomDataTypes = CustomDataTypeDao.instance.findAll(Filters.empty());
             for(AktoDataType dataType: updatedTypes){
                 sensitiveInResponse.add(dataType.getName());
             }
