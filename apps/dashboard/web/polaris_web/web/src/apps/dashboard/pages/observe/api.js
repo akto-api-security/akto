@@ -244,11 +244,11 @@ export default {
     // atlas-scale-test/DASHBOARD_OPTIMIZATION.md's "paginated server-side aggregation rebuild").
     // trafficMap/riskScoreMap are the same maps AgenticAssetsPage.jsx already fetches via
     // fetchAndCacheAgenticCollectionsBundle.
-    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, maliciousSkillKeys, violationsByCollectionId, usernameMap, userMetadataMap } = {}) {
+    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, maliciousSkillKeys, violationsByCollectionId, usernameMap, userMetadataMap } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsSummary',
             method: 'post',
-            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, maliciousSkillKeys, violationsByCollectionId, usernameMap, userMetadataMap },
+            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, maliciousSkillKeys, violationsByCollectionId, usernameMap, userMetadataMap },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0 }
     },
@@ -271,6 +271,11 @@ export default {
             mcpServers: resp?.assetMcpServers || [],
             mcpServerCollectionIds: resp?.assetMcpServerCollectionIds || {},
             devices: resp?.assetDevices || [],
+            // Agent rows only — needed by the legacy Endpoints.jsx page's row-click ->
+            // Inventory-filter feature (buildAgenticInventoryFilterForRow); unused by the new
+            // layout's flyout.
+            tagKey: resp?.assetTagKey || null,
+            rawTagValues: resp?.assetRawTagValues || [],
         }
     },
     // Server-side paginated device list for ONE asset's flyout Devices tab — scoped to just
@@ -309,6 +314,7 @@ export default {
         })
         return {
             totalAssets: resp?.totalAssets || 0,
+            totalEndpoints: resp?.totalEndpoints || 0,
             countsByType: resp?.countsByType || {},
             monthLabels: resp?.monthLabels || [],
             assetSparkline: resp?.assetSparkline || [],

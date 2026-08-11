@@ -375,9 +375,23 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         final String rowType; // "agent" | "service" | "llm" | "skill"
         String name;
         String clientType;
+        // Agent rows only — the specific tag key that identified this asset (e.g. "mcp-client"),
+        // and the raw tag value variants that collapsed into this canonical group (e.g. "cursor",
+        // "Cursor", "cursor-ide" all -> group "cursor"). Cheap/bounded (distinct tag-variant count,
+        // not collection count) but only used by the legacy Endpoints.jsx page's row-click ->
+        // Inventory-filter feature, so exposed via fetchAgenticAssetDetail (lazy, one asset at a
+        // time) rather than toSummaryResponse() (every row of every page).
+        String tagKey;
+        final Set<String> rawTagValues = new HashSet<>();
         final Set<String> hostNames = new HashSet<>();
         final Set<String> endpointIds = new HashSet<>();
         final Set<String> skillNames = new HashSet<>();
+        // Small — bounded by the account's distinct sensitive-data type names (e.g. "Email",
+        // "IP Address"), not by member-collection count, so safe to serialize eagerly unlike
+        // hostNames/collectionIds/skillNames above. Mirrors constants.js's groupCollectionsByAgent's
+        // (etc.) sensitiveTypes accumulation for the legacy Endpoints.jsx page's "Sensitive data"
+        // column, which the original server-side rebuild of this class didn't carry over.
+        final Set<String> sensitiveTypes = new HashSet<>();
         // Agent rows only — the distinct services (MCP servers) this agent's own collections
         // represent, mirrors constants.js's mcpServers derivation exactly (extractServiceName over
         // non-connector-ingested collections, excluding the agent's own name).
@@ -398,10 +412,15 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             this.rowType = rowType;
         }
 
-        void accumulateCheap(ApiCollection c, String hostName, List<CollectionTags> envType, double collRisk, int collTraffic, String deviceId) {
+        void accumulateCheap(ApiCollection c, String hostName, List<CollectionTags> envType, double collRisk, int collTraffic, String deviceId, List<String> sensitive) {
             collectionIds.add(c.getId());
             hostNames.add(hostName);
             if (deviceId != null) endpointIds.add(deviceId);
+            if (sensitive != null) {
+                for (String s : sensitive) {
+                    if (StringUtils.isNotBlank(s)) sensitiveTypes.add(s);
+                }
+            }
             if (c.getSkills() != null) {
                 for (String s : c.getSkills()) {
                     if (StringUtils.isNotBlank(s)) skillNames.add(s);
@@ -454,6 +473,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             g.put("hasPersonalAccount", hasPersonalAccount);
             g.put("hasLocalMcpServer", hasLocalMcpServer);
             g.put("hasMisconfiguredConfig", hasMisconfiguredConfig);
+            if (!sensitiveTypes.isEmpty()) g.put("sensitiveInRespTypes", new ArrayList<>(sensitiveTypes));
             return g;
         }
     }
@@ -970,6 +990,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
      */
     private Map<String, GroupSummary> classifyAllGroups(List<ApiCollection> collections,
             Map<String, Integer> traffic, Map<String, Double> risk) {
+        return classifyAllGroups(collections, traffic, risk, Collections.emptyMap());
+    }
+
+    private Map<String, GroupSummary> classifyAllGroups(List<ApiCollection> collections,
+            Map<String, Integer> traffic, Map<String, Double> risk, Map<String, List<String>> sensitiveMap) {
         Map<String, GroupSummary> groups = new LinkedHashMap<>();
 
         for (ApiCollection c : collections) {
@@ -983,6 +1008,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             int collTraffic = trafficVal != null ? trafficVal : 0;
             Double riskVal = risk.get(idStr);
             double collRisk = riskVal != null ? riskVal : 0.0;
+            List<String> sensitive = sensitiveMap != null ? sensitiveMap.get(idStr) : null;
             String deviceId = AgenticObserveUtil.extractEndpointId(hostName);
 
             // Skill fan-out — a collection with multiple skills is a member of multiple skill
@@ -999,7 +1025,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                         gs.clientType = AgenticObserveUtil.CLIENT_TYPE_SKILL;
                         return gs;
                     });
-                    g.accumulateCheap(c, hostName, envType, collRisk, collTraffic, deviceId);
+                    g.accumulateCheap(c, hostName, envType, collRisk, collTraffic, deviceId, sensitive);
                 }
             }
 
@@ -1015,7 +1041,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                         gs.clientType = AgenticObserveUtil.CLIENT_TYPE_LLM;
                         return gs;
                     });
-                    g.accumulateCheap(c, hostName, envType, collRisk, collTraffic, deviceId);
+                    g.accumulateCheap(c, hostName, envType, collRisk, collTraffic, deviceId, sensitive);
                 }
                 continue; // matches groupCollectionsByAgent/Service's browser-llm skip
             }
@@ -1031,7 +1057,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     gs.clientType = McpClientRegistry.getAgentTypeFromValue(key);
                     return gs;
                 });
-                g.accumulateCheap(c, hostName, envType, collRisk, collTraffic, deviceId);
+                g.tagKey = assetTag.getKeyName();
+                g.rawTagValues.add(assetTag.getValue());
+                g.accumulateCheap(c, hostName, envType, collRisk, collTraffic, deviceId, sensitive);
                 addedToAgentGroup = true;
             }
 
@@ -1057,7 +1085,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 gs.clientType = AgenticObserveUtil.getTypeFromCollection(fc);
                 return gs;
             });
-            g.accumulateCheap(c, hostName, envType, collRisk, collTraffic, deviceId);
+            g.accumulateCheap(c, hostName, envType, collRisk, collTraffic, deviceId, sensitive);
         }
 
         // Matches constants.js's agentGroupKeys/servicesToShow filter — ONLY service groups (not
@@ -1237,13 +1265,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         try {
             Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
+            Map<String, List<String>> sensitive = sensitiveMap != null ? sensitiveMap : Collections.emptyMap();
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS)
             );
 
-            Map<String, GroupSummary> groups = classifyAllGroups(collections, traffic, risk);
+            Map<String, GroupSummary> groups = classifyAllGroups(collections, traffic, risk, sensitive);
             List<GroupSummary> all = new ArrayList<>(groups.values());
 
             // Matches agenticPageBuilders.js's filterAssetsByLastSeen exactly — startTimestamp <= 0
@@ -1354,6 +1383,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Getter private List<String> assetMcpServers;
     @Getter private Map<String, List<Integer>> assetMcpServerCollectionIds;
     @Getter private List<BasicDBObject> assetDevices;
+    @Getter private String assetTagKey;
+    @Getter private List<String> assetRawTagValues;
 
     /**
      * Lazy per-asset detail — hostNames/collectionIds/skillNames/mcpServers/mcpServerCollectionIds/
@@ -1391,6 +1422,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 assetMcpServers = Collections.emptyList();
                 assetMcpServerCollectionIds = Collections.emptyMap();
                 assetDevices = Collections.emptyList();
+                assetTagKey = null;
+                assetRawTagValues = Collections.emptyList();
                 return SUCCESS.toUpperCase();
             }
 
@@ -1402,6 +1435,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             for (Map.Entry<String, Set<Integer>> e : g.serviceCollectionIds.entrySet()) {
                 assetMcpServerCollectionIds.put(e.getKey(), new ArrayList<>(e.getValue()));
             }
+            assetTagKey = g.tagKey;
+            assetRawTagValues = new ArrayList<>(g.rawTagValues);
 
             Map<Integer, ApiCollection> byId = new HashMap<>();
             for (ApiCollection c : collections) byId.put(c.getId(), c);
@@ -1452,6 +1487,17 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
             response.put("totalAssets", counted.size());
             response.put("countsByType", countsByType);
+
+            // Legacy Endpoints.jsx's "Total endpoints" summary card — unique device count across the
+            // whole account (not deduped per-group, since one device can belong to several groups).
+            // collections is already in memory for classification above; one more cheap pass.
+            Set<String> allEndpointIds = new HashSet<>();
+            for (ApiCollection c : collections) {
+                if (c.isDeactivated()) continue;
+                String endpointId = AgenticObserveUtil.extractEndpointId(c.getHostName());
+                if (endpointId != null) allEndpointIds.add(endpointId);
+            }
+            response.put("totalEndpoints", allEndpointIds.size());
 
             // Asset-count trend for the "Agentic Assets" card — same buildWindowSlots/cumulativeCounts
             // pattern already used for Endpoints/Users-and-Devices; bucketing ~800 group timestamps is
