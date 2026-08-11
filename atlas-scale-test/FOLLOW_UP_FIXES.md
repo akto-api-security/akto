@@ -64,9 +64,11 @@ pick up cold.
   none of them do real server-side aggregation; they load-all-then-classify-in-memory, which is
   itself listed as tech debt below). Built two new lightweight calls instead: a
   `fetchNhiIdentitiesStats` action doing four independent `count()` queries (total/expired/
-  disabled/with-violations, the last via `Filters.in(IDENTITY_NAME, ...)` against the identity
-  names already known to have violations from the existing cheap
-  `fetchViolationCountsByIdentity`) for the summary cards and tab badges, and reused the already-
+  disabled/with-violations, the last via `Filters.in(_id, ...)` against the identity ids already
+  known to have violations from the existing cheap `fetchViolationCountsByIdentity` — originally
+  written against `identityName` instead of `_id`, which turned out to be the same non-unique-name
+  bug fixed two bullets below, and was corrected alongside it) for the summary cards and tab
+  badges, and reused the already-
   paginated `fetchAllNhiIdentities` with a 200-row cap (`createdAt` desc) to feed the graph,
   matching the identity flyout's existing `IDENTITY_VIOLATIONS_LIMIT = 200` precedent. Added a
   "Showing the 200 most recently discovered identities of 13,817 total" notice to the graph when
@@ -76,6 +78,21 @@ pick up cold.
   flyout correctly, summary cards/tab badges show the true account-wide counts (13,817 total /
   6,325 expired / 1,953 disabled / 6,259 with violations) while the graph fetch payload dropped
   from the full account to exactly 200 documents.
+- **Identities table's violation badges showed inflated counts that didn't match the identity's
+  own flyout** (e.g. a row showing "85/82/135" critical/high/medium while its flyout's Violations
+  tab showed 0-5). Root cause: `fetchViolationCountsByIdentity` (`NhiGovernanceViolationsAction.
+  java`) grouped violations by `identities.identityName` — a display label, not a unique key. On
+  the Atlas Scale Test account, `identityName` is wildly non-unique (319 distinct identities
+  across different agents/owners all share the literal name "razorpay-remote-akto.Authorization"),
+  so every row's badge was really the sum of violations across every identity sharing that name,
+  not just that one row's own count. `fetchViolationsByIdentity` (the flyout's own fetch) was
+  already correct — it scopes by `identities.id`, the actual per-identity ObjectId. Fixed by
+  grouping the aggregation by `identities.id` (`$toString`'d to a hex string) instead of name,
+  and propagating the rename (`identityNames` → `identityId`/`violatingIdentityIds`) through
+  `IdentitiesPage.jsx`'s `violationIndex` and the `fetchNhiIdentitiesStats` "Identities with
+  Violations" count (same bug, different call site — see the correction noted in that bullet
+  above). Verified live: a "razorpay-remote-akto.Authorization" row's badge ("2") now matches its
+  flyout's Violations tab exactly ("Showing 1-2 of 2").
 - "Top Used Applications" showed "No AI interaction data yet." even against a real production data
   dump with genuine `UserAnalysisData` records — **initially misdiagnosed as a data-seeding gap;
   it wasn't.** Root cause: `UserAnalysisData.serviceId` is a readable client name ("claudecli",
