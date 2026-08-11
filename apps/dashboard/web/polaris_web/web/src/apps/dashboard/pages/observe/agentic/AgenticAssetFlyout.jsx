@@ -287,7 +287,7 @@ export default function AgenticAssetFlyout({
                         />
                     </div>
                 )}
-                {selectedTab === 2 && <ViolationsTab asset={asset} collections={collections} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onViolationClick={asset?.type === "Skill" ? () => handleTabSelect(1) : undefined} />}
+                {selectedTab === 2 && <ViolationsTab asset={asset} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onViolationClick={asset?.type === "Skill" ? () => handleTabSelect(1) : undefined} />}
                 {selectedTab === 3 && <DevicesTab asset={asset} enrichMaps={enrichMaps} />}
             </Box>
         </AgenticFlyoutShell>

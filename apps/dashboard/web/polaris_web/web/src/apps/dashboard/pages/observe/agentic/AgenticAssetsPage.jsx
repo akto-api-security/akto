@@ -26,8 +26,8 @@ import "../../../components/layouts/style.css";
 import NewLayoutTooltip from "./NewLayoutTooltip";
 import api from "../api";
 import agenticObserveApi, {
-  aggregateViolationCountsByCollectionId,
   fetchAgenticViolationCountsByHost,
+  fetchViolationCountsByCollection,
 } from "./agenticObserveApi";
 import {
   buildUserAnalysisLookup,
@@ -37,7 +37,7 @@ import {
   enrichDevicesWithUsername,
   fetchAndCacheSkillApiData,
   skillCollectionKey,
-  fetchAndCacheAgenticCollectionsBundle,
+  fetchAndCacheAgenticTrafficRiskBundle,
 } from "./constants";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
@@ -212,7 +212,6 @@ function TableSection({
   onServerFetch,
   flyout,
   setFlyout,
-  collections,
   startTimestamp,
   endTimestamp,
   refreshKey,
@@ -290,7 +289,6 @@ function TableSection({
         agenticFlatData={[]}
         assetDevices={flyout ? { [flyout.id]: flyout.devices || [] } : {}}
         enrichMaps={enrichMaps}
-        collections={collections}
         agenticViolationRows={undefined}
         startTimestamp={startTimestamp}
         endTimestamp={endTimestamp}
@@ -305,7 +303,6 @@ export default function AgenticAssetsPage() {
   const navigate = useNavigate();
   const [flyout, setFlyout] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [collections, setCollections] = useState([]);
   const [hostSeverityCounts, setHostSeverityCounts] = useState({});
   const [stats, setStats] = useState({ totalAssets: 0, countsByType: {} });
   const [refreshKey, setRefreshKey] = useState(0);
@@ -370,10 +367,14 @@ export default function AgenticAssetsPage() {
 
   // Mount-time fetch of everything shapeRow/stats need but the paginated table endpoint doesn't
   // carry itself, split into two tiers so the page's first paint isn't gated on the slowest call:
-  //   Tier 1 (blocks first paint, both calls measured <500ms): the collections/traffic/risk bundle
-  //     (also needed for trafficMap/riskScoreMap, which the date-range filter's maxTrafficTimestamp
-  //     check depends on) and Endpoint Shield username/team data. As soon as these land, the grid
-  //     mounts and fires its own (fast, paginated) fetch.
+  //   Tier 1 (blocks first paint, both calls measured <500ms): the traffic/risk bundle (needed for
+  //     trafficMap/riskScoreMap, which the date-range filter's maxTrafficTimestamp check depends on)
+  //     and Endpoint Shield username/team data. As soon as these land, the grid mounts and fires its
+  //     own (fast, paginated) fetch. This used to also fetch the account's full raw collection list
+  //     (getAllCollectionsBasic, ~19 fields/doc, several MB on large accounts) just to read id/
+  //     hostName off each one for the violation-count host join below — that join now happens
+  //     server-side (see attributeViolationCountsToCollections), so this page no longer needs the
+  //     collections list at all.
   //   Tier 2 (patches in after, non-blocking — measured up to ~6s, proxies through
   //     threat-detection-backend): server-aggregated violation counts and the account-wide
   //     AI-interaction list. Deliberately does NOT force a grid remount/re-fetch to patch these in
@@ -384,13 +385,13 @@ export default function AgenticAssetsPage() {
 
     (async () => {
       try {
-        const [collectionsBundle, shieldResult] = await Promise.all([
-          fetchAndCacheAgenticCollectionsBundle({ api, PersistStore }),
+        const [trafficRiskBundle, shieldResult] = await Promise.all([
+          fetchAndCacheAgenticTrafficRiskBundle({ api, PersistStore }),
           fetchEndpointShieldUserMetadata(),
         ]);
         if (!isMountedRef.current) return;
 
-        const { collections = [], trafficMap = {}, riskScoreMap = {} } = collectionsBundle || {};
+        const { trafficMap = {}, riskScoreMap = {} } = trafficRiskBundle || {};
         const { usernameMap = {}, userMetadataMap = {} } = shieldResult || {};
 
         enrichRef.current = {
@@ -401,7 +402,6 @@ export default function AgenticAssetsPage() {
           riskScoreMap,
         };
 
-        setCollections(collections);
         setRefreshKey((k) => k + 1); // (re)mount the grid now that enrichRef is populated
         setLoading(false);
 
@@ -422,9 +422,12 @@ export default function AgenticAssetsPage() {
           fetchAgenticViolationCountsByHost({ startTimestamp, endTimestamp }),
           agenticObserveApi.listUserAnalysis().catch(() => []),
         ])
-          .then(([hostCounts, userAnalysisList]) => {
+          .then(async ([hostCounts, userAnalysisList]) => {
             if (!isMountedRef.current) return;
-            const violationsByCollectionId = aggregateViolationCountsByCollectionId(hostCounts, collections);
+            // Host -> collection-id attribution now happens server-side (no raw collection list
+            // needed client-side for this — see attributeViolationCountsToCollections).
+            const violationsByCollectionId = await fetchViolationCountsByCollection(hostCounts);
+            if (!isMountedRef.current) return;
             const analysisByKey = buildUserAnalysisLookup(userAnalysisList);
             enrichRef.current = {
               ...enrichRef.current,
@@ -443,7 +446,6 @@ export default function AgenticAssetsPage() {
         // eslint-disable-next-line no-console
         console.error("AgenticAssetsPage mount fetch failed:", e);
         if (isMountedRef.current) {
-          setCollections([]);
           setHostSeverityCounts({});
           setLoading(false);
         }
@@ -642,7 +644,6 @@ export default function AgenticAssetsPage() {
           onServerFetch={onServerFetch}
           flyout={flyout}
           setFlyout={setFlyout}
-          collections={collections}
           startTimestamp={startTimestamp}
           endTimestamp={endTimestamp}
           refreshKey={refreshKey}

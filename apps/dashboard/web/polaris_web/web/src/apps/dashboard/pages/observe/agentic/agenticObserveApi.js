@@ -84,6 +84,28 @@ export async function fetchAgenticViolationCountsByHost({ startTimestamp, endTim
     return byHost;
 }
 
+// Server-side host->collection attribution (AgenticObserveAction.attributeViolationCountsToCollections)
+// — takes the already-fetched per-host counts and returns them re-keyed by collection id, without the
+// caller needing the account's raw collection list at all. Replaces the old client-side
+// aggregateViolationCountsByCollectionId(hostCounts, collections) for AgenticAssetsPage.jsx, which used
+// to require fetching every ApiCollection (getAllCollectionsBasic, several MB on large accounts) just
+// to read id/hostName off each one for this join.
+export async function fetchViolationCountsByCollection(hostCounts) {
+    if (!hostCounts || Object.keys(hostCounts).length === 0) return {};
+    try {
+        const resp = await request({
+            url: "/api/attributeViolationCountsToCollections",
+            method: "post",
+            data: { hostCounts },
+        });
+        return resp?.collectionViolationCounts || {};
+    } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("fetchViolationCountsByCollection failed:", e);
+        return {};
+    }
+}
+
 // LatestAPICollectionID in events is set to time.Now().Unix() (a fake timestamp),
 // so apiCollectionId cannot be used to match events to collections.
 // The real join key is the host: agentic traffic events and their collections are both

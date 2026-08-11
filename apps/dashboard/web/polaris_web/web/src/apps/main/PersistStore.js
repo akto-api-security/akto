@@ -85,6 +85,7 @@ const initialState = {
     hostNameMap: {}, // Keep in memory (not persisted)
     skillRiskScoreCache: { data: {}, ts: 0 }, // skillName -> maxRiskScore, in-memory only
     agenticCollectionsCache: { data: null, ts: 0 }, // {collections, trafficMap, riskScoreMap}, in-memory only
+    agenticTrafficRiskCache: { data: null, ts: 0 }, // {trafficMap, riskScoreMap} only (no collections), in-memory only
     agenticSensitiveInfoCache: { data: null, ts: 0 }, // sensitiveMap, in-memory only
     guardrailPolicyNames: { data: [], ts: 0 },
     lastFetchedInfo: { lastRiskScoreInfo: 0, lastSensitiveInfo: 0 },
@@ -194,6 +195,13 @@ let persistStore = (set, get) => ({
             set({ agenticCollectionsCache });
         } catch (error) {
             console.error("Error setting agenticCollectionsCache:", error);
+        }
+    },
+    setAgenticTrafficRiskCache: (agenticTrafficRiskCache) => {
+        try {
+            set({ agenticTrafficRiskCache });
+        } catch (error) {
+            console.error("Error setting agenticTrafficRiskCache:", error);
         }
     },
     setAgenticSensitiveInfoCache: (agenticSensitiveInfoCache) => {

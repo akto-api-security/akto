@@ -35,13 +35,14 @@ const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 // AgenticObserveAction... no, this specific tab talks to threat-detection-backend's
 // MaliciousEventService.listMaliciousRequests directly via SuspectSampleDataAction, not
 // AgenticObserveAction — see fetchAgenticViolationsPage/agenticObserveApi.js). Host attribution
-// (exact / loose device+service / claude-config) mirrors the same three tiers this tab always
-// used client-side, now sent to the server instead of filtering an account-wide fetch.
-export default function ViolationsTab({ asset, collections = [], startTimestamp, endTimestamp, onViolationClick }) {
+// (exact / loose device+service / claude-config) mirrors the same three tiers this tab always used.
+// hostNames comes straight off the asset row itself (AgenticObserveAction's GroupSummary already
+// collects every member collection's hostName server-side) — no need to fetch/filter the account's
+// full collection list just to re-derive it client-side.
+export default function ViolationsTab({ asset, startTimestamp, endTimestamp, onViolationClick }) {
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
         const isClaudeAsset = asset?.assetTagValue?.toLowerCase() === "claude";
-        const ids = new Set((asset.collectionIds || []).map(Number));
-        const hostNames = collections.filter(c => ids.has(Number(c.id)) && c.hostName).map(c => c.hostName);
+        const hostNames = asset?.hostNames || [];
 
         if (!hostNames.length && !isClaudeAsset) {
             return Promise.resolve({ value: [], total: 0 });
@@ -78,7 +79,7 @@ export default function ViolationsTab({ asset, collections = [], startTimestamp,
             })),
             total: res.total,
         }));
-    }, [asset?.id, asset?.assetTagValue, asset?.collectionIds, collections, startTimestamp, endTimestamp]);
+    }, [asset?.id, asset?.assetTagValue, asset?.hostNames, startTimestamp, endTimestamp]);
 
     const handleViolationClick = useCallback((e) => {
         if (!e.data) return;

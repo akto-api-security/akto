@@ -1069,6 +1069,119 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return cmp;
     }
 
+    @Setter
+    private Map<String, Map<String, Integer>> hostCounts;
+
+    @Getter
+    private Map<String, Map<String, Integer>> collectionViolationCounts;
+
+    // Mirrors agenticObserveApi.js's deviceServiceKey exactly — device+service loose-match key for
+    // 2-segment vs 3-segment host attribution (see resolveHostToCollectionIds's javadoc below).
+    private static String deviceServiceKey(String hostName) {
+        if (StringUtils.isBlank(hostName)) return null;
+        String[] parts = hostName.split("\\.");
+        if (parts.length < 2) return null;
+        return parts[0] + " " + parts[parts.length - 1];
+    }
+
+    // Mirrors agenticObserveApi.js's isClaudeConfigHost exactly.
+    private static boolean isClaudeConfigHost(String hostName) {
+        if (StringUtils.isBlank(hostName)) return false;
+        String[] parts = hostName.split("\\.");
+        if (parts.length != 2) return false;
+        String service = parts[1].toLowerCase(Locale.ROOT);
+        return "claude-settings".equals(service) || "claude".equals(service);
+    }
+
+    /**
+     * Attributes server-aggregated per-host violation severity counts (from
+     * ThreatApiAction.fetchHostSeverityCounts, already fetched client-side and passed in as
+     * hostCounts) to collection ids — the same exact/loose/claude-config three-tier join
+     * agenticObserveApi.js's buildHostAttributionMaps/resolveHostToCollectionIds used to do
+     * client-side, which required fetching every ApiCollection in the account (getAllCollectionsBasic,
+     * ~19 fields/doc, several MB on large accounts) just to read two fields (id, hostName) off each
+     * one. Ported here instead: loads only {id, hostName} for the join, runs entirely server-side, and
+     * returns counts already keyed by collection id — the Agentic Assets page no longer needs the
+     * account's collection list for this at all.
+     */
+    public String attributeViolationCountsToCollections() {
+        collectionViolationCounts = new HashMap<>();
+        try {
+            if (hostCounts == null || hostCounts.isEmpty()) {
+                return SUCCESS.toUpperCase();
+            }
+
+            List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
+                    Filters.empty(),
+                    Projections.include(Constants.ID, ApiCollection.HOST_NAME)
+            );
+
+            Map<String, List<Integer>> hostToIds = new HashMap<>();
+            Map<String, List<Integer>> looseToIds = new HashMap<>();
+            Map<String, List<Integer>> claudeDeviceToIds = new HashMap<>();
+            List<Integer> allClaudeIds = new ArrayList<>();
+
+            for (ApiCollection c : collections) {
+                String hostName = c.getHostName();
+                if (StringUtils.isBlank(hostName)) continue;
+
+                hostToIds.computeIfAbsent(hostName, k -> new ArrayList<>()).add(c.getId());
+
+                String lk = deviceServiceKey(hostName);
+                if (lk != null) {
+                    looseToIds.computeIfAbsent(lk, k -> new ArrayList<>()).add(c.getId());
+                }
+
+                String[] parts = hostName.split("\\.");
+                String deviceId = parts.length > 0 ? parts[0] : null;
+                String service = parts.length > 0 ? parts[parts.length - 1].toLowerCase(Locale.ROOT) : null;
+                if (StringUtils.isNotBlank(deviceId) && "claude".equals(service)) {
+                    claudeDeviceToIds.computeIfAbsent(deviceId, k -> new ArrayList<>()).add(c.getId());
+                    allClaudeIds.add(c.getId());
+                }
+            }
+
+            for (Map.Entry<String, Map<String, Integer>> entry : hostCounts.entrySet()) {
+                String host = entry.getKey();
+                Map<String, Integer> counts = entry.getValue();
+                if (host == null || counts == null) continue;
+
+                List<Integer> ids = hostToIds.get(host);
+                if (ids == null || ids.isEmpty()) {
+                    ids = looseToIds.get(deviceServiceKey(host));
+                }
+                if ((ids == null || ids.isEmpty()) && isClaudeConfigHost(host)) {
+                    String deviceId = host.split("\\.")[0];
+                    List<Integer> pool = claudeDeviceToIds.get(deviceId);
+                    if (pool == null || pool.isEmpty()) pool = allClaudeIds;
+                    ids = pool.isEmpty() ? null : Collections.singletonList(pool.get(0));
+                }
+                if (ids == null || ids.isEmpty()) continue;
+
+                for (Integer id : ids) {
+                    Map<String, Integer> agg = collectionViolationCounts.computeIfAbsent(String.valueOf(id), k -> {
+                        Map<String, Integer> m = new HashMap<>();
+                        m.put("critical", 0);
+                        m.put("high", 0);
+                        m.put("medium", 0);
+                        m.put("low", 0);
+                        return m;
+                    });
+                    agg.merge("critical", counts.getOrDefault("critical", 0), Integer::sum);
+                    agg.merge("high", counts.getOrDefault("high", 0), Integer::sum);
+                    agg.merge("medium", counts.getOrDefault("medium", 0), Integer::sum);
+                    agg.merge("low", counts.getOrDefault("low", 0), Integer::sum);
+                }
+            }
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error attributing violation counts to collections: " + e.getMessage());
+            addActionError(e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
     /**
      * Paginated, sorted, searchable grouped-asset rows for the Agentic Assets "New Layout" table.
      * Builds lightweight summaries for every group (classifyAllGroups — one pass, no per-device

@@ -1267,6 +1267,49 @@ export async function fetchAndCacheAgenticCollectionsBundle({ api, PersistStore 
     return _agenticCollectionsInflight;
 }
 
+let _agenticTrafficRiskInflight = null;
+
+/**
+ * Fetches + caches {trafficMap, riskScoreMap} ONLY — no getAllCollectionsBasic. Separate cache slot
+ * (agenticTrafficRiskCache) from fetchAndCacheAgenticCollectionsBundle's above, deliberately: that
+ * bundle is shared by 4 other agentic pages (UsersAndDevices/Endpoints/DeviceEndpoints/
+ * EndpointPosture) that may still need the raw collections list, so its contract stays untouched.
+ * AgenticAssetsPage.jsx uses this leaner one instead — its only past use of `collections` was a
+ * client-side host→collectionId join for violation counts, now done server-side (see
+ * AgenticObserveAction.attributeViolationCountsToCollections), and hostnames for the flyout's
+ * Violations tab now come from the asset row's own `hostNames` field instead of a full account scan.
+ */
+export async function fetchAndCacheAgenticTrafficRiskBundle({ api, PersistStore }) {
+    const cached = PersistStore.getState().agenticTrafficRiskCache;
+    const cacheAge = Date.now() - (cached?.ts || 0);
+    if (cached?.data && cacheAge <= AGENTIC_COLLECTIONS_CACHE_TTL_MS) {
+        return cached.data;
+    }
+    if (_agenticTrafficRiskInflight) return _agenticTrafficRiskInflight;
+
+    _agenticTrafficRiskInflight = (async () => {
+        try {
+            const [trafficInfoResp, riskScoreResp] = await Promise.all([
+                api.getLastTrafficSeen(),
+                api.getRiskScoreInfo(),
+            ]);
+            const data = {
+                trafficMap: trafficInfoResp || {},
+                riskScoreMap: riskScoreResp?.riskScoreOfCollectionsMap || {},
+            };
+            PersistStore.getState().setAgenticTrafficRiskCache({ data, ts: Date.now() });
+            return data;
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error("fetchAndCacheAgenticTrafficRiskBundle failed:", e);
+            return { trafficMap: {}, riskScoreMap: {} };
+        } finally {
+            _agenticTrafficRiskInflight = null;
+        }
+    })();
+    return _agenticTrafficRiskInflight;
+}
+
 let _agenticSensitiveInfoInflight = null;
 
 /**
