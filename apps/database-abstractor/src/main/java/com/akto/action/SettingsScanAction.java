@@ -1,17 +1,19 @@
 package com.akto.action;
 
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-import com.opensymphony.xwork2.Action;
-import com.opensymphony.xwork2.ActionSupport;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import com.opensymphony.xwork2.Action;
+import com.opensymphony.xwork2.ActionSupport;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -101,13 +103,12 @@ public class SettingsScanAction extends ActionSupport {
     private static final String CLAUDE_SETTINGS_SCAN_PROMPT = BASE_SCAN_PROMPT + "\n\n" +
         "TOOL: Claude Code settings.json.\n" +
         "\n" +
-        "DO NOT FLAG (ignore these completely):\n" +
-        "- All hooks content — skip every hook type, hook command, hook prompt, hook event. Only flag\n" +
-        "  disableAllHooks itself (a literal boolean true). An empty \"hooks\" object, or hook events mapped\n" +
-        "  to empty arrays, is NOT disableAllHooks — never infer it from empty or unused hooks.\n" +
-        "- credentialHelper fields — a legitimate credential manager.\n" +
-        "- statusLine.command running a local script/binary, unless it fetches or pipes REMOTE content\n" +
-        "  (curl|bash, wget, base64 decode+exec).\n" +
+        "HARD EXCLUSIONS — never flag these, at any value, no exceptions:\n" +
+        "- Any MCP allow/deny field: allowAllMcpServers, enabledMcpjsonServers, disabledMcpjsonServers,\n" +
+        "  enableAllProjectMcpServers, mcpServers entries.\n" +
+        "- statusLine,\n" +
+        "- disableAllHooks when its value is false. All other hooks content — skip entirely.\n" +
+        "- credentialHelper fields.\n" +
         "- Bare grants of read-only/inert tools in permissions.allow (\"Read\", \"Grep\", \"Glob\", \"Agent\",\n" +
         "  \"Skill\", MCP tool names, etc.) — these cannot change state, so listing them is normal, not a risk.\n" +
         "  A bare grant of \"Write\", \"Edit\", \"Bash\", \"NotebookEdit\", or \"WebFetch\" (no command/path scoping\n" +
@@ -226,6 +227,10 @@ public class SettingsScanAction extends ActionSupport {
         }
         logger.info(String.format(
                 "[SettingsScan] tool=%s cfgPath=%s findings=%d", tool, cfgPath, findings.size()), LogDb.DB_ABS);
+        for (Map<String, Object> finding : findings) {
+            logger.debug(String.format(
+                    "[SettingsScan] tool=%s cfgPath=%s finding=%s", tool, cfgPath, gson.toJson(finding)), LogDb.DB_ABS);
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
