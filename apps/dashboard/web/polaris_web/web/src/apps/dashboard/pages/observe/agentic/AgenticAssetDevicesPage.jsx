@@ -10,8 +10,6 @@ import TooltipText from "../../../components/shared/TooltipText";
 import api from "../api";
 import func from "@/util/func";
 import transform from "../transform";
-import PersistStore from "../../../../main/PersistStore";
-import { fetchAndCacheAgenticTrafficRiskBundle, fetchAndCacheAgenticSensitiveInfo } from "./constants";
 import { fetchEndpointShieldUsernameMap } from "../api_collections/endpointShieldHelper";
 
 /**
@@ -222,7 +220,7 @@ export default function AgenticAssetDevicesPage() {
     // resolves, so the "loading" feedback lives on this page instead of freezing the previous one.
     const [loading, setLoading] = useState(true);
     const collectionIdsRef = useRef([]);
-    const enrichRef = useRef({ trafficMap: {}, riskScoreMap: {}, sensitiveMap: {}, usernameMap: {} });
+    const enrichRef = useRef({ usernameMap: {} });
     const [refreshKey, setRefreshKey] = useState(0);
 
     useEffect(() => {
@@ -230,15 +228,20 @@ export default function AgenticAssetDevicesPage() {
         setLoading(true);
         (async () => {
             try {
-                const [trafficRiskBundle, sensitiveMap, usernameMap, detail] = await Promise.all([
-                    fetchAndCacheAgenticTrafficRiskBundle({ api, PersistStore }),
-                    fetchAndCacheAgenticSensitiveInfo({ api, PersistStore }),
+                // trafficMap/riskScoreMap/sensitiveMap are deliberately NOT fetched here — unlike
+                // the list pages (Endpoints.jsx etc.), which fetch those account-wide maps once to
+                // enrich every row of a big grid, this page only ever needs a handful of entries out
+                // of them for one asset's own devices. fetchAgenticAssetEndpointsPage computes those
+                // three server-side, scoped to apiCollectionIds, instead of requiring this page to
+                // pull the whole account's map just to read a few entries back out of it.
+                // usernameMap still comes from here since Endpoint Shield's device registry isn't
+                // collection-scoped (it's keyed by physical device, already small account-wide).
+                const [usernameMap, detail] = await Promise.all([
                     fetchEndpointShieldUsernameMap(),
                     api.fetchAgenticAssetDetail({ groupKey, rowType }),
                 ]);
                 if (cancelled) return;
-                const { trafficMap = {}, riskScoreMap = {} } = trafficRiskBundle || {};
-                enrichRef.current = { trafficMap, riskScoreMap, sensitiveMap: sensitiveMap || {}, usernameMap };
+                enrichRef.current = { usernameMap };
                 collectionIdsRef.current = detail?.collectionIds || [];
             } catch {
                 if (!cancelled) collectionIdsRef.current = [];
@@ -250,14 +253,14 @@ export default function AgenticAssetDevicesPage() {
     }, [groupKey, rowType]);
 
     const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
-        const { trafficMap, riskScoreMap, sensitiveMap, usernameMap } = enrichRef.current;
+        const { usernameMap } = enrichRef.current;
         const mongoSortOrder = sortOrder === -1 ? 1 : -1;
         const endpointTags = filtersObj?.endpointTags;
         const res = await api.fetchAgenticAssetEndpointsPage({
             apiCollectionIds: collectionIdsRef.current,
             rowType,
             skip, limit, sortKey: sortKey || "riskScore", sortOrder: mongoSortOrder, queryValue,
-            trafficMap, riskScoreMap, sensitiveMap, usernameMap,
+            usernameMap,
             filters: endpointTags?.length ? { endpointTags } : undefined,
         });
         const rows = (res.endpoints || []).map((row) => shapeEndpointRow(row, { rowType }));

@@ -305,11 +305,15 @@ export default {
     // the richer sibling of fetchAgenticAssetDevicesPage above: each row is a device with its own
     // children[] (the individual member collections + their own risk/sensitive/tags), matching
     // AgentEndpointTreeTable.jsx's expandable UI but scoped/paginated instead of account-wide.
-    async fetchAgenticAssetEndpointsPage({ apiCollectionIds, rowType, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, usernameMap, filters } = {}) {
+    // Deliberately does NOT take trafficMap/riskScoreMap/sensitiveMap — unlike the list pages'
+    // endpoints, which need those account-wide maps client-fetched once to enrich every row of a
+    // big grid, this endpoint computes them itself server-side, scoped to apiCollectionIds — no
+    // point requiring the client to fetch/repost a whole-account map for a handful of entries.
+    async fetchAgenticAssetEndpointsPage({ apiCollectionIds, rowType, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetEndpointsPage',
             method: 'post',
-            data: { apiCollectionIds, rowType, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, usernameMap, filters },
+            data: { apiCollectionIds, rowType, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters },
         })
         return { endpoints: resp?.endpoints || [], total: resp?.total || 0 }
     },

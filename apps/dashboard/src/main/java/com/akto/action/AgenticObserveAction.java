@@ -5,6 +5,7 @@ import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.McpAuditInfoDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -424,6 +425,18 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         if (StringUtils.isBlank(hostName)) return "";
         String[] parts = DOT_SPLIT.split(hostName);
         return parts.length >= 2 ? parts[1] : "";
+    }
+
+    // ApiInfoDao/SingleTypeInfoDao's scoped lookups key by the raw int collection id; every other
+    // consumer in this file (trafficMap/riskScoreMap/sensitiveMap, whether client-posted or
+    // computed here) expects String keys, matching how these maps travel over JSON.
+    private static <V> Map<String, V> toStringKeyedMap(Map<Integer, V> intKeyed) {
+        Map<String, V> result = new HashMap<>();
+        if (intKeyed == null) return result;
+        for (Map.Entry<Integer, V> e : intKeyed.entrySet()) {
+            result.put(String.valueOf(e.getKey()), e.getValue());
+        }
+        return result;
     }
 
     // Java port of mcpClientHelper.js's hasPersonalAccountTag/hasLocalMcpServerTag/
@@ -879,13 +892,26 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                             ApiCollection.SKILLS, ApiCollection.START_TS)
             );
 
-            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
-            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
+            // Computed here, scoped to just this asset's own `ids` — unlike every other agentic
+            // endpoint on this page, which reads trafficMap/riskScoreMap/sensitiveMap off the
+            // request because they're genuinely account-wide maps a LIST page already has to fetch
+            // once for all its rows. A single-asset page has no such list to amortize across, so
+            // requiring the client to fetch the whole account's map just to read a handful of
+            // entries back out of it was pure waste — these three DAO calls are real Mongo queries
+            // filtered by `ids`, not a repost of client-supplied data.
+            Map<String, Integer> traffic = toStringKeyedMap(ApiInfoDao.instance.getLastTrafficSeenForCollections(ids));
+            Map<String, Double> risk = toStringKeyedMap(ApiInfoDao.instance.getRiskScoreForCollections(ids));
+            List<String> sensitiveSubtypes = SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames();
+            sensitiveSubtypes.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
+            sensitiveSubtypes.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames());
+            Map<String, List<String>> sensitive = toStringKeyedMap(
+                    SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollections(sensitiveSubtypes, ids));
+
             Set<String> maliciousSkillKeys = getOrBuildSkillData().maliciousSkillKeys;
             String effectiveRowType = StringUtils.isNotBlank(rowType) ? rowType : "agent";
 
             Map<String, EndpointGroup> groups = groupCollectionsByEndpointId(
-                    collections, traffic, risk, sensitiveMap, maliciousSkillKeys, usernameMap, effectiveRowType);
+                    collections, traffic, risk, sensitive, maliciousSkillKeys, usernameMap, effectiveRowType);
 
             List<BasicDBObject> rows = new ArrayList<>();
             for (EndpointGroup g : groups.values()) {
