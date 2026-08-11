@@ -181,10 +181,18 @@ export default function AgenticAssetFlyout({
         setTopNavPicker(picker || null);
     }, []);
 
+    // Device-scoped deep links (?collectionIds=...) attach a `devicesOverride` array to the asset
+    // instead of the org-wide `assetDevices[asset.id]` list, so a single device's flyout shows
+    // Devices (1) rather than every device that uses the same agent/service.
+    const effectiveAssetDevices = useMemo(() => {
+        if (!asset?.devicesOverride) return assetDevices;
+        return { ...assetDevices, [asset.id]: asset.devicesOverride };
+    }, [asset, assetDevices]);
+
     const tabs = useMemo(() => {
         if (!asset) return [];
         const totalV   = (asset.violations?.critical || 0) + (asset.violations?.high || 0) + (asset.violations?.medium || 0) + (asset.violations?.low || 0);
-        const devCount = (assetDevices[asset.id] || []).length;
+        const devCount = (asset.devicesOverride || assetDevices[asset.id] || []).length;
         let componentCount = 0;
         if (asset.type === "AI Agent") {
             componentCount = countAgentComponentsTab(asset, {
@@ -248,7 +256,7 @@ export default function AgenticAssetFlyout({
                     <OverviewTab
                         asset={asset}
                         onTabChange={handleTabSelect}
-                        assetDevices={assetDevices}
+                        assetDevices={effectiveAssetDevices}
                         agenticTreeData={agenticTreeData}
                         agenticFlatData={agenticFlatData}
                         mcpComponentCount={mcpComponentCount}
@@ -268,7 +276,7 @@ export default function AgenticAssetFlyout({
                     </div>
                 )}
                 {selectedTab === 2 && <ViolationsTab asset={asset} collections={collections} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onViolationClick={asset?.type === "Skill" ? () => handleTabSelect(1) : undefined} />}
-                {selectedTab === 3 && <DevicesTab asset={asset} assetDevices={assetDevices} />}
+                {selectedTab === 3 && <DevicesTab asset={asset} assetDevices={effectiveAssetDevices} />}
             </Box>
         </AgenticFlyoutShell>
     );

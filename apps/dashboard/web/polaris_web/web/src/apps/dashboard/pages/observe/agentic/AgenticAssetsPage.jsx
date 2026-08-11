@@ -37,6 +37,9 @@ import {
   buildUserAnalysisLookup,
   fetchAndCacheSkillApiData,
   skillCollectionKey,
+  computeAgentMcpServers,
+  buildDevicesForGroup,
+  resolveClientKey,
 } from "./constants";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
@@ -176,6 +179,9 @@ function TableSection({
   agenticViolationRows,
   startTimestamp,
   endTimestamp,
+  usernameMap,
+  riskScoreMap,
+  trafficMap,
 }) {
   const gridRef = useRef(null);
   // Auto-open from a ?asset= deep link must run ONCE on load — not every time the
@@ -225,6 +231,15 @@ function TableSection({
             .replace(/^-|-$/g, "")
         : "";
     const decodedSlug = toSlug(decoded);
+    // AI Agent names are canonicalized/aliased on this page (e.g. raw "claude" and
+    // "claude-cli-user" both collapse into the "Claude CLI" group via CLIENT_TAG_ALIASES), but
+    // DeviceEndpoints.jsx builds the deep link from the raw (unaliased) hostname service name.
+    // Resolve the URL value through the same alias table before matching, so it's compared
+    // canonical-key-to-canonical-key against each row's `assetTagValue` instead of comparing
+    // display-name slugs (which only line up by coincidence, e.g. for "claude-desktop").
+    const canonicalKey = resolveClientKey(lc);
+    const canonicalMatch = (r) =>
+      !!r?.assetTagValue && r.assetTagValue.toLowerCase() === canonicalKey;
     const nameMatch = (n) => {
       if (!n) return false;
       if (n === decoded || n === assetName || n.toLowerCase() === lc)
@@ -234,19 +249,66 @@ function TableSection({
         return true;
       return false;
     };
+    // Loose substring match kept only as a last-resort fallback for asset types without
+    // `assetTagValue` aliasing (Skills, MCP Servers, LLMs); require the slug to be an exact
+    // trailing id segment rather than any substring, so e.g. "claude" no longer matches an
+    // unrelated id like "agent-claude1".
     const idMatch = (id) =>
-      id && (id === assetName || id.includes(decodedSlug));
+      !!id && (id === assetName || id === decodedSlug || id.endsWith(`-${decodedSlug}`));
     const row = baseRows.find(
-      (r) => nameMatch(r.name) || idMatch(r.path?.[0]),
+      (r) => canonicalMatch(r) || nameMatch(r.name) || idMatch(r.path?.[0]),
     );
     const flat = row
       ? agenticFlatData.find((a) => a.id === row.path[0]) || {
           ...row,
           id: row.path[0],
         }
-      : agenticFlatData.find((a) => nameMatch(a.name) || idMatch(a.id));
-    if (flat) setFlyout(flat);
-  }, [agenticTreeData, agenticFlatData, setFlyout]);
+      : agenticFlatData.find(
+          (a) => canonicalMatch(a) || nameMatch(a.name) || idMatch(a.id),
+        );
+    if (!flat) return;
+
+    // Device-scoped deep link (e.g. from DeviceEndpoints.jsx: ?asset=...&collectionIds=123) —
+    // narrow the flyout down to just the device's own collection(s) instead of the org-wide
+    // asset group, and re-derive every field that was originally computed org-wide from
+    // `flat.collections` (mcpServers, skillCount, devices) so Components/Devices tabs match.
+    const scopedIdsParam = params.get("collectionIds");
+    if (!scopedIdsParam) {
+      setFlyout(flat);
+      return;
+    }
+    const scopedIds = new Set(scopedIdsParam.split(",").map(Number));
+    const narrowedIds = (flat.collectionIds || []).filter((id) =>
+      scopedIds.has(Number(id)),
+    );
+    if (!narrowedIds.length) {
+      setFlyout(flat);
+      return;
+    }
+    const scopedCollections = (flat.collections || collections).filter((c) =>
+      scopedIds.has(Number(c.id)),
+    );
+    const mcpServers =
+      flat.type === "AI Agent"
+        ? computeAgentMcpServers(scopedCollections, flat.assetTagValue ?? flat.name)
+        : flat.mcpServers;
+    const skillCount = new Set(
+      scopedCollections.flatMap((c) => c.skills || []),
+    ).size;
+    const devicesOverride = buildDevicesForGroup(
+      { collections: scopedCollections },
+      usernameMap,
+      riskScoreMap,
+      trafficMap,
+    );
+    setFlyout({
+      ...flat,
+      collectionIds: narrowedIds,
+      mcpServers,
+      skillCount,
+      devicesOverride,
+    });
+  }, [agenticTreeData, agenticFlatData, setFlyout, collections, usernameMap, riskScoreMap, trafficMap]);
 
   const handleRowClick = useCallback(
     (e) => {
@@ -319,6 +381,11 @@ export default function AgenticAssetsPage() {
   const [assetDevices, setAssetDevices] = useState({});
   const [agenticViolationRows, setAgenticViolationRows] = useState([]);
   const [collections, setCollections] = useState([]);
+  // Kept for device-scoped deep links (?collectionIds=...), which recompute a single device's
+  // mcpServers/skillCount/devices from just its own collections instead of the org-wide group.
+  const [usernameMap, setUsernameMap] = useState({});
+  const [riskScoreMap, setRiskScoreMap] = useState({});
+  const [trafficMap, setTrafficMap] = useState({});
   const newLayout = LocalStore((state) => state.agenticNewLayout);
   const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
 
@@ -427,6 +494,9 @@ export default function AgenticAssetsPage() {
         setAssetDevices(pageData.assetDevices);
         setAgenticViolationRows(violationRows);
         setCollections(collections);
+        setUsernameMap(usernameMap);
+        setRiskScoreMap(riskScoreMap);
+        setTrafficMap(trafficMap);
 
         // Enrich Skill rows with malicious flag (same source as old UI) — async, non-blocking.
         // Only collections that actually have skills need this lookup; querying every collection
@@ -755,6 +825,9 @@ export default function AgenticAssetsPage() {
           agenticViolationRows={agenticViolationRows}
           startTimestamp={startTimestamp}
           endTimestamp={endTimestamp}
+          usernameMap={usernameMap}
+          riskScoreMap={riskScoreMap}
+          trafficMap={trafficMap}
         />,
       ]}
     />
