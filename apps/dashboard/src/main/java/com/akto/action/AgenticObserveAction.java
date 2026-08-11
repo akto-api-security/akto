@@ -375,8 +375,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         final String rowType; // "agent" | "service" | "llm" | "skill"
         String name;
         String clientType;
-        String tagKey; // agent rows only
-        final Set<String> rawTagValues = new HashSet<>(); // agent rows only — variant tag values collapsed into this canonical group
         final Set<String> hostNames = new HashSet<>();
         final Set<String> endpointIds = new HashSet<>();
         final Set<String> skillNames = new HashSet<>();
@@ -432,6 +430,16 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (collTraffic > maxTrafficTimestamp) maxTrafficTimestamp = collTraffic;
         }
 
+        // Deliberately excludes hostNames/collectionIds/skillNames/mcpServers/mcpServerCollectionIds
+        // (all Set/List/Map fields whose size scales with member-collection count — up to ~25,272 for
+        // one agent group on the Atlas Scale Test account) and tagKey/rawTagValues (dead for this
+        // page — only a different page/data source reads them). A single page of 50 rows including
+        // these measured at 16MB; none of them are read by the main grid's own rendering (confirmed
+        // by tracing every consumer), only by the flyout when a user opens ONE specific asset — see
+        // fetchAgenticAssetDetail, the lazy per-asset endpoint the flyout now calls on open instead.
+        // The two fields the grid's OWN rendering used to derive from collectionIds client-side
+        // (violations, isMalicious) are precomputed server-side instead, in fetchAgenticAssetsSummary
+        // itself, using the same in-memory collectionIds this method no longer serializes.
         BasicDBObject toSummaryResponse() {
             BasicDBObject g = new BasicDBObject();
             g.put("id", rowType + "-" + groupKey);
@@ -439,26 +447,13 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             g.put("name", name);
             g.put("rowType", rowType);
             g.put("clientType", clientType);
-            g.put("tagKey", tagKey);
-            g.put("rawTagValues", new ArrayList<>(rawTagValues));
-            g.put("hostNames", new ArrayList<>(hostNames));
-            g.put("collectionIds", collectionIds);
             g.put("endpointsCount", endpointIds.size());
-            g.put("skillNames", new ArrayList<>(skillNames));
             g.put("skillCount", skillNames.size());
             g.put("riskScore", maxRiskScore > 0 ? AgenticObserveUtil.roundRiskScore(maxRiskScore) : null);
             g.put("lastSeenEpoch", maxTrafficTimestamp);
             g.put("hasPersonalAccount", hasPersonalAccount);
             g.put("hasLocalMcpServer", hasLocalMcpServer);
             g.put("hasMisconfiguredConfig", hasMisconfiguredConfig);
-            if (!serviceNames.isEmpty()) {
-                g.put("mcpServers", new ArrayList<>(serviceNames));
-                BasicDBObject mcpServerCollectionIds = new BasicDBObject();
-                for (Map.Entry<String, Set<Integer>> e : serviceCollectionIds.entrySet()) {
-                    mcpServerCollectionIds.put(e.getKey(), new ArrayList<>(e.getValue()));
-                }
-                g.put("mcpServerCollectionIds", mcpServerCollectionIds);
-            }
             return g;
         }
     }
@@ -546,6 +541,32 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         if (usernameMap == null || usernameMap.isEmpty() || deviceId == null) return "-";
         String v = usernameMap.get("__deviceId__" + deviceId.toLowerCase(Locale.ROOT));
         return StringUtils.isNotBlank(v) ? v : "-";
+    }
+
+    // Java port of constants.js's buildTeamGroupsFromDevices — team name -> member count, from an
+    // already-built per-device list (DeviceAcc.toResponse() rows). Used to precompute the grid's
+    // "Teams" column server-side instead of shipping the raw per-device list (up to hundreds of
+    // entries per row) just so the browser can do this same tally.
+    private static List<BasicDBObject> buildTeamGroupsForRow(List<BasicDBObject> devices, Map<String, String> usernameMap, Map<String, Map<String, String>> userMetadataMap) {
+        if (usernameMap == null || usernameMap.isEmpty() || userMetadataMap == null || userMetadataMap.isEmpty()) return Collections.emptyList();
+        Map<String, Integer> teamCounts = new LinkedHashMap<>();
+        for (BasicDBObject d : devices) {
+            String deviceId = String.valueOf(d.get("deviceId"));
+            String username = usernameMap.get("__deviceId__" + deviceId.toLowerCase(Locale.ROOT));
+            if (StringUtils.isBlank(username) || "-".equals(username)) continue;
+            Map<String, String> meta = userMetadataMap.get(username);
+            String team = meta != null ? meta.get("team") : null;
+            if (StringUtils.isBlank(team)) continue;
+            teamCounts.merge(team, 1, Integer::sum);
+        }
+        List<BasicDBObject> out = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : teamCounts.entrySet()) {
+            BasicDBObject g = new BasicDBObject();
+            g.put("name", e.getKey());
+            g.put("count", e.getValue());
+            out.add(g);
+        }
+        return out;
     }
 
     private static Comparator<BasicDBObject> buildDeviceComparator(String key) {
@@ -1004,15 +1025,12 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (assetTag != null && StringUtils.isNotBlank(assetTag.getValue())
                     && !Constants.AKTO_BROWSER_LLM_AGENT_TAG.equals(assetTag.getKeyName())) {
                 String key = McpClientRegistry.resolveClientKey(assetTag.getValue());
-                final CollectionTags fAssetTag = assetTag;
                 GroupSummary g = groups.computeIfAbsent("agent|" + key, k -> {
                     GroupSummary gs = new GroupSummary(key, "agent");
                     gs.name = McpClientRegistry.formatDisplayName(key);
                     gs.clientType = McpClientRegistry.getAgentTypeFromValue(key);
-                    gs.tagKey = fAssetTag.getKeyName();
                     return gs;
                 });
-                g.rawTagValues.add(assetTag.getValue());
                 g.accumulateCheap(c, hostName, envType, collRisk, collTraffic, deviceId);
                 addedToAgentGroup = true;
             }
@@ -1182,6 +1200,30 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         }
     }
 
+    // Sums an already-computed collectionId -> {critical,high,medium,low} map (from
+    // attributeViolationCountsToCollections, fetched once account-wide and passed in as
+    // violationsByCollectionId) over one row's own collectionIds. Returns null (not a zeroed object)
+    // when the total is 0, matching the old client-side violationsForCollections' contract exactly.
+    private static BasicDBObject sumViolationsForCollections(List<Integer> collectionIds, Map<String, Map<String, Integer>> violationsByCollectionId) {
+        if (violationsByCollectionId == null || violationsByCollectionId.isEmpty()) return null;
+        int critical = 0, high = 0, medium = 0, low = 0;
+        for (Integer cid : collectionIds) {
+            Map<String, Integer> v = violationsByCollectionId.get(String.valueOf(cid));
+            if (v == null) continue;
+            critical += v.getOrDefault("critical", 0);
+            high += v.getOrDefault("high", 0);
+            medium += v.getOrDefault("medium", 0);
+            low += v.getOrDefault("low", 0);
+        }
+        if (critical + high + medium + low == 0) return null;
+        BasicDBObject out = new BasicDBObject();
+        out.put("critical", critical);
+        out.put("high", high);
+        out.put("medium", medium);
+        out.put("low", low);
+        return out;
+    }
+
     /**
      * Paginated, sorted, searchable grouped-asset rows for the Agentic Assets "New Layout" table.
      * Builds lightweight summaries for every group (classifyAllGroups — one pass, no per-device
@@ -1261,10 +1303,35 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             for (ApiCollection c : collections) byId.put(c.getId(), c);
 
             Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
+            Set<String> maliciousKeys = maliciousSkillKeys != null ? new HashSet<>(maliciousSkillKeys) : Collections.emptySet();
             List<BasicDBObject> rowsOut = new ArrayList<>();
             for (GroupSummary g : page) {
                 BasicDBObject row = g.toSummaryResponse();
-                row.put("devices", buildDevicesForGroup(g, byId, traffic, risk, userAnalysis));
+                // devices itself is NOT sent (dropped in favor of the two small values actually
+                // derived from it below) — a group with hundreds of member devices turned this into
+                // the single biggest contributor to a 16MB response once hostNames/collectionIds were
+                // fixed (see fetchAgenticAssetDetail, the lazy per-asset endpoint the Overview tab's
+                // full device list — topology graph, etc. — now comes from instead).
+                List<BasicDBObject> devices = buildDevicesForGroup(g, byId, traffic, risk, userAnalysis);
+                List<BasicDBObject> teamGroups = buildTeamGroupsForRow(devices, usernameMap, userMetadataMap);
+                if (!teamGroups.isEmpty()) row.put("groups", teamGroups);
+                int aiInteractionsTotal = 0;
+                for (BasicDBObject d : devices) {
+                    Object v = d.get("aiInteractions");
+                    if (v instanceof Number) aiInteractionsTotal += ((Number) v).intValue();
+                }
+                if (aiInteractionsTotal > 0) row.put("aiInteractions", aiInteractionsTotal);
+                // Precomputed here (server already has g.collectionIds in memory) instead of sending
+                // the raw collectionIds list to the browser just so it can do this same sum — see
+                // toSummaryResponse()'s comment for why collectionIds/hostNames/etc. no longer appear
+                // in this response at all.
+                BasicDBObject violations = sumViolationsForCollections(g.collectionIds, violationsByCollectionId);
+                if (violations != null) row.put("violations", violations);
+                if ("skill".equals(g.rowType) && StringUtils.isNotBlank(g.name)) {
+                    String lname = g.name.toLowerCase(Locale.ROOT);
+                    boolean malicious = g.collectionIds.stream().anyMatch(cid -> maliciousKeys.contains(cid + "|" + lname));
+                    if (malicious) row.put("isMalicious", true);
+                }
                 rowsOut.add(row);
             }
 
@@ -1274,6 +1341,79 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching agentic assets summary: " + e.getMessage());
             addActionError("Error fetching agentic assets summary: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    @Setter private String groupKey;
+    @Setter private String rowType;
+
+    @Getter private List<String> assetHostNames;
+    @Getter private List<Integer> assetCollectionIds;
+    @Getter private List<String> assetSkillNames;
+    @Getter private List<String> assetMcpServers;
+    @Getter private Map<String, List<Integer>> assetMcpServerCollectionIds;
+    @Getter private List<BasicDBObject> assetDevices;
+
+    /**
+     * Lazy per-asset detail — hostNames/collectionIds/skillNames/mcpServers/mcpServerCollectionIds/
+     * devices for exactly ONE group (identified by groupKey+rowType, both already on every row
+     * fetchAgenticAssetsSummary returns), fetched only when a user actually opens that asset's
+     * flyout instead of being shipped for all 50 rows of every page (see toSummaryResponse()'s
+     * comment, and fetchAgenticAssetsSummary's row-loop comment for the devices/groups/aiInteractions
+     * split — together these are what used to make that response 16MB, mostly from raw per-device
+     * breakdowns on rows with hundreds of member devices). Pays the same classifyAllGroups
+     * full-account-scan cost fetchAgenticAssetsSummary already pays on every page turn (documented
+     * tech debt, not made worse by this endpoint), just on-demand instead of on every list load.
+     * trafficMap/riskScoreMap/userAnalysisFlatMap are the same account-wide maps already sent to
+     * fetchAgenticAssetsSummary/fetchAgenticAssetDevicesPage — reused here for the same per-device
+     * enrichment (risk score, last seen, AI interactions) the Overview tab's topology graph needs.
+     */
+    public String fetchAgenticAssetDetail() {
+        response = new BasicDBObject();
+        try {
+            if (StringUtils.isBlank(groupKey) || StringUtils.isBlank(rowType)) {
+                addActionError("groupKey and rowType are required");
+                return ERROR.toUpperCase();
+            }
+
+            List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
+                    Filters.empty(),
+                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS)
+            );
+            Map<String, GroupSummary> groups = classifyAllGroups(collections, Collections.emptyMap(), Collections.emptyMap());
+            GroupSummary g = groups.get(rowType + "|" + groupKey);
+
+            if (g == null) {
+                assetHostNames = Collections.emptyList();
+                assetCollectionIds = Collections.emptyList();
+                assetSkillNames = Collections.emptyList();
+                assetMcpServers = Collections.emptyList();
+                assetMcpServerCollectionIds = Collections.emptyMap();
+                assetDevices = Collections.emptyList();
+                return SUCCESS.toUpperCase();
+            }
+
+            assetHostNames = new ArrayList<>(g.hostNames);
+            assetCollectionIds = g.collectionIds;
+            assetSkillNames = new ArrayList<>(g.skillNames);
+            assetMcpServers = new ArrayList<>(g.serviceNames);
+            assetMcpServerCollectionIds = new HashMap<>();
+            for (Map.Entry<String, Set<Integer>> e : g.serviceCollectionIds.entrySet()) {
+                assetMcpServerCollectionIds.put(e.getKey(), new ArrayList<>(e.getValue()));
+            }
+
+            Map<Integer, ApiCollection> byId = new HashMap<>();
+            for (ApiCollection c : collections) byId.put(c.getId(), c);
+            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
+            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
+            Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
+            assetDevices = buildDevicesForGroup(g, byId, traffic, risk, userAnalysis);
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching agentic asset detail: " + e.getMessage());
+            addActionError("Error fetching agentic asset detail: " + e.getMessage());
             return ERROR.toUpperCase();
         }
     }

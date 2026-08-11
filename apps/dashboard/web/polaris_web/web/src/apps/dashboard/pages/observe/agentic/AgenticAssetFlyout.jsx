@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Tabs, Box, VerticalStack, Text, Divider } from "@shopify/polaris";
+import { Tabs, Box, VerticalStack, Text, Divider, Spinner } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AgenticFlyoutShell from "./AgenticFlyoutShell";
@@ -88,13 +88,12 @@ function AgenticComponentsTab({ asset, onNavChange, onNavigateToAsset, configVio
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export default function AgenticAssetFlyout({
-    asset,
+    asset: rawAsset,
     show,
     onClose,
     onNavigateToAsset,
     agenticTreeData = [],
     agenticFlatData = [],
-    assetDevices = {},
     enrichMaps = {},
     collections = [],
     // Left undefined (not defaulted to []) when the parent hasn't loaded raw violation rows yet, so
@@ -109,6 +108,52 @@ export default function AgenticAssetFlyout({
     const [topNavPicker,   setTopNavPicker]   = useState(null);
     const [mcpComponentCount, setMcpComponentCount] = useState(0);
     const [inlineTopology, setInlineTopology] = useState([]);
+
+    // hostNames/collectionIds/skillNames/mcpServers/mcpServerCollectionIds/devices no longer come
+    // with the grid row (see AgenticObserveAction.GroupSummary.toSummaryResponse()'s and
+    // fetchAgenticAssetsSummary's row-loop comments — sending them for every row of every page used
+    // to make a single 50-row page 16MB, mostly from raw per-device breakdowns on rows with hundreds
+    // of devices). Fetched lazily here, once, only for the one asset actually opened.
+    const [assetDetail, setAssetDetail] = useState(null);
+
+    useEffect(() => {
+        setAssetDetail(null);
+        if (!rawAsset?.groupKey || !rawAsset?.rowType) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const { trafficMap, riskScoreMap, userAnalysisFlatMap } = enrichMaps;
+                const detail = await api.fetchAgenticAssetDetail({
+                    groupKey: rawAsset.groupKey, rowType: rawAsset.rowType,
+                    trafficMap, riskScoreMap, userAnalysisFlatMap,
+                });
+                if (!cancelled) setAssetDetail(detail);
+            } catch {
+                if (!cancelled) setAssetDetail({ hostNames: [], collectionIds: [], skillNames: [], mcpServers: [], mcpServerCollectionIds: {}, devices: [] });
+            }
+        })();
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rawAsset?.groupKey, rawAsset?.rowType]);
+
+    const asset = useMemo(() => {
+        if (!rawAsset) return null;
+        if (!assetDetail) return rawAsset;
+        return { ...rawAsset, ...assetDetail };
+    }, [rawAsset, assetDetail]);
+
+    // Id-keyed map for OverviewTab's existing contract (built from the lazily-fetched asset.devices
+    // instead of being threaded in as a prop from the grid — there's only ever one asset open at a
+    // time in this flyout).
+    const assetDevices = useMemo(() => (
+        asset ? { [asset.id]: asset.devices || [] } : {}
+    ), [asset]);
+
+    // True only for the brief window between opening an asset and its lazy detail landing — the
+    // shell/header (name, riskScore — cheap scalars, always present on the row) render immediately;
+    // only tab content needs to wait, since every tab needs asset.collectionIds/hostNames for its
+    // own data fetch.
+    const detailLoading = !!rawAsset && !assetDetail;
 
     useEffect(() => { setSelectedTab(0); setTopNav(null); setTopNavPicker(null); }, [asset?.id]);
 
@@ -205,7 +250,10 @@ export default function AgenticAssetFlyout({
     const tabs = useMemo(() => {
         if (!asset) return [];
         const totalV   = (asset.violations?.critical || 0) + (asset.violations?.high || 0) + (asset.violations?.medium || 0) + (asset.violations?.low || 0);
-        const devCount = (assetDevices[asset.id] || []).length;
+        // endpointsCount is a cheap scalar already present on the grid row (before the lazy detail
+        // fetch lands), same number (asset.devices).length would give once loaded — avoids the tab
+        // badge flashing 0 while assetDetail is still in flight.
+        const devCount = asset.endpointsCount || 0;
         let componentCount = 0;
         if (asset.type === "AI Agent") {
             componentCount = countAgentComponentsTab(asset, {
@@ -265,30 +313,36 @@ export default function AgenticAssetFlyout({
             }
         >
             <Box padding="2" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-                {selectedTab === 0 && (
-                    <OverviewTab
-                        asset={asset}
-                        onTabChange={handleTabSelect}
-                        assetDevices={assetDevices}
-                        agenticTreeData={agenticTreeData}
-                        agenticFlatData={agenticFlatData}
-                        mcpComponentCount={mcpComponentCount}
-                        inlineComponents={inlineTopology}
-                    />
+                {detailLoading ? (
+                    <Box padding="8"><Spinner accessibilityLabel="Loading asset details" size="large" /></Box>
+                ) : (
+                    <>
+                        {selectedTab === 0 && (
+                            <OverviewTab
+                                asset={asset}
+                                onTabChange={handleTabSelect}
+                                assetDevices={assetDevices}
+                                agenticTreeData={agenticTreeData}
+                                agenticFlatData={agenticFlatData}
+                                mcpComponentCount={mcpComponentCount}
+                                inlineComponents={inlineTopology}
+                            />
+                        )}
+                        {selectedTab === 1 && (
+                            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                                <AgenticComponentsTab
+                                    asset={asset}
+                                    onNavChange={handleNavChange}
+                                    onNavigateToAsset={onNavigateToAsset}
+                                    configViolations={configViolations}
+                                    configRows={configRows}
+                                />
+                            </div>
+                        )}
+                        {selectedTab === 2 && <ViolationsTab asset={asset} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onViolationClick={asset?.type === "Skill" ? () => handleTabSelect(1) : undefined} />}
+                        {selectedTab === 3 && <DevicesTab asset={asset} enrichMaps={enrichMaps} />}
+                    </>
                 )}
-                {selectedTab === 1 && (
-                    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-                        <AgenticComponentsTab
-                            asset={asset}
-                            onNavChange={handleNavChange}
-                            onNavigateToAsset={onNavigateToAsset}
-                            configViolations={configViolations}
-                            configRows={configRows}
-                        />
-                    </div>
-                )}
-                {selectedTab === 2 && <ViolationsTab asset={asset} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onViolationClick={asset?.type === "Skill" ? () => handleTabSelect(1) : undefined} />}
-                {selectedTab === 3 && <DevicesTab asset={asset} enrichMaps={enrichMaps} />}
             </Box>
         </AgenticFlyoutShell>
     );

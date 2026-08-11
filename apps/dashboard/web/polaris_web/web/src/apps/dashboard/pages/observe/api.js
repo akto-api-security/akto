@@ -244,13 +244,34 @@ export default {
     // atlas-scale-test/DASHBOARD_OPTIMIZATION.md's "paginated server-side aggregation rebuild").
     // trafficMap/riskScoreMap are the same maps AgenticAssetsPage.jsx already fetches via
     // fetchAndCacheAgenticCollectionsBundle.
-    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, maliciousSkillKeys } = {}) {
+    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, maliciousSkillKeys, violationsByCollectionId, usernameMap, userMetadataMap } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsSummary',
             method: 'post',
-            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, maliciousSkillKeys },
+            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, maliciousSkillKeys, violationsByCollectionId, usernameMap, userMetadataMap },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0 }
+    },
+    // Lazy per-asset detail (hostNames/collectionIds/skillNames/mcpServers/mcpServerCollectionIds/
+    // devices) for exactly ONE group — fetched only when a user opens that asset's flyout, not
+    // shipped for every row of every fetchAgenticAssetsSummary page (that used to make a single
+    // 50-row page 16MB, mostly from raw per-device breakdowns on rows with hundreds of devices).
+    // trafficMap/riskScoreMap/userAnalysisFlatMap enrich the one asset's own device list the same
+    // way fetchAgenticAssetsSummary's rows used to — needed by the Overview tab's topology graph.
+    async fetchAgenticAssetDetail({ groupKey, rowType, trafficMap, riskScoreMap, userAnalysisFlatMap } = {}) {
+        const resp = await request({
+            url: '/api/fetchAgenticAssetDetail',
+            method: 'post',
+            data: { groupKey, rowType, trafficMap, riskScoreMap, userAnalysisFlatMap },
+        })
+        return {
+            hostNames: resp?.assetHostNames || [],
+            collectionIds: resp?.assetCollectionIds || [],
+            skillNames: resp?.assetSkillNames || [],
+            mcpServers: resp?.assetMcpServers || [],
+            mcpServerCollectionIds: resp?.assetMcpServerCollectionIds || {},
+            devices: resp?.assetDevices || [],
+        }
     },
     // Server-side paginated device list for ONE asset's flyout Devices tab — scoped to just
     // that asset's own apiCollectionIds (cheap), not the whole account. usernameMap is the

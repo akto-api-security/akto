@@ -32,11 +32,7 @@ import agenticObserveApi, {
 import {
   buildUserAnalysisLookup,
   buildUserAnalysisFlatMap,
-  getRowViolations,
-  buildTeamGroupsFromDevices,
-  enrichDevicesWithUsername,
   fetchAndCacheSkillApiData,
-  skillCollectionKey,
   fetchAndCacheAgenticTrafficRiskBundle,
 } from "./constants";
 import PersistStore from "../../../../main/PersistStore";
@@ -168,28 +164,21 @@ const DEFAULT_COL_DEF = {
 
 // ─── Row shaping ──────────────────────────────────────────────────────────────
 // Turns one server-computed row (AgenticObserveAction.fetchAgenticAssetsSummary) into the shape
-// COL_DEFS/AgenticCellRenderers/AgenticAssetFlyout expect. Team breakdown, AI-interaction totals and
-// violations are computed here, client-side, scoped to just this row's device list — cheap, since
-// it's bounded by however many rows are on the current page, not the account's full ~800 groups (see
-// atlas-scale-test/DASHBOARD_OPTIMIZATION.md's "paginated server-side aggregation rebuild" entry for
-// why that distinction is the whole point).
-function shapeRow(row, { violationsByCollectionId, usernameMap, userMetadataMap, maliciousSkillKeys }) {
-  const devices = enrichDevicesWithUsername(row.devices || [], usernameMap);
-  const violations = getRowViolations(row.collectionIds, violationsByCollectionId);
-  const groups = buildTeamGroupsFromDevices(devices, usernameMap, userMetadataMap);
-  // Server-computed per device (see AgenticObserveAction.buildDevicesForGroup/accumulateAiInteractions)
-  // — matches UserAnalysisData's own serviceId scheme (hostname-segment-derived), not
-  // Endpoint Shield's module_info id/name, which never actually matches real interaction data.
-  const aiInteractionsTotal = devices.reduce((sum, d) => sum + (d.aiInteractions || 0), 0);
+// COL_DEFS/AgenticCellRenderers/AgenticAssetFlyout expect. `violations`/`isMalicious`/`groups`
+// (team breakdown)/`aiInteractions` all come precomputed from the server now — a row's raw
+// per-device list (up to hundreds of entries for a big group) used to be sent just so the browser
+// could derive these few small values from it; a single 50-row page measured at 16MB. The full
+// device list itself now comes from fetchAgenticAssetDetail (see AgenticAssetFlyout.jsx), fetched
+// lazily only for the one asset a user actually opens. See
+// AgenticObserveAction.GroupSummary.toSummaryResponse()'s and fetchAgenticAssetsSummary's row-loop
+// comments.
+function shapeRow(row) {
   const isSkill = row.rowType === "skill";
   const tags = [];
   if (row.hasPersonalAccount && !isSkill) tags.push("Contains personal account");
   if (row.hasLocalMcpServer && !isSkill) tags.push("Local MCP Server");
   if (row.hasMisconfiguredConfig && !isSkill) tags.push("Misconfigured");
-  // Collection-scoped so a same-named skill belonging to a different user/agent doesn't mark this
-  // one malicious too (see skillCollectionKey in constants.js).
-  const isMalicious = isSkill && (row.collectionIds || []).some((cid) => maliciousSkillKeys?.has(skillCollectionKey(cid, row.name)));
-  if (isMalicious) tags.push("Malicious Skill");
+  if (row.isMalicious) tags.push("Malicious Skill");
 
   return {
     ...row,
@@ -197,11 +186,6 @@ function shapeRow(row, { violationsByCollectionId, usernameMap, userMetadataMap,
     endpointCount: row.endpointsCount,
     lastSeen: row.lastSeenEpoch > 0 ? func.prettifyEpoch(row.lastSeenEpoch) : "",
     assetTagValue: row.groupKey,
-    isMalicious,
-    violations,
-    groups: groups.length ? groups : undefined,
-    aiInteractions: aiInteractionsTotal > 0 ? aiInteractionsTotal : undefined,
-    devices,
     tags: tags.length ? tags : undefined,
   };
 }
@@ -287,7 +271,6 @@ function TableSection({
         onNavigateToAsset={handleNavigateToAsset}
         agenticTreeData={[]}
         agenticFlatData={[]}
-        assetDevices={flyout ? { [flyout.id]: flyout.devices || [] } : {}}
         enrichMaps={enrichMaps}
         agenticViolationRows={undefined}
         startTimestamp={startTimestamp}
@@ -471,7 +454,7 @@ export default function AgenticAssetsPage() {
     // AG Grid SSRM sends sortOrder: -1 for asc, 1 for desc — opposite of the backend's Mongo
     // convention (1 asc / -1 desc, matching NhiGovernanceViolationsAction's own onServerFetch).
     const mongoSortOrder = sortOrder ? -sortOrder : -1;
-    const { trafficMap, riskScoreMap, userAnalysisFlatMap, maliciousSkillKeys } = enrichRef.current;
+    const { trafficMap, riskScoreMap, userAnalysisFlatMap, maliciousSkillKeys, violationsByCollectionId, usernameMap, userMetadataMap } = enrichRef.current;
 
     return api.fetchAgenticAssetsSummary({
       skip,
@@ -486,8 +469,18 @@ export default function AgenticAssetsPage() {
       userAnalysisFlatMap,
       filters,
       maliciousSkillKeys: Array.from(maliciousSkillKeys || []),
+      // Precomputed account-wide already (attributeViolationCountsToCollections, via
+      // fetchViolationCountsByCollection in the Tier-2 mount effect below) — passed straight through
+      // so the server can compute each row's own violations total in-memory instead of the browser
+      // needing every row's raw collectionIds list to do that sum itself.
+      violationsByCollectionId,
+      // Endpoint Shield maps, so the server can precompute each row's own Teams breakdown/AI
+      // interactions total from its own per-device list, instead of sending that raw list (up to
+      // hundreds of entries per row) just for the browser to derive these few small values.
+      usernameMap,
+      userMetadataMap,
     }).then((res) => ({
-      value: (res.rows || []).map((row) => shapeRow(row, enrichRef.current)),
+      value: (res.rows || []).map((row) => shapeRow(row)),
       total: res.total || 0,
     }));
   }, [startTimestamp, endTimestamp]);
