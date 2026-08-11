@@ -369,6 +369,30 @@ pick up cold.
     `usernameMap`/`userMetadataMap` in full on **every** grid page turn — one observed request body
     was 722KB for a 49-collection account. Already listed below under "Duplication & efficiency" as
     a known pattern; this is a concrete size data point for that item, not a new finding.
+- **`getAllCollectionsBasic` (mount-time full-account fetch, `ApiCollectionsAction.fetchAllCollectionsBasic`
+  — `Filters.empty()`, no skip/limit, ~19 fields/doc, several MB on large accounts) eliminated
+  entirely from the Agentic Assets page**, not just cached or slimmed. User pushed back on
+  "generalize the existing cache" (the cache is hardcoded to one specific account id, so it never
+  engaged elsewhere) by asking why a *grouped* display needs *per-collection* data at all — traced
+  every real usage and found only two of the ~19 fields were ever read (`id`, `hostName`), both
+  purely to join server-aggregated per-host violation counts back to collection ids client-side
+  (`buildHostAttributionMaps`/`resolveHostToCollectionIds`, a 3-tier exact/loose/claude-config
+  match) and, in the flyout's Violations tab, to look up one asset's own hostnames — both of which
+  the server already has everything needed to do itself. Fixed by porting the matching logic to
+  Java (`AgenticObserveAction.attributeViolationCountsToCollections`, loads only `{id, hostName}`
+  to do the join, returns counts pre-keyed by collection id) and by having `ViolationsTab.jsx` read
+  `hostNames` straight off the asset row (`GroupSummary` already collects every member collection's
+  hostName server-side, per row, via `toSummaryResponse()` — this data was already being shipped to
+  the browser and simply wasn't being used). `fetchAndCacheAgenticCollectionsBundle` — shared by 4
+  other agentic pages (`UsersAndDevices`/`Endpoints`/`DeviceEndpoints`/`EndpointPosture`), not
+  audited in this pass — was left untouched; added a smaller sibling
+  (`fetchAndCacheAgenticCollectionsBundle` → `fetchAndCacheAgenticTrafficRiskBundle`, own
+  `PersistStore` cache slot) fetching only `trafficMap`/`riskScoreMap` for this one page instead.
+  **Those 4 other pages likely have the same eliminable dependency** (same shared bundle, same
+  join pattern is plausible) — worth auditing as a follow-up rather than assuming they're fine.
+  Verified live on Atlas Scale Test (25,890 collections): a clean page load fires zero
+  `getAllCollectionsBasic` calls, while the new attribution call returns correct real counts
+  (e.g. `{"1738051842": {"critical":43,"high":896,"medium":120,"low":0}}`).
 
 ## High priority — wrong output today
 
