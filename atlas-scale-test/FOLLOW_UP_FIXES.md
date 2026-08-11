@@ -443,6 +443,26 @@ pick up cold.
   console errors, and row-click on both an agent row ("Cursor" → `envType__mcp-client=cursor`) and
   a service row ("default" MCP Server → hostName-list filter) navigates to Inventory with the
   correct filter.
+- **`getAllCollections` (83MB, not the already-fixed `getAllCollectionsBasic`) fired on the legacy
+  Agentic Assets page**, found via the user's own DevTools performance trace right after the fix
+  above shipped. Traced the network event's initiator stack in the trace JSON straight to
+  `Dashboard.jsx`'s `fetchAllCollections` — the root layout's mount-once bootstrap effect (deps
+  `[]`, so it only ever runs once per full page load) that populates
+  `allCollections`/`collectionsMap`/`hostNameMap`/`tagCollectionsMap` for the whole app, already
+  carved out an exclusion for `/dashboard/observe/inventory` but not this route. This call is
+  pre-existing and unrelated to any Endpoints.jsx change in this round — it fires on a cold/direct
+  load of **any** non-Inventory page, before that page's own effects can resolve (Dashboard's
+  effect body runs synchronously, well before any child's `await`ed fetch settles, so nothing the
+  page itself does can win that race) — it simply became the next-most-visible bottleneck in the
+  trace once the 16MB-per-page problem was fixed. Confirmed via grep that nothing under
+  `pages/observe/agentic/` reads any of those four PersistStore fields, so extended the existing
+  Inventory exclusion to `/dashboard/observe/agentic-assets-legacy` too. Verified live: a fresh
+  full-navigation load of the legacy page fires zero `getAllCollections`/`getAllCollectionsBasic`
+  requests, table/stats still render correctly (777/24/20/0/733), no new console errors.
+  **The same likely applies to the other 3 agentic pages sharing this pattern**
+  (`agentic-assets`/`users-and-devices`/`endpoints`, i.e. `AgenticAssetsPage`/`UsersAndDevices`/
+  `DeviceEndpoints`) since they equally don't read these fields, but wasn't extended there since
+  only the legacy page was in scope for this round — worth a quick follow-up.
 
 ## High priority — wrong output today
 
