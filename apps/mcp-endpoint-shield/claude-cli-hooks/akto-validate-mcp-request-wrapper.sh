@@ -22,5 +22,10 @@ export LOG_PAYLOADS="false"
 # Optional: Disable SSL verification (INSECURE - use only for testing)
 # export SSL_VERIFY="false"
 
-# Execute Python hook script
-exec python3 "$HOME/.claude/hooks/akto-validate-mcp-request.py" "$@"
+AKTO_LOG_DIR="${LOG_DIR:-$HOME/.claude/akto/logs}"
+mkdir -p "$AKTO_LOG_DIR" 2>/dev/null
+if ! akto_out=$(python3 "$HOME/.claude/hooks/akto-validate-mcp-request.py" "$@" 2>>"$AKTO_LOG_DIR/wrapper.err"); then
+    printf '{}'
+    exit 0
+fi
+printf '%s' "$akto_out"

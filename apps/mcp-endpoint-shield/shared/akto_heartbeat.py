@@ -30,7 +30,14 @@ import ssl
 import time
 import urllib.request
 
-from akto_machine_id import get_machine_id, get_username
+try:
+    from akto_machine_id import get_machine_id, get_username
+except ImportError:
+    def get_machine_id() -> str:
+        return ""
+
+    def get_username() -> str:
+        return os.getenv("USER") or os.getenv("USERNAME") or "unknown"
 
 MODULE_TYPE = "MCP_ENDPOINT_SHIELD"
 VERSION = "1.0.0"
@@ -135,6 +142,11 @@ def send_heartbeat(log_dir: str, logger=None) -> None:
             return
 
         device_id = os.getenv("DEVICE_ID") or get_machine_id()
+        if not device_id:
+            if logger:
+                logger.debug("Heartbeat skipped (no device id could be resolved)")
+            return
+
         username = get_username()
         agent_id = _get_or_create_agent_id(log_dir)
         now_s = int(time.time())

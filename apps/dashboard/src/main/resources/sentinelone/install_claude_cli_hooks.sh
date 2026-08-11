@@ -479,13 +479,26 @@ main() {
     SHARED_PY_FILES=(
         "akto_ingestion_utility.py"
         "akto_machine_id.py"
-        "akto_heartbeat.py"
     )
 
     for f in "${SHARED_PY_FILES[@]}"; do
         if ! download_file "$GITHUB_SHARED_BASE/$f" "$CLAUDE_HOOKS_DIR/$f"; then
             log_error "Failed to download $f"
             return 1
+        fi
+        chmod +x "$CLAUDE_HOOKS_DIR/$f"
+        log "Downloaded $f"
+    done
+
+    OPTIONAL_SHARED_PY_FILES=(
+        "akto_heartbeat.py"
+    )
+
+    for f in "${OPTIONAL_SHARED_PY_FILES[@]}"; do
+        if ! download_file "$GITHUB_SHARED_BASE/$f" "$CLAUDE_HOOKS_DIR/$f"; then
+            rm -f "$CLAUDE_HOOKS_DIR/$f"
+            log "Warning: could not download optional $f — continuing without it"
+            continue
         fi
         chmod +x "$CLAUDE_HOOKS_DIR/$f"
         log "Downloaded $f"
