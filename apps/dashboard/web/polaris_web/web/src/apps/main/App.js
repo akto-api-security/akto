@@ -131,6 +131,7 @@ import DastProgress from "../dashboard/pages/observe/api_collections/DastProgres
 import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
 import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
+import AgenticAssetDevicesPage from "../dashboard/pages/observe/agentic/AgenticAssetDevicesPage.jsx";
 import UsersAndDevices from "../dashboard/pages/observe/agentic/UsersAndDevices.jsx";
 import DeviceEndpoints from "../dashboard/pages/observe/agentic/DeviceEndpoints.jsx";
 import AgenticAssetsPage from "../dashboard/pages/observe/agentic/AgenticAssetsPage.jsx";
@@ -229,6 +230,10 @@ const router = createBrowserRouter([
                             {
                                 path: "agentic-assets-legacy",
                                 element: <Endpoints/>
+                            },
+                            {
+                                path: "agentic-assets-legacy/devices",
+                                element: <AgenticAssetDevicesPage/>
                             },
                             {
                                 path: "agentic-assets",

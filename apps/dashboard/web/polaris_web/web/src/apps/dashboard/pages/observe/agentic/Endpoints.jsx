@@ -17,10 +17,7 @@ import NewLayoutTooltip from "./NewLayoutTooltip";
 import {
     getHeaders,
     resourceName,
-    INVENTORY_PATH,
-    INVENTORY_FILTER_KEY,
     PAGE_LIMIT,
-    buildAgenticInventoryFilterForRow,
     fetchAndCacheSkillApiData,
     fetchAndCacheAgenticTrafficRiskBundle,
     fetchAndCacheAgenticSensitiveInfo,
@@ -140,9 +137,6 @@ function Endpoints() {
     const initialSelectedTab = tableSelectedTab[window.location.pathname] || "ai_agents";
     const [selectedTab, setSelectedTab] = useState(initialSelectedTab);
     const [selected, setSelected] = useState(func.getTableTabIndexById(1, definedTableTabs, initialSelectedTab));
-
-    const filtersMap = PersistStore((state) => state.filtersMap);
-    const setFiltersMap = PersistStore((state) => state.setFiltersMap);
 
     // Everything fetchTableData/shapeRow need but the paginated table endpoint doesn't carry
     // itself — populated once at mount (Tier 1: trafficMap/riskScoreMap/sensitiveMap; Tier 2,
@@ -265,32 +259,22 @@ function Endpoints() {
         return func.convertToDisambiguateLabelObj(value, null, 2);
     }, []);
 
-    // Row click doesn't open a flyout on this (legacy) layout — it navigates to the Inventory page
-    // with a derived filter, same as before. groupKey/hostNames/tagKey/rawTagValues that
-    // buildAgenticInventoryFilterForRow needs aren't on the compact summary row any more (see
-    // AgenticObserveAction.GroupSummary.toSummaryResponse()'s comment), so this fetches them lazily
-    // for just the one clicked asset first — mirrors the new layout's flyout doing the same lazy
-    // fetch on open, just triggered by a click instead of an open.
-    const handleRowClick = useCallback(async (row) => {
-        try {
-            const detail = await api.fetchAgenticAssetDetail({ groupKey: row.groupKey, rowType: row.rowType });
-            const merged = { ...row, ...detail };
-            const updatedFiltersMap = { ...filtersMap };
-            const filterPayload = buildAgenticInventoryFilterForRow(merged);
-            if (filterPayload) {
-                updatedFiltersMap[INVENTORY_FILTER_KEY] = filterPayload;
-            } else {
-                delete updatedFiltersMap[INVENTORY_FILTER_KEY];
-            }
-            delete updatedFiltersMap[`${INVENTORY_FILTER_KEY}agent-tree/`];
-            setFiltersMap(updatedFiltersMap);
-            setTableSelectedTab({ ...tableSelectedTab, [INVENTORY_PATH]: "hostname" });
-        } catch {
-            // Detail fetch failed — still navigate, just without a derived filter.
-        } finally {
-            navigate(INVENTORY_PATH);
-        }
-    }, [filtersMap, setFiltersMap, navigate, tableSelectedTab, setTableSelectedTab]);
+    // Row click navigates immediately (no await first) to a dedicated, paginated device/endpoint
+    // view scoped to just this one asset — groupKey/rowType/name/type travel via query params, the
+    // destination page does its own lazy fetchAgenticAssetDetail + fetchAgenticAssetDevicesPage.
+    // Deliberately NOT navigating to Inventory any more: that needed the whole account's collections
+    // (getAllCollectionsBasic) just to build a filter, and navigating only after that resolved made
+    // every click feel like it froze for several seconds with no feedback. Navigating first means the
+    // loading spinner the user sees is on the new page, not a stuck click on this one.
+    const handleRowClick = useCallback((row) => {
+        const params = new URLSearchParams({
+            groupKey: row.groupKey || "",
+            rowType: row.rowType || "",
+            name: row.name || "",
+            type: row.clientType || "",
+        });
+        navigate(`/dashboard/observe/agentic-assets-legacy/devices?${params.toString()}`);
+    }, [navigate]);
 
     const summaryItems = useMemo(() => [
         {
