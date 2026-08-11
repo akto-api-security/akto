@@ -52,8 +52,11 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
     @Getter private long total;
 
     // ---- Lightweight counts for fetchNhiIdentitiesStats (summary cards / tab badges) ----
-    @Setter private List<String> identityNames; // identityNames known to have violations (from the
-                                                 // already-fetched, cheap fetchViolationCountsByIdentity)
+    @Setter private List<String> violatingIdentityIds; // hex ids known to have violations (from the
+                                                        // already-fetched, cheap
+                                                        // fetchViolationCountsByIdentity) — NOT
+                                                        // identityName, which isn't unique across
+                                                        // identities.
     @Getter private long statTotal;
     @Getter private long statExpired;
     @Getter private long statDisabled;
@@ -190,9 +193,17 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
             disabledConditions.add(Filters.eq(NhiIdentity.STATUS, "INACTIVE"));
             statDisabled = NhiIdentityDao.instance.count(combineIdentityMatch(disabledConditions));
 
-            if (identityNames != null && !identityNames.isEmpty()) {
+            if (violatingIdentityIds != null && !violatingIdentityIds.isEmpty()) {
+                List<ObjectId> objectIds = new ArrayList<>();
+                for (String hexId : violatingIdentityIds) {
+                    try {
+                        objectIds.add(new ObjectId(hexId));
+                    } catch (IllegalArgumentException ignored) {
+                        // skip malformed ids rather than failing the whole stats call
+                    }
+                }
                 List<Bson> withViolationsConditions = new ArrayList<>(baseConditions);
-                withViolationsConditions.add(Filters.in(NhiIdentity.IDENTITY_NAME, identityNames));
+                withViolationsConditions.add(Filters.in(NhiIdentity.ID, objectIds));
                 statWithViolations = NhiIdentityDao.instance.count(combineIdentityMatch(withViolationsConditions));
             } else {
                 statWithViolations = 0;

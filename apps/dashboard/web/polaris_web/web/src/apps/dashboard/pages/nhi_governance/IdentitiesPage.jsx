@@ -82,7 +82,7 @@ const transformIdentityForUI = (apiIdentity) => {
 // without an extra network call.
 function buildPageRow(apiIdentity, violationIndex) {
     const r = transformIdentityForUI(apiIdentity);
-    const v = violationIndex[r.identityName] || { violCrit: 0, violHigh: 0, violMed: 0 };
+    const v = violationIndex[r.hexId] || { violCrit: 0, violHigh: 0, violMed: 0 };
     return {
         ...r,
         id: r.hexId,
@@ -175,10 +175,10 @@ export default function IdentitiesPage() {
             }
             setRawViolations(violRows);
 
-            const violatingNames = [...new Set(violRows.map((r) => r.identityName).filter(Boolean))];
+            const violatingIdentityIds = [...new Set(violRows.map((r) => r.identityId).filter(Boolean))];
 
             const [statsRes, graphRes] = await Promise.all([
-                observeRequests.fetchNhiIdentitiesStats(startTimestamp, endTimestamp, violatingNames),
+                observeRequests.fetchNhiIdentitiesStats(startTimestamp, endTimestamp, violatingIdentityIds),
                 observeRequests.fetchAllNhiIdentities(startTimestamp, endTimestamp, {
                     skip: 0, limit: GRAPH_NODE_CAP, sortKey: "createdAt", sortOrder: -1,
                 }),
@@ -198,17 +198,20 @@ export default function IdentitiesPage() {
         fetchData();
     }, [startTimestamp, endTimestamp]);
 
-    // Build violation index from the server-grouped counts (one row per identityName x severity,
-    // not one row per violation document).
+    // Build violation index from the server-grouped counts (one row per identity x severity, not one
+    // row per violation document). Keyed by identityId (hexId) — NOT identityName, which is just a
+    // display label and isn't unique (many distinct identities across different agents/owners share
+    // the same name, e.g. every "github-api.Authorization"). Keying by name previously summed
+    // violations across every identity sharing that name into each row's badge.
     const violationIndex = useMemo(() => {
         return rawViolations.reduce((acc, row) => {
-            const identityName = row.identityName;
-            if (!identityName) return acc;
-            if (!acc[identityName]) acc[identityName] = { violCrit: 0, violHigh: 0, violMed: 0 };
+            const identityId = row.identityId;
+            if (!identityId) return acc;
+            if (!acc[identityId]) acc[identityId] = { violCrit: 0, violHigh: 0, violMed: 0 };
             const count = row.count || 0;
-            if (row.severity === "Critical")     acc[identityName].violCrit += count;
-            else if (row.severity === "High")    acc[identityName].violHigh += count;
-            else if (row.severity === "Medium")  acc[identityName].violMed += count;
+            if (row.severity === "Critical")     acc[identityId].violCrit += count;
+            else if (row.severity === "High")    acc[identityId].violHigh += count;
+            else if (row.severity === "Medium")  acc[identityId].violMed += count;
             return acc;
         }, {});
     }, [rawViolations]);

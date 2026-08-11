@@ -278,8 +278,14 @@ public class NhiGovernanceViolationsAction extends UserAction {
     }
 
     /**
-     * Per-identity violation counts, grouped server-side (one row per identityName x severity) instead of
-     * shipping every non-fixed violation document to the browser for client-side grouping.
+     * Per-identity violation counts, grouped server-side (one row per identity x severity) instead of
+     * shipping every non-fixed violation document to the browser for client-side grouping. Groups by
+     * identities.id (the referenced identity's own ObjectId, converted to its hex string via $toString)
+     * rather than identities.identityName — identityName is just a display label and is NOT unique
+     * (many distinct identities across different agents/owners share the same name, e.g. every
+     * "github-api.Authorization"), so grouping by name summed violations across every identity sharing
+     * that name into one bucket. fetchViolationsByIdentity (the flyout's own fetch) already scopes
+     * correctly by identities.id — this now matches that.
      */
     public String fetchViolationCountsByIdentity() {
         try {
@@ -287,11 +293,11 @@ public class NhiGovernanceViolationsAction extends UserAction {
                     Aggregates.match(Filters.ne(NhiViolation.STATUS, "Fixed")),
                     Aggregates.unwind("$" + NhiViolation.IDENTITIES),
                     Aggregates.group(
-                            new Document("identityName", "$" + NhiViolation.IDENTITIES + ".identityName")
+                            new Document("identityId", new Document("$toString", "$" + NhiViolation.IDENTITIES + ".id"))
                                     .append("severity", "$" + NhiViolation.SEVERITY),
                             Accumulators.sum("count", 1))
             );
-            identityViolationCounts = groupPairsToList(pipeline, "identityName");
+            identityViolationCounts = groupPairsToList(pipeline, "identityId");
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching violation counts: " + e.getMessage());

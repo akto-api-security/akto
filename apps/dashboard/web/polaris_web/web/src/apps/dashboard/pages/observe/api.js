@@ -1301,14 +1301,15 @@ export default {
     },
 
     // Counts-only (ATLAS NHI Governance Identities page): feeds the summary cards and tab badges
-    // without pulling any identity documents. identityNames (optional) is the list of identityNames
+    // without pulling any identity documents. violatingIdentityIds (optional) is the list of hex ids
     // already known to have violations, from the cheap fetchViolationCountsByIdentity() call, used to
-    // compute the "Identities with Violations" count server-side.
-    async fetchNhiIdentitiesStats(startTimestamp, endTimestamp, identityNames) {
+    // compute the "Identities with Violations" count server-side. Hex ids, not identityNames — names
+    // aren't unique across identities.
+    async fetchNhiIdentitiesStats(startTimestamp, endTimestamp, violatingIdentityIds) {
         const resp = await request({
             url: '/api/fetchNhiIdentitiesStats',
             method: 'post',
-            data: { startTimestamp, endTimestamp, identityNames }
+            data: { startTimestamp, endTimestamp, violatingIdentityIds }
         })
         return {
             total: resp?.statTotal || 0,
