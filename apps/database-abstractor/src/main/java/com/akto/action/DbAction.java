@@ -6622,9 +6622,12 @@ public class DbAction extends ActionSupport {
     @Getter @Setter
     private int globalRateLimit;
 
+    @Getter @Setter
+    private String dashboardContext;
+
     public String incrementAndGetTestRateLimitUsage() {
         try {
-            testRateLimitUsageCount = DbLayer.incrementAndGetTestRateLimitUsage(globalRateLimit);
+            testRateLimitUsageCount = DbLayer.incrementAndGetTestRateLimitUsage(globalRateLimit, dashboardContext);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in incrementAndGetTestRateLimitUsage " + e.toString());
             return Action.ERROR.toUpperCase();
