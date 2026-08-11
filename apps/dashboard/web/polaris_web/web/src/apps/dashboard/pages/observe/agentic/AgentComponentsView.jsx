@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Box, Text, Badge, HorizontalStack, VerticalStack, Spinner } from "@shopify/polaris";
+import { Box, Text, Badge, HorizontalStack, VerticalStack, Spinner, Divider } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { TypeBadge, RiskPill, SeverityBadge } from "./AgenticCellRenderers";
 import { ToolDetailPanel, SkillDetailPanel } from "./McpComponentsView";
@@ -115,9 +115,13 @@ const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 function AgentMcpToolsView({ asset, selectedMcp, agenticFlatData, goToList, onNavChange, setSelectedTool, setView }) {
     const [mcpTools, setMcpTools] = useState([]);
 
+    const mcpAsset = useMemo(
+        () => agenticFlatData.find((a) => a.name === selectedMcp.name || a.id === selectedMcp.name),
+        [agenticFlatData, selectedMcp?.name],
+    );
+
     useEffect(() => {
-        const flat = agenticFlatData.find((a) => a.name === selectedMcp.name || a.id === selectedMcp.name);
-        const collectionIds = flat?.collectionIds;
+        const collectionIds = mcpAsset?.collectionIds;
         if (!collectionIds?.length) { setMcpTools([]); return; }
         let cancelled = false;
         (async () => {
@@ -137,10 +141,18 @@ function AgentMcpToolsView({ asset, selectedMcp, agenticFlatData, goToList, onNa
             }
         })();
         return () => { cancelled = true; };
-    }, [selectedMcp?.name, agenticFlatData]);
+    }, [mcpAsset]);
 
     return (
         <Box className="agentic-flex-fill">
+            {mcpAsset?.description && (
+                <>
+                    <Box paddingInlineStart="3" paddingInlineEnd="3" paddingBlockStart="3" paddingBlockEnd="3">
+                        <Text variant="bodySm">{mcpAsset.description}</Text>
+                    </Box>
+                    <Divider />
+                </>
+            )}
             {mcpTools.length === 0 ? (
                 <Box padding="4"><Text variant="bodySm" color="subdued">No tools found.</Text></Box>
             ) : (
@@ -401,7 +413,7 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
     }
 
     if (view === "skill-detail" && selectedSkill) {
-        return <SkillDetailPanel skill={selectedSkill} />;
+        return <SkillDetailPanel skill={selectedSkill} collectionIds={asset?.collectionIds} />;
     }
 
     if (view === "config-detail") {
