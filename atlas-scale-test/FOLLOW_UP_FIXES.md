@@ -53,6 +53,29 @@ pick up cold.
   causing the "Expired" tab to show 38 rows against its own "50" count badge on a real account
   (Acorns Demo) — reproduced live, matching the user's report, and confirmed fixed (`total: 50`,
   matching the tab badge, after removing the filter).
+- Even after the pagination fix above, `IdentitiesPage.jsx`'s topology graph and summary
+  cards/tab counts still fed off `fetchNhiIdentities()` — unpaginated, whole-account — because
+  `IdentityOverviewGraph` needs "every identity" to fan out each agent correctly. On the Atlas
+  Scale Test account (13,817 identities) this meant a 13.8k-row fetch on every load, and
+  `IdentityOverviewGraph` rendering one ReactFlow node per identity with no virtualization —
+  the graph tab became completely unresponsive (no click, no zoom/pan). No existing page in this
+  PR had already solved "feed a graph/summary without pulling every row" (checked
+  `DeviceEndpoints.jsx`'s topology tab and the `fetchAgenticAssetsSummary`-style endpoints —
+  none of them do real server-side aggregation; they load-all-then-classify-in-memory, which is
+  itself listed as tech debt below). Built two new lightweight calls instead: a
+  `fetchNhiIdentitiesStats` action doing four independent `count()` queries (total/expired/
+  disabled/with-violations, the last via `Filters.in(IDENTITY_NAME, ...)` against the identity
+  names already known to have violations from the existing cheap
+  `fetchViolationCountsByIdentity`) for the summary cards and tab badges, and reused the already-
+  paginated `fetchAllNhiIdentities` with a 200-row cap (`createdAt` desc) to feed the graph,
+  matching the identity flyout's existing `IDENTITY_VIOLATIONS_LIMIT = 200` precedent. Added a
+  "Showing the 200 most recently discovered identities of 13,817 total" notice to the graph when
+  capped. `fetchNhiIdentities()` itself is untouched — `CreateNhiPolicyModal.jsx` still needs the
+  full list for its dropdown options and wasn't part of this bug report. Verified live on Atlas
+  Scale Test: graph renders ~200 nodes instead of 13,817, clicking a node opens the identity
+  flyout correctly, summary cards/tab badges show the true account-wide counts (13,817 total /
+  6,325 expired / 1,953 disabled / 6,259 with violations) while the graph fetch payload dropped
+  from the full account to exactly 200 documents.
 - "Top Used Applications" showed "No AI interaction data yet." even against a real production data
   dump with genuine `UserAnalysisData` records — **initially misdiagnosed as a data-seeding gap;
   it wasn't.** Root cause: `UserAnalysisData.serviceId` is a readable client name ("claudecli",
