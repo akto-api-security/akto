@@ -2737,6 +2737,9 @@ public class InitializerListener implements ServletContextListener {
                         } catch (InterruptedException ignored) {}
                     }
                 } while (!connectedToMongo);
+                
+                SingleTypeInfo.init();
+
                 int now = Context.now();
                 if (runJobFunctions || runJobFunctionsAnyway) {
 

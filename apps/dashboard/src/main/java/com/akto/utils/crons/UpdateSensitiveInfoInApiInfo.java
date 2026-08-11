@@ -24,7 +24,6 @@ public class UpdateSensitiveInfoInApiInfo {
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private int cronTime = 15;
     public void setUpSensitiveMapInApiInfoScheduler() {
-        SingleTypeInfo.init();
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
