@@ -219,7 +219,7 @@ public class Utils {
     }
 
     public static String printDebugHostLog(HttpResponseParams httpResponseParams) {
-       
+       DEBUG_HOSTS_SET = initializeDebugHostsSet();
         if (DEBUG_HOSTS_SET.isEmpty() || httpResponseParams == null || httpResponseParams.getRequestParams() == null) return null;
         String host = RuntimeUtil.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
         return DEBUG_HOSTS_SET.contains(host) ? host : null;
@@ -239,6 +239,7 @@ public class Utils {
     }
 
     public static boolean printDebugUrlLog(String url) {
+        DEBUG_URLS_SET = initializeDebugUrlsSet();
         if (DEBUG_URLS_SET.isEmpty())
             return false;
         if (url == null || url.isEmpty())

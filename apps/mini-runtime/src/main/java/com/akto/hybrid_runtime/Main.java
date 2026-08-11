@@ -11,7 +11,6 @@ import java.util.regex.Pattern;
 
 import com.akto.DaoInit;
 import com.akto.RuntimeMode;
-import com.akto.config.ConfigHandler;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
@@ -69,13 +68,16 @@ public class Main {
     public static final String VXLAN_ID = "vxlanId";
     public static final String VPC_CIDR = "vpc_cidr";
     public static final String ACCOUNT_ID = "account_id";
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.RUNTIME);
+    
 
     static {
         DataActorFactory.setModuleType("MINI_RUNTIME");
     }
 
     public static final DataActor dataActor = DataActorFactory.fetchInstance();
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.RUNTIME);
+
+    
     private static final ClientLayer clientLayer = new ClientLayer();
 
     // this sync threshold time is used for deleting sample data
@@ -92,7 +94,7 @@ public class Main {
             loggerMaker.warn(o.toString());
         }
     }   
-
+    
     public static boolean isOnprem = false;
     static long lastLogSyncOffsetMRS;
     static boolean syncImmediately = false;
@@ -260,9 +262,9 @@ public class Main {
 
 
     public static String customMiniRuntimeServiceName;
-    private static final String podName = ConfigHandler.readEnv("POD_NAME", "");
-    private static final String nodeName = ConfigHandler.readEnv("NODE_NAME", "");
-    private static final String miniRuntimeName = ConfigHandler.readEnv("MINI_RUNTIME_NAME", "");
+    private static final String podName = System.getenv().getOrDefault("POD_NAME", "");
+    private static final String nodeName = System.getenv().getOrDefault("NODE_NAME", "");
+    private static final String miniRuntimeName = System.getenv().getOrDefault("MINI_RUNTIME_NAME", "");
     static {
         if (!miniRuntimeName.isEmpty()) {
             // Highest priority: explicit MINI_RUNTIME_NAME
@@ -317,16 +319,16 @@ public class Main {
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
-        String configName = ConfigHandler.readEnv("AKTO_CONFIG_NAME", null);
+        String configName = System.getenv("AKTO_CONFIG_NAME");
         String topicName = KafkaConfig.getTopicName();
-        String kafkaBrokerUrl = ConfigHandler.readEnv("AKTO_KAFKA_BROKER_URL", "localhost:29092");
+        String kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "host.docker.internal:29092");
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
             loggerMaker.infoAndAddToDb("is_kubernetes: true");
-            kafkaBrokerUrl = ConfigHandler.readEnv("AKTO_KAFKA_BROKER_URL", "127.0.0.1:29092");
+            kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "127.0.0.1:29092");
         }
         final String brokerUrlFinal = kafkaBrokerUrl;
-        String groupIdConfig = ConfigHandler.readEnv("AKTO_KAFKA_GROUP_ID_CONFIG", "asdf");
+        String groupIdConfig = System.getenv().getOrDefault("AKTO_KAFKA_GROUP_ID_CONFIG", "asdf");
         boolean syncImmediately = false;
         boolean fetchAllSTI = true;
         Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
@@ -339,7 +341,7 @@ public class Main {
             syncImmediately = true;
             fetchAllSTI = false;
         }
-        int maxPollRecordsConfigTemp = Integer.parseInt(ConfigHandler.readEnv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG", "100"));
+        int maxPollRecordsConfigTemp = Integer.parseInt(System.getenv().getOrDefault("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG", "100"));
 
         AccountSettings aSettings = dataActor.fetchAccountSettings();
         if (aSettings == null) {
@@ -1496,7 +1498,7 @@ public class Main {
         }
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
         Map<String, SessionAnalyzer> sessionAnalyzerMap = new HashMap<>();
-        String configName = ConfigHandler.readEnv("AKTO_CONFIG_NAME", null);
+        String configName = System.getenv("AKTO_CONFIG_NAME");
         APIConfig apiConfig = dataActor.fetchApiConfig(configName);
         if (apiConfig == null) {
             apiConfig = new APIConfig(configName,"access-token", 1, 10_000_000, sync_threshold_time); // this sync threshold time is used for deleting sample data

@@ -13,17 +13,17 @@ import java.util.concurrent.TimeUnit;
 public class ConfigHandler {
 
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
-    private static volatile Map<String, String> overrides = poll();
+    private static volatile Map<String, String> overrides = new HashMap<>();
     private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     static {
-        scheduler.scheduleAtFixedRate(ConfigHandler::poll, 30, 30, TimeUnit.SECONDS);
+        scheduler.scheduleAtFixedRate(ConfigHandler::poll, 0, 60, TimeUnit.SECONDS);
     }
 
     private ConfigHandler() {
     }
 
-    // Fetches the latest overrides, stores them, and returns them - so it doubles as the field initializer above.
+    // Fetches the latest overrides and caches them for readEnv to look up.
     public static Map<String, String> poll() {
         Map<String, String> fetched = new HashMap<>();
         try {
