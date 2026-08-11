@@ -1208,7 +1208,7 @@ public class Main {
                     }
 
                     if (Utils.printDebugUrlLog(accWiseResponseEntry.getRequestParams().getURL())) {
-                        loggerMaker.infoAndAddToDb("Found debug url in filterBasedOnHeaders " + accWiseResponseEntry.getRequestParams().getURL() + " shouldKeep: " + shouldKeep);
+                        Utils.printUrlDebugLog("Found debug url in filterBasedOnHeaders " + accWiseResponseEntry.getRequestParams().getURL() + " shouldKeep: " + shouldKeep);
                     }
                     if(Utils.printDebugHostLog(accWiseResponseEntry) != null){
                         Utils.printDebugHostLog(" in filterBasedOnHeaders " + accWiseResponseEntry.getRequestParams().getURL() + " shouldKeep: " + shouldKeep);
@@ -1244,7 +1244,7 @@ public class Main {
                                         reqHeaders.put("host", Collections.singletonList(newValue));
 
                                         if (Utils.printDebugUrlLog(accWiseResponseEntry.getRequestParams().getURL())) {
-                                            loggerMaker.infoAndAddToDb("Found debug url in changeTargetCollection " + accWiseResponseEntry.getRequestParams().getURL() + " newValue: " + newValue + " reqHeaderValue: " + reqHeaderValue);
+                                            Utils.printUrlDebugLog("Found debug url in changeTargetCollection " + accWiseResponseEntry.getRequestParams().getURL() + " newValue: " + newValue + " reqHeaderValue: " + reqHeaderValue);
                                         }
                                     }
                                 } catch (Exception e) {
@@ -1477,10 +1477,10 @@ public class Main {
                HttpRequestParams requestParams = payload.getRequestParams();
                String debugHost = Utils.printDebugHostLog(payload);
                if (debugHost != null) {
-                   loggerMaker.infoAndAddToDb("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
+                   Utils.printUrlDebugLog("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
                }
                if (Utils.printDebugUrlLog(requestParams.getURL())) {
-                   loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
+                   Utils.printUrlDebugLog("Found debug url: " + requestParams.getURL());
                }
            } catch (Exception e) {
                String payloadStr = payload != null ? payload.toString() : "null";
