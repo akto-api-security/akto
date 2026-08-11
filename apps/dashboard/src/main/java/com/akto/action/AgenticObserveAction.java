@@ -770,6 +770,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return url != null && url.startsWith("/tool/") && url.length() > "/tool/".length();
     }
 
+    // LLM traffic on the agent host — mirrors agenticPageBuilders.js's isAgentLlmMessagesUrl.
+    private static boolean isAgentLlmMessagesUrl(String url) {
+        return "/v1/messages".equals(url) || (url != null && url.startsWith("/v1/messages/"));
+    }
+
     // Split-and-capitalize fallback only — mirrors mcpClientHelper.js's formatDisplayName minus its
     // MCP-client-keyword branch (that branch matches known client/service names like "cursor", not
     // skill/tool names, so it never fires for this endpoint's inputs in practice).
@@ -1499,6 +1504,15 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Getter private List<BasicDBObject> assetDevices;
     @Getter private String assetTagKey;
     @Getter private List<String> assetRawTagValues;
+    // Inline-topology summary for the flyout's Overview tab — computed here (scoped to just this
+    // asset's own collectionIds, via the same ApiCollectionsDao.fetchEndpointsInCollection STI
+    // aggregation fetchAgenticComponentsPage already uses) instead of the browser fetching raw STI
+    // data itself (fetchApiInfosFromSTIs) and re-deriving these same three values client-side. Only
+    // one of the two is ever populated: hasInlineLlm/inlineToolNames for AI Agent rows,
+    // mcpComponentCount for MCP Server/LLM rows (Skill rows need neither).
+    @Getter private boolean assetHasInlineLlm;
+    @Getter private List<String> assetInlineToolNames;
+    @Getter private int assetMcpComponentCount;
 
     /**
      * Lazy per-asset detail — hostNames/collectionIds/skillNames/mcpServers/mcpServerCollectionIds/
@@ -1542,6 +1556,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 assetDevices = Collections.emptyList();
                 assetTagKey = null;
                 assetRawTagValues = Collections.emptyList();
+                assetHasInlineLlm = false;
+                assetInlineToolNames = Collections.emptyList();
+                assetMcpComponentCount = 0;
                 return SUCCESS.toUpperCase();
             }
 
@@ -1560,6 +1577,52 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             for (ApiCollection c : collections) byId.put(c.getId(), c);
             Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
             assetDevices = buildDevicesForGroup(g, byId, traffic, risk, userAnalysis);
+
+            // Scoped to just THIS asset's own collectionIds (never account-wide) — same STI
+            // aggregation fetchAgenticComponentsPage already runs when the Components tab opens, just
+            // a cheap boolean/name-set pass over it instead of the full skill/tool/resource/prompt
+            // breakdown. "agent" rows want hasInlineLlm/inlineToolNames; "service"/"llm" rows want
+            // mcpComponentCount; "skill" rows need neither, so skip the query entirely for those.
+            assetHasInlineLlm = false;
+            assetInlineToolNames = Collections.emptyList();
+            assetMcpComponentCount = 0;
+            boolean wantsInlineTopology = "agent".equals(g.rowType);
+            boolean wantsComponentCount = "service".equals(g.rowType) || "llm".equals(g.rowType);
+            if ((wantsInlineTopology || wantsComponentCount) && !g.collectionIds.isEmpty()) {
+                List<BasicDBObject> stiRows = ApiCollectionsDao.fetchEndpointsInCollection(
+                        Filters.in(SingleTypeInfo._COLLECTION_IDS, g.collectionIds), 0, -1, DELTA_PERIOD_VALUE);
+                if (wantsInlineTopology) {
+                    boolean hasLlm = false;
+                    Set<String> toolNames = new LinkedHashSet<>();
+                    for (BasicDBObject sti : stiRows) {
+                        Object idObj = sti.get("_id");
+                        if (!(idObj instanceof BasicDBObject)) continue;
+                        String url = ((BasicDBObject) idObj).getString("url");
+                        if (isAgentLlmMessagesUrl(url)) hasLlm = true;
+                        if (isAgentBuiltinToolUrl(url)) toolNames.add(mcpDisplayName(url));
+                    }
+                    assetHasInlineLlm = hasLlm;
+                    assetInlineToolNames = new ArrayList<>(toolNames);
+                } else {
+                    // Distinct Tool/Resource/Prompt names (Skill/Server buckets excluded) — mirrors
+                    // buildMcpComponentsFromStis' tools+resources+prompts count, url-based fallback
+                    // bucketing only (no apiInfo/audit — this is a count, not a detailed listing).
+                    Set<String> componentKeys = new HashSet<>();
+                    for (BasicDBObject sti : stiRows) {
+                        Object idObj = sti.get("_id");
+                        if (!(idObj instanceof BasicDBObject)) continue;
+                        BasicDBObject stiId = (BasicDBObject) idObj;
+                        String method = stiId.getString("method");
+                        String url = stiId.getString("url");
+                        if (method == null || url == null) continue;
+                        String bucket = bucketFromUrl(url);
+                        if ("Tool".equals(bucket) || "Resource".equals(bucket) || "Prompt".equals(bucket)) {
+                            componentKeys.add(bucket + ":" + mcpDisplayName(url));
+                        }
+                    }
+                    assetMcpComponentCount = componentKeys.size();
+                }
+            }
 
             return SUCCESS.toUpperCase();
         } catch (Exception e) {

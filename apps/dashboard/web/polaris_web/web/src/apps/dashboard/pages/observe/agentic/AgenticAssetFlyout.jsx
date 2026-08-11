@@ -4,9 +4,9 @@ import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AgenticFlyoutShell from "./AgenticFlyoutShell";
 import AiChatSection from "./AiChatSection";
-import { buildAgentInlineTopologyComponents, buildAgentBuiltinToolsFromStis, buildMcpComponentsFromStis, countAgentComponentsTab } from "./agenticPageBuilders";
+import { buildAgentInlineTopologyComponents, countAgentComponentsTab } from "./agenticPageBuilders";
 import { RiskScoreCellRenderer } from "./AgenticCellRenderers";
-import agenticObserveApi, { buildAgenticObserveChatMetadata, selectConfigViolationRows, summarizeViolations } from "./agenticObserveApi";
+import { buildAgenticObserveChatMetadata, selectConfigViolationRows, summarizeViolations } from "./agenticObserveApi";
 import api from "../api";
 import func from "@/util/func";
 import OverviewTab from "./OverviewTab";
@@ -106,8 +106,6 @@ export default function AgenticAssetFlyout({
     const [selectedTab,    setSelectedTab]    = useState(0);
     const [topNav,         setTopNav]         = useState(null);
     const [topNavPicker,   setTopNavPicker]   = useState(null);
-    const [mcpComponentCount, setMcpComponentCount] = useState(0);
-    const [inlineTopology, setInlineTopology] = useState([]);
 
     // hostNames/collectionIds/skillNames/mcpServers/mcpServerCollectionIds/devices no longer come
     // with the grid row (see AgenticObserveAction.GroupSummary.toSummaryResponse()'s and
@@ -157,69 +155,15 @@ export default function AgenticAssetFlyout({
 
     useEffect(() => { setSelectedTab(0); setTopNav(null); setTopNavPicker(null); }, [asset?.id]);
 
-    useEffect(() => {
-        const collectionIds = asset?.collectionIds;
-        const type = asset?.type;
-        if (!collectionIds?.length || type !== "AI Agent") { setInlineTopology([]); return; }
-        let cancelled = false;
-        (async () => {
-            try {
-                // Overview only needs to know THAT an inline LLM/tool exists and its name — not its
-                // risk score or MCP-audit classification (that level of detail is what the Components
-                // tab needs, and AgentComponentsView already fetches it independently, lazily, only
-                // once that tab actually mounts). STI-only here is 1 batched request instead of 3
-                // (apiInfoList/auditRows empty — buildAgentBuiltinToolsFromStis' url-based fallback
-                // bucketing correctly classifies plain /tool/* paths as "Tool" without audit data).
-                const bundleMap = await agenticObserveApi.fetchCollectionStiOnlyBatch(collectionIds);
-                const bundles = Array.from(bundleMap.values());
-                const sti = bundles.flatMap(b => b.stiEndpoints || []);
-                const builtinTools = bundles.flatMap(b =>
-                    buildAgentBuiltinToolsFromStis(b.stiEndpoints, [], b.id, [])
-                );
-                if (!cancelled) setInlineTopology(buildAgentInlineTopologyComponents(sti, builtinTools, asset));
-            } catch {
-                if (!cancelled) setInlineTopology([]);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [asset?.id, asset?.type, asset?.collectionIds, asset?.assetTagValue, asset?.name]);
-
-    useEffect(() => {
-        const collectionIds = asset?.collectionIds;
-        const type = asset?.type;
-        if (!collectionIds?.length || (type !== "MCP Server" && type !== "LLM")) { setMcpComponentCount(0); return; }
-        let cancelled = false;
-        (async () => {
-            try {
-                // Overview only needs distinct component NAMES to produce a count — not risk/audit
-                // detail, which McpComponentsView already fetches independently, lazily, once the
-                // Components tab actually mounts. STI-only: 1 batched request instead of 3 (see the
-                // AI Agent effect above for the same reasoning).
-                const bundleMap = await agenticObserveApi.fetchCollectionStiOnlyBatch(collectionIds);
-                if (cancelled) return;
-                const seen = new Set();
-                let count = 0;
-                bundleMap.forEach((b) => {
-                    const data = buildMcpComponentsFromStis(b.stiEndpoints, [], b.id, []);
-                    const categories = [
-                        { items: data.tools,     prefix: "tool:" },
-                        { items: data.resources, prefix: "resource:" },
-                        { items: data.prompts,   prefix: "prompt:" },
-                    ];
-                    categories.forEach(({ items, prefix }) => {
-                        (items || []).forEach(item => {
-                            const k = `${prefix}${item.name}`;
-                            if (!seen.has(k)) { seen.add(k); count++; }
-                        });
-                    });
-                });
-                setMcpComponentCount(count);
-            } catch {
-                if (!cancelled) setMcpComponentCount(0);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [asset?.id, asset?.type, asset?.collectionIds]);
+    // Both computed server-side now (AgenticObserveAction.fetchAgenticAssetDetail, scoped to just
+    // this asset's own collections) — no more browser-side STI fetch/derivation. asset.hasInlineLlm/
+    // inlineToolNames/mcpComponentCount default to false/[]/0 until assetDetail lands (detailLoading
+    // gates all tab content on that anyway, see below).
+    const inlineTopology = useMemo(
+        () => (asset?.type === "AI Agent" ? buildAgentInlineTopologyComponents(asset.hasInlineLlm, asset.inlineToolNames, asset) : []),
+        [asset],
+    );
+    const mcpComponentCount = asset?.mcpComponentCount || 0;
 
     const chatMetadata = useMemo(() => {
         if (!asset) return null;

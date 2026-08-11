@@ -279,6 +279,14 @@ export default {
             // layout's flyout.
             tagKey: resp?.assetTagKey || null,
             rawTagValues: resp?.assetRawTagValues || [],
+            // Inline-topology summary for the new layout's Overview tab — computed server-side,
+            // scoped to just this asset's own collections (AgenticObserveAction.fetchAgenticAssetDetail),
+            // so the browser no longer needs its own fetchApiInfosFromSTIs round-trip to derive them.
+            // hasInlineLlm/inlineToolNames populated for "agent" rows, mcpComponentCount for
+            // "service"/"llm" rows; the other stays at its default for whichever type this row isn't.
+            hasInlineLlm: resp?.assetHasInlineLlm || false,
+            inlineToolNames: resp?.assetInlineToolNames || [],
+            mcpComponentCount: resp?.assetMcpComponentCount || 0,
         }
     },
     // Server-side paginated device list for ONE asset's flyout Devices tab — scoped to just
