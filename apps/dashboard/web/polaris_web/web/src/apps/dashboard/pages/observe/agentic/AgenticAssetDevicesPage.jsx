@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { Badge, Box, HorizontalStack, Text, DataTable } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, Text, DataTable } from "@shopify/polaris";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubServerTable from "@/apps/dashboard/components/tables/GithubServerTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip";
+import TitleWithInfo from "../../../components/shared/TitleWithInfo";
 import TooltipText from "../../../components/shared/TooltipText";
 import api from "../api";
 import func from "@/util/func";
@@ -208,11 +209,30 @@ function shapeEndpointRow(row, { rowType }) {
 }
 
 export default function AgenticAssetDevicesPage() {
+    const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const groupKey = searchParams.get("groupKey") || "";
     const rowType = searchParams.get("rowType") || "";
     const assetName = searchParams.get("name") || "Asset";
     const assetType = searchParams.get("type") || "";
+
+    // Matches ApiCollections.jsx's own agent-tree header exactly (getFilteredPageTitle's
+    // "<Type> - <Name>" template + TitleWithInfo's info icon) — that page and this one are the
+    // two places this exact asset's device breakdown is shown, so the header should read the same
+    // regardless of which one a click landed on.
+    const pageTitle = useMemo(() => (
+        <TitleWithInfo
+            tooltipContent={`Viewing devices for ${assetType || "asset"} ${assetName}`}
+            titleText={assetType ? `${assetType} - ${assetName}` : assetName}
+            docsUrl="https://ai-security-docs.akto.io/agentic-ai-discovery/get-started"
+        />
+    ), [assetType, assetName]);
+
+    // Same "Explore mode" primaryAction ApiCollections.jsx always shows next to its title —
+    // generic query-explorer shortcut, not scoped to this asset, kept only for header parity.
+    const exploreModeAction = useMemo(() => (
+        <Button primary onClick={() => navigate("/dashboard/observe/query_mode")}>Explore mode</Button>
+    ), [navigate]);
 
     // True only until this one asset's own collectionIds resolve (lazy — mirrors the new layout's
     // flyout fetching fetchAgenticAssetDetail once per asset instead of shipping collectionIds on
@@ -272,8 +292,8 @@ export default function AgenticAssetDevicesPage() {
     if (loading) {
         return (
             <PageWithMultipleCards
-                title={assetName}
-                titleMetadata={assetType ? <Badge>{assetType}</Badge> : undefined}
+                title={pageTitle}
+                primaryAction={exploreModeAction}
                 components={[<SpinnerCentered key="loading" />]}
             />
         );
@@ -281,8 +301,8 @@ export default function AgenticAssetDevicesPage() {
 
     return (
         <PageWithMultipleCards
-            title={assetName}
-            titleMetadata={assetType ? <Badge>{assetType}</Badge> : undefined}
+            title={pageTitle}
+            primaryAction={exploreModeAction}
             components={[
                 <GithubServerTable
                     key={`asset-endpoints-${groupKey}-${rowType}-${refreshKey}`}
