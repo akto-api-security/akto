@@ -414,7 +414,7 @@ public class MaliciousEventService {
   }
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
-      String accountId, ListMaliciousRequestsRequest request, String contextSource, String skillEvalMode) {
+      String accountId, ListMaliciousRequestsRequest request, String contextSource, String skillEvalMode, String configEvalMode) {
 
     if(!shouldNotCreateIndexes.getOrDefault(accountId, false)) {
       createIndexIfAbsent(accountId);
@@ -564,22 +564,36 @@ public class MaliciousEventService {
       query.putAll(contextFilter);
     }
 
-    // Skills Evaluations partition — Atlas (ENDPOINT) only. An event belongs to Skills
-    // Evaluations iff latestApiEndpoint starts with "/skills/".
-    //   "only"    → return just those events (Skills Evaluations tab)
-    //   "exclude" → return everything except them (Active tab)
-    // Done server-side so the total count and pagination stay correct.
-    if (skillEvalMode != null && !skillEvalMode.isEmpty()
-        && "ENDPOINT".equalsIgnoreCase(contextSource)) {
-      Document existing = new Document(query);
-      query.clear();
+    // Skills Evaluations / Misconfigured Settings partitions — Atlas (ENDPOINT) only. An event
+    // belongs to Skills Evaluations iff latestApiEndpoint starts with "/skills/"; it belongs to
+    // Misconfigured Settings iff latestApiEndpoint contains "/config/" (e.g.
+    // "/codex/config/mcp_servers.computer-use.command" — the agent name prefix varies, so this
+    // isn't anchored to the start like the skills pattern). Each mode independently narrows to
+    // just its own partition ("only") or excludes it ("exclude") — Active sets both to "exclude"
+    // so neither shows up there. Done server-side so the total count and pagination stay correct.
+    boolean hasSkillMode = skillEvalMode != null && !skillEvalMode.isEmpty();
+    boolean hasConfigMode = configEvalMode != null && !configEvalMode.isEmpty();
+    if ((hasSkillMode || hasConfigMode) && "ENDPOINT".equalsIgnoreCase(contextSource)) {
+      List<Document> andConditions = new ArrayList<>();
+      andConditions.add(new Document(query));
+
       Pattern skillsEndpointPattern = Pattern.compile("^/skills/");
       if ("only".equalsIgnoreCase(skillEvalMode)) {
-        query.append("$and", Arrays.asList(existing, new Document("latestApiEndpoint", skillsEndpointPattern)));
+        andConditions.add(new Document("latestApiEndpoint", skillsEndpointPattern));
       } else if ("exclude".equalsIgnoreCase(skillEvalMode)) {
-        query.append("$and", Arrays.asList(existing, new Document("latestApiEndpoint", new Document("$not", skillsEndpointPattern))));
-      } else {
-        query.putAll(existing);
+        andConditions.add(new Document("latestApiEndpoint", new Document("$not", skillsEndpointPattern)));
+      }
+
+      Pattern configEndpointPattern = Pattern.compile("/config/");
+      if ("only".equalsIgnoreCase(configEvalMode)) {
+        andConditions.add(new Document("latestApiEndpoint", configEndpointPattern));
+      } else if ("exclude".equalsIgnoreCase(configEvalMode)) {
+        andConditions.add(new Document("latestApiEndpoint", new Document("$not", configEndpointPattern)));
+      }
+
+      if (andConditions.size() > 1) {
+        query.clear();
+        query.append("$and", andConditions);
       }
     }
 

@@ -25,7 +25,7 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label, hosts, latestApiOrigRegex, method = [], sortBySeverity = false, severity = [], skillEvaluationMode = undefined) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label, hosts, latestApiOrigRegex, method = [], sortBySeverity = false, severity = [], skillEvaluationMode = undefined, configEvaluationMode = undefined) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -50,7 +50,8 @@ const threatDetectionRequests = {
                 method: method,
                 ...(typeof sortBySeverity === 'boolean' ? { sortBySeverity } : {}),
                 ...(severity && severity.length > 0 ? { severity } : {}),
-                ...(skillEvaluationMode ? { skillEvaluationMode } : {})
+                ...(skillEvaluationMode ? { skillEvaluationMode } : {}),
+                ...(configEvaluationMode ? { configEvaluationMode } : {})
             },
             suppress403Toast: true
         })
