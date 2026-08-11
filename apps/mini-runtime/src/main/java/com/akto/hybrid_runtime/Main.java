@@ -620,6 +620,8 @@ public class Main {
 
                                         if (trafficProducerLog.getLogType() != null && trafficProducerLog.getLogType().equalsIgnoreCase("ERROR")) {
                                             loggerMaker.errorAndAddToDb(message);
+                                        } else if (trafficProducerLog.getLogType() != null && trafficProducerLog.getLogType().equalsIgnoreCase("WARN")) {
+                                            loggerMaker.warnAndAddToDb(message);
                                         } else if (trafficProducerLog.getLogType() != null && trafficProducerLog.getLogType().equalsIgnoreCase("DEBUG")) {
                                             loggerMaker.debug(message);
                                         } else {
