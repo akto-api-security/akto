@@ -46,6 +46,12 @@ public class ClaudeAdapter implements ProviderAdapter {
         if (body.get("actor") instanceof Map) {
             frame.actor = (Map<String, Object>) body.get("actor");
         }
+        // source.application is an open string (claude-code = CLI, claude-ai =
+        // app, config-test = connection test). Carry any value through as-is;
+        // never reject an unrecognized one.
+        if (body.get("source") instanceof Map) {
+            frame.application = stringOrNull(((Map<String, Object>) body.get("source")).get("application"));
+        }
         if (body.get("metadata") instanceof Map) {
             frame.metadata = (Map<String, Object>) body.get("metadata");
         }

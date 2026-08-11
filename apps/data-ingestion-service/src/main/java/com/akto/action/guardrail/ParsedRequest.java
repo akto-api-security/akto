@@ -21,6 +21,14 @@ public class ParsedRequest {
     public String model;
     /** The principal the request is attributed to, when present. */
     public Map<String, Object> actor;
+    /**
+     * Advisory source application, when present (e.g. Claude's
+     * source.application: "claude-code" = CLI, "claude-ai" = app,
+     * "config-test" = connection test). Open string — unknown values are
+     * carried through, never rejected. Advisory routing metadata only; must
+     * not drive a security-critical policy decision.
+     */
+    public String application;
     /** Any extra vendor metadata to carry through. */
     public Map<String, Object> metadata;
     /**

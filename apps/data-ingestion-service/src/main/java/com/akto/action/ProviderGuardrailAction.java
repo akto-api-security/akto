@@ -129,6 +129,9 @@ public class ProviderGuardrailAction extends ActionSupport {
         meta.put("tenant_id", frame.tenantId);
         meta.put("model", frame.model);
         meta.put("actor", frame.actor);
+        // Advisory only (e.g. claude-code = CLI, claude-ai = app). Recorded for
+        // visibility/routing; never used in the allow/deny decision.
+        meta.put("application", frame.application);
         if (frame.metadata != null) {
             meta.put("provider_metadata", frame.metadata);
         }
