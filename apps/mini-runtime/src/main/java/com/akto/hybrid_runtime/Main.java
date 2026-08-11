@@ -321,15 +321,17 @@ public class Main {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
         String topicName = KafkaConfig.getTopicName();
-        String kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "host.docker.internal:29092");
+        String kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "kafka1:19092");
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
             loggerMaker.infoAndAddToDb("is_kubernetes: true");
             kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "127.0.0.1:29092");
         }
         final String brokerUrlFinal = kafkaBrokerUrl;
-        String groupIdConfig = System.getenv().getOrDefault("AKTO_KAFKA_GROUP_ID_CONFIG", "asdf");
-        boolean syncImmediately = false;
+        String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG") != null
+                ? System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG")
+                : "asdf";
+        boolean syncImmediately = true;
         boolean fetchAllSTI = true;
         Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
 
@@ -341,7 +343,9 @@ public class Main {
             syncImmediately = true;
             fetchAllSTI = false;
         }
-        int maxPollRecordsConfigTemp = Integer.parseInt(System.getenv().getOrDefault("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG", "100"));
+        int maxPollRecordsConfigTemp = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG") != null
+                ? System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG")
+                : "100");
 
         AccountSettings aSettings = dataActor.fetchAccountSettings();
         if (aSettings == null) {
