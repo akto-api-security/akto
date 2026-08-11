@@ -589,6 +589,35 @@ pick up cold.
   `mcpComponentCount=0` against `McpComponentsView`'s independent, untouched full-detail fetch
   ("No tools, resources, prompts or skills found") to confirm the fallback bucketing agrees with
   ground truth rather than just returning a plausible-looking number.
+- **Legacy Agentic Assets row-click still called `getAllCollectionsBasic` (56MB) and froze for
+  several seconds with zero feedback before navigating.** User pushed back on the earlier "this is
+  inherent to Inventory's architecture, out of scope" call — asked for an actual redesign: minimal-
+  info requests, real pagination, and a paginated endpoint/device view on click instead of
+  Inventory. Confirmed via `AskUserQuestion` that the destination should NOT be a flyout (reversing
+  the earlier "keep navigate-to-Inventory" choice would have meant a flyout) — old-layout look,
+  just paginated data. Built `AgenticAssetDevicesPage.jsx`: a new page (`PageWithMultipleCards` +
+  `GithubServerTable`, automatic back arrow, not a flyout) showing a paginated device/endpoint table
+  for exactly one asset via `fetchAgenticAssetDevicesPage` — the same endpoint the new layout's
+  flyout Devices tab already uses, scoped to just that asset's own `collectionIds`, never account-
+  wide. `groupKey`/`rowType`/`name`/`type` travel via query params (`?groupKey=...`); the new page
+  resolves `collectionIds` itself via a lazy `fetchAgenticAssetDetail` call and shows its own
+  spinner while that resolves. `Endpoints.jsx`'s `handleRowClick` now calls `navigate()`
+  synchronously with no `await` first — the freeze is gone because there's nothing left to wait for
+  before navigating; the destination page owns its own loading state instead. Removed the now-dead
+  `buildAgenticInventoryFilterForRow`/`INVENTORY_PATH`/`INVENTORY_FILTER_KEY` imports and
+  `filtersMap`/`setFiltersMap` selectors from `Endpoints.jsx` (the `constants.js` exports themselves
+  are untouched — `UsersAndDevices.jsx`'s own row-click still uses them and wasn't in scope this
+  round). Verified live: clicking "Claude CLI" navigates instantly (URL changes immediately), shows
+  "Search in 1,000 devices" matching the asset's own count exactly, real per-device service/risk/
+  traffic data, working pagination/sort/back-button, zero console errors, and zero
+  `getAllCollectionsBasic`/`getAllCollections` calls anywhere in the flow (~5KB per page instead of
+  56MB). **Not done**: a loading indicator on every routine sort/filter/tab-switch interaction on
+  the main grid — `GithubServerTable`'s only loading affordance (`props.loading`+`loadingText`)
+  replaces the entire table with a bare spinner, so wiring it into every fast (now usually <100ms
+  thanks to the earlier classification cache) interaction would trade a rare multi-second freeze for
+  a constant, more disruptive flash on the common case. Flagged rather than silently applied —
+  worth a real design (e.g. a subtler inline/overlay indicator in the shared `GithubServerTable`
+  component itself) if it's still wanted.
 
 ## High priority — wrong output today
 
