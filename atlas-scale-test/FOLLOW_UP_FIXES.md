@@ -618,6 +618,42 @@ pick up cold.
   a constant, more disruptive flash on the common case. Flagged rather than silently applied —
   worth a real design (e.g. a subtler inline/overlay indicator in the shared `GithubServerTable`
   component itself) if it's still wanted.
+- **The paginated device page above was a functional regression vs. the existing production tree
+  view.** User provided side-by-side screenshots: prod's `AgentEndpointTreeTable.jsx` (reached via
+  Inventory's agent-tree mode) shows a two-level expandable tree — device row -> its own child
+  collections, each with independent risk/sensitive/tags/skills columns, filter chips, an info
+  tooltip — while the new flat page had far fewer columns and no expand/collapse. Investigated
+  `AgentEndpointTreeTable.jsx` and found the reason it hadn't just been reused as-is: it's a pure
+  presentational component fed entirely by `ApiCollections.jsx`'s own full `getAllCollectionsBasic()`
+  fetch — the exact expensive call this round exists to eliminate. User confirmed (`AskUserQuestion`,
+  "Full match (recommended)") a proper rebuild: same rich tree, sourced from new scoped/paginated
+  backend data instead. Added `AgenticObserveAction.fetchAgenticAssetEndpointsPage` — Java port of
+  `groupByEndpointId`/`prettifyGroupedData`/`ChildrenTable`'s grouping and tag-detection logic
+  (`computeAgenticTagFlags`, new `extractSourceIdForGrouping` mirroring `splitCollectionNameForEnd
+  pointSecurity`'s `sourceId` segment, reusing the existing `getOrBuildSkillData().maliciousSkillKeys`
+  cache for the malicious-skill badge), scoped to one asset's own `apiCollectionIds` and paginated at
+  the DEVICE-GROUP level; each returned device row carries its own `children[]` (full per-collection
+  risk/sensitive/tags/skillCount) for the expanded sub-table. Rewrote `AgenticAssetDevicesPage.jsx`
+  to render this via `GithubServerTable` + `CellType.COLLAPSIBLE` (confirmed via investigation that
+  `GithubServerTable` supports the same `collapsibleRow`-per-row pattern `GithubSimpleTable` uses —
+  they share the same `GithubRow` renderer, no `treeView` prop needed for a simple 2-level tree),
+  porting `ChildrenTable`'s exact badge/config-row logic. Added an "Endpoint tags" filter chip
+  (bounded 4-choice set, same `{key,label,choices}` convention as `Endpoints.jsx`'s existing "Tag"
+  filter) — the one piece of prod's chip set deliberately not ported 1:1 is per-value Endpoint-ID/
+  Username chips, since those are high-cardinality and would need a new distinct-values endpoint;
+  left as free-text search instead (already the established `GithubServerTable` convention), not a
+  silent gap. Verified live on Atlas Scale Test across both an "agent" row (Claude CLI: 4 devices,
+  expand shows config/notion-mcp/claudecli/claude-cli-user(27 skills)/api.githubcopilot.com/
+  mcp.razorpay.com/ai-security-docs.akto.io/claude(27 skills)/docs.akto.io/razorpay-stdio child rows,
+  matching prod's structure) and a "service" row (notion-mcp: 4 devices, real usernames resolved) —
+  zero console errors, zero `getAllCollectionsBasic` calls in the network log either time.
+  **Follow-up self-caught during this same round**: the first pass used `fetchEndpointShieldUser
+  Metadata()` (`endpointShieldHelper.js`) to resolve the Username column, which internally fires TWO
+  account-wide calls — Endpoint Shield module info AND `fetchAgenticUsers` (all agentic users, for a
+  team/role `userMetadataMap` this page never renders, since it has no Team/Role column). Switched to
+  the leaner sibling `fetchEndpointShieldUsernameMap()`, which only fires the module-info call —
+  confirmed live that `fetchAgenticUsers` no longer appears in the network log and usernames still
+  resolve correctly (john.smith, liam.patel, rakshaksatsangi, jane.doe).
 
 ## High priority — wrong output today
 
