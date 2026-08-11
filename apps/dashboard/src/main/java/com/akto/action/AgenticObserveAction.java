@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 /**
@@ -988,9 +989,71 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
      * is what made that attempt not a win, since agent groups cover ~98% of this account's
      * collections). Cheap: no per-device breakdown here, see buildDevicesForGroup.
      */
-    private Map<String, GroupSummary> classifyAllGroups(List<ApiCollection> collections,
-            Map<String, Integer> traffic, Map<String, Double> risk) {
-        return classifyAllGroups(collections, traffic, risk, Collections.emptyMap());
+    // Per-account cache of (findAll + classifyAllGroups) — shared by fetchAgenticAssetsSummary,
+    // fetchAgenticAssetsStats and fetchAgenticAssetDetail, the 3 callers that each independently
+    // re-ran this same O(N) pass over EVERY collection in the account on EVERY request (every sort
+    // click, filter change, tab switch, page turn, or asset open). Measured live on Atlas Scale Test
+    // (25,890 collections): findAll ~1-3s, but classifyAllGroups alone took 30s+ under concurrent
+    // load (multiple tabs/requests all recomputing this at once, contending for CPU) — this is what
+    // actually made fetchAgenticAssetsSummary take 13-17s for a ~5KB response.
+    // ConcurrentHashMap.compute() holds its per-key lock for the whole remapping call, so concurrent
+    // requests for the SAME account serialize onto one recompute instead of each redoing the full
+    // pass (the "thundering herd" that made the live numbers above so much worse than a single
+    // isolated call) — different accounts don't block each other.
+    // TTL is deliberately short (not the 45-minute style of ApiCollectionsAction's one-hardcoded-
+    // account cache): traffic/risk/sensitive inputs are themselves already frontend-cached for ~2
+    // minutes, and newly-discovered assets only need to show up within a similarly short window, not
+    // instantly — this just eliminates the redundant recompute across the handful of calls one
+    // page-load/interactive session naturally makes within that window.
+    private static final long CLASSIFICATION_CACHE_TTL_MS = 60_000L;
+    private static final Map<Integer, ClassificationCacheEntry> classificationCache = new ConcurrentHashMap<>();
+
+    private static final class ClassificationCacheEntry {
+        final List<ApiCollection> collections;
+        final Map<String, GroupSummary> groups;
+        final long builtAt;
+        ClassificationCacheEntry(List<ApiCollection> collections, Map<String, GroupSummary> groups, long builtAt) {
+            this.collections = collections;
+            this.groups = groups;
+            this.builtAt = builtAt;
+        }
+    }
+
+    // Entries are only ever overwritten on that same account's next miss, never proactively evicted
+    // — over a long server uptime with many distinct accounts, stale entries for accounts nobody
+    // revisits would otherwise sit in memory forever. Piggybacks a cheap sweep onto the (already
+    // slow-path) rebuild rather than running a separate background thread for it.
+    private static final int CLASSIFICATION_CACHE_SWEEP_THRESHOLD = 50;
+
+    private ClassificationCacheEntry getOrBuildClassification(Map<String, Integer> traffic,
+            Map<String, Double> risk, Map<String, List<String>> sensitive) {
+        int accountId = Context.accountId.get();
+        long now = System.currentTimeMillis();
+        ClassificationCacheEntry existing = classificationCache.get(accountId);
+        if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+            return existing;
+        }
+        if (classificationCache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
+            classificationCache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
+        }
+        return classificationCache.compute(accountId, (id, cached) -> {
+            long recheckNow = System.currentTimeMillis();
+            if (cached != null && (recheckNow - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                return cached;
+            }
+            long tStart = System.currentTimeMillis();
+            List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
+                    Filters.empty(),
+                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS)
+            );
+            long tFindAll = System.currentTimeMillis();
+            Map<String, GroupSummary> groups = classifyAllGroups(collections, traffic, risk, sensitive);
+            long tClassify = System.currentTimeMillis();
+            loggerMaker.warnAndAddToDb("[agenticClassificationCache] rebuilt: findAll=" + (tFindAll - tStart)
+                    + "ms, classify=" + (tClassify - tFindAll) + "ms, collections=" + collections.size()
+                    + ", groups=" + groups.size());
+            return new ClassificationCacheEntry(collections, groups, tClassify);
+        });
     }
 
     private Map<String, GroupSummary> classifyAllGroups(List<ApiCollection> collections,
@@ -1263,17 +1326,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     public String fetchAgenticAssetsSummary() {
         response = new BasicDBObject();
         try {
+            long tStart = System.currentTimeMillis();
             Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
             Map<String, List<String>> sensitive = sensitiveMap != null ? sensitiveMap : Collections.emptyMap();
 
-            List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
-                    Filters.empty(),
-                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS)
-            );
-
-            Map<String, GroupSummary> groups = classifyAllGroups(collections, traffic, risk, sensitive);
-            List<GroupSummary> all = new ArrayList<>(groups.values());
+            ClassificationCacheEntry cached = getOrBuildClassification(traffic, risk, sensitive);
+            List<ApiCollection> collections = cached.collections;
+            List<GroupSummary> all = new ArrayList<>(cached.groups.values());
 
             // Matches agenticPageBuilders.js's filterAssetsByLastSeen exactly — startTimestamp <= 0
             // means "all time" (no filter).
@@ -1363,6 +1423,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 }
                 rowsOut.add(row);
             }
+            loggerMaker.warnAndAddToDb("[fetchAgenticAssetsSummary-timing] TOTAL=" + (System.currentTimeMillis() - tStart)
+                    + "ms, rows=" + rowsOut.size() + ", accountCollections=" + collections.size());
 
             response.put("rows", rowsOut);
             response.put("total", total);
@@ -1408,12 +1470,16 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 return ERROR.toUpperCase();
             }
 
-            List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
-                    Filters.empty(),
-                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS)
-            );
-            Map<String, GroupSummary> groups = classifyAllGroups(collections, Collections.emptyMap(), Collections.emptyMap());
-            GroupSummary g = groups.get(rowType + "|" + groupKey);
+            // Uses the request's own trafficMap/riskScoreMap (not empty maps) even though this
+            // endpoint itself never reads GroupSummary's traffic/risk-derived fields — it shares the
+            // classification cache with fetchAgenticAssetsSummary/fetchAgenticAssetsStats (which DO
+            // read them), so building with empty maps here could win the rebuild race and leave every
+            // other caller reading zeroed-out traffic/risk for the whole TTL window.
+            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
+            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
+            ClassificationCacheEntry cached = getOrBuildClassification(traffic, risk, Collections.emptyMap());
+            List<ApiCollection> collections = cached.collections;
+            GroupSummary g = cached.groups.get(rowType + "|" + groupKey);
 
             if (g == null) {
                 assetHostNames = Collections.emptyList();
@@ -1440,8 +1506,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             Map<Integer, ApiCollection> byId = new HashMap<>();
             for (ApiCollection c : collections) byId.put(c.getId(), c);
-            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
-            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
             Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
             assetDevices = buildDevicesForGroup(g, byId, traffic, risk, userAnalysis);
 
@@ -1466,11 +1530,15 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
             Map<String, Map<String, Integer>> violations = violationsByCollectionId != null ? violationsByCollectionId : Collections.emptyMap();
 
-            List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
-                    Filters.empty(),
-                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS)
-            );
-            Map<String, GroupSummary> groups = classifyAllGroups(collections, traffic, risk);
+            // This endpoint doesn't send/read sensitiveMap (no "Sensitive data" breakdown on the
+            // stats cards) — shares the classification cache with fetchAgenticAssetsSummary anyway,
+            // so if THIS call happens to win the rebuild race, sensitiveTypes will be empty for every
+            // group until the cache's short TTL naturally expires. Accepted as a minor, self-healing
+            // edge case (see AgenticObserveAction.getOrBuildClassification's own doc) rather than
+            // plumbing sensitiveMap through a card that never uses it.
+            ClassificationCacheEntry cached = getOrBuildClassification(traffic, risk, Collections.emptyMap());
+            List<ApiCollection> collections = cached.collections;
+            Map<String, GroupSummary> groups = cached.groups;
             Collection<GroupSummary> counted = groups.values();
             if (startTimestamp > 0) {
                 int end = endTimestamp > 0 ? endTimestamp : (int) (System.currentTimeMillis() / 1000);
