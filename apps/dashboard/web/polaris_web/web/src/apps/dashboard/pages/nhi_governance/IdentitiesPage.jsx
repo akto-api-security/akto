@@ -1,9 +1,11 @@
-import { useState, useMemo, useReducer, useEffect, useCallback, useRef } from "react";
-import { Badge, Box, HorizontalStack, Modal, Tabs, Text } from "@shopify/polaris";
+import { useState, useMemo, useReducer, useEffect, useCallback } from "react";
+import { IndexFiltersMode } from "@shopify/polaris";
+import { Badge, HorizontalStack, Modal, Text } from "@shopify/polaris";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
 import { produce } from "immer";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
-import AgGridTable from "../../components/tables/AgGridTable";
+import GithubServerTable from "../../components/tables/GithubServerTable";
+import { CellType } from "../../components/tables/rows/GithubRow";
 import SummaryCardInfo from "../../components/shared/SummaryCardInfo";
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import useTable from "../../components/tables/TableContext";
@@ -19,6 +21,7 @@ import observeRequests from "../observe/api";
 import SpinnerCentered from "../../components/progress/SpinnerCentered";
 
 const definedTableTabs = ["All", "Expired", "Disabled"];
+const resourceName = { singular: "identity", plural: "identities" };
 
 // ── Expiry status renderer ─────────────────────────────────────────────────────
 const expiryComp = (s) => {
@@ -30,36 +33,28 @@ const expiryComp = (s) => {
     return <Text variant="bodyMd">{s}</Text>;
 };
 
-// Full-dataset row shaping — feeds IdentityOverviewGraph, tab counts, and summary cards, none of
-// which render table cells, so no JSX construction needed here (unlike buildGridRow below).
-const buildFullDatasetRows = (rawRows, violationIndex = {}) =>
-    rawRows.map((r) => {
-        const v = violationIndex[r.identityName] || { violCrit: 0, violHigh: 0, violMed: 0 };
-        return {
+const buildTableData = (rawRows, violationIndex = {}) =>
+    rawRows
+        .map((r) => {
+            const v = violationIndex[r.identityName] || { violCrit: 0, violHigh: 0, violMed: 0 };
+            return { ...r, violCrit: v.violCrit, violHigh: v.violHigh, violMed: v.violMed };
+        })
+        .sort((a, b) => {
+            if (b.violCrit !== a.violCrit) return b.violCrit - a.violCrit;
+            return (b.violCrit + b.violHigh + b.violMed) - (a.violCrit + a.violHigh + a.violMed);
+        })
+        .map((r) => ({
             ...r,
-            id: r.hexId,
-            violCrit: v.violCrit, violHigh: v.violHigh, violMed: v.violMed,
-            totalViolations: v.violCrit + v.violHigh + v.violMed,
-        };
-    });
+            id:             r.hexId,
+            totalViolations: r.violCrit + r.violHigh + r.violMed,
+            priorityScore:  r.violCrit * 1000 + (r.violCrit + r.violHigh + r.violMed),
+            identityComp:  <HorizontalStack gap="2" blockAlign="center" wrap={false}><IdentityIcon name={r.identityName} /><Text variant="bodyMd" fontWeight="medium">{r.identityName}</Text></HorizontalStack>,
+            agentComp:     <HorizontalStack gap="2" blockAlign="center" wrap={false}><AgentIcon name={r.agent} /><Text variant="bodyMd">{r.agent}</Text></HorizontalStack>,
+            typeComp:      <Badge>{r.type}</Badge>,
+            violationsComp: <ViolationBubbles critical={r.violCrit} high={r.violHigh} medium={r.violMed} />,
+            expiryComp:    expiryComp(r.expiryStatus),
+        }));
 
-// Per-page row shaping for the paginated AG Grid table — builds the JSX cell fields the column
-// defs below read (identityComp/agentComp/typeComp/violationsComp/expiryComp).
-function buildGridRow(apiIdentity, violationIndex) {
-    const r = transformIdentityForUI(apiIdentity);
-    const v = violationIndex[r.identityName] || { violCrit: 0, violHigh: 0, violMed: 0 };
-    return {
-        ...r,
-        id: r.hexId,
-        violCrit: v.violCrit, violHigh: v.violHigh, violMed: v.violMed,
-        totalViolations: v.violCrit + v.violHigh + v.violMed,
-        identityComp: <HorizontalStack gap="2" blockAlign="center" wrap={false}><IdentityIcon name={r.identityName} /><Text variant="bodyMd" fontWeight="medium">{r.identityName}</Text></HorizontalStack>,
-        agentComp: <HorizontalStack gap="2" blockAlign="center" wrap={false}><AgentIcon name={r.agent} /><Text variant="bodyMd">{r.agent}</Text></HorizontalStack>,
-        typeComp: <Badge>{r.type}</Badge>,
-        violationsComp: <ViolationBubbles critical={v.violCrit} high={v.violHigh} medium={v.violMed} />,
-        expiryComp: expiryComp(r.expiryStatus),
-    };
-}
 
 // Helper to format expiry status (expiryDate is epoch seconds)
 const formatExpiryStatus = (expiryDate) => {
@@ -96,6 +91,27 @@ const transformIdentityForUI = (apiIdentity) => {
     };
 };
 
+// Per-row shaping for the table's own server-paginated page — mirrors buildTableData's per-row
+// map step above (same identityComp/agentComp/typeComp/violationsComp/expiryComp cell shapes),
+// applied to one already-fetched page instead of the full account. violationIndex is the same
+// small, cheap, account-wide map buildTableData already uses (fetchViolationCountsByIdentity),
+// safe to merge in per-page without an extra network call.
+function buildPageRow(apiIdentity, violationIndex) {
+    const r = transformIdentityForUI(apiIdentity);
+    const v = violationIndex[r.identityName] || { violCrit: 0, violHigh: 0, violMed: 0 };
+    return {
+        ...r,
+        id: r.hexId,
+        violCrit: v.violCrit, violHigh: v.violHigh, violMed: v.violMed,
+        totalViolations: v.violCrit + v.violHigh + v.violMed,
+        identityComp: <HorizontalStack gap="2" blockAlign="center" wrap={false}><IdentityIcon name={r.identityName} /><Text variant="bodyMd" fontWeight="medium">{r.identityName}</Text></HorizontalStack>,
+        agentComp: <HorizontalStack gap="2" blockAlign="center" wrap={false}><AgentIcon name={r.agent} /><Text variant="bodyMd">{r.agent}</Text></HorizontalStack>,
+        typeComp: <Badge>{r.type}</Badge>,
+        violationsComp: <ViolationBubbles critical={v.violCrit} high={v.violHigh} medium={v.violMed} />,
+        expiryComp: expiryComp(r.expiryStatus),
+    };
+}
+
 // ── Computed summary ───────────────────────────────────────────────────────────
 const makeSummaryItems = (data) => {
     const total   = data.length;
@@ -108,42 +124,28 @@ const makeSummaryItems = (data) => {
     ];
 };
 
-// ── AG Grid column definitions ──────────────────────────────────────────────────
-function JsxCellRenderer({ value }) {
-    return value ?? null;
-}
+// ── Headers ────────────────────────────────────────────────────────────────────
+const headers = [
+    { text: "Identity",      value: "identityComp",       title: "Identity"                           },
+    { text: "Agentic Asset", value: "agentComp",          title: "Agentic Asset"                      },
+    ...(isEndpointSecurityCategory() ? [{ text: "Owner", value: "owner", title: "Owner", type: CellType.TEXT }] : []),
+    { text: "Type",          value: "typeComp",           title: "Type"                               },
+    { text: "Violations",    value: "violationsComp",     title: "Violations"                         },
+    { text: "Expiry Status", value: "expiryComp",         title: "Expiry Status"                      },
+    { text: "Discovered",    value: "discoveredTimestamp", title: "Discovered", type: CellType.TEXT   },
+];
 
-const DEFAULT_COL_DEF = {
-    sortable: true,
-    resizable: true,
-    filter: false,
-    cellStyle: { display: "flex", alignItems: "center" },
-};
-
-const AUTO_SIZE_STRATEGY = { type: "fitCellContents" };
-
-// AG Grid colId -> backend sortKey ("identityName"|"expiryDate"|"lastUsedAt"|"createdAt")
-const SORT_FIELD_MAP = {
-    identityComp: "identityName",
-    expiryComp: "expiryDate",
-    discoveredTimestamp: "createdAt",
-};
-
-function buildColDefs() {
-    return [
-        { field: "identityComp", headerName: "Identity", minWidth: 220, cellRenderer: JsxCellRenderer },
-        { field: "agentComp", headerName: "Agentic Asset", minWidth: 180, sortable: false, cellRenderer: JsxCellRenderer },
-        ...(isEndpointSecurityCategory() ? [{ field: "owner", headerName: "Owner", minWidth: 140, sortable: false }] : []),
-        { field: "typeComp", headerName: "Type", minWidth: 120, sortable: false, cellRenderer: JsxCellRenderer },
-        { field: "violationsComp", headerName: "Violations", minWidth: 160, sortable: false, cellRenderer: JsxCellRenderer },
-        { field: "expiryComp", headerName: "Expiry Status", minWidth: 160, cellRenderer: JsxCellRenderer },
-        // Defaults to desc so the grid's initial (unsorted-by-user) request already asks the
-        // backend for "most recently discovered first" — see NhiGovernanceIdentitiesAction's
-        // fetchAllNhiIdentities doc comment for why this replaces the old client-side
-        // "most violations first" ranking (that would need a $lookup into nhi_violations).
-        { field: "discoveredTimestamp", headerName: "Discovered", minWidth: 140, sort: "desc", sortIndex: 0 },
-    ];
-}
+// Real backend-sortable fields only (NhiGovernanceIdentitiesAction.fetchAllNhiIdentities) — the old
+// "sort by violations" option relied on a client-only computed priorityScore, which isn't something
+// the paginated query can sort by without a $lookup into nhi_violations (identities don't carry a
+// denormalized violation count). Default view (Discovered desc) is set on the Discovered column
+// itself via GithubServerTable's usual initial-sort convention.
+const sortOptions = [
+    { label: "Discovered", value: "createdAt desc", directionLabel: "Newest first", sortKey: "createdAt", columnIndex: 6 },
+    { label: "Discovered", value: "createdAt asc",  directionLabel: "Oldest first", sortKey: "createdAt", columnIndex: 6 },
+    { label: "Identity",   value: "identityName asc",  directionLabel: "A-Z", sortKey: "identityName", columnIndex: 0 },
+    { label: "Identity",   value: "identityName desc", directionLabel: "Z-A", sortKey: "identityName", columnIndex: 0 },
+];
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 const pageTitle = (
@@ -163,18 +165,16 @@ export default function IdentitiesPage() {
     const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
     const initialSelectedTab  = tableSelectedTab[window.location.pathname] || "all";
 
-    // Full-account fetch — feeds the topology graph, tab counts, and summary cards, all of which
-    // genuinely need every identity (see IdentityOverviewGraph, which fans out ALL of an agent's
-    // identities). The table itself (below) fetches its own paginated page independently.
+    // API fetching state
     const [rawIdentities, setRawIdentities] = useState([]);
     const [rawViolations, setRawViolations] = useState([]);
     const [loading, setLoading] = useState(true);
 
     // UI state
     const [selectedTab, setSelectedTab]         = useState(initialSelectedTab);
-    const [bulkSelectedCount, setBulkSelectedCount] = useState(0);
-    const [tableRefreshKey, setTableRefreshKey] = useState(0);
-    const gridRef = useRef(null);
+    const [selected, setSelected]               = useState(
+        func.getTableTabIndexById(0, definedTableTabs, initialSelectedTab)
+    );
     const [showDeleteModal, setShowDeleteModal]     = useState(false);
     const [selectedIdentityIds, setSelectedIdentityIds] = useState([]);
     const [deleting, setDeleting]                   = useState(false);
@@ -231,16 +231,16 @@ export default function IdentitiesPage() {
         }, {});
     }, [rawViolations]);
 
-    // Full dataset (unpaginated) — feeds the graph, tab counts, and summary cards only.
-    const fullDatasetRows = useMemo(() => {
-        return buildFullDatasetRows(rawIdentities, violationIndex);
+    // Build table data with violation counts
+    const tableData = useMemo(() => {
+        return buildTableData(rawIdentities, violationIndex);
     }, [rawIdentities, violationIndex]);
 
     const dataByTab = useMemo(() => ({
-        "all":      fullDatasetRows,
-        "expired":  fullDatasetRows.filter((r) => r.expiryStatus && r.expiryStatus.startsWith("Expired")),
-        "disabled": fullDatasetRows.filter((r) => r.status === "INACTIVE"),
-    }), [fullDatasetRows]);
+        "all":      tableData,
+        "expired":  tableData.filter((r) => r.expiryStatus && r.expiryStatus.startsWith("Expired")),
+        "disabled": tableData.filter((r) => r.status === "INACTIVE"),
+    }), [tableData]);
 
     const tableCountObj = func.getTabsCount(definedTableTabs, dataByTab);
     const tableTabs = func.getTableTabsContent(
@@ -251,67 +251,23 @@ export default function IdentitiesPage() {
         },
         selectedTab, tabsInfo
     );
-    const selectedTabIndex = Math.max(0, definedTableTabs.findIndex((t) => func.getKeyFromName(t) === selectedTab));
 
-    const summaryItems = makeSummaryItems(fullDatasetRows);
+    const summaryItems = makeSummaryItems(tableData);
 
-    const triggerTableRefresh = useCallback(() => setTableRefreshKey((k) => k + 1), []);
-
-    // IdentityOverviewGraph (react-flow) sits above the grid and settles its own layout
-    // asynchronously after mount, which can leave the grid's row virtualization computed against
-    // a stale viewport — rows land correctly in the DOM (confirmed via accessibility tree) but
-    // don't visually paint until something forces a relayout. Nudge it once per grid (re)mount.
-    useEffect(() => {
-        const t = setTimeout(() => window.dispatchEvent(new Event("resize")), 300);
-        return () => clearTimeout(t);
-    }, [selectedTab, startTimestamp, endTimestamp, tableRefreshKey]);
-
-    // ─── Server-side data fetch for AG Grid ─────────────────────────────────────
-    const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
-        const pageSize = limit || 50;
-        const mappedSortKey = SORT_FIELD_MAP[sortKey] || sortKey || "createdAt";
-        // AG Grid SSRM sends sortOrder: -1 for asc, 1 for desc — opposite of the backend's Mongo
-        // convention (1 asc / -1 desc), matching ViolationsPage.jsx's own onServerFetch.
-        const mongoSortOrder = sortOrder ? -sortOrder : -1;
+    // ─── Server-side paginated fetch for the table itself ───────────────────────
+    // The graph/summary cards/tab counts above keep using the full-account fetch (tableData) —
+    // unchanged from before, and already the cheapest way to feed IdentityOverviewGraph, which
+    // genuinely needs every identity to fan out each agent's full list correctly. Only the table's
+    // own rows are server-paginated now, via fetchAllNhiIdentities.
+    const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
+        const mongoSortOrder = sortOrder === -1 ? 1 : -1; // GithubServerTable: asc=-1/desc=1, inverted vs Mongo
         const status = selectedTab === "all" ? undefined : (selectedTab === "expired" ? "Expired" : "Disabled");
-
-        return observeRequests.fetchAllNhiIdentities(startTimestamp, endTimestamp, {
-            skip,
-            limit: pageSize,
-            sortKey: mappedSortKey,
-            sortOrder: mongoSortOrder,
-            queryValue: searchString || undefined,
-            status,
-        }).then((res) => ({
-            value: (res.identities || []).map((identity) => buildGridRow(identity, violationIndex)),
-            total: res.total || 0,
-        }));
-    }, [startTimestamp, endTimestamp, selectedTab, violationIndex]);
-
-    // ─── Bulk selection (SSRM tracks selection via node state, not getSelectedRows()) ────
-    const getSelectedIds = useCallback(() => {
-        const ids = [];
-        gridRef.current?.api?.forEachNode((node) => {
-            if (!node.stub && node.isSelected() && node.data?.id) ids.push(node.data.id);
+        const res = await observeRequests.fetchAllNhiIdentities(startTimestamp, endTimestamp, {
+            skip, limit, sortKey: sortKey || "createdAt", sortOrder: mongoSortOrder, queryValue, status,
         });
-        return ids;
-    }, []);
-
-    const clearBulkSelection = useCallback(() => {
-        gridRef.current?.api?.deselectAll();
-        setBulkSelectedCount(0);
-    }, []);
-
-    const bulkActions = useMemo(() => [
-        {
-            label: "Delete identity",
-            destructive: true,
-            onAction: () => {
-                setSelectedIdentityIds(getSelectedIds());
-                setShowDeleteModal(true);
-            },
-        },
-    ], [getSelectedIds]);
+        const rows = (res.identities || []).map((identity) => buildPageRow(identity, violationIndex));
+        return { value: rows, total: res.total || 0 };
+    }, [startTimestamp, endTimestamp, selectedTab, violationIndex]);
 
     const handleDeleteIdentities = async () => {
         try {
@@ -319,8 +275,6 @@ export default function IdentitiesPage() {
             await observeRequests.deleteNhiIdentities(selectedIdentityIds);
             func.setToast(true, false, `${selectedIdentityIds.length} identit${selectedIdentityIds.length > 1 ? "ies" : "y"} deleted successfully`);
             setShowDeleteModal(false);
-            clearBulkSelection();
-            triggerTableRefresh();
             await fetchData();
         } catch (err) {
             func.setToast(true, true, "Failed to delete identities");
@@ -328,15 +282,6 @@ export default function IdentitiesPage() {
             setDeleting(false);
         }
     };
-
-    const handleRowClick = useCallback((e) => {
-        if (e?.data) {
-            setSelectedRow(e.data);
-            setShowDetailsPanel(true);
-        }
-    }, []);
-
-    const colDefs = useMemo(() => buildColDefs(), []);
 
     if (loading) {
         return <SpinnerCentered />;
@@ -353,52 +298,39 @@ export default function IdentitiesPage() {
 
                 <IdentityOverviewGraph
                     key="overview-graph"
-                    tableData={fullDatasetRows}
+                    tableData={tableData}
                     onIdentityClick={(row) => { setSelectedRow(row); setShowDetailsPanel(true); }}
                 />,
 
-                <Box key="identities-table">
-                    <Box paddingBlockEnd="3">
-                        <Tabs
-                            tabs={tableTabs}
-                            selected={selectedTabIndex}
-                            onSelect={(index) => tableTabs[index]?.onAction?.()}
-                        />
-                    </Box>
-                    <AgGridTable
-                        key={`nhi-identities-grid-${selectedTab}-${startTimestamp}-${endTimestamp}-${tableRefreshKey}`}
-                        columnDefs={colDefs}
-                        defaultColDef={DEFAULT_COL_DEF}
-                        autoSizeStrategy={AUTO_SIZE_STRATEGY}
-                        searchPlaceholder="Search identities"
-                        onRowClicked={handleRowClick}
-                        suppressRowClickSelection
-                        getRowStyle={() => ({ cursor: "pointer" })}
-                        gridRef={gridRef}
-                        rowSelection={{
-                            mode: "multiRow",
-                            checkboxes: true,
-                            headerCheckbox: true,
-                            enableClickSelection: false,
-                        }}
-                        onSelectionChanged={(e) => {
-                            let count = 0;
-                            e.api.forEachNode((node) => { if (!node.stub && node.isSelected()) count++; });
-                            setBulkSelectedCount(count);
-                        }}
-                        bulkActionCount={bulkSelectedCount}
-                        bulkActions={bulkActions}
-                        onClearBulk={clearBulkSelection}
-                        paginationPageSize={50}
-                        paginationPageSizeSelector={[20, 50, 100]}
-                        height={500}
-                        domLayout="normal"
-                        onServerFetch={onServerFetch}
-                        filterStateUrl="nhi-identities-grid"
-                        serverSideRowModel
-                        getRowId={(params) => params.data.id}
-                    />
-                </Box>,
+                <GithubServerTable
+                    key={`identities-table-${selectedTab}-${startTimestamp}-${endTimestamp}`}
+                    fetchData={fetchTableData}
+                    headers={headers}
+                    resourceName={resourceName}
+                    sortOptions={sortOptions}
+                    filters={[]}
+                    selectable={true}
+                    mode={IndexFiltersMode.Default}
+                    headings={headers}
+                    useNewRow={true}
+                    condensedHeight={true}
+                    tableTabs={tableTabs}
+                    onSelect={(i) => setSelected(i)}
+                    selected={selected}
+                    promotedBulkActions={(selectedResources) => [
+                        {
+                            content: "Delete identity",
+                            destructive: true,
+                            onAction: () => {
+                                setSelectedIdentityIds(selectedResources);
+                                setShowDeleteModal(true);
+                            },
+                        },
+                    ]}
+                    onRowClick={(row) => { setSelectedRow(row); setShowDetailsPanel(true); }}
+                    rowClickable={true}
+                    supportsNegationFilter={false}
+                />,
             ]}
         />
         {selectedRow && (
@@ -406,7 +338,7 @@ export default function IdentitiesPage() {
                 row={selectedRow}
                 show={showDetailsPanel}
                 setShow={setShowDetailsPanel}
-                onUpdated={() => { fetchData(); triggerTableRefresh(); }}
+                onUpdated={fetchData}
             />
         )}
         <Modal

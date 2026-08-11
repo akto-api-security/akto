@@ -349,26 +349,15 @@ public class NhiGovernanceViolationsAction extends UserAction {
                 return Action.ERROR.toUpperCase();
             }
 
-            Bson identityOnlyFilter = Filters.eq(NhiViolation.IDENTITIES + ".id", new ObjectId(identityId));
-            List<Bson> matchConditions = new ArrayList<>();
-            matchConditions.add(identityOnlyFilter);
-            if (queryValue != null && !queryValue.trim().isEmpty()) {
-                String q = Pattern.quote(queryValue.trim());
-                matchConditions.add(Filters.or(
-                        Filters.regex(NhiViolation.AGENT_NAME, q, "i"),
-                        Filters.regex(NhiViolation.VIOLATION_TYPE, q, "i")
-                ));
-            }
-            Bson identityFilter = matchConditions.size() == 1 ? matchConditions.get(0) : Filters.and(matchConditions);
+            Bson identityFilter = Filters.eq(NhiViolation.IDENTITIES + ".id", new ObjectId(identityId));
             total = NhiViolationDao.instance.count(identityFilter);
 
-            String sortField = mapSortField(sortKey);
             int lim = (limit <= 0) ? 50 : Math.min(limit, 500);
             int sk = Math.max(skip, 0);
 
             List<Bson> pipeline = new ArrayList<>();
             pipeline.add(Aggregates.match(identityFilter));
-            pipeline.add(Aggregates.sort((sortOrder < 0) ? Sorts.descending(sortField) : Sorts.ascending(sortField)));
+            pipeline.add(Aggregates.sort(Sorts.descending(NhiViolation.DISCOVERED_AT)));
             pipeline.add(Aggregates.skip(sk));
             pipeline.add(Aggregates.limit(lim));
             pipeline.addAll(policyLookupAndProjectStages());
@@ -380,10 +369,9 @@ public class NhiGovernanceViolationsAction extends UserAction {
                 violations.add(cursor.next());
             }
 
-            // Severity counts across ALL of this identity's violations (not just the current page,
-            // and not narrowed by an active search — always the whole identity's own breakdown).
+            // Severity counts across ALL of this identity's violations (not just the current page).
             List<Bson> sevPipeline = Arrays.asList(
-                    Aggregates.match(Filters.and(identityOnlyFilter, Filters.ne(NhiViolation.STATUS, "Fixed"))),
+                    Aggregates.match(Filters.and(identityFilter, Filters.ne(NhiViolation.STATUS, "Fixed"))),
                     Aggregates.group("$" + NhiViolation.SEVERITY, Accumulators.sum("count", 1))
             );
             Map<String, Object> sevMap = new HashMap<>();

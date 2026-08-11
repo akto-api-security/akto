@@ -1322,11 +1322,11 @@ export default {
 
     // Scoped, paginated violations for ONE identity (identity-details flyout) — replaces fetching every
     // violation account-wide with no time bound just to filter down to a single identity client-side.
-    async fetchViolationsByIdentity(identityId, { skip, limit, sortKey, sortOrder, queryValue } = {}) {
+    async fetchViolationsByIdentity(identityId, { skip, limit } = {}) {
         const resp = await request({
             url: '/api/fetchViolationsByIdentity',
             method: 'post',
-            data: { identityId, skip, limit, sortKey, sortOrder, queryValue }
+            data: { identityId, skip, limit }
         })
         return { violations: resp?.violations || [], total: resp?.total || 0, stats: resp?.stats || {} }
     },
