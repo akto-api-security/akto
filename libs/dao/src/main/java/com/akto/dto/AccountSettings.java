@@ -38,6 +38,13 @@ public class AccountSettings {
     public static final String CENTRAL_KAFKA_IP = "centralKafkaIp";
     private String centralKafkaIp;
 
+
+    public static final String TEST_RATE_LIMIT_USAGE_DAY = "testRateLimitUsageDay";
+    private int testRateLimitUsageDay;
+    public static final String TEST_RATE_LIMIT_USAGE_COUNT = "testRateLimitUsageCount";
+    private int testRateLimitUsageCount;
+
+
     // Used by mini-runtime to send to threat topic.
     public static final String THREAT_KAFKA_PARTITION_KEY = "threatKafkaPartitionKey";
     private ThreatKafkaPartitionKey threatKafkaPartitionKey;
@@ -240,6 +247,23 @@ public class AccountSettings {
     public enum SetupType {
         PROD, QA, STAGING, DEV
     }
+
+    public int getTestRateLimitUsageDay() {
+        return testRateLimitUsageDay;
+    }
+
+    public void setTestRateLimitUsageDay(int testRateLimitUsageDay) {
+        this.testRateLimitUsageDay = testRateLimitUsageDay;
+    }
+
+    public int getTestRateLimitUsageCount() {
+        return testRateLimitUsageCount;
+    }
+
+    public void setTestRateLimitUsageCount(int testRateLimitUsageCount) {
+        this.testRateLimitUsageCount = testRateLimitUsageCount;
+    }
+
 
     public Map<String, Map<Pattern, String>> convertApiCollectionNameMapperToRegex() {
         

@@ -3685,4 +3685,43 @@ public class DbLayer {
         AgentGuardCorpusQueueDao.instance.insertMany(corpusEntries);
     }
 
+    public static int incrementAndGetTestRateLimitUsage(int globalRateLimit) {
+        int today = Context.today();
+        FindOneAndUpdateOptions options = new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER);
+
+        List<Bson> sameDayFilters = new ArrayList<>();
+        sameDayFilters.add(AccountSettingsDao.generateFilter());
+        sameDayFilters.add(Filters.eq(AccountSettings.TEST_RATE_LIMIT_USAGE_DAY, today));
+        // Limit applicable only when > 0; otherwise always allow increment.
+        if (globalRateLimit > 0) {
+            sameDayFilters.add(Filters.lt(AccountSettings.TEST_RATE_LIMIT_USAGE_COUNT, globalRateLimit));
+        }
+
+        AccountSettings updated = AccountSettingsDao.instance.getMCollection().findOneAndUpdate(
+                Filters.and(sameDayFilters),
+                Updates.inc(AccountSettings.TEST_RATE_LIMIT_USAGE_COUNT, 1),
+                options
+        );
+        if (updated != null) {
+            return updated.getTestRateLimitUsageCount();
+        }
+
+        // Same day but already at/over limit — do not increment.
+        AccountSettings current = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        if (current != null && current.getTestRateLimitUsageDay() == today) {
+            return current.getTestRateLimitUsageCount();
+        }
+
+        // New day (or first ever) — reset counter to 1.
+        updated = AccountSettingsDao.instance.getMCollection().findOneAndUpdate(
+                AccountSettingsDao.generateFilter(),
+                Updates.combine(
+                        Updates.set(AccountSettings.TEST_RATE_LIMIT_USAGE_DAY, today),
+                        Updates.set(AccountSettings.TEST_RATE_LIMIT_USAGE_COUNT, 1)
+                ),
+                options
+        );
+        return updated != null ? updated.getTestRateLimitUsageCount() : 1;
+    }
+
 }

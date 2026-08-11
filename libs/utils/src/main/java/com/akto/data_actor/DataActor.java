@@ -408,4 +408,6 @@ public abstract class DataActor {
 
     public abstract void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook);
 
+    public abstract int incrementAndGetTestRateLimitUsage(int globalRateLimit);
+
 }
