@@ -43,6 +43,10 @@ public class AccountSettings {
     private int testRateLimitUsageDay;
     public static final String TEST_RATE_LIMIT_USAGE_COUNT = "testRateLimitUsageCount";
     private int testRateLimitUsageCount;
+    public static final String TEST_RATE_LIMIT_USAGE_DAY_AGENTIC = "testRateLimitUsageDayAgentic";
+    private int testRateLimitUsageDayAgentic;
+    public static final String TEST_RATE_LIMIT_USAGE_COUNT_AGENTIC = "testRateLimitUsageCountAgentic";
+    private int testRateLimitUsageCountAgentic;
 
 
     // Used by mini-runtime to send to threat topic.
@@ -262,6 +266,22 @@ public class AccountSettings {
 
     public void setTestRateLimitUsageCount(int testRateLimitUsageCount) {
         this.testRateLimitUsageCount = testRateLimitUsageCount;
+    }
+
+    public int getTestRateLimitUsageDayAgentic() {
+        return testRateLimitUsageDayAgentic;
+    }
+
+    public void setTestRateLimitUsageDayAgentic(int testRateLimitUsageDayAgentic) {
+        this.testRateLimitUsageDayAgentic = testRateLimitUsageDayAgentic;
+    }
+
+    public int getTestRateLimitUsageCountAgentic() {
+        return testRateLimitUsageCountAgentic;
+    }
+
+    public void setTestRateLimitUsageCountAgentic(int testRateLimitUsageCountAgentic) {
+        this.testRateLimitUsageCountAgentic = testRateLimitUsageCountAgentic;
     }
 
 
