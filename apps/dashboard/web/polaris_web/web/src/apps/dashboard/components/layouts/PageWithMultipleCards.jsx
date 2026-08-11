@@ -20,9 +20,15 @@ const PageWithMultipleCards = (props) => {
     // Track pathnames in sessionStorage
     const MAX_STACK_SIZE = 50; // Maximum number of entries in the stack
 
+    // Includes location.search, not just pathname — a page whose identity depends on its query
+    // params (e.g. an asset-detail page keyed by ?groupKey=...&rowType=...) would otherwise have
+    // its own stack entry silently stripped down to the bare route, so navigating back to it from
+    // one page further in (e.g. Inventory's own back button) lands on a query-string-less URL that
+    // page can't actually render (reproduced: "groupKey and rowType are required"). For every page
+    // that doesn't use query params, `search` is always "", so this is a no-op there.
     useEffect(() => {
         let stack = JSON.parse(sessionStorage.getItem('pathnameStack') || '[]');
-        const currentPath = location.pathname;
+        const currentPath = location.pathname + location.search;
         if (stack.length === 0 || stack[stack.length - 1] !== currentPath) {
             stack.push(currentPath);
             // Trim the stack to the maximum size
@@ -32,12 +38,12 @@ const PageWithMultipleCards = (props) => {
             sessionStorage.setItem('pathnameStack', JSON.stringify(stack));
         }
         prevPathRef.current = currentPath;
-    }, [location.pathname]);
+    }, [location.pathname, location.search]);
 
     // Custom navigateBack: skip over same-pathname entries
     const navigateBack = () => {
         let stack = JSON.parse(sessionStorage.getItem('pathnameStack') || '[]');
-        const currentPath = location.pathname;
+        const currentPath = location.pathname + location.search;
         // Remove current path
         while (stack.length > 0 && stack[stack.length - 1] === currentPath) {
             stack.pop();
