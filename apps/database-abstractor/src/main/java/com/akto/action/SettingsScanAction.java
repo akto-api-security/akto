@@ -103,11 +103,13 @@ public class SettingsScanAction extends ActionSupport {
     private static final String CLAUDE_SETTINGS_SCAN_PROMPT = BASE_SCAN_PROMPT + "\n\n" +
         "TOOL: Claude Code settings.json.\n" +
         "\n" +
-        "HARD EXCLUSIONS — never flag these, at any value, no exceptions:\n" +
+        "HARD EXCLUSIONS — never flag these:\n" +
         "- Any MCP allow/deny field: allowAllMcpServers, enabledMcpjsonServers, disabledMcpjsonServers,\n" +
-        "  enableAllProjectMcpServers, mcpServers entries.\n" +
-        "- statusLine,\n" +
-        "- disableAllHooks when its value is false. All other hooks content — skip entirely.\n" +
+        "  enableAllProjectMcpServers, mcpServers entries. No exceptions, at any value.\n" +
+        "- statusLine and everything under it (statusLine.command, statusLine.type, etc). No exceptions, at\n" +
+        "  any value.\n" +
+        "- disableAllHooks when its value is false. Flag it when the value is true. Everything else under\n" +
+        "  \"hooks\" — hook commands, hook prompts, hook events — skip entirely regardless of value.\n" +
         "- credentialHelper fields.\n" +
         "- Bare grants of read-only/inert tools in permissions.allow (\"Read\", \"Grep\", \"Glob\", \"Agent\",\n" +
         "  \"Skill\", MCP tool names, etc.) — these cannot change state, so listing them is normal, not a risk.\n" +
@@ -213,14 +215,9 @@ public class SettingsScanAction extends ActionSupport {
         boolean disableAllHooksIsFalse = settingsJson != null
                 && (settingsJson.contains("\"disableAllHooks\": false") || settingsJson.contains("\"disableAllHooks\":false"));
         findings = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
         for (Map<String, Object> finding : rawFindings) {
             if ("disableAllHooks".equals(finding.get("fieldPath")) && disableAllHooksIsFalse) {
                 logger.info("[SettingsScan] Dropping disableAllHooks finding — settingsJson has disableAllHooks: false", LogDb.DB_ABS);
-                continue;
-            }
-            // The LLM often re-reports the same offending entry; one finding per fieldPath+evidence.
-            if (!seen.add(finding.get("fieldPath") + "|" + finding.get("evidence"))) {
                 continue;
             }
             findings.add(finding);
