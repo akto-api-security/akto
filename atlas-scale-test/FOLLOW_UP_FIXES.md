@@ -494,6 +494,61 @@ pick up cold.
   **`fetchUsersAndDevicesSummary`/`fetchDeviceEndpointsSummary` have the identical uncached
   findAll+classify pattern and would hit the same problem at this account's scale** — not fixed
   here (out of scope for this round), tracked under "Duplication & efficiency" below.
+- **`fetchAgenticAssetsStats` still took 8s+ on Atlas Scale Test even with the classification cache
+  above warm**, reported right after that fix shipped. Traced to `fetchViolationsMonthlyTotals` — a
+  separate HTTP round-trip to the threat-detection-backend, called once for the overall trend PLUS
+  once per top-5 violated asset (host-filtered) — 6 total, issued **sequentially**, each ~1-1.5s at
+  this account's scale. None of this touches `classifyAllGroups`, so the earlier cache didn't help
+  it at all. Fixed by firing all 6 concurrently via `CompletableFuture` (they're independent —
+  nothing downstream needs one before another) instead of one after another. Verified live: a
+  warm-classification-cache stats call dropped from what would've been several seconds of
+  sequential HTTP to ~1.06s; page still renders correctly, no new console errors.
+- **`fetchAgenticAssetsSummary`'s request payload measured ~650KB on Atlas Scale Test** — asked
+  directly why `trafficMap`/`riskScoreMap`/etc. get re-POSTed on every call. Captured and inspected
+  a real request body: `trafficMap`/`riskScoreMap` (5,566 entries each) and `sensitiveMap` (320
+  entries) are legitimate per-request state (account-wide maps the frontend already fetches/caches
+  for other pages too), but `maliciousSkillKeys` — 14,218 `"<collectionId>|<skillName>"` string
+  entries, ~500KB+ — turned out to be the single largest contributor. It's server-computed data
+  (`fetchAgenticSkillData`, same `AgenticObserveAction` class) that the frontend fetches once into
+  its own `skillRiskScoreCache` and then had to re-POST the *entire account-wide set* back into
+  `fetchAgenticAssetsSummary` on every paginated request, purely so that endpoint could check Set
+  membership for the current page's ~50-100 rows. Fixed by adding `getOrBuildSkillData()` — a
+  per-account cache mirroring `getOrBuildClassification`'s exact shape/TTL/sweep — and reading
+  `maliciousSkillKeys` from it directly instead of the client-supplied field; removed the now-dead
+  field and stopped sending it from both `AgenticAssetsPage.jsx` and `Endpoints.jsx` (their own
+  `fetchAndCacheSkillApiData` calls are unchanged — still needed for `skillScoreMap`/
+  `misconfiguredSkills`, which stay client-derived; only `maliciousSkillKeys` moved server-side).
+  Verified live: payload dropped from ~650KB to ~220KB (confirmed via a captured request body — no
+  more `maliciousSkillKeys` field, `trafficMap`/`riskScoreMap`/`sensitiveMap` unchanged), "Malicious"
+  badges and the Tag filter's "Malicious Skill" branch verified still correct on both layouts (raw
+  API response showed `isMalicious: true` on exactly the expected skill rows —
+  `codex-workspace-sync`/`skill-creator`/`repo-onboarding-assistant`/etc.).
+  **`trafficMap`/`riskScoreMap` were deliberately NOT moved server-side** — they come from
+  `ApiCollectionsAction.fetchRiskScoreInfo`/`ApiInfoDao.getLastTrafficSeen`, a different Action
+  class's own aggregation pipeline (itself non-trivial — the non-hardcoded-account branch does a
+  full `unwind`+`sort`+`group` over `api_info`). Computing them inside `AgenticObserveAction`
+  instead would mean either duplicating that pipeline or reaching across Action classes, and
+  wouldn't reduce total system cost since the same aggregation has to run somewhere — it would only
+  relocate who pays for it, unlike `maliciousSkillKeys` which was a genuine repeated-round-trip of
+  data this same class already owns. Flagged as a real but lower-value, higher-risk follow-up if
+  the remaining ~220KB (mostly these two maps) is still a problem in practice.
+- **`getAllCollectionsBasic` (56MB on Atlas Scale Test) still fires when clicking a row — but only
+  on the legacy layout, not the new one.** Verified both empirically: a new-layout row click only
+  fires `fetchAgenticAssetDetail` (no `getAllCollectionsBasic` at all); a legacy-layout row click
+  navigates to Inventory (`buildAgenticInventoryFilterForRow` + `navigate`), and Inventory
+  (`ApiCollections.jsx`) has its own independent, pre-existing mount-time `getAllCollectionsBasic`
+  fetch, gated by a `hasValidCache` check requiring `PersistStore.allCollections` to already be
+  non-empty. That cache used to get silently warmed by `Dashboard.jsx`'s own eager
+  `fetchAllCollections()` bootstrap — the exact 83MB `getAllCollections()` call removed earlier this
+  round by excluding the legacy Agentic Assets route from it. Removing that eager, page-wide waste
+  means Inventory can no longer assume the cache is warm, so it now pays its own (unrelated, already
+  5-minute-cached) full-collections cost lazily, only when a user actually navigates there — a
+  strict improvement over eagerly paying it on every Agentic Assets page load regardless of whether
+  the user clicks through. Not treated as a bug to fix: Inventory's own architecture (needs the full
+  account's collections to render, unless it's redesigned around its own arriving `?filters=` query
+  instead of always fetching everything) is out of scope here — it's a widely-shared page used well
+  beyond agentic flows, and a scoped/paginated-on-arrival rewrite of it is a real, separate,
+  higher-risk initiative, not a quick patch.
 
 ## High priority — wrong output today
 
