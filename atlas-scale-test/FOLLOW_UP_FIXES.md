@@ -411,6 +411,38 @@ pick up cold.
   Verified live on Atlas Scale Test (25,890 collections): a clean page load fires zero
   `getAllCollectionsBasic` calls, while the new attribution call returns correct real counts
   (e.g. `{"1738051842": {"critical":43,"high":896,"medium":120,"low":0}}`).
+- **Legacy Agentic Assets page (`Endpoints.jsx`, `/agentic-assets-legacy`) had the same anti-pattern
+  as the new layout before this branch's earlier fixes**: one mount-time
+  `fetchAndCacheAgenticCollectionsBundle` (full `getAllCollectionsBasic`) into a client-paginated
+  `GithubSimpleTable`. User explicitly asked for this page to be fixed too. Rewrote it to
+  `GithubServerTable` with real `skip`/`limit` against `fetchAgenticAssetsSummary` (same endpoint
+  the new layout uses), the leaner `fetchAndCacheAgenticTrafficRiskBundle` bootstrap instead of the
+  full collections bundle, async skill-risk enrichment patched in via a `refreshKey` bump (replacing
+  the old page's bespoke `applySkillRiskScores`/`skillEnrichVersion` client-patch mechanism, no
+  longer needed since `isMalicious`/risk scores are now server-computed), and a row-click handler
+  that lazily calls `fetchAgenticAssetDetail` for the one clicked asset before navigating to
+  Inventory (kept navigate-to-Inventory behavior, no flyout added — user's explicit choice).
+  Restored `tagKey`/`rawTagValues` on `GroupSummary` (removed in the response-shrink fix above as
+  apparently dead) since this page's Inventory-filter building needs them for agent rows — exposed
+  via the existing lazy `fetchAgenticAssetDetail` endpoint, not the eager summary (cheap/bounded,
+  doesn't reopen the 16MB problem). Added a `sensitiveTypes` accumulator (server-side, from the
+  already-fetched sensitive-data map) and a `totalEndpoints` stat so the page's "Sensitive data"
+  column and endpoint-count card have real values instead of being dropped.
+  Two bugs found live-testing this before it shipped, both fixed: (1) `GithubServerTable` takes its
+  filter-chip choices from a separate `filters` prop, not from `headers`' `filterKey`/`showFilter` —
+  the Tag (Malicious/Misconfigured) facet was rendering as a chip-less no-op; added a `filtersDef`
+  memo (`{key: "assetTags", label: "Tag", choices: [...]}`) matching `UsersAndDevices.jsx`'s own
+  precedent. (2) `GithubServerTable.handleSort` expects `sortOptions[].columnIndex` to be the
+  heading's 0-based array position **+ 1** (matches this same file's shared default `sortOptions`
+  export, columnIndex 2/4/5/7 for Name/Endpoints/RiskScore/LastTraffic) — the new page-local
+  `sortOptions` used the raw position (1/3/4/6), so clicking any sortable column header threw
+  `Cannot read properties of undefined (reading 'value')`. Verified live on "My account": table
+  numbers match the new layout exactly for the same account (777/AI Agents 24/MCP Servers 20/
+  LLMs 0/Skills 733), zero `getAllCollectionsBasic` calls, Tag filter returns exactly the one
+  Misconfigured row ("Claude CLI", "Showing 1-1 of 1"), Name-column sort reorders correctly with no
+  console errors, and row-click on both an agent row ("Cursor" → `envType__mcp-client=cursor`) and
+  a service row ("default" MCP Server → hostName-list filter) navigates to Inventory with the
+  correct filter.
 
 ## High priority — wrong output today
 
