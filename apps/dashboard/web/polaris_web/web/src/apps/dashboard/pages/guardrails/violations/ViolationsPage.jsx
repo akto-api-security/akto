@@ -884,6 +884,15 @@ function Violations() {
                 // both counts the same way the tabs themselves do: skillEvaluationMode/configEvaluationMode
                 // "only", limit 1, read .total. Atlas (ENDPOINT) only — undefined elsewhere skips the calls.
                 const wantsPartitionCounts = isEndpointSecurityCategory();
+                // getDailyThreatActorsCount's totalActiveStatus (below, dailyResp) excludes /skills/
+                // events server-side (ThreatUtils.excludeSkillEndpointFilter in ThreatActorService.java)
+                // but has NO equivalent config-exclusion filter anywhere in that file, so it overcounts
+                // Active by however many /config/ (Misconfigured Settings) events exist — the table
+                // itself (fetchSuspectSampleData with skillEvaluationMode/configEvaluationMode:
+                // "exclude") excludes both and is the source of truth. Rather than touch the shared
+                // ThreatActorService backend (which also feeds 5+ other dashboard widgets), get the
+                // corrected Active/Under Review/Ignored counts the same way the grid does, scoped to
+                // just this page.
                 const results = await Promise.allSettled([
                     threatDetectionApi.fetchCountBySeverity(startTimestamp, endTimestamp, "ACTIVE"),
                     threatDetectionApi.fetchThreatCategoryCount(startTimestamp, endTimestamp, activeStatusValue),
@@ -895,6 +904,15 @@ function Violations() {
                     wantsPartitionCounts
                         ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "ACTIVE", undefined, undefined, undefined, undefined, undefined, false, [], undefined, "only")
                         : Promise.resolve(null),
+                    wantsPartitionCounts
+                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "ACTIVE", undefined, undefined, undefined, undefined, undefined, false, [], "exclude", "exclude")
+                        : Promise.resolve(null),
+                    wantsPartitionCounts
+                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "UNDER_REVIEW", undefined, undefined, undefined, undefined, undefined, false, [], "exclude", "exclude")
+                        : Promise.resolve(null),
+                    wantsPartitionCounts
+                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "IGNORED", undefined, undefined, undefined, undefined, undefined, false, [], "exclude", "exclude")
+                        : Promise.resolve(null),
                 ]);
 
                 const severityResp = results[0].status === 'fulfilled' ? results[0].value : {};
@@ -903,6 +921,9 @@ function Violations() {
                 const topNResp     = results[3].status === 'fulfilled' ? results[3].value : {};
                 const skillsCountResp = results[4].status === 'fulfilled' ? results[4].value : null;
                 const configCountResp = results[5].status === 'fulfilled' ? results[5].value : null;
+                const activeCountResp = results[6].status === 'fulfilled' ? results[6].value : null;
+                const underReviewCountResp = results[7].status === 'fulfilled' ? results[7].value : null;
+                const ignoredCountResp = results[8].status === 'fulfilled' ? results[8].value : null;
                 const skillsEvaluationsCount = skillsCountResp?.total || 0;
                 const misconfiguredSettingsCount = configCountResp?.total || 0;
 
@@ -917,11 +938,15 @@ function Violations() {
                     }
                 });
 
-                // Status counts from daily actors response
+                // Status counts: prefer the corrected, skill+config-excluded totals (activeCountResp
+                // etc.) over dailyResp's raw totalActiveStatus/etc, which overcounts by however many
+                // Misconfigured Settings events exist (see comment above). Falls back to dailyResp
+                // when partition counts aren't applicable (non-Endpoint-Security accounts) or a
+                // request failed.
                 const statusCounts = {
-                    ACTIVE: dailyResp?.totalActiveStatus || 0,
-                    IGNORED: dailyResp?.totalIgnoredStatus || 0,
-                    UNDER_REVIEW: dailyResp?.totalUnderReviewStatus || 0,
+                    ACTIVE: activeCountResp?.total ?? (dailyResp?.totalActiveStatus || 0),
+                    IGNORED: ignoredCountResp?.total ?? (dailyResp?.totalIgnoredStatus || 0),
+                    UNDER_REVIEW: underReviewCountResp?.total ?? (dailyResp?.totalUnderReviewStatus || 0),
                     FIXED: 0,
                 };
 
