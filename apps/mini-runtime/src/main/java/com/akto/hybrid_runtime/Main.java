@@ -90,7 +90,8 @@ public class Main {
             debugPrintCounter--;
             loggerMaker.warn(o.toString());
         }
-    }
+    }   
+
     public static boolean isOnprem = false;
     static long lastLogSyncOffsetMRS;
     static boolean syncImmediately = false;
