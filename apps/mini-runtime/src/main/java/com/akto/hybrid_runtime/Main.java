@@ -68,16 +68,13 @@ public class Main {
     public static final String VXLAN_ID = "vxlanId";
     public static final String VPC_CIDR = "vpc_cidr";
     public static final String ACCOUNT_ID = "account_id";
-    
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.RUNTIME);
 
     static {
         DataActorFactory.setModuleType("MINI_RUNTIME");
     }
 
     public static final DataActor dataActor = DataActorFactory.fetchInstance();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.RUNTIME);
-
-    
     private static final ClientLayer clientLayer = new ClientLayer();
 
     // this sync threshold time is used for deleting sample data
@@ -321,7 +318,7 @@ public class Main {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
         String topicName = KafkaConfig.getTopicName();
-        String kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "kafka1:19092");
+        String kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "kafka1:29092");
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
             loggerMaker.infoAndAddToDb("is_kubernetes: true");
