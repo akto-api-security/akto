@@ -655,18 +655,18 @@ const settingRequests = {
             data: {}
         })
     },
-    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, allowedFeaturesForUser) {
+    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled) {
         return request({
             url: '/api/createCustomRole',
             method: 'post',
-            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole, allowedFeaturesForUser }
+            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled }
         })
     },
-    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, allowedFeaturesForUser) {
+    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled) {
         return request({
             url: '/api/updateCustomRole',
             method: 'post',
-            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole, allowedFeaturesForUser}
+            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled}
         })
     },
     deleteCustomRole(roleName) {
@@ -954,13 +954,6 @@ const settingRequests = {
     async resetCollectionAccessTypes() {
         return await request({
             url: '/api/resetCollectionAccessTypes',
-            method: 'post',
-            data: {}
-        })
-    },
-    getAllowedFeaturesForRBAC() {
-        return request({
-            url: '/api/allowedFeaturesForRBAC',
             method: 'post',
             data: {}
         })
