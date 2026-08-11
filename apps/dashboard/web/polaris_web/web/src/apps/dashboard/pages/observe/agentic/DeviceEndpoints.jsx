@@ -52,7 +52,7 @@ function TopSection({ summary }) {
                 <VerticalStack>
                     <AgenticStatsCard
                         title="Total Endpoints"
-                        total={summary?.deviceCount ?? 0}
+                        total={summary?.totalEndpoints ?? 0}
                         delta={summary?.deltaEndpoints ?? 0}
                         sparklineCounts={sparklines.endpoints}
                         sparklineColor="#7C3AED"
@@ -365,9 +365,14 @@ function TableSection({ deviceFlatData, agentRiskData, collections, startTimesta
             setDeviceFlyout({ device: data, agents: findAgentsForDevice(deviceId), hostNames: getHostNamesForDevice(deviceId, collections) });
             return;
         }
-        // Child (agentic asset) rows — open on the Agentic Assets page with flyout pre-selected
+        // Child (agentic asset) rows — open on the Agentic Assets page with flyout pre-selected,
+        // scoped to just this device's own collection(s) via collectionIds so the flyout's
+        // Devices/Components tabs reflect this one device instead of every device using the asset.
         const assetId = data.rawServiceName || data.endpoint;
         const params = new URLSearchParams({ asset: assetId, type: data.type || "" });
+        if (data.collectionIds?.length) {
+            params.set("collectionIds", data.collectionIds.join(","));
+        }
         window.open(`/dashboard/observe/agentic-assets?${params}`, "_blank");
     }, [findAgentsForDevice]);
 

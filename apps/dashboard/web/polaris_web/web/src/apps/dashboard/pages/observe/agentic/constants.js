@@ -809,7 +809,7 @@ function buildTeamGroupsForAsset(group, usernameMap, userMetadataMap) {
     return Object.entries(teamCounts).map(([name, count]) => ({ name, count }));
 }
 
-function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}, trafficMap = {}) {
+export function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}, trafficMap = {}) {
     const byDevice = new Map();
     (group.collections || []).forEach((c) => {
         const hostName = c.hostName || c.displayName || c.name;
@@ -846,6 +846,30 @@ function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}, traffi
         riskScore: d.riskScore > 0 ? Math.round(d.riskScore * 10) / 10 : null,
         lastSeen: d.lastSeenEpoch > 0 ? func.formatChatTimestamp(d.lastSeenEpoch) : "-",
     }));
+}
+
+// Unique MCP/service names an AI Agent talks to, derived from a set of collections' hostnames
+// (excluding the agent's own name and connector-ingested collections). Shared by the org-wide
+// group builder and by device-scoped recomputation (deep links narrowed to one endpoint).
+export function computeAgentMcpServers(collections, agentKey) {
+    const mcpNames = new Set();
+    const key = agentKey?.toLowerCase();
+    (collections || []).forEach((c) => {
+        // Skip collections ingested via an external connector (e.g. MICROSOFT_DEFENDER /
+        // source=DEFENDER) — these represent the agent itself via the connector, not an MCP server.
+        const isConnectorIngested = (c.envType || []).some((t) =>
+            t.keyName === "connector" || (t.keyName === "source" && t.value === "DEFENDER")
+        );
+        if (isConnectorIngested) return;
+        const hostName = c.hostName || c.displayName || c.name;
+        const serviceName = extractServiceName(hostName);
+        // Canonicalize before comparing — hostnames carry the raw ai-agent tag variant (e.g.
+        // "claude-desktop"), while `agentKey` is the group's canonical alias key (e.g. "claude1");
+        // comparing them directly never recognized the agent's own hostname as "itself",
+        // miscounting it as a phantom extra MCP server.
+        if (serviceName && resolveClientKey(serviceName.toLowerCase()) !== key) mcpNames.add(serviceName);
+    });
+    return [...mcpNames];
 }
 
 function uniqueSkillNamesForGroup(group) {
@@ -1041,20 +1065,8 @@ export function buildAgenticAssetsPageData(
             };
         }
         if (group.rowType === ROW_TYPES.AGENT && group.clientType === CLIENT_TYPES.AI_AGENT) {
-            const mcpNames = new Set();
-            const agentKey = group.groupKey?.toLowerCase();
-            (group.collections || []).forEach((c) => {
-                // Skip collections ingested via an external connector (e.g. MICROSOFT_DEFENDER /
-                // source=DEFENDER) — these represent the agent itself via the connector, not an MCP server.
-                const isConnectorIngested = (c.envType || []).some((t) =>
-                    t.keyName === "connector" || (t.keyName === "source" && t.value === "DEFENDER")
-                );
-                if (isConnectorIngested) return;
-                const hostName = c.hostName || c.displayName || c.name;
-                const serviceName = extractServiceName(hostName);
-                if (serviceName && serviceName.toLowerCase() !== agentKey) mcpNames.add(serviceName);
-            });
-            if (mcpNames.size) flatRow.mcpServers = [...mcpNames];
+            const mcpServers = computeAgentMcpServers(group.collections, group.groupKey);
+            if (mcpServers.length) flatRow.mcpServers = mcpServers;
         }
 
         agenticTreeData.push(treeRow);
