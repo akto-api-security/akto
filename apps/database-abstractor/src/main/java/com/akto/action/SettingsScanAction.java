@@ -220,7 +220,7 @@ public class SettingsScanAction extends ActionSupport {
         findings = new ArrayList<>();
         for (Map<String, Object> finding : rawFindings) {
             if ("disableAllHooks".equals(finding.get("fieldPath")) && disableAllHooksIsFalse) {
-                logger.info("[SettingsScan] Dropping disableAllHooks finding — settingsJson has disableAllHooks: false", LogDb.DB_ABS);
+                logger.debug("[SettingsScan] Dropping disableAllHooks finding — settingsJson has disableAllHooks: false", LogDb.DB_ABS);
                 continue;
             }
             if (!fieldPresentInConfig(finding.get("fieldPath"))) {
