@@ -67,7 +67,7 @@
         <!-- Generic AI-provider guardrail webhook: provider is the {1} path variable.
              Parses that provider's format (adapter registry), always runs guardrails
              + ingests. Adding a provider = one new adapter, no struts change. -->
-        <action name="api/v1/webhooks/*/guardrail" class="com.akto.action.ProviderGuardrailAction" method="guardrail">
+        <action name="api/v1/webhooks/{provider}/guardrail/?" class="com.akto.action.ProviderGuardrailAction" method="guardrail">
             <param name="provider">{1}</param>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
