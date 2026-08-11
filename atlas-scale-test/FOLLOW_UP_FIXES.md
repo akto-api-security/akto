@@ -654,6 +654,28 @@ pick up cold.
   the leaner sibling `fetchEndpointShieldUsernameMap()`, which only fires the module-info call —
   confirmed live that `fetchAgenticUsers` no longer appears in the network log and usernames still
   resolve correctly (john.smith, liam.patel, rakshaksatsangi, jane.doe).
+- **Follow-up asked again, same round: why does the asset endpoints page still call
+  `getLastTrafficSeen`/`getRiskScoreInfo`/`getSensitiveInfoForCollections` at all, if the new
+  `fetchAgenticAssetEndpointsPage` endpoint is supposed to be the one computing everything?** Traced
+  each: `getLastTrafficSeen`/`getRiskScoreInfo` (`ApiCollectionsAction.java:1066-1139`) aggregate over
+  `ApiInfoDao`, grouped by `apiCollectionId` — naturally per-collection, unscoped only because those
+  endpoints take no request params; `getSensitiveInfoForCollections`
+  (`ApiCollectionsAction.java:1034-1048`) aggregates over `SingleTypeInfoDao`, whose own
+  `generateFilterForSubtypes` helper already accepts a `customFilter` Bson, just always called with
+  `Filters.empty()`. This is the exact `[ ]` "Duplication & efficiency" bullet below
+  ("Client-side full-account maps... re-POSTed in full on every grid interaction") — previously
+  flagged and deferred, but for a single-asset page (vs. a list page amortizing one account-wide
+  fetch across hundreds of rows) the scope mismatch is disproportionate enough to fix directly rather
+  than defer again. Added `ApiInfoDao.getLastTrafficSeenForCollections`/`getRiskScoreForCollections`
+  and `SingleTypeInfoDao.getSensitiveSubtypesDetectedForCollections` — each a `Filters.in
+  (collectionIds)` sibling of the existing unscoped method, not a modification of it (zero risk to
+  other unscoped callers). `fetchAgenticAssetEndpointsPage` now computes all three itself, scoped to
+  its own `apiCollectionIds`; the frontend no longer fetches or reposts any of the three.
+  `usernameMap` (Endpoint Shield) stays client-fetched — its backing `ModuleInfo` registry is bounded
+  by physical device count, not collection count, and is already small/cheap regardless of scope, so
+  scoping it would be new plumbing for little payoff. Verified live: identical risk/sensitive/traffic
+  values before and after the change (including the misconfigured/malicious/skill-count badges on
+  expanded child rows), zero console errors, and all three old calls gone from the network log.
 
 ## High priority — wrong output today
 
