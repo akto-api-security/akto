@@ -42,14 +42,14 @@ public class Utils {
         if( o == null ){
             return;
         }
-        logger.infoAndAddToDb(o.toString());
+        logger.warnAndAddToDb(o.toString());
     }
 
     public static void printDebugHostLog(Object o){
         if( o == null ){
             return;
         }
-        logger.infoAndAddToDb("Found debug host: " + o.toString());
+        logger.warnAndAddToDb("Found debug host: " + o.toString());
     }
 
 
@@ -177,7 +177,7 @@ public class Utils {
                         if (lastFileUrls == null || !lastFileUrls.equals(fileUrls)) {
                             DEBUG_URLS_SET = fileUrls;
                             DEBUG_HOSTS_SET = fileUrls;
-                            logger.infoAndAddToDb("DEBUG_URLS updated from file: " + DEBUG_URLS_SET.toString());
+                            logger.warnAndAddToDb("DEBUG_URLS updated from file: " + DEBUG_URLS_SET.toString());
                             lastFileUrls = new HashSet<>(fileUrls);
                         }
                     }
@@ -234,7 +234,7 @@ public class Utils {
         } else {
             ret = new HashSet<>(Arrays.asList(debugUrls.split(",")));
         }
-        logger.info("DEBUG_URLS initialized with: " + ret.toString());
+        logger.warn("DEBUG_URLS initialized with: " + ret.toString());
         return ret;
     }
 
