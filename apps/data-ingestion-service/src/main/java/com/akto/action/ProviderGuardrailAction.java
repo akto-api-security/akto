@@ -104,7 +104,7 @@ public class ProviderGuardrailAction extends ActionSupport {
      * model, actor) is carried through so it is recorded and available to policies.
      */
     private Map<String, Object> buildEnvelope(ParsedRequest frame) {
-        String host = provider.toLowerCase() + ".agentic";
+        String host = buildAgentHost(frame);
 
         Map<String, Object> requestHeaders = new HashMap<>();
         requestHeaders.put("host", host);
@@ -191,6 +191,60 @@ public class ProviderGuardrailAction extends ActionSupport {
             return Boolean.parseBoolean(val.toString());
         }
         return true; // fail-open when no verdict present
+    }
+
+    /**
+     * Agent collection hostname, built server-side as {emailSlug}.ai-agent.{app}.
+     * Mirrors the client-side endpoint-shield convention
+     * ({deviceLabel}.ai-agent.{agentName}, see device.go GetAgentCollectionName)
+     * but uses the incoming email as the slug because the device name and
+     * machine-id are not available in the webhook — the machine-id hash suffix
+     * is intentionally omitted.
+     */
+    private static String buildAgentHost(ParsedRequest frame) {
+        String emailSlug = slugify(extractEmail(frame.actor));
+        if (emailSlug.isEmpty()) {
+            emailSlug = "unknown";
+        }
+        return emailSlug + ".ai-agent." + normalizeApp(frame.application);
+    }
+
+    private static String extractEmail(Map<String, Object> actor) {
+        if (actor == null) {
+            return null;
+        }
+        Object email = actor.get("email_address");
+        if (email == null) {
+            email = actor.get("email");
+        }
+        return email != null ? email.toString() : null;
+    }
+
+    /** Lowercase; each run of non-alphanumerics -> "-"; trim leading/trailing "-". */
+    private static String slugify(String s) {
+        if (s == null) {
+            return "";
+        }
+        return s.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("(^-+|-+$)", "");
+    }
+
+    /**
+     * Map source.application to the collection's app segment. Advisory open
+     * string: known values are mapped, anything else passes through slugified,
+     * and it is never rejected.
+     */
+    private static String normalizeApp(String application) {
+        if (application == null || application.isEmpty()) {
+            return "unknown";
+        }
+        String a = application.toLowerCase();
+        if (a.equals("claude-code") || a.startsWith("claude-cli")) {
+            return "claude-cli";
+        }
+        if (a.equals("claude-ai")) {
+            return "claude-app";
+        }
+        return slugify(a);
     }
 
     private static String resolveAccountId() {
