@@ -1,6 +1,5 @@
 package com.akto.action;
 
-import com.akto.dao.context.Context;
 import com.akto.dao.nhi_governance.NhiIdentityDao;
 import com.akto.dto.nhi_governance.NhiIdentity;
 import com.akto.log.LoggerMaker;
@@ -52,14 +51,14 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
     @Setter private String status;      // tab filter: "Expired" / "Disabled" / null-or-"All"
     @Getter private long total;
 
-    // Mirrors NhiGovernanceViolationsAction.buildBaseMatchConditions — NhiIdentityDao isn't a
-    // AccountsContextDaoWithContextSource like NhiViolationDao, but NhiIdentity still carries its
-    // own contextSource field, so scope explicitly here too rather than assume the DAO does it.
+    // Unlike NhiGovernanceViolationsAction.buildBaseMatchConditions, this does NOT add a
+    // contextSource filter: NhiIdentityDao extends the plain AccountsContextDao (not
+    // AccountsContextDaoWithContextSource like NhiViolationDao), which never auto-scopes by
+    // contextSource for any of its queries — including the existing, unpaginated
+    // fetchNhiIdentities() below, which has never filtered by it either. Matches the date-range
+    // filter that method already applies.
     private List<Bson> buildIdentityMatchConditions() {
         List<Bson> matchConditions = new ArrayList<>();
-        if (Context.contextSource.get() != null) {
-            matchConditions.add(Filters.eq(NhiIdentity.CONTEXT_SOURCE, Context.contextSource.get().name()));
-        }
         if (startTimestamp > 0 && endTimestamp > 0) {
             matchConditions.add(Filters.gte(NhiIdentity.CREATED_AT, startTimestamp));
             matchConditions.add(Filters.lte(NhiIdentity.CREATED_AT, endTimestamp));
