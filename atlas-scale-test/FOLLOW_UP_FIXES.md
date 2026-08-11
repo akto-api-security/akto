@@ -354,21 +354,39 @@ pick up cold.
   (connection/promise explosion client-side, not per-query cost). All three cap at 300 ids.
   Verified by calling the old and new endpoints directly (authenticated fetch) against 6 real
   collection ids: identical result counts for every id.
-- **Two more issues found while diagnosing the flyout fan-out above, left unfixed (out of scope for
-  that fix, noted here for a dedicated pass):**
-  - The Agentic Assets **new-layout grid renders 0 rows** on every account tested (Atlas Scale Test
-    *and* Acorns Demo) — `fetchAgenticAssetsSummary` returns `{"rows":[],"total":0}` even though the
-    account-wide summary cards on the same page show real data (e.g. "Violations: 2,355"). Not
-    caused by anything in this fix (pre-existing, reproduces on an untouched code path) — one
-    console log showed a `403` on `getAllCollectionsBasic` around the same time, possibly an
-    RBAC/timing issue for the session used to test rather than a hard bug (a direct authenticated
-    call to the same endpoint from the same session succeeded with 200 moments later). Blocked live
-    UI verification of the flyout fix above (had to verify via direct API calls instead of an actual
-    row click) — worth a dedicated investigation before relying on the new layout for any account.
-  - `fetchAgenticAssetsSummary`'s `onServerFetch` re-POSTs `trafficMap`/`riskScoreMap`/`sensitiveMap`/
-    `usernameMap`/`userMetadataMap` in full on **every** grid page turn — one observed request body
-    was 722KB for a 49-collection account. Already listed below under "Duplication & efficiency" as
-    a known pattern; this is a concrete size data point for that item, not a new finding.
+- ~~The Agentic Assets new-layout grid renders 0 rows on every account tested~~ — **correction, not a
+  real bug**: this was logged earlier in this doc as a suspected pre-existing/RBAC issue, but it was
+  actually a testing mistake on my part. `ApiCollectionsDao extends AccountsContextDaoWithRbac`,
+  which scopes every query by the request's `x-context-source` header (derived from the top-left
+  product-category switcher — "API Security" -> `API`, "Akto ATLAS" -> `AGENTIC`). I'd been testing
+  the Agentic Assets page while the category switcher was still on "API Security" (its default),
+  so `getAllCollectionsBasic`/`fetchAgenticAssetsSummary` correctly scoped to that account's ~49
+  *API*-context collections — none of which are agentic (no browser-llm/asset tags), hence 0
+  classified groups. Switching the category to "Akto ATLAS" before testing immediately showed real
+  data (795/777 assets depending on account, real violations, working flyout). No code fix needed;
+  flagging so nobody re-diagnoses this as a backend bug — **always set the product category to
+  "Akto ATLAS" before testing any agentic page.**
+- `fetchAgenticAssetsSummary`'s `onServerFetch` re-POSTs `trafficMap`/`riskScoreMap`/`sensitiveMap`/
+  `usernameMap`/`userMetadataMap` in full on **every** grid page turn — one observed request body
+  was 722KB for a 49-collection account. Already listed below under "Duplication & efficiency" as
+  a known pattern; this is a concrete size data point for that item, not a new finding.
+- **`fetchAgenticAssetsSummary`'s response measured at 16MB for a single 50-row page** (Atlas Scale
+  Test). User pushed back on treating this as "just cache/paginate it" and asked what the grid
+  actually needs from the response. Traced every field in `GroupSummary.toSummaryResponse()` plus
+  the per-row `devices` list `fetchAgenticAssetsSummary` separately attached, and found the main
+  grid only ever reads small scalars — the bulk of the payload was per-group member lists
+  (`hostNames`/`collectionIds`/`skillNames`/`mcpServers`, up to ~25k entries for one giant group,
+  used only by the flyout for the ONE asset a user opens) and the raw per-device breakdown (up to
+  hundreds of entries per row, used only to derive a small Teams breakdown + an AI-interactions
+  total). Removed all of it from the paginated response; added `violations`/`isMalicious`/`groups`/
+  `aiInteractions` precomputed server-side instead (the server already has this data in memory
+  during classification — no new queries), and a new `fetchAgenticAssetDetail` lazy per-asset
+  endpoint (`groupKey`+`rowType` -> the removed fields, plus `devices`) that the flyout calls once
+  when a user actually opens an asset, behind a brief loading spinner — unchanged from every tab
+  component's perspective, just populated one render later. Also discovered mid-fix: the "0 rows"
+  item above, which blocked verification until resolved. Verified live: a 50-row page returns
+  compactly (no longer needs saving to a file, unlike the prior 16MB/8.6MB intermediate responses);
+  a "Cursor" row's precomputed `violations:{medium:73}` matches its flyout's Violations tab exactly.
 - **`getAllCollectionsBasic` (mount-time full-account fetch, `ApiCollectionsAction.fetchAllCollectionsBasic`
   — `Filters.empty()`, no skip/limit, ~19 fields/doc, several MB on large accounts) eliminated
   entirely from the Agentic Assets page**, not just cached or slimmed. User pushed back on
