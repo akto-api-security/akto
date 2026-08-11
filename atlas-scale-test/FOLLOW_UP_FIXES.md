@@ -570,10 +570,25 @@ pick up cold.
   effect. Verified live: opening the flyout now fires only `fetchAgenticAssetDetail` +
   `fetchApiInfosFromSTIs` (zero apiInfo/audit calls); Overview's stats (1000/12/40/1/16129, matching
   the reported screenshot exactly) and Components tab both still render correctly, no new console
-  errors. **Residual, smaller inefficiency**: for MCP Server/LLM assets, the STI batch itself still
-  gets fetched twice if the user opens Components (once lean by the flyout, once full by
-  `McpComponentsView`) — not chased further this round since the expensive apiInfo/audit duplication
-  (the actual complaint) is gone; only the comparatively cheap STI call remains doubled.
+  errors. **Residual, smaller inefficiency (now fixed, see below)**: for MCP Server/LLM assets, the
+  STI batch itself still got fetched twice if the user opened Components (once lean by the flyout,
+  once full by `McpComponentsView`).
+- **Follow-up to the above**: user asked directly why the flyout needed a live STI fetch at all,
+  given `fetchAgenticComponentsPage` already proves the same STI data can be queried server-side,
+  scoped to one asset's own collections. It can — `fetchAgenticAssetDetail` now runs the identical
+  `ApiCollectionsDao.fetchEndpointsInCollection` aggregation itself (only for "agent"/"service"/"llm"
+  rows; "skill" rows need neither) and returns `hasInlineLlm`/`inlineToolNames`/`mcpComponentCount`
+  directly, computed with the same url-based fallback bucketing (`bucketFromUrl`/`mcpDisplayName`,
+  already Java-ported for `fetchAgenticComponentsPage`) rather than shipping raw STI endpoint lists
+  to the browser at all. `AgenticAssetFlyout.jsx`'s two STI-fetching effects are gone entirely,
+  replaced by a synchronous `useMemo` over fields already present on the fetched asset — removed the
+  now-dead `fetchCollectionStiOnlyBatch` helper and the JS `isAgentLlmMessagesUrl` utility (zero
+  remaining callers). Verified live: opening the "Claude CLI" flyout (1000 collections) now fires
+  only `fetchAgenticAssetDetail` — zero STI calls of any kind — with Overview stats still matching
+  exactly (1000/12/40/1/16129). Cross-checked an MCP Server asset's server-computed
+  `mcpComponentCount=0` against `McpComponentsView`'s independent, untouched full-detail fetch
+  ("No tools, resources, prompts or skills found") to confirm the fallback bucketing agrees with
+  ground truth rather than just returning a plausible-looking number.
 
 ## High priority — wrong output today
 
