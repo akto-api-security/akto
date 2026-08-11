@@ -549,6 +549,31 @@ pick up cold.
   instead of always fetching everything) is out of scope here — it's a widely-shared page used well
   beyond agentic flows, and a scoped/paginated-on-arrival rewrite of it is a real, separate,
   higher-risk initiative, not a quick patch.
+- **Opening the new-layout asset flyout (screenshot: "Claude CLI", 1000 devices) unconditionally
+  fetched full per-endpoint apiInfo + MCP-audit data for every one of its collections, just to
+  render the Overview tab's 2 inline counts and a handful of graph nodes.** `AgenticAssetFlyout.jsx`
+  fired `fetchCollectionStiBundlesBatch` (3 batched calls: `fetchApiInfosFromSTIs`/
+  `fetchApiInfosForCollection`/`fetchMcpAuditInfoByCollection`) on mount for AI Agent and MCP
+  Server/LLM assets, purely to compute an inline-LLM/Tool count (`buildAgentInlineTopologyComponents`/
+  `buildMcpComponentsFromStis`) — and once a user opened Components, `AgentComponentsView`'s MCP-
+  tools drill-down / `McpComponentsView`'s top-level list independently re-fetched the *same* 3-way
+  bundle again. Traced what each downstream consumer actually reads: the risk score (`apiInfoList`)
+  and MCP-audit classification (`auditRows`) only matter for the Components tab's detailed listing —
+  Overview only needs endpoint *names* (does `/v1/messages*` exist? what are the distinct `/tool/*`
+  names?), answerable from the STI batch alone. Added `fetchCollectionStiOnlyBatch` (1 request
+  instead of 3) and switched both of the flyout's mount-time effects to it, relying on the existing
+  url-based fallback bucketing (`bucketFromUrl`) to correctly classify plain `/tool/*` paths as
+  "Tool" without audit data. `AgentComponentsView`'s own top-level list was already lean (server-
+  paginated `fetchAgenticComponentsPage`, not this bundle at all) — only its MCP-tools drill-down and
+  `McpComponentsView`'s top-level list still use the full bundle, and correctly so (genuine per-
+  component risk/violations detail), just no longer duplicated by the parent's own Overview-feeding
+  effect. Verified live: opening the flyout now fires only `fetchAgenticAssetDetail` +
+  `fetchApiInfosFromSTIs` (zero apiInfo/audit calls); Overview's stats (1000/12/40/1/16129, matching
+  the reported screenshot exactly) and Components tab both still render correctly, no new console
+  errors. **Residual, smaller inefficiency**: for MCP Server/LLM assets, the STI batch itself still
+  gets fetched twice if the user opens Components (once lean by the flyout, once full by
+  `McpComponentsView`) — not chased further this round since the expensive apiInfo/audit duplication
+  (the actual complaint) is gone; only the comparatively cheap STI call remains doubled.
 
 ## High priority — wrong output today
 
