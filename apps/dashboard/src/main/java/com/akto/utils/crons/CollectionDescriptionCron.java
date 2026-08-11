@@ -29,7 +29,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.task.Cluster;
 import com.akto.usage.UsageMetricCalculator;
-import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -58,9 +57,9 @@ public class CollectionDescriptionCron {
     private static final int MAX_SAMPLE_ENDPOINTS = 2;
     private static final int MAX_SAMPLE_CHARS = 600;
 
-    // Gets first crack at the budget each run, before the normal account sweep - everyone else still
-    // gets processed after, just with whatever budget this account didn't use.
-    private static final int PRIORITY_ACCOUNT_ID = 1779231193;
+    // Explicit allowlist - this cron no longer sweeps every account, only these. Add more IDs here as
+    // needed.
+    private static final List<Integer> ALLOWED_ACCOUNT_IDS = Collections.singletonList(1779231193);
 
     // Skill/MCP-server collections can have hundreds of distinct skills or tools - sampled wide enough
     // to report the true count, but only a slice of names is ever put in a prompt.
@@ -92,15 +91,12 @@ public class CollectionDescriptionCron {
             ExecutorService pool = Executors.newFixedThreadPool(CONCURRENCY);
 
             try {
-                processAccountCollections(PRIORITY_ACCOUNT_ID, remaining, pool);
-
-                AccountTask.instance.executeTask(account -> {
-                    int accountId = account.getId();
-                    if (accountId == PRIORITY_ACCOUNT_ID) {
-                        return; // already handled above, ahead of the rest of this run
+                for (int accountId : ALLOWED_ACCOUNT_IDS) {
+                    if (remaining.get() <= 0) {
+                        break;
                     }
                     processAccountCollections(accountId, remaining, pool);
-                }, "collection-description-cron");
+                }
             } finally {
                 // Always shut the pool down, even if account iteration itself failed (e.g. the initial
                 // account fetch throwing) - otherwise these threads leak for good, since nothing else
@@ -120,8 +116,7 @@ public class CollectionDescriptionCron {
         }
     }
 
-    /** Sets Context.accountId itself - called both directly (priority account) and from inside
-     *  AccountTask.executeTask (which already sets it, but doing it again here is harmless). */
+    /** Sets Context.accountId itself - called once per account in ALLOWED_ACCOUNT_IDS. */
     private void processAccountCollections(int accountId, AtomicInteger remaining, ExecutorService pool) {
         Context.accountId.set(accountId);
         List<ApiCollection> pending = findPendingCollections(remaining.get());
@@ -163,7 +158,7 @@ public class CollectionDescriptionCron {
         }
     }
 
-    /** Assumes Context.accountId is already set (true inside AccountTask.executeTask's callback). */
+    /** Assumes Context.accountId is already set by the caller. */
     private List<ApiCollection> findPendingCollections(int limit) {
         if (limit <= 0) {
             return new ArrayList<>();
