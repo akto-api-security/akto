@@ -334,6 +334,41 @@ pick up cold.
   was independently confirmed via code review to already be a fully correct, working SSRM
   implementation end-to-end — its own AG Grid usage predates this round of fixes (part of
   `937bfa384a`) and was left as-is; no changes needed or made there.
+- **Opening the Agentic Assets flyout for an "AI Agent"/"MCP Server"/"LLM" row fired 3 network
+  requests PER collection id in that row's group** (`fetchApisFromStis`, `fetchApiInfosForCollection`,
+  `fetchMcpAuditInfoByCollection` via `agenticObserveApi.fetchCollectionStiBundle`,
+  `AgenticAssetFlyout.jsx`'s two top-level effects, plus the same pattern in
+  `McpComponentsView.jsx`/`AgentComponentsView.jsx`'s Components tab). A summary row is a *group*,
+  not one collection — on Atlas Scale Test, agent groups alone span 25,272 of 25,890 collections —
+  so opening one flyout could fire tens of thousands of concurrent requests and choke the browser
+  tab (user-reported: "clicking on entry ... causing too many api calls ... browser got choked").
+  Fixed by adding optional batch variants to the three backend endpoints
+  (`InventoryAction.fetchApiInfosFromSTIs`/`fetchApiInfosForCollection`,
+  `AuditDataAction.fetchMcpAuditInfoByCollection` — each now accepts `apiCollectionIds` alongside
+  the existing single `apiCollectionId`, fully backward compatible) and a new
+  `fetchCollectionStiBundlesBatch` on the frontend: 3 requests total per flyout open regardless of
+  group size, not 3 per collection. `fetchApiInfosForCollection`/`fetchMcpAuditInfoByCollection`
+  batch via true single/two-query `$in` lookups; `fetchApiInfosFromSTIs` loops server-side (its
+  host-based STI pagination has no clean single-query multi-collection form) — same total DB work,
+  but one round trip from the browser instead of N, which is what was actually choking the tab
+  (connection/promise explosion client-side, not per-query cost). All three cap at 300 ids.
+  Verified by calling the old and new endpoints directly (authenticated fetch) against 6 real
+  collection ids: identical result counts for every id.
+- **Two more issues found while diagnosing the flyout fan-out above, left unfixed (out of scope for
+  that fix, noted here for a dedicated pass):**
+  - The Agentic Assets **new-layout grid renders 0 rows** on every account tested (Atlas Scale Test
+    *and* Acorns Demo) — `fetchAgenticAssetsSummary` returns `{"rows":[],"total":0}` even though the
+    account-wide summary cards on the same page show real data (e.g. "Violations: 2,355"). Not
+    caused by anything in this fix (pre-existing, reproduces on an untouched code path) — one
+    console log showed a `403` on `getAllCollectionsBasic` around the same time, possibly an
+    RBAC/timing issue for the session used to test rather than a hard bug (a direct authenticated
+    call to the same endpoint from the same session succeeded with 200 moments later). Blocked live
+    UI verification of the flyout fix above (had to verify via direct API calls instead of an actual
+    row click) — worth a dedicated investigation before relying on the new layout for any account.
+  - `fetchAgenticAssetsSummary`'s `onServerFetch` re-POSTs `trafficMap`/`riskScoreMap`/`sensitiveMap`/
+    `usernameMap`/`userMetadataMap` in full on **every** grid page turn — one observed request body
+    was 722KB for a 49-collection account. Already listed below under "Duplication & efficiency" as
+    a known pattern; this is a concrete size data point for that item, not a new finding.
 
 ## High priority — wrong output today
 
