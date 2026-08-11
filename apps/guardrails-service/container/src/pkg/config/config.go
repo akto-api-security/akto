@@ -54,6 +54,20 @@ type Config struct {
 	// fails open here *before* the caller gives up. <=0 disables the bound.
 	ValidationTimeoutMs int
 
+	// Prompt guard: the pre-inference endpoint AI providers call with a prompt
+	// transcript, expecting an allow/deny guardrail verdict (Anthropic's
+	// "inference hooks", and equivalents from other providers).
+	PromptGuardEnabled bool
+	// PromptGuardClaudeSecret / PrevSecret are the "whsec_..." Standard Webhooks
+	// signing secrets for the Claude provider. Prev is accepted alongside the
+	// current one during a secret rotation's overlap window. Empty disables
+	// signature verification (local/dev, or the pre-first-save connection test).
+	PromptGuardClaudeSecret     string
+	PromptGuardClaudePrevSecret string
+	// PromptGuardMaxBodyBytes bounds the accepted prompt-frame size (transcripts
+	// can be large; Anthropic's ceiling is 10 MB).
+	PromptGuardMaxBodyBytes int
+
 	File FileConfig
 }
 
@@ -116,6 +130,10 @@ func LoadConfig() *Config {
 		NhiEnabled:                       getEnvAsBool("NHI_ENABLED", true),
 		NhiScanIntervalMin:               getEnvAsInt("NHI_SCAN_INTERVAL_MIN", 30),
 		ValidationTimeoutMs:              getEnvAsInt("GUARDRAILS_VALIDATION_TIMEOUT_MS", 2500),
+		PromptGuardEnabled:               getEnvAsBool("PROMPT_GUARD_ENABLED", true),
+		PromptGuardClaudeSecret:          getEnv("PROMPT_GUARD_CLAUDE_SECRET", ""),
+		PromptGuardClaudePrevSecret:      getEnv("PROMPT_GUARD_CLAUDE_PREV_SECRET", ""),
+		PromptGuardMaxBodyBytes:          getEnvAsInt("PROMPT_GUARD_MAX_BODY_BYTES", 10*1024*1024),
 		File: FileConfig{
 			Enabled:          getEnvAsBool("FILE_VALIDATION_ENABLED", false),
 			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),

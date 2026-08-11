@@ -24,6 +24,7 @@ import (
 	"github.com/akto-api-security/guardrails-service/pkg/metrics"
 	"github.com/akto-api-security/guardrails-service/pkg/nhi"
 	"github.com/akto-api-security/guardrails-service/pkg/nhi/source/endpointshield"
+	"github.com/akto-api-security/guardrails-service/pkg/promptguard"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -162,6 +163,13 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 
 	validationHandler := handlers.NewValidationHandler(validatorService, logger, cfg, fileRegistry, acc)
 
+	// Prompt guard: one registry, one provider per AI vendor. Adding a vendor
+	// later (e.g. OpenAI) is another promptguard.Provider here.
+	promptGuardRegistry := promptguard.NewRegistry(
+		promptguard.NewClaudeProvider(cfg.PromptGuardClaudeSecret, cfg.PromptGuardClaudePrevSecret),
+	)
+	promptGuardHandler := handlers.NewPromptGuardHandler(validatorService, logger, cfg, promptGuardRegistry, acc)
+
 	var authMiddleware gin.HandlerFunc
 	if cfg.AuthEnabled {
 		m, err := auth.NewMiddleware(cfg.RSAPublicKey, logger)
@@ -174,7 +182,7 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 		logger.Warn("Inbound authentication disabled (set AKTO_GR_AUTHENTICATE=true to enable)")
 	}
 
-	router := setupRouter(validationHandler, authMiddleware, logger)
+	router := setupRouter(validationHandler, promptGuardHandler, authMiddleware, cfg, logger)
 
 	addr := fmt.Sprintf(":%d", cfg.ServerPort)
 	logger.Info("Server starting in HTTP mode", zap.String("address", addr))
@@ -219,7 +227,7 @@ func corsMiddleware() gin.HandlerFunc {
 	}
 }
 
-func setupRouter(validationHandler *handlers.ValidationHandler, authMiddleware gin.HandlerFunc, logger *zap.Logger) *gin.Engine {
+func setupRouter(validationHandler *handlers.ValidationHandler, promptGuardHandler *handlers.PromptGuardHandler, authMiddleware gin.HandlerFunc, cfg *config.Config, logger *zap.Logger) *gin.Engine {
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -246,6 +254,22 @@ func setupRouter(validationHandler *handlers.ValidationHandler, authMiddleware g
 		api.POST("/validate/requestWithPolicy", validationHandler.ValidateRequestWithPolicy)
 		api.POST("/validate/response", validationHandler.ValidateResponse)
 		api.POST("/validate/file", validationHandler.ValidateFile)
+	}
+
+	// Versioned API group. Existing endpoints above stay unversioned to avoid
+	// client changes; new endpoints are added under /api/v1 going forward.
+	// Prompt guard authenticity is proven by the provider's own signature
+	// (verified in the handler), while the admin-configured Authorization: Bearer
+	// <Akto JWT> identifies the tenant — so this route runs under the same JWT
+	// middleware as /api, and the handler falls back to the service-token account
+	// when auth is disabled.
+	if cfg.PromptGuardEnabled {
+		v1 := router.Group("/api/v1")
+		if authMiddleware != nil {
+			v1.Use(authMiddleware)
+		}
+		v1.POST("/webhooks/:provider/guardrail", promptGuardHandler.Guard)
+		logger.Info("Prompt guard endpoint enabled at POST /api/v1/webhooks/:provider/guardrail")
 	}
 
 	return router
