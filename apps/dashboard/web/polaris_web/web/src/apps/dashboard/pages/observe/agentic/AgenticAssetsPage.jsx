@@ -301,7 +301,6 @@ export default function AgenticAssetsPage() {
     userMetadataMap: {},
     analysisByKey: new Map(),
     userAnalysisFlatMap: {},
-    maliciousSkillKeys: new Set(),
     trafficMap: {},
     riskScoreMap: {},
   });
@@ -388,17 +387,12 @@ export default function AgenticAssetsPage() {
         setRefreshKey((k) => k + 1); // (re)mount the grid now that enrichRef is populated
         setLoading(false);
 
-        // Malicious-skill flag — account-wide, single call, non-blocking, patched in on the next
-        // natural fetch rather than forcing a grid remount (see comment above). Keyed by
-        // maliciousSkillKeys (collection-scoped `<collectionId>|<skillName>`, see skillCollectionKey)
-        // rather than skill name alone, so a same-named skill belonging to a different user/agent
-        // doesn't mark this one malicious too.
-        fetchAndCacheSkillApiData([], { api, PersistStore })
-          .then(({ maliciousSkillKeys }) => {
-            if (!isMountedRef.current || !maliciousSkillKeys?.size) return;
-            enrichRef.current = { ...enrichRef.current, maliciousSkillKeys };
-          })
-          .catch(() => {});
+        // Warms the shared skillRiskScoreCache (PersistStore) that AgentEndpointTreeTable.jsx
+        // (Inventory's Agent tree view) reads from — this page no longer needs the result itself:
+        // "Malicious Skill" (row.isMalicious) and skill risk scores are now computed server-side in
+        // fetchAgenticAssetsSummary (AgenticObserveAction.getOrBuildSkillData's own account-wide
+        // cache), so there's nothing left to patch into enrichRef/onServerFetch here.
+        fetchAndCacheSkillApiData([], { api, PersistStore }).catch(() => {});
 
         // Tier 2 — slow, runs after first paint, patches in without a grid remount.
         Promise.all([
@@ -454,7 +448,7 @@ export default function AgenticAssetsPage() {
     // AG Grid SSRM sends sortOrder: -1 for asc, 1 for desc — opposite of the backend's Mongo
     // convention (1 asc / -1 desc, matching NhiGovernanceViolationsAction's own onServerFetch).
     const mongoSortOrder = sortOrder ? -sortOrder : -1;
-    const { trafficMap, riskScoreMap, userAnalysisFlatMap, maliciousSkillKeys, violationsByCollectionId, usernameMap, userMetadataMap } = enrichRef.current;
+    const { trafficMap, riskScoreMap, userAnalysisFlatMap, violationsByCollectionId, usernameMap, userMetadataMap } = enrichRef.current;
 
     return api.fetchAgenticAssetsSummary({
       skip,
@@ -468,7 +462,6 @@ export default function AgenticAssetsPage() {
       endTimestamp,
       userAnalysisFlatMap,
       filters,
-      maliciousSkillKeys: Array.from(maliciousSkillKeys || []),
       // Precomputed account-wide already (attributeViolationCountsToCollections, via
       // fetchViolationCountsByCollection in the Tier-2 mount effect below) — passed straight through
       // so the server can compute each row's own violations total in-memory instead of the browser

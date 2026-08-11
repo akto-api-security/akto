@@ -77,7 +77,7 @@ function getRiskScoreStatus(riskScore) {
 // keyed enrichment call (fetchAndCacheSkillApiData), not classifyAllGroups' collection-tag-based
 // fields — those are deliberately not computed for skill rows, matching prettifyGroupData's
 // original client-side behavior. isMalicious for skill rows IS computed server-side already
-// (maliciousSkillKeys, passed into fetchAgenticAssetsSummary below).
+// (AgenticObserveAction's own account-wide maliciousSkillKeys cache — no client round-trip needed).
 function shapeRow(row, { skillScoreMap = {}, misconfiguredSkills = new Set() } = {}) {
     const isSkill = row.rowType === ROW_TYPES.SKILL;
     const riskScore = isSkill ? (skillScoreMap[row.name] || 0) : (row.riskScore || 0);
@@ -149,7 +149,7 @@ function Endpoints() {
     // async: skill risk/malicious/misconfigured data), read (not reacted to) by fetchTableData.
     const enrichRef = useRef({
         trafficMap: {}, riskScoreMap: {}, sensitiveMap: {},
-        maliciousSkillKeys: [], skillScoreMap: {}, misconfiguredSkills: new Set(),
+        skillScoreMap: {}, misconfiguredSkills: new Set(),
     });
 
     // headings drives the rendered COLUMNS; headers drives FILTERS/CSV export (GithubServerTable's
@@ -211,15 +211,17 @@ function Endpoints() {
                 if (isMountedRef.current) setStats(result);
             }).catch(() => {});
 
-            // Async enrichment — single account-wide call (no per-collection N+1), updates skill
-            // risk scores/malicious/misconfigured flags after initial render, then re-fetches the
-            // current table page (via refreshKey) so badges appear without losing sort/search/tab.
-            fetchAndCacheSkillApiData([], { api, PersistStore }).then(({ skillScoreMap, maliciousSkillKeys, misconfiguredSkills }) => {
+            // Async enrichment — single account-wide call (no per-collection N+1), updates skill risk
+            // scores/misconfigured flags after initial render, then re-fetches the current table page
+            // (via refreshKey) so badges appear without losing sort/search/tab. Doesn't read
+            // maliciousSkillKeys here — "Malicious" (row.isMalicious) is computed server-side in
+            // fetchAgenticAssetsSummary (AgenticObserveAction.getOrBuildSkillData's own account-wide
+            // cache) instead of requiring the whole set re-POSTed on every paginated request.
+            fetchAndCacheSkillApiData([], { api, PersistStore }).then(({ skillScoreMap, misconfiguredSkills }) => {
                 if (!isMountedRef.current) return;
                 enrichRef.current = {
                     ...enrichRef.current,
                     skillScoreMap: skillScoreMap || {},
-                    maliciousSkillKeys: Array.from(maliciousSkillKeys || []),
                     misconfiguredSkills: misconfiguredSkills || new Set(),
                 };
                 setRefreshKey((k) => k + 1);
@@ -236,7 +238,7 @@ function Endpoints() {
     }, []);
 
     const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
-        const { trafficMap, riskScoreMap, sensitiveMap, maliciousSkillKeys, skillScoreMap, misconfiguredSkills } = enrichRef.current;
+        const { trafficMap, riskScoreMap, sensitiveMap, skillScoreMap, misconfiguredSkills } = enrichRef.current;
         // GithubServerTable: asc=-1/desc=1, inverted vs Mongo (matches AgenticAssetsPage.jsx/
         // NhiGovernanceIdentitiesAction's own onServerFetch convention).
         const mongoSortOrder = sortOrder === -1 ? 1 : -1;
@@ -254,7 +256,6 @@ function Endpoints() {
             queryValue,
             trafficMap, riskScoreMap, sensitiveMap,
             filters: Object.keys(filters).length ? filters : undefined,
-            maliciousSkillKeys,
         });
         const rows = (res.rows || []).map((row) => shapeRow(row, { skillScoreMap, misconfiguredSkills }));
         return { value: rows, total: res.total || 0 };

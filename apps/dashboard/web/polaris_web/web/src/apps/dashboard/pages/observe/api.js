@@ -244,11 +244,14 @@ export default {
     // atlas-scale-test/DASHBOARD_OPTIMIZATION.md's "paginated server-side aggregation rebuild").
     // trafficMap/riskScoreMap are the same maps AgenticAssetsPage.jsx already fetches via
     // fetchAndCacheAgenticCollectionsBundle.
-    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, maliciousSkillKeys, violationsByCollectionId, usernameMap, userMetadataMap } = {}) {
+    // maliciousSkillKeys is NOT sent — AgenticObserveAction computes/caches it itself now
+    // (getOrBuildSkillData) instead of requiring the whole account-wide set (14,218 entries /
+    // ~500KB+ on Atlas Scale Test) to be re-POSTed on every paginated request.
+    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, usernameMap, userMetadataMap } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsSummary',
             method: 'post',
-            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, maliciousSkillKeys, violationsByCollectionId, usernameMap, userMetadataMap },
+            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, usernameMap, userMetadataMap },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0 }
     },

@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
@@ -96,7 +97,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Setter private Map<String, Integer> trafficMap;
     @Setter private Map<String, Double> riskScoreMap;
     @Setter private Map<String, List<String>> filters; // AG Grid column filters, keyed by field name (e.g. "team", "userRole")
-    @Setter private List<String> maliciousSkillKeys; // account-wide "<collectionId>|<skillName>" set, see constants.js's skillCollectionKey — only needed for the "tags" Set Filter's "Malicious Skill" branch
 
     // ---- Server-side pagination for fetchUsersAndDevicesSummary ----
     @Setter private String groupBy; // "user" | "device"
@@ -120,56 +120,106 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
      * the Agentic-assets / Users-and-devices pages need — replacing the old per-collection N+1 that fired
      * one fetchApiInfosForCollection call for each of the account's ~26k collections.
      */
-    public String fetchAgenticSkillData() {
-        response = new BasicDBObject();
-        Set<Integer> deactivated = UsageMetricCalculator.getDeactivated();
-        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(
-                Filters.and(
-                        Filters.or(
-                                Filters.regex(ApiInfo.ID_URL, "skills/"),
-                                Filters.regex(ApiInfo.ID_URL, "/config/")
-                        ),
-                        Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivated)
-                ));
+    // Per-account cache of fetchAgenticSkillData's own computation — the frontend fetches this once
+    // (its own 2-min PersistStore cache: skillRiskScoreCache) but then has to re-POST the resulting
+    // maliciousSkillKeys back into fetchAgenticAssetsSummary on every single paginated request just
+    // so that endpoint can check Set membership — measured at 14,218 entries (~500KB+) for Atlas
+    // Scale Test, the single largest contributor to that endpoint's ~650KB request payload. Since
+    // fetchAgenticSkillData lives on this same class, fetchAgenticAssetsSummary can just read this
+    // cache directly instead of requiring the client to round-trip the whole set back to us. Same
+    // TTL/eviction shape as getOrBuildClassification (see its own doc for the rationale).
+    private static final Map<Integer, SkillDataCacheEntry> skillDataCache = new ConcurrentHashMap<>();
 
-        Map<String, Float> skillScoreMap = new HashMap<>();
-        Set<String> maliciousSkills = new HashSet<>();
-        // Collection-scoped "<collectionId>|<skillNameLowercase>" keys — matches constants.js's
-        // skillCollectionKey exactly — so a same-named skill on a different user/collection doesn't
-        // inherit the malicious flag (the account-wide maliciousSkills set above is name-only).
-        Set<String> maliciousSkillKeys = new HashSet<>();
-        Set<String> misconfiguredSkills = new HashSet<>();
-        Set<Integer> misconfiguredCollectionIds = new HashSet<>();
+    private static final class SkillDataCacheEntry {
+        final Map<String, Float> skillScoreMap;
+        final Set<String> maliciousSkills;
+        final Set<String> maliciousSkillKeys;
+        final Set<String> misconfiguredSkills;
+        final Set<Integer> misconfiguredCollectionIds;
+        final long builtAt;
+        SkillDataCacheEntry(Map<String, Float> skillScoreMap, Set<String> maliciousSkills, Set<String> maliciousSkillKeys,
+                Set<String> misconfiguredSkills, Set<Integer> misconfiguredCollectionIds, long builtAt) {
+            this.skillScoreMap = skillScoreMap;
+            this.maliciousSkills = maliciousSkills;
+            this.maliciousSkillKeys = maliciousSkillKeys;
+            this.misconfiguredSkills = misconfiguredSkills;
+            this.misconfiguredCollectionIds = misconfiguredCollectionIds;
+            this.builtAt = builtAt;
+        }
+    }
 
-        for (ApiInfo info : apiInfos) {
-            if (info == null || info.getId() == null) continue;
-            String url = info.getId().getUrl();
-            if (url == null) url = "";
-            boolean malicious = hasTrueTag(info.getTagsList(), "malicious-skill");
-            boolean misconfigured = hasTrueTag(info.getTagsList(), "misconfigured-config");
+    private SkillDataCacheEntry getOrBuildSkillData() {
+        int accountId = Context.accountId.get();
+        long now = System.currentTimeMillis();
+        SkillDataCacheEntry existing = skillDataCache.get(accountId);
+        if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+            return existing;
+        }
+        if (skillDataCache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
+            skillDataCache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
+        }
+        return skillDataCache.compute(accountId, (id, cached) -> {
+            if (cached != null && (System.currentTimeMillis() - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                return cached;
+            }
+            long tStart = System.currentTimeMillis();
+            Set<Integer> deactivated = UsageMetricCalculator.getDeactivated();
+            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(
+                    Filters.and(
+                            Filters.or(
+                                    Filters.regex(ApiInfo.ID_URL, "skills/"),
+                                    Filters.regex(ApiInfo.ID_URL, "/config/")
+                            ),
+                            Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivated)
+                    ));
 
-            int idx = url.indexOf("skills/");
-            if (idx >= 0) {
-                String skillName = url.substring(idx + "skills/".length());
-                if (!skillName.isEmpty()) {
-                    skillScoreMap.put(skillName, info.getRiskScore());
-                    if (malicious) {
-                        maliciousSkills.add(skillName);
-                        maliciousSkillKeys.add(info.getId().getApiCollectionId() + "|" + skillName.toLowerCase(Locale.ROOT));
+            Map<String, Float> skillScoreMap = new HashMap<>();
+            Set<String> maliciousSkills = new HashSet<>();
+            // Collection-scoped "<collectionId>|<skillNameLowercase>" keys — matches constants.js's
+            // skillCollectionKey exactly — so a same-named skill on a different user/collection
+            // doesn't inherit the malicious flag (the account-wide maliciousSkills set is name-only).
+            Set<String> maliciousSkillKeys = new HashSet<>();
+            Set<String> misconfiguredSkills = new HashSet<>();
+            Set<Integer> misconfiguredCollectionIds = new HashSet<>();
+
+            for (ApiInfo info : apiInfos) {
+                if (info == null || info.getId() == null) continue;
+                String url = info.getId().getUrl();
+                if (url == null) url = "";
+                boolean malicious = hasTrueTag(info.getTagsList(), "malicious-skill");
+                boolean misconfigured = hasTrueTag(info.getTagsList(), "misconfigured-config");
+
+                int idx = url.indexOf("skills/");
+                if (idx >= 0) {
+                    String skillName = url.substring(idx + "skills/".length());
+                    if (!skillName.isEmpty()) {
+                        skillScoreMap.put(skillName, info.getRiskScore());
+                        if (malicious) {
+                            maliciousSkills.add(skillName);
+                            maliciousSkillKeys.add(info.getId().getApiCollectionId() + "|" + skillName.toLowerCase(Locale.ROOT));
+                        }
+                        if (misconfigured) misconfiguredSkills.add(skillName);
                     }
-                    if (misconfigured) misconfiguredSkills.add(skillName);
+                }
+                if (url.contains("/config/") && misconfigured) {
+                    misconfiguredCollectionIds.add(info.getId().getApiCollectionId());
                 }
             }
-            if (url.contains("/config/") && misconfigured) {
-                misconfiguredCollectionIds.add(info.getId().getApiCollectionId());
-            }
-        }
+            loggerMaker.warnAndAddToDb("[agenticSkillDataCache] rebuilt: " + (System.currentTimeMillis() - tStart)
+                    + "ms, apiInfos=" + apiInfos.size() + ", maliciousSkillKeys=" + maliciousSkillKeys.size());
+            return new SkillDataCacheEntry(skillScoreMap, maliciousSkills, maliciousSkillKeys, misconfiguredSkills,
+                    misconfiguredCollectionIds, System.currentTimeMillis());
+        });
+    }
 
-        response.put("skillScoreMap", skillScoreMap);
-        response.put("maliciousSkills", new ArrayList<>(maliciousSkills));
-        response.put("maliciousSkillKeys", new ArrayList<>(maliciousSkillKeys));
-        response.put("misconfiguredSkills", new ArrayList<>(misconfiguredSkills));
-        response.put("misconfiguredCollectionIds", new ArrayList<>(misconfiguredCollectionIds));
+    public String fetchAgenticSkillData() {
+        response = new BasicDBObject();
+        SkillDataCacheEntry cached = getOrBuildSkillData();
+        response.put("skillScoreMap", cached.skillScoreMap);
+        response.put("maliciousSkills", new ArrayList<>(cached.maliciousSkills));
+        response.put("maliciousSkillKeys", new ArrayList<>(cached.maliciousSkillKeys));
+        response.put("misconfiguredSkills", new ArrayList<>(cached.misconfiguredSkills));
+        response.put("misconfiguredCollectionIds", new ArrayList<>(cached.misconfiguredCollectionIds));
         return SUCCESS.toUpperCase();
     }
 
@@ -1350,8 +1400,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // AG Grid column filters. "type" is a small fixed enum (AgenticObserveUtil.CLIENT_TYPE_*),
             // matched directly. "tags" mirrors AgenticAssetsPage.jsx's shapeRow tag derivation exactly
             // (an array-valued field — Set Filter semantics: match if ANY selected tag is present),
-            // including the "Malicious Skill" branch, which needs maliciousSkillKeys threaded from the
-            // client (account-wide, already fetched once there — see skillCollectionKey).
+            // including the "Malicious Skill" branch, which reads maliciousSkillKeys from this same
+            // class's own skill-data cache (getOrBuildSkillData) instead of requiring the client to
+            // re-POST the whole account-wide set (measured 14,218 entries / ~500KB+ on Atlas Scale
+            // Test — the single largest contributor to this endpoint's request payload).
             if (filters != null) {
                 if (filters.containsKey("type")) {
                     Set<String> allowed = new HashSet<>(filters.get("type"));
@@ -1359,7 +1411,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 }
                 if (filters.containsKey("tags")) {
                     Set<String> allowedTags = new HashSet<>(filters.get("tags"));
-                    Set<String> maliciousKeys = maliciousSkillKeys != null ? new HashSet<>(maliciousSkillKeys) : Collections.emptySet();
+                    Set<String> maliciousKeys = getOrBuildSkillData().maliciousSkillKeys;
                     all.removeIf(g -> {
                         boolean isSkill = "skill".equals(g.rowType);
                         Set<String> groupTags = new HashSet<>();
@@ -1392,7 +1444,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             for (ApiCollection c : collections) byId.put(c.getId(), c);
 
             Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
-            Set<String> maliciousKeys = maliciousSkillKeys != null ? new HashSet<>(maliciousSkillKeys) : Collections.emptySet();
+            Set<String> maliciousKeys = getOrBuildSkillData().maliciousSkillKeys;
             List<BasicDBObject> rowsOut = new ArrayList<>();
             for (GroupSummary g : page) {
                 BasicDBObject row = g.toSummaryResponse();
@@ -1526,6 +1578,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     public String fetchAgenticAssetsStats() {
         response = new BasicDBObject();
         try {
+            long tStatsStart = System.currentTimeMillis();
             Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
             Map<String, Map<String, Integer>> violations = violationsByCollectionId != null ? violationsByCollectionId : Collections.emptyMap();
@@ -1581,19 +1634,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             response.put("assetSparkline", assetCounts);
             response.put("assetDelta", windowDelta(assetCounts));
 
-            // Violations trend for the "Violations" card — reuses the same cheap server-side $bucket
-            // aggregation built for Endpoints (fetchViolationsMonthlyTotals); the current total/severity
-            // breakdown stays client-side (hostSeverityCounts, already cheap — see class comment above).
-            List<Integer> monthBoundaries = new ArrayList<>();
-            for (MonthSlot s : slots) monthBoundaries.add(s.boundary);
-            List<Integer> monthlyViolations = fetchViolationsMonthlyTotals(startTimestamp, endTimestamp, monthBoundaries, null);
-            int[] violationsCounts = cumulativeFromMonthlyCounts(monthlyViolations, slots.size());
-            response.put("violationsSparkline", violationsCounts);
-            response.put("violationsDelta", windowDelta(violationsCounts));
-
-            // "Top Assets with Violations" — per-group totals from the violationsByCollectionId map the
-            // frontend already fetched once at mount (aggregateViolationCountsByCollectionId), summed
-            // over each group's own collectionIds. No new data source; top-N of what's already available.
+            // "Top Assets with Violations" ranking — per-group totals from the violationsByCollectionId
+            // map the frontend already fetched once at mount (aggregateViolationCountsByCollectionId),
+            // summed over each group's own collectionIds. No new data source; top-N of what's already
+            // available. Computed before the trend fetches below so we know which 5 assets need one.
             List<Map.Entry<GroupSummary, Integer>> violRanked = new ArrayList<>();
             for (GroupSummary g : groups.values()) {
                 int groupTotal = 0;
@@ -1608,18 +1652,39 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             violRanked.sort((a, b) -> Integer.compare(b.getValue(), a.getValue()));
             List<Map.Entry<GroupSummary, Integer>> topViolPage = violRanked.subList(0, Math.min(5, violRanked.size()));
 
-            // Per-asset monthly trend, scoped to just this asset's own hostNames via host_filter — one
-            // small targeted $bucket aggregation per top-5 row (bounded, not per-group for all ~800).
-            List<BasicDBObject> topViol = new ArrayList<>();
+            // Violations trend for the "Violations" card (overall) + one per top-5 asset, scoped via
+            // host_filter — each is its own HTTP round-trip to the threat-detection-backend
+            // (fetchViolationsMonthlyTotals), and these 6 calls were previously issued one after
+            // another. That sequential chain — NOT classifyAllGroups, already cached above — is what
+            // actually dominated this endpoint's latency (measured 8s+ on Atlas Scale Test even with a
+            // warm classification cache). They're independent of each other, so fire them concurrently
+            // and only pay the slowest one instead of the sum of all six.
+            List<Integer> monthBoundaries = new ArrayList<>();
+            for (MonthSlot s : slots) monthBoundaries.add(s.boundary);
+            CompletableFuture<List<Integer>> overallTrendFuture = CompletableFuture.supplyAsync(
+                    () -> fetchViolationsMonthlyTotals(startTimestamp, endTimestamp, monthBoundaries, null));
+            List<CompletableFuture<List<Integer>>> topViolTrendFutures = new ArrayList<>();
             for (Map.Entry<GroupSummary, Integer> entry : topViolPage) {
+                GroupSummary g = entry.getKey();
+                topViolTrendFutures.add(CompletableFuture.supplyAsync(() -> fetchViolationsMonthlyTotals(
+                        startTimestamp, endTimestamp, monthBoundaries, new ArrayList<>(g.hostNames))));
+            }
+
+            List<Integer> monthlyViolations = overallTrendFuture.join();
+            int[] violationsCounts = cumulativeFromMonthlyCounts(monthlyViolations, slots.size());
+            response.put("violationsSparkline", violationsCounts);
+            response.put("violationsDelta", windowDelta(violationsCounts));
+
+            List<BasicDBObject> topViol = new ArrayList<>();
+            for (int i = 0; i < topViolPage.size(); i++) {
+                Map.Entry<GroupSummary, Integer> entry = topViolPage.get(i);
                 GroupSummary g = entry.getKey();
                 BasicDBObject row = new BasicDBObject();
                 row.put("id", g.rowType + "-" + g.groupKey);
                 row.put("name", g.name);
                 row.put("type", g.clientType);
                 row.put("violations", entry.getValue());
-                List<Integer> assetMonthly = fetchViolationsMonthlyTotals(
-                        startTimestamp, endTimestamp, monthBoundaries, new ArrayList<>(g.hostNames));
+                List<Integer> assetMonthly = topViolTrendFutures.get(i).join();
                 row.put("sparkline", cumulativeFromMonthlyCounts(assetMonthly, slots.size()));
                 topViol.add(row);
             }
@@ -1661,6 +1726,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             topApps.sort((a, b) -> Integer.compare(b.getInt("aiInteractions"), a.getInt("aiInteractions")));
             response.put("topUsedApplications", topApps.subList(0, Math.min(5, topApps.size())));
 
+            loggerMaker.warnAndAddToDb("[fetchAgenticAssetsStats-timing] TOTAL=" + (System.currentTimeMillis() - tStatsStart) + "ms");
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching agentic assets stats: " + e.getMessage());
