@@ -1274,8 +1274,11 @@ export default {
         })
     },
 
-    // Unpaginated — feeds IdentityOverviewGraph's topology graph, which needs every identity.
-    // The Identities page's own table uses fetchAllNhiIdentities (below) instead.
+    // Unpaginated — only for CreateNhiPolicyModal's agent/identity dropdown options, which need every
+    // distinct name. The Identities page no longer uses this (it used to, for the topology graph and
+    // summary cards/tab counts, which pulled the whole account — 13.8k+ rows on Atlas Scale Test —
+    // just to draw a handful of nodes or compute four numbers); it now uses fetchAllNhiIdentities
+    // (small, capped) and fetchNhiIdentitiesStats (counts-only) below instead.
     async fetchNhiIdentities(startTimestamp, endTimestamp) {
         const resp = await request({
             url: '/api/fetchNhiIdentities',
@@ -1287,6 +1290,7 @@ export default {
 
     // Server-side paginated (ATLAS NHI Governance Identities page): pass skip/limit/sortKey/sortOrder/
     // queryValue/status ("Expired"/"Disabled"/omit-for-"All") to get one page. Returns {identities, total}.
+    // Also used (with a small limit) to feed IdentityOverviewGraph's topology graph.
     async fetchAllNhiIdentities(startTimestamp, endTimestamp, { skip, limit, sortKey, sortOrder, queryValue, status } = {}) {
         const resp = await request({
             url: '/api/fetchAllNhiIdentities',
@@ -1294,6 +1298,24 @@ export default {
             data: { startTimestamp, endTimestamp, skip, limit, sortKey, sortOrder, queryValue, status }
         })
         return { identities: resp?.identities || [], total: resp?.total || 0 }
+    },
+
+    // Counts-only (ATLAS NHI Governance Identities page): feeds the summary cards and tab badges
+    // without pulling any identity documents. identityNames (optional) is the list of identityNames
+    // already known to have violations, from the cheap fetchViolationCountsByIdentity() call, used to
+    // compute the "Identities with Violations" count server-side.
+    async fetchNhiIdentitiesStats(startTimestamp, endTimestamp, identityNames) {
+        const resp = await request({
+            url: '/api/fetchNhiIdentitiesStats',
+            method: 'post',
+            data: { startTimestamp, endTimestamp, identityNames }
+        })
+        return {
+            total: resp?.statTotal || 0,
+            expired: resp?.statExpired || 0,
+            disabled: resp?.statDisabled || 0,
+            withViolations: resp?.statWithViolations || 0,
+        }
     },
 
     // Server-side paginated (ATLAS NHI Governance): pass skip/limit/sortKey/sortOrder/queryValue/status

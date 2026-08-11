@@ -23,6 +23,13 @@ import SpinnerCentered from "../../components/progress/SpinnerCentered";
 const definedTableTabs = ["All", "Expired", "Disabled"];
 const resourceName = { singular: "identity", plural: "identities" };
 
+// IdentityOverviewGraph renders one ReactFlow node per identity (plus one per agent) with no
+// virtualization — beyond a few hundred nodes it hangs (unresponsive pan/zoom/click). Cap the graph
+// to the most recently discovered identities rather than fetching the whole account (13.8k+ on the
+// Atlas Scale Test account) just to draw a graph. Matches the flyout's existing
+// IDENTITY_VIOLATIONS_LIMIT precedent for "small, deliberately bounded batch, not real pagination".
+const GRAPH_NODE_CAP = 200;
+
 // ── Expiry status renderer ─────────────────────────────────────────────────────
 const expiryComp = (s) => {
     if (!s) return null;
@@ -32,28 +39,6 @@ const expiryComp = (s) => {
         return <Text variant="bodyMd" color="warning" fontWeight="medium">{s}</Text>;
     return <Text variant="bodyMd">{s}</Text>;
 };
-
-const buildTableData = (rawRows, violationIndex = {}) =>
-    rawRows
-        .map((r) => {
-            const v = violationIndex[r.identityName] || { violCrit: 0, violHigh: 0, violMed: 0 };
-            return { ...r, violCrit: v.violCrit, violHigh: v.violHigh, violMed: v.violMed };
-        })
-        .sort((a, b) => {
-            if (b.violCrit !== a.violCrit) return b.violCrit - a.violCrit;
-            return (b.violCrit + b.violHigh + b.violMed) - (a.violCrit + a.violHigh + a.violMed);
-        })
-        .map((r) => ({
-            ...r,
-            id:             r.hexId,
-            totalViolations: r.violCrit + r.violHigh + r.violMed,
-            priorityScore:  r.violCrit * 1000 + (r.violCrit + r.violHigh + r.violMed),
-            identityComp:  <HorizontalStack gap="2" blockAlign="center" wrap={false}><IdentityIcon name={r.identityName} /><Text variant="bodyMd" fontWeight="medium">{r.identityName}</Text></HorizontalStack>,
-            agentComp:     <HorizontalStack gap="2" blockAlign="center" wrap={false}><AgentIcon name={r.agent} /><Text variant="bodyMd">{r.agent}</Text></HorizontalStack>,
-            typeComp:      <Badge>{r.type}</Badge>,
-            violationsComp: <ViolationBubbles critical={r.violCrit} high={r.violHigh} medium={r.violMed} />,
-            expiryComp:    expiryComp(r.expiryStatus),
-        }));
 
 
 // Helper to format expiry status (expiryDate is epoch seconds)
@@ -91,11 +76,10 @@ const transformIdentityForUI = (apiIdentity) => {
     };
 };
 
-// Per-row shaping for the table's own server-paginated page — mirrors buildTableData's per-row
-// map step above (same identityComp/agentComp/typeComp/violationsComp/expiryComp cell shapes),
-// applied to one already-fetched page instead of the full account. violationIndex is the same
-// small, cheap, account-wide map buildTableData already uses (fetchViolationCountsByIdentity),
-// safe to merge in per-page without an extra network call.
+// Per-row shaping shared by the table's own server-paginated page and the capped graph batch
+// (identityComp/agentComp/typeComp/violationsComp/expiryComp cell shapes). violationIndex is the
+// same small, cheap, account-wide map (fetchViolationCountsByIdentity) merged into either batch
+// without an extra network call.
 function buildPageRow(apiIdentity, violationIndex) {
     const r = transformIdentityForUI(apiIdentity);
     const v = violationIndex[r.identityName] || { violCrit: 0, violHigh: 0, violMed: 0 };
@@ -111,18 +95,6 @@ function buildPageRow(apiIdentity, violationIndex) {
         expiryComp: expiryComp(r.expiryStatus),
     };
 }
-
-// ── Computed summary ───────────────────────────────────────────────────────────
-const makeSummaryItems = (data) => {
-    const total   = data.length;
-    const expired = data.filter((r) => r.expiryStatus && r.expiryStatus.startsWith("Expired")).length;
-    const withV   = data.filter((r) => r.totalViolations > 0).length;
-    return [
-        { title: "Total Identities",          data: total.toLocaleString()   },
-        { title: "Expired Identities",        data: expired.toLocaleString() },
-        { title: "Identities with Violations",data: withV.toLocaleString()   },
-    ];
-};
 
 // ── Headers ────────────────────────────────────────────────────────────────────
 const headers = [
@@ -166,8 +138,10 @@ export default function IdentitiesPage() {
     const initialSelectedTab  = tableSelectedTab[window.location.pathname] || "all";
 
     // API fetching state
-    const [rawIdentities, setRawIdentities] = useState([]);
     const [rawViolations, setRawViolations] = useState([]);
+    const [graphIdentities, setGraphIdentities] = useState([]);
+    const [graphTotal, setGraphTotal] = useState(0);
+    const [stats, setStats] = useState({ total: 0, expired: 0, disabled: 0, withViolations: 0 });
     const [loading, setLoading] = useState(true);
 
     // UI state
@@ -192,20 +166,28 @@ export default function IdentitiesPage() {
         try {
             setLoading(true);
 
-            const identitiesResponse = await observeRequests.fetchNhiIdentities(startTimestamp, endTimestamp);
-            setRawIdentities(Array.isArray(identitiesResponse) ? identitiesResponse.map(transformIdentityForUI) : []);
-            setLoading(false);
-
+            let violRows = [];
             try {
                 const violationsResponse = await observeRequests.fetchViolationCountsByIdentity();
-                setRawViolations(Array.isArray(violationsResponse) ? violationsResponse : []);
+                violRows = Array.isArray(violationsResponse) ? violationsResponse : [];
             } catch (violErr) {
                 console.error("Error fetching violations for counts:", violErr);
-                setRawViolations([]);
             }
+            setRawViolations(violRows);
+
+            const violatingNames = [...new Set(violRows.map((r) => r.identityName).filter(Boolean))];
+
+            const [statsRes, graphRes] = await Promise.all([
+                observeRequests.fetchNhiIdentitiesStats(startTimestamp, endTimestamp, violatingNames),
+                observeRequests.fetchAllNhiIdentities(startTimestamp, endTimestamp, {
+                    skip: 0, limit: GRAPH_NODE_CAP, sortKey: "createdAt", sortOrder: -1,
+                }),
+            ]);
+            setStats(statsRes);
+            setGraphIdentities(graphRes.identities || []);
+            setGraphTotal(graphRes.total || 0);
         } catch (err) {
-            console.error("Error fetching identities:", err);
-            setRawIdentities([]);
+            console.error("Error fetching identities overview:", err);
         } finally {
             setLoading(false);
         }
@@ -231,18 +213,16 @@ export default function IdentitiesPage() {
         }, {});
     }, [rawViolations]);
 
-    // Build table data with violation counts
-    const tableData = useMemo(() => {
-        return buildTableData(rawIdentities, violationIndex);
-    }, [rawIdentities, violationIndex]);
+    // Capped batch of the most recently discovered identities, enriched with violation counts —
+    // feeds only the topology graph now. The table below is independently server-paginated via
+    // fetchTableData/fetchAllNhiIdentities and never touches this capped batch.
+    const graphData = useMemo(() => (
+        graphIdentities.map((identity) => buildPageRow(identity, violationIndex))
+    ), [graphIdentities, violationIndex]);
 
-    const dataByTab = useMemo(() => ({
-        "all":      tableData,
-        "expired":  tableData.filter((r) => r.expiryStatus && r.expiryStatus.startsWith("Expired")),
-        "disabled": tableData.filter((r) => r.status === "INACTIVE"),
-    }), [tableData]);
-
-    const tableCountObj = func.getTabsCount(definedTableTabs, dataByTab);
+    const tableCountObj = func.getTabsCount(definedTableTabs, {
+        _counts: { all: stats.total, expired: stats.expired, disabled: stats.disabled },
+    });
     const tableTabs = func.getTableTabsContent(
         definedTableTabs, tableCountObj,
         (tabId) => {
@@ -252,13 +232,15 @@ export default function IdentitiesPage() {
         selectedTab, tabsInfo
     );
 
-    const summaryItems = makeSummaryItems(tableData);
+    const summaryItems = [
+        { title: "Total Identities",           data: stats.total.toLocaleString() },
+        { title: "Expired Identities",         data: stats.expired.toLocaleString() },
+        { title: "Identities with Violations", data: stats.withViolations.toLocaleString() },
+    ];
 
     // ─── Server-side paginated fetch for the table itself ───────────────────────
-    // The graph/summary cards/tab counts above keep using the full-account fetch (tableData) —
-    // unchanged from before, and already the cheapest way to feed IdentityOverviewGraph, which
-    // genuinely needs every identity to fan out each agent's full list correctly. Only the table's
-    // own rows are server-paginated now, via fetchAllNhiIdentities.
+    // Independent of the graph's capped batch above — the table pages through the whole account via
+    // fetchAllNhiIdentities with its own skip/limit/sort/search, never bounded by GRAPH_NODE_CAP.
     const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
         const mongoSortOrder = sortOrder === -1 ? 1 : -1; // GithubServerTable: asc=-1/desc=1, inverted vs Mongo
         const status = selectedTab === "all" ? undefined : (selectedTab === "expired" ? "Expired" : "Disabled");
@@ -298,7 +280,8 @@ export default function IdentitiesPage() {
 
                 <IdentityOverviewGraph
                     key="overview-graph"
-                    tableData={tableData}
+                    tableData={graphData}
+                    totalCount={graphTotal}
                     onIdentityClick={(row) => { setSelectedRow(row); setShowDetailsPanel(true); }}
                 />,
 

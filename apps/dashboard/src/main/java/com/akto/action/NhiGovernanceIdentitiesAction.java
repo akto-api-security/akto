@@ -51,6 +51,14 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
     @Setter private String status;      // tab filter: "Expired" / "Disabled" / null-or-"All"
     @Getter private long total;
 
+    // ---- Lightweight counts for fetchNhiIdentitiesStats (summary cards / tab badges) ----
+    @Setter private List<String> identityNames; // identityNames known to have violations (from the
+                                                 // already-fetched, cheap fetchViolationCountsByIdentity)
+    @Getter private long statTotal;
+    @Getter private long statExpired;
+    @Getter private long statDisabled;
+    @Getter private long statWithViolations;
+
     // Unlike NhiGovernanceViolationsAction.buildBaseMatchConditions, this does NOT add a
     // contextSource filter: NhiIdentityDao extends the plain AccountsContextDao (not
     // AccountsContextDaoWithContextSource like NhiViolationDao), which never auto-scopes by
@@ -153,6 +161,46 @@ public class NhiGovernanceIdentitiesAction extends UserAction {
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching paginated NHI identities: " + e.getMessage());
+            addActionError(e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Cheap counts-only companion to fetchAllNhiIdentities — feeds the Identities page's summary
+     * cards and tab badges without pulling the full account's identity documents over the wire
+     * (that used to happen via the old unpaginated fetchNhiIdentities(), which returns 13.8k+ docs
+     * on the Atlas Scale Test account just to compute four numbers). Four independent count()
+     * calls rather than one $facet — simplest correct fix; revisit as a single $facet if profiling
+     * shows the round trips matter.
+     */
+    public String fetchNhiIdentitiesStats() {
+        try {
+            List<Bson> baseConditions = buildIdentityMatchConditions();
+            Bson baseFilter = combineIdentityMatch(baseConditions);
+            statTotal = NhiIdentityDao.instance.count(baseFilter);
+
+            int nowEpoch = (int) (System.currentTimeMillis() / 1000);
+            List<Bson> expiredConditions = new ArrayList<>(baseConditions);
+            expiredConditions.add(Filters.gt(NhiIdentity.EXPIRY_DATE, 0));
+            expiredConditions.add(Filters.lt(NhiIdentity.EXPIRY_DATE, nowEpoch));
+            statExpired = NhiIdentityDao.instance.count(combineIdentityMatch(expiredConditions));
+
+            List<Bson> disabledConditions = new ArrayList<>(baseConditions);
+            disabledConditions.add(Filters.eq(NhiIdentity.STATUS, "INACTIVE"));
+            statDisabled = NhiIdentityDao.instance.count(combineIdentityMatch(disabledConditions));
+
+            if (identityNames != null && !identityNames.isEmpty()) {
+                List<Bson> withViolationsConditions = new ArrayList<>(baseConditions);
+                withViolationsConditions.add(Filters.in(NhiIdentity.IDENTITY_NAME, identityNames));
+                statWithViolations = NhiIdentityDao.instance.count(combineIdentityMatch(withViolationsConditions));
+            } else {
+                statWithViolations = 0;
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching NHI identities stats: " + e.getMessage());
             addActionError(e.getMessage());
             return Action.ERROR.toUpperCase();
         }
