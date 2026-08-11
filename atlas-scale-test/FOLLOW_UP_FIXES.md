@@ -28,6 +28,31 @@ pick up cold.
   each row, not just the number) — extended `FetchHostSeverityCountsRequest` with an optional
   `host_filter` so the same cheap `$bucket` aggregation can be scoped to one asset's own hostNames,
   one small targeted call per top-5 row.
+- NHI Governance Identities page (`IdentitiesPage.jsx`) had **zero** server-side pagination —
+  `fetchNhiIdentities()` pulled the whole account's identity list via `findAll` and paginated
+  client-side via `GithubSimpleTable`. Added `NhiGovernanceIdentitiesAction.fetchAllNhiIdentities()`
+  (real Mongo `$skip`/`$limit`/`count()`, mirroring `fetchAllViolations`'s pattern) and wired the
+  table to it. First pass used `AgGridTable` by analogy with the sibling `ViolationsPage.jsx` — user
+  caught that this was the wrong convention ("got changed into new layout, that was in old layout
+  ... refer the master version") and that it was slower than before. `ViolationsPage.jsx`'s AG-Grid
+  choice was specific to that page (commit `937bfa384a`), not a general NHI Governance pattern; the
+  actual established convention for `IdentitiesPage.jsx` (per that same commit, matching
+  `UsersAndDevices.jsx`) is `GithubServerTable`'s real server-mode. Reverted to that, and reverted
+  the Identity flyout's Violations tab (`IdentityDetailsPanel.jsx`) entirely — its
+  `IDENTITY_VIOLATIONS_LIMIT = 200` bounded single-fetch design was a deliberate existing choice,
+  not a bug, and didn't need touching. `ViolationsPage.jsx` itself needed no changes — confirmed
+  already correctly paginated. **Lesson**: match the established convention for the specific page
+  being changed, not whatever a sibling page happens to use.
+- `fetchAllNhiIdentities()`'s match-condition builder copied a `Context.contextSource` filter from
+  `NhiGovernanceViolationsAction.buildBaseMatchConditions` defensively, without checking whether it
+  was actually needed. It wasn't: `NhiIdentityDao extends AccountsContextDao` (plain — never
+  auto-scopes by contextSource for any query), unlike `NhiViolationDao extends
+  AccountsContextDaoWithContextSource` (which auto-injects that filter, which is why the violations
+  action needs to manually replicate it only for its raw-aggregate bypass). The spurious filter
+  silently excluded identities whose `contextSource` didn't match the current request's context,
+  causing the "Expired" tab to show 38 rows against its own "50" count badge on a real account
+  (Acorns Demo) — reproduced live, matching the user's report, and confirmed fixed (`total: 50`,
+  matching the tab badge, after removing the filter).
 - "Top Used Applications" showed "No AI interaction data yet." even against a real production data
   dump with genuine `UserAnalysisData` records — **initially misdiagnosed as a data-seeding gap;
   it wasn't.** Root cause: `UserAnalysisData.serviceId` is a readable client name ("claudecli",
