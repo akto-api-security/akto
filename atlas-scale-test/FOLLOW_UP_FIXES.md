@@ -230,6 +230,46 @@ pick up cold.
   unchecking "Contains personal account" from Tags (leaving Local MCP Server/Malicious
   Skill/Misconfigured) narrows 777 → 20, and all 20 visible rows correctly show the "Local MCP
   Server" badge.
+- NHI Governance's Identities page had **zero** server-side pagination —
+  `NhiGovernanceIdentitiesAction.fetchNhiIdentities()` did an unbounded `findAll(filter)` with no
+  skip/limit/count at all, pulling every identity in the account into the browser on every load,
+  then paginating client-side via `GithubSimpleTable`. The identity flyout's own "Violations" tab
+  (`IdentityDetailsPanel.jsx`) had a lesser version of the same problem: a single bounded
+  `limit: 200` fetch, then client-side pagination over that batch — silently truncating any
+  identity with more than 200 violations, and not a real per-page round trip either way. Converted
+  both to true AG Grid SSRM, mirroring the sibling `ViolationsPage.jsx`'s already-correct pattern:
+  added `fetchAllNhiIdentities` (real Mongo `$skip`/`$limit`/`count()`, mirroring
+  `fetchAllViolations`) while keeping the old `fetchNhiIdentities()` unpaginated — it now serves
+  only `IdentityOverviewGraph`'s topology graph, which genuinely needs every identity to fan out
+  each agent's full list correctly (same "separate full-fetch for the graph" split established for
+  `DeviceEndpoints.jsx`'s Overview tab). `fetchViolationsByIdentity` already did real server-side
+  pagination — only `sortKey`/`sortOrder`/`queryValue` were declared on the action but silently
+  unused by that specific method; wired them up so the flyout's Violations tab can request one page
+  at a time, keeping severity stats/totals correctly identity-wide (unaffected by an active
+  search). Moved `mapViolationToRow`/`transformViolationsPage` out of `ViolationsPage.jsx`
+  (previously module-private) into the shared `nhiViolationsData.jsx` so both pages' grids share one
+  per-row cell-shaping implementation instead of duplicating it; removed the now-fully-dead
+  `transformApiViolations`/`violationsHeaders`/`violationsSortOptions`, which only existed for the
+  old `GithubSimpleTable`-based flyout table. Default sort on the Identities table changes from the
+  old client-side "most violations first" ranking to `createdAt` descending (most recently
+  discovered first) — replicating the old ranking server-side would need a `$lookup` into
+  `nhi_violations` since identities don't carry a denormalized violation count; flagging this as a
+  deliberate, visible behavior change. Also caught and fixed a real rendering bug during
+  verification: `IdentitiesPage.jsx`'s topology graph (`react-flow`) settles its own layout
+  asynchronously above the grid, leaving the newly-mounted AG Grid's row virtualization computed
+  against a stale viewport — rows landed correctly in the DOM (confirmed via accessibility-tree
+  inspection) but didn't visually paint until something forced a relayout (e.g. a manual window
+  resize). Fixed with a one-time `window.dispatchEvent(new Event("resize"))` nudge ~300ms after each
+  grid (re)mount. Verified live: all 12 identities render on fresh load with no manual interaction,
+  tab switching ("All"/"Expired"/"Disabled") re-fetches from the server with matching counts,
+  search narrows 12 → 4 for "notion", and the flyout's Violations tab correctly shows "No violations
+  found for this identity" for a zero-violation identity (this demo account has no NHI violations
+  at all, so the populated-grid path couldn't be exercised with real rows — verified via request/
+  response payload inspection instead). The main Violations page itself
+  (`NhiGovernanceViolationsAction.fetchAllViolations` + `ViolationsPage.jsx`'s `onServerFetch`) was
+  independently found to already be a fully correct, working SSRM implementation end-to-end via
+  code review — confirmed its pagination footer renders correctly against 0 rows; no changes were
+  needed or made there, despite it being reported alongside the other two.
 
 ## High priority — wrong output today
 
