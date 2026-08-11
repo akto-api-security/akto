@@ -11,11 +11,26 @@ public class CustomRole {
     public final static String BASE_ROLE = "baseRole";
     public static final String API_COLLECTIONS_ID = "apiCollectionsId";
     public static final String DEFAULT_INVITE_ROLE = "defaultInviteRole";
+    public static final String THREAT_PROTECTION_ENABLED = "threatProtectionEnabled";
     private String name;
     private String baseRole;
-    private List<Integer> apiCollectionsId;    
+    private List<Integer> apiCollectionsId;
     boolean defaultInviteRole;
 
+    /*
+     * Whether this role may use threat protection, independent of what its base role
+     * allows. Nullable on purpose: null means "no explicit choice", so roles created
+     * before this existed keep whatever their base role grants.
+     */
+    @Getter
+    @Setter
+    private Boolean threatProtectionEnabled;
+
+    /*
+     * Retained so existing documents keep their values, but nothing reads it: access is
+     * resolved from the base role's map plus threatProtectionEnabled. There is no UI to
+     * set it either. Do not treat a value here as granting anything.
+     */
     @Getter
     @Setter
     private List<String> allowedFeaturesForUser;
@@ -23,7 +38,7 @@ public class CustomRole {
     public CustomRole() {
     }
 
-    public CustomRole(String name, String baseRole, List<Integer> apiCollectionsId, boolean defaultInviteRole, List<String> allowedFeaturesForUser) {
+    public CustomRole(String name, String baseRole, List<Integer> apiCollectionsId, boolean defaultInviteRole, Boolean threatProtectionEnabled) {
         switch (baseRole) {
             case "ADMIN":
             case "DEVELOPER":
@@ -40,7 +55,7 @@ public class CustomRole {
         this.name = name;
         this.apiCollectionsId = apiCollectionsId;
         this.defaultInviteRole = defaultInviteRole;
-        this.allowedFeaturesForUser = allowedFeaturesForUser;
+        this.threatProtectionEnabled = threatProtectionEnabled;
     }
 
     public String getName() {

@@ -172,6 +172,16 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             Feature featureType = Feature.valueOf(this.featureLabel.toUpperCase());
 
             ReadWriteAccess accessGiven = userRoleRecord.getReadWriteAccessForFeature(featureType);
+
+            /*
+             * Threat protection is the one feature a custom role can be granted or denied
+             * independently of its base role. Scoped to this feature because resolving it
+             * costs a custom role lookup.
+             */
+            if (featureType == Feature.THREAT_PROTECTION) {
+                accessGiven = RBACDao.resolveThreatAccess(userId, sessionAccId, accessGiven);
+            }
+
             boolean hasRequiredAccess = false;
 
             if(this.accessType.equalsIgnoreCase(ReadWriteAccess.READ.toString()) || this.accessType.equalsIgnoreCase(accessGiven.toString())){

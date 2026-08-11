@@ -7,7 +7,6 @@ import { usersCollectionRenderItem } from "../rbac/utils";
 import PersistStore from "../../../../main/PersistStore";
 import SearchableResourceList from "../../../components/shared/SearchableResourceList";
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
-import Dropdown from "../../../components/layouts/Dropdown";
 
 const rolesOptions = [
     {
@@ -46,7 +45,43 @@ function getRoleDisplayName(role) {
 
 export { rolesOptions, getRoleDisplayName }
 
+// base roles whose static access map already grants threat protection
+const THREAT_ENABLED_BASE_ROLES = ['ADMIN', 'THREAT_ENGINEER', 'THREAT_VIEWER']
+
+/*
+ * threatProtectionEnabled is null for roles created before the toggle existed, which
+ * means "no explicit choice" - those keep whatever the base role grants.
+ */
+function threatEnabledFor(role) {
+    return role?.threatProtectionEnabled ?? THREAT_ENABLED_BASE_ROLES.includes(role?.baseRole)
+}
+
+// base roles that already grant threat protection have nothing to toggle
+function showThreatToggle(role) {
+    return !THREAT_ENABLED_BASE_ROLES.includes(role?.baseRole)
+}
+
+/*
+ * Only persist a choice while the toggle is shown. Saving one for a base role that
+ * already grants threat access would leave a stale override behind if the base role
+ * were later changed to one that does not.
+ */
+function threatValueToSave(role) {
+    return showThreatToggle(role) ? threatEnabledFor(role) : null
+}
+
+// an empty feature map means a self-hosted deployment, where everything is granted
+function isThreatFeatureGranted() {
+    const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED
+    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
+        return true
+    }
+    return stiggFeatures?.THREAT_DETECTION?.isGranted === true
+}
+
 const Roles = () => {
+
+    const threatFeatureGranted = isThreatFeatureGranted()
 
     const userRole = window.USER_ROLE
     const isLocalDeploy = func.checkLocal();
@@ -56,7 +91,6 @@ const Roles = () => {
     const [loading, setLoading] = useState(false)
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const [createNewRoleModalActive, setCreateNewRoleModalActive] = useState(false)
-    const [allowedFeatures, setAllowedFeatures] = useState([])
 
     const toggleInviteUserModal = () => {
         setCreateNewRoleModalActive(!createNewRoleModalActive)
@@ -76,21 +110,10 @@ const Roles = () => {
         }
     };
 
-    const getAllAllowedFeatures = async () => {
-        try {
-            const featuresResponse = await settingRequests.getAllowedFeaturesForRBAC()
-            if (featuresResponse) {
-                setAllowedFeatures(featuresResponse);
-            }
-        } catch (error) {
-        }
-    }
-
     useEffect(() => {
         if (userRole !== 'GUEST') {
             getRoleData();
         }
-        getAllAllowedFeatures();
 
     }, [])
 
@@ -137,6 +160,20 @@ const Roles = () => {
         })
     }
 
+    const updateThreatProtection = (role, value) => {
+        setRoles(prevRoles => {
+            return prevRoles.map(r => {
+                if (r.name === role) {
+                    return {
+                        ...r,
+                        threatProtectionEnabled: value
+                    }
+                }
+                return r;
+            })
+        })
+    }
+
     const updateDefaultInviteRole = (role, value) => {
         setRoles(prevRoles => {
             return prevRoles.map(r => {
@@ -153,7 +190,7 @@ const Roles = () => {
 
     const handleUpdate = async (role) => {
         const roleData = roles.filter(r => r.name === role)[0]
-        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole, roleData.allowedFeaturesForUser)
+        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole, threatValueToSave(roleData))
         await getRoleData();
     }
 
@@ -233,20 +270,14 @@ const Roles = () => {
                                                         checked={defaultInviteRole}
                                                         onChange={(checked) => { updateDefaultInviteRole(name, checked) }}
                                                     />
-                                                </HorizontalStack>
-                                            </Box>
-                                            <Box paddingBlockStart={4}> 
-                                                <HorizontalStack gap={"4"}  align="center" blockAlign="center">
-                                                    <Text variant="bodyMd" as="h4">
-                                                        Allowed Features
-                                                    </Text>
-                                                    <Dropdown
-                                                        id={`allowed-features-${name}`}
-                                                        menuItems={allowedFeatures.map(feature => ({ label: feature, value: feature }))}
-                                                        selected={(items) =>  handleSelectedItemsChange(name, items, 'allowedFeaturesForUser')}
-                                                        allowMultiple={true}
-                                                        initial={getRoleItems(name, "allowedFeaturesForUser")}
-                                                    />
+                                                    {showThreatToggle(item) ? (
+                                                        <Checkbox
+                                                            label={"Enable threat protection"}
+                                                            checked={threatEnabledFor(item)}
+                                                            disabled={!threatFeatureGranted}
+                                                            onChange={(checked) => { updateThreatProtection(name, checked) }}
+                                                        />
+                                                    ) : null}
                                                 </HorizontalStack>
                                             </Box>
                                             <Box>

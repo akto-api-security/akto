@@ -143,7 +143,7 @@ public class TestInviteUserAction extends MongoBasedTest{
 
         assertEquals("ERROR",inviteUserAction.execute());
 
-        CustomRole customRole = new CustomRole("CUSTOM_ROLE", Role.ADMIN.name(), new ArrayList<>(), false, new ArrayList<>());
+        CustomRole customRole = new CustomRole("CUSTOM_ROLE", Role.ADMIN.name(), new ArrayList<>(), false, null);
         CustomRoleDao.instance.insertOne(customRole);
 
         inviteUserAction.setInviteeRole("CUSTOM_ROLE");
