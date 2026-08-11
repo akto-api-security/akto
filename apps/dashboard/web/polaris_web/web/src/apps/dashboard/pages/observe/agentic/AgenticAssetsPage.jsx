@@ -361,17 +361,22 @@ export default function AgenticAssetsPage() {
           trafficInfoResp,
           riskScoreResp,
           sensitiveInfoResp,
-          shieldResult,
-          rawViolationRows,
-          userAnalysisList,
         ] = await Promise.all([
           api.getAllCollectionsBasic(),
           api.getLastTrafficSeen(),
           api.getRiskScoreInfo(),
           api.getSensitiveInfoForCollections(),
+        ]);
+
+        if (!isMountedRef.current) return;
+
+        // These enrich the core asset list (violations, usernames, AI-interaction counts) but
+        // live behind separate plan entitlements (e.g. Threat Detection). A denial here shouldn't
+        // sink the whole page — fall back to empty/default data so the asset inventory still loads.
+        const [shieldResult, rawViolationRows, userAnalysisList] = await Promise.all([
           fetchEndpointShieldUserMetadata(),
-          fetchAgenticViolations({ startTimestamp, endTimestamp }),
-          agenticObserveApi.listUserAnalysis(),
+          fetchAgenticViolations({ startTimestamp, endTimestamp }).catch(() => []),
+          agenticObserveApi.listUserAnalysis().catch(() => []),
         ]);
 
         if (!isMountedRef.current) return;

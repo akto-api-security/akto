@@ -200,6 +200,24 @@ export const deviceServiceKey = (hostName) => {
 // "All time" even though the asset genuinely exists.
 const lastSeenOrStartTs = (c, trafficMap) => trafficMap[c.id] || c.startTs || 0;
 
+// A grouped asset (agent/service/LLM/skill) is a rollup of many collections — e.g. the "cursor"
+// agent group contains both <device>.ai_agent.cursor (the agent client itself) and
+// <device>.ai_agent.github (a service it happened to call). Prefer the description on the
+// collection whose hostname service segment matches the group's own name/key — that's the
+// canonical "self" collection, not an unrelated downstream service. Fall back to any collection
+// in the group that has a description if there's no such match (or it has none).
+export const groupDescription = (collections, groupKey) => {
+    const key = (groupKey || "").toLowerCase();
+    const list = collections || [];
+    const selfCollection = list.find((c) => {
+        const hostName = c.hostName || c.displayName || c.name;
+        const serviceName = extractServiceName(hostName);
+        return serviceName && serviceName.toLowerCase() === key;
+    });
+    if (selfCollection?.description) return selfCollection.description;
+    return list.find((c) => c.description)?.description || "";
+};
+
 // Group collections by agent identification (mcp-client, ai-agent values)
 // These are the sources that discovered the services (cursor, litellm, etc.)
 // Note: browser-llm-agent is excluded from this grouping
@@ -278,6 +296,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore || null,
+        description: groupDescription(g.collections, g.groupKey),
     }));
 };
 
@@ -384,6 +403,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore,
+        description: groupDescription(g.collections, g.groupKey),
     }));
 };
 
@@ -463,6 +483,7 @@ export const groupCollectionsByLLM = (collections, trafficMap = {}, sensitiveMap
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore,
+        description: groupDescription(g.collections, g.groupKey),
     }));
 };
 
@@ -551,6 +572,7 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore || null,
+        description: groupDescription(g.collections, g.groupKey),
     }));
 };
 
@@ -1001,6 +1023,7 @@ export function buildAgenticAssetsPageData(
             deviceCount: group.endpointsCount,
             lastSeen: lastSeen > 0 ? func.prettifyEpoch(lastSeen) : "",
             lastSeenEpoch: lastSeen,
+            description: group.description,
             skillCount: skillNames.size,
             skillNames: skillNames.size ? [...skillNames] : undefined,
             toolCount: 0,
