@@ -106,6 +106,16 @@ export default {
         });
         return resp?.mcpAuditInfoList || [];
     },
+    // Batch form of fetchMcpAuditInfoByCollection — one request for many collection ids instead of
+    // one request per id. Returns a plain object keyed by collection id (string) -> mcpAuditInfoList.
+    async fetchMcpAuditInfoByCollectionBatch(apiCollectionIds) {
+        const resp = await request({
+            url: '/api/fetchMcpAuditInfoByCollection',
+            method: 'post',
+            data: { apiCollectionIds }
+        });
+        return resp?.mcpAuditInfoListByCollection || {};
+    },
 
     async fetchDataTypeNames() {
         const resp = await request({
@@ -525,6 +535,16 @@ export default {
             }
         })
     },
+    // Batch form of fetchApisFromStis — one request for many collection ids instead of one request
+    // per id. Returns a plain object keyed by collection id (string) -> STI list.
+    async fetchApisFromStisBatch(apiCollectionIds) {
+        const resp = await request({
+            url: '/api/fetchApiInfosFromSTIs',
+            method: 'post',
+            data: { apiCollectionIds }
+        })
+        return resp?.listByCollection || {}
+    },
 
     async fetchApiInfosForCollection(apiCollectionId) {
         return await request({
@@ -534,6 +554,16 @@ export default {
                 apiCollectionId: apiCollectionId,
             }
         })
+    },
+    // Batch form of fetchApiInfosForCollection — one request for many collection ids instead of one
+    // request per id. Returns a plain object keyed by collection id (string) -> apiInfoList.
+    async fetchApiInfosForCollectionBatch(apiCollectionIds) {
+        const resp = await request({
+            url: '/api/fetchApiInfosForCollection',
+            method: 'post',
+            data: { apiCollectionIds }
+        })
+        return resp?.apiInfoListByCollection || {}
     },
     // ATLAS: single call returning skill risk / malicious / misconfigured maps for the whole account
     // (replaces the per-collection fetchApiInfosForCollection N+1 on the agentic pages).

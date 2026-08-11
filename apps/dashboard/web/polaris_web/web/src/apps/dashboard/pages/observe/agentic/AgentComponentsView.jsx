@@ -5,6 +5,7 @@ import { TypeBadge, RiskPill, SeverityBadge } from "./AgenticCellRenderers";
 import { ToolDetailPanel, SkillDetailPanel } from "./McpComponentsView";
 import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges";
 import agenticObserveApi, { openViolationInThreatActivity } from "./agenticObserveApi";
+import { buildMcpComponentsFromStis } from "./agenticPageBuilders";
 import api from "../api";
 import func from "@/util/func";
 
@@ -122,11 +123,13 @@ function AgentMcpToolsView({ asset, selectedMcp, goToList, onNavChange, setSelec
         let cancelled = false;
         (async () => {
             try {
-                const results = await Promise.all(collectionIds.map(id => agenticObserveApi.fetchMcpComponentsData(id)));
+                // Batched — see AgenticAssetFlyout.jsx's AI Agent effect for why this matters.
+                const bundleMap = await agenticObserveApi.fetchCollectionStiBundlesBatch(collectionIds);
                 if (cancelled) return;
                 const seen = new Set();
                 const merged = [];
-                results.forEach(data => {
+                bundleMap.forEach(b => {
+                    const data = buildMcpComponentsFromStis(b.stiEndpoints, b.apiInfoList, b.id, b.auditRows);
                     (data.tools || []).forEach(t => {
                         if (!seen.has(t.name)) { seen.add(t.name); merged.push(t); }
                     });

@@ -302,6 +302,31 @@ const agenticObserveApi = {
         };
     },
 
+    // Batch form of fetchCollectionStiBundle — 3 requests total (one per data type) regardless of how
+    // many collection ids are passed, instead of 3 requests PER id. An agentic asset group can span
+    // thousands of underlying collections, so the per-id form could fire thousands of concurrent
+    // browser requests when a flyout opened (AgenticAssetFlyout.jsx). Returns a Map<id, bundle>.
+    async fetchCollectionStiBundlesBatch(apiCollectionIds) {
+        const ids = (apiCollectionIds || []).map((x) => (typeof x === "string" ? parseInt(x, 10) : x));
+        if (!ids.length) return new Map();
+        const [stiById, apiInfoById, auditById] = await Promise.all([
+            observeApi.fetchApisFromStisBatch(ids),
+            observeApi.fetchApiInfosForCollectionBatch(ids),
+            observeApi.fetchMcpAuditInfoByCollectionBatch(ids),
+        ]);
+        const bundles = new Map();
+        ids.forEach((id) => {
+            const stiList = stiById[String(id)] || [];
+            bundles.set(id, {
+                id,
+                stiEndpoints: stiList.map((x) => ({ method: x?._id?.method, url: x?._id?.url })),
+                apiInfoList: apiInfoById[String(id)] || [],
+                auditRows: auditById[String(id)] || [],
+            });
+        });
+        return bundles;
+    },
+
     // Tools/resources/prompts sourced from the collection's STI endpoints (for real url+method, used
     // to fetch sample traffic) classified by the MCP audit `type` field (the authoritative source for
     // tool/resource/prompt/server — same as the legacy Audit Data page), joined with apiInfoList for risk.

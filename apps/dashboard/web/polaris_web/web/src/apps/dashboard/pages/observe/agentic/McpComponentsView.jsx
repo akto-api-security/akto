@@ -4,6 +4,7 @@ import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { ParamNameCellRenderer, ParamTypeCellRenderer, ParamDescCellRenderer, SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges";
 import agenticObserveApi from "./agenticObserveApi";
+import { buildMcpComponentsFromStis } from "./agenticPageBuilders";
 import observeApi from "../api";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import ApiIssuesTab from "../api_collections/ApiIssuesTab";
@@ -276,13 +277,17 @@ export default function McpComponentsView({ asset, onNavChange }) {
         let cancelled = false;
         (async () => {
             try {
-                const results = await Promise.all(collectionIds.map(id => agenticObserveApi.fetchMcpComponentsData(id)));
+                // Batched: 3 requests total regardless of collectionIds.length, not 1 request PER
+                // id — an agent/mcp group can span thousands of collections, which used to fire
+                // that many concurrent requests here and choke the browser on opening this tab.
+                const bundleMap = await agenticObserveApi.fetchCollectionStiBundlesBatch(collectionIds);
                 if (cancelled) return;
                 // Merge across all collections, dedupe by name+type
                 const seen = new Set();
                 const tools = [], resources = [], prompts = [], skills = [];
                 const toolViolations = {};
-                results.forEach(data => {
+                bundleMap.forEach(b => {
+                    const data = buildMcpComponentsFromStis(b.stiEndpoints, b.apiInfoList, b.id, b.auditRows);
                     Object.assign(toolViolations, data.toolViolations || {});
                     (data.tools     || []).forEach(t  => { const k = `tool:${t.name}`;     if (!seen.has(k)) { seen.add(k); tools.push(t); } });
                     (data.resources || []).forEach(r  => { const k = `resource:${r.name}`; if (!seen.has(k)) { seen.add(k); resources.push(r); } });

@@ -4,7 +4,7 @@ import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AgenticFlyoutShell from "./AgenticFlyoutShell";
 import AiChatSection from "./AiChatSection";
-import { buildAgentInlineTopologyComponents, buildAgentBuiltinToolsFromStis, countAgentComponentsTab } from "./agenticPageBuilders";
+import { buildAgentInlineTopologyComponents, buildAgentBuiltinToolsFromStis, buildMcpComponentsFromStis, countAgentComponentsTab } from "./agenticPageBuilders";
 import { RiskScoreCellRenderer } from "./AgenticCellRenderers";
 import agenticObserveApi, { buildAgenticObserveChatMetadata, selectConfigViolationRows, summarizeViolations } from "./agenticObserveApi";
 import api from "../api";
@@ -119,7 +119,11 @@ export default function AgenticAssetFlyout({
         let cancelled = false;
         (async () => {
             try {
-                const bundles = await Promise.all(collectionIds.map(id => agenticObserveApi.fetchCollectionStiBundle(id)));
+                // Batched: 3 requests total regardless of collectionIds.length, not 3 PER id — an
+                // agent group can span thousands of collections, which used to fire thousands of
+                // concurrent requests here and choke the browser on opening this flyout.
+                const bundleMap = await agenticObserveApi.fetchCollectionStiBundlesBatch(collectionIds);
+                const bundles = Array.from(bundleMap.values());
                 const sti = bundles.flatMap(b => b.stiEndpoints || []);
                 const builtinTools = bundles.flatMap(b =>
                     buildAgentBuiltinToolsFromStis(b.stiEndpoints, b.apiInfoList, b.id, b.auditRows)
@@ -139,11 +143,13 @@ export default function AgenticAssetFlyout({
         let cancelled = false;
         (async () => {
             try {
-                const results = await Promise.all(collectionIds.map(id => agenticObserveApi.fetchMcpComponentsData(id)));
+                // Batched — see comment in the AI Agent effect above for why this matters.
+                const bundleMap = await agenticObserveApi.fetchCollectionStiBundlesBatch(collectionIds);
                 if (cancelled) return;
                 const seen = new Set();
                 let count = 0;
-                results.forEach(data => {
+                bundleMap.forEach((b) => {
+                    const data = buildMcpComponentsFromStis(b.stiEndpoints, b.apiInfoList, b.id, b.auditRows);
                     const categories = [
                         { items: data.tools,     prefix: "tool:" },
                         { items: data.resources, prefix: "resource:" },
