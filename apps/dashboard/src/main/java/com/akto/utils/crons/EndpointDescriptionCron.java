@@ -1,6 +1,7 @@
 package com.akto.utils.crons;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,7 +28,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.task.Cluster;
 import com.akto.usage.UsageMetricCalculator;
-import com.akto.util.AccountTask;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -49,6 +49,9 @@ public class EndpointDescriptionCron {
     private static final Pattern MCP_TOOL_NAME_PATTERN = Pattern.compile("tools/call/([^/?]+)");
 
     private static final int TEST_ATLAS_ACCOUNT_ID = 1779231193;
+    // Explicit allowlist - this cron no longer sweeps every account, only these. Add more IDs here as
+    // needed.
+    private static final List<Integer> ALLOWED_ACCOUNT_IDS = Collections.singletonList(TEST_ATLAS_ACCOUNT_ID);
     private static final String ENDPOINT_DESCRIPTION_ENABLED_TAG = "endpoint-description-enabled";
     private static final int ENDPOINT_NAME_BATCH_SIZE = 25;
     private static final int AGENT_LLM_ENDPOINT_BATCH_SIZE = 10;
@@ -76,8 +79,10 @@ public class EndpointDescriptionCron {
             ExecutorService pool = Executors.newFixedThreadPool(3);
 
             try {
-                AccountTask.instance.executeTask(account -> {
-                    int accountId = account.getId();
+                for (int accountId : ALLOWED_ACCOUNT_IDS) {
+                    if (batchesRemaining.get() <= 0) {
+                        break;
+                    }
                     List<ApiCollection> eligible = findEndpointEligibleCollections(accountId, batchesRemaining.get());
                     for (ApiCollection collection : eligible) {
                         if (batchesRemaining.get() <= 0) {
@@ -86,7 +91,7 @@ public class EndpointDescriptionCron {
                         pool.submit(() -> generateEndpointDescriptions(
                             accountId, collection, batchesRemaining, MAX_ENDPOINTS_PER_COLLECTION_PER_RUN, false));
                     }
-                }, "endpoint-description-cron");
+                }
             } finally {
                 pool.shutdown();
                 try {
