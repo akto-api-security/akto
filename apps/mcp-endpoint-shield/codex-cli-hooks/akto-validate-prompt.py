@@ -61,7 +61,7 @@ def _detect_codex_api():
 _detected_host, CODEX_API_PATH = _detect_codex_api()
 if MODE == "atlas":
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    CODEX_API_HOST = f"https://{device_id}.ai-agent.codexcli" if device_id else _detected_host
+    CODEX_API_HOST = f"https://{device_id}.ai-agent.codex-cli" if device_id else _detected_host
     logger.info(f"MODE: {MODE}, Device ID: {device_id}, CODEX_API_HOST: {CODEX_API_HOST}, CODEX_API_PATH: {CODEX_API_PATH}")
 else:
     CODEX_API_HOST = _detected_host
@@ -91,6 +91,7 @@ def build_http_proxy_url(
 
 def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
     logger.info(f"API CALL: POST {url}")
+    logger.info(f"AKTO_DBG outbound device_id={os.getenv('DEVICE_ID') or ''} url={url} payload={json.dumps(payload)[:3000]}")
     if LOG_PAYLOADS:
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
 
@@ -130,7 +131,7 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
 def build_validation_request(query: str, session_info: dict = None) -> dict:
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
-        tags["ai-agent"] = "codexcli"
+        tags["ai-agent"] = "codex-cli"
         tags["source"] = CONTEXT_SOURCE
 
     host = CODEX_API_HOST.replace("https://", "").replace("http://", "")

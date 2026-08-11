@@ -35,12 +35,12 @@ CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 # Map AKTO_CONNECTOR to a short tag name used in headers, ai-agent tag, and atlas URL suffix.
 # Add new connectors here without touching anything else.
 _CONNECTOR_TAG: Dict[str, str] = {
-    "claude_code_cli": "claudecli",
+    "claude_code_cli": "claude-cli",
     "cursor": "cursor",
     "vscode": "vscode",
     "gemini_cli": "geminicli",
     "github": "github",
-    "codex_cli": "codexcli",
+    "codex_cli": "codex-cli",
     "kiro_cli": "kirocli"
 }
 TAG_NAME = _CONNECTOR_TAG.get(AKTO_CONNECTOR, AKTO_CONNECTOR)
@@ -115,6 +115,16 @@ def post_payload_json(
     logger: logging.Logger,
 ) -> Union[Dict[str, Any], str]:
     logger.info(f"API CALL: POST {url}")
+    # AKTO_DBG: single filterable line for every outbound hook request. The payload
+    # carries the host, tags and requestPayload, so `grep AKTO_DBG` isolates exactly
+    # what each hook sent and under which device_id/collection.
+    logger.info(
+        "AKTO_DBG outbound"
+        f" device_id={os.getenv('DEVICE_ID') or ''}"
+        f" connector={AKTO_CONNECTOR} tag_name={TAG_NAME}"
+        f" url={url}"
+        f" payload={json.dumps(payload)[:3000]}"
+    )
     if LOG_PAYLOADS:
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
 
