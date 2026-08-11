@@ -60,6 +60,10 @@ public class AccountSettings {
 
     private Map<String, String> filterHeaderValueMap;
     public static final String FILTER_HEADER_VALUE_MAP = "filterHeaderValueMap";
+    public static final String RUNTIME_ENV_OVERRIDES = "runtimeEnvOverrides";
+    @Getter
+    @Setter
+    private Map<String, String> runtimeEnvOverrides;
     public static final String DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES = "timeForScheduledSummaries";
     private int timeForScheduledSummaries;
     private Map<String, CollectionReplaceDetails> apiCollectionNameMapper;
