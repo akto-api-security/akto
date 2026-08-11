@@ -3706,10 +3706,10 @@ public class DbLayer {
             return updated.getTestRateLimitUsageCount();
         }
 
-        // Same day but already at/over limit — do not increment.
+        // Same day but already at/over limit — do not increment; return limit+1 so caller can detect overage.
         AccountSettings current = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         if (current != null && current.getTestRateLimitUsageDay() == today) {
-            return current.getTestRateLimitUsageCount();
+            return globalRateLimit > 0 ? globalRateLimit + 1 : current.getTestRateLimitUsageCount();
         }
 
         // New day (or first ever) — reset counter to 1.
