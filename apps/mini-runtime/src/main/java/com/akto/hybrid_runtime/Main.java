@@ -90,8 +90,7 @@ public class Main {
             debugPrintCounter--;
             loggerMaker.warn(o.toString());
         }
-    }   
-    
+    }
     public static boolean isOnprem = false;
     static long lastLogSyncOffsetMRS;
     static boolean syncImmediately = false;
@@ -318,7 +317,7 @@ public class Main {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
         String topicName = KafkaConfig.getTopicName();
-        String kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "kafka1:29092");
+        String kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL","kafka1:19092");
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
             loggerMaker.infoAndAddToDb("is_kubernetes: true");
