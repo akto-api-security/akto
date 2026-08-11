@@ -676,6 +676,43 @@ pick up cold.
   scoping it would be new plumbing for little payoff. Verified live: identical risk/sensitive/traffic
   values before and after the change (including the misconfigured/malicious/skill-count badges on
   expanded child rows), zero console errors, and all three old calls gone from the network log.
+- **A header regression against `ApiCollections.jsx`'s agent-tree view for the same asset**: the new
+  asset endpoints page showed "Claude CLI" + a plain "AI Agent" badge, no info icon, no "Explore
+  mode" button, while `ApiCollections.jsx` (unchanged, byte-identical to master —
+  `git diff master...HEAD` on that file is empty) shows "AI Agent - Claude CLI" as one title
+  (`TitleWithInfo`'s info icon + tooltip) plus an always-present "Explore mode" primaryAction. Fixed
+  `AgenticAssetDevicesPage.jsx` to build the same `"<Type> - <Name>"` title via `TitleWithInfo` and
+  added the same primaryAction navigating to `/dashboard/observe/query_mode`. Verified live: header
+  now matches the prod screenshot pixel-for-pixel, zero console errors. (The description subtitle
+  visible in an earlier screenshot the user provided could not be located anywhere in this codebase —
+  not in `ApiCollections.jsx`, `mcpClientHelper.js`, `TitleWithInfo.jsx`, or the backend
+  `McpClientRegistry.java` — and didn't reappear in the follow-up screenshots either, so it's left
+  unaddressed pending clarification on its actual source.)
+- **Back button from a child collection's Inventory page threw "groupKey and rowType are required"
+  when returning to the asset endpoints page.** Root cause was in the SHARED
+  `PageWithMultipleCards.jsx`, not the new page: its sessionStorage-tracked back-navigation stack
+  (`:23-53`) stored only `location.pathname`, never `location.search`, in both the push effect and
+  `navigateBack`'s own lookup. Any page whose identity depends on query params (like the new asset
+  endpoints page, keyed by `?groupKey=...&rowType=...`) got its own stack entry silently stripped to
+  the bare route, so a caller one hop further in (Inventory's own back button, going through the
+  same shared component) landed on a URL missing the query string entirely. Fixed by tracking
+  `pathname + search` consistently in both places — a no-op for every existing page that doesn't use
+  query params (their `search` is always `""`), fixing only pages that depend on it surviving
+  navigation. Verified live: full round-trip (asset endpoints page -> child collection -> Inventory
+  -> back) now correctly returns with `groupKey`/`rowType` intact, table renders normally, zero
+  console errors.
+- **Not a bug, reported and investigated**: user flagged a brief "Loading service graph..." spinner
+  before a clicked child collection's Inventory page finishes rendering. Traced to
+  `AgentDiscoverGraph.jsx:262,316-369,612-623` — its own `loading` state, gated on one scoped
+  `api.getCollection(apiCollectionId)` call, with an early-return spinner card. Confirmed this only
+  replaces that ONE component's own output (one entry in `ApiEndpoints.jsx`'s `components` array,
+  `:2025`/`:2066`) — the rest of the page (table, tabs, header) mounts and is interactive
+  independently; it's not a true full-page-blocking overlay, just visually prominent since it sits
+  first in the content area. Also confirmed via `git diff master...HEAD` (empty for both
+  `AgentDiscoverGraph.jsx` and `ApiEndpoints.jsx`) that this is pre-existing behavior on master,
+  unrelated to this branch's rebuild. Not fixed — flagged here only so it isn't re-investigated from
+  scratch if raised again; a real fix would defer/lazy-mount this card behind the rest of the page's
+  content instead of it always rendering first.
 
 ## High priority — wrong output today
 
