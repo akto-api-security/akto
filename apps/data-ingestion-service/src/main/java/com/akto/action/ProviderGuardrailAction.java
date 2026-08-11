@@ -202,11 +202,20 @@ public class ProviderGuardrailAction extends ActionSupport {
      * is intentionally omitted.
      */
     private static String buildAgentHost(ParsedRequest frame) {
-        String emailSlug = slugify(extractEmail(frame.actor));
+        String emailSlug = slugify(emailLocalPart(extractEmail(frame.actor)));
         if (emailSlug.isEmpty()) {
             emailSlug = "unknown";
         }
         return emailSlug + ".ai-agent." + normalizeApp(frame.application);
+    }
+
+    /** Local part of the email (before "@"); the domain is dropped. */
+    private static String emailLocalPart(String email) {
+        if (email == null) {
+            return null;
+        }
+        int at = email.indexOf('@');
+        return at > 0 ? email.substring(0, at) : email;
     }
 
     private static String extractEmail(Map<String, Object> actor) {
