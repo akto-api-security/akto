@@ -411,6 +411,17 @@ pick up cold.
 Lower urgency — none of these produce a wrong result today, but multiple independent review
 angles flagged the same patterns, so they're worth batching into one cleanup pass:
 
+- [ ] **`GithubServerTable.js` fires its initial fetch twice on every page load** (confirmed on both
+  `IdentitiesPage.jsx` and the pre-existing `UsersAndDevices.jsx` — not page-specific). The
+  fetch effect (`GithubServerTable.js:249-253`) depends on `[sortSelected, appliedFilters, page,
+  pageFiltersMap]`; a separate effect keyed on `currentPageKey` (`:136-155`) unconditionally calls
+  `setSortSelected(tableFunc.getInitialSortSelected(...))` on mount, which returns a fresh array
+  literal every time regardless of whether the sort actually changed — React sees a new reference
+  and re-fires the fetch effect, doubling every real-server-mode table's first network call
+  (verified identical `limit`/`sortKey`/`filters` payload both times). Affects every page using
+  `GithubServerTable` in real server-mode, not just the two pages rebuilt in this round.
+  **Fix:** compare the new `getInitialSortSelected()` result against the current `sortSelected` by
+  value before calling `setSortSelected`, or memoize/skip the call when unchanged.
 - [ ] Pagination-clamp logic (`effectiveLimit`/`from`/`to`) hand-copied 6× across
   `AgenticObserveAction.java`, `NhiGovernanceViolationsAction.java`, `ModuleInfoAction.java`, with
   inconsistent default caps (50/500 vs 20/200). Extract one shared `paginate(list, skip, limit)`.
