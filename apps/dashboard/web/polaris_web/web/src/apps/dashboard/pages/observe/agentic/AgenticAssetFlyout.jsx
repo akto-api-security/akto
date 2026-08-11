@@ -164,14 +164,17 @@ export default function AgenticAssetFlyout({
         let cancelled = false;
         (async () => {
             try {
-                // Batched: 3 requests total regardless of collectionIds.length, not 3 PER id — an
-                // agent group can span thousands of collections, which used to fire thousands of
-                // concurrent requests here and choke the browser on opening this flyout.
-                const bundleMap = await agenticObserveApi.fetchCollectionStiBundlesBatch(collectionIds);
+                // Overview only needs to know THAT an inline LLM/tool exists and its name — not its
+                // risk score or MCP-audit classification (that level of detail is what the Components
+                // tab needs, and AgentComponentsView already fetches it independently, lazily, only
+                // once that tab actually mounts). STI-only here is 1 batched request instead of 3
+                // (apiInfoList/auditRows empty — buildAgentBuiltinToolsFromStis' url-based fallback
+                // bucketing correctly classifies plain /tool/* paths as "Tool" without audit data).
+                const bundleMap = await agenticObserveApi.fetchCollectionStiOnlyBatch(collectionIds);
                 const bundles = Array.from(bundleMap.values());
                 const sti = bundles.flatMap(b => b.stiEndpoints || []);
                 const builtinTools = bundles.flatMap(b =>
-                    buildAgentBuiltinToolsFromStis(b.stiEndpoints, b.apiInfoList, b.id, b.auditRows)
+                    buildAgentBuiltinToolsFromStis(b.stiEndpoints, [], b.id, [])
                 );
                 if (!cancelled) setInlineTopology(buildAgentInlineTopologyComponents(sti, builtinTools, asset));
             } catch {
@@ -188,13 +191,16 @@ export default function AgenticAssetFlyout({
         let cancelled = false;
         (async () => {
             try {
-                // Batched — see comment in the AI Agent effect above for why this matters.
-                const bundleMap = await agenticObserveApi.fetchCollectionStiBundlesBatch(collectionIds);
+                // Overview only needs distinct component NAMES to produce a count — not risk/audit
+                // detail, which McpComponentsView already fetches independently, lazily, once the
+                // Components tab actually mounts. STI-only: 1 batched request instead of 3 (see the
+                // AI Agent effect above for the same reasoning).
+                const bundleMap = await agenticObserveApi.fetchCollectionStiOnlyBatch(collectionIds);
                 if (cancelled) return;
                 const seen = new Set();
                 let count = 0;
                 bundleMap.forEach((b) => {
-                    const data = buildMcpComponentsFromStis(b.stiEndpoints, b.apiInfoList, b.id, b.auditRows);
+                    const data = buildMcpComponentsFromStis(b.stiEndpoints, [], b.id, []);
                     const categories = [
                         { items: data.tools,     prefix: "tool:" },
                         { items: data.resources, prefix: "resource:" },

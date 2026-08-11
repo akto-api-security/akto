@@ -349,6 +349,27 @@ const agenticObserveApi = {
         return bundles;
     },
 
+    // STI-only batch — for callers that just need to know WHICH endpoints exist (names/urls), not
+    // per-endpoint risk (apiInfoList) or MCP audit classification (auditRows). One request instead of
+    // three; the other two only matter once a user drills into a component's actual risk/violations.
+    // Same Map<id, bundle> shape as fetchCollectionStiBundlesBatch, with apiInfoList/auditRows empty.
+    async fetchCollectionStiOnlyBatch(apiCollectionIds) {
+        const ids = (apiCollectionIds || []).map((x) => (typeof x === "string" ? parseInt(x, 10) : x));
+        if (!ids.length) return new Map();
+        const stiById = await observeApi.fetchApisFromStisBatch(ids);
+        const bundles = new Map();
+        ids.forEach((id) => {
+            const stiList = stiById[String(id)] || [];
+            bundles.set(id, {
+                id,
+                stiEndpoints: stiList.map((x) => ({ method: x?._id?.method, url: x?._id?.url })),
+                apiInfoList: [],
+                auditRows: [],
+            });
+        });
+        return bundles;
+    },
+
     // Tools/resources/prompts sourced from the collection's STI endpoints (for real url+method, used
     // to fetch sample traffic) classified by the MCP audit `type` field (the authoritative source for
     // tool/resource/prompt/server — same as the legacy Audit Data page), joined with apiInfoList for risk.
