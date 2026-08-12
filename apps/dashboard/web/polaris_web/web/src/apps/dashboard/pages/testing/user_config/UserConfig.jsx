@@ -160,6 +160,10 @@ function UserConfig() {
         ? "No limit is applied"
         : `This rate limit allows ${limit.toLocaleString()} requests per day`
 
+    const getRateLimitHelperTextAgentic = (limit) => limit === 0
+        ? "No limit is applied"
+        : `This limit allows ${limit.toLocaleString()} probes per day`
+
     const handleUpdateDeltaTime = async(limit) => {
         setInitialDeltaTime(limit);
         LocalStore.getState().setDefaultIgnoreSummaryTime(limit * 60)
@@ -251,7 +255,7 @@ function UserConfig() {
                                 initial={initialLimitAgentic}
                             />
                         </div>
-                        <Text variant="bodySm" color="subdued">{getRateLimitHelperText(initialLimitAgentic)}</Text>
+                        <Text variant="bodySm" color="subdued">{getRateLimitHelperTextAgentic(initialLimitAgentic)}</Text>
                     </LegacyStack>
                 </LegacyCard.Section>
             )}
