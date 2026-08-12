@@ -121,7 +121,7 @@ public class ProviderGuardrailAction extends ActionSupport {
         Map<String, Object> tag = new HashMap<>();
         tag.put("gen-ai", "Gen AI");
         tag.put("ai-agent", provider.toLowerCase());
-        tag.put("source", "AGENTIC");
+        tag.put("source", "ENDPOINT");
 
         Map<String, Object> meta = new HashMap<>();
         meta.put("webhook_id", frame.requestId);
@@ -156,7 +156,7 @@ public class ProviderGuardrailAction extends ActionSupport {
         envelope.put("source", "MIRRORING");
         envelope.put("tag", toJson(tag));
         envelope.put("metadata", toJson(meta));
-        envelope.put("contextSource", "AGENTIC");
+        envelope.put("contextSource", "ENDPOINT");
         return envelope;
     }
 
