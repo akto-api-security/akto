@@ -363,6 +363,12 @@ export default function AgenticAssetsPage() {
   //     (same reasoning as the malicious-skill flag below) — they apply on the next natural fetch
   //     (page change, sort, search, date-range change) instead of paying a second full round trip.
   useEffect(() => {
+    // Mirrors the redirect effect's own condition above — without this guard, this effect's Tier 1
+    // calls still fire on a cold first-visit-to-new-layout mount even though the redirect effect
+    // (also firing in the same tick) is about to unmount this page in favor of legacy Endpoints.jsx,
+    // wasting a fetchAndCacheAgenticTrafficRiskBundle/fetchEndpointShieldUserMetadata round trip that
+    // nothing here ever gets to use.
+    if (!newLayout) return;
     const isMountedRef = { current: true };
 
     (async () => {
@@ -431,7 +437,7 @@ export default function AgenticAssetsPage() {
     return () => {
       isMountedRef.current = false;
     };
-  }, [startTimestamp, endTimestamp]);
+  }, [startTimestamp, endTimestamp, newLayout]);
 
   useEffect(() => {
     // refreshKey starts at 0 and only becomes meaningful once the mount effect above has populated
