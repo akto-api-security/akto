@@ -334,6 +334,12 @@
                 <configuration>
                     <warSourceDirectory>web</warSourceDirectory>
                     <failOnMissingWebXml>false</failOnMissingWebXml>
+                    <!-- Build-time only; must not be served as static assets from the WAR.
+                         Kept on disk under web/ for npm/webpack config; never needed at runtime. -->
+                    <packagingExcludes>
+                        **/webpack.config.js,
+                        **/webpack.config.*.js
+                    </packagingExcludes>
                 </configuration>
             </plugin>
             <plugin>

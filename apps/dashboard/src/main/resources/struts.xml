@@ -13925,6 +13925,29 @@
             </result>
         </action>
 
+        <action name="api/updateRuntimeEnvOverrides" class="com.akto.action.AdminSettingsAction" method="updateRuntimeEnvOverrides">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated mini-runtime env overrides</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">runtimeEnvOverrides</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/saveDashboardLayout" class="com.akto.action.UserDashboardAction" method="saveDashboardLayout">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -15783,6 +15806,15 @@
             <result name="UNAUTHORIZED" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
         </action>
 
+        <action name="api/scheduleCrowdStrikeDiscovery" class="com.akto.action.CrowdStrikeIntegrationAction" method="scheduleCrowdStrikeDiscovery">
+            <interceptor-ref name="json"/><interceptor-ref name="defaultStack"/>
+            <interceptor-ref name="roleAccessInterceptor"><param name="featureLabel">INTEGRATIONS</param><param name="accessType">READ_WRITE</param><param name="actionDescription">User scheduled CrowdStrike discovery job</param></interceptor-ref>
+            <result name="FORBIDDEN" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json"><param name="statusCode">422</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+            <result name="UNAUTHORIZED" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
+        </action>
+
         <action name="api/exportGuardrailActivityToAdx" class="com.akto.action.AdxIntegrationAction" method="exportGuardrailActivityToAdx" >
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -17032,38 +17064,6 @@
                 <param name="includeProperties">^actionErrors.*, ^responses.*</param>
             </result>
         </action>
-
-        <action name="api/allowedFeaturesForRBAC" class="com.akto.action.RoleAction" method="allowedFeaturesForRBAC">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">ADMIN_ACTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result> 
-            <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">RBAC_FEATURE</param>
-            </interceptor-ref>
-            <result name="UNAUTHORIZED" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json">
-                <param name="root">allowedFeaturesForRBAC</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
         <action name="api/fetchMcpToolsApiCalls" class="com.akto.action.ApiCollectionsAction" method="fetchMcpToolsApiCalls">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

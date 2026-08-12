@@ -437,7 +437,6 @@ export default function DeviceEndpoints() {
                     fetchAgenticViolationCountsByHost({ startTimestamp, endTimestamp }),
                 ]);
                 if (!isMountedRef.current) return;
-
                 const { collections = [], trafficMap = {}, riskScoreMap = {} } = collectionsBundle || {};
                 const { usernameMap = {}, userMetadataMap = {}, moduleInfos = [] } = shieldResult || {};
                 const violationsByCollectionId = aggregateViolationCountsByCollectionId(hostCounts, collections);

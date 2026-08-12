@@ -99,50 +99,55 @@ get_api_token() {
 }
 
 generate_device_id() {
+    local device_name=""
+    if [ "$IS_MACOS" = true ]; then
+        device_name=$(scutil --get ComputerName 2>/dev/null | tr ' ' '-')
+    fi
+    [ -z "$device_name" ] && device_name=$(hostname 2>/dev/null | sed 's/\.local$//' | tr ' ' '-')
+
+    local machine_id=""
     # macOS: Try ioreg first
     if [ "$IS_MACOS" = true ] && command -v ioreg >/dev/null 2>&1; then
         UUID=$(ioreg -rd1 -c IOPlatformExpertDevice 2>/dev/null | grep IOPlatformUUID | awk -F'"' '{print $4}')
-        if [ -n "$UUID" ]; then
-            echo "$UUID" | tr -d '-' | tr '[:upper:]' '[:lower:]'
-            return 0
-        fi
+        [ -n "$UUID" ] && machine_id=$(echo "$UUID" | tr -d '-' | tr '[:upper:]' '[:lower:]')
     fi
 
     # Linux: Try machine-id
-    if [ "$IS_LINUX" = true ] && [ -f "/etc/machine-id" ]; then
-        cat "/etc/machine-id" | tr '[:upper:]' '[:lower:]'
-        return 0
+    if [ -z "$machine_id" ] && [ "$IS_LINUX" = true ] && [ -f "/etc/machine-id" ]; then
+        machine_id=$(cat "/etc/machine-id" | tr '[:upper:]' '[:lower:]')
     fi
 
-    if [ "$IS_LINUX" = true ] && [ -f "/var/lib/dbus/machine-id" ]; then
-        cat "/var/lib/dbus/machine-id" | tr '[:upper:]' '[:lower:]'
-        return 0
+    if [ -z "$machine_id" ] && [ "$IS_LINUX" = true ] && [ -f "/var/lib/dbus/machine-id" ]; then
+        machine_id=$(cat "/var/lib/dbus/machine-id" | tr '[:upper:]' '[:lower:]')
     fi
 
     # Fallback: Get MAC address (macOS: en0, Linux: eth0 or ens0)
-    if command -v ifconfig >/dev/null 2>&1; then
+    if [ -z "$machine_id" ] && command -v ifconfig >/dev/null 2>&1; then
         if [ "$IS_MACOS" = true ]; then
             MAC=$(ifconfig en0 2>/dev/null | grep ether | awk '{print $2}' | tr -d ':')
         else
             MAC=$(ifconfig eth0 2>/dev/null | awk '/ether/{print $2}' | tr -d ':')
             [ -z "$MAC" ] && MAC=$(ifconfig ens0 2>/dev/null | awk '/ether/{print $2}' | tr -d ':')
         fi
-        if [ -n "$MAC" ]; then
-            echo "$MAC" | tr '[:upper:]' '[:lower:]'
-            return 0
-        fi
+        [ -n "$MAC" ] && machine_id=$(echo "$MAC" | tr '[:upper:]' '[:lower:]')
     fi
 
     # Last resort: ip command (Linux only) — no grep -oP, use awk instead
-    if [ "$IS_LINUX" = true ] && command -v ip >/dev/null 2>&1; then
+    if [ -z "$machine_id" ] && [ "$IS_LINUX" = true ] && command -v ip >/dev/null 2>&1; then
         MAC=$(ip link show | awk '/link\/ether/{print $2}' | head -1 | tr -d ':')
-        if [ -n "$MAC" ]; then
-            echo "$MAC" | tr '[:upper:]' '[:lower:]'
-            return 0
-        fi
+        [ -n "$MAC" ] && machine_id=$(echo "$MAC" | tr '[:upper:]' '[:lower:]')
     fi
 
-    echo ""
+    local short_id="${machine_id:0:8}"
+    if [ -n "$device_name" ] && [ -n "$short_id" ]; then
+        echo "${device_name}-${short_id}"
+    elif [ -n "$device_name" ]; then
+        echo "$device_name"
+    elif [ -n "$machine_id" ]; then
+        echo "$machine_id"
+    else
+        echo "unknown-device"
+    fi
 }
 
 download_file() {

@@ -235,6 +235,7 @@ export default function AgenticAssetFlyout({
                             : [{ label: asset.name, badge: asset.riskScore }]
                         }
                         onClose={onClose}
+                        subtitle={!topNav ? asset.description : null}
                     >
                         {topNavPicker && (
                             <>

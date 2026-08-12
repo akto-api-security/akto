@@ -28,7 +28,7 @@ const headings = [
     createHeading("Hostname", "hostname"),
     createHeading("Device ID", "deviceId"),
     createHeading("Agent Version", "agentVersion"),
-    createHeading("OS", "osComp", "os"),
+    createHeading("OS/Browser", "osComp", "os"),
     createHeading("Username", "username"),
     createHeading("Last Heartbeat", "lastHeartbeatComp", "lastHeartbeat"),
     createHeading("Last Deployed", "lastDeployedComp", "lastDeployed")
@@ -68,15 +68,52 @@ const resourceName = {
     plural: 'agents',
 };
 
-const OS_ICON_MAP = { darwin: '/public/os-mac.svg', mac: '/public/os-mac.svg', windows: '/public/os-windows.svg', linux: '/public/os-linux.svg' };
+const OS_ICON_MAP = { darwin: '/public/os-mac.svg', mac: '/public/os-mac.svg', windows: '/public/os-windows.svg', linux: '/public/linux.svg' };
+const BROWSER_ICON_MAP = { chrome: '/public/chrome.svg', firefox: '/public/firefox.svg', safari: '/public/safari.svg', brave: '/public/brave.svg', edge: '/public/edge.svg' };
+const GENERIC_BROWSER_ICON = '/public/Globe_icon.svg';
 
-const getOsIcon = (os) => {
-    if (!os || os === DEFAULT_VALUE) return null;
-    const key = os.toLowerCase();
-    for (const [prefix, icon] of Object.entries(OS_ICON_MAP)) {
+const getIconFromMap = (value, map) => {
+    if (!value || value === DEFAULT_VALUE) return null;
+    const key = value.toLowerCase();
+    for (const [prefix, icon] of Object.entries(map)) {
         if (key.includes(prefix)) return icon;
     }
     return null;
+};
+
+// Installer device IDs are raw hex (no hyphens); extension IDs are hyphenated UUIDs or missing ("-").
+// Newer extension builds also suffix their version with "-extension" 
+const isExtensionAgent = (deviceId, agentVersion) =>
+    !deviceId || deviceId.includes('-') || !!agentVersion?.toLowerCase().includes('extension');
+
+const getOsOrBrowserComp = (agentData) => {
+    if (isExtensionAgent(agentData?.deviceId, agentData?.agentVersion)) {
+        const browserName = agentData?.browserName;
+        const browserVersion = agentData?.browserVersion;
+        const hasBrowserName = browserName && browserName !== DEFAULT_VALUE && browserName.toLowerCase() !== 'unknown';
+        const label = hasBrowserName
+            ? `${browserName}${browserVersion && browserVersion !== DEFAULT_VALUE && browserVersion.toLowerCase() !== 'unknown' ? ` ${browserVersion}` : ''}`
+            : 'Browser';
+        const icon = (hasBrowserName && getIconFromMap(browserName, BROWSER_ICON_MAP)) || GENERIC_BROWSER_ICON;
+        return (
+            <HorizontalStack gap="1" wrap={false} blockAlign="center">
+                <img src={icon} alt={label} style={{ width: '16px', height: '16px', flexShrink: 0 }} />
+                <Text variant="bodySm">{label}</Text>
+            </HorizontalStack>
+        );
+    }
+
+    const os = agentData?.os;
+    const osDisplayName = agentData?.osDisplayName;
+    const displayOs = (osDisplayName && osDisplayName !== DEFAULT_VALUE) ? osDisplayName : (os && os !== DEFAULT_VALUE ? os : null);
+    if (!displayOs) return DEFAULT_VALUE;
+    const osIcon = getIconFromMap(os, OS_ICON_MAP);
+    return (
+        <HorizontalStack gap="1" wrap={false} blockAlign="center">
+            {osIcon && <img src={osIcon} alt={os} style={{ width: '16px', height: '16px', flexShrink: 0 }} />}
+            <Text variant="bodySm">{displayOs}</Text>
+        </HorizontalStack>
+    );
 };
 
 const getStatusComp = (installStatus, lastHeartbeat) => {
@@ -104,27 +141,14 @@ const getStatusComp = (installStatus, lastHeartbeat) => {
     return null;
 };
 
-const convertDataIntoTableFormat = (agentData) => {
-    const os = agentData?.os;
-    const osDisplayName = agentData?.osDisplayName;
-    const displayOs = (osDisplayName && osDisplayName !== DEFAULT_VALUE) ? osDisplayName : (os && os !== DEFAULT_VALUE ? os : null);
-    const osIcon = getOsIcon(os);
-    const osComp = displayOs ? (
-        <HorizontalStack gap="1" wrap={false} blockAlign="center">
-            {osIcon && <img src={osIcon} alt={os} style={{ width: '16px', height: '16px', flexShrink: 0 }} />}
-            <Text variant="bodySm">{displayOs}</Text>
-        </HorizontalStack>
-    ) : DEFAULT_VALUE;
-
-    return {
-        ...agentData,
-        id: agentData?.agentId,
-        lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
-        lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed),
-        osComp,
-        statusComp: getStatusComp(agentData?.installStatus, agentData?.lastHeartbeat),
-    };
-};
+const convertDataIntoTableFormat = (agentData) => ({
+    ...agentData,
+    id: agentData?.agentId,
+    lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
+    lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed),
+    osComp: getOsOrBrowserComp(agentData),
+    statusComp: getStatusComp(agentData?.installStatus, agentData?.lastHeartbeat),
+});
 
 const mapModuleToAgent = (module) => ({
     agentId: module.id,

@@ -195,6 +195,31 @@ export const deviceServiceKey = (hostName) => {
     return parts[0] + " " + parts[parts.length - 1];
 };
 
+// "Last seen" timestamp for a collection: prefer its last traffic timestamp; collections that
+// were only ever discovered via a tag/config-scan (no directly-attributed traffic) have no
+// trafficMap entry, so fall back to startTs (set at collection-creation time, never absent) -
+// otherwise they'd default to 0 ("never") and get dropped by any date filter narrower than
+// "All time" even though the asset genuinely exists.
+const lastSeenOrStartTs = (c, trafficMap) => trafficMap[c.id] || c.startTs || 0;
+
+// A grouped asset (agent/service/LLM/skill) is a rollup of many collections — e.g. the "cursor"
+// agent group contains both <device>.ai_agent.cursor (the agent client itself) and
+// <device>.ai_agent.github (a service it happened to call). Prefer the description on the
+// collection whose hostname service segment matches the group's own name/key — that's the
+// canonical "self" collection, not an unrelated downstream service. Fall back to any collection
+// in the group that has a description if there's no such match (or it has none).
+export const groupDescription = (collections, groupKey) => {
+    const key = (groupKey || "").toLowerCase();
+    const list = collections || [];
+    const selfCollection = list.find((c) => {
+        const hostName = c.hostName || c.displayName || c.name;
+        const serviceName = extractServiceName(hostName);
+        return serviceName && serviceName.toLowerCase() === key;
+    });
+    if (selfCollection?.description) return selfCollection.description;
+    return list.find((c) => c.description)?.description || "";
+};
+
 // Group collections by agent identification (mcp-client, ai-agent values)
 // These are the sources that discovered the services (cursor, litellm, etc.)
 // Note: browser-llm-agent is excluded from this grouping
@@ -251,7 +276,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
         sensitive.forEach(s => agents[key].sensitiveTypes.add(s));
         
         // Track max traffic timestamp
-        const traffic = trafficMap[c.id] || 0;
+        const traffic = lastSeenOrStartTs(c, trafficMap);
         if (traffic > agents[key].maxTrafficTimestamp) {
             agents[key].maxTrafficTimestamp = traffic;
         }
@@ -273,6 +298,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore || null,
+        description: groupDescription(g.collections, g.groupKey),
     }));
 };
 
@@ -356,7 +382,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
         sensitive.forEach(s => services[key].sensitiveTypes.add(s));
         
         // Track max traffic timestamp
-        const traffic = trafficMap[c.id] || 0;
+        const traffic = lastSeenOrStartTs(c, trafficMap);
         if (traffic > services[key].maxTrafficTimestamp) {
             services[key].maxTrafficTimestamp = traffic;
         }
@@ -378,6 +404,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore,
+        description: groupDescription(g.collections, g.groupKey),
     }));
 };
 
@@ -435,7 +462,7 @@ export const groupCollectionsByLLM = (collections, trafficMap = {}, sensitiveMap
         const sensitive = sensitiveMap[c.id] || [];
         sensitive.forEach(s => llms[key].sensitiveTypes.add(s));
 
-        const traffic = trafficMap[c.id] || 0;
+        const traffic = lastSeenOrStartTs(c, trafficMap);
         if (traffic > llms[key].maxTrafficTimestamp) {
             llms[key].maxTrafficTimestamp = traffic;
         }
@@ -456,6 +483,7 @@ export const groupCollectionsByLLM = (collections, trafficMap = {}, sensitiveMap
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore,
+        description: groupDescription(g.collections, g.groupKey),
     }));
 };
 
@@ -521,7 +549,7 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
             const sensitive = sensitiveMap[c.id] || [];
             sensitive.forEach(s => skills[skillValue].sensitiveTypes.add(s));
 
-            const traffic = trafficMap[c.id] || 0;
+            const traffic = lastSeenOrStartTs(c, trafficMap);
             if (traffic > skills[skillValue].maxTrafficTimestamp) {
                 skills[skillValue].maxTrafficTimestamp = traffic;
             }
@@ -543,6 +571,7 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore || null,
+        description: groupDescription(g.collections, g.groupKey),
     }));
 };
 
@@ -554,7 +583,7 @@ const accumulateHostGroupedCollection = (group, c, trafficMap, sensitiveMap, ris
     }
     const sensitive = sensitiveMap[c.id] || [];
     sensitive.forEach((s) => group.sensitiveTypes.add(s));
-    const traffic = trafficMap[c.id] || 0;
+    const traffic = lastSeenOrStartTs(c, trafficMap);
     if (traffic > group.maxTrafficTimestamp) {
         group.maxTrafficTimestamp = traffic;
     }
@@ -1008,6 +1037,7 @@ export async function buildAgenticAssetsPageData(
         usernameMap = {},
         userMetadataMap = {},
         violationsByCollectionId = {},
+        violationRows = [],
         analysisByKey = new Map(),
         userAnalysisKeysByDeviceId = new Map(),
         // AgenticAssetsPage calls this twice per mount: once immediately (empty analysisByKey, for
@@ -1123,6 +1153,7 @@ export async function buildAgenticAssetsPageData(
             deviceCount: group.endpointsCount,
             lastSeen: lastSeen > 0 ? func.prettifyEpoch(lastSeen) : "",
             lastSeenEpoch: lastSeen,
+            description: group.description,
             skillCount: skillNames.size,
             skillNames: skillNames.size ? [...skillNames] : undefined,
             toolCount: 0,

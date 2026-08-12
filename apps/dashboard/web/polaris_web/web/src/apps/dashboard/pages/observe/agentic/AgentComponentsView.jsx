@@ -348,7 +348,7 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
     }
 
     if (view === "skill-detail" && selectedSkill) {
-        return <SkillDetailPanel skill={selectedSkill} />;
+        return <SkillDetailPanel skill={selectedSkill} collectionIds={asset?.collectionIds} />;
     }
 
     if (view === "config-detail") {

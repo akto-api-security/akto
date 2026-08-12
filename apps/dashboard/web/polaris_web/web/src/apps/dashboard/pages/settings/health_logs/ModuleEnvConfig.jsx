@@ -39,7 +39,13 @@ const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields
 
     const handleSave = async () => {
         try {
-            await onSaveEnv(module.id, module.name, envData);
+            const changedEnvData = {};
+            for (const key of Object.keys(envData)) {
+                if (envData[key] !== initialEnvData[key]) {
+                    changedEnvData[key] = envData[key];
+                }
+            }
+            await onSaveEnv(module.id, module.name, changedEnvData);
             setInitialEnvData({ ...envData });
         } catch (error) {
             func.setToast(true, true, "Error saving environment config");

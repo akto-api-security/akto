@@ -331,8 +331,9 @@ function SampleData(props) {
     }, [instance, editorData])
 
     useEffect(()=>{
-      instance && instance.revealLineInCenter(currLine)
-      let a = instance && instance.createDecorationsCollection([{
+      if (!instance || !currLine) return
+      instance.revealLineInCenter(currLine)
+      let a = instance.createDecorationsCollection([{
         range: new monaco.Range(currLine, 1, currLine, 2),
         options: {
           blockClassName: "active-line"
@@ -344,7 +345,7 @@ function SampleData(props) {
         }, 2000)
       }
 
-    },[currLine])
+    },[currLine, instance])
 
     // Add effect to re-highlight vulnerabilities if they change
     useEffect(() => {
