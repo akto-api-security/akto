@@ -65,14 +65,12 @@ const SORT_OPTIONS = [
     { label: "Discovered", value: "startTs asc", directionLabel: "Oldest", sortKey: "startTs", columnIndex: 7 },
 ];
 
-const FILTERS_DEF = [
-    { key: "endpointTags", label: "Endpoint tags", choices: [
-        { label: "Contains personal account", value: "Contains personal account" },
-        { label: "Local MCP Server", value: "Local MCP Server" },
-        { label: "Misconfigured", value: "Misconfigured" },
-        { label: "Malicious Skills", value: "Malicious Skills" },
-    ] },
-];
+const ENDPOINT_TAGS_FILTER_DEF = { key: "endpointTags", label: "Endpoint tags", choices: [
+    { label: "Contains personal account", value: "Contains personal account" },
+    { label: "Local MCP Server", value: "Local MCP Server" },
+    { label: "Misconfigured", value: "Misconfigured" },
+    { label: "Malicious Skills", value: "Malicious Skills" },
+] };
 
 const resourceName = { singular: "endpoint", plural: "endpoints" };
 
@@ -243,6 +241,20 @@ export default function AgenticAssetDevicesPage() {
     const enrichRef = useRef({ usernameMap: {} });
     const [refreshKey, setRefreshKey] = useState(0);
 
+    // Endpoint ID/Username filter choices — matches AgentEndpointTreeTable.jsx's own enumerated
+    // facets (this asset's device count is small enough to list directly, no distinct-values
+    // endpoint needed). The server computes these from the full unfiltered set on every response,
+    // so content is stable across calls for the same asset; only update state when it actually
+    // changes to avoid a re-render every single fetch.
+    const [filterChoices, setFilterChoices] = useState({ endpointIds: [], usernames: [] });
+    const updateFilterChoicesIfChanged = useCallback((endpointIds, usernames) => {
+        setFilterChoices((prev) => {
+            const sameEndpointIds = prev.endpointIds.length === endpointIds.length && prev.endpointIds.every((v, i) => v === endpointIds[i]);
+            const sameUsernames = prev.usernames.length === usernames.length && prev.usernames.every((v, i) => v === usernames[i]);
+            return (sameEndpointIds && sameUsernames) ? prev : { endpointIds, usernames };
+        });
+    }, []);
+
     useEffect(() => {
         let cancelled = false;
         setLoading(true);
@@ -275,17 +287,32 @@ export default function AgenticAssetDevicesPage() {
     const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
         const { usernameMap } = enrichRef.current;
         const mongoSortOrder = sortOrder === -1 ? 1 : -1;
-        const endpointTags = filtersObj?.endpointTags;
+        const filters = {};
+        if (filtersObj?.endpointTags?.length) filters.endpointTags = filtersObj.endpointTags;
+        if (filtersObj?.endpointId?.length) filters.endpointId = filtersObj.endpointId;
+        if (filtersObj?.username?.length) filters.username = filtersObj.username;
         const res = await api.fetchAgenticAssetEndpointsPage({
             apiCollectionIds: collectionIdsRef.current,
             rowType,
             skip, limit, sortKey: sortKey || "riskScore", sortOrder: mongoSortOrder, queryValue,
             usernameMap,
-            filters: endpointTags?.length ? { endpointTags } : undefined,
+            filters: Object.keys(filters).length ? filters : undefined,
         });
+        updateFilterChoicesIfChanged(res.distinctEndpointIds || [], res.distinctUsernames || []);
         const rows = (res.endpoints || []).map((row) => shapeEndpointRow(row, { rowType }));
         return { value: rows, total: res.total || 0 };
-    }, [rowType]);
+    }, [rowType, updateFilterChoicesIfChanged]);
+
+    const filtersDef = useMemo(() => {
+        const defs = [ENDPOINT_TAGS_FILTER_DEF];
+        if (filterChoices.endpointIds.length) {
+            defs.push({ key: "endpointId", label: "Endpoint ID", choices: filterChoices.endpointIds.map((v) => ({ label: v, value: v })) });
+        }
+        if (filterChoices.usernames.length) {
+            defs.push({ key: "username", label: "Username", choices: filterChoices.usernames.map((v) => ({ label: v, value: v })) });
+        }
+        return defs;
+    }, [filterChoices]);
 
     const disambiguateLabel = useCallback((key, value) => func.convertToDisambiguateLabelObj(value, null, 2), []);
 
@@ -310,7 +337,7 @@ export default function AgenticAssetDevicesPage() {
                     pageLimit={20}
                     sortOptions={SORT_OPTIONS}
                     resourceName={resourceName}
-                    filters={FILTERS_DEF}
+                    filters={filtersDef}
                     headers={PARENT_HEADERS}
                     selectable={false}
                     headings={PARENT_HEADERS}

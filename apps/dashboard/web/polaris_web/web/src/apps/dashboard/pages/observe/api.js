@@ -315,7 +315,12 @@ export default {
             method: 'post',
             data: { apiCollectionIds, rowType, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters },
         })
-        return { endpoints: resp?.endpoints || [], total: resp?.total || 0 }
+        return {
+            endpoints: resp?.endpoints || [],
+            total: resp?.total || 0,
+            distinctEndpointIds: resp?.distinctEndpointIds || [],
+            distinctUsernames: resp?.distinctUsernames || [],
+        }
     },
     // Server-side paginated Components list for ONE AI-Agent asset's flyout — merges skills,
     // built-in tools, and connected MCP servers into one batched, server-sorted/paginated list.

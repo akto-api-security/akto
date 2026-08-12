@@ -45,6 +45,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.TreeSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -931,6 +932,19 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 rows.add(row);
             }
 
+            // Filter-chip choices — matches AgentEndpointTreeTable.jsx's own Endpoint ID/Username
+            // facets, which enumerate every value present rather than a free-text field, since this
+            // asset's own device count is small enough to list directly (bounded by ids.size(), not
+            // account-wide). Computed from the full unfiltered/unsearched set so choices stay stable
+            // regardless of what's currently searched/filtered — same as prod's own behavior.
+            Set<String> distinctEndpointIds = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            Set<String> distinctUsernames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            for (BasicDBObject r : rows) {
+                distinctEndpointIds.add(String.valueOf(r.get("endpointId")));
+                String u = String.valueOf(r.get("username"));
+                if (StringUtils.isNotBlank(u) && !"-".equals(u)) distinctUsernames.add(u);
+            }
+
             if (StringUtils.isNotBlank(queryValue)) {
                 String q = queryValue.toLowerCase(Locale.ROOT);
                 rows.removeIf(r -> {
@@ -952,6 +966,18 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 });
             }
 
+            List<String> endpointIdFilters = filters != null ? filters.get("endpointId") : null;
+            if (endpointIdFilters != null && !endpointIdFilters.isEmpty()) {
+                Set<String> wanted = new HashSet<>(endpointIdFilters);
+                rows.removeIf(r -> !wanted.contains(String.valueOf(r.get("endpointId"))));
+            }
+
+            List<String> usernameFilters = filters != null ? filters.get("username") : null;
+            if (usernameFilters != null && !usernameFilters.isEmpty()) {
+                Set<String> wanted = new HashSet<>(usernameFilters);
+                rows.removeIf(r -> !wanted.contains(String.valueOf(r.get("username"))));
+            }
+
             Comparator<BasicDBObject> cmp = buildEndpointGroupComparator(sortKey);
             if (sortOrder < 0) cmp = cmp.reversed();
             rows.sort(cmp);
@@ -964,6 +990,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             response.put("endpoints", page);
             response.put("total", total);
+            response.put("distinctEndpointIds", new ArrayList<>(distinctEndpointIds));
+            response.put("distinctUsernames", new ArrayList<>(distinctUsernames));
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching agentic asset endpoints page: " + e.getMessage());
