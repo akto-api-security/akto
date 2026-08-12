@@ -84,8 +84,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter List<String> hosts;
   @Getter @Setter String latestApiOrigRegex;
   @Getter @Setter Boolean sortBySeverity;
-  // Skills Evaluations partition mode ("only" | "exclude"), sent to the threat backend as a header.
+  // Skills Evaluations / Misconfigured Settings partition modes ("only" | "exclude"), sent to
+  // the threat backend as headers.
   @Getter @Setter String skillEvaluationMode;
+  @Getter @Setter String configEvaluationMode;
   // ---- Agentic Assets flyout Violations tab server-side pagination/search ----
   @Getter @Setter String searchText; // free-text match across filterId/host/actor
   @Getter @Setter List<String> looseHostKeys; // "<firstSegment> <lastSegment>" — see ViolationsTab.jsx's looseHostSet
@@ -119,6 +121,9 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
     if (this.skillEvaluationMode != null && !this.skillEvaluationMode.isEmpty()) {
       post.addHeader("x-skill-eval-mode", this.skillEvaluationMode);
+    }
+    if (this.configEvaluationMode != null && !this.configEvaluationMode.isEmpty()) {
+      post.addHeader("x-config-eval-mode", this.configEvaluationMode);
     }
 
     Map<String, Object> filter = new HashMap<>();

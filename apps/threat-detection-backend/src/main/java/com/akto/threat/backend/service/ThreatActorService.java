@@ -821,6 +821,7 @@ public class ThreatActorService {
     if (!contextFilter.isEmpty()) {
       eventsMatch.putAll(contextFilter);
     }
+    eventsMatch.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
     // Daily actor counts from malicious_events (for chart daily breakdown)
     List<DailyActorsCountResponse.ActorsCount> dailyActors = new ArrayList<>();
