@@ -221,8 +221,10 @@ function UserConfig() {
         </LegacyCard>
     )
 
+    const rateLimitCardTitle = isAgenticSecurityCategory() ? "Configure max probes per day" : "Configure rate limit"
+
     const rateLimit = (
-        <LegacyCard sectioned title="Configure rate limit" key="globalRateLimit">
+        <LegacyCard sectioned title={rateLimitCardTitle} key="globalRateLimit">
             <Divider />
             {isApiSecurityCategory() && (
                 <LegacyCard.Section>
