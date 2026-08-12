@@ -59,6 +59,13 @@ public class TestingRun {
         ONE_TIME, RECURRING, CI_CD, CONTINUOUS_TESTING
     }
 
+    public enum DashboardContext {
+        AGENTIC, API
+    }
+
+    public static final String DASHBOARD_CONTEXT = "dashboardContext";
+    private DashboardContext dashboardContext;
+
     public static final String DO_NOT_MARK_ISSUES_AS_FIXED = "doNotMarkIssuesAsFixed";
     private boolean doNotMarkIssuesAsFixed = false;
 
@@ -247,6 +254,14 @@ public class TestingRun {
 
     public void setRunAutomatedTests(boolean runAutomatedTests) {
         this.runAutomatedTests = runAutomatedTests;
+    }
+
+    public DashboardContext getDashboardContext() {
+        return dashboardContext;
+    }
+
+    public void setDashboardContext(DashboardContext dashboardContext) {
+        this.dashboardContext = dashboardContext;
     }
 
 

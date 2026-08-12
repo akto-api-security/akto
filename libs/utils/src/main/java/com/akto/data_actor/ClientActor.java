@@ -2113,6 +2113,32 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public int incrementAndGetTestRateLimitUsage(int limit, String dashboardContext) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("globalRateLimit", limit);
+        obj.put("contextSource", dashboardContext);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/incrementAndGetTestRateLimitUsage", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in incrementTestRateLimitUsage", LoggerMaker.LogDb.RUNTIME);
+                return 0;
+            }
+            try {
+                BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+                return Integer.parseInt(payloadObj.get("testRateLimitUsageCount").toString());
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error parsing response in incrementTestRateLimitUsage" + e, LoggerMaker.LogDb.RUNTIME);
+                return 0;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in incrementTestRateLimitUsage" + e, LoggerMaker.LogDb.RUNTIME);
+            return 0;
+        }
+    }
+
     public void insertTestingRunResultSummary(TestingRunResultSummary trrs) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();

@@ -1568,6 +1568,15 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String incrementTestRateLimitUsage() {
+        try {
+            count = DbLayer.incrementAndGetTestRateLimitUsage(limit);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String updateAccessMatrixInfo() {
         try {
             DbLayer.updateAccessMatrixInfo(taskId, frequencyInSeconds);        
