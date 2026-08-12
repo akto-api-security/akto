@@ -32,6 +32,8 @@ public class HttpResponseParams {
     String tags;
     List<String> parentMcpToolNames;
     String traces;
+    // Guardrail result recorded at ingestion (Gateway.recordGuardrailVerdict), as a JSON blob.
+    String guardrailVerdict;
 
     public HttpResponseParams() {}
 
@@ -270,5 +272,13 @@ public class HttpResponseParams {
 
     public void setTraces(String traces) {
         this.traces = traces;
+    }
+
+    public String getGuardrailVerdict() {
+        return guardrailVerdict;
+    }
+
+    public void setGuardrailVerdict(String guardrailVerdict) {
+        this.guardrailVerdict = guardrailVerdict;
     }
 }
