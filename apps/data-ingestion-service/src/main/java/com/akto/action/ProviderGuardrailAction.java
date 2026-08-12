@@ -113,10 +113,10 @@ public class ProviderGuardrailAction extends ActionSupport {
         Map<String, Object> responseHeaders = new HashMap<>();
         responseHeaders.put("content-type", "application/json");
 
+        // Match the http-proxy/browser payload shape: user text under "body".
+        // model / session_id are carried in metadata (below), not here.
         Map<String, Object> requestPayload = new HashMap<>();
-        requestPayload.put("prompt", frame.prompt);
-        requestPayload.put("model", frame.model);
-        requestPayload.put("session_id", frame.sessionId);
+        requestPayload.put("body", frame.prompt);
 
         Map<String, Object> tag = new HashMap<>();
         tag.put("gen-ai", "Gen AI");
