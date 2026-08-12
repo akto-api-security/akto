@@ -92,6 +92,16 @@ public class AccountSettings {
     public static final String API_COLLECTION_NAME_MAPPER = "apiCollectionNameMapper";
     public static final String GLOBAL_RATE_LIMIT = "globalRateLimit";
     private int globalRateLimit;
+
+    public static final String GLOBAL_RATE_LIMIT_AGENTIC = "globalRateLimitAgentic";
+    private int globalRateLimitAgentic;
+
+    public static final String AGENTIC_TEST_RATE_LIMIT_USAGE_DAY = "agenticTestRateLimitUsageDay";
+    private int agenticTestRateLimitUsageDay;
+    public static final String AGENTIC_TEST_RATE_LIMIT_USAGE_COUNT = "agenticTestRateLimitUsageCount";
+    private int agenticTestRateLimitUsageCount;
+
+
     public static final String ENABLE_TELEMETRY = "enableTelemetry";
 
     public static final String TELEMETRY_SETTINGS = "telemetrySettings";
@@ -223,6 +233,32 @@ public class AccountSettings {
     public void setGlobalRateLimit(int globalRateLimit) {
         this.globalRateLimit = globalRateLimit;
     }
+
+
+    public int getGlobalRateLimitAgentic() {
+        return globalRateLimitAgentic;
+    }
+
+    public void setGlobalRateLimitAgentic(int globalRateLimitAgentic) {
+        this.globalRateLimitAgentic = globalRateLimitAgentic;
+    }
+
+    public int getAgenticTestRateLimitUsageDay() {
+        return agenticTestRateLimitUsageDay;
+    }
+
+    public void setAgenticTestRateLimitUsageDay(int agenticTestRateLimitUsageDay) {
+        this.agenticTestRateLimitUsageDay = agenticTestRateLimitUsageDay;
+    }
+
+    public int getAgenticTestRateLimitUsageCount() {
+        return agenticTestRateLimitUsageCount;
+    }
+
+    public void setAgenticTestRateLimitUsageCount(int agenticTestRateLimitUsageCount) {
+        this.agenticTestRateLimitUsageCount = agenticTestRateLimitUsageCount;
+    }
+
 
     public String getGithubAppSecretKey() {
         return githubAppSecretKey;
