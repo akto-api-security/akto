@@ -467,21 +467,22 @@ export default function LeftNav() {
                     },
                 ],
             }] : []),
-            ...(dashboardCategory === "Agentic Security" && func.isDemoAccount() ? [{
-                label: (
-                    <Text variant="bodyMd" fontWeight="medium">
-                        Prompt Hardening
-                    </Text>
-                ),
-                icon: AutomationFilledMajor,
-                onClick: () => {
-                    handleSelect("dashboard_prompt_hardening");
-                    navigate("/dashboard/prompt-hardening");
-                    setActive("normal");
-                },
-                selected: leftNavSelected === "dashboard_prompt_hardening",
-                key: "prompt_hardening",
-            }] : []),
+            //Prompt Hardening nav item hidden for now
+            // ...(dashboardCategory === "Agentic Security" && func.isDemoAccount() ? [{
+            //     label: (
+            //         <Text variant="bodyMd" fontWeight="medium">
+            //             Prompt Hardening
+            //         </Text>
+            //     ),
+            //     icon: AutomationFilledMajor,
+            //     onClick: () => {
+            //         handleSelect("dashboard_prompt_hardening");
+            //         navigate("/dashboard/prompt-hardening");
+            //         setActive("normal");
+            //     },
+            //     selected: leftNavSelected === "dashboard_prompt_hardening",
+            //     key: "prompt_hardening",
+            // }] : []),
             {
                 url: "#",
                 label: (
