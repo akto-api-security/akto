@@ -76,6 +76,8 @@ public class AccountSettings {
     public static final String API_COLLECTION_NAME_MAPPER = "apiCollectionNameMapper";
     public static final String GLOBAL_RATE_LIMIT = "globalRateLimit";
     private int globalRateLimit;
+    public static final String GLOBAL_RATE_LIMIT_AGENTIC = "globalRateLimitAgentic";
+    private int globalRateLimitAgentic;
     public static final String ENABLE_TELEMETRY = "enableTelemetry";
 
     public static final String TELEMETRY_SETTINGS = "telemetrySettings";
@@ -265,6 +267,14 @@ public class AccountSettings {
 
     public void setGlobalRateLimit(int globalRateLimit) {
         this.globalRateLimit = globalRateLimit;
+    }
+
+    public int getGlobalRateLimitAgentic() {
+        return globalRateLimitAgentic;
+    }
+
+    public void setGlobalRateLimitAgentic(int globalRateLimitAgentic) {
+        this.globalRateLimitAgentic = globalRateLimitAgentic;
     }
 
     public String getGithubAppSecretKey() {
