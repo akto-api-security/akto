@@ -1126,7 +1126,7 @@ function ApiCollections(props) {
     }
 
     // Use custom hook for Agentic filter detection and summary calculation
-    const { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections, activeFilterPlainTitle } = useAgenticFilter(normalData);
+    const { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections, activeFilterPlainTitle, activeFilterDescription } = useAgenticFilter(normalData);
 
     // Persist tag filters whenever they change (same pattern as existing filters)
     useEffect(() => {
@@ -2181,13 +2181,16 @@ function ApiCollections(props) {
         <>
             <PageWithMultipleCards
                 title={
-                    <TitleWithInfo
-                        tooltipContent={activeFilterTitle
-                            ? `Viewing collections filtered by ${activeFilterTitle}`
-                            : "Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
-                        titleText={pageTitle}
-                        docsUrl={"https://docs.akto.io/api-inventory/concepts"}
-                    />
+                    <VerticalStack gap="1">
+                        <TitleWithInfo
+                            tooltipContent={activeFilterTitle
+                                ? `Viewing collections filtered by ${activeFilterTitle}`
+                                : "Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
+                            titleText={pageTitle}
+                            docsUrl={"https://docs.akto.io/api-inventory/concepts"}
+                        />
+                        {activeFilterDescription && <Text variant="bodySm">{activeFilterDescription}</Text>}
+                    </VerticalStack>
                 }
                 primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
                 isFirstPage={!agenticObserveBackUrl}

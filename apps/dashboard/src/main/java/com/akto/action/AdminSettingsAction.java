@@ -53,6 +53,7 @@ public class AdminSettingsAction extends UserAction {
 
     AccountSettings accountSettings;
     private int globalRateLimit = 0;
+    private int globalRateLimitAgentic = 0;
     private Organization organization;
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private static final ScheduledExecutorService newExecutor = Executors.newSingleThreadScheduledExecutor();
@@ -132,6 +133,9 @@ public class AdminSettingsAction extends UserAction {
     @Setter
     @Getter
     private List<String> filterLogPolicy;
+    @Setter
+    @Getter
+    private Map<String, String> runtimeEnvOverrides;
 
     public String updateSetupType() {
         if (this.setupType == null) {
@@ -152,6 +156,14 @@ public class AdminSettingsAction extends UserAction {
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.GLOBAL_RATE_LIMIT, globalRateLimit));
+        return SUCCESS.toUpperCase();
+    }
+
+    public String updateGlobalRateLimitAgentic() {
+
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.GLOBAL_RATE_LIMIT_AGENTIC, globalRateLimitAgentic));
         return SUCCESS.toUpperCase();
     }
 
@@ -610,6 +622,26 @@ public class AdminSettingsAction extends UserAction {
         }
     }
 
+    public String updateRuntimeEnvOverrides() {
+        if (this.runtimeEnvOverrides == null || this.runtimeEnvOverrides.isEmpty()) {
+            return SUCCESS.toUpperCase();
+        }
+        try {
+            List<Bson> updates = new ArrayList<>();
+            for (Map.Entry<String, String> entry : this.runtimeEnvOverrides.entrySet()) {
+                updates.add(Updates.set(AccountSettings.RUNTIME_ENV_OVERRIDES + "." + entry.getKey(), entry.getValue()));
+            }
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.combine(updates)
+            );
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error updating runtime env overrides", e);
+            return ERROR.toUpperCase();
+        }
+    }
+
     @Setter
     private String hostPattern;
     @Getter
@@ -745,6 +777,14 @@ public class AdminSettingsAction extends UserAction {
 
     public void setGlobalRateLimit(int globalRateLimit) {
         this.globalRateLimit = globalRateLimit;
+    }
+
+    public int getGlobalRateLimitAgentic() {
+        return globalRateLimitAgentic;
+    }
+
+    public void setGlobalRateLimitAgentic(int globalRateLimitAgentic) {
+        this.globalRateLimitAgentic = globalRateLimitAgentic;
     }
 
     public void setTrafficAlertThresholdSeconds(int trafficAlertThresholdSeconds) {

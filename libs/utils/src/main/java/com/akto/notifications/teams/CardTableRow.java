@@ -23,8 +23,12 @@ public class CardTableRow {
                     "                            ]\n" +
                     "                        },\n");
         }
+        if (!data.isEmpty()) {
+            body.setLength(body.length() - 2); // drop the ",\n" left by the last cell
+            body.append("\n");
+        }
         body.append("                    ]\n" +
-                "                },\n");
+                "                }");
 
         return body.toString();
 

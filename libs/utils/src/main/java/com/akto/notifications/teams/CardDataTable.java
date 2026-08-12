@@ -15,14 +15,21 @@ public class CardDataTable {
             body.append("                {\"width\": 1},\n");
             i--;
         }
+        if (!data.isEmpty()) {
+            body.setLength(body.length() - 2); // drop the ",\n" left by the last column
+            body.append("\n");
+        }
         body.append("            ],\n" +
                 "            \"rows\": [\n");
+        boolean firstRow = true;
         for (List<String> dataRow : data) {
+            if (!firstRow) body.append(",\n");
             body.append(CardTableRow.createTableRow(dataRow));
+            firstRow = false;
         }
 
-        body.append("                    ]\n" +
-                "                },\n");
+        body.append("\n                    ]\n" +
+                "                }");
 
         return body.toString();
 

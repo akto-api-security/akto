@@ -45,24 +45,19 @@ const isSkillDetectionValue = (value) => {
     });
 };
 
-// Label for a Recent Activity row: "Category : SubCategory" (e.g. "Sensitive Data Disclosure :
-// PII Email"), collapsing to a single name when both are the same or only one is present.
-// Skill-related events (filterId "skill_evaluation", or a malicious-skill rule id like
-// "malicious_skill_detected") always show "Skill Evaluation" as the category - e.g.
-// "Skill Evaluation : Sensitive Data Disclosure" - since the raw category on those events is
-// whatever violation the skill scan found, not something meaningful on its own without knowing
-// it came from a skill evaluation.
+// Label for a Recent Activity row: category only (e.g. "Block - Security Information") - never
+// subCategory, which is often a raw rule id (e.g. "UserDefinedLLMRule") not meant to stand next
+// to the category. Skill-related events (filterId "skill_evaluation", or a malicious-skill rule
+// id like "malicious_skill_detected") always show "Skill Evaluation" instead, since the raw
+// category on those events is whatever violation the skill scan found, not meaningful on its own
+// without knowing it came from a skill evaluation.
 export const getRecentActivityLabel = (event) => {
     const isSkillEvent = event?.filterId === "skill_evaluation"
         || isSkillDetectionValue(event?.subCategory || event?.filterId);
 
-    const category = isSkillEvent
-        ? "Skill Evaluation"
-        : (event?.category?.trim() ? formatCategoryName(event.category) : null);
-    const subCategory = event?.subCategory?.trim() ? formatCategoryName(event.subCategory) : null;
-
-    if (category && subCategory && category !== subCategory) return `${category} : ${subCategory}`;
-    return category || subCategory || formatCategoryName(event?.filterId);
+    if (isSkillEvent) return "Skill Evaluation";
+    if (event?.category?.trim()) return formatCategoryName(event.category);
+    return formatCategoryName(event?.filterId);
 };
 
 // Split a guardrail host into { username, agent } for the Top Endpoints with Violations list.

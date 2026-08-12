@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Box, Text, Badge, HorizontalStack, VerticalStack, Spinner } from "@shopify/polaris";
+import { Box, Text, Badge, HorizontalStack, VerticalStack } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { TypeBadge, RiskPill, SeverityBadge } from "./AgenticCellRenderers";
 import { ToolDetailPanel, SkillDetailPanel } from "./McpComponentsView";
 import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges";
 import agenticObserveApi, { openViolationInThreatActivity } from "./agenticObserveApi";
+import { buildMcpComponentsFromStis } from "./agenticPageBuilders";
+import api from "../api";
 import func from "@/util/func";
 
 // ── Cell renderers ────────────────────────────────────────────────────────────
@@ -112,21 +114,22 @@ const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 
 // ── MCP tools drill-down ──────────────────────────────────────────────────────
 
-function AgentMcpToolsView({ asset, selectedMcp, agenticFlatData, goToList, onNavChange, setSelectedTool, setView }) {
+function AgentMcpToolsView({ asset, selectedMcp, goToList, onNavChange, setSelectedTool, setView }) {
     const [mcpTools, setMcpTools] = useState([]);
 
     useEffect(() => {
-        const flat = agenticFlatData.find((a) => a.name === selectedMcp.name || a.id === selectedMcp.name);
-        const collectionIds = flat?.collectionIds;
+        const collectionIds = selectedMcp?.collectionIds;
         if (!collectionIds?.length) { setMcpTools([]); return; }
         let cancelled = false;
         (async () => {
             try {
-                const results = await Promise.all(collectionIds.map(id => agenticObserveApi.fetchMcpComponentsData(id)));
+                // Batched — see AgenticAssetFlyout.jsx's AI Agent effect for why this matters.
+                const bundleMap = await agenticObserveApi.fetchCollectionStiBundlesBatch(collectionIds);
                 if (cancelled) return;
                 const seen = new Set();
                 const merged = [];
-                results.forEach(data => {
+                bundleMap.forEach(b => {
+                    const data = buildMcpComponentsFromStis(b.stiEndpoints, b.apiInfoList, b.id, b.auditRows);
                     (data.tools || []).forEach(t => {
                         if (!seen.has(t.name)) { seen.add(t.name); merged.push(t); }
                     });
@@ -137,7 +140,7 @@ function AgentMcpToolsView({ asset, selectedMcp, agenticFlatData, goToList, onNa
             }
         })();
         return () => { cancelled = true; };
-    }, [selectedMcp?.name, agenticFlatData]);
+    }, [selectedMcp?.name, selectedMcp?.collectionIds]);
 
     return (
         <Box className="agentic-flex-fill">
@@ -235,80 +238,32 @@ function ConfigViolationsView({ configRows = [] }) {
 
 // ── Main view ─────────────────────────────────────────────────────────────────
 
-export default function AgentComponentsView({ asset, onNavChange, onNavigateToAsset, agenticFlatData = [], configViolations = null, configRows = [] }) {
+export default function AgentComponentsView({ asset, onNavChange, onNavigateToAsset, configViolations = null, configRows = [] }) {
     const [view,          setView]          = useState("list");
     const [selectedMcp,   setSelectedMcp]   = useState(null);
     const [selectedTool,  setSelectedTool]  = useState(null);
     const [selectedSkill, setSelectedSkill] = useState(null);
-    const [skills,        setSkills]        = useState([]);
-    const [builtinTools,  setBuiltinTools]  = useState([]);
-    // Skills and built-in tools are fetched async; connectedMcps/configRow are derived
-    // synchronously. Track loading so the empty state isn't shown while a fetch is in flight.
-    const [skillsLoading,       setSkillsLoading]       = useState(true);
-    const [builtinToolsLoading, setBuiltinToolsLoading] = useState(true);
 
-    const connectedMcps = useMemo(() => {
-        if (!asset.mcpServers?.length) return [];
-        const seen = new Set();
-        return asset.mcpServers
-            .filter((mcpName) => {
-                const key = String(mcpName).toLowerCase();
-                if (seen.has(key)) return false;
-                seen.add(key);
-                return true;
-            })
-            .map((mcpName) => ({ id: mcpName, name: mcpName, endpoint: mcpName, toolCount: 0 }));
-    }, [asset.mcpServers]);
-
-    useEffect(() => {
-        const collectionIds = asset?.collectionIds;
-        if (!collectionIds?.length) { setSkills([]); setSkillsLoading(false); return; }
-        let cancelled = false;
-        setSkillsLoading(true);
-        (async () => {
-            try {
-                const results = await Promise.all(collectionIds.map(id => agenticObserveApi.fetchSkillsFlyoutData(id)));
-                if (cancelled) return;
-                const seen = new Set();
-                const merged = [];
-                results.forEach(data => {
-                    (data.skills || []).forEach(s => {
-                        if (!seen.has(s.name)) { seen.add(s.name); merged.push(s); }
-                    });
-                });
-                setSkills(merged);
-            } catch {
-                if (!cancelled) setSkills([]);
-            } finally {
-                if (!cancelled) setSkillsLoading(false);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [asset?.id, asset?.collectionIds]);
-
-    useEffect(() => {
-        const collectionIds = asset?.collectionIds;
-        if (!collectionIds?.length) { setBuiltinTools([]); setBuiltinToolsLoading(false); return; }
-        let cancelled = false;
-        setBuiltinToolsLoading(true);
-        (async () => {
-            try {
-                const results = await Promise.all(collectionIds.map(id => agenticObserveApi.fetchAgentBuiltinToolsData(id)));
-                if (cancelled) return;
-                const seen = new Set();
-                const merged = [];
-                results.flat().forEach((tool) => {
-                    if (!seen.has(tool.name)) { seen.add(tool.name); merged.push(tool); }
-                });
-                setBuiltinTools(merged);
-            } catch {
-                if (!cancelled) setBuiltinTools([]);
-            } finally {
-                if (!cancelled) setBuiltinToolsLoading(false);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [asset?.id, asset?.collectionIds]);
+    // Server-side paginated — merges skills, built-in tools, and connected MCP servers into one
+    // batched query instead of the old per-collection-id N+1 (see AgenticObserveAction.
+    // fetchAgenticComponentsPage). asset.collectionIds/mcpServers/mcpServerCollectionIds are all
+    // already known client-side (part of the asset row itself), so no extra fetch is needed to
+    // build the request.
+    const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
+        return api.fetchAgenticComponentsPage({
+            apiCollectionIds: asset.collectionIds || [],
+            mcpServerNames: asset.mcpServers || [],
+            mcpServerCollectionIds: asset.mcpServerCollectionIds || {},
+            skip,
+            limit: limit || 20,
+            sortKey,
+            sortOrder: sortOrder ? -sortOrder : -1,
+            queryValue: searchString || undefined,
+        }).then((res) => ({
+            value: res.components || [],
+            total: res.total || 0,
+        }));
+    }, [asset.id, asset.collectionIds, asset.mcpServers, asset.mcpServerCollectionIds]);
 
     const goToList = useCallback(() => {
         setView("list"); setSelectedMcp(null); setSelectedTool(null); setSelectedSkill(null);
@@ -328,13 +283,6 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
             violations: configViolations,
         };
     }, [asset?.assetTagValue, configViolations]);
-
-    const allComponents = useMemo(() => [
-        ...(configRow ? [configRow] : []),
-        ...builtinTools.map(t => ({ ...t, _type: "Tool" })),
-        ...connectedMcps.map(m => ({ ...m, _type: "MCP Server" })),
-        ...skills.map(s => ({ ...s, _type: "Skill" })),
-    ], [configRow, builtinTools, connectedMcps, skills]);
 
     const handleListRowClick = useCallback((e) => {
         if (!e.data || e.data._nonClickable) return;
@@ -391,7 +339,6 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
             <AgentMcpToolsView
                 asset={asset}
                 selectedMcp={selectedMcp}
-                agenticFlatData={agenticFlatData}
                 goToList={goToList}
                 onNavChange={onNavChange}
                 setSelectedTool={setSelectedTool}
@@ -401,31 +348,26 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
     }
 
     if (view === "skill-detail" && selectedSkill) {
-        return <SkillDetailPanel skill={selectedSkill} />;
+        return <SkillDetailPanel skill={selectedSkill} collectionIds={asset?.collectionIds} />;
     }
 
     if (view === "config-detail") {
         return <ConfigViolationsView configRows={configRows} />;
     }
 
-    if (allComponents.length === 0) {
-        if (skillsLoading || builtinToolsLoading) {
-            return <Box padding="4"><Spinner accessibilityLabel="Loading components" size="small" /></Box>;
-        }
-        return <Box padding="4"><Text variant="bodySm" color="subdued">No components found for this agent.</Text></Box>;
-    }
-
     return (
         <AgGridTable
-            rowData={allComponents}
+            key={asset.id}
             columnDefs={COMBINED_AGENT_COL_DEFS}
             defaultColDef={GRID_DEFAULT_COL}
+            onServerFetch={onServerFetch}
+            serverSideRowModel
+            getRowId={(params) => `${params.data._type}:${params.data.name}`}
+            pinnedTopRowData={configRow ? [configRow] : undefined}
             onRowClicked={handleListRowClick}
             getRowStyle={({ data }) => ({ cursor: data?._nonClickable ? "default" : "pointer" })}
-            fillHeight
             noOuterBorder
             searchPlaceholder="Search components..."
-            pagination
             paginationPageSize={20}
             sideBar={{ toolPanels: ["columns", "filters"], defaultToolPanel: null }}
             domLayout="normal"

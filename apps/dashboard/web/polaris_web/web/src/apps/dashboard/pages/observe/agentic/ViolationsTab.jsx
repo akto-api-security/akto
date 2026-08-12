@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Box, VerticalStack, Text } from "@shopify/polaris";
+import React, { useCallback } from "react";
+import { Box, Text } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
-import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import { SeverityBadge } from "./AgenticCellRenderers";
-import { fetchAgenticViolations, openViolationInThreatActivity, deviceServiceKey, isClaudeConfigHost } from "./agenticObserveApi";
+import { fetchAgenticViolationsPage, openViolationInThreatActivity, deviceServiceKey } from "./agenticObserveApi";
 import func from "@/util/func";
 
 function ViolSeverityCellRenderer({ data }) {
@@ -20,69 +19,67 @@ function ViolTitleCellRenderer({ data }) {
     );
 }
 
-const SEVERITY_ORDER = { low: 1, medium: 2, high: 3, critical: 4 };
-
+// Only "time" (-> detectedAt) and "severity" have a server-side sort mapping (see onServerFetch) —
+// "title"/"deviceId" aren't real backend fields (title is filterId, deviceId is derived from host),
+// so sorting by them isn't offered.
 const VIOLATIONS_COL_DEFS = [
-    { field: "time",     headerName: "Time",      width: 160, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.timeEpoch || 0) - (nodeB?.data?.timeEpoch || 0) },
-    { field: "title",    headerName: "Violation", flex: 1,    minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
-    { field: "deviceId", headerName: "Device",    width: 200, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" } },
-    { field: "severity", headerName: "Severity",  width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, comparator: (a, b) => (SEVERITY_ORDER[a] || 0) - (SEVERITY_ORDER[b] || 0) },
+    { field: "time",     headerName: "Time",      width: 160, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" } },
+    { field: "title",    headerName: "Violation", flex: 1,    minWidth: 200, cellRenderer: ViolTitleCellRenderer, cellStyle: { display: "flex", alignItems: "center" }, sortable: false },
+    { field: "deviceId", headerName: "Device",    width: 200, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", fontSize: 12, color: "#6D7175" }, sortable: false },
+    { field: "severity", headerName: "Severity",  width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: ViolSeverityCellRenderer },
 ];
 
 const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 
-export default function ViolationsTab({ asset, collections = [], startTimestamp, endTimestamp, onViolationClick }) {
-    const [violations, setViolations] = useState([]);
-    const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        setLoading(true);
+// Server-side paginated/searched/sorted — scoped to this one asset's own hostnames (see
+// AgenticObserveAction... no, this specific tab talks to threat-detection-backend's
+// MaliciousEventService.listMaliciousRequests directly via SuspectSampleDataAction, not
+// AgenticObserveAction — see fetchAgenticViolationsPage/agenticObserveApi.js). Host attribution
+// (exact / loose device+service / claude-config) mirrors the same three tiers this tab always used.
+// hostNames comes straight off the asset row itself (AgenticObserveAction's GroupSummary already
+// collects every member collection's hostName server-side) — no need to fetch/filter the account's
+// full collection list just to re-derive it client-side.
+export default function ViolationsTab({ asset, startTimestamp, endTimestamp, onViolationClick }) {
+    const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
         const isClaudeAsset = asset?.assetTagValue?.toLowerCase() === "claude";
-        if (!asset?.collectionIds?.length || !collections.length) {
-            if (!isClaudeAsset) { setViolations([]); setLoading(false); return; }
+        const hostNames = asset?.hostNames || [];
+
+        if (!hostNames.length && !isClaudeAsset) {
+            return Promise.resolve({ value: [], total: 0 });
         }
-
-        const ids = new Set((asset.collectionIds || []).map(Number));
-        const hostNames = collections.filter(c => ids.has(Number(c.id)) && c.hostName).map(c => c.hostName);
-
-        if (!hostNames.length && !isClaudeAsset) { setViolations([]); setLoading(false); return; }
 
         // Collect device IDs that have a claude-type collection among this asset's collections.
         // This covers both direct Claude AI Agent assets and Skills/MCPs whose collections
         // include a claude collection (and thus receive attributed claude-settings events).
-        const claudeDeviceIds = new Set(
-            hostNames
-                .filter(h => { const parts = h.split("."); return parts[parts.length - 1]?.toLowerCase() === "claude"; })
-                .map(h => h.split(".")[0])
-                .filter(Boolean)
-        );
+        const claudeDeviceIds = hostNames
+            .filter(h => { const parts = h.split("."); return parts[parts.length - 1]?.toLowerCase() === "claude"; })
+            .map(h => h.split(".")[0])
+            .filter(Boolean);
+        const looseHostKeys = hostNames.map(h => deviceServiceKey(h)).filter(Boolean);
 
-        let cancelled = false;
-        const hostSet = new Set(hostNames);
-        const looseHostSet = new Set(hostNames.map(h => deviceServiceKey(h)).filter(Boolean));
-        fetchAgenticViolations({ startTimestamp, endTimestamp })
-            .then((rows) => {
-                if (cancelled) return;
-                const filtered = rows.filter(r =>
-                    hostSet.has(r.host) ||
-                    looseHostSet.has(deviceServiceKey(r.host)) ||
-                    (isClaudeConfigHost(r.host) && (
-                        isClaudeAsset ||
-                        claudeDeviceIds.has(r.host.split(".")[0])
-                    ))
-                );
-                setViolations(filtered.map((r) => ({
-                    ...r,
-                    time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
-                    deviceId: r.host ? r.host.split(".")[0] : "",
-                })));
-                setLoading(false);
-            })
-            .catch(() => {
-                if (!cancelled) { setViolations([]); setLoading(false); }
-            });
-        return () => { cancelled = true; };
-    }, [asset?.id, asset?.assetTagValue, asset?.collectionIds, collections, startTimestamp, endTimestamp]);
+        const mongoOrder = sortOrder ? -sortOrder : -1; // AG-Grid asc/desc convention is inverted vs Mongo
+        const sortBySeverity = sortKey === "severity";
+
+        return fetchAgenticViolationsPage({
+            startTimestamp, endTimestamp,
+            hosts: hostNames,
+            looseHostKeys,
+            claudeDeviceIds,
+            matchClaudeConfig: isClaudeAsset,
+            skip,
+            limit: limit || 20,
+            sort: sortBySeverity ? { severity: mongoOrder } : { detectedAt: mongoOrder },
+            sortBySeverity,
+            searchText: searchString || undefined,
+        }).then((res) => ({
+            value: res.violations.map((r) => ({
+                ...r,
+                time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
+                deviceId: r.host ? r.host.split(".")[0] : "",
+            })),
+            total: res.total,
+        }));
+    }, [asset?.id, asset?.assetTagValue, asset?.hostNames, startTimestamp, endTimestamp]);
 
     const handleViolationClick = useCallback((e) => {
         if (!e.data) return;
@@ -93,32 +90,18 @@ export default function ViolationsTab({ asset, collections = [], startTimestamp,
         }
     }, [onViolationClick]);
 
-    if (loading) {
-        return <SpinnerCentered height="200px" />;
-    }
-
-    if (violations.length === 0) {
-        return (
-            <Box padding="8">
-                <VerticalStack gap="1" inlineAlign="center">
-                    <Text variant="bodySm" fontWeight="semibold">No violations</Text>
-                    <Text variant="bodySm" color="subdued">This asset is operating within policy.</Text>
-                </VerticalStack>
-            </Box>
-        );
-    }
-
     return (
         <AgGridTable
-            rowData={violations}
+            key={asset.id}
             columnDefs={VIOLATIONS_COL_DEFS}
             defaultColDef={GRID_DEFAULT_COL}
+            onServerFetch={onServerFetch}
+            serverSideRowModel
+            getRowId={(params) => params.data.refId || `${params.data.host}-${params.data.timeEpoch}-${params.data.title}`}
             onRowClicked={handleViolationClick}
             getRowStyle={() => ({ cursor: "pointer" })}
-            fillHeight
             noOuterBorder
             searchPlaceholder="Search violations..."
-            pagination
             paginationPageSize={20}
             sideBar={{ toolPanels: ["columns", "filters"] }}
             domLayout="normal"

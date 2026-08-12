@@ -112,7 +112,14 @@ function Dashboard() {
     },[trafficAlerts.length])
 
     useEffect(() => {
-        if(((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)) && location.pathname !== "/dashboard/observe/inventory"){
+        // Agentic Assets (legacy) doesn't read allCollections/collectionsMap/hostNameMap/
+        // tagCollectionsMap at all (it fetches its own slim, paginated data) — same reasoning as
+        // the pre-existing Inventory exclusion below. Landing here first (direct URL/refresh) would
+        // otherwise fire this mount-once effect's full, unpaginated getAllCollections() (tens of MB
+        // on large accounts) purely to populate maps this page never reads.
+        const skipsAllCollectionsFetch = location.pathname === "/dashboard/observe/inventory"
+            || location.pathname === "/dashboard/observe/agentic-assets-legacy";
+        if(((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)) && !skipsAllCollectionsFetch){
             fetchAllCollections()
         }
         // Report pages (testing/summary/:reportId, issues/summary/:reportId, threat-detection/report/:reportId)

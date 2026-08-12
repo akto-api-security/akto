@@ -22,6 +22,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.De
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchThreatsForActorRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchDashboardTopDataRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ToggleArchivalEnabledRequest;
 import com.akto.threat.backend.service.MaliciousEventService;
@@ -142,9 +143,11 @@ public class DashboardRouter implements ARouter {
             .post("/list_malicious_requests")
             .blockingHandler(ctx -> {
                 String contextSource = getContextSourceHeader(ctx);
-                // Skills Evaluations partition mode ("only" | "exclude"), Atlas-only. Passed as a
-                // header like x-context-source so we don't need a new proto filter field.
+                // Skills Evaluations / Misconfigured Settings partition modes ("only" | "exclude"),
+                // Atlas-only. Passed as headers like x-context-source so we don't need new proto
+                // filter fields.
                 String skillEvalMode = ctx.request().getHeader("x-skill-eval-mode");
+                String configEvalMode = ctx.request().getHeader("x-config-eval-mode");
 
                 RequestBody reqBody = ctx.body();
                 ListMaliciousRequestsRequest req = ProtoMessageUtils.<
@@ -160,7 +163,7 @@ public class DashboardRouter implements ARouter {
                 }
 
                 ProtoMessageUtils.toString(
-                    dsService.listMaliciousRequests(ctx.get("accountId"), req, contextSource, skillEvalMode)
+                    dsService.listMaliciousRequests(ctx.get("accountId"), req, contextSource, skillEvalMode, configEvalMode)
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
@@ -659,6 +662,36 @@ public class DashboardRouter implements ARouter {
                         req.getLatestAttackList(),
                         req.getLimit(),
                         contextSource
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+        router
+            .post("/get_host_severity_counts")
+            .blockingHandler(ctx -> {
+                String contextSource = getContextSourceHeader(ctx);
+
+                RequestBody reqBody = ctx.body();
+                FetchHostSeverityCountsRequest req = ProtoMessageUtils.<
+                FetchHostSeverityCountsRequest
+                >toProtoMessage(
+                    FetchHostSeverityCountsRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                ProtoMessageUtils.toString(
+                    threatActorService.fetchHostSeverityCounts(
+                        ctx.get("accountId"),
+                        req.getStartTs(),
+                        req.getEndTs(),
+                        contextSource,
+                        req.getMonthBoundariesList(),
+                        req.getHostFilterList()
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });

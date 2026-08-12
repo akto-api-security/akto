@@ -560,7 +560,30 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         }
         return result ;
     }
-    
+
+    // Scoped sibling of getSensitiveSubtypesDetectedForCollection above — for a caller that only
+    // needs a handful of collectionIds (e.g. one agentic asset's own devices) instead of every
+    // collection in the account.
+    public Map<Integer,List<String>> getSensitiveSubtypesDetectedForCollections(List<String> sensitiveParameters, List<Integer> collectionIds){
+        Map<Integer,List<String>> result = new HashMap<>();
+        if (collectionIds == null || collectionIds.isEmpty()) return result;
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId");
+        Bson customFilter = Filters.in(SingleTypeInfo._API_COLLECTION_ID, collectionIds);
+        List<Bson> pipeline = generateFilterForSubtypes(sensitiveParameters, groupedId, false, customFilter);
+        MongoCursor<BasicDBObject> collectionsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while(collectionsCursor.hasNext()){
+            try {
+                BasicDBObject basicDBObject = collectionsCursor.next();
+                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
+                List<String> subtypes = (List<String>) basicDBObject.get("subTypes");
+                result.put(apiCollectionId, subtypes);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return result;
+    }
+
     public List<BasicDBObject> getSensitiveSubtypesDetectedForUrl(List<String> sensitiveParameters) {
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
                 .append(SingleTypeInfo._URL, "$url")
