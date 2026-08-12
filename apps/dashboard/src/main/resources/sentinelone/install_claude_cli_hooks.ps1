@@ -12,7 +12,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$GITHUB_RAW_BASE = "https://raw.githubusercontent.com/akto-api-security/akto/agent-hooks/apps/mcp-endpoint-shield/claude-cli-hooks"
+$GITHUB_RAW_BASE = "https://raw.githubusercontent.com/akto-api-security/akto/master/apps/mcp-endpoint-shield/claude-cli-hooks"
+$GITHUB_SHARED_BASE = "https://raw.githubusercontent.com/akto-api-security/akto/master/apps/mcp-endpoint-shield/shared"
 
 foreach ($arg in $args) {
     switch -Wildcard ($arg) {
@@ -274,6 +275,23 @@ function Install-ForUser {
 
     Write-Log "Downloading hook scripts from GitHub..."
 
+    foreach ($sharedFile in @("akto_ingestion_utility.py", "akto_machine_id.py")) {
+        $sharedDest = Join-Path $ClaudeHooksDir $sharedFile
+        if (-not (Get-FileFromUrl "$GITHUB_SHARED_BASE/$sharedFile" $sharedDest)) {
+            Write-ErrorLog "Failed to download $sharedFile"
+            return $false
+        }
+        Write-Log "Downloaded $sharedFile"
+    }
+
+    $heartbeatDest = Join-Path $ClaudeHooksDir "akto_heartbeat.py"
+    if (Get-FileFromUrl "$GITHUB_SHARED_BASE/akto_heartbeat.py" $heartbeatDest) {
+        Write-Log "Downloaded akto_heartbeat.py"
+    } else {
+        Remove-Item -LiteralPath $heartbeatDest -Force -ErrorAction SilentlyContinue
+        Write-Log "Warning: could not download optional akto_heartbeat.py - continuing without it"
+    }
+
     $promptPy = Join-Path $ClaudeHooksDir "akto-validate-prompt.py"
     if (-not (Get-FileFromUrl "$GITHUB_RAW_BASE/akto-validate-prompt.py" $promptPy)) {
         Write-ErrorLog "Failed to download akto-validate-prompt.py"
@@ -287,16 +305,6 @@ function Install-ForUser {
         return $false
     }
     Write-Log "Downloaded akto-validate-response.py"
-
-    $sharedBase = "https://raw.githubusercontent.com/akto-api-security/akto/master/apps/mcp-endpoint-shield/shared"
-    foreach ($sharedFile in @("akto_machine_id.py", "akto_heartbeat.py")) {
-        $sharedDest = Join-Path $ClaudeHooksDir $sharedFile
-        if (-not (Get-FileFromUrl "$sharedBase/$sharedFile" $sharedDest)) {
-            Write-ErrorLog "Failed to download $sharedFile"
-            return $false
-        }
-        Write-Log "Downloaded $sharedFile"
-    }
 
     Write-Log "Creating wrapper scripts with environment variables..."
     New-WrapperScript -HookType "prompt" -IngestionUrl $GuardrailsUrl -DeviceId $DeviceId -HooksDir $ClaudeHooksDir
