@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-import { createPortal } from "react-dom";
+import React from "react";
 import { Badge, Box, HorizontalStack, Text, Tooltip } from "@shopify/polaris";
 import McpRedIcon from "@/assets/McpRedIcon.svg";
 import PersonLockIcon from "@/assets/PersonLockIcon.svg";
@@ -139,54 +138,3 @@ export function InteractionsCellRenderer({ value, data }) {
     );
 }
 
-export function GroupCellRenderer({ data }) {
-    const [tipPos, setTipPos] = useState(null);
-    if (!data?.groups?.length) return <Text variant="bodySm" color="subdued">-</Text>;
-
-    const primary = data.groups[0];
-    const rest = data.groups.slice(1);
-
-    return (
-        <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-            <Text variant="bodySm">{primary.name} [{primary.count}]</Text>
-            {rest.length > 0 && (
-                <>
-                    {/* count chip — neutral palette pill, hover reveals a portal tooltip */}
-                    <Box
-                        as="span"
-                        background="bg-strong"
-                        borderRadius="4"
-                        paddingInlineStart="2"
-                        paddingInlineEnd="2"
-                        onMouseEnter={(e) => {
-                            const r = e.currentTarget.getBoundingClientRect();
-                            setTipPos({ top: r.bottom + 6, left: r.left });
-                        }}
-                        onMouseLeave={() => setTipPos(null)}
-                    >
-                        <Text variant="bodySm" color="subdued" fontWeight="semibold">+{rest.length}</Text>
-                    </Box>
-                    {/* createPortal renders into document.body — escapes AG Grid's overflow:hidden */}
-                    {tipPos && createPortal(
-                        <Box
-                            position="fixed"
-                            background="bg"
-                            borderColor="border"
-                            borderWidth="1"
-                            borderRadius="2"
-                            padding="2"
-                            shadow="lg"
-                            zIndex="9999"
-                            style={{ top: tipPos.top, left: tipPos.left, whiteSpace: "nowrap", pointerEvents: "none" }}
-                        >
-                            {rest.map((g) => (
-                                <Text key={g.name} variant="bodySm">{g.name} [{g.count}]</Text>
-                            ))}
-                        </Box>,
-                        document.body,
-                    )}
-                </>
-            )}
-        </HorizontalStack>
-    );
-}

@@ -19,7 +19,6 @@ import {
   RiskScoreCellRenderer,
   ViolationsCellRenderer,
   InteractionsCellRenderer,
-  GroupCellRenderer,
 } from "./AgenticCellRenderers";
 import { cumulativeByMonth, filterAssetsByLastSeen } from "./agenticPageBuilders";
 import SmoothAreaChart from "@/apps/dashboard/pages/dashboard/new_components/SmoothChart";
@@ -118,16 +117,6 @@ const COL_DEFS = [
           : 0;
       return sum(a) - sum(b);
     },
-  },
-  {
-    field: "groups",
-    headerName: "Group",
-    flex: 1,
-    minWidth: 160,
-    sortable: false,
-    filter: false,
-    cellRenderer: GroupCellRenderer,
-    cellStyle: { display: "flex", alignItems: "center" },
   },
   {
     field: "lastSeen",

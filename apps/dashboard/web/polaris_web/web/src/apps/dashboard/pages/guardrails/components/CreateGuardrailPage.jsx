@@ -248,8 +248,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     // Step 12: User targeting
     const [applyToAllUsers, setApplyToAllUsers] = useState(true);
-    const [targetTeams, setTargetTeams] = useState([]);
-    const [targetRoles, setTargetRoles] = useState([]);
+    // Generic device-tag targeting: { [tagKey]: [selectedValues] }. Any tag key present on
+    // AgenticUsers (group, role, team, department, ...) is targetable, not just a fixed set.
+    const [targetTags, setTargetTags] = useState({});
     const [targetDeviceIds, setTargetDeviceIds] = useState([]);
     const [enterpriseLicenseComplianceCategories, setEnterpriseLicenseComplianceCategories] = useState([]);
 
@@ -266,16 +267,20 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // Get collections from PersistStore
     const allCollections = PersistStore(state => state.allCollections);
 
-    const availableTeams = useMemo(() => {
-        const teams = new Set();
-        (agenticUsers || []).forEach(u => { if (u.teamName) teams.add(u.teamName); });
-        return Array.from(teams).sort();
-    }, [agenticUsers]);
-
-    const availableRoles = useMemo(() => {
-        const roles = new Set();
-        (agenticUsers || []).forEach(u => { if (u.userRole) roles.add(u.userRole); });
-        return Array.from(roles).sort();
+    // Every device-tag key/value pair seen across AgenticUsers — powers the dynamic
+    // tag-key picker below (any key is targetable, e.g. group, role, team, department).
+    const availableTagKeyValues = useMemo(() => {
+        const map = new Map();
+        (agenticUsers || []).forEach(u => {
+            (u.deviceTags || []).forEach(t => {
+                if (!t?.key || !t.value) return;
+                if (!map.has(t.key)) map.set(t.key, new Set());
+                map.get(t.key).add(t.value);
+            });
+        });
+        return Array.from(map.entries())
+            .map(([key, values]) => ({ key, values: Array.from(values).sort() }))
+            .sort((a, b) => a.key.localeCompare(b.key));
     }, [agenticUsers]);
 
     // One dropdown option per device (not per username) — usernames can repeat across devices
@@ -300,20 +305,21 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         const rows = [];
         (agenticUsers || []).forEach(u => {
             (u.devices || []).forEach(deviceId => {
-                rows.push({ deviceId, username: u.userName, team: u.teamName, role: u.userRole });
+                rows.push({ deviceId, username: u.userName, tags: u.deviceTags || [] });
             });
         });
         if (applyToAllUsers) return rows;
-        const teamSet = new Set(targetTeams);
-        const roleSet = new Set(targetRoles);
+        const tagKeys = Object.keys(targetTags || {}).filter(k => (targetTags[k] || []).length > 0);
         const deviceSet = new Set(targetDeviceIds);
-        if (teamSet.size === 0 && roleSet.size === 0 && deviceSet.size === 0) return [];
-        return rows.filter(r =>
-            (teamSet.size === 0 || teamSet.has(r.team)) &&
-            (roleSet.size === 0 || roleSet.has(r.role)) &&
-            (deviceSet.size === 0 || deviceSet.has(r.deviceId))
-        );
-    }, [agenticUsers, applyToAllUsers, targetTeams, targetRoles, targetDeviceIds]);
+        if (tagKeys.length === 0 && deviceSet.size === 0) return [];
+        return rows.filter(r => {
+            const matchesAllTagKeys = tagKeys.every(k => {
+                const valueSet = new Set(targetTags[k]);
+                return r.tags.some(t => t.key === k && valueSet.has(t.value));
+            });
+            return matchesAllTagKeys && (deviceSet.size === 0 || deviceSet.has(r.deviceId));
+        });
+    }, [agenticUsers, applyToAllUsers, targetTags, targetDeviceIds]);
 
     // Create validation state object
     const getStoredStateData = () => ({
@@ -386,8 +392,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         applyOnResponse,
         policyBehaviour,
         applyToAllUsers,
-        targetTeams,
-        targetRoles,
+        targetTags,
         targetDeviceIds,
         enterpriseLicenseComplianceCategories,
         serverScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllServers &&
@@ -395,8 +400,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             (selectedAgentServers || []).length === 0 &&
             (selectedBrowserLlms || []).length === 0,
         userScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllUsers &&
-            (targetTeams || []).length === 0 &&
-            (targetRoles || []).length === 0 &&
+            Object.values(targetTags || {}).every(values => !(values || []).length) &&
             (targetDeviceIds || []).length === 0,
     });
 
@@ -699,8 +703,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyOnRequest(false);
         setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
         setApplyToAllUsers(true);
-        setTargetTeams([]);
-        setTargetRoles([]);
+        setTargetTags({});
         setEnterpriseLicenseComplianceCategories([]);
     };
 
@@ -869,9 +872,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             caseSensitive: !!entry.caseSensitive
         })));
 
-        setApplyToAllUsers(!policy.targetTeams?.length && !policy.targetRoles?.length && !policy.targetDeviceIds?.length);
-        setTargetTeams(policy.targetTeams || []);
-        setTargetRoles(policy.targetRoles || []);
+        const loadedTargetTags = policy.targetTags || {};
+        const hasAnyTag = Object.values(loadedTargetTags).some(values => (values || []).length > 0);
+        setApplyToAllUsers(!hasAnyTag && !policy.targetDeviceIds?.length);
+        setTargetTags(loadedTargetTags);
         setTargetDeviceIds(policy.targetDeviceIds || []);
         setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
     };
@@ -1007,8 +1011,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 ignorePhrases: cleanedIgnorePhrases,
                 applyOnResponse,
                 applyOnRequest,
-                targetTeams: applyToAllUsers ? [] : targetTeams,
-                targetRoles: applyToAllUsers ? [] : targetRoles,
+                targetTags: applyToAllUsers ? {} : Object.fromEntries(
+                    Object.entries(targetTags).filter(([, values]) => (values || []).length > 0)
+                ),
                 targetDeviceIds: applyToAllUsers ? [] : targetDeviceIds,
                 enterpriseLicenseComplianceCategories,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
@@ -1218,14 +1223,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         collectionsLoading={collectionsLoading}
                         policyBehaviour={policyBehaviour}
                         setPolicyBehaviour={setPolicyBehaviour}
-                        targetTeams={targetTeams}
-                        setTargetTeams={setTargetTeams}
-                        targetRoles={targetRoles}
-                        setTargetRoles={setTargetRoles}
+                        targetTags={targetTags}
+                        setTargetTags={setTargetTags}
                         targetDeviceIds={targetDeviceIds}
                         setTargetDeviceIds={setTargetDeviceIds}
-                        availableTeams={availableTeams}
-                        availableRoles={availableRoles}
+                        availableTagKeyValues={availableTagKeyValues}
                         availableDevices={availableDevices}
                         matchingDeviceRows={matchingDeviceRows}
                         usersLoading={usersLoading}
@@ -1249,12 +1251,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         onTryPrompt={handleSamplePayloadClick}
                         enterpriseLicenseComplianceCategories={enterpriseLicenseComplianceCategories}
                         setEnterpriseLicenseComplianceCategories={setEnterpriseLicenseComplianceCategories}
-                        targetTeams={targetTeams}
-                        setTargetTeams={setTargetTeams}
-                        targetRoles={targetRoles}
-                        setTargetRoles={setTargetRoles}
-                        availableTeams={availableTeams}
-                        availableRoles={availableRoles}
                         usersLoading={usersLoading}
                         applyToAllUsers={applyToAllUsers}
                         setApplyToAllUsers={setApplyToAllUsers}

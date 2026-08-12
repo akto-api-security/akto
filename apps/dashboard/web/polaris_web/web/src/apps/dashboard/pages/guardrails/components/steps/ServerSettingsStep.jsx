@@ -23,7 +23,7 @@ export const ServerSettingsConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTeams, targetRoles, targetDeviceIds }) => {
+    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTags, targetDeviceIds }) => {
         const appSettings = (applyOnRequest || applyOnResponse) ?
             ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
         const behaviourSuffix = policyBehaviour ? `Rule behaviour: ${policyBehaviour}` : '';
@@ -41,8 +41,12 @@ export const ServerSettingsConfig = {
             summary += ' | All users';
         } else {
             const userParts = [];
-            if (targetTeams?.length > 0) userParts.push(`${targetTeams.length} Team${targetTeams.length !== 1 ? 's' : ''}`);
-            if (targetRoles?.length > 0) userParts.push(`${targetRoles.length} Role${targetRoles.length !== 1 ? 's' : ''}`);
+            Object.entries(targetTags || {}).forEach(([key, values]) => {
+                if (values?.length > 0) {
+                    const label = key.charAt(0).toUpperCase() + key.slice(1);
+                    userParts.push(`${values.length} ${label}${values.length !== 1 ? 's' : ''}`);
+                }
+            });
             if (targetDeviceIds?.length > 0) userParts.push(`${targetDeviceIds.length} User${targetDeviceIds.length !== 1 ? 's' : ''}`);
             if (userParts.length > 0) summary += ` | ${userParts.join(', ')}`;
         }
@@ -130,14 +134,11 @@ const ServerSettingsStep = ({
     collectionsLoading,
     policyBehaviour,
     setPolicyBehaviour,
-    targetTeams,
-    setTargetTeams,
-    targetRoles,
-    setTargetRoles,
+    targetTags,
+    setTargetTags,
     targetDeviceIds,
     setTargetDeviceIds,
-    availableTeams,
-    availableRoles,
+    availableTagKeyValues = [],
     availableDevices,
     matchingDeviceRows = [],
     usersLoading,
@@ -159,9 +160,9 @@ const ServerSettingsStep = ({
     });
 
     const [userConditions, userDispatch] = useReducer(conditionsReducer, null, () => {
-        const conds = [];
-        if ((targetRoles || []).length > 0) conds.push({ type: 'ROLE', values: targetRoles });
-        if ((targetTeams || []).length > 0) conds.push({ type: 'TEAM', values: targetTeams });
+        const conds = Object.entries(targetTags || {})
+            .filter(([, values]) => (values || []).length > 0)
+            .map(([key, values]) => ({ type: key, values }));
         if ((targetDeviceIds || []).length > 0) conds.push({ type: 'DEVICE', values: targetDeviceIds });
         return conds;
     });
@@ -174,8 +175,12 @@ const ServerSettingsStep = ({
 
     useEffect(() => {
         if (isAtlas) {
-            setTargetRoles(userConditions.filter(c => c.type === 'ROLE').flatMap(c => c.values).filter(Boolean));
-            setTargetTeams(userConditions.filter(c => c.type === 'TEAM').flatMap(c => c.values).filter(Boolean));
+            const tagMap = {};
+            userConditions.filter(c => c.type !== 'DEVICE').forEach(c => {
+                const values = (c.values || []).filter(Boolean);
+                if (values.length) tagMap[c.type] = values;
+            });
+            setTargetTags(tagMap);
             setTargetDeviceIds(userConditions.filter(c => c.type === 'DEVICE').flatMap(c => c.values).filter(Boolean));
         }
     }, [userConditions]);
@@ -198,10 +203,11 @@ const ServerSettingsStep = ({
             case 'AGENT': return enrichOptions(agentOptions, 'AI Agent');
             case 'MCP_SERVER': return enrichOptions(mcpOptions, 'MCP Server');
             case 'LLM': return enrichOptions(llmOptions, 'LLM');
-            case 'ROLE': return (availableRoles || []).map(r => ({ label: r, value: r })).sort((a, b) => a.label.localeCompare(b.label));
-            case 'TEAM': return (availableTeams || []).map(t => ({ label: t, value: t })).sort((a, b) => a.label.localeCompare(b.label));
             case 'DEVICE': return (availableDevices || []).slice().sort((a, b) => a.label.localeCompare(b.label));
-            default: return [];
+            default: {
+                const entry = (availableTagKeyValues || []).find(k => k.key === type);
+                return (entry?.values || []).map(v => ({ label: v, value: v })).sort((a, b) => a.label.localeCompare(b.label));
+            }
         }
     };
 
@@ -274,12 +280,14 @@ const ServerSettingsStep = ({
         { label: `LLM${llmOptions.length > 1 ? 's' : ''} [${llmOptions.length}]`, value: 'LLM', disabled: llmOptions.length === 0 },
     ];
 
-    const teamCount = (availableTeams || []).length;
-    const roleCount = (availableRoles || []).length;
     const deviceCount = (availableDevices || []).length;
+    const tagTypeOptions = (availableTagKeyValues || []).map(({ key, values }) => {
+        const label = key.charAt(0).toUpperCase() + key.slice(1);
+        const count = (values || []).length;
+        return { label: `${count > 1 ? `${label}s` : label} [${count}]`, value: key, disabled: count === 0 };
+    });
     const userTypeOptions = [
-        { label: `${teamCount > 1 ? 'Teams' : 'Team'} [${teamCount}]`, value: 'TEAM', disabled: teamCount === 0 },
-        { label: `${roleCount > 1 ? 'Roles' : 'Role'} [${roleCount}]`, value: 'ROLE', disabled: roleCount === 0 },
+        ...tagTypeOptions,
         { label: `${deviceCount > 1 ? 'Users' : 'User'} [${deviceCount}]`, value: 'DEVICE', disabled: deviceCount === 0 },
     ];
 
@@ -444,7 +452,7 @@ const ServerSettingsStep = ({
                     <Box borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                         <Box padding="4">
                             <VerticalStack gap="4">
-                                <Text variant="headingSm">Teams, Roles & Users</Text>
+                                <Text variant="headingSm">Device Tags & Users</Text>
                                 <VerticalStack gap="2">
                                     <RadioButton
                                         label={
@@ -469,19 +477,19 @@ const ServerSettingsStep = ({
                                         }
                                     />
                                     <RadioButton
-                                        label="Select Teams, Roles & Users"
+                                        label="Select Device Tags & Users"
                                         checked={!applyToAllUsers}
                                         id="select_users_teams"
                                         name="userTargeting"
                                         onChange={() => setApplyToAllUsers(false)}
-                                        disabled={(availableTeams || []).length === 0 && (availableRoles || []).length === 0 && (availableDevices || []).length === 0}
+                                        disabled={(availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0}
                                         helpText={(() => {
-                                            const noOptions = (availableTeams || []).length === 0 && (availableRoles || []).length === 0 && (availableDevices || []).length === 0;
+                                            const noOptions = (availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0;
                                             if (noOptions) {
-                                                return "No Teams, Roles, or Users found. Devices must report in before you can target them here.";
+                                                return "No device tags or users found. Devices must report in before you can target them here.";
                                             }
                                             if (userConditions.length === 0) {
-                                                return "Choose specific Teams, Roles, or Users.";
+                                                return "Choose specific device tags or Users.";
                                             }
                                             if (matchingDeviceRows.length === 0) {
                                                 return "Applies to 0 users with the current selection.";

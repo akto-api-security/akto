@@ -406,7 +406,10 @@ const settingRequests = {
     },
 
     saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, opts = {}) {
-        const data = { oktaGroupToAktoUserRoleMap }
+        const data = {
+            oktaGroupToAktoUserRoleMap,
+            syncGroupsToUserTags: opts.syncGroupsToUserTags === true,
+        }
         if (Object.prototype.hasOwnProperty.call(opts, 'managementApiToken')) {
             const t = opts.managementApiToken
             // Struts cannot distinguish JSON null from omitted String fields; send "" to mean "clear stored token".
@@ -881,18 +884,19 @@ const settingRequests = {
             data: { moduleIds }
         })
     },
-    async updateUserDeviceTag(username, team, userRole) {
+    /** tags: { [key]: string[] } — only the keys present are touched; other tags are left alone. */
+    async updateUserDeviceTag(username, tags) {
         return await request({
             url: '/api/updateUserDeviceTag',
             method: 'post',
-            data: { username, team, userRole }
+            data: { username, tags }
         })
     },
-    async bulkUpdateUserDeviceTag(usernames, team, userRole) {
+    async bulkUpdateUserDeviceTag(usernames, tags) {
         return await request({
             url: '/api/bulkUpdateUserDeviceTag',
             method: 'post',
-            data: { usernames, team, userRole }
+            data: { usernames, tags }
         })
     },
     async fetchAgenticUsers(params = {}) {

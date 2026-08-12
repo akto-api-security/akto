@@ -427,8 +427,6 @@ function OverviewTab({ device, agents, collections, onTabChange, startTimestamp,
     const deviceDetails = useMemo(() => [
         { label: "User",      value: safeVal(device.username) },
         { label: "OS",        value: osLabel },
-        { label: "Group",     value: safeVal(device.group) },
-        { label: "Role",      value: safeVal(device.role) },
         { label: "Last Seen", value: safeVal(device.lastTraffic) },
         device.hasPersonalAccount
             ? { label: "Account", value: "Personal account", isWarning: true }

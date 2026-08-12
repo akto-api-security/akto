@@ -18,7 +18,7 @@ import { EndpointBrowserTrendChart } from "./TrendCharts";
 import { aggregateViolationsByCollectionId, fetchAgenticViolations } from "./agenticObserveApi";
 import { buildDeviceEndpointsPageData } from "./agenticPageBuilders";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
-import { groupCollectionsByUser } from "./constants";
+import { groupCollectionsByUser, buildTagFilterValues } from "./constants";
 import NewLayoutTooltip from "./NewLayoutTooltip";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import values from "@/util/values";
@@ -160,6 +160,27 @@ function RiskScoreCellRenderer({ value }) {
     return <RiskPill score={value} />;
 }
 
+// Compact "key=value" badge — just the first tag inline, rest collapsed behind a "+N"
+// badge with a tooltip, same idiom as the classic Users & Devices page's Tags column.
+const MAX_VISIBLE_TAGS = 1;
+function TagsCellRenderer({ value }) {
+    if (!value || value.length === 0) return null;
+    const shown = value.slice(0, MAX_VISIBLE_TAGS);
+    const rest = value.slice(MAX_VISIBLE_TAGS);
+    return (
+        <HorizontalStack gap="1" wrap={false} blockAlign="center">
+            {shown.map((t, i) => (
+                <Badge key={`${t.key}-${i}`} size="small" status="info">{`${t.key}=${t.value}`}</Badge>
+            ))}
+            {rest.length > 0 && (
+                <Tooltip content={rest.map((t) => `${t.key}=${t.value}`).join(", ")} dismissOnMouseOut>
+                    <Badge size="small" status="info">{`+${rest.length}`}</Badge>
+                </Tooltip>
+            )}
+        </HorizontalStack>
+    );
+}
+
 function ViolationsCellRenderer({ value }) {
     if (!value) return null;
     const parts = ["critical", "high", "medium", "low"].filter(k => value[k] > 0);
@@ -266,14 +287,17 @@ function buildDeviceColDefs(agentRiskData) {
         filter: "agSetColumnFilter",
     },
     {
-        field: "group", headerName: "Group", flex: 1, minWidth: 120,
-        valueGetter: (p) => p.data?.group || "",
-        valueFormatter: (p) => p.value || "-",
-    },
-    {
-        field: "role", headerName: "Role", flex: 1.2, minWidth: 150,
-        valueGetter: (p) => p.data?.role || "",
-        valueFormatter: (p) => p.value || "-",
+        field: "tags",
+        headerName: "Tags",
+        flex: 1.2,
+        minWidth: 160,
+        sortable: false,
+        // Set Filter treats an array cell value as multiple filterable values — includes
+        // both the bare key ("group") and "key=value" so it's filterable by either.
+        filter: "agSetColumnFilter",
+        filterValueGetter: (params) => buildTagFilterValues(params.data?.tags),
+        cellRenderer: TagsCellRenderer,
+        valueGetter: (p) => p.data?.tags || [],
     },
     {
         field: "violations",
@@ -398,10 +422,7 @@ function TableSection({ deviceFlatData, agentRiskData, collections, startTimesta
         },
     }), []);
 
-    const bulkActions = useMemo(() => [
-        { label: "Edit Team", onAction: () => {} },
-        { label: "Edit Role", onAction: () => {} },
-    ], []);
+    const bulkActions = useMemo(() => [], []);
 
     return (
         <VerticalStack gap="0">
@@ -513,6 +534,7 @@ export default function DeviceEndpoints() {
                     {
                         moduleInfos,
                         usernameMap,
+                        userMetadataMap,
                         violationsByCollectionId: aggregateViolationsByCollectionId(violationRows, collections),
                         violationRows,
                         startTimestamp,

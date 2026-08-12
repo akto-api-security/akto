@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Badge, HorizontalStack, Text, Modal, FormLayout, Banner, VerticalStack, Autocomplete } from "@shopify/polaris";
+import { IndexFiltersMode, Badge, HorizontalStack, Text, Modal, FormLayout, Banner, VerticalStack, TextField, Button, Box, Divider, Tooltip, Checkbox } from "@shopify/polaris";
+import { DeleteMinor } from "@shopify/polaris-icons";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -26,6 +27,7 @@ import {
     buildAgenticInventoryFilterForRow,
     fetchAndCacheSkillApiData,
     hasMaliciousSkillInCollections,
+    buildTagFilterValues,
 } from "./constants";
 import { hasMisconfiguredConfigTag } from "./mcpClientHelper";
 
@@ -35,6 +37,27 @@ const usersAndDevicesCountColumnOpts = {
     endpointsColumnLabel: "Agentic assets",
     endpointsColumnBoxWidth: "120px",
 };
+
+// Compact "key=value" badge for the single Tags column — just the first tag inline, the
+// rest collapsed behind a "+N" badge with a tooltip listing them.
+const MAX_VISIBLE_TAGS = 1;
+function buildTagsDisplay(tags) {
+    if (!tags || tags.length === 0) return null;
+    const shown = tags.slice(0, MAX_VISIBLE_TAGS);
+    const rest = tags.slice(MAX_VISIBLE_TAGS);
+    return (
+        <HorizontalStack gap="1" wrap={false}>
+            {shown.map((t, i) => (
+                <Badge key={`${t.key}-${i}`} size="small" status="info">{`${t.key}=${t.value}`}</Badge>
+            ))}
+            {rest.length > 0 && (
+                <Tooltip content={rest.map((t) => `${t.key}=${t.value}`).join(", ")} dismissOnMouseOut>
+                    <Badge size="small" status="info">{`+${rest.length}`}</Badge>
+                </Tooltip>
+            )}
+        </HorizontalStack>
+    );
+}
 
 function UsersAndDevices() {
     const navigate = useNavigate();
@@ -50,7 +73,14 @@ function UsersAndDevices() {
     const [data, setData] = useState({ users: [], devices: [] });
     const [userEnrichVersion, setUserEnrichVersion] = useState(0);
     const [summaryData, setSummaryData] = useState({ profileCount: 0, collectionCount: 0 });
-    const [editTagModal, setEditTagModal] = useState({ active: false, usernames: [], team: '', userRole: '', teamSource: 'sso', roleSource: 'sso', ssoHintTeam: '', ssoHintRole: '', saving: false });
+    // entries: [{key, value, source}] — one row per raw tag for the selected user(s); a key can
+    // have more than one row (different sources, e.g. manual + Okta, all coexisting). Only
+    // source==='manual' rows are ever edited/removed here.
+    // isBulk (>1 user selected): existing per-user tags are never prefilled/shown, since they can
+    // differ across users and silently copying one user's values onto the rest would be a data-loss
+    // footgun. Bulk mode only supports adding a new tag (applied to all) or clearing all manual tags.
+    const emptyEditTagModal = { active: false, usernames: [], isBulk: false, entries: [], originalManualKeys: [], clearAll: false, newKey: '', newValue: '', saving: false };
+    const [editTagModal, setEditTagModal] = useState(emptyEditTagModal);
 
     const { tabsInfo } = useTable();
     const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
@@ -115,6 +145,7 @@ function UsersAndDevices() {
             return groups.map((group) => ({
                 ...group,
                 groupNameDisplay: buildGroupNameDisplay(group),
+                tagsDisplay: buildTagsDisplay(group.tags),
                 sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes || [], false),
                 riskScoreComp:
                     group.riskScore !== null ? (
@@ -234,46 +265,133 @@ function UsersAndDevices() {
     }, []);
 
     const openEditTagModal = useCallback((usernames) => {
+        if (usernames.length > 1) {
+            // Bulk mode: don't prefill from any one user's tags — they can differ across the
+            // selection, and pre-filling from just one would risk silently overwriting the rest.
+            setEditTagModal({
+                active: true,
+                usernames,
+                isBulk: true,
+                entries: [],
+                originalManualKeys: [],
+                clearAll: false,
+                newKey: '',
+                newValue: '',
+                saving: false,
+            });
+            return;
+        }
         const firstUser = data.users.find((u) => usernames.includes(u.id));
-        const teamSrc = firstUser?.teamSource || 'sso';
-        const roleSrc = firstUser?.roleSource || 'sso';
+        // One row per raw tag — a key can have more than one value/source at once (e.g. a
+        // manually-set "team" alongside an Okta-synced "team"), and all of them coexist rather
+        // than one overriding the other, so all are shown.
+        const entries = (firstUser?.tags || []).map((t) => ({ key: t.key, value: t.value, source: t.source }));
         setEditTagModal({
             active: true,
             usernames,
-            team: teamSrc === 'manual' ? (firstUser?.team || '') : '',
-            userRole: roleSrc === 'manual' ? (firstUser?.userRole || '') : '',
-            teamSource: teamSrc,
-            roleSource: roleSrc,
-            // firstUser.team for SSO users is already the SSO value (post-processed by Java)
-            ssoHintTeam: teamSrc === 'sso' ? (firstUser?.team || '') : '',
-            ssoHintRole: roleSrc === 'sso' ? (firstUser?.userRole || '') : '',
+            isBulk: false,
+            entries,
+            originalManualKeys: entries.filter((e) => e.source === 'manual').map((e) => e.key),
+            clearAll: false,
+            newKey: '',
+            newValue: '',
             saving: false,
         });
     }, [data.users]);
 
     const closeEditTagModal = useCallback(() => {
-        setEditTagModal({ active: false, usernames: [], team: '', userRole: '', teamSource: 'sso', roleSource: 'sso', ssoHintTeam: '', ssoHintRole: '', saving: false });
+        setEditTagModal(emptyEditTagModal);
     }, []);
+
+    // Only manual rows are ever edited/removed here — tags from any other source (e.g. Okta) are
+    // shown read-only, since this dashboard action only ever writes manual-source tags and a
+    // synced value would just be overwritten again on the next sync anyway.
+    const updateEntryValue = useCallback((key, value) => {
+        setEditTagModal((prev) => ({
+            ...prev,
+            entries: prev.entries.map((e) => (e.key === key && e.source === 'manual' ? { ...e, value } : e)),
+        }));
+    }, []);
+
+    const removeEntry = useCallback((key) => {
+        setEditTagModal((prev) => ({
+            ...prev,
+            entries: prev.entries.filter((e) => !(e.key === key && e.source === 'manual')),
+        }));
+    }, []);
+
+    const addEntry = useCallback(() => {
+        const key = editTagModal.newKey.trim().toLowerCase();
+        const value = editTagModal.newValue.trim();
+        if (!key) {
+            func.setToast(true, true, "Device tag key cannot be empty");
+            return;
+        }
+        // Only checked against other manual rows — a manual value is allowed alongside an
+        // existing non-manual value for the same key, they simply coexist.
+        if (editTagModal.entries.some((e) => e.key === key && e.source === 'manual')) {
+            func.setToast(true, true, "This device tag key already has a manual value in the list below.");
+            return;
+        }
+        setEditTagModal((prev) => ({
+            ...prev,
+            entries: [...prev.entries, { key, value, source: 'manual' }],
+            newKey: '',
+            newValue: '',
+        }));
+    }, [editTagModal.newKey, editTagModal.newValue, editTagModal.entries]);
 
     const saveEditTag = useCallback(async () => {
         setEditTagModal((prev) => ({ ...prev, saving: true }));
         try {
             const selectedUsers = data.users.filter((u) => editTagModal.usernames.includes(u.id));
             const groupNames = selectedUsers.map((u) => u.groupName).filter(Boolean);
-            await settingRequests.bulkUpdateUserDeviceTag(groupNames, editTagModal.team, editTagModal.userRole);
+
+            // Only manual rows are ever sent — this action only writes the "manual" source, never
+            // touching tags synced in from elsewhere. Empty value = explicit clear. Manual keys
+            // removed from the original prefill are also sent as an explicit clear, so "remove"
+            // actually un-pins the manual override instead of just hiding it locally; a same-key
+            // tag from another source (if any) is untouched either way.
+            const manualEntries = editTagModal.entries.filter((e) => e.source === 'manual');
+            const tags = {};
+            manualEntries.forEach((e) => { tags[e.key] = e.value ? [e.value] : []; });
+            if (editTagModal.isBulk) {
+                // "Clear all" in bulk mode clears every manually-set key any selected user
+                // currently has — computed from the union of their real tags, never guessed from
+                // one user's set. Tags from other sources aren't affected.
+                if (editTagModal.clearAll) {
+                    selectedUsers.forEach((u) => (u.tags || []).forEach((t) => {
+                        if (t?.key && t.source === 'manual' && !(t.key in tags)) tags[t.key] = [];
+                    }));
+                }
+            } else {
+                const currentManualKeys = new Set(manualEntries.map((e) => e.key));
+                editTagModal.originalManualKeys.forEach((k) => { if (!currentManualKeys.has(k)) tags[k] = []; });
+            }
+
+            await settingRequests.bulkUpdateUserDeviceTag(groupNames, tags);
             setData((prev) => ({
                 ...prev,
-                users: prev.users.map((u) =>
-                    editTagModal.usernames.includes(u.id)
-                        ? { ...u, team: editTagModal.team, userRole: editTagModal.userRole }
-                        : u
-                ),
+                users: prev.users.map((u) => {
+                    if (!editTagModal.usernames.includes(u.id)) return u;
+                    const remainingTags = (u.tags || []).filter((t) => !(t.source === 'manual' && t.key in tags));
+                    const newManualTags = manualEntries
+                        .filter((e) => e.value)
+                        .map((e) => ({ key: e.key, value: e.value, source: 'manual' }));
+                    const merged = [...remainingTags, ...newManualTags];
+                    return {
+                        ...u,
+                        tags: merged,
+                        tagsDisplay: buildTagsDisplay(merged),
+                        tagFilterValues: buildTagFilterValues(merged),
+                    };
+                }),
             }));
             setUserEnrichVersion((v) => v + 1);
-            func.setToast(true, false, "Team and role updated successfully");
+            func.setToast(true, false, "Tags updated successfully");
             closeEditTagModal();
         } catch {
-            func.setToast(true, true, "Failed to update team and role");
+            func.setToast(true, true, "Failed to update tags");
             setEditTagModal((prev) => ({ ...prev, saving: false }));
         }
     }, [editTagModal, data.users, closeEditTagModal]);
@@ -330,7 +448,7 @@ function UsersAndDevices() {
     const promotedBulkActions = useCallback((selectedIds) => {
         if (selectedTab !== 'users') return [];
         return [{
-            content: 'Edit team & role',
+            content: 'Edit device tags',
             onAction: () => openEditTagModal(selectedIds),
         }];
     }, [selectedTab, openEditTagModal]);
@@ -387,67 +505,99 @@ function UsersAndDevices() {
         );
     }
 
+    const hasNonManualEntry = editTagModal.entries.some((e) => e.source && e.source !== 'manual');
+
     const editTagModalComp = (
         <Modal
             open={editTagModal.active}
             onClose={closeEditTagModal}
-            title={`Edit team & role \u2014 ${editTagModal.usernames?.length > 1 ? `${editTagModal.usernames.length} users` : (data.users.find((u) => editTagModal.usernames?.[0] === u.id)?.groupName || '')}`}
+            title={`Edit device tags \u2014 ${editTagModal.usernames?.length > 1 ? `${editTagModal.usernames.length} users` : (data.users.find((u) => editTagModal.usernames?.[0] === u.id)?.groupName || '')}`}
             primaryAction={{ content: 'Save', onAction: saveEditTag, loading: editTagModal.saving }}
             secondaryActions={[{ content: 'Cancel', onAction: closeEditTagModal }]}
         >
             <Modal.Section>
                 <VerticalStack gap="4">
-                    {(editTagModal.teamSource === 'sso' || editTagModal.roleSource === 'sso') && (
+                    {editTagModal.isBulk ? (
                         <Banner tone="info">
                             <Text variant="bodySm">
-                                {editTagModal.teamSource === 'sso' && editTagModal.roleSource === 'sso'
-                                    ? 'Team and role are currently managed by SSO. Saving will override SSO values and pin them to your manual entries.'
-                                    : editTagModal.teamSource === 'sso'
-                                        ? 'Team is currently managed by SSO. Saving will override the SSO value and pin it to your manual entry.'
-                                        : 'Role is currently managed by SSO. Saving will override the SSO value and pin it to your manual entry.'
-                                }
+                                Editing {editTagModal.usernames.length} users at once — their existing tags may differ, so they aren't shown here. A tag you add below is applied to all of them; use "Clear all" to remove every manually-set device tag from all of them instead.
+                            </Text>
+                        </Banner>
+                    ) : hasNonManualEntry && (
+                        <Banner tone="info">
+                            <Text variant="bodySm">
+                                Tags synced from elsewhere (e.g. Okta) are shown for reference and can't be edited here — they're managed at the source and will reappear on the next sync. A manual tag can coexist with one of these on the same key; both apply.
                             </Text>
                         </Banner>
                     )}
                     <FormLayout>
-                        <Autocomplete
-                            options={(() => {
-                                const query = (editTagModal.team || '').toLowerCase();
-                                const all = [...new Set(data.users.map(u => u.team).filter(Boolean))].sort();
-                                return (query ? all.filter(t => t.toLowerCase().includes(query)) : all).map(t => ({ label: t, value: t }));
-                            })()}
-                            selected={editTagModal.team ? [editTagModal.team] : []}
-                            onSelect={(sel) => setEditTagModal((prev) => ({ ...prev, team: sel[0] || '' }))}
-                            textField={
-                                <Autocomplete.TextField
-                                    label="Team"
-                                    value={editTagModal.team}
-                                    onChange={(v) => setEditTagModal((prev) => ({ ...prev, team: v }))}
-                                    placeholder={editTagModal.teamSource === 'sso' && editTagModal.ssoHintTeam ? `SSO: ${editTagModal.ssoHintTeam}` : 'e.g. Backend, DevOps'}
-                                    autoComplete="off"
-                                    helpText={editTagModal.teamSource === 'manual' ? 'Clear this field to fall back to SSO value.' : undefined}
-                                />
-                            }
-                        />
-                        <Autocomplete
-                            options={(() => {
-                                const query = (editTagModal.userRole || '').toLowerCase();
-                                const all = [...new Set(data.users.map(u => u.userRole).filter(Boolean))].sort();
-                                return (query ? all.filter(r => r.toLowerCase().includes(query)) : all).map(r => ({ label: r, value: r }));
-                            })()}
-                            selected={editTagModal.userRole ? [editTagModal.userRole] : []}
-                            onSelect={(sel) => setEditTagModal((prev) => ({ ...prev, userRole: sel[0] || '' }))}
-                            textField={
-                                <Autocomplete.TextField
-                                    label="User role"
-                                    value={editTagModal.userRole}
-                                    onChange={(v) => setEditTagModal((prev) => ({ ...prev, userRole: v }))}
-                                    placeholder={editTagModal.roleSource === 'sso' && editTagModal.ssoHintRole ? `SSO: ${editTagModal.ssoHintRole}` : 'e.g. Engineer, Architect'}
-                                    autoComplete="off"
-                                    helpText={editTagModal.roleSource === 'manual' ? 'Clear this field to fall back to SSO value.' : undefined}
-                                />
-                            }
-                        />
+                        <VerticalStack gap="2">
+                            <Text variant="headingSm">Existing tags</Text>
+                            {editTagModal.entries.length === 0 ? (
+                                <Text variant="bodySm" color="subdued">
+                                    {editTagModal.isBulk ? "Not shown for multiple users \u2014 see note above." : "No device tags yet."}
+                                </Text>
+                            ) : (
+                                editTagModal.entries.map((entry, idx) => {
+                                    const isManual = entry.source === 'manual';
+                                    return (
+                                        <HorizontalStack key={`${entry.key}|${entry.source}|${idx}`} gap="2" blockAlign="center" wrap={false}>
+                                            <Box width="100px">
+                                                <Text variant="bodyMd" fontWeight="medium" truncate>{entry.key}</Text>
+                                            </Box>
+                                            <Box minWidth="0" width="100%">
+                                                <TextField
+                                                    label={entry.key}
+                                                    labelHidden
+                                                    value={entry.value}
+                                                    onChange={isManual ? (v) => updateEntryValue(entry.key, v) : () => {}}
+                                                    disabled={!isManual}
+                                                    autoComplete="off"
+                                                />
+                                            </Box>
+                                            <Box minWidth="72px">
+                                                {isManual ? (
+                                                    <Button plain destructive icon={DeleteMinor} onClick={() => removeEntry(entry.key)} accessibilityLabel={`Remove ${entry.key}`} />
+                                                ) : (
+                                                    <Badge size="small">{entry.source}</Badge>
+                                                )}
+                                            </Box>
+                                        </HorizontalStack>
+                                    );
+                                })
+                            )}
+                        </VerticalStack>
+                        <Divider />
+                        <VerticalStack gap="2">
+                            <Text variant="headingSm">Add a tag</Text>
+                            <HorizontalStack gap="2" blockAlign="end" wrap={false}>
+                                <Box minWidth="0" width="100%">
+                                    <TextField
+                                        label="Key"
+                                        placeholder="e.g. department"
+                                        value={editTagModal.newKey}
+                                        onChange={(v) => setEditTagModal((prev) => ({ ...prev, newKey: v }))}
+                                        autoComplete="off"
+                                    />
+                                </Box>
+                                <Box minWidth="0" width="100%">
+                                    <TextField
+                                        label="Value"
+                                        value={editTagModal.newValue}
+                                        onChange={(v) => setEditTagModal((prev) => ({ ...prev, newValue: v }))}
+                                        autoComplete="off"
+                                    />
+                                </Box>
+                                <Box paddingBlockStart="6"><Button onClick={addEntry}>Add</Button></Box>
+                            </HorizontalStack>
+                        </VerticalStack>
+                        {editTagModal.isBulk && (
+                            <Checkbox
+                                label={`Clear all manually-set device tags for these ${editTagModal.usernames.length} users`}
+                                checked={editTagModal.clearAll}
+                                onChange={(checked) => setEditTagModal((prev) => ({ ...prev, clearAll: checked }))}
+                            />
+                        )}
                     </FormLayout>
                 </VerticalStack>
             </Modal.Section>

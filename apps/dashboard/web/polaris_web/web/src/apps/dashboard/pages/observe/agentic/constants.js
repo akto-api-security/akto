@@ -105,28 +105,18 @@ export const getHeaders = (options = {}) => {
             mergeType: (a, b) => Math.max(a || 0, b || 0),
             shouldMerge: true
         },
-        ...(includeUserColumns ? [
-            {
-                title: "Team",
-                text: "Team",
-                value: "team",
-                filterKey: "team",
-                textValue: "team",
-                isText: CellType.TEXT,
-                showFilter: true,
-                boxWidth: "120px",
-            },
-            {
-                title: "User role",
-                text: "User role",
-                value: "userRole",
-                filterKey: "userRole",
-                textValue: "userRole",
-                isText: CellType.TEXT,
-                showFilter: true,
-                boxWidth: "120px",
-            },
-        ] : []),
+        // Single compact column for all device tags (group, role, team, department, ...)
+        // instead of one column per key — value is prebuilt badge JSX (see
+        // UsersAndDevices.jsx buildTagsDisplay), same idiom as riskScoreComp/sensitiveSubTypes.
+        // Filterable on the raw "key=value" strings (tagFilterValues), not the display JSX.
+        ...(includeUserColumns ? [{
+            title: "Tags",
+            text: "Tags",
+            value: "tagsDisplay",
+            filterKey: "tagFilterValues",
+            showFilter: true,
+            boxWidth: "220px",
+        }] : []),
     ];
     if (!includeIconColumn) {
         return headers.filter((h) => h.value !== "iconComp");
@@ -596,6 +586,14 @@ const accumulateHostGroupedCollection = (group, c, trafficMap, sensitiveMap, ris
     }
 };
 
+// Filterable keys for a device-tag list — filtering is by tag key only ("group" matches
+// any device with a group tag, regardless of value).
+export const buildTagFilterValues = (tags) => {
+    const keys = new Set();
+    (tags || []).forEach((t) => { if (t?.key) keys.add(t.key); });
+    return Array.from(keys);
+};
+
 const finalizeHostGroupedRow = (g, idSegment) => {
     const clientTypeStr = g.clientTypes.size > 0 ? [...g.clientTypes].sort().join(", ") : "-";
     return {
@@ -614,13 +612,11 @@ const finalizeHostGroupedRow = (g, idSegment) => {
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore,
-        team: g.team || '',
-        userRole: g.userRole || '',
         hasPersonalAccount: g.hasPersonalAccount || false,
         hasLocalMcpServer: g.hasLocalMcpServer || false,
         hasMisconfiguredConfig: g.hasMisconfiguredConfig || false,
-        teamSource: g.teamSource || 'sso',
-        roleSource: g.roleSource || 'sso',
+        tags: g.tags || [],
+        tagFilterValues: buildTagFilterValues(g.tags),
     };
 };
 
@@ -688,10 +684,7 @@ export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMa
                 maxRiskScore: 0,
                 uniqueSkillNames: new Set(),
                 nonSkillCollectionsCount: 0,
-                team: meta.team || '',
-                userRole: meta.userRole || '',
-                teamSource: meta.teamSource || 'sso',
-                roleSource: meta.roleSource || 'sso',
+                tags: meta.tags || [],
             };
         }
         const g = users[username];
@@ -790,23 +783,6 @@ function violationsForSkill(skillName, violationsBySkillName) {
     if (!counts) return null;
     const total = counts.critical + counts.high + counts.medium + counts.low;
     return total > 0 ? counts : null;
-}
-
-function buildTeamGroupsForAsset(group, usernameMap, userMetadataMap) {
-    const teamCounts = {};
-    const seenDevices = new Set();
-    (group.collections || []).forEach((c) => {
-        const hostName = c.hostName || c.displayName || c.name;
-        const deviceId = extractEndpointId(hostName);
-        if (!deviceId || seenDevices.has(deviceId)) return;
-        seenDevices.add(deviceId);
-        const username = getResolvedUsernameForCollection(c, usernameMap);
-        if (!username || username === DEFAULT_VALUE) return;
-        const team = userMetadataMap[username]?.team;
-        if (!team) return;
-        teamCounts[team] = (teamCounts[team] || 0) + 1;
-    });
-    return Object.entries(teamCounts).map(([name, count]) => ({ name, count }));
 }
 
 function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}, trafficMap = {}) {
@@ -948,7 +924,6 @@ export function buildAgenticAssetsPageData(
     sensitiveMap = {},
     {
         usernameMap = {},
-        userMetadataMap = {},
         violationsByCollectionId = {},
         violationRows = [],
         analysisByKey = new Map(),
@@ -979,7 +954,6 @@ export function buildAgenticAssetsPageData(
         const violations = group.rowType === ROW_TYPES.SKILL
             ? violationsForSkill(group.groupKey, violationsBySkillName)
             : violationsForCollections(collectionIds, violationsByCollectionId);
-        const groups = buildTeamGroupsForAsset(group, usernameMap, userMetadataMap);
         const devices = buildDevicesForGroup(group, usernameMap, riskScoreMap, trafficMap);
         const skillNames = uniqueSkillNamesForGroup(group);
         const riskScore = group.riskScore ?? group.maxRiskScore ?? null;
@@ -1010,7 +984,6 @@ export function buildAgenticAssetsPageData(
             };
         }
         if (violations) treeRow.violations = violations;
-        if (groups.length) treeRow.groups = groups;
         if (skillNames.size) treeRow.skillCount = skillNames.size;
 
         const flatRow = {
@@ -1032,7 +1005,6 @@ export function buildAgenticAssetsPageData(
             hasMisconfiguredConfig: group.hasMisconfiguredConfig || false,
         };
         if (violations) flatRow.violations = violations;
-        if (groups.length) flatRow.groups = groups;
         if (aiInteractions) {
             flatRow.aiInteractions = aiInteractions.total;
             flatRow.aiInteractionsDetail = {
