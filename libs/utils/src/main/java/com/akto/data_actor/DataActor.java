@@ -158,6 +158,9 @@ public abstract class DataActor {
 
     public abstract void insertTestingRunResultSummary(TestingRunResultSummary trrs);
 
+
+    public abstract int incrementAndGetTestRateLimitUsage(int limit, String dashboardContext);
+
     public abstract void bulkWriteTestingRunIssues(List<Object> writesForTestingRunIssues);
 
     public abstract void bulkWriteOverageInfo(List<Object> writesForOverageInfo);

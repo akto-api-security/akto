@@ -725,6 +725,53 @@ public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<
         TestingRunResultSummariesDao.instance.insertOne(trrs);
     }
 
+    public static int incrementAndGetTestRateLimitUsage(int limit) {
+        return incrementAndGetTestRateLimitUsage(limit, null);
+    }
+
+    public static int incrementAndGetTestRateLimitUsage(int limit, String dashboardContext) {
+        boolean agentic = "AGENTIC".equalsIgnoreCase(dashboardContext);
+        String dayField = agentic ? AccountSettings.AGENTIC_TEST_RATE_LIMIT_USAGE_DAY : AccountSettings.TEST_RATE_LIMIT_USAGE_DAY;
+        String countField = agentic ? AccountSettings.AGENTIC_TEST_RATE_LIMIT_USAGE_COUNT : AccountSettings.TEST_RATE_LIMIT_USAGE_COUNT;
+
+        int today = Context.today();
+
+        Bson sameDayUnderLimitFilter = Filters.and(
+                AccountSettingsDao.generateFilter(),
+                Filters.eq(dayField, today),
+                Filters.lt(countField, limit)
+        );
+        AccountSettings updated = AccountSettingsDao.instance.getMCollection().findOneAndUpdate(
+                sameDayUnderLimitFilter,
+                Updates.inc(countField, 1),
+                new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)
+        );
+        if (updated != null) {
+            return agentic ? updated.getAgenticTestRateLimitUsageCount() : updated.getTestRateLimitUsageCount();
+        }
+
+        AccountSettings current = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        int currentDay = agentic ? (current != null ? current.getAgenticTestRateLimitUsageDay() : 0) : (current != null ? current.getTestRateLimitUsageDay() : 0);
+        if (current != null && currentDay == today) {
+            // Same day, already at/over the limit - don't increment further, just signal "exceeded".
+            return limit + 1;
+        }
+
+        // First increment of a new day (or first ever) - (re)initialize the counter for today.
+        updated = AccountSettingsDao.instance.getMCollection().findOneAndUpdate(
+                AccountSettingsDao.generateFilter(),
+                Updates.combine(
+                        Updates.set(dayField, today),
+                        Updates.set(countField, 1)
+                ),
+                new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)
+        );
+        if (updated == null) {
+            return 1;
+        }
+        return agentic ? updated.getAgenticTestRateLimitUsageCount() : updated.getTestRateLimitUsageCount();
+    }
+
     public static void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTimestamp) {
         Bson completedUpdate = Updates.combine(
             Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
