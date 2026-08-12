@@ -486,6 +486,11 @@ public class DbActor extends DataActor {
         DbLayer.insertTestingRunResultSummary(trrs);
     }
 
+    @Override
+    public int incrementAndGetTestRateLimitUsage(int limit, String dashboardContext) {
+        return DbLayer.incrementAndGetTestRateLimitUsage(limit, dashboardContext);
+    }
+
     public void insertTestingRunResults(TestingRunResult testingRunResults) {
         DbLayer.insertTestingRunResults(testingRunResults);
     }
