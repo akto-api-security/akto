@@ -385,6 +385,8 @@ public class TestExecutor {
 
         // init the singleton class here
         TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed(), testingRun.getRunAutomatedTests());
+        TestingConfigurations.getInstance().setDashboardContext(
+                testingRun.getDashboardContext() != null ? testingRun.getDashboardContext().toString() : null);
 
         Set<Integer> collectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
         List<ApiCollection> apiCollections = dataActor.fetchApiCollectionsByIds(new ArrayList<>(collectionIds), LogDb.TESTING);
@@ -1311,6 +1313,10 @@ public class TestExecutor {
         // Add SSRF tracking values to varMap
         if(testRunId != null) {
             varMap.put("testRunId", testRunId.toHexString());
+        }
+        String dashboardContext = TestingConfigurations.getInstance().getDashboardContext();
+        if (dashboardContext != null) {
+            varMap.put("dashboardContext", dashboardContext);
         }
         if(testRunResultSummaryId != null) {
             varMap.put("testRunResultSummaryId", testRunResultSummaryId.toHexString());

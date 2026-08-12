@@ -154,6 +154,18 @@ public class Executor {
         boolean runAutomatedPentest = TestingConfigurations.getInstance().isRunAutomatedTests() && templateAllowsAutomated;
         boolean onlySmartTestingAllowed = varMap.containsKey("onlySmartTestingAllowed") && Boolean.TRUE.equals(varMap.get("onlySmartTestingAllowed"));
 
+        String testingRunResultSummaryIdHex = testingRunConfig != null && testingRunConfig.getTestRunResultSummaryId() != null
+                ? testingRunConfig.getTestRunResultSummaryId().toHexString() : null;
+        String dashboardContext = varMap != null && varMap.get("dashboardContext") != null
+                ? varMap.get("dashboardContext").toString() : null;
+        if (TestRateLimitGuard.isDailyLimitExceededAndStop(testingRunResultSummaryIdHex, dashboardContext)) {
+            String limitMsg = "Daily test limit reached for this account; stopping test run.";
+            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, limitMsg));
+            loggerMaker.infoAndAddToDb("Daily test limit reached, stopping run " + logId, LogDb.TESTING);
+            result.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(limitMsg), 0, false, TestResult.Confidence.HIGH, null));
+            return new YamlTestResult(result, workflowTest);
+        }
+
         String executionType = node.getChildNodes().get(0).getValues().toString();
         boolean isParallelExecution = executionType.equalsIgnoreCase("parallel");
         if (!runAutomatedPentest && (executionType.equals("multiple") || executionType.equals("graph") || isParallelExecution) && !onlySmartTestingAllowed) {
@@ -242,7 +254,6 @@ public class Executor {
                     if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
                         // execute agentic test here
                         requestAttempted = true;
-                        String testingRunResultSummaryIdHex = null;
                         if (testingRunConfig != null && testingRunConfig.getTestRunResultSummaryId() != null) {
                             testingRunResultSummaryIdHex = testingRunConfig.getTestRunResultSummaryId().toHexString();
                         }
