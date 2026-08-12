@@ -130,6 +130,11 @@ public class SampleParser {
         if (!traces.isEmpty()) {
             httpResponseParams.setTraces(traces);
         }
+
+        Object guardrailObj = json.get("_guardrail");
+        if (guardrailObj != null) {
+            httpResponseParams.setGuardrailVerdict(guardrailObj.toString());
+        }
         if(tags != null && !tags.isEmpty()){
             String tagLog = "K8 Pod Tags: " + tags + " Host: " + requestHeaders.getOrDefault("host", new ArrayList<>()) + " Url: " + url;
             printL(tagLog);
