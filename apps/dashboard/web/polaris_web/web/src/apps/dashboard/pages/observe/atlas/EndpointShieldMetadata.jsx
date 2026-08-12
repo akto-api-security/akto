@@ -160,6 +160,8 @@ const mapModuleToAgent = (module) => ({
     lastDeployed: module.startedTs || 0,
     os: module.additionalData?.os || DEFAULT_VALUE,
     osDisplayName: module.additionalData?.osDisplayName || DEFAULT_VALUE,
+    browserName: module.additionalData?.browserName || DEFAULT_VALUE,
+    browserVersion: module.additionalData?.browserVersion || DEFAULT_VALUE,
     osVersion: module.additionalData?.osVersion || DEFAULT_VALUE,
     arch: module.additionalData?.arch || DEFAULT_VALUE,
     kernelVersion: module.additionalData?.kernelVersion || DEFAULT_VALUE,
