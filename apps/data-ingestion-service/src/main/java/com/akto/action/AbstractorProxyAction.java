@@ -7,7 +7,12 @@ import com.akto.testing.ApiExecutor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
+import org.apache.struts2.interceptor.ServletRequestAware;
 
+import javax.servlet.http.HttpServletRequest;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -23,12 +28,17 @@ import java.util.Set;
  * The exposed path is identical to the abstractor's own path (see struts.xml) so client
  * config changes are limited to which base URL/env var they point at.
  *
- * To proxy another database-abstractor endpoint, add its name to both ALLOWED_PATHS here
- * and the action-name alternation in struts.xml.
+ * The request body is read raw (no "json" interceptor) and forwarded verbatim — callers
+ * post their payload at the top level (e.g. {@code {"moduleInfo": {...}}}), not nested
+ * under a named field, so binding it onto a typed action property would drop it.
+ *
+ * To proxy another database-abstractor endpoint, add its name to ALLOWED_PATHS here and
+ * register one more literal &lt;action&gt; for it in struts.xml (same class, different
+ * "subpath" param) — no new Action class needed.
  */
 @lombok.Getter
 @lombok.Setter
-public class AbstractorProxyAction extends ActionSupport {
+public class AbstractorProxyAction extends ActionSupport implements ServletRequestAware {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AbstractorProxyAction.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -42,7 +52,7 @@ public class AbstractorProxyAction extends ActionSupport {
     private static final String ABSTRACTOR_TOKEN = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
 
     private String subpath;
-    private Map<String, Object> body;
+    private HttpServletRequest servletRequest;
 
     private Map<String, Object> data;
     private boolean success;
@@ -80,7 +90,7 @@ public class AbstractorProxyAction extends ActionSupport {
                 headers.put("Authorization", Collections.singletonList(ABSTRACTOR_TOKEN));
             }
 
-            String payload = objectMapper.writeValueAsString(body != null ? body : new HashMap<>());
+            String payload = readRawBody();
             OriginalHttpRequest request = new OriginalHttpRequest(
                     ABSTRACTOR_URL + "/api/" + normalizedPath, "", "POST", payload, headers, "");
 
@@ -92,7 +102,9 @@ public class AbstractorProxyAction extends ActionSupport {
 
             int statusCode = response.getStatusCode();
             success = statusCode >= 200 && statusCode < 300;
-            if (!success) {
+            if (success) {
+                loggerMaker.info("Proxied {} to abstractor - status: {}", normalizedPath, statusCode);
+            } else {
                 message = "Abstractor returned status " + statusCode;
                 loggerMaker.errorAndAddToDb("Non-2xx response proxying to abstractor path " + normalizedPath + ": " + statusCode);
             }
@@ -103,6 +115,18 @@ public class AbstractorProxyAction extends ActionSupport {
             success = false;
             message = "Unexpected error: " + e.getMessage();
             return Action.ERROR.toUpperCase();
+        }
+    }
+
+    private String readRawBody() throws Exception {
+        try (InputStream is = servletRequest.getInputStream()) {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            int read;
+            while ((read = is.read(chunk)) != -1) {
+                buffer.write(chunk, 0, read);
+            }
+            return buffer.toString(StandardCharsets.UTF_8.name());
         }
     }
 }
