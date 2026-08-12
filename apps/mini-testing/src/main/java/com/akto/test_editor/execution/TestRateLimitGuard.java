@@ -16,7 +16,7 @@ public class TestRateLimitGuard {
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestRateLimitGuard.class, LogDb.TESTING);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
-    private static final int SETTINGS_CACHE_TTL_SECONDS = 60;
+    private static final int SETTINGS_CACHE_TTL_SECONDS = 300;
 
     private static volatile int cachedGlobalRateLimit = 0;
     private static volatile int cachedGlobalRateLimitAgentic = 0;
