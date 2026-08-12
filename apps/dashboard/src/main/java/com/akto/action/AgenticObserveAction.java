@@ -110,6 +110,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Setter private String parentDeviceId; // blank => paginated top-level device rows; set => that device's (device,service) children
     @Setter private Map<String, Map<String, String>> deviceMetadataMap; // deviceId -> {username, team, role, os}
     @Setter private Map<String, Map<String, Integer>> violationsByCollectionId; // collection id (string) -> {critical, high, medium, low}
+    // skill name -> {critical, high, medium, low} — skill invocations aren't attributable by
+    // collection (a skill's declaring collection is shared with the agent/device that invoked it,
+    // so collection-based attribution can't give a skill its own count), so skill rows use this
+    // instead of violationsByCollectionId. See ThreatActorService.fetchSkillSeverityCounts.
+    @Setter private Map<String, Map<String, Integer>> skillViolationsByName;
     @Setter private Map<String, Integer> userAnalysisFlatMap; // "serviceId|deviceId" -> total AI-interaction tokens (see constants.js's buildUserAnalysisFlatMap)
 
     // ---- Server-side pagination for fetchAgenticComponentsPage ----
@@ -1650,6 +1655,27 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return out;
     }
 
+    // Skill-name equivalent of sumViolationsForCollections above — skill rows use this instead,
+    // since a skill's declaring collection is shared with the agent/device that invoked it, so
+    // collection-based attribution can't give a skill its own count (see skillViolationsByName's
+    // own field comment). Same "null when zero" contract.
+    private static BasicDBObject violationsForSkillName(String skillName, Map<String, Map<String, Integer>> skillViolationsByName) {
+        if (StringUtils.isBlank(skillName) || skillViolationsByName == null) return null;
+        Map<String, Integer> v = skillViolationsByName.get(skillName);
+        if (v == null) return null;
+        int critical = v.getOrDefault("critical", 0);
+        int high = v.getOrDefault("high", 0);
+        int medium = v.getOrDefault("medium", 0);
+        int low = v.getOrDefault("low", 0);
+        if (critical + high + medium + low == 0) return null;
+        BasicDBObject out = new BasicDBObject();
+        out.put("critical", critical);
+        out.put("high", high);
+        out.put("medium", medium);
+        out.put("low", low);
+        return out;
+    }
+
     /**
      * Paginated, sorted, searchable grouped-asset rows for the Agentic Assets "New Layout" table.
      * Builds lightweight summaries for every group (classifyAllGroups — one pass, no per-device
@@ -1751,7 +1777,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 // the raw collectionIds list to the browser just so it can do this same sum — see
                 // toSummaryResponse()'s comment for why collectionIds/hostNames/etc. no longer appear
                 // in this response at all.
-                BasicDBObject violations = sumViolationsForCollections(g.collectionIds, violationsByCollectionId);
+                BasicDBObject violations = "skill".equals(g.rowType)
+                        ? violationsForSkillName(g.name, skillViolationsByName)
+                        : sumViolationsForCollections(g.collectionIds, violationsByCollectionId);
                 if (violations != null) row.put("violations", violations);
                 if ("skill".equals(g.rowType) && StringUtils.isNotBlank(g.name)) {
                     String lname = g.name.toLowerCase(Locale.ROOT);
@@ -1981,14 +2009,26 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // map the frontend already fetched once at mount (aggregateViolationCountsByCollectionId),
             // summed over each group's own collectionIds. No new data source; top-N of what's already
             // available. Computed before the trend fetches below so we know which 5 assets need one.
+            Map<String, Map<String, Integer>> skillViolations = skillViolationsByName != null ? skillViolationsByName : Collections.emptyMap();
             List<Map.Entry<GroupSummary, Integer>> violRanked = new ArrayList<>();
             for (GroupSummary g : groups.values()) {
                 int groupTotal = 0;
-                for (Integer cid : g.collectionIds) {
-                    Map<String, Integer> v = violations.get(String.valueOf(cid));
-                    if (v == null) continue;
-                    groupTotal += v.getOrDefault("critical", 0) + v.getOrDefault("high", 0)
-                            + v.getOrDefault("medium", 0) + v.getOrDefault("low", 0);
+                // Skills aren't attributable by collection — their declaring collection is shared
+                // with the agent/device that invoked them (see skillViolationsByName's own comment) —
+                // so rank them by their own skill-name-keyed count instead.
+                if ("skill".equals(g.rowType)) {
+                    Map<String, Integer> v = StringUtils.isNotBlank(g.name) ? skillViolations.get(g.name) : null;
+                    if (v != null) {
+                        groupTotal = v.getOrDefault("critical", 0) + v.getOrDefault("high", 0)
+                                + v.getOrDefault("medium", 0) + v.getOrDefault("low", 0);
+                    }
+                } else {
+                    for (Integer cid : g.collectionIds) {
+                        Map<String, Integer> v = violations.get(String.valueOf(cid));
+                        if (v == null) continue;
+                        groupTotal += v.getOrDefault("critical", 0) + v.getOrDefault("high", 0)
+                                + v.getOrDefault("medium", 0) + v.getOrDefault("low", 0);
+                    }
                 }
                 if (groupTotal > 0) violRanked.add(new AbstractMap.SimpleEntry<>(g, groupTotal));
             }
