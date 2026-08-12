@@ -382,6 +382,9 @@ public class InventoryAction extends UserAction {
     }
 
     public String fetchApiInfosFromSTIs(){
+        if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
+            return fetchApiInfosFromSTIsBatch();
+        }
         ApiCollection collection = ApiCollectionsDao.instance.findOne(
                 Filters.in(Constants.ID, apiCollectionId),
                 Projections.include(ApiCollection.HOST_NAME, ApiCollection._TYPE)
@@ -408,7 +411,53 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private static final int STI_BATCH_CAP = 300;
+
+    // Batch variant for the Agentic Assets flyout (AgenticAssetFlyout.jsx), which previously fired
+    // one fetchApiInfosFromSTIs request PER collection id in an asset group — a group can span
+    // thousands of collections, so opening one flyout could fire thousands of concurrent browser
+    // requests ("browser got choked"). The host-based STI pagination below has no clean single-query
+    // multi-collection form, so this loops server-side instead: same total DB work as before, but
+    // exactly one network round trip from the browser regardless of how many ids are requested.
+    private String fetchApiInfosFromSTIsBatch() {
+        Map<String, List<BasicDBObject>> byCollection = new HashMap<>();
+        int cap = Math.min(apiCollectionIds.size(), STI_BATCH_CAP);
+        for (int i = 0; i < cap; i++) {
+            int id = apiCollectionIds.get(i);
+            try {
+                ApiCollection collection = ApiCollectionsDao.instance.findOne(
+                        Filters.eq(Constants.ID, id),
+                        Projections.include(ApiCollection.HOST_NAME, ApiCollection._TYPE)
+                );
+                if (collection == null) {
+                    byCollection.put(String.valueOf(id), Collections.emptyList());
+                    continue;
+                }
+                List<BasicDBObject> list;
+                if ((collection.getHostName() == null || collection.getHostName().isEmpty()) && collection.getId() != AllAPIsGroup.ALL_APIS_GROUP_ID) {
+                    Bson filter = Filters.and(Filters.in(SingleTypeInfo._COLLECTION_IDS, id),
+                            Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+                    if (collection.getType() != null && collection.getType().equals(ApiCollection.Type.API_GROUP) && Context.accountId.get() == 1729478227) {
+                        filter = Filters.and(SingleTypeInfoDao.filterForHostHeader(0, false), filter);
+                    }
+                    list = ApiCollectionsDao.fetchEndpointsInCollection(filter, 0, -1, Utils.DELTA_PERIOD_VALUE);
+                } else {
+                    list = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(id, 0, collection.getId() == AllAPIsGroup.ALL_APIS_GROUP_ID);
+                }
+                byCollection.put(String.valueOf(id), list);
+            } catch (Exception e) {
+                byCollection.put(String.valueOf(id), Collections.emptyList());
+            }
+        }
+        response = new BasicDBObject();
+        response.put("listByCollection", byCollection);
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchApiInfosForCollection(){
+        if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
+            return fetchApiInfosForCollectionBatch();
+        }
         List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(
                 Filters.and(
                         Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
@@ -425,6 +474,30 @@ public class InventoryAction extends UserAction {
                 response.put("redacted", apiCollection.getRedact());
             }
         }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    private static final int API_INFO_BATCH_CAP = 300;
+
+    // Batch variant for the Agentic Assets flyout — a true single $in query across all requested
+    // ids (not a per-id loop), partitioned afterward by each ApiInfo's own collectionId. See
+    // fetchApiInfosFromSTIsBatch's comment above for why this endpoint needed a batch form at all.
+    private String fetchApiInfosForCollectionBatch() {
+        List<Integer> ids = apiCollectionIds.size() > API_INFO_BATCH_CAP
+                ? apiCollectionIds.subList(0, API_INFO_BATCH_CAP) : apiCollectionIds;
+        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(
+                Filters.and(
+                        Filters.in(SingleTypeInfo._COLLECTION_IDS, ids),
+                        Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivatedCollections)
+                ));
+        Map<String, List<ApiInfo>> byCollection = new HashMap<>();
+        for (ApiInfo apiInfo : apiInfos) {
+            apiInfo.calculateActualAuth();
+            String key = String.valueOf(apiInfo.getId().getApiCollectionId());
+            byCollection.computeIfAbsent(key, k -> new ArrayList<>()).add(apiInfo);
+        }
+        response = new BasicDBObject();
+        response.put("apiInfoListByCollection", byCollection);
         return Action.SUCCESS.toUpperCase();
     }
 

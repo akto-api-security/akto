@@ -65,6 +65,16 @@ message ListMaliciousRequestsRequest {
       repeated string method = 14;  // Filter by HTTP methods (GET, POST, etc.)
       optional bool sort_by_severity = 15;  // Sort results by severity (CRITICAL > HIGH > MEDIUM > LOW)
       repeated string severity = 16;  // Filter by severity (CRITICAL, HIGH, MEDIUM, LOW)
+      optional string search_text = 17;  // Free-text match across filterId/host/actor
+      // Loose device+service host match ("<firstSegment> <lastSegment>", computed client-side from
+      // hostName the same way constants.js's deviceServiceKey does) — matched alongside `hosts` (OR),
+      // not instead of it, for 2-vs-3-segment hostname format mismatches between an event's own host
+      // and its owning collection's hostName.
+      repeated string loose_host_keys = 18;
+      // Claude-config scanner events (2-segment host ending in ".claude"/".claude-settings") have no
+      // matching collection of their own — attributed via device id instead. See match_claude_config.
+      repeated string claude_device_ids = 19;
+      optional bool match_claude_config = 20;  // true: match ANY claude-config host (the queried asset IS a Claude agent)
     }
 
     // The number of alerts to return
@@ -445,6 +455,34 @@ message FetchTopNDataResponse {
 
   repeated TopApiData top_apis = 1;
   repeated TopHostData top_hosts = 2;
+}
+
+message FetchHostSeverityCountsRequest {
+  uint32 start_ts = 1;
+  uint32 end_ts = 2;
+  // Ascending epoch-second month-start boundaries. When non-empty, the response's monthly_totals is
+  // populated with one count per boundary (per-month, not cumulative), bucketed via a cheap
+  // server-side aggregation — no per-event data leaves this service.
+  repeated uint32 month_boundaries = 3;
+  // Optional — when non-empty, scopes both host_counts and monthly_totals to just these hosts
+  // instead of the whole account. Used to get a per-asset monthly trend for a small, already-known
+  // set of hosts (e.g. one Agentic Assets group's hostNames) without a second full-account scan.
+  repeated string host_filter = 4;
+}
+
+message FetchHostSeverityCountsResponse {
+  message HostSeverityCount {
+    string host = 1;
+    uint32 critical = 2;
+    uint32 high = 3;
+    uint32 medium = 4;
+    uint32 low = 5;
+  }
+
+  repeated HostSeverityCount host_counts = 1;
+  // Parallel to the request's month_boundaries — count of events in [boundary[i], boundary[i+1]) for
+  // all but the last entry, and [boundary[i], end_ts] for the last. Empty when month_boundaries wasn't set.
+  repeated uint32 monthly_totals = 2;
 }
 
 message FetchDashboardTopDataRequest {

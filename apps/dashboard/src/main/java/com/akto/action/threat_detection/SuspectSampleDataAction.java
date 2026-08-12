@@ -86,6 +86,11 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter Boolean sortBySeverity;
   // Skills Evaluations partition mode ("only" | "exclude"), sent to the threat backend as a header.
   @Getter @Setter String skillEvaluationMode;
+  // ---- Agentic Assets flyout Violations tab server-side pagination/search ----
+  @Getter @Setter String searchText; // free-text match across filterId/host/actor
+  @Getter @Setter List<String> looseHostKeys; // "<firstSegment> <lastSegment>" — see ViolationsTab.jsx's looseHostSet
+  @Getter @Setter List<String> claudeDeviceIds;
+  @Getter @Setter Boolean matchClaudeConfig;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -159,6 +164,22 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
     if (this.latestApiOrigRegex != null && !this.latestApiOrigRegex.isEmpty()) {
       filter.put("latestApiOrigRegex", this.latestApiOrigRegex);
+    }
+
+    if (this.searchText != null && !this.searchText.isEmpty()) {
+      filter.put("searchText", this.searchText);
+    }
+
+    if (this.looseHostKeys != null && !this.looseHostKeys.isEmpty()) {
+      filter.put("looseHostKeys", this.looseHostKeys);
+    }
+
+    if (this.claudeDeviceIds != null && !this.claudeDeviceIds.isEmpty()) {
+      filter.put("claudeDeviceIds", this.claudeDeviceIds);
+    }
+
+    if (this.matchClaudeConfig != null) {
+      filter.put("matchClaudeConfig", this.matchClaudeConfig);
     }
 
     filter.put("latestAttack", latestAttack);

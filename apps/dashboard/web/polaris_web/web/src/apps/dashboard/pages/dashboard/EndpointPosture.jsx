@@ -18,7 +18,8 @@ import dashboardApi from './api'
 import api from '../observe/api'
 import func from '@/util/func'
 import values from '@/util/values'
-import { extractEndpointId, groupCollectionsByAgent, groupCollectionsByService, groupCollectionsByLLM } from '../observe/agentic/constants'
+import { extractEndpointId, groupCollectionsByAgent, groupCollectionsByService, groupCollectionsByLLM, fetchAndCacheAgenticCollectionsBundle } from '../observe/agentic/constants'
+import PersistStore from '../../../main/PersistStore'
 import { GridLayout, verticalCompactor } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
@@ -176,17 +177,20 @@ function EndpointPosture() {
                 const startTimestamp = getTimeEpoch("since")
                 const endTimestamp = getTimeEpoch("until")
 
-                // Fetch data from existing APIs in parallel
+                // Fetch data from existing APIs in parallel. getAllCollectionsBasic (via the cached
+                // bundle) is cached (PersistStore, 2-min TTL, in-flight-deduped) and shared with
+                // AgenticAssetsPage/UsersAndDevices/Endpoints/DeviceEndpoints — this page doesn't need
+                // traffic/risk itself, but reuses the same shared cache entry those pages populate.
                 const [
                     guardrailResponse,
-                    collectionsResponse
+                    collectionsBundle
                 ] = await Promise.all([
                     dashboardApi.fetchGuardrailData(startTimestamp, endTimestamp),
-                    api.getAllCollectionsBasic()
+                    fetchAndCacheAgenticCollectionsBundle({ api, PersistStore })
                 ])
 
                 // Process collections to get component data (like Endpoints.jsx does)
-                const collections = collectionsResponse?.apiCollections || []
+                const collections = collectionsBundle?.collections || []
                 const { mcpServers, llms, aiAgents, totalEndpoints } = processAgenticCollections(collections, 10)
 
                 // Extract values from guardrail response

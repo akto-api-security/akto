@@ -32,6 +32,8 @@ export const PAGE_LIMIT = 100;
 export const NEW_LAYOUT_TOOLTIP = "Switch to the new layout for a faster, more focused experience.";
 
 export const SKILL_RISK_CACHE_TTL_MS = 2 * 60 * 1000;
+export const AGENTIC_COLLECTIONS_CACHE_TTL_MS = 2 * 60 * 1000;
+export const AGENTIC_SENSITIVE_INFO_CACHE_TTL_MS = 2 * 60 * 1000;
 
 // Route constants
 export const INVENTORY_PATH = '/dashboard/observe/inventory';
@@ -349,7 +351,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
                 groupName: serviceName,
                 groupKey: key,
                 serviceName: serviceName,
-                hostNames: [],
+                hostNames: new Set(),
                 clientType: getTypeFromTags(c.envType),
                 collections: [],
                 firstCollection: null,
@@ -364,9 +366,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
         }
 
         services[key].collections.push(c);
-        if (!services[key].hostNames.includes(hostName)) {
-            services[key].hostNames.push(hostName);
-        }
+        services[key].hostNames.add(hostName);
         if (!services[key].firstCollection) services[key].firstCollection = c;
         if (hasPersonalAccountTag(c.envType)) services[key].hasPersonalAccount = true;
         if (hasLocalMcpServerTag(c.envType)) services[key].hasLocalMcpServer = true;
@@ -397,6 +397,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
     return Object.values(services).map(g => ({
         ...g,
         id: `${ROW_ID_PREFIX.SERVICE}-${g.groupKey}`,
+        hostNames: Array.from(g.hostNames),
         endpointsCount: g.endpointIds.size,
         sensitiveInRespTypes: Array.from(g.sensitiveTypes),
         sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
@@ -433,7 +434,7 @@ export const groupCollectionsByLLM = (collections, trafficMap = {}, sensitiveMap
                 groupName: serviceName,
                 groupKey: key,
                 serviceName: serviceName,
-                hostNames: [],
+                hostNames: new Set(),
                 clientType: CLIENT_TYPES.LLM,
                 collections: [],
                 firstCollection: null,
@@ -448,9 +449,7 @@ export const groupCollectionsByLLM = (collections, trafficMap = {}, sensitiveMap
         }
 
         llms[key].collections.push(c);
-        if (!llms[key].hostNames.includes(hostName)) {
-            llms[key].hostNames.push(hostName);
-        }
+        llms[key].hostNames.add(hostName);
         if (!llms[key].firstCollection) llms[key].firstCollection = c;
         if (hasPersonalAccountTag(c.envType)) llms[key].hasPersonalAccount = true;
         if (hasLocalMcpServerTag(c.envType)) llms[key].hasLocalMcpServer = true;
@@ -477,6 +476,7 @@ export const groupCollectionsByLLM = (collections, trafficMap = {}, sensitiveMap
     return Object.values(llms).map(g => ({
         ...g,
         id: `${ROW_ID_PREFIX.LLM}-${g.groupKey}`,
+        hostNames: Array.from(g.hostNames),
         endpointsCount: g.endpointIds.size,
         sensitiveInRespTypes: Array.from(g.sensitiveTypes),
         sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
@@ -531,7 +531,7 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
                     clientType: CLIENT_TYPES.SKILL,
                     collections: [],
                     firstCollection: null,
-                    hostNames: [],
+                    hostNames: new Set(),
                     endpointIds: new Set(),
                     sensitiveTypes: new Set(),
                     maxTrafficTimestamp: 0,
@@ -543,9 +543,7 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
             skills[skillValue].collections.push(c);
             if (!skills[skillValue].firstCollection) skills[skillValue].firstCollection = c;
             if (hasPersonalAccountTag(c.envType)) skills[skillValue].hasPersonalAccount = true;
-            if (hostName && !skills[skillValue].hostNames.includes(hostName)) {
-                skills[skillValue].hostNames.push(hostName);
-            }
+            if (hostName) skills[skillValue].hostNames.add(hostName);
             if (endpointId) skills[skillValue].endpointIds.add(endpointId);
 
             const sensitive = sensitiveMap[c.id] || [];
@@ -566,6 +564,7 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
     return Object.values(skills).map(g => ({
         ...g,
         id: `${ROW_ID_PREFIX.SKILL}-${g.groupKey}`,
+        hostNames: Array.from(g.hostNames),
         endpointsCount: g.endpointIds.size,
         sensitiveInRespTypes: Array.from(g.sensitiveTypes),
         sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
@@ -578,9 +577,7 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
 
 const accumulateHostGroupedCollection = (group, c, trafficMap, sensitiveMap, riskScoreMap) => {
     const hostName = c.hostName || c.displayName || c.name;
-    if (hostName && !group.hostNames.includes(hostName)) {
-        group.hostNames.push(hostName);
-    }
+    if (hostName) group.hostNames.add(hostName);
     if (!group.firstCollection) {
         group.firstCollection = c;
     }
@@ -602,13 +599,13 @@ const finalizeHostGroupedRow = (g, idSegment) => {
         rowType: g.rowType,
         groupName: g.groupName,
         groupKey: g.groupKey,
-        hostNames: g.hostNames,
+        hostNames: Array.from(g.hostNames),
         inventoryScopeLabel: g.groupName,
         collections: g.collections,
         firstCollection: g.firstCollection,
         id: `${ROW_ID_PREFIX.SERVICE}-${idSegment}-${String(g.groupKey).replace(/[^a-zA-Z0-9_.-]/g, "_")}`,
         clientType: clientTypeStr,
-        endpointsCount: g.hostNames.length,
+        endpointsCount: g.hostNames.size,
         sensitiveInRespTypes: Array.from(g.sensitiveTypes),
         sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(" ") || "-",
         detectedTimestamp: g.maxTrafficTimestamp,
@@ -640,7 +637,7 @@ export const groupCollectionsByDevice = (collections, trafficMap = {}, sensitive
                 rowType: ROW_TYPES.SERVICE,
                 groupName: deviceId,
                 groupKey: deviceId,
-                hostNames: [],
+                hostNames: new Set(),
                 clientTypes: new Set(),
                 collections: [],
                 firstCollection: null,
@@ -679,7 +676,7 @@ export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMa
                 rowType: ROW_TYPES.SERVICE,
                 groupName: username,
                 groupKey: username,
-                hostNames: [],
+                hostNames: new Set(),
                 clientTypes: new Set(),
                 collections: [],
                 firstCollection: null,
@@ -766,41 +763,20 @@ function violationsForCollections(collectionIds, violationsByCollectionId) {
     return total > 0 ? merged : null;
 }
 
-// A skill's declaring collection is shared across every other skill on that same device/agent, so
-// collection-level attribution can't give a skill its own count (see violationsForCollections).
-// But violation events carry the actual endpoint that fired — for skill events this is
-// `/skills/<skillName>` (DashboardMaliciousEvent.url, sourced from latestApiEndpoint) — a genuine,
-// non-shared skill identity independent of which collection/device triggered it. Pre-aggregate by
-// that name once so every skill group can look up its own real count.
-function buildViolationsBySkillName(violationRows = []) {
-    const bySkill = {};
-    violationRows.forEach((row) => {
-        if (!row?.url?.startsWith("/skills/")) return;
-        const skillName = row.url.slice("/skills/".length);
-        if (!skillName) return;
-        const sev = (row.severity || "").toLowerCase();
-        if (!bySkill[skillName]) bySkill[skillName] = { critical: 0, high: 0, medium: 0, low: 0 };
-        if (bySkill[skillName][sev] != null) bySkill[skillName][sev] += 1;
-    });
-    return bySkill;
-}
-
-function violationsForSkill(skillName, violationsBySkillName) {
-    const counts = violationsBySkillName[skillName];
-    if (!counts) return null;
-    const total = counts.critical + counts.high + counts.medium + counts.low;
-    return total > 0 ? counts : null;
-}
-
-function buildTeamGroupsForAsset(group, usernameMap, userMetadataMap) {
+// Collections belong to several overlapping groups at once (a collection with N skill tags is a
+// member of N skill groups, plus its owning service/agent/llm group), so buildAgenticAssetsPageData
+// processes the same collection many more times than there are collections. deviceId/serviceName/
+// resolvedUsername only depend on the collection itself, not on which group is asking — precomputing
+// them once per collection (see precomputeCollectionInfo) and passing the lookup map in here turns
+// that repeated per-membership cost back into a per-collection one.
+function buildTeamGroupsForAsset(group, userMetadataMap, collectionInfoMap) {
     const teamCounts = {};
     const seenDevices = new Set();
     (group.collections || []).forEach((c) => {
-        const hostName = c.hostName || c.displayName || c.name;
-        const deviceId = extractEndpointId(hostName);
-        if (!deviceId || seenDevices.has(deviceId)) return;
-        seenDevices.add(deviceId);
-        const username = getResolvedUsernameForCollection(c, usernameMap);
+        const info = collectionInfoMap.get(c.id);
+        if (!info?.deviceId || seenDevices.has(info.deviceId)) return;
+        seenDevices.add(info.deviceId);
+        const username = info.resolvedUsername;
         if (!username || username === DEFAULT_VALUE) return;
         const team = userMetadataMap[username]?.team;
         if (!team) return;
@@ -809,51 +785,29 @@ function buildTeamGroupsForAsset(group, usernameMap, userMetadataMap) {
     return Object.entries(teamCounts).map(([name, count]) => ({ name, count }));
 }
 
-function buildDevicesForGroup(group, usernameMap = {}, riskScoreMap = {}, trafficMap = {}) {
-    const byDevice = new Map();
-    (group.collections || []).forEach((c) => {
-        const hostName = c.hostName || c.displayName || c.name;
-        const deviceId = extractEndpointId(hostName);
-        if (!deviceId) return;
-        const serviceName = extractServiceName(hostName);
-        const collRisk = riskScoreMap[c.id] || 0;
-        const collTraffic = lastSeenOrStartTs(c, trafficMap);
-        if (!byDevice.has(deviceId)) {
-            const resolved = getResolvedUsernameForCollection(c, usernameMap);
-            const username = (resolved && resolved !== DEFAULT_VALUE) ? resolved : "";
-            byDevice.set(deviceId, {
-                deviceId,
-                endpoint: deviceId,
-                username,
-                os: null,
-                riskScore: collRisk,
-                lastSeenEpoch: collTraffic,
-                services: [],
-            });
-        }
-        const entry = byDevice.get(deviceId);
-        // accumulate max risk across all collections this device appears in
-        if (collRisk > (entry.riskScore || 0)) entry.riskScore = collRisk;
-        // accumulate max traffic timestamp across all collections this device appears in
-        if (collTraffic > (entry.lastSeenEpoch || 0)) entry.lastSeenEpoch = collTraffic;
-        if (serviceName && !entry.services.includes(serviceName)) {
-            entry.services.push(serviceName);
-        }
-    });
+function finalizeDevices(byDevice) {
     // round to 1 dp and null out zero scores (no data)
     return [...byDevice.values()].map(d => ({
         ...d,
+        services: Array.from(d.services),
         riskScore: d.riskScore > 0 ? Math.round(d.riskScore * 10) / 10 : null,
         lastSeen: d.lastSeenEpoch > 0 ? func.formatChatTimestamp(d.lastSeenEpoch) : "-",
     }));
 }
 
-function uniqueSkillNamesForGroup(group) {
-    const names = new Set();
-    (group.collections || []).forEach((c) => {
-        (c.skills || []).forEach((s) => { if (s) names.add(s); });
+// One pass over every collection (not every group-membership) to compute the per-collection values
+// buildTeamGroupsForAsset/buildDevicesForGroup need — see the comment above buildTeamGroupsForAsset.
+function precomputeCollectionInfo(collections, usernameMap) {
+    const map = new Map();
+    collections.forEach((c) => {
+        const hostName = c.hostName || c.displayName || c.name;
+        map.set(c.id, {
+            deviceId: extractEndpointId(hostName),
+            serviceName: extractServiceName(hostName),
+            resolvedUsername: getResolvedUsernameForCollection(c, usernameMap),
+        });
     });
-    return names;
+    return map;
 }
 
 function userAnalysisCompositeKey(serviceId, deviceId) {
@@ -917,31 +871,164 @@ function lookupUserAnalysisRow(analysisByKey, serviceId, deviceId) {
         ?? analysisByKey.get(userAnalysisCompositeKey(String(serviceId).toLowerCase(), String(deviceId).toLowerCase()));
 }
 
-export function aggregateAiInteractionsForGroup(group, analysisByKey, userAnalysisKeysByDeviceId) {
+// Violations for one server-computed row (see AgenticObserveAction.fetchAgenticAssetsSummary) —
+// exported so AgenticAssetsPage.jsx can attach this per-row, for just the current page, instead of
+// the server needing to duplicate the hostCounts-attribution logic.
+export function getRowViolations(collectionIds, violationsByCollectionId) {
+    return violationsForCollections(collectionIds, violationsByCollectionId);
+}
+
+// Team breakdown for a server-computed row's device list. Deliberately lighter than
+// buildTeamGroupsForAsset (used by the legacy/agent-group client pipeline): the server's `devices`
+// list only carries deviceId (not full collection objects), so username resolution here uses only
+// the Endpoint Shield deviceId-keyed lookup tier, not the displayName/name-based fallback tiers
+// getResolvedUsernameForCollection also tries. Documented tradeoff, not an oversight.
+export function buildTeamGroupsFromDevices(devices, usernameMap, userMetadataMap) {
+    const teamCounts = {};
+    (devices || []).forEach((d) => {
+        const key = `__deviceId__${String(d.deviceId).toLowerCase()}`;
+        const username = usernameMap?.[key];
+        if (!username || username === DEFAULT_VALUE) return;
+        const team = userMetadataMap[username]?.team;
+        if (!team) return;
+        teamCounts[team] = (teamCounts[team] || 0) + 1;
+    });
+    return Object.entries(teamCounts).map(([name, count]) => ({ name, count }));
+}
+
+// Fills in the two display fields the flyout's Devices tab (AgenticAssetFlyout.jsx's DevicesTab,
+// unchanged since master) reads straight off each device row — username and a formatted lastSeen
+// string — which AgenticObserveAction.buildDevicesForGroup/DeviceAcc don't send back, same
+// deviceId-keyed lookup tier tradeoff as buildTeamGroupsFromDevices above.
+export function enrichDevicesWithUsername(devices, usernameMap) {
+    return (devices || []).map((d) => {
+        const key = `__deviceId__${String(d.deviceId).toLowerCase()}`;
+        const resolved = usernameMap?.[key];
+        const username = resolved && resolved !== DEFAULT_VALUE ? resolved : "-";
+        return {
+            ...d,
+            username,
+            lastSeen: d.lastSeenEpoch > 0 ? func.prettifyEpoch(d.lastSeenEpoch) : "-",
+        };
+    });
+}
+
+// AI-interaction tally for a server-computed row's device list — same tradeoff as
+// buildTeamGroupsFromDevices: only the Endpoint Shield deviceId mapping (the primary,
+// highest-coverage match tier), not the hostname-parts-based fallback tiers
+// analysisKeysForCollection also tries, which need per-collection hostnames the server doesn't send
+// back for these rows.
+export function computeAiInteractionsFromDevices(devices, analysisByKey, userAnalysisKeysByDeviceId) {
     const seen = new Set();
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
+    (devices || []).forEach((d) => {
+        const deviceId = d.deviceId;
+        const shieldEntry = userAnalysisKeysByDeviceId?.get(deviceId)
+            ?? userAnalysisKeysByDeviceId?.get(String(deviceId).toLowerCase());
+        if (!shieldEntry) return;
+        const sk = userAnalysisCompositeKey(shieldEntry.serviceId, shieldEntry.deviceId);
+        if (seen.has(sk)) return;
+        seen.add(sk);
+        const row = lookupUserAnalysisRow(analysisByKey, shieldEntry.serviceId, shieldEntry.deviceId);
+        if (!row) return;
+        totalInputTokens += Number(row.totalInputTokens) || 0;
+        totalOutputTokens += Number(row.totalOutputTokens) || 0;
+    });
+    const total = totalInputTokens + totalOutputTokens;
+    return total > 0 ? { totalInputTokens, totalOutputTokens, total } : null;
+}
+
+// Flat "serviceId|deviceId" -> total-tokens lookup, straight from analysisByKey's own rows — sent
+// server-side so fetchAgenticAssetsStats can rank "Top Used Applications" across every group, not
+// just the current page. Deliberately NOT keyed by the Endpoint Shield deviceId (the tier
+// computeAiInteractionsFromDevices uses): for real data, UserAnalysisData's serviceId is a readable
+// client name ("claudecli", "codexcli", ...) matching the SECOND segment of the collection's own
+// hostname (device.<serviceId>.<host>), not module_info's own UUID _id — that shield-entry tier
+// never actually matches production data, it only looked like it worked because it fails silently.
+// The server reconstructs the same candidate keys from each group's hostNames and looks them up here.
+export function buildUserAnalysisFlatMap(analysisByKey) {
+    const result = {};
+    (analysisByKey || new Map()).forEach((row, key) => {
+        const total = (Number(row.totalInputTokens) || 0) + (Number(row.totalOutputTokens) || 0);
+        if (total > 0) result[key] = total;
+    });
+    return result;
+}
+
+// Combines what used to be three separate (group.collections || []).forEach passes —
+// buildDevicesForGroup, uniqueSkillNamesForGroup, aggregateAiInteractionsForGroup — into one. Each
+// collection can belong to many overlapping groups (a collection with N skill tags is a member of N
+// skill groups), so buildAgenticAssetsPageData already visits the same collection far more times than
+// there are collections; tripling that with three independent traversals per group multiplied the
+// cost further for no reason since none of the three depend on each other's results.
+// cachedNonAi carries the devices/skillNames computed on a prior call for this same group (see
+// buildAgenticAssetsPageData's groupsCache) — everything except aiInteractions is invariant across
+// calls that only differ by analysisByKey, so a cache hit skips the device/skill accumulation
+// entirely and just re-walks collections for the (much cheaper) AI-interactions tally.
+function buildGroupAggregates(group, riskScoreMap, trafficMap, collectionInfoMap, analysisByKey, userAnalysisKeysByDeviceId, cachedNonAi) {
+    const byDevice = cachedNonAi ? null : new Map();
+    const skillNames = cachedNonAi ? cachedNonAi.skillNames : new Set();
+    const seenAnalysisKeys = new Set();
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+
     (group.collections || []).forEach((c) => {
+        if (!cachedNonAi) {
+            const info = collectionInfoMap.get(c.id);
+
+            (c.skills || []).forEach((s) => { if (s) skillNames.add(s); });
+
+            if (info?.deviceId) {
+                const { deviceId, serviceName, resolvedUsername } = info;
+                const collRisk = riskScoreMap[c.id] || 0;
+                const collTraffic = trafficMap[c.id] || 0;
+                if (!byDevice.has(deviceId)) {
+                    const username = (resolvedUsername && resolvedUsername !== DEFAULT_VALUE) ? resolvedUsername : "";
+                    byDevice.set(deviceId, {
+                        deviceId, endpoint: deviceId, username, os: null,
+                        riskScore: collRisk, lastSeenEpoch: collTraffic, services: new Set(),
+                    });
+                }
+                const entry = byDevice.get(deviceId);
+                // accumulate max risk/traffic across all collections this device appears in
+                if (collRisk > (entry.riskScore || 0)) entry.riskScore = collRisk;
+                if (collTraffic > (entry.lastSeenEpoch || 0)) entry.lastSeenEpoch = collTraffic;
+                if (serviceName) entry.services.add(serviceName);
+            }
+        }
+
         const keys = analysisKeysForCollection(c, group.tagValue, userAnalysisKeysByDeviceId);
         keys.forEach(({ serviceId, deviceId }) => {
             const sk = userAnalysisCompositeKey(serviceId, deviceId);
-            if (seen.has(sk)) return;
-            seen.add(sk);
+            if (seenAnalysisKeys.has(sk)) return;
+            seenAnalysisKeys.add(sk);
             const row = lookupUserAnalysisRow(analysisByKey, serviceId, deviceId);
             if (!row) return;
             totalInputTokens += Number(row.totalInputTokens) || 0;
             totalOutputTokens += Number(row.totalOutputTokens) || 0;
         });
     });
+
     const total = totalInputTokens + totalOutputTokens;
-    if (total <= 0) return null;
-    return { totalInputTokens, totalOutputTokens, total };
+    return {
+        devices: cachedNonAi ? cachedNonAi.devices : finalizeDevices(byDevice),
+        skillNames,
+        aiInteractions: total > 0 ? { totalInputTokens, totalOutputTokens, total } : null,
+    };
 }
+
 
 /**
  * Same grouping as {@link Endpoints} (agentic-assets), shaped for AgenticAssetsPage + flyout.
  */
-export function buildAgenticAssetsPageData(
+// Max stretch of synchronous work (ms) before yielding back to the browser's event loop — see the
+// chunking comment at the top of the allGroups loop below. Time-based rather than a fixed group count
+// because group sizes vary by two orders of magnitude (a handful of collections vs. several thousand),
+// so a fixed count either yields too rarely for the biggest groups or needlessly often for the rest.
+const MAX_SYNC_MS_PER_BATCH = 16; // ~one frame at 60fps
+
+export async function buildAgenticAssetsPageData(
     collections,
     trafficMap = {},
     riskScoreMap = {},
@@ -953,38 +1040,81 @@ export function buildAgenticAssetsPageData(
         violationRows = [],
         analysisByKey = new Map(),
         userAnalysisKeysByDeviceId = new Map(),
+        // AgenticAssetsPage calls this twice per mount: once immediately (empty analysisByKey, for
+        // first paint) and once more when the account-wide AI-interaction list resolves, just to
+        // patch that one field in. analysisByKey is the ONLY thing that differs between those calls —
+        // grouping, devices, skill names and violations all come out identical either way. Passing the
+        // same (initially empty) object back in as groupsCache across both calls skips redoing that
+        // work on the second, "just patch a column" pass instead of rebuilding everything from scratch.
+        groupsCache = null,
+        // Checked between batches so a component that unmounts mid-build (route change, fast toggle)
+        // stops wasted work instead of grinding through the rest of a real-scale account's groups.
+        shouldContinue = () => true,
     } = {},
 ) {
-    const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap, riskScoreMap);
-    const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);
-    const llmGroups = groupCollectionsByLLM(collections, trafficMap, sensitiveMap, riskScoreMap);
-    const skillGroups = groupCollectionsBySkill(collections, trafficMap, sensitiveMap, riskScoreMap);
-
-    const agentGroupKeys = new Set(agentGroups.map((a) => a.groupKey));
-    const servicesToShow = serviceGroups.filter((s) => !agentGroupKeys.has(s.groupKey));
-    const allGroups = [...agentGroups, ...servicesToShow, ...llmGroups, ...skillGroups];
-    const violationsBySkillName = buildViolationsBySkillName(violationRows);
+    const reuse = !!groupsCache?.allGroups;
+    let allGroups, collectionInfoMap;
+    if (reuse) {
+        ({ allGroups, collectionInfoMap } = groupsCache);
+    } else {
+        const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap, riskScoreMap);
+        const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);
+        const llmGroups = groupCollectionsByLLM(collections, trafficMap, sensitiveMap, riskScoreMap);
+        const skillGroups = groupCollectionsBySkill(collections, trafficMap, sensitiveMap, riskScoreMap);
+        const agentGroupKeys = new Set(agentGroups.map((a) => a.groupKey));
+        const servicesToShow = serviceGroups.filter((s) => !agentGroupKeys.has(s.groupKey));
+        allGroups = [...agentGroups, ...servicesToShow, ...llmGroups, ...skillGroups];
+        collectionInfoMap = precomputeCollectionInfo(collections, usernameMap);
+        if (groupsCache) {
+            groupsCache.allGroups = allGroups;
+            groupsCache.collectionInfoMap = collectionInfoMap;
+            groupsCache.perGroup = new Map();
+        }
+    }
 
     const agenticTreeData = [];
     const agenticFlatData = [];
     const assetDevices = {};
 
-    allGroups.forEach((group) => {
+    // buildGroupAggregates/buildTeamGroupsForAsset touch every (collection, group-membership) pair —
+    // at real scale that's ~1.5-2M pairs, tens of seconds of synchronous work (see the comment on
+    // buildGroupAggregates). Running the whole loop in one synchronous stretch blocks the main thread
+    // solid for that entire time — the page looks and IS frozen. Yielding via a zero-delay setTimeout
+    // whenever a batch has run past MAX_SYNC_MS_PER_BATCH hands control back to the browser between
+    // batches, so paint/input/the loading spinner's own animation keep running throughout instead of
+    // the tab appearing hung. Doesn't reduce the total time, but changes "frozen for 30s" into
+    // "visibly working for 30s". Group sizes range from tens to several thousand collections, so the
+    // yield check is time-based, not a fixed group count — a handful of the largest groups would each
+    // blow past any fixed count's budget on their own.
+    let __batchStart = Date.now();
+    for (let __i = 0; __i < allGroups.length; __i++) {
+        if (Date.now() - __batchStart > MAX_SYNC_MS_PER_BATCH) {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            if (!shouldContinue()) return { agenticTreeData, agenticFlatData, assetDevices };
+            __batchStart = Date.now();
+        }
+        const group = allGroups[__i];
         const collectionIds = (group.collections || []).map((c) => c.id);
-        // Skills share their declaring collection with every other skill on the same device/agent,
-        // so collection-level attribution would give every sibling skill the same duplicated count.
-        // Attribute by the skill's own identity instead — violation events on a skill carry
-        // `/skills/<skillName>` as their endpoint (see buildViolationsBySkillName), independent of
-        // which collection/device triggered them.
-        const violations = group.rowType === ROW_TYPES.SKILL
-            ? violationsForSkill(group.groupKey, violationsBySkillName)
-            : violationsForCollections(collectionIds, violationsByCollectionId);
-        const groups = buildTeamGroupsForAsset(group, usernameMap, userMetadataMap);
-        const devices = buildDevicesForGroup(group, usernameMap, riskScoreMap, trafficMap);
-        const skillNames = uniqueSkillNamesForGroup(group);
+        const cachedPerGroup = reuse ? groupsCache.perGroup.get(group.id) : null;
+        let violations, groups;
+        if (cachedPerGroup) {
+            ({ violations, teamGroups: groups } = cachedPerGroup);
+        } else {
+            // Skills are capability manifest entries — violations belong to the agent/service
+            // collection that declares them, not to the skill itself. Suppress to avoid
+            // double-counting.
+            violations = violationsForCollections(collectionIds, violationsByCollectionId);
+            groups = buildTeamGroupsForAsset(group, userMetadataMap, collectionInfoMap);
+        }
+        const { devices, skillNames, aiInteractions } = buildGroupAggregates(
+            group, riskScoreMap, trafficMap, collectionInfoMap, analysisByKey, userAnalysisKeysByDeviceId,
+            cachedPerGroup ? { devices: cachedPerGroup.devices, skillNames: cachedPerGroup.skillNames } : null,
+        );
+        if (groupsCache && !reuse) {
+            groupsCache.perGroup.set(group.id, { violations, teamGroups: groups, devices, skillNames });
+        }
         const riskScore = group.riskScore ?? group.maxRiskScore ?? null;
         const lastSeen = group.detectedTimestamp || 0;
-        const aiInteractions = aggregateAiInteractionsForGroup(group, analysisByKey, userAnalysisKeysByDeviceId);
 
         const treeRow = {
             path: [group.id],
@@ -1060,7 +1190,7 @@ export function buildAgenticAssetsPageData(
         agenticTreeData.push(treeRow);
         agenticFlatData.push(flatRow);
         assetDevices[group.id] = devices;
-    });
+    }
 
     return { agenticTreeData, agenticFlatData, assetDevices };
 }
@@ -1091,6 +1221,9 @@ export function hasMaliciousSkillInCollections(maliciousSkillKeys, collections) 
  * callers that have no collection context.
  */
 export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistStore }) {
+    // NOTE: `collectionIds` is accepted for backwards-compatibility but is no longer used — skill/config
+    // endpoints only exist on agentic collections, so the backend returns the whole-account skill data in
+    // ONE call (api/fetchAgenticSkillData) instead of one fetchApiInfosForCollection per collection (N+1).
 
     const cached = PersistStore.getState().skillRiskScoreCache;
     const cacheAge = Date.now() - (cached?.ts || 0);
@@ -1099,44 +1232,141 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
         return { skillScoreMap: cached.data || {}, maliciousSkills: new Set(cached.maliciousSkills || []), maliciousSkillKeys: new Set(cached.maliciousSkillKeys || []), misconfiguredSkills: new Set(cached.misconfiguredSkills || []), misconfiguredCollectionIds: new Set(cached.misconfiguredCollectionIds || []) };
     }
 
-    const results = await Promise.all(
-        collectionIds.map(async (id) => {
-            try {
-                const resp = await api.fetchApiInfosForCollection(id);
-                return { id, infos: resp?.apiInfoList || [] };
-            } catch {
-                return { id, infos: [] };
-            }
-        })
-    );
+    let resp;
+    try {
+        resp = await api.fetchAgenticSkillData();
+    } catch {
+        resp = {};
+    }
 
-    const skillScoreMap = {};
-    const maliciousSkills = new Set();
-    const maliciousSkillKeys = new Set();
-    const misconfiguredSkills = new Set();
-    const misconfiguredCollectionIds = new Set();
-    results.forEach(({ id: collectionId, infos }) => {
-        infos.forEach((info) => {
-            const url = info?.id?.url || "";
-            const splits = url.split("skills/");
-            const skillName = splits?.[1];
-            if (skillName) {
-                skillScoreMap[skillName] = info.riskScore || 0;
-                const isMalicious = (info.tagsList || []).some(t => (t.keyName === "malicious-skill-tag" || t.key === "malicious-skill-tag") && t.value === "true");
-                if (isMalicious) {
-                    maliciousSkills.add(skillName);
-                    maliciousSkillKeys.add(skillCollectionKey(collectionId, skillName));
-                }
-                const isMisconfigured = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
-                if (isMisconfigured) misconfiguredSkills.add(skillName);
-            }
-            if (url.includes("/config/")) {
-                const hasMisconfiguredTag = (info.tagsList || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true");
-                if (hasMisconfiguredTag) misconfiguredCollectionIds.add(collectionId);
-            }
-        });
-    });
+    // Server (fetchAgenticSkillData) now returns maliciousSkillKeys pre-aggregated too — collection-
+    // scoped `<collectionId>|<skillName>` keys, same format skillCollectionKey produces, so this stays
+    // a single query instead of reintroducing the old per-collection fetchApiInfosForCollection N+1.
+    const skillScoreMap = resp?.skillScoreMap || {};
+    const maliciousSkills = new Set(resp?.maliciousSkills || []);
+    const maliciousSkillKeys = new Set(resp?.maliciousSkillKeys || []);
+    const misconfiguredSkills = new Set(resp?.misconfiguredSkills || []);
+    const misconfiguredCollectionIds = new Set(resp?.misconfiguredCollectionIds || []);
 
     PersistStore.getState().setSkillRiskScoreCache({ data: skillScoreMap, maliciousSkills: [...maliciousSkills], maliciousSkillKeys: [...maliciousSkillKeys], misconfiguredSkills: [...misconfiguredSkills], misconfiguredCollectionIds: [...misconfiguredCollectionIds], ts: Date.now() });
     return { skillScoreMap, maliciousSkills, maliciousSkillKeys, misconfiguredSkills, misconfiguredCollectionIds };
+}
+
+// In-flight dedup on top of the PersistStore TTL cache below — skillRiskScoreCache/guardrailPolicyNames
+// only do a TTL check, so two pages mounting in the same tick (e.g. the agenticNewLayout redirect chain)
+// both miss a cold cache and both fire; this closes that gap for the heavier collections/traffic/risk
+// fetch specifically.
+let _agenticCollectionsInflight = null;
+
+/**
+ * Fetches + caches {collections, trafficMap, riskScoreMap} — the 3 account-wide, parameterless calls
+ * every agentic list page (AgenticAssetsPage, UsersAndDevices, Endpoints, DeviceEndpoints,
+ * EndpointPosture) needs on mount. Same PersistStore {data, ts} + TTL convention as
+ * skillRiskScoreCache/guardrailPolicyNames, so a page-to-page navigation within the TTL window reuses
+ * the same in-memory data instead of re-fetching ~53MB of collections + traffic + risk maps.
+ */
+export async function fetchAndCacheAgenticCollectionsBundle({ api, PersistStore }) {
+    const cached = PersistStore.getState().agenticCollectionsCache;
+    const cacheAge = Date.now() - (cached?.ts || 0);
+    if (cached?.data && cacheAge <= AGENTIC_COLLECTIONS_CACHE_TTL_MS) {
+        return cached.data;
+    }
+    if (_agenticCollectionsInflight) return _agenticCollectionsInflight;
+
+    _agenticCollectionsInflight = (async () => {
+        try {
+            const [apiCollectionsResp, trafficInfoResp, riskScoreResp] = await Promise.all([
+                api.getAllCollectionsBasic(),
+                api.getLastTrafficSeen(),
+                api.getRiskScoreInfo(),
+            ]);
+            const data = {
+                collections: apiCollectionsResp?.apiCollections || [],
+                trafficMap: trafficInfoResp || {},
+                riskScoreMap: riskScoreResp?.riskScoreOfCollectionsMap || {},
+            };
+            PersistStore.getState().setAgenticCollectionsCache({ data, ts: Date.now() });
+            return data;
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error("fetchAndCacheAgenticCollectionsBundle failed:", e);
+            return { collections: [], trafficMap: {}, riskScoreMap: {} };
+        } finally {
+            _agenticCollectionsInflight = null;
+        }
+    })();
+    return _agenticCollectionsInflight;
+}
+
+let _agenticTrafficRiskInflight = null;
+
+/**
+ * Fetches + caches {trafficMap, riskScoreMap} ONLY — no getAllCollectionsBasic. Separate cache slot
+ * (agenticTrafficRiskCache) from fetchAndCacheAgenticCollectionsBundle's above, deliberately: that
+ * bundle is shared by 4 other agentic pages (UsersAndDevices/Endpoints/DeviceEndpoints/
+ * EndpointPosture) that may still need the raw collections list, so its contract stays untouched.
+ * AgenticAssetsPage.jsx uses this leaner one instead — its only past use of `collections` was a
+ * client-side host→collectionId join for violation counts, now done server-side (see
+ * AgenticObserveAction.attributeViolationCountsToCollections), and hostnames for the flyout's
+ * Violations tab now come from the asset row's own `hostNames` field instead of a full account scan.
+ */
+export async function fetchAndCacheAgenticTrafficRiskBundle({ api, PersistStore }) {
+    const cached = PersistStore.getState().agenticTrafficRiskCache;
+    const cacheAge = Date.now() - (cached?.ts || 0);
+    if (cached?.data && cacheAge <= AGENTIC_COLLECTIONS_CACHE_TTL_MS) {
+        return cached.data;
+    }
+    if (_agenticTrafficRiskInflight) return _agenticTrafficRiskInflight;
+
+    _agenticTrafficRiskInflight = (async () => {
+        try {
+            const [trafficInfoResp, riskScoreResp] = await Promise.all([
+                api.getLastTrafficSeen(),
+                api.getRiskScoreInfo(),
+            ]);
+            const data = {
+                trafficMap: trafficInfoResp || {},
+                riskScoreMap: riskScoreResp?.riskScoreOfCollectionsMap || {},
+            };
+            PersistStore.getState().setAgenticTrafficRiskCache({ data, ts: Date.now() });
+            return data;
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error("fetchAndCacheAgenticTrafficRiskBundle failed:", e);
+            return { trafficMap: {}, riskScoreMap: {} };
+        } finally {
+            _agenticTrafficRiskInflight = null;
+        }
+    })();
+    return _agenticTrafficRiskInflight;
+}
+
+let _agenticSensitiveInfoInflight = null;
+
+/**
+ * Fetches + caches sensitiveMap (getSensitiveInfoForCollections). Kept as a SEPARATE cache from the
+ * bundle above since only Endpoints.jsx/UsersAndDevices.jsx render a sensitive-subtypes column — the
+ * other agentic pages don't need this call at all and shouldn't pay for it via a shared bundle.
+ */
+export async function fetchAndCacheAgenticSensitiveInfo({ api, PersistStore }) {
+    const cached = PersistStore.getState().agenticSensitiveInfoCache;
+    const cacheAge = Date.now() - (cached?.ts || 0);
+    if (cached?.data && cacheAge <= AGENTIC_SENSITIVE_INFO_CACHE_TTL_MS) {
+        return cached.data;
+    }
+    if (_agenticSensitiveInfoInflight) return _agenticSensitiveInfoInflight;
+
+    _agenticSensitiveInfoInflight = (async () => {
+        try {
+            const resp = await api.getSensitiveInfoForCollections();
+            const data = resp?.sensitiveSubtypesInCollection || {};
+            PersistStore.getState().setAgenticSensitiveInfoCache({ data, ts: Date.now() });
+            return data;
+        } catch {
+            return {};
+        } finally {
+            _agenticSensitiveInfoInflight = null;
+        }
+    })();
+    return _agenticSensitiveInfoInflight;
 }

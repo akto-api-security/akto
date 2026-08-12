@@ -40,10 +40,16 @@ function GithubServerTable(props) {
   const navigate = useNavigate();
 
   const [searchParams, setSearchParams] = useSearchParams();
+  // {replace: true} — this only mirrors internal filter state into the URL (for shareability/
+  // refresh-persistence), it isn't a user-initiated navigation. Without replace, every mount
+  // (this runs even with an empty filter set, see the effect below) pushes a second, near-duplicate
+  // history/location entry on top of whatever page just navigated here — PageWithMultipleCards'
+  // own back-navigation stack (which tracks pathname+search) then sees that as a distinct entry,
+  // so its back arrow has to be pressed twice to actually leave a page that mounted this table.
   const updateQueryParams = (key, value) => {
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set(key, value);
-    setSearchParams(newSearchParams);
+    setSearchParams(newSearchParams, { replace: true });
   };
 
   const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
