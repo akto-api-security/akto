@@ -86,6 +86,19 @@ public class ElasticSearchClient {
                     .put("traceId",           r.getTraceId())
                     .put("spanId",            r.getSpanId())
                     .put("topicProcessed",    false);
+
+                // Guardrail result: whether a policy was hit, which policy and rule, what was done
+                // about it, and why. Saved on the trace so an investigation does not have to look up
+                // the threat event separately. Written only when guardrails actually ran - otherwise
+                // the trace would claim a clean result for a prompt that was never checked.
+                if (r.getGuardrailViolated() != null) {
+                    doc.put("guardrailViolated", r.getGuardrailViolated())
+                       .put("guardrailAction",   emptyIfNull(r.getGuardrailAction()))
+                       .put("guardrailPolicy",   emptyIfNull(r.getGuardrailPolicy()))
+                       .put("guardrailRule",     emptyIfNull(r.getGuardrailRule()))
+                       .put("guardrailReason",   emptyIfNull(r.getGuardrailReason()))
+                       .put("guardrailSeverity", emptyIfNull(r.getGuardrailSeverity()));
+                }
                 ndjson.append(doc).append("\n");
             } catch (JSONException e) {
                 logger.error("Failed to serialize AgentQueryRecord: " + e.getMessage());
@@ -190,8 +203,13 @@ public class ElasticSearchClient {
             source.optString("traceId", ""),
             source.optString("spanId", ""),
             source.optBoolean("isAtlasTraffic", false),
-            source.optBoolean("topicProcessed", false)
-
+            source.optBoolean("topicProcessed", false),
+            source.has("guardrailViolated") ? source.optBoolean("guardrailViolated") : null,
+            source.optString("guardrailAction", ""),
+            source.optString("guardrailPolicy", ""),
+            source.optString("guardrailRule", ""),
+            source.optString("guardrailReason", ""),
+            source.optString("guardrailSeverity", "")
         );
     }
 
@@ -225,5 +243,10 @@ public class ElasticSearchClient {
     private static String trimTrailingSlash(String s) {
         if (s == null) return "";
         return s.endsWith("/") ? s.substring(0, s.length() - 1) : s;
+    }
+
+    // org.json throws on a null value, so missing guardrail fields have to be saved as "".
+    private static String emptyIfNull(String s) {
+        return s == null ? "" : s;
     }
 }

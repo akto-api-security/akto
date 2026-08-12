@@ -753,4 +753,9 @@ public class DbActor extends DataActor {
     public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
         DbLayer.storeTestingRunWebhook(testingRunWebhook);
     }
+
+    @Override
+    public int incrementAndGetTestRateLimitUsage(int globalRateLimit, String dashboardContext) {
+        return DbLayer.incrementAndGetTestRateLimitUsage(globalRateLimit, dashboardContext);
+    }
 }

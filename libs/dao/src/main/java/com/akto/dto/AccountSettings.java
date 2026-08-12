@@ -38,6 +38,17 @@ public class AccountSettings {
     public static final String CENTRAL_KAFKA_IP = "centralKafkaIp";
     private String centralKafkaIp;
 
+
+    public static final String TEST_RATE_LIMIT_USAGE_DAY = "testRateLimitUsageDay";
+    private int testRateLimitUsageDay;
+    public static final String TEST_RATE_LIMIT_USAGE_COUNT = "testRateLimitUsageCount";
+    private int testRateLimitUsageCount;
+    public static final String TEST_RATE_LIMIT_USAGE_DAY_AGENTIC = "testRateLimitUsageDayAgentic";
+    private int testRateLimitUsageDayAgentic;
+    public static final String TEST_RATE_LIMIT_USAGE_COUNT_AGENTIC = "testRateLimitUsageCountAgentic";
+    private int testRateLimitUsageCountAgentic;
+
+
     // Used by mini-runtime to send to threat topic.
     public static final String THREAT_KAFKA_PARTITION_KEY = "threatKafkaPartitionKey";
     private ThreatKafkaPartitionKey threatKafkaPartitionKey;
@@ -71,12 +82,26 @@ public class AccountSettings {
 
     private Map<String, String> filterHeaderValueMap;
     public static final String FILTER_HEADER_VALUE_MAP = "filterHeaderValueMap";
+    public static final String RUNTIME_ENV_OVERRIDES = "runtimeEnvOverrides";
+    @Getter
+    @Setter
+    private Map<String, String> runtimeEnvOverrides;
     public static final String DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES = "timeForScheduledSummaries";
     private int timeForScheduledSummaries;
     private Map<String, CollectionReplaceDetails> apiCollectionNameMapper;
     public static final String API_COLLECTION_NAME_MAPPER = "apiCollectionNameMapper";
     public static final String GLOBAL_RATE_LIMIT = "globalRateLimit";
     private int globalRateLimit;
+
+    public static final String GLOBAL_RATE_LIMIT_AGENTIC = "globalRateLimitAgentic";
+    private int globalRateLimitAgentic;
+
+    public static final String AGENTIC_TEST_RATE_LIMIT_USAGE_DAY = "agenticTestRateLimitUsageDay";
+    private int agenticTestRateLimitUsageDay;
+    public static final String AGENTIC_TEST_RATE_LIMIT_USAGE_COUNT = "agenticTestRateLimitUsageCount";
+    private int agenticTestRateLimitUsageCount;
+
+
     public static final String ENABLE_TELEMETRY = "enableTelemetry";
 
     public static final String TELEMETRY_SETTINGS = "telemetrySettings";
@@ -209,6 +234,32 @@ public class AccountSettings {
         this.globalRateLimit = globalRateLimit;
     }
 
+
+    public int getGlobalRateLimitAgentic() {
+        return globalRateLimitAgentic;
+    }
+
+    public void setGlobalRateLimitAgentic(int globalRateLimitAgentic) {
+        this.globalRateLimitAgentic = globalRateLimitAgentic;
+    }
+
+    public int getAgenticTestRateLimitUsageDay() {
+        return agenticTestRateLimitUsageDay;
+    }
+
+    public void setAgenticTestRateLimitUsageDay(int agenticTestRateLimitUsageDay) {
+        this.agenticTestRateLimitUsageDay = agenticTestRateLimitUsageDay;
+    }
+
+    public int getAgenticTestRateLimitUsageCount() {
+        return agenticTestRateLimitUsageCount;
+    }
+
+    public void setAgenticTestRateLimitUsageCount(int agenticTestRateLimitUsageCount) {
+        this.agenticTestRateLimitUsageCount = agenticTestRateLimitUsageCount;
+    }
+
+
     public String getGithubAppSecretKey() {
         return githubAppSecretKey;
     }
@@ -236,6 +287,39 @@ public class AccountSettings {
     public enum SetupType {
         PROD, QA, STAGING, DEV
     }
+
+    public int getTestRateLimitUsageDay() {
+        return testRateLimitUsageDay;
+    }
+
+    public void setTestRateLimitUsageDay(int testRateLimitUsageDay) {
+        this.testRateLimitUsageDay = testRateLimitUsageDay;
+    }
+
+    public int getTestRateLimitUsageCount() {
+        return testRateLimitUsageCount;
+    }
+
+    public void setTestRateLimitUsageCount(int testRateLimitUsageCount) {
+        this.testRateLimitUsageCount = testRateLimitUsageCount;
+    }
+
+    public int getTestRateLimitUsageDayAgentic() {
+        return testRateLimitUsageDayAgentic;
+    }
+
+    public void setTestRateLimitUsageDayAgentic(int testRateLimitUsageDayAgentic) {
+        this.testRateLimitUsageDayAgentic = testRateLimitUsageDayAgentic;
+    }
+
+    public int getTestRateLimitUsageCountAgentic() {
+        return testRateLimitUsageCountAgentic;
+    }
+
+    public void setTestRateLimitUsageCountAgentic(int testRateLimitUsageCountAgentic) {
+        this.testRateLimitUsageCountAgentic = testRateLimitUsageCountAgentic;
+    }
+
 
     public Map<String, Map<Pattern, String>> convertApiCollectionNameMapperToRegex() {
         

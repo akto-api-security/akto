@@ -6615,4 +6615,23 @@ public class DbAction extends ActionSupport {
         }
         return Action.SUCCESS.toUpperCase();
     }
+
+    @Getter @Setter
+    private int testRateLimitUsageCount;
+
+    @Getter @Setter
+    private int globalRateLimit;
+
+    @Getter @Setter
+    private String contextSource;
+
+    public String incrementAndGetTestRateLimitUsage() {
+        try {
+            testRateLimitUsageCount = DbLayer.incrementAndGetTestRateLimitUsage(globalRateLimit, contextSource);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in incrementAndGetTestRateLimitUsage " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
 }

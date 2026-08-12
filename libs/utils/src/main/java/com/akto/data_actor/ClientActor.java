@@ -4495,4 +4495,31 @@ public class ClientActor extends DataActor {
         }
     }
 
+    @Override
+    public int incrementAndGetTestRateLimitUsage(int globalRateLimit, String dashboardContext) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("globalRateLimit", globalRateLimit);
+        obj.put("contextSource", dashboardContext);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/incrementAndGetTestRateLimitUsage", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in incrementAndGetTestRateLimitUsage", LoggerMaker.LogDb.RUNTIME);
+                return 0;
+            }
+            try {
+                BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+                return Integer.parseInt(payloadObj.get("testRateLimitUsageCount").toString());
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error parsing incrementAndGetTestRateLimitUsage response" + e, LoggerMaker.LogDb.RUNTIME);
+                return 0;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in incrementAndGetTestRateLimitUsage" + e, LoggerMaker.LogDb.RUNTIME);
+            return 0;
+        }
+    }
+
 }
