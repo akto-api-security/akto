@@ -53,6 +53,7 @@ public class AdminSettingsAction extends UserAction {
 
     AccountSettings accountSettings;
     private int globalRateLimit = 0;
+    private int globalRateLimitAgentic = 0;
     private Organization organization;
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     private static final ScheduledExecutorService newExecutor = Executors.newSingleThreadScheduledExecutor();
@@ -155,6 +156,14 @@ public class AdminSettingsAction extends UserAction {
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.GLOBAL_RATE_LIMIT, globalRateLimit));
+        return SUCCESS.toUpperCase();
+    }
+
+    public String updateGlobalRateLimitAgentic() {
+
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.GLOBAL_RATE_LIMIT_AGENTIC, globalRateLimitAgentic));
         return SUCCESS.toUpperCase();
     }
 
@@ -768,6 +777,14 @@ public class AdminSettingsAction extends UserAction {
 
     public void setGlobalRateLimit(int globalRateLimit) {
         this.globalRateLimit = globalRateLimit;
+    }
+
+    public int getGlobalRateLimitAgentic() {
+        return globalRateLimitAgentic;
+    }
+
+    public void setGlobalRateLimitAgentic(int globalRateLimitAgentic) {
+        this.globalRateLimitAgentic = globalRateLimitAgentic;
     }
 
     public void setTrafficAlertThresholdSeconds(int trafficAlertThresholdSeconds) {
