@@ -2,6 +2,9 @@ package com.akto.dto.testing;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
+
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+
 import java.util.List;
 
 import lombok.Getter;
@@ -62,6 +65,9 @@ public class TestingRun {
 
     public static final String RUN_AUTOMATED_TESTS = "runAutomatedTests";
     private boolean runAutomatedTests = false;
+
+    public static final String DASHBOARD_CONTEXT = "dashboardContext";
+    private CONTEXT_SOURCE dashboardContext;
 
 
     public TestingRun() { }
@@ -260,6 +266,14 @@ public class TestingRun {
 
     public void setRunAutomatedTests(boolean runAutomatedTests) {
         this.runAutomatedTests = runAutomatedTests;
+    }
+
+    public CONTEXT_SOURCE getDashboardContext() {
+        return dashboardContext;
+    }
+
+    public void setDashboardContext(CONTEXT_SOURCE dashboardContext) {
+        this.dashboardContext = dashboardContext;
     }
 
 
