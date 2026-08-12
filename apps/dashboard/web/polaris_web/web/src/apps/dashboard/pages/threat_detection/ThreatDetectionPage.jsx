@@ -348,7 +348,7 @@ function ThreatDetectionPage() {
     const [moreActions, setMoreActions] = useState(false);
     const [webhookIntegrationModalOpen, setWebhookIntegrationModalOpen] = useState(false);
     const [webhookIntegrationData, setWebhookIntegrationData] = useState(null);
-    const [latencyData, setLatencyData] = useState([]);
+    const [latencyData, setLatencyData] = useState(null);
     const [detailsLoading, setDetailsLoading] = useState(false);
     const pollingIntervalRef = useRef(null);
     const [pendingRowContext, setPendingRowContext] = useState(null);

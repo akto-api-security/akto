@@ -626,7 +626,7 @@ function Violations() {
     const [bulkSelectedCount, setBulkSelectedCount] = useState(0);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [filterValues, setFilterValues] = useState({ hosts: [], subCategory: [] });
-    const [latencyData, setLatencyData] = useState([]);
+    const [latencyData, setLatencyData] = useState(null);
     const [activeSeverityFilter, setActiveSeverityFilter] = useState(new Set());
     const [activePolicyFilter, setActivePolicyFilter] = useState(new Set());
     const [activeTypeFilter, setActiveTypeFilter] = useState(null);
