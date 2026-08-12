@@ -701,18 +701,54 @@ pick up cold.
   navigation. Verified live: full round-trip (asset endpoints page -> child collection -> Inventory
   -> back) now correctly returns with `groupKey`/`rowType` intact, table renders normally, zero
   console errors.
-- **Not a bug, reported and investigated**: user flagged a brief "Loading service graph..." spinner
-  before a clicked child collection's Inventory page finishes rendering. Traced to
-  `AgentDiscoverGraph.jsx:262,316-369,612-623` — its own `loading` state, gated on one scoped
-  `api.getCollection(apiCollectionId)` call, with an early-return spinner card. Confirmed this only
-  replaces that ONE component's own output (one entry in `ApiEndpoints.jsx`'s `components` array,
-  `:2025`/`:2066`) — the rest of the page (table, tabs, header) mounts and is interactive
-  independently; it's not a true full-page-blocking overlay, just visually prominent since it sits
-  first in the content area. Also confirmed via `git diff master...HEAD` (empty for both
-  `AgentDiscoverGraph.jsx` and `ApiEndpoints.jsx`) that this is pre-existing behavior on master,
-  unrelated to this branch's rebuild. Not fixed — flagged here only so it isn't re-investigated from
-  scratch if raised again; a real fix would defer/lazy-mount this card behind the rest of the page's
-  content instead of it always rendering first.
+- **"Loading service graph..." spinner visually front-ran the endpoints table on every Inventory
+  collection page.** Traced to `AgentDiscoverGraph.jsx:262,316-369,612-623` — its own `loading`
+  state, gated on one scoped `api.getCollection(apiCollectionId)` call, with an early-return spinner
+  card. Initially flagged as "not a bug" (confirmed via `git diff master...HEAD` — empty for both
+  `AgentDiscoverGraph.jsx`/`ApiEndpoints.jsx` — this is pre-existing behavior, and it only replaces
+  that one component's own output, not the whole page). User asked for it fixed anyway on a second
+  report ("Issue still exists") — reordered `ApiEndpoints.jsx`'s `components` array (the common,
+  non-empty-collection branch) so the endpoints table renders first and the graph card mounts after
+  it, instead of ahead of it. Minimal, order-only change — no logic/behavior difference, just what's
+  visually first.
+- **Endpoint ID/Username filter chips were missing** from the asset endpoints page — only "Endpoint
+  tags" had one (a bounded 4-choice facet), matching the earlier scoping note that Endpoint ID/
+  Username are "high-cardinality, free-text search instead". Revisited: for a page scoped to ONE
+  asset's own devices (not account-wide), the candidate set is small enough to enumerate directly.
+  `fetchAgenticAssetEndpointsPage` now also returns `distinctEndpointIds`/`distinctUsernames`
+  (computed from the full unfiltered/unsearched set, so choices stay stable regardless of current
+  search/filter) plus `filters.endpointId`/`filters.username` support. Frontend builds both extra
+  chips dynamically once the first response lands. Verified live: both chips render with real,
+  correct choices (e.g. all 4 of notion-mcp's device IDs) and filtering by either works.
+- **The back-arrow fix above (pathname+search tracking) was necessary but not sufficient — still
+  needed two presses to leave a page with a `GithubServerTable` on it.** Root cause, found while
+  re-testing the fix above end-to-end: `GithubServerTable` syncs its filter state into the URL via
+  `setSearchParams` on mount (even with an empty filter set) WITHOUT `{replace: true}` — this changes
+  `location.search` shortly after every mount, which (now that the stack tracks search too) pushes a
+  second, near-duplicate entry for "the same page" on top of whatever just navigated here. Confirmed
+  by reproducing exactly: pressing back once from Inventory correctly landed on the asset endpoints
+  page; pressing back a second time (intending to reach the Agentic Assets list) instead landed on
+  that SAME asset endpoints page's own pre-self-correction URL variant, requiring a third press to
+  actually leave. Fixed two ways: (1) `GithubServerTable`'s filter-sync now passes `{replace: true}`
+  (a URL-normalization side-effect, not a real navigation, so it shouldn't have been pushing at the
+  router level either); (2) `PageWithMultipleCards` now checks `useNavigationType()` — a `'REPLACE'`
+  navigation updates the stack's top entry in place instead of pushing a new one, which is what
+  actually fixes the custom stack (react-router's own push-vs-replace distinction doesn't
+  automatically propagate to a separate sessionStorage-based stack that only watches `location`).
+  Both fixes are in shared components, so they benefit every `GithubServerTable` page using
+  `PageWithMultipleCards`'s back arrow, not just this one. Verified live: the same full round-trip
+  now returns to the true previous page in exactly two presses (one per real hop) instead of three.
+- **`AgenticAssetsPage.jsx`'s own Tier-1 mount-fetch fired even when about to redirect to legacy.**
+  `agenticNewLayout` defaults to `false` until explicitly toggled, so several hardcoded entry points
+  (HomePage, TokenValidator, Settings, EndpointPosture) land here only to immediately bounce to
+  `Endpoints.jsx` — but both the redirect effect and the data-fetch effect fire in the same tick, so
+  the fetch (traffic/risk bundle + Endpoint Shield metadata) completed and was thrown away every
+  single time. Guarded the fetch effect on `newLayout` so it's skipped entirely when the redirect is
+  about to fire. This does NOT eliminate the `getAllCollectionsBasic` call the user also reported —
+  that's `Endpoints.jsx`'s own separate, legitimate, pre-existing need (it still classifies
+  client-side, unlike the rebuilt new layout) firing AFTER the bounce, not something leaking from the
+  new layout. Verified live (cleared local storage to simulate a cold first visit): no more duplicate
+  traffic/risk/sensitive calls on the redirect path.
 
 ## High priority — wrong output today
 
