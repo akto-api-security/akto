@@ -164,7 +164,7 @@ export const applyThreatActivityTableFilter = (filterKey, filterValue) => {
     return { resolvedValue, filterStr };
 };
 
-export const openThreatActivityPage = (filters = {}) => {
+const openActivityPage = (path, filters) => {
     const params = new URLSearchParams();
     const filterParts = [];
     if (filters.host) filterParts.push(`host__${filters.host}`);
@@ -180,9 +180,16 @@ export const openThreatActivityPage = (filters = {}) => {
     setTimeRangeParams(params, filters, "startTimestamp", "endTimestamp");
     const categoryParam = getCategoryParam();
     if (categoryParam) params.set("category", categoryParam);
-    const url = `${window.location.origin}/dashboard/protection/threat-activity?${params.toString()}`;
+    const url = `${window.location.origin}${path}?${params.toString()}`;
     window.open(url, "_blank");
 };
+
+export const openThreatActivityPage = (filters = {}) =>
+    openActivityPage("/dashboard/protection/threat-activity", filters);
+
+// Guardrail Activity is the same table on its own route (see LeftNav), so it takes the same filters.
+export const openGuardrailActivityPage = (filters = {}) =>
+    openActivityPage("/dashboard/guardrails/activity", filters);
 
 export const openThreatActorsPage = (filters = {}) => {
     const params = new URLSearchParams();

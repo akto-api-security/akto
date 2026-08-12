@@ -1,4 +1,5 @@
-import { useReducer, useState } from "react";
+import { useMemo, useReducer, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Box, HorizontalStack, Popover, ActionList, Button, Icon } from '@shopify/polaris';
 import {FileMinor} from '@shopify/polaris-icons';
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
@@ -6,7 +7,8 @@ import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCard
 import func from "@/util/func";
 import values from "@/util/values";
 import { produce } from "immer"
-import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
+import { getDashboardCategory, getReportCategoryShortName, mapLabel, shortNameToCategory } from "../../../main/labelHelper";
+import PersistStore from "../../../main/PersistStore";
 import SessionStore from "../../../main/SessionStore";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import guardRailData from "./dummyData";
@@ -16,10 +18,32 @@ import SusDataTable from "../threat_detection/components/SusDataTable";
 import NormalSampleDetails from "../threat_detection/components/NormalSampleDetails";
 import { extractBehaviour } from "../threat_detection/utils/formatUtils";
 
+// Apply ?category= before the first render — same as GuardrailPolicies.jsx. A link opened in a new
+// tab has no PersistStore session, so without this the page would load the wrong category.
+const categoryOverride = shortNameToCategory[getReportCategoryShortName()];
+if (categoryOverride) {
+    PersistStore.getState().setDashboardCategory(categoryOverride);
+}
 
 function GuardrailDetection() {
 
-    const initialVal = values.ranges[3]
+    const [searchParams] = useSearchParams();
+    // A link into this page (e.g. from a flagged trace) carries the time range it wants to land on,
+    // either as a preset alias or as a start/end pair. Same params ThreatDetectionPage accepts.
+    const initialVal = useMemo(() => {
+        const preset = values.ranges.find((r) => r.alias === searchParams.get("range"));
+        if (preset) return preset;
+        const startTs = parseInt(searchParams.get("startTimestamp"), 10);
+        const endTs = parseInt(searchParams.get("endTimestamp"), 10);
+        if (!Number.isNaN(startTs) && !Number.isNaN(endTs)) {
+            return {
+                alias: "custom",
+                title: "Custom",
+                period: { since: new Date(startTs * 1000), until: new Date(endTs * 1000) },
+            };
+        }
+        return values.ranges[3];
+    }, [searchParams]);
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
     const [moreActions, setMoreActions] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
