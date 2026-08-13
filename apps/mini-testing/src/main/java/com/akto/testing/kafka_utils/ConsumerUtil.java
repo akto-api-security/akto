@@ -30,6 +30,7 @@ import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.info.SingleTestPayload;
+import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.TestExecutor;
@@ -44,12 +45,19 @@ import io.confluent.parallelconsumer.ParallelStreamProcessor;
 
 public class ConsumerUtil {
 
+    public static final String EXPECTED_RECORDS_KEY = "expectedRecords";
+
+    private static final int MAX_POLL_INTERVAL_MS = 10000;
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ConsumerUtil.class, LogDb.TESTING);
     static Properties properties = com.akto.runtime.utils.Utils.configProperties(Constants.LOCAL_KAFKA_BROKER_URL, Constants.AKTO_KAFKA_GROUP_ID_CONFIG, Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
     static{
-        properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 10000); 
+        properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, MAX_POLL_INTERVAL_MS);
+        if (!KafkaConfig.applyAuthenticationPropertiesFromEnv(properties)) {
+            loggerMaker.errorAndAddToDb("Kafka authentication is enabled but credentials are missing for testing consumer");
+        }
     }
     private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ConsumerUtil.class, LogDb.TESTING);
     public static ExecutorService executor = Executors.newFixedThreadPool(150);
     private static final int maxRunTimeForTests = 5 * 60;
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
