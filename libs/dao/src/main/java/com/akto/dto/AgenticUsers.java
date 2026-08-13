@@ -20,6 +20,8 @@ public class AgenticUsers {
     public static final String LAST_UPDATED_AT = "lastUpdatedAt";
     public static final String LAST_UPDATED_BY = "lastUpdatedBy";
 
+    public static final String DEVICE_TAGS = "deviceTags";
+
     private String userName;
     private String userEmail;
     private String userRole;
@@ -27,4 +29,11 @@ public class AgenticUsers {
     private int lastUpdatedAt;
     private String lastUpdatedBy;
     private List<String> devices;
+
+    // Generic key-value tags (e.g. Okta groups under key "group"). One entry per (key, value,
+    // source) — see AgentUsersDao.upsertDeviceTags. Ported for the periodic Okta user-sync cron;
+    // unrelated to the legacy teamName/userRole fields above. Multiple sources (or multiple
+    // values from the same source) for the same key all coexist — this is the single source of
+    // truth read directly wherever tags are used, no separate resolved field.
+    private List<DeviceTag> deviceTags;
 }
