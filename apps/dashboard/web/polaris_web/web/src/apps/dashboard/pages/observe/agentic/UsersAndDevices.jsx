@@ -17,16 +17,9 @@ import NewLayoutTooltip from "./NewLayoutTooltip";
 import {
     getHeaders,
     getSortOptionsWithoutIconColumn,
-    PAGE_LIMIT,
     INVENTORY_PATH,
     INVENTORY_FILTER_KEY,
     PAGE_LIMIT,
-    groupCollectionsByUser,
-    groupCollectionsByDevice,
-    groupCollectionsByAgent,
-    groupCollectionsByService,
-    groupCollectionsByLLM,
-    groupCollectionsBySkill,
     buildAgenticInventoryFilterForRow,
     fetchAndCacheSkillApiData,
     // Note: this page's malicious-skill badge stays name-only (enrichRef.maliciousSkills), not the
@@ -68,13 +61,6 @@ function UsersAndDevices() {
             navigate("/dashboard/observe/endpoints", { replace: true });
         }
     }, [navigate, agenticNewLayout]);
-    const [data, setData] = useState({ users: [], devices: [] });
-    const [userEnrichVersion, setUserEnrichVersion] = useState(0);
-    const [summaryData, setSummaryData] = useState({ profileCount: 0, collectionCount: 0 });
-    // De-duplicated org-wide agentic asset total (same grouping as the Agentic Assets page) —
-    // not scoped to the Users/Devices tab, unlike profileCount.
-    const [totalAgenticAssets, setTotalAgenticAssets] = useState(0);
-    const [editTagModal, setEditTagModal] = useState({ active: false, usernames: [], team: '', userRole: '', teamSource: 'sso', roleSource: 'sso', ssoHintTeam: '', ssoHintRole: '', saving: false });
 
     const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
     const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
@@ -249,88 +235,11 @@ function UsersAndDevices() {
         } else {
             delete updatedFiltersMap[INVENTORY_FILTER_KEY];
         }
-
-        const { maliciousSkillKeys } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
-
-        if (!isMountedRef.current) return;
-        applyMaliciousBadgeToUsers(maliciousSkillKeys || new Set(), isMountedRef);
-    }, [applyMaliciousBadgeToUsers]);
-
-    async function fetchData(isMountedRef = { current: true }) {
-        try {
-            setLoading(true);
-
-            const [apiCollectionsResp, trafficInfoResp, riskScoreResp, sensitiveInfoResp, shieldResult] =
-                await Promise.all([
-                    api.getAllCollectionsBasic(),
-                    api.getLastTrafficSeen(),
-                    api.getRiskScoreInfo(),
-                    api.getSensitiveInfoForCollections(),
-                    fetchEndpointShieldUserMetadata(),
-                ]);
-
-            if (!isMountedRef.current) return;
-
-            const collections = apiCollectionsResp.apiCollections || [];
-            const trafficMap = trafficInfoResp || {};
-            const riskScoreMap = riskScoreResp?.riskScoreOfCollectionsMap || {};
-            const sensitiveMap = sensitiveInfoResp?.sensitiveSubtypesInCollection || {};
-            const { usernameMap = {}, userMetadataMap = {} } = shieldResult || {};
-
-            const userGroups = prettifyGroupData(
-                groupCollectionsByUser(collections, trafficMap, sensitiveMap, riskScoreMap, usernameMap, userMetadataMap),
-            );
-            const deviceGroups = prettifyGroupData(
-                groupCollectionsByDevice(collections, trafficMap, sensitiveMap, riskScoreMap),
-            );
-
-            // De-duplicated org-wide asset count — same grouping as the Agentic Assets page
-            // (Endpoints.jsx), so the "Agentic assets" stat here matches that page's total
-            // instead of summing each user/device's own asset count (which double-counts
-            // assets shared across users/devices).
-            const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap, riskScoreMap);
-            const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);
-            const llmGroups = groupCollectionsByLLM(collections, trafficMap, sensitiveMap, riskScoreMap);
-            const skillGroups = groupCollectionsBySkill(collections, trafficMap, sensitiveMap, riskScoreMap);
-            const agentGroupKeys = new Set(agentGroups.map((a) => a.groupKey));
-            const servicesToShow = serviceGroups.filter((s) => !agentGroupKeys.has(s.groupKey));
-            setTotalAgenticAssets(agentGroups.length + servicesToShow.length + llmGroups.length + skillGroups.length);
-
-            setData({
-                users: userGroups,
-                devices: deviceGroups,
-            });
-            setLoading(false);
-
-            enrichUsersWithMaliciousSkills([...userGroups, ...deviceGroups], isMountedRef);
-        } catch {
-            setLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        const isMountedRef = { current: true };
-        fetchData(isMountedRef);
-        return () => {
-            isMountedRef.current = false;
-        };
-    }, []);
-
-    useEffect(() => {
-        const userLen = data.users.length;
-        const deviceLen = data.devices.length;
-        setSummaryData({
-            profileCount: selectedTab === "users" ? userLen : deviceLen,
-            // Org-wide de-duplicated total (matches the Agentic Assets page) — intentionally
-            // not derived from `rows`, since summing each row's own asset count double-counts
-            // assets shared across multiple users/devices.
-            collectionCount: totalAgenticAssets,
-        });
-    }, [selectedTab, data.users, data.devices, totalAgenticAssets]);
-
-    const disambiguateLabel = useCallback((key, value) => {
-        return func.convertToDisambiguateLabelObj(value, null, 2);
-    }, []);
+        delete updatedFiltersMap[`${INVENTORY_FILTER_KEY}agent-tree/`];
+        setFiltersMap(updatedFiltersMap);
+        setTableSelectedTab({ ...tableSelectedTab, [INVENTORY_PATH]: "hostname" });
+        setTimeout(() => navigate(INVENTORY_PATH), 0);
+    }, [filtersMap, setFiltersMap, navigate, tableSelectedTab, setTableSelectedTab]);
 
     const openEditTagModal = useCallback((usernames) => {
         const rows = lastRowsRef.current.filter((r) => usernames.includes(r.id));

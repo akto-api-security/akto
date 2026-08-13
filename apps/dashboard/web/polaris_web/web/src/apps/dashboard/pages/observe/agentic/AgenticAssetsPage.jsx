@@ -52,6 +52,7 @@ const SORT_FIELD_MAP = {
   name: "name",
   riskScore: "riskScore",
   endpointCount: "endpointsCount",
+  lastSeen: "lastSeenEpoch",
 };
 
 const COL_DEFS = [
@@ -135,7 +136,8 @@ const COL_DEFS = [
     headerName: "Last Traffic Seen",
     width: 150,
     filter: false,
-    sortable: false,
+    // Backend supports this sort key already (buildSummaryComparator's "lastSeenEpoch"/"lastSeen"
+    // branch) — see SORT_FIELD_MAP above for the AG Grid colId -> backend sortKey mapping.
     cellStyle: {
       display: "flex",
       alignItems: "center",
