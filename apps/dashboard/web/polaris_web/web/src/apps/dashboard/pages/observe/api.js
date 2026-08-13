@@ -239,6 +239,17 @@ export default {
             data: {}
         })
     },
+    // Same response shape as getAllCollectionsBasic (apiCollections array), scoped to a specific
+    // hostName list via a server-side $in query — for ApiCollections.jsx's device-tree drill-down
+    // (see UsersAndDevices.jsx's row click), which only needs one device's handful of collections
+    // and shouldn't pay for loading the whole account's collections to get there.
+    async fetchCollectionsBasicForHostNames(deviceHostNames) {
+        return await request({
+            url: '/api/fetchCollectionsBasicForHostNames',
+            method: 'post',
+            data: { deviceHostNames }
+        })
+    },
     // Paginated, sorted, searchable grouped-asset rows for the Agentic Assets "New Layout" table —
     // replaces computing all ~800 grouped rows client-side on every load (see
     // atlas-scale-test/DASHBOARD_OPTIMIZATION.md's "paginated server-side aggregation rebuild").
