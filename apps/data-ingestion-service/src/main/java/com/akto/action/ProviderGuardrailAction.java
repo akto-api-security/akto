@@ -52,11 +52,6 @@ public class ProviderGuardrailAction extends ActionSupport {
     private Map<String, Object> response;
 
     public String guardrail() {
-        HttpServletRequest req = ServletActionContext.getRequest();
-        loggerMaker.infoAndAddToDb("[API-TRACE] ProviderGuardrailAction.guardrail HIT - method: "
-                + req.getMethod() + ", uri: " + req.getRequestURI() + ", provider: " + provider,
-                LoggerMaker.LogDb.DATA_INGESTION);
-
         ProviderAdapter adapter = ProviderRegistry.get(provider);
         if (adapter == null) {
             loggerMaker.warn("Provider guardrail: unknown provider '" + provider + "'");
@@ -85,14 +80,13 @@ public class ProviderGuardrailAction extends ActionSupport {
             boolean allow = guardrailsResult == null || isAllowed(guardrailsResult);
             String reason = guardrailsResult == null ? null : stringOrNull(guardrailsResult.get("Reason"));
             response = adapter.verdict(allow, reason, frame.requestId);
-
-            loggerMaker.infoAndAddToDb("Provider guardrail completed - provider: {}, allow: {}", provider, allow);
             return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
-            // Fail-open: never let guardrails break inference.
-            loggerMaker.errorAndAddToDb("Provider guardrail error (fail-open) - provider: " + provider + ", error: " + e.getMessage(),
-                    LoggerMaker.LogDb.DATA_INGESTION);
+            // Fail-open: never let guardrails break inference. Log to console only
+            // (not the DB) — this is an inline hot path, and per-request DB writes
+            // would amplify load during a downstream outage.
+            loggerMaker.error("Provider guardrail error (fail-open) - provider: " + provider, e);
             response = adapter.verdict(true, null, null);
             return Action.SUCCESS.toUpperCase();
         }
