@@ -67,7 +67,7 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
                 .collect(Collectors.toCollection(ArrayList::new));
         merged.addAll(newTags);
 
-        instance.updateMany(Filters.eq(AgenticUsers.USER_NAME, identityUserName),
+        instance.updateOne(Filters.eq(AgenticUsers.USER_NAME, identityUserName),
                 Updates.set(AgenticUsers.DEVICE_TAGS, merged));
     }
 
@@ -88,6 +88,39 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         if (email == null || email.isEmpty() || !email.contains("@")) return null;
         String local = email.substring(0, email.indexOf('@')).trim();
         return local.isEmpty() ? null : local;
+    }
+
+    /**
+     * Read-side counterpart to syncSsoIdentity's write-side convergence — resolves a user's
+     * AgenticUsers doc (and their synced device tags) starting from any of the 3 spellings a
+     * caller might have on hand: a raw username/login, an email, or the email's derived
+     * local-part. Lets a future caller (e.g. a device-to-owner tag lookup) find the right doc
+     * without needing to already know which spelling ended up as the canonical userName.
+     * Prefers the canonical (derived-local-part) doc when more than one match exists — e.g.
+     * before a sync has had a chance to converge stray fragments onto it — so callers get a
+     * stable answer even mid-convergence.
+     */
+    public AgenticUsers findByAnyIdentity(String userName, String userEmail) {
+        String trimmedName = userName == null ? "" : userName.trim();
+        String trimmedEmail = userEmail == null ? "" : userEmail.trim();
+        // A caller sometimes only has one string in hand and doesn't know whether it's a username
+        // or an email (e.g. a device report using an email-shaped string as its "username" field,
+        // with no separate email available) — if no email was separately supplied but the name
+        // looks like one, use it for the email-side match too.
+        if (trimmedEmail.isEmpty() && trimmedName.contains("@")) {
+            trimmedEmail = trimmedName;
+        }
+        if (trimmedName.isEmpty() && trimmedEmail.isEmpty()) return null;
+        String derivedUsername = deriveUsernameFromEmail(trimmedEmail);
+
+        List<AgenticUsers> matches = findAllIdentityMatches(trimmedName, trimmedEmail, derivedUsername);
+        if (matches.isEmpty()) return null;
+        if (derivedUsername != null) {
+            for (AgenticUsers u : matches) {
+                if (derivedUsername.equals(u.getUserName())) return u;
+            }
+        }
+        return matches.get(0);
     }
 
     /**

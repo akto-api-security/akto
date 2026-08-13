@@ -119,8 +119,11 @@ public class OktaUserSyncCron {
 
             // syncAccountIfEnabled already confirmed isSyncGroupsToUserTags() before calling here.
             List<String> groupNames = groupNamesByUserId.getOrDefault(user.id, Collections.emptyList());
-            AgentUsersDao.instance.upsertDeviceTags(identityUserName, SYNC_SOURCE,
-                    Collections.singletonMap(GROUP_TAG_KEY, groupNames), SYNC_SOURCE);
+            Map<String, List<String>> groupTags = Collections.singletonMap(GROUP_TAG_KEY, groupNames);
+            AgentUsersDao.instance.upsertDeviceTags(identityUserName, SYNC_SOURCE, groupTags, SYNC_SOURCE);
+            if (!username.equals(identityUserName)) {
+                AgentUsersDao.instance.upsertDeviceTags(username, SYNC_SOURCE, groupTags, SYNC_SOURCE);
+            }
             syncedCount++;
         }
 

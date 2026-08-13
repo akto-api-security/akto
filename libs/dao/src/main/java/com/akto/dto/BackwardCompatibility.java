@@ -135,6 +135,9 @@ public class BackwardCompatibility {
     public static final String MIGRATE_TEAM_ROLE_TO_DEVICE_TAGS = "migrateTeamRoleToDeviceTags";
     private int migrateTeamRoleToDeviceTags;
 
+    public static final String MIGRATE_GUARDRAIL_TARGET_TEAMS_ROLES_TO_TAGS = "migrateGuardrailTargetTeamsRolesToTags";
+    private int migrateGuardrailTargetTeamsRolesToTags;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -566,5 +569,13 @@ public class BackwardCompatibility {
 
     public void setMigrateTeamRoleToDeviceTags(int migrateTeamRoleToDeviceTags) {
         this.migrateTeamRoleToDeviceTags = migrateTeamRoleToDeviceTags;
+    }
+
+    public int getMigrateGuardrailTargetTeamsRolesToTags() {
+        return migrateGuardrailTargetTeamsRolesToTags;
+    }
+
+    public void setMigrateGuardrailTargetTeamsRolesToTags(int migrateGuardrailTargetTeamsRolesToTags) {
+        this.migrateGuardrailTargetTeamsRolesToTags = migrateGuardrailTargetTeamsRolesToTags;
     }
 }

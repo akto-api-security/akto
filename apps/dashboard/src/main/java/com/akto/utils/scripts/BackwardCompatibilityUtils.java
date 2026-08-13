@@ -3,6 +3,7 @@ package com.akto.utils.scripts;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -11,6 +12,8 @@ import java.util.stream.Collectors;
 import com.akto.dao.AgentUsersDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
+import com.akto.dao.GuardrailPoliciesDao;
+import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AgenticUsers;
@@ -20,9 +23,11 @@ import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.Constants;
 import com.akto.util.Pair;
+import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import static com.akto.util.Constants.AKTO_GEN_AI_TAG;
@@ -206,6 +211,68 @@ public class BackwardCompatibilityUtils {
                     Filters.eq(AgenticUsers.USER_NAME, u.getUserName()),
                     Updates.set(AgenticUsers.DEVICE_TAGS, merged));
         }
+    }
+
+    /**
+     * One-time, idempotent conversion of guardrail_policies' old fixed targetTeams/targetRoles
+     * fields into the generic targetTags model. Raw-Document approach, same reason as
+     * migrateTeamRoleToDeviceTags: this repo's GuardrailPolicies POJO never had those fields, but
+     * documents written by the main dashboard app (which does) can still exist in the shared
+     * production collection. Run after migrateTeamRoleToDeviceTags so the "team"/"role" keys line up.
+     *
+     * Filters on legacy-field presence, not on targetTags being empty, and merges rather than
+     * overwrites — a policy already edited through the new UI before this migration runs could have
+     * targetTags set for "team"/"role" that must not be clobbered or duplicated by the stale legacy
+     * value.
+     */
+    public static void migrateGuardrailTargetTeamsRolesToTags() {
+        MongoCollection<Document> rawColl = MCollection.getMCollection(
+                GuardrailPoliciesDao.instance.getDBName(), GuardrailPoliciesDao.instance.getCollName(), Document.class);
+
+        Bson hasLegacyFields = Filters.or(
+                Filters.exists("targetTeams", true),
+                Filters.exists("targetRoles", true));
+
+        for (Document doc : rawColl.find(hasLegacyFields)) {
+            Map<String, List<String>> legacyTags = new HashMap<>();
+            addLegacyTargetTagKey(legacyTags, "team", doc.getList("targetTeams", String.class));
+            addLegacyTargetTagKey(legacyTags, "role", doc.getList("targetRoles", String.class));
+            if (legacyTags.isEmpty()) continue;
+
+            Map<String, List<String>> existingTags = parseExistingTargetTags(doc.get("targetTags", Document.class));
+            boolean changed = false;
+            for (Map.Entry<String, List<String>> entry : legacyTags.entrySet()) {
+                if (!existingTags.containsKey(entry.getKey())) {
+                    existingTags.put(entry.getKey(), entry.getValue());
+                    changed = true;
+                }
+            }
+            if (!changed) continue;
+
+            GuardrailPoliciesDao.instance.updateOne(
+                    Filters.eq(Constants.ID, doc.get(Constants.ID)),
+                    Updates.set("targetTags", existingTags));
+        }
+    }
+
+    private static Map<String, List<String>> parseExistingTargetTags(Document raw) {
+        Map<String, List<String>> tags = new LinkedHashMap<>();
+        if (raw == null) return tags;
+        for (Map.Entry<String, Object> entry : raw.entrySet()) {
+            if (entry.getValue() instanceof List) {
+                tags.put(entry.getKey(), (List<String>) entry.getValue());
+            }
+        }
+        return tags;
+    }
+
+    private static void addLegacyTargetTagKey(Map<String, List<String>> targetTags, String key, List<String> values) {
+        if (values == null || values.isEmpty()) return;
+        List<String> normalized = values.stream()
+                .filter(v -> v != null && !v.trim().isEmpty())
+                .map(v -> v.trim().toLowerCase())
+                .collect(Collectors.toList());
+        if (!normalized.isEmpty()) targetTags.put(key, normalized);
     }
 
 }
