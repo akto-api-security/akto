@@ -132,6 +132,9 @@ public class BackwardCompatibility {
     public static final String MIGRATE_ORPHAN_SKILL_COLLECTIONS = "migrateOrphanSkillCollections";
     private int migrateOrphanSkillCollections;
 
+    public static final String MIGRATE_TEAM_ROLE_TO_DEVICE_TAGS = "migrateTeamRoleToDeviceTags";
+    private int migrateTeamRoleToDeviceTags;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -555,5 +558,13 @@ public class BackwardCompatibility {
 
     public void setMigrateOrphanSkillCollections(int migrateOrphanSkillCollections) {
         this.migrateOrphanSkillCollections = migrateOrphanSkillCollections;
+    }
+
+    public int getMigrateTeamRoleToDeviceTags() {
+        return migrateTeamRoleToDeviceTags;
+    }
+
+    public void setMigrateTeamRoleToDeviceTags(int migrateTeamRoleToDeviceTags) {
+        this.migrateTeamRoleToDeviceTags = migrateTeamRoleToDeviceTags;
     }
 }
