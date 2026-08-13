@@ -2685,6 +2685,8 @@ public class InitializerListener implements ServletContextListener {
                             runInitializerFunctions();
                         }
                     }, "context-initializer-secondary");
+                    logger.warn("Started Okta user sync scheduler", LogDb.DASHBOARD);
+                    oktaUserSyncCron.setUpOktaUserSyncScheduler();
                     logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
                     setUpWebhookScheduler();
                     logger.warn("Started threat detection rolling reboot scheduler", LogDb.DASHBOARD);
@@ -2713,7 +2715,6 @@ public class InitializerListener implements ServletContextListener {
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                         syncCronInfo.setUpUpdateCronScheduler();
                         agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
-                        oktaUserSyncCron.setUpOktaUserSyncScheduler();
                         updateApiGroupsForAccounts();
                         setupAutomatedApiGroupsScheduler();
                         trimCappedCollectionsJob();
