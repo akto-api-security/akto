@@ -230,10 +230,10 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">success</param>
+                <param name="includeProperties">initialised</param>
             </result>
             <result name="ERROR" type="json">
-                <param name="includeProperties">success,actionErrors.*</param>
+                <param name="includeProperties">initialised,actionErrors.*</param>
             </result>
         </action>
 

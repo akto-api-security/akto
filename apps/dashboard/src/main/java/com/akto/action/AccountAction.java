@@ -426,10 +426,10 @@ public class AccountAction extends UserAction {
         return ERROR.toUpperCase();
     }
 
-    private boolean success;
+    private boolean initialised;
 
-    public boolean getSuccess() {
-        return success;
+    public boolean getInitialised() {
+        return initialised;
     }
 
     public String initialiseDemoCollections() {
@@ -438,11 +438,11 @@ public class AccountAction extends UserAction {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error while initialising demo collections: " + e.getMessage());
             addActionError(e.getMessage());
-            success = false;
+            initialised = false;
             return ERROR.toUpperCase();
         }
 
-        success = true;
+        initialised = true;
         return SUCCESS.toUpperCase();
     }
 
