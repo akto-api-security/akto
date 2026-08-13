@@ -15,6 +15,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.DeviceTag;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.Constants;
@@ -161,6 +162,49 @@ public class BackwardCompatibilityUtils {
             ApiCollectionsDao.instance.getMCollection().deleteMany(
                 Filters.in(Constants.ID, oldIdsToDelete)
             );
+        }
+    }
+
+    /**
+     * One-time, idempotent conversion of agent_users' old teamName/userRole fields (written by
+     * AgentUsersDao.upsertTag, the dashboard's manual-edit path) into deviceTags — the model the
+     * new Okta sync cron (upsertDeviceTags) and any tags-aware UI actually read. teamName/userRole
+     * aren't removed here, just mirrored, so this is safe to run even if some other caller still
+     * writes them. Only adds a manual tag where one isn't already present for that key, so a
+     * fresher manual edit or a synced value from another source is never clobbered or duplicated.
+     */
+    public static void migrateTeamRoleToDeviceTags() {
+        List<AgenticUsers> users = AgentUsersDao.instance.findAll(Filters.or(
+                Filters.exists(AgenticUsers.TEAM_NAME, true),
+                Filters.exists(AgenticUsers.USER_ROLE, true)));
+
+        int now = Context.now();
+        for (AgenticUsers u : users) {
+            String team = u.getTeamName();
+            String role = u.getUserRole();
+            boolean hasTeam = team != null && !team.trim().isEmpty();
+            boolean hasRole = role != null && !role.trim().isEmpty();
+            if (!hasTeam && !hasRole) continue;
+
+            List<DeviceTag> existing = u.getDeviceTags() != null ? u.getDeviceTags() : new ArrayList<>();
+            boolean hasManualTeamTag = existing.stream().anyMatch(t -> "team".equals(t.getKey()) && DeviceTag.SOURCE_MANUAL.equals(t.getSource()));
+            boolean hasManualRoleTag = existing.stream().anyMatch(t -> "role".equals(t.getKey()) && DeviceTag.SOURCE_MANUAL.equals(t.getSource()));
+
+            List<DeviceTag> merged = new ArrayList<>(existing);
+            boolean changed = false;
+            if (hasTeam && !hasManualTeamTag) {
+                merged.add(new DeviceTag("team", team.trim().toLowerCase(), DeviceTag.SOURCE_MANUAL, now, "migration"));
+                changed = true;
+            }
+            if (hasRole && !hasManualRoleTag) {
+                merged.add(new DeviceTag("role", role.trim().toLowerCase(), DeviceTag.SOURCE_MANUAL, now, "migration"));
+                changed = true;
+            }
+            if (!changed) continue;
+
+            AgentUsersDao.instance.updateOne(
+                    Filters.eq(AgenticUsers.USER_NAME, u.getUserName()),
+                    Updates.set(AgenticUsers.DEVICE_TAGS, merged));
         }
     }
 

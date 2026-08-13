@@ -2679,14 +2679,15 @@ public class InitializerListener implements ServletContextListener {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
 
+                    logger.warn("Started Okta user sync scheduler", LogDb.DASHBOARD);
+                    oktaUserSyncCron.setUpOktaUserSyncScheduler();
+
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
                         public void accept(Account account) {
                             runInitializerFunctions();
                         }
                     }, "context-initializer-secondary");
-                    logger.warn("Started Okta user sync scheduler", LogDb.DASHBOARD);
-                    oktaUserSyncCron.setUpOktaUserSyncScheduler();
                     logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
                     setUpWebhookScheduler();
                     logger.warn("Started threat detection rolling reboot scheduler", LogDb.DASHBOARD);
@@ -3662,6 +3663,24 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    // Individually try/catch'd and called first in setBackwardCompatibilities — that method has no
+    // per-call isolation, so an unrelated hook throwing further down would otherwise silently
+    // prevent every hook after it (including this one) from ever running, with no
+    // migration-specific error logged anywhere.
+    private static void safeMigrateTeamRoleToDeviceTags(BackwardCompatibility backwardCompatibility){
+        try {
+            if(backwardCompatibility.getMigrateTeamRoleToDeviceTags() == 0){
+                BackwardCompatibilityUtils.migrateTeamRoleToDeviceTags();
+                BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.MIGRATE_TEAM_ROLE_TO_DEVICE_TAGS, Context.now())
+                );
+            }
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "error in migrateTeamRoleToDeviceTags: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
 
     private static void removeRagDatabaseTag(BackwardCompatibility backwardCompatibility) {
         int accountId = Context.accountId.get();
@@ -3698,13 +3717,15 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
+        safeMigrateTeamRoleToDeviceTags(backwardCompatibility);
+
         if (DashboardMode.isMetered()) {
             try {
                 setOrganizationsInBilling(backwardCompatibility);
             } catch (Exception e) {
                 e.printStackTrace();
             }
-            
+
         }
         removeRagDatabaseTag(backwardCompatibility);
         setAktoDefaultNewUI(backwardCompatibility);
