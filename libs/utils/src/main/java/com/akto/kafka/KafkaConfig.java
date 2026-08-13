@@ -269,6 +269,13 @@ public class KafkaConfig {
 
         return kafkaProps;
     }
+    
+    public static boolean applyAuthenticationPropertiesFromEnv(Properties properties) {
+        if (!isKafkaAuthenticationEnabled()) {
+            return true;
+        }
+        return addValidatedAuthenticationProperties(properties, getKafkaUsername(), getKafkaPassword());
+    }
 
     public static String getTopicName() {
         String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
