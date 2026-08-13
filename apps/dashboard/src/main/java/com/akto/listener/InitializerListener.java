@@ -3668,16 +3668,42 @@ public class InitializerListener implements ServletContextListener {
     // prevent every hook after it (including this one) from ever running, with no
     // migration-specific error logged anywhere.
     private static void safeMigrateTeamRoleToDeviceTags(BackwardCompatibility backwardCompatibility){
+        int accountId = Context.accountId.get();
         try {
             if(backwardCompatibility.getMigrateTeamRoleToDeviceTags() == 0){
+                logger.infoAndAddToDb("migrateTeamRoleToDeviceTags: starting migration for accountId=" + accountId, LogDb.DASHBOARD);
                 BackwardCompatibilityUtils.migrateTeamRoleToDeviceTags();
                 BackwardCompatibilityDao.instance.updateOne(
                     Filters.eq("_id", backwardCompatibility.getId()),
                     Updates.set(BackwardCompatibility.MIGRATE_TEAM_ROLE_TO_DEVICE_TAGS, Context.now())
                 );
+                logger.infoAndAddToDb("migrateTeamRoleToDeviceTags: migration complete for accountId=" + accountId, LogDb.DASHBOARD);
+            } else {
+                logger.infoAndAddToDb("migrateTeamRoleToDeviceTags: already executed, skipping for accountId=" + accountId, LogDb.DASHBOARD);
             }
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "error in migrateTeamRoleToDeviceTags: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
+    // Individually try/catch'd for the same reason as safeMigrateTeamRoleToDeviceTags above. Run
+    // after it so the "team"/"role" keys line up.
+    private static void safeMigrateGuardrailTargetTeamsRolesToTags(BackwardCompatibility backwardCompatibility){
+        int accountId = Context.accountId.get();
+        try {
+            if(backwardCompatibility.getMigrateGuardrailTargetTeamsRolesToTags() == 0){
+                logger.infoAndAddToDb("migrateGuardrailTargetTeamsRolesToTags: starting migration for accountId=" + accountId, LogDb.DASHBOARD);
+                BackwardCompatibilityUtils.migrateGuardrailTargetTeamsRolesToTags();
+                BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.MIGRATE_GUARDRAIL_TARGET_TEAMS_ROLES_TO_TAGS, Context.now())
+                );
+                logger.infoAndAddToDb("migrateGuardrailTargetTeamsRolesToTags: migration complete for accountId=" + accountId, LogDb.DASHBOARD);
+            } else {
+                logger.infoAndAddToDb("migrateGuardrailTargetTeamsRolesToTags: already executed, skipping for accountId=" + accountId, LogDb.DASHBOARD);
+            }
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "error in migrateGuardrailTargetTeamsRolesToTags: " + e.getMessage(), LogDb.DASHBOARD);
         }
     }
 
@@ -3707,17 +3733,23 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static void migrateOrphanSkillCollections(BackwardCompatibility backwardCompatibility){
+        int accountId = Context.accountId.get();
         if(backwardCompatibility.getMigrateOrphanSkillCollections() == 0){
+            logger.infoAndAddToDb("migrateOrphanSkillCollections: starting migration for accountId=" + accountId, LogDb.DASHBOARD);
             BackwardCompatibilityUtils.migrateOrphanSkillCollections();
             BackwardCompatibilityDao.instance.updateOne(
                 Filters.eq("_id", backwardCompatibility.getId()),
                 Updates.set(BackwardCompatibility.MIGRATE_ORPHAN_SKILL_COLLECTIONS, Context.now())
             );
+            logger.infoAndAddToDb("migrateOrphanSkillCollections: migration complete for accountId=" + accountId, LogDb.DASHBOARD);
+        } else {
+            logger.infoAndAddToDb("migrateOrphanSkillCollections: already executed, skipping for accountId=" + accountId, LogDb.DASHBOARD);
         }
     }
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         safeMigrateTeamRoleToDeviceTags(backwardCompatibility);
+        safeMigrateGuardrailTargetTeamsRolesToTags(backwardCompatibility);
 
         if (DashboardMode.isMetered()) {
             try {
