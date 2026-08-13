@@ -22,6 +22,7 @@ import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
+import com.akto.metrics.AllMetrics;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.execution.Executor;
 import com.akto.testing.TestExecutor;
@@ -65,11 +66,13 @@ public class Producer {
 
             // Check if producer is ready before sending
             if (producer == null) {
+                AllMetrics.instance.setTestingKafkaSendFailureCount(1);
                 loggerMaker.infoAndAddToDb("Kafka producer is null! Cannot send message. Triggering fallback mode.");
                 throw new Exception("Kafka producer is null - fallback to legacy testing required");
             }
 
             if (!producer.producerReady) {
+                AllMetrics.instance.setTestingKafkaSendFailureCount(1);
                 loggerMaker.infoAndAddToDb("Kafka producer not ready! Cannot send message. Triggering fallback mode.");
                 throw new Exception("Kafka producer not ready - fallback to legacy testing required");
             }

@@ -1001,6 +1001,18 @@ public class TestExecutor {
         }
     }
 
+    private void recordTestExecutionMetrics(List<TestResult> testResults) {
+        AllMetrics.instance.setTestingTestsExecutedCount(1);
+        for (TestResult testResult : testResults) {
+            List<String> errors = testResult.getErrors();
+            if (errors == null || errors.isEmpty()) {
+                AllMetrics.instance.setTestingApiHitSuccessCount(1);
+            } else if (TestResult.isApiCallFailure(errors)) {
+                AllMetrics.instance.setTestingApiHitFailureCount(1);
+            }
+        }
+    }
+
     public void insertResultsAndMakeIssues(List<TestingRunResult> testingRunResults, ObjectId testRunResultSummaryId) {
         int resultSize = testingRunResults.size();
         if (resultSize > 0) {
@@ -1027,6 +1039,7 @@ public class TestExecutor {
                     list.add((TestResult) testResult);
                 }
                 trr.setSingleTestResults(list);
+                recordTestExecutionMetrics(list);
             } else {
                 List<MultiExecTestResult> list = new ArrayList<>();
                 for(GenericTestResult testResult: trr.getTestResults()){

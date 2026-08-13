@@ -33,6 +33,7 @@ import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
 import com.akto.util.Constants;
@@ -317,6 +318,7 @@ public class ConsumerUtil {
                 }
 
                 long workRemaining = parallelConsumer.workRemaining();
+                AllMetrics.instance.setTestingKafkaQueuePending(workRemaining);
                 long nowMs = System.currentTimeMillis();
                 int polled = polledRecords.get();
                 // Periodic progress only when counts moved (avoids duplicate spam while idle)

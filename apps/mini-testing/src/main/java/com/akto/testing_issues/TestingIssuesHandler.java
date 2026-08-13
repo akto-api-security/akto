@@ -11,6 +11,7 @@ import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.util.enums.GlobalEnums;
@@ -208,6 +209,11 @@ public class TestingIssuesHandler {
             dataActor.updateIssueCountInSummary(summaryId.toHexString(), countIssuesMap, "increment");
             loggerMaker.infoAndAddToDb(String.format("Increasing the issues count map with summary id %s , HIGH: %d, MEDIUM: %d, LOW: %d", summaryId.toHexString(),countIssuesMap.get("HIGH"), countIssuesMap.get("MEDIUM"), countIssuesMap.get("LOW")), LogDb.TESTING);
         }
+
+        AllMetrics.instance.setTestingIssuesCreatedCriticalCount(countIssuesMap.getOrDefault(Severity.CRITICAL.toString(), 0));
+        AllMetrics.instance.setTestingIssuesCreatedHighCount(countIssuesMap.getOrDefault(Severity.HIGH.toString(), 0));
+        AllMetrics.instance.setTestingIssuesCreatedMediumCount(countIssuesMap.getOrDefault(Severity.MEDIUM.toString(), 0));
+        AllMetrics.instance.setTestingIssuesCreatedLowCount(countIssuesMap.getOrDefault(Severity.LOW.toString(), 0));
     }
 
     public void handleIssuesCreationFromTestingRunResults(List<TestingRunResult> testingRunResultList, boolean triggeredByTestEditor) {
