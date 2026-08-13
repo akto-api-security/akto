@@ -19,12 +19,13 @@ import {
     getClientTagVariants,
     resolveClientKey,
 } from "./mcpClientHelper";
-export { CLIENT_TAG_ALIASES, getClientTagVariants, resolveClientKey };
 import func from "@/util/func";
 import {
     getResolvedUsernameForCollection,
     DEFAULT_VALUE,
 } from "../api_collections/endpointShieldHelper";
+
+export { CLIENT_TAG_ALIASES, getClientTagVariants, resolveClientKey };
 
 // Table constants
 export const PAGE_LIMIT = 100;
@@ -107,28 +108,18 @@ export const getHeaders = (options = {}) => {
             mergeType: (a, b) => Math.max(a || 0, b || 0),
             shouldMerge: true
         },
-        ...(includeUserColumns ? [
-            {
-                title: "Team",
-                text: "Team",
-                value: "team",
-                filterKey: "team",
-                textValue: "team",
-                isText: CellType.TEXT,
-                showFilter: true,
-                boxWidth: "120px",
-            },
-            {
-                title: "User role",
-                text: "User role",
-                value: "userRole",
-                filterKey: "userRole",
-                textValue: "userRole",
-                isText: CellType.TEXT,
-                showFilter: true,
-                boxWidth: "120px",
-            },
-        ] : []),
+        // Single compact column for all device tags (group, role, team, department, ...)
+        // instead of one column per key — value is prebuilt badge JSX (see
+        // UsersAndDevices.jsx buildTagsDisplay), same idiom as riskScoreComp/sensitiveSubTypes.
+        // Filterable on the raw "key=value" strings (tagFilterValues), not the display JSX.
+        ...(includeUserColumns ? [{
+            title: "Tags",
+            text: "Tags",
+            value: "tagsDisplay",
+            filterKey: "tagFilterValues",
+            showFilter: true,
+            boxWidth: "220px",
+        }] : []),
     ];
     if (!includeIconColumn) {
         return headers.filter((h) => h.value !== "iconComp");
@@ -593,6 +584,14 @@ const accumulateHostGroupedCollection = (group, c, trafficMap, sensitiveMap, ris
     }
 };
 
+// Filterable keys for a device-tag list — filtering is by tag key only ("group" matches
+// any device with a group tag, regardless of value).
+export const buildTagFilterValues = (tags) => {
+    const keys = new Set();
+    (tags || []).forEach((t) => { if (t?.key) keys.add(t.key); });
+    return Array.from(keys);
+};
+
 const finalizeHostGroupedRow = (g, idSegment) => {
     const clientTypeStr = g.clientTypes.size > 0 ? [...g.clientTypes].sort().join(", ") : "-";
     return {
@@ -611,13 +610,11 @@ const finalizeHostGroupedRow = (g, idSegment) => {
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore,
-        team: g.team || '',
-        userRole: g.userRole || '',
         hasPersonalAccount: g.hasPersonalAccount || false,
         hasLocalMcpServer: g.hasLocalMcpServer || false,
         hasMisconfiguredConfig: g.hasMisconfiguredConfig || false,
-        teamSource: g.teamSource || 'sso',
-        roleSource: g.roleSource || 'sso',
+        tags: g.tags || [],
+        tagFilterValues: buildTagFilterValues(g.tags),
     };
 };
 
@@ -685,10 +682,7 @@ export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMa
                 maxRiskScore: 0,
                 uniqueSkillNames: new Set(),
                 nonSkillCollectionsCount: 0,
-                team: meta.team || '',
-                userRole: meta.userRole || '',
-                teamSource: meta.teamSource || 'sso',
-                roleSource: meta.roleSource || 'sso',
+                tags: meta.tags || [],
             };
         }
         const g = users[username];
@@ -763,28 +757,6 @@ function violationsForCollections(collectionIds, violationsByCollectionId) {
     return total > 0 ? merged : null;
 }
 
-// Collections belong to several overlapping groups at once (a collection with N skill tags is a
-// member of N skill groups, plus its owning service/agent/llm group), so buildAgenticAssetsPageData
-// processes the same collection many more times than there are collections. deviceId/serviceName/
-// resolvedUsername only depend on the collection itself, not on which group is asking — precomputing
-// them once per collection (see precomputeCollectionInfo) and passing the lookup map in here turns
-// that repeated per-membership cost back into a per-collection one.
-function buildTeamGroupsForAsset(group, userMetadataMap, collectionInfoMap) {
-    const teamCounts = {};
-    const seenDevices = new Set();
-    (group.collections || []).forEach((c) => {
-        const info = collectionInfoMap.get(c.id);
-        if (!info?.deviceId || seenDevices.has(info.deviceId)) return;
-        seenDevices.add(info.deviceId);
-        const username = info.resolvedUsername;
-        if (!username || username === DEFAULT_VALUE) return;
-        const team = userMetadataMap[username]?.team;
-        if (!team) return;
-        teamCounts[team] = (teamCounts[team] || 0) + 1;
-    });
-    return Object.entries(teamCounts).map(([name, count]) => ({ name, count }));
-}
-
 function finalizeDevices(byDevice) {
     // round to 1 dp and null out zero scores (no data)
     return [...byDevice.values()].map(d => ({
@@ -796,7 +768,7 @@ function finalizeDevices(byDevice) {
 }
 
 // One pass over every collection (not every group-membership) to compute the per-collection values
-// buildTeamGroupsForAsset/buildDevicesForGroup need — see the comment above buildTeamGroupsForAsset.
+// buildDevicesForGroup needs, turning a repeated per-membership cost into a per-collection one.
 function precomputeCollectionInfo(collections, usernameMap) {
     const map = new Map();
     collections.forEach((c) => {
@@ -878,28 +850,12 @@ export function getRowViolations(collectionIds, violationsByCollectionId) {
     return violationsForCollections(collectionIds, violationsByCollectionId);
 }
 
-// Team breakdown for a server-computed row's device list. Deliberately lighter than
-// buildTeamGroupsForAsset (used by the legacy/agent-group client pipeline): the server's `devices`
-// list only carries deviceId (not full collection objects), so username resolution here uses only
-// the Endpoint Shield deviceId-keyed lookup tier, not the displayName/name-based fallback tiers
-// getResolvedUsernameForCollection also tries. Documented tradeoff, not an oversight.
-export function buildTeamGroupsFromDevices(devices, usernameMap, userMetadataMap) {
-    const teamCounts = {};
-    (devices || []).forEach((d) => {
-        const key = `__deviceId__${String(d.deviceId).toLowerCase()}`;
-        const username = usernameMap?.[key];
-        if (!username || username === DEFAULT_VALUE) return;
-        const team = userMetadataMap[username]?.team;
-        if (!team) return;
-        teamCounts[team] = (teamCounts[team] || 0) + 1;
-    });
-    return Object.entries(teamCounts).map(([name, count]) => ({ name, count }));
-}
-
 // Fills in the two display fields the flyout's Devices tab (AgenticAssetFlyout.jsx's DevicesTab,
 // unchanged since master) reads straight off each device row — username and a formatted lastSeen
-// string — which AgenticObserveAction.buildDevicesForGroup/DeviceAcc don't send back, same
-// deviceId-keyed lookup tier tradeoff as buildTeamGroupsFromDevices above.
+// string — which AgenticObserveAction.buildDevicesForGroup/DeviceAcc don't send back. The server's
+// `devices` list only carries deviceId (not full collection objects), so username resolution here
+// uses only the Endpoint Shield deviceId-keyed lookup tier, not the displayName/name-based fallback
+// tiers getResolvedUsernameForCollection also tries. Documented tradeoff, not an oversight.
 export function enrichDevicesWithUsername(devices, usernameMap) {
     return (devices || []).map((d) => {
         const key = `__deviceId__${String(d.deviceId).toLowerCase()}`;
@@ -914,7 +870,7 @@ export function enrichDevicesWithUsername(devices, usernameMap) {
 }
 
 // AI-interaction tally for a server-computed row's device list — same tradeoff as
-// buildTeamGroupsFromDevices: only the Endpoint Shield deviceId mapping (the primary,
+// enrichDevicesWithUsername above: only the Endpoint Shield deviceId mapping (the primary,
 // highest-coverage match tier), not the hostname-parts-based fallback tiers
 // analysisKeysForCollection also tries, which need per-collection hostnames the server doesn't send
 // back for these rows.
@@ -1076,7 +1032,7 @@ export async function buildAgenticAssetsPageData(
     const agenticFlatData = [];
     const assetDevices = {};
 
-    // buildGroupAggregates/buildTeamGroupsForAsset touch every (collection, group-membership) pair —
+    // buildGroupAggregates touches every (collection, group-membership) pair —
     // at real scale that's ~1.5-2M pairs, tens of seconds of synchronous work (see the comment on
     // buildGroupAggregates). Running the whole loop in one synchronous stretch blocks the main thread
     // solid for that entire time — the page looks and IS frozen. Yielding via a zero-delay setTimeout
@@ -1096,22 +1052,21 @@ export async function buildAgenticAssetsPageData(
         const group = allGroups[__i];
         const collectionIds = (group.collections || []).map((c) => c.id);
         const cachedPerGroup = reuse ? groupsCache.perGroup.get(group.id) : null;
-        let violations, groups;
+        let violations;
         if (cachedPerGroup) {
-            ({ violations, teamGroups: groups } = cachedPerGroup);
+            ({ violations } = cachedPerGroup);
         } else {
             // Skills are capability manifest entries — violations belong to the agent/service
             // collection that declares them, not to the skill itself. Suppress to avoid
             // double-counting.
             violations = violationsForCollections(collectionIds, violationsByCollectionId);
-            groups = buildTeamGroupsForAsset(group, userMetadataMap, collectionInfoMap);
         }
         const { devices, skillNames, aiInteractions } = buildGroupAggregates(
             group, riskScoreMap, trafficMap, collectionInfoMap, analysisByKey, userAnalysisKeysByDeviceId,
             cachedPerGroup ? { devices: cachedPerGroup.devices, skillNames: cachedPerGroup.skillNames } : null,
         );
         if (groupsCache && !reuse) {
-            groupsCache.perGroup.set(group.id, { violations, teamGroups: groups, devices, skillNames });
+            groupsCache.perGroup.set(group.id, { violations, devices, skillNames });
         }
         const riskScore = group.riskScore ?? group.maxRiskScore ?? null;
         const lastSeen = group.detectedTimestamp || 0;
@@ -1140,7 +1095,6 @@ export async function buildAgenticAssetsPageData(
             };
         }
         if (violations) treeRow.violations = violations;
-        if (groups.length) treeRow.groups = groups;
         if (skillNames.size) treeRow.skillCount = skillNames.size;
 
         const flatRow = {
@@ -1162,7 +1116,6 @@ export async function buildAgenticAssetsPageData(
             hasMisconfiguredConfig: group.hasMisconfiguredConfig || false,
         };
         if (violations) flatRow.violations = violations;
-        if (groups.length) flatRow.groups = groups;
         if (aiInteractions) {
             flatRow.aiInteractions = aiInteractions.total;
             flatRow.aiInteractionsDetail = {

@@ -359,39 +359,38 @@ export default {
     },
     // Paginated, sorted, searchable user/device rows for Users-and-Devices / Endpoints — same
     // lightweight-summary-first-then-slice shape as fetchAgenticAssetsSummary. groupBy: "user"|"device".
-    async fetchUsersAndDevicesSummary({ groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap } = {}) {
+    async fetchUsersAndDevicesSummary({ groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap, tagsByUsername } = {}) {
         const resp = await request({
             url: '/api/fetchUsersAndDevicesSummary',
             method: 'post',
-            data: { groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap },
+            data: { groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap, tagsByUsername },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0 }
     },
     // Tab-header counts ("Users (N)" / "Devices (N)") for Users-and-Devices / Endpoints, each tab's
-    // "Agentic assets" total, plus distinct team/role names for the "Edit team & role" modal's autocomplete.
-    async fetchUsersAndDevicesStats({ trafficMap, riskScoreMap, usernameMap, userMetadataMap } = {}) {
+    // "Agentic assets" total, plus distinct device-tag keys for the Tags filter/"Edit device tags" modal.
+    async fetchUsersAndDevicesStats({ trafficMap, riskScoreMap, usernameMap, userMetadataMap, tagsByUsername } = {}) {
         const resp = await request({
             url: '/api/fetchUsersAndDevicesStats',
             method: 'post',
-            data: { trafficMap, riskScoreMap, usernameMap, userMetadataMap },
+            data: { trafficMap, riskScoreMap, usernameMap, userMetadataMap, tagsByUsername },
         })
         return {
             usersCount: resp?.usersCount || 0,
             devicesCount: resp?.devicesCount || 0,
             usersAgenticAssetsTotal: resp?.usersAgenticAssetsTotal || 0,
             devicesAgenticAssetsTotal: resp?.devicesAgenticAssetsTotal || 0,
-            teams: resp?.teams || [],
-            roles: resp?.roles || [],
             usernames: resp?.usernames || [],
+            tagKeys: resp?.tagKeys || [],
         }
     },
     // Paginated top-level device rows for Endpoints' tree grid, or (when parentDeviceId is set) one
     // device's (device,service) children — see AgenticObserveAction.fetchDeviceEndpointsSummary.
-    async fetchDeviceEndpointsSummary({ parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters } = {}) {
+    async fetchDeviceEndpointsSummary({ parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters, tagsByUsername } = {}) {
         const resp = await request({
             url: '/api/fetchDeviceEndpointsSummary',
             method: 'post',
-            data: { parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters },
+            data: { parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters, tagsByUsername },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0 }
     },

@@ -417,6 +417,15 @@ public abstract class Config {
         private String managementApiToken;
         /** Okta group name → Akto user role. Stored in Mongo as {@code oktaGroupToAktoUserRoleMap}. */
         private Map<String, String> oktaGroupToAktoUserRoleMap;
+        /**
+         * Master on/off switch for the periodic org-wide cron that syncs Okta groups into
+         * AgenticUsers as a "group" device tag for every org user, not just people who log in.
+         * Requires {@link #managementApiToken} — the cron has no login session to read a JWT
+         * groups claim from, so the Management API is the only way it can enumerate users/groups.
+         * Defaults to false; the dashboard UI keeps this disabled until a token is saved.
+         */
+        public static final String SYNC_GROUPS_TO_USER_TAGS = "syncGroupsToUserTags";
+        private boolean syncGroupsToUserTags = false;
 
         public static final String CONFIG_ID = ConfigType.OKTA.name() + CONFIG_SALT;
 
@@ -505,6 +514,13 @@ public abstract class Config {
         }
         public void setOktaGroupToAktoUserRoleMap(Map<String, String> oktaGroupToAktoUserRoleMap) {
             this.oktaGroupToAktoUserRoleMap = oktaGroupToAktoUserRoleMap;
+        }
+
+        public boolean isSyncGroupsToUserTags() {
+            return syncGroupsToUserTags;
+        }
+        public void setSyncGroupsToUserTags(boolean syncGroupsToUserTags) {
+            this.syncGroupsToUserTags = syncGroupsToUserTags;
         }
     }
 

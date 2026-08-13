@@ -108,9 +108,12 @@ let _shieldMetaCache = { ts: 0, data: null };
 let _shieldMetaInflight = null;
 const SHIELD_META_TTL_MS = 3000;
 
-const fetchEndpointShieldUserMetadata = async () => {
+// force=true bypasses the TTL cache (but still joins an in-flight fetch rather than firing a
+// second one) — used right after writing a device tag, where the caller needs the just-saved
+// value back immediately rather than whatever was cached before the write.
+const fetchEndpointShieldUserMetadata = async (force = false) => {
     const now = Date.now();
-    if (_shieldMetaCache.data && now - _shieldMetaCache.ts <= SHIELD_META_TTL_MS) return _shieldMetaCache.data;
+    if (!force && _shieldMetaCache.data && now - _shieldMetaCache.ts <= SHIELD_META_TTL_MS) return _shieldMetaCache.data;
     if (_shieldMetaInflight) return _shieldMetaInflight;
 
     _shieldMetaInflight = (async () => {
@@ -124,16 +127,15 @@ const fetchEndpointShieldUserMetadata = async () => {
             const usernameMap = buildUsernameMapFromModuleInfos(moduleInfos);
             const userAnalysisKeysByDeviceId = buildUserAnalysisKeysByDeviceId(moduleInfos);
 
+            // Generic key-value device tags (team/role/department/arbitrary Okta groups, ...)
+            // replace the old dedicated teamName/userRole/teamSource/roleSource fields.
             const userMetadataMap = {};
             const agenticUsers = agenticUsersResp?.agenticUsers || [];
             agenticUsers.forEach((u) => {
                 if (!u?.userName) return;
                 userMetadataMap[u.userName] = {
-                    team: u.teamName || '',
-                    userRole: u.userRole || '',
                     userEmail: u.userEmail || '',
-                    teamSource: u.teamSource || 'sso',
-                    roleSource: u.roleSource || 'sso',
+                    tags: u.deviceTags || [],
                 };
             });
 

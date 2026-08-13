@@ -5,6 +5,7 @@ import com.akto.dao.AgentUsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AgenticUsers;
+import com.akto.dto.DeviceTag;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.akto.dto.monitoring.ModuleInfoConstants;
@@ -19,9 +20,11 @@ import lombok.Setter;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 public class ModuleInfoAction extends UserAction {
@@ -49,10 +52,7 @@ public class ModuleInfoAction extends UserAction {
     private List<String> usernames;
     @Getter
     @Setter
-    private String team;
-    @Getter
-    @Setter
-    private String userRole;
+    private Map<String, List<String>> tags;
     @Getter
     @Setter
     private String userEmail;
@@ -428,7 +428,9 @@ public class ModuleInfoAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        AgentUsersDao.instance.upsertTagFromDashboard(username, userEmail, team, userRole, getSUser().getLogin());
+        String identityUserName = AgentUsersDao.instance.ensureDashboardIdentity(username, userEmail, getSUser().getLogin());
+        AgentUsersDao.instance.mergeDeviceTags(identityUserName, DeviceTag.SOURCE_MANUAL,
+                tags != null ? tags : Collections.emptyMap(), getSUser().getLogin());
         return SUCCESS.toUpperCase();
     }
 
@@ -439,23 +441,32 @@ public class ModuleInfoAction extends UserAction {
         }
 
         String updatedBy = getSUser().getLogin();
+        Map<String, List<String>> tagsToApply = tags != null ? tags : Collections.emptyMap();
         for (String u : usernames) {
-            AgentUsersDao.instance.upsertTagFromDashboard(u, null, team, userRole, updatedBy);
+            String identityUserName = AgentUsersDao.instance.ensureDashboardIdentity(u, null, updatedBy);
+            AgentUsersDao.instance.mergeDeviceTags(identityUserName, DeviceTag.SOURCE_MANUAL, tagsToApply, updatedBy);
         }
         return SUCCESS.toUpperCase();
     }
 
     public String fetchAgenticUsers() {
         agenticUsers = AgentUsersDao.instance.findAll(Filters.empty());
-        // Overwrite teamName/userRole with SSO values for users not manually pinned,
-        // so callers always see a single consistent effective field.
+
+        // AgenticUsers.devices is only ever backfilled once by a startup migration and never
+        // kept in sync afterwards — overwrite with live devices from module_info (updated every
+        // heartbeat) instead of trusting the stored field.
+        Map<String, Set<String>> liveDevicesByUsername = ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield();
         for (AgenticUsers u : agenticUsers) {
-            if (!AgenticUsers.SOURCE_MANUAL.equals(u.getTeamSource()) && u.getSsoTeamName() != null) {
-                u.setTeamName(u.getSsoTeamName());
-            }
-            if (!AgenticUsers.SOURCE_MANUAL.equals(u.getRoleSource()) && u.getSsoUserRole() != null) {
-                u.setUserRole(u.getSsoUserRole());
-            }
+            Set<String> liveDevices = liveDevicesByUsername.remove(u.getUserName());
+            u.setDevices(liveDevices != null ? new ArrayList<>(liveDevices) : new ArrayList<>());
+        }
+        // Any username reporting devices but with no team/role ever assigned has no AgenticUsers
+        // doc yet — synthesize a lightweight entry so it still shows up as filterable/previewable.
+        for (Map.Entry<String, Set<String>> entry : liveDevicesByUsername.entrySet()) {
+            AgenticUsers synthetic = new AgenticUsers();
+            synthetic.setUserName(entry.getKey());
+            synthetic.setDevices(new ArrayList<>(entry.getValue()));
+            agenticUsers.add(synthetic);
         }
         return SUCCESS.toUpperCase();
     }
