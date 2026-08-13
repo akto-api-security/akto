@@ -124,16 +124,15 @@ const fetchEndpointShieldUserMetadata = async () => {
             const usernameMap = buildUsernameMapFromModuleInfos(moduleInfos);
             const userAnalysisKeysByDeviceId = buildUserAnalysisKeysByDeviceId(moduleInfos);
 
+            // Generic key-value device tags (team/role/department/arbitrary Okta groups, ...)
+            // replace the old dedicated teamName/userRole/teamSource/roleSource fields.
             const userMetadataMap = {};
             const agenticUsers = agenticUsersResp?.agenticUsers || [];
             agenticUsers.forEach((u) => {
                 if (!u?.userName) return;
                 userMetadataMap[u.userName] = {
-                    team: u.teamName || '',
-                    userRole: u.userRole || '',
                     userEmail: u.userEmail || '',
-                    teamSource: u.teamSource || 'sso',
-                    roleSource: u.roleSource || 'sso',
+                    tags: u.deviceTags || [],
                 };
             });
 

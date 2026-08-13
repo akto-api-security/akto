@@ -19,7 +19,6 @@ import {
   RiskScoreCellRenderer,
   ViolationsCellRenderer,
   InteractionsCellRenderer,
-  GroupCellRenderer,
 } from "./AgenticCellRenderers";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import "../../../components/layouts/style.css";
@@ -118,16 +117,6 @@ const COL_DEFS = [
     sortable: false,
     filter: false,
     cellRenderer: ViolationsCellRenderer,
-    cellStyle: { display: "flex", alignItems: "center" },
-  },
-  {
-    field: "groups",
-    headerName: "Group",
-    flex: 1,
-    minWidth: 160,
-    sortable: false,
-    filter: false,
-    cellRenderer: GroupCellRenderer,
     cellStyle: { display: "flex", alignItems: "center" },
   },
   {

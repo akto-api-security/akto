@@ -351,13 +351,16 @@ export function buildModuleDeviceMap(moduleInfos = []) {
         const ad = module.additionalData || {};
         map[module.name] = {
             username: ad.username || ad.userName || ad.user || ad.email || "-",
-            team: ad.team || "",
-            role: ad.userRole || "",
             os: ad.os || null,
             browserName: ad.browserName || null,
         };
     });
     return map;
+}
+
+function tagsForUsername(username, userMetadataMap) {
+    if (!username || username === "-") return [];
+    return userMetadataMap[username]?.tags || [];
 }
 
 /**
@@ -499,7 +502,7 @@ export function buildDeviceEndpointsPageData(
     collections,
     trafficMap = {},
     riskScoreMap = {},
-    { moduleInfos = [], usernameMap = {}, violationsByCollectionId = {}, violationRows = [], startTimestamp = 0, endTimestamp = 0 } = {},
+    { moduleInfos = [], usernameMap = {}, userMetadataMap = {}, violationsByCollectionId = {}, violationRows = [], startTimestamp = 0, endTimestamp = 0 } = {},
 ) {
     const agenticCollections = collections.filter((c) => !c.deactivated);
     const deviceModules = buildModuleDeviceMap(moduleInfos);
@@ -530,8 +533,7 @@ export function buildDeviceEndpointsPageData(
                 // Reported directly by the browser extension itself (module_info.additionalData.browserName).
                 browserName: mod.browserName || null,
                 username,
-                team: mod.team || "",
-                role: mod.role || "",
+                tags: tagsForUsername(username, userMetadataMap),
                 maxRisk: 0,
                 maxTraffic: 0,
                 hasPersonalAccount: false,
@@ -589,8 +591,6 @@ export function buildDeviceEndpointsPageData(
             const mod = deviceModules[devId];
             const device = deviceMap[devId];
             if (!device.os) device.os = mod.os || null;
-            if (!device.team) device.team = mod.team || "";
-            if (!device.role) device.role = mod.role || "";
         }
     });
 
@@ -607,8 +607,7 @@ export function buildDeviceEndpointsPageData(
             userCount: 1,
             riskScore: Math.round(device.maxRisk * 10) / 10,
             username: device.username,
-            group: device.team,
-            role: device.role,
+            tags: device.tags,
             violations: { ...device.violations },
             lastTraffic: device.maxTraffic > 0 ? func.prettifyEpoch(device.maxTraffic) : "-",
             lastTrafficEpoch: device.maxTraffic || 0,

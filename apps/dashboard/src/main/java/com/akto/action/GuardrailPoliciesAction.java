@@ -103,17 +103,18 @@ public class GuardrailPoliciesAction extends UserAction {
             this.guardrailPolicies = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(skip, limit);
             this.total = GuardrailPoliciesDao.instance.getTotalCount();
 
-            // Resolve targetTeams/targetRoles → device IDs fresh on every fetch.
+            // Resolve targetTags/targetDeviceIds → device IDs fresh on every fetch.
             // applyToDeviceIds left null (never set below) = no targeting configured → apply to all devices.
             // applyToDeviceIds set to a List (possibly empty, when targeting matches zero devices)
             // = targeting configured → apply only to the listed device labels; empty means apply to none.
             // null vs. an empty List must stay distinguishable on the wire — do not collapse them.
             for (GuardrailPolicies p : this.guardrailPolicies) {
-                boolean hasTargeting = (p.getTargetTeams() != null && !p.getTargetTeams().isEmpty())
-                        || (p.getTargetRoles() != null && !p.getTargetRoles().isEmpty());
+                boolean hasTagTargeting = p.getTargetTags() != null && !p.getTargetTags().isEmpty();
+                boolean hasTargeting = hasTagTargeting
+                        || (p.getTargetDeviceIds() != null && !p.getTargetDeviceIds().isEmpty());
                 if (hasTargeting) {
-                    p.setApplyToDeviceIds(AgentUsersDao.instance.findDeviceIdsByTeamsAndRoles(
-                            p.getTargetTeams(), p.getTargetRoles()));
+                    p.setApplyToDeviceIds(AgentUsersDao.instance.findDeviceIdsByTags(
+                            p.getTargetTags(), p.getTargetDeviceIds()));
                 }
                 EnterpriseLicenseComplianceCatalog.applyToPolicy(p);
             }
@@ -348,11 +349,11 @@ public class GuardrailPoliciesAction extends UserAction {
         if (p.getIgnorePhrases() != null) {
             updates.add(Updates.set("ignorePhrases", p.getIgnorePhrases()));
         }
-        if (p.getTargetTeams() != null) {
-            updates.add(Updates.set("targetTeams", p.getTargetTeams()));
+        if (p.getTargetDeviceIds() != null) {
+            updates.add(Updates.set("targetDeviceIds", p.getTargetDeviceIds()));
         }
-        if (p.getTargetRoles() != null) {
-            updates.add(Updates.set("targetRoles", p.getTargetRoles()));
+        if (p.getTargetTags() != null) {
+            updates.add(Updates.set("targetTags", p.getTargetTags()));
         }
         updates.add(Updates.set("blockPersonalAccounts", p.isBlockPersonalAccounts()));
         if (StringUtils.isNotBlank(p.getBehaviour())) {

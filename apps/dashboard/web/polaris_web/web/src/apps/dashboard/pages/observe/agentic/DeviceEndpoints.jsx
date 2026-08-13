@@ -157,6 +157,27 @@ function RiskScoreCellRenderer({ value }) {
     return <RiskPill score={value} />;
 }
 
+// Compact "key=value" badge — just the first tag inline, rest collapsed behind a "+N"
+// badge with a tooltip, same idiom as the classic Users & Devices page's Tags column.
+const MAX_VISIBLE_TAGS = 1;
+function TagsCellRenderer({ value }) {
+    if (!value || value.length === 0) return null;
+    const shown = value.slice(0, MAX_VISIBLE_TAGS);
+    const rest = value.slice(MAX_VISIBLE_TAGS);
+    return (
+        <HorizontalStack gap="1" wrap={false} blockAlign="center">
+            {shown.map((t, i) => (
+                <Badge key={`${t.key}-${i}`} size="small" status="info">{`${t.key}=${t.value}`}</Badge>
+            ))}
+            {rest.length > 0 && (
+                <Tooltip content={rest.map((t) => `${t.key}=${t.value}`).join(", ")} dismissOnMouseOut>
+                    <Badge size="small" status="info">{`+${rest.length}`}</Badge>
+                </Tooltip>
+            )}
+        </HorizontalStack>
+    );
+}
+
 function ViolationsCellRenderer({ value }) {
     if (!value) return null;
     const parts = ["critical", "high", "medium", "low"].filter(k => value[k] > 0);
@@ -240,12 +261,14 @@ function buildDeviceColDefs(filterOptions) {
             filter: "agSetColumnFilter", filterParams: { values: filterOptions.os },
         },
         {
-            field: "group", headerName: "Group", flex: 1, minWidth: 120, sortable: false, valueFormatter: (p) => p.value || "-",
-            filter: "agSetColumnFilter", filterParams: { values: filterOptions.group },
-        },
-        {
-            field: "role", headerName: "Role", flex: 1.2, minWidth: 150, sortable: false, valueFormatter: (p) => p.value || "-",
-            filter: "agSetColumnFilter", filterParams: { values: filterOptions.role },
+            field: "tags", headerName: "Tags", flex: 1.2, minWidth: 160, sortable: false,
+            // Server-computed (AgenticObserveAction.HostGroupSummary.toRow) — filterable by tag KEY
+            // only, matching constants.js's buildTagFilterValues semantics ("group" matches any row
+            // with a "group" tag, regardless of value).
+            filter: "agSetColumnFilter", filterParams: { values: filterOptions.tags },
+            filterValueGetter: (params) => params.data?.tagFilterValues || [],
+            cellRenderer: TagsCellRenderer,
+            valueGetter: (p) => p.data?.tags || [],
         },
         { field: "violations", headerName: "Violations", width: 200, sortable: false, filter: false, cellRenderer: ViolationsCellRenderer },
         { field: "lastTraffic", headerName: "Last Traffic", width: 130, filter: false, valueFormatter: DASH_FORMATTER },
@@ -260,16 +283,13 @@ const DEFAULT_COL_DEF = {
 };
 
 // Backend row field names don't match the grid's column defs directly — device (parent) rows carry
-// team/userRole/lastSeenEpoch (AgenticObserveAction.HostGroupSummary.toRow), service (child) rows
-// carry lastTrafficEpoch (buildDeviceChildren) and no team/role at all. Reshape both into the
-// group/role/lastTraffic the columns actually read, matching AgenticAssetsPage.jsx's shapeRow.
+// lastSeenEpoch (AgenticObserveAction.HostGroupSummary.toRow), service (child) rows carry
+// lastTrafficEpoch (buildDeviceChildren). Reshape both into the lastTraffic the columns actually read.
 function shapeRow(row) {
     if (!row) return row;
     const epoch = row.lastSeenEpoch ?? row.lastTrafficEpoch;
     return {
         ...row,
-        group: row.team,
-        role: row.userRole,
         lastTraffic: epoch > 0 ? func.prettifyEpoch(epoch) : "",
     };
 }
@@ -488,8 +508,8 @@ export default function DeviceEndpoints() {
         loadStats();
     }, [loadStats, refreshKey]);
 
-    // Distinct deviceId/os/team/role values for the grid's Set Filters. os/team/role come from
-    // deviceMetadataMap — already the full, unpaginated account-wide map (fetched once at mount via
+    // Distinct deviceId/os values for the grid's Set Filters. os comes from deviceMetadataMap —
+    // already the full, unpaginated account-wide map (fetched once at mount via
     // fetchEndpointShieldUserMetadata) — so no extra network call. deviceId comes from
     // fetchDeviceEndpointsStats's own deviceIds list (arrives slightly later, once loadStats
     // resolves) rather than being derived client-side, since it must match the grid's own
@@ -497,26 +517,34 @@ export default function DeviceEndpoints() {
     // than re-derive it in the browser and risk drift.
     const filterOptions = useMemo(() => {
         const meta = Object.values(enrichRef.current.deviceMetadataMap || {});
-        const os = new Set(), group = new Set(), role = new Set();
+        const os = new Set();
         meta.forEach((m) => {
             if (m.os) os.add(m.os);
-            if (m.team) group.add(m.team);
-            if (m.role) role.add(m.role);
+        });
+        // Distinct device-tag keys — same source (userMetadataMap, full/unpaginated) as os above,
+        // just keyed by username instead of deviceId.
+        const tags = new Set();
+        Object.values(enrichRef.current.userMetadataMap || {}).forEach((u) => {
+            (u.tags || []).forEach((t) => { if (t?.key) tags.add(t.key); });
         });
         return {
             deviceId: stats.deviceIds || [],
-            os: Array.from(os).sort(), group: Array.from(group).sort(), role: Array.from(role).sort(),
+            os: Array.from(os).sort(),
+            tags: Array.from(tags).sort(),
         };
     }, [refreshKey, stats.deviceIds]);
 
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString, groupKeys, filters }) => {
-        const { trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId } = enrichRef.current;
+        const { trafficMap, riskScoreMap, usernameMap, userMetadataMap, deviceMetadataMap, violationsByCollectionId } = enrichRef.current;
         const mappedSortKey = SORT_FIELD_MAP[sortKey] || "riskScore";
         const mongoSortOrder = sortOrder === -1 ? 1 : -1; // AG Grid asc=-1/desc=1 is inverted vs Mongo
         const parentDeviceId = groupKeys && groupKeys.length === 1 ? groupKeys[0] : undefined;
+        const tagsByUsername = Object.fromEntries(
+            Object.entries(userMetadataMap || {}).map(([u, m]) => [u, m.tags || []])
+        );
         return api.fetchDeviceEndpointsSummary({
             parentDeviceId, skip, limit, sortKey: mappedSortKey, sortOrder: mongoSortOrder, queryValue: searchString,
-            trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters,
+            trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters, tagsByUsername,
         }).then((res) => ({ value: (res.rows || []).map(shapeRow), total: res.total || 0 }));
     }, []);
 

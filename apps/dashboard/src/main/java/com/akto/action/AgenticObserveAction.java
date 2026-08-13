@@ -12,6 +12,7 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ComponentRiskAnalysis;
+import com.akto.dto.DeviceTag;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.test_editor.Info;
@@ -98,17 +99,20 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Setter private String queryValue; // free-text search — asset/group name (summary), or username/deviceId (fetchAgenticAssetDevicesPage)
     @Setter private Map<String, Integer> trafficMap;
     @Setter private Map<String, Double> riskScoreMap;
-    @Setter private Map<String, List<String>> filters; // AG Grid column filters, keyed by field name (e.g. "team", "userRole")
+    @Setter private Map<String, List<String>> filters; // AG Grid column filters, keyed by field name (e.g. "tags", "groupName")
 
     // ---- Server-side pagination for fetchUsersAndDevicesSummary ----
     @Setter private String groupBy; // "user" | "device"
     @Setter private Map<String, List<String>> sensitiveMap; // collection id (string) -> sensitive types
     @Setter private Map<String, String> usernameMap; // Endpoint Shield username resolution map
-    @Setter private Map<String, Map<String, String>> userMetadataMap; // username -> {team, userRole, teamSource, roleSource}
+    @Setter private Map<String, Map<String, String>> userMetadataMap; // username -> {userEmail}
+    // username -> that user's generic device tags (AgenticUsers.deviceTags, each {key, value, source}).
+    // Device rows inherit their resolved owner's tags (see classifyHostGroupedRows).
+    @Setter private Map<String, List<Map<String, String>>> tagsByUsername;
 
     // ---- Server-side pagination for fetchDeviceEndpointsSummary ----
     @Setter private String parentDeviceId; // blank => paginated top-level device rows; set => that device's (device,service) children
-    @Setter private Map<String, Map<String, String>> deviceMetadataMap; // deviceId -> {username, team, role, os}
+    @Setter private Map<String, Map<String, String>> deviceMetadataMap; // deviceId -> {username, os}
     @Setter private Map<String, Map<String, Integer>> violationsByCollectionId; // collection id (string) -> {critical, high, medium, low}
     @Setter private Map<String, Integer> userAnalysisFlatMap; // "serviceId|deviceId" -> total AI-interaction tokens (see constants.js's buildUserAnalysisFlatMap)
 
@@ -656,32 +660,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         if (usernameMap == null || usernameMap.isEmpty() || deviceId == null) return "-";
         String v = usernameMap.get("__deviceId__" + deviceId.toLowerCase(Locale.ROOT));
         return StringUtils.isNotBlank(v) ? v : "-";
-    }
-
-    // Java port of constants.js's buildTeamGroupsFromDevices — team name -> member count, from an
-    // already-built per-device list (DeviceAcc.toResponse() rows). Used to precompute the grid's
-    // "Teams" column server-side instead of shipping the raw per-device list (up to hundreds of
-    // entries per row) just so the browser can do this same tally.
-    private static List<BasicDBObject> buildTeamGroupsForRow(List<BasicDBObject> devices, Map<String, String> usernameMap, Map<String, Map<String, String>> userMetadataMap) {
-        if (usernameMap == null || usernameMap.isEmpty() || userMetadataMap == null || userMetadataMap.isEmpty()) return Collections.emptyList();
-        Map<String, Integer> teamCounts = new LinkedHashMap<>();
-        for (BasicDBObject d : devices) {
-            String deviceId = String.valueOf(d.get("deviceId"));
-            String username = usernameMap.get("__deviceId__" + deviceId.toLowerCase(Locale.ROOT));
-            if (StringUtils.isBlank(username) || "-".equals(username)) continue;
-            Map<String, String> meta = userMetadataMap.get(username);
-            String team = meta != null ? meta.get("team") : null;
-            if (StringUtils.isBlank(team)) continue;
-            teamCounts.merge(team, 1, Integer::sum);
-        }
-        List<BasicDBObject> out = new ArrayList<>();
-        for (Map.Entry<String, Integer> e : teamCounts.entrySet()) {
-            BasicDBObject g = new BasicDBObject();
-            g.put("name", e.getKey());
-            g.put("count", e.getValue());
-            out.add(g);
-        }
-        return out;
     }
 
     private static Comparator<BasicDBObject> buildDeviceComparator(String key) {
@@ -1739,8 +1717,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 // fixed (see fetchAgenticAssetDetail, the lazy per-asset endpoint the Overview tab's
                 // full device list — topology graph, etc. — now comes from instead).
                 List<BasicDBObject> devices = buildDevicesForGroup(g, byId, traffic, risk, userAnalysis);
-                List<BasicDBObject> teamGroups = buildTeamGroupsForRow(devices, usernameMap, userMetadataMap);
-                if (!teamGroups.isEmpty()) row.put("groups", teamGroups);
                 int aiInteractionsTotal = 0;
                 for (BasicDBObject d : devices) {
                     Object v = d.get("aiInteractions");
@@ -2148,10 +2124,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         boolean hasPersonalAccount = false;
         boolean hasLocalMcpServer = false;
         boolean hasMisconfiguredConfig = false;
-        String team = "";
-        String userRole = "";
-        String teamSource = "sso";
-        String roleSource = "sso";
+        // Generic device tags (AgenticUsers.deviceTags), resolved via this group's owner username.
+        List<Map<String, String>> tags = Collections.emptyList();
         int nonSkillCollectionsCount = 0;
         final Set<String> uniqueSkillNames = new HashSet<>();
         // Device-row extras (DeviceEndpoints only — null/zero when not populated, e.g. Users-and-Devices).
@@ -2211,10 +2185,17 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             row.put("sensitiveInRespTypes", new ArrayList<>(sensitiveTypes));
             row.put("riskScore", maxRiskScore);
             row.put("lastSeenEpoch", maxTrafficTimestamp);
-            row.put("team", team);
-            row.put("userRole", userRole);
-            row.put("teamSource", teamSource);
-            row.put("roleSource", roleSource);
+            row.put("tags", tags);
+            // Bare tag keys only — matches constants.js's buildTagFilterValues ("filtering is by
+            // tag key only... regardless of value") so the Tags column's Set Filter/dropdown options
+            // and this row's own filter-membership value stay derived the same way client- and
+            // server-side.
+            Set<String> tagKeys = new LinkedHashSet<>();
+            for (Map<String, String> t : tags) {
+                String k = t != null ? t.get(DeviceTag.KEY) : null;
+                if (StringUtils.isNotBlank(k)) tagKeys.add(k);
+            }
+            row.put("tagFilterValues", new ArrayList<>(tagKeys));
             row.put("hasPersonalAccount", hasPersonalAccount);
             row.put("hasLocalMcpServer", hasLocalMcpServer);
             row.put("hasMisconfiguredConfig", hasMisconfiguredConfig);
@@ -2260,7 +2241,17 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, String> usernames, Map<String, Map<String, String>> userMeta,
             Map<String, Map<String, String>> deviceMeta, Map<String, Map<String, Integer>> violationsByCollectionId,
             boolean excludeConnectorIngested) {
+        return classifyHostGroupedRows(collections, groupBy, traffic, risk, sensitive, usernames, userMeta,
+                deviceMeta, violationsByCollectionId, excludeConnectorIngested, Collections.emptyMap());
+    }
+
+    private Map<String, HostGroupSummary> classifyHostGroupedRows(List<ApiCollection> collections, String groupBy,
+            Map<String, Integer> traffic, Map<String, Double> risk, Map<String, List<String>> sensitive,
+            Map<String, String> usernames, Map<String, Map<String, String>> userMeta,
+            Map<String, Map<String, String>> deviceMeta, Map<String, Map<String, Integer>> violationsByCollectionId,
+            boolean excludeConnectorIngested, Map<String, List<Map<String, String>>> tagsByUser) {
         boolean isUserGroup = "user".equals(groupBy);
+        Map<String, List<Map<String, String>>> tags = tagsByUser != null ? tagsByUser : Collections.emptyMap();
         Map<String, HostGroupSummary> groups = new LinkedHashMap<>();
 
         for (ApiCollection c : collections) {
@@ -2290,22 +2281,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             final String fKey = key;
             HostGroupSummary g = groups.computeIfAbsent(key, k -> {
                 HostGroupSummary gs = new HostGroupSummary(fKey);
-                if (isUserGroup && userMeta != null) {
-                    Map<String, String> meta = userMeta.get(fKey);
-                    if (meta != null) {
-                        gs.team = meta.getOrDefault("team", "");
-                        gs.userRole = meta.getOrDefault("userRole", "");
-                        gs.teamSource = meta.getOrDefault("teamSource", "sso");
-                        gs.roleSource = meta.getOrDefault("roleSource", "sso");
-                    }
+                if (isUserGroup) {
+                    gs.tags = tags.getOrDefault(fKey, Collections.emptyList());
                 }
                 if (!isUserGroup && deviceMeta != null) {
                     Map<String, String> meta = deviceMeta.get(fKey);
                     if (meta != null) {
                         gs.os = meta.get("os");
                         gs.username = StringUtils.isNotBlank(meta.get("username")) ? meta.get("username") : "-";
-                        gs.team = meta.getOrDefault("team", "");
-                        gs.userRole = meta.getOrDefault("role", "");
                     }
                 }
                 return gs;
@@ -2315,6 +2298,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (!isUserGroup && "-".equals(g.username)) {
                 String resolved = resolveUsername(hostName, usernames, envType);
                 if (StringUtils.isNotBlank(resolved) && !"-".equals(resolved)) g.username = resolved;
+            }
+            // Device tags are the resolved owner's device tags (AgenticUsers.deviceTags is keyed by
+            // username, not deviceId) — re-derive whenever the username above may have just changed.
+            if (!isUserGroup && !"-".equals(g.username)) {
+                g.tags = tags.getOrDefault(g.username, Collections.emptyList());
             }
             g.accumulate(c, hostName, envType, collRisk, collTraffic, sensitiveTypes, collViolations);
         }
@@ -2346,13 +2334,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, List<String>> sensitive = sensitiveMap != null ? sensitiveMap : Collections.emptyMap();
             Map<String, String> usernames = usernameMap != null ? usernameMap : Collections.emptyMap();
             Map<String, Map<String, String>> userMeta = userMetadataMap != null ? userMetadataMap : Collections.emptyMap();
+            Map<String, List<Map<String, String>>> tagsByUser = tagsByUsername != null ? tagsByUsername : Collections.emptyMap();
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS)
             );
 
-            Map<String, HostGroupSummary> groups = classifyHostGroupedRows(collections, groupBy, traffic, risk, sensitive, usernames, userMeta, null, null, false);
+            Map<String, HostGroupSummary> groups = classifyHostGroupedRows(collections, groupBy, traffic, risk, sensitive, usernames, userMeta, null, null, false, tagsByUser);
             List<HostGroupSummary> all = new ArrayList<>(groups.values());
 
             if (StringUtils.isNotBlank(queryValue)) {
@@ -2360,19 +2349,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 all.removeIf(g -> g.groupName == null || !g.groupName.toLowerCase(Locale.ROOT).contains(q));
             }
 
-            // AG Grid column filters (agSetColumnFilter on "team"/"userRole", agTextColumnFilter on
-            // "groupName") — extractFilterModel (AgGridTable.jsx) keys these by colDef field name.
+            // AG Grid column filters (agSetColumnFilter on "tags", agTextColumnFilter on "groupName")
+            // — extractFilterModel (AgGridTable.jsx) keys these by colDef field name.
             if (filters != null) {
-                List<String> teamFilter = filters.get("team");
-                if (teamFilter != null && !teamFilter.isEmpty()) {
-                    Set<String> allowed = new HashSet<>(teamFilter);
-                    all.removeIf(g -> !allowed.contains(g.team));
-                }
-                List<String> roleFilter = filters.get("userRole");
-                if (roleFilter != null && !roleFilter.isEmpty()) {
-                    Set<String> allowed = new HashSet<>(roleFilter);
-                    all.removeIf(g -> !allowed.contains(g.userRole));
-                }
                 List<String> nameFilter = filters.get("groupName");
                 if (nameFilter != null && !nameFilter.isEmpty() && StringUtils.isNotBlank(nameFilter.get(0))) {
                     String q = nameFilter.get(0).toLowerCase(Locale.ROOT);
@@ -2384,6 +2363,13 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 if (usernameFilter != null && !usernameFilter.isEmpty()) {
                     Set<String> allowed = new HashSet<>(usernameFilter);
                     all.removeIf(g -> !allowed.contains(g.username));
+                }
+                // Generic device-tag filter — matches by tag KEY only (buildTagFilterValues'
+                // semantics: "group" matches any row with a "group" tag, regardless of value).
+                List<String> tagsFilter = filters.get("tags");
+                if (tagsFilter != null && !tagsFilter.isEmpty()) {
+                    Set<String> allowedKeys = new HashSet<>(tagsFilter);
+                    all.removeIf(g -> g.tags.stream().noneMatch(t -> t != null && allowedKeys.contains(t.get(DeviceTag.KEY))));
                 }
             }
 
@@ -2413,11 +2399,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     }
 
     /**
-     * Tab-header counts ("Users (1234)" / "Devices (567)"), distinct team/role names for the edit
-     * modal's autocomplete, and each tab's "Agentic assets" total (sum of endpointsCount across every
-     * row — needs the full per-group classification, not just distinct-key counting, so this calls
-     * classifyHostGroupedRows for both groupBy modes; same order of cost as fetchUsersAndDevicesSummary
-     * itself, just without the pagination slice).
+     * Tab-header counts ("Users (1234)" / "Devices (567)"), distinct device-tag keys for the Tags
+     * filter/"Edit device tags" modal, and each tab's "Agentic assets" total (sum of endpointsCount
+     * across every row — needs the full per-group classification, not just distinct-key counting, so
+     * this calls classifyHostGroupedRows for both groupBy modes; same order of cost as
+     * fetchUsersAndDevicesSummary itself, just without the pagination slice).
      */
     public String fetchUsersAndDevicesStats() {
         response = new BasicDBObject();
@@ -2426,15 +2412,16 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
             Map<String, String> usernames = usernameMap != null ? usernameMap : Collections.emptyMap();
             Map<String, Map<String, String>> userMeta = userMetadataMap != null ? userMetadataMap : Collections.emptyMap();
+            Map<String, List<Map<String, String>>> tagsByUser = tagsByUsername != null ? tagsByUsername : Collections.emptyMap();
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS)
             );
 
             Map<String, HostGroupSummary> userGroups = classifyHostGroupedRows(collections, "user", traffic, risk,
-                    Collections.emptyMap(), usernames, userMeta, null, null, false);
+                    Collections.emptyMap(), usernames, userMeta, null, null, false, tagsByUser);
             Map<String, HostGroupSummary> deviceGroups = classifyHostGroupedRows(collections, "device", traffic, risk,
-                    Collections.emptyMap(), usernames, Collections.emptyMap(), null, null, false);
+                    Collections.emptyMap(), usernames, Collections.emptyMap(), null, null, false, tagsByUser);
 
             long usersAgenticAssetsTotal = 0;
             for (HostGroupSummary g : userGroups.values()) {
@@ -2444,24 +2431,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             for (HostGroupSummary g : deviceGroups.values()) {
                 devicesAgenticAssetsTotal += g.hostNames.size();
             }
-
-            // Distinct team/role names across all known users — feeds the "Edit team & role" modal's
-            // autocomplete suggestions, which previously read straight off the full in-memory user
-            // array; cheap to compute here since userMetadataMap is already keyed by username.
-            Set<String> teams = new HashSet<>();
-            Set<String> roles = new HashSet<>();
-            for (String username : userGroups.keySet()) {
-                Map<String, String> meta = userMeta.get(username);
-                if (meta == null) continue;
-                String team = meta.get("team");
-                String role = meta.get("userRole");
-                if (StringUtils.isNotBlank(team)) teams.add(team);
-                if (StringUtils.isNotBlank(role)) roles.add(role);
-            }
-            List<String> teamList = new ArrayList<>(teams);
-            List<String> roleList = new ArrayList<>(roles);
-            Collections.sort(teamList);
-            Collections.sort(roleList);
 
             // Distinct device-owner usernames — feeds the Devices tab's "User" filter (GithubServerTable
             // choices, UsersAndDevices.jsx). deviceGroups already resolved each device's username
@@ -2473,13 +2442,26 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             List<String> deviceUsernameList = new ArrayList<>(deviceUsernames);
             Collections.sort(deviceUsernameList);
 
+            // Distinct device-tag keys across every known user/device — feeds the Tags column's Set
+            // Filter dropdown (both tabs) and the "Edit device tags" modal's key autocomplete.
+            Set<String> tagKeys = new TreeSet<>();
+            for (HostGroupSummary g : userGroups.values()) {
+                for (Map<String, String> t : g.tags) {
+                    if (t != null && StringUtils.isNotBlank(t.get(DeviceTag.KEY))) tagKeys.add(t.get(DeviceTag.KEY));
+                }
+            }
+            for (HostGroupSummary g : deviceGroups.values()) {
+                for (Map<String, String> t : g.tags) {
+                    if (t != null && StringUtils.isNotBlank(t.get(DeviceTag.KEY))) tagKeys.add(t.get(DeviceTag.KEY));
+                }
+            }
+
             response.put("usersCount", userGroups.size());
             response.put("devicesCount", deviceGroups.size());
             response.put("usersAgenticAssetsTotal", usersAgenticAssetsTotal);
             response.put("devicesAgenticAssetsTotal", devicesAgenticAssetsTotal);
-            response.put("teams", teamList);
-            response.put("roles", roleList);
             response.put("usernames", deviceUsernameList);
+            response.put("tagKeys", new ArrayList<>(tagKeys));
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching users and devices stats: " + e.getMessage());
@@ -2607,6 +2589,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, Map<String, String>> deviceMeta = deviceMetadataMap != null ? deviceMetadataMap : Collections.emptyMap();
             Map<String, String> usernames = usernameMap != null ? usernameMap : Collections.emptyMap();
             Map<String, Map<String, Integer>> violations = violationsByCollectionId != null ? violationsByCollectionId : Collections.emptyMap();
+            Map<String, List<Map<String, String>>> tagsByUser = tagsByUsername != null ? tagsByUsername : Collections.emptyMap();
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
@@ -2642,7 +2625,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
 
             Map<String, HostGroupSummary> groups = classifyHostGroupedRows(collections, "device", traffic, risk,
-                    Collections.emptyMap(), usernames, Collections.emptyMap(), deviceMeta, violations, true);
+                    Collections.emptyMap(), usernames, Collections.emptyMap(), deviceMeta, violations, true, tagsByUser);
             List<HostGroupSummary> all = new ArrayList<>(groups.values());
 
             if (StringUtils.isNotBlank(queryValue)) {
@@ -2653,7 +2636,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 });
             }
 
-            // AG Grid column filters (agSetColumnFilter on "os"/"group"/"role") — extractFilterModel
+            // AG Grid column filters (agSetColumnFilter on "os"/"tags") — extractFilterModel
             // (AgGridTable.jsx) keys these by colDef field name, matching DEVICE_COL_DEFS in
             // DeviceEndpoints.jsx. A key present with an empty list means the user unchecked every
             // value, which must match zero rows (real Set Filter semantics) — containsKey (not
@@ -2667,13 +2650,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     Set<String> allowed = new HashSet<>(filters.get("os"));
                     all.removeIf(g -> !allowed.contains(g.os));
                 }
-                if (filters.containsKey("group")) {
-                    Set<String> allowed = new HashSet<>(filters.get("group"));
-                    all.removeIf(g -> !allowed.contains(g.team));
-                }
-                if (filters.containsKey("role")) {
-                    Set<String> allowed = new HashSet<>(filters.get("role"));
-                    all.removeIf(g -> !allowed.contains(g.userRole));
+                if (filters.containsKey("tags")) {
+                    Set<String> allowedKeys = new HashSet<>(filters.get("tags"));
+                    all.removeIf(g -> g.tags.stream().noneMatch(t -> t != null && allowedKeys.contains(t.get(DeviceTag.KEY))));
                 }
             }
 
