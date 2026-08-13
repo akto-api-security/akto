@@ -522,9 +522,13 @@ function ApiCollections(props) {
 
     const navigate = useNavigate();
 
-    // /inventory is deprecated for Atlas/Argus; redirect unless embedded (e.g. McpSecurityPage's tab)
+    // /inventory is deprecated for Atlas (its left-nav always targets /agentic-assets directly, so
+    // reaching /inventory here means a stale link/back-button); redirect unless embedded (e.g.
+    // McpSecurityPage's tab). Argus has NO equivalent grouped page — its own left-nav intentionally
+    // sends it to /inventory, and this component's isArgus-conditional rendering below is its real
+    // view, so it must not be redirected away from itself.
     useEffect(() => {
-        if (!onlyShowCollectionsTable && (isEndpointSecurityCategory() || isAgenticSecurityCategory())) {
+        if (!onlyShowCollectionsTable && isEndpointSecurityCategory()) {
             navigate("/dashboard/observe/agentic-assets", { replace: true });
         }
     }, [navigate]);
