@@ -13,10 +13,10 @@ public class ModuleInfoConstants {
         put(ModuleInfo.ModuleType.MINI_TESTING, new HashMap<String, String>() {{
             put("DATABASE_ABSTRACTOR_SERVICE_TOKEN", "Database Abstractor Service Token");
             put("AKTO_LOG_LEVEL", "Akto Log Level");
-            put("AKTO_MONGO_CONN", "Akto Mongo Connection String");
             put("DATABASE_ABSTRACTOR_SERVICE_URL", "Database Abstractor Service URL");
             put("NEW_TESTING_ENABLED", "New Testing Enabled");
             put("KAFKA_BROKER_URL", "Kafka Broker URL");
+            put("KAFKA_AUTH_ENABLED", "Kafka Auth Enabled");
             put("RUNTIME_MODE", "Runtime Mode");
             put("LINGER_MS_KAFKA", "Kafka Linger MS");
             put("SEND_LOGS_FOR_TESTING", "Send Logs For Testing");
