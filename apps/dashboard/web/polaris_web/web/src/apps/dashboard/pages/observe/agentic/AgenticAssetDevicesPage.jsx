@@ -12,6 +12,7 @@ import api from "../api";
 import func from "@/util/func";
 import transform from "../transform";
 import { fetchEndpointShieldUsernameMap } from "../api_collections/endpointShieldHelper";
+import { settledValue, logRejected } from "./constants";
 
 /**
  * Endpoint/device-wise view for ONE agentic asset — what clicking a row on the legacy Agentic
@@ -84,7 +85,8 @@ function ChildrenTable({ children, rowType, misconfiguredChildId }) {
 
     const handleChildClick = useCallback((child) => {
         const bundlesSkills = (rowType === "agent" || rowType === "service") && (child.skillCount || 0) > 0;
-        const scope = bundlesSkills ? "?agentic_view=skills" : "";
+        // Plugin rows scope to the plugin endpoints, not the agent collection's full inventory.
+        const scope = rowType === "plugin" ? "?agentic_view=plugins" : (bundlesSkills ? "?agentic_view=skills" : "");
         navigate(`/dashboard/observe/inventory/${child.id}${scope}`);
     }, [navigate, rowType]);
 
@@ -118,6 +120,7 @@ function ChildrenTable({ children, rowType, misconfiguredChildId }) {
             <div key={`name-${child.id}`} style={{ cursor: "pointer", width: CHILD_COL_WIDTH.name }} onClick={() => handleChildClick(child)}>
                 <HorizontalStack gap="1" align="start" wrap={false}>
                     <Box maxWidth="200px"><TooltipText tooltip={displayValue} text={displayValue} /></Box>
+                    {child.type && <Badge size="small">{child.type}</Badge>}
                     {(child.skillCount || 0) > 0 && (
                         <Badge size="small" status="info">{`${child.skillCount} ${child.skillCount === 1 ? "skill" : "skills"}`}</Badge>
                     )}
@@ -268,13 +271,16 @@ export default function AgenticAssetDevicesPage() {
                 // pull the whole account's map just to read a few entries back out of it.
                 // usernameMap still comes from here since Endpoint Shield's device registry isn't
                 // collection-scoped (it's keyed by physical device, already small account-wide).
-                const [usernameMap, detail] = await Promise.all([
+                // allSettled: a usernameMap failure must not also lose detail.collectionIds, which is
+                // this page's entire collection scope.
+                const [usernameSettled, detailSettled] = await Promise.allSettled([
                     fetchEndpointShieldUsernameMap(),
                     api.fetchAgenticAssetDetail({ groupKey, rowType }),
                 ]);
                 if (cancelled) return;
-                enrichRef.current = { usernameMap };
-                collectionIdsRef.current = detail?.collectionIds || [];
+                logRejected("AgenticAssetDevicesPage mount", { usernameMap: usernameSettled, detail: detailSettled });
+                enrichRef.current = { usernameMap: settledValue(usernameSettled, {}) };
+                collectionIdsRef.current = settledValue(detailSettled, {})?.collectionIds || [];
             } catch {
                 if (!cancelled) collectionIdsRef.current = [];
             } finally {
@@ -294,6 +300,7 @@ export default function AgenticAssetDevicesPage() {
         const res = await api.fetchAgenticAssetEndpointsPage({
             apiCollectionIds: collectionIdsRef.current,
             rowType,
+            groupKey,
             skip, limit, sortKey: sortKey || "riskScore", sortOrder: mongoSortOrder, queryValue,
             usernameMap,
             filters: Object.keys(filters).length ? filters : undefined,
@@ -301,7 +308,7 @@ export default function AgenticAssetDevicesPage() {
         updateFilterChoicesIfChanged(res.distinctEndpointIds || [], res.distinctUsernames || []);
         const rows = (res.endpoints || []).map((row) => shapeEndpointRow(row, { rowType }));
         return { value: rows, total: res.total || 0 };
-    }, [rowType, updateFilterChoicesIfChanged]);
+    }, [rowType, groupKey, updateFilterChoicesIfChanged]);
 
     const filtersDef = useMemo(() => {
         const defs = [ENDPOINT_TAGS_FILTER_DEF];

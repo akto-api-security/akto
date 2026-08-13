@@ -21,10 +21,23 @@ import {
     fetchAndCacheSkillApiData,
     fetchAndCacheAgenticTrafficRiskBundle,
     fetchAndCacheAgenticSensitiveInfo,
+    settledValue,
+    logRejected,
 } from "./constants";
 import { CLIENT_TYPES, ROW_TYPES } from "./mcpClientHelper";
 
-const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills'];
+const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills', 'Plugins'];
+
+// "unknown" is treated as disabled — an unreported status is not proof a plugin is active.
+const isPluginEnabled = (status) => String(status).toLowerCase() === 'enabled';
+
+// Plugins have no endpoints or sensitive data of their own — show their reported metadata instead.
+const pluginMetadataHeaders = [
+    { title: 'Status', text: 'Status', value: 'pluginStatusComp', textValue: 'pluginStatus', boxWidth: '90px' },
+    { title: 'Version', text: 'Version', value: 'pluginVersion', boxWidth: '90px' },
+    { title: 'Scope', text: 'Scope', value: 'pluginScope', boxWidth: '80px' },
+    { title: 'Marketplace', text: 'Marketplace', value: 'pluginMarketplace', boxWidth: '160px' },
+];
 
 const TAB_TO_CLIENT_TYPE = {
     all: undefined,
@@ -32,7 +45,9 @@ const TAB_TO_CLIENT_TYPE = {
     mcp_servers: CLIENT_TYPES.MCP_SERVER,
     llms: CLIENT_TYPES.LLM,
     skills: CLIENT_TYPES.SKILL,
+    plugins: CLIENT_TYPES.PLUGIN,
 };
+
 
 // Real backend-sortable fields only (AgenticObserveAction.buildSummaryComparator) — "Type" isn't
 // supported server-side (matches the new layout's own SORT_FIELD_MAP in AgenticAssetsPage.jsx,
@@ -77,12 +92,16 @@ function getRiskScoreStatus(riskScore) {
 // (AgenticObserveAction's own account-wide maliciousSkillKeys cache — no client round-trip needed).
 function shapeRow(row, { skillScoreMap = {}, misconfiguredSkills = new Set() } = {}) {
     const isSkill = row.rowType === ROW_TYPES.SKILL;
+    const isPlugin = row.rowType === ROW_TYPES.PLUGIN;
+    // Fan-out rows borrow their parent agent collection's flags, so suppress them on both.
+    const isFanout = isSkill || isPlugin;
+    // Plugin riskScore is already the plugin's own (overwritten server-side), not the agent's.
     const riskScore = isSkill ? (skillScoreMap[row.name] || 0) : (row.riskScore || 0);
     const isMisconfiguredSkill = isSkill && misconfiguredSkills.has(row.name);
 
-    const showPersonal = row.hasPersonalAccount && !isSkill;
-    const showLocalMcp = row.hasLocalMcpServer && !isSkill;
-    const showMisconfigured = (row.hasMisconfiguredConfig && !isSkill) || isMisconfiguredSkill;
+    const showPersonal = row.hasPersonalAccount && !isFanout;
+    const showLocalMcp = row.hasLocalMcpServer && !isFanout;
+    const showMisconfigured = (row.hasMisconfiguredConfig && !isFanout) || isMisconfiguredSkill;
     const showMalicious = isSkill && row.isMalicious;
 
     const groupNameDisplay = (showPersonal || showLocalMcp || showMisconfigured || showMalicious) ? (
@@ -109,6 +128,15 @@ function shapeRow(row, { skillScoreMap = {}, misconfiguredSkills = new Set() } =
                 <CollectionIcon assetTagValue={row.groupKey} displayName={row.name} />
             </Box>
         ),
+        pluginVersion: row.pluginVersion || "-",
+        pluginScope: row.pluginScope || "-",
+        pluginMarketplace: row.pluginMarketplace || "-",
+        pluginStatus: row.pluginStatus || "",
+        pluginStatusComp: isPlugin ? (
+            <Badge size="small" status={isPluginEnabled(row.pluginStatus) ? "success" : "warning"}>
+                {isPluginEnabled(row.pluginStatus) ? "enabled" : "disabled"}
+            </Badge>
+        ) : "-",
         assetTags: [
             ...(showMalicious ? ["Malicious"] : []),
             ...(showMisconfigured ? ["Misconfigured"] : []),
@@ -151,8 +179,15 @@ function Endpoints() {
     const headings = useMemo(() => {
         const h = getHeaders();
         h[1] = { ...h[1], value: "groupNameDisplay" };
+        // Plugins have no endpoints or sensitive data of their own — swap in their metadata.
+        if (selectedTab === "plugins") {
+            return [
+                ...h.filter((col) => col.value !== "endpointsCount" && col.value !== "sensitiveSubTypes"),
+                ...pluginMetadataHeaders,
+            ];
+        }
         return h;
-    }, []);
+    }, [selectedTab]);
     const headers = useMemo(() => [...headings, tagFilterHeader], [headings]);
     // GithubServerTable renders filter chips from a separate `filters` prop (Polaris IndexFilters
     // shape: {key, label, choices}) — headers' filterKey only feeds filterOperators/CSV export,
@@ -164,6 +199,12 @@ function Endpoints() {
         ] },
     ], []);
 
+    // Endpoints sort is meaningless on the plugins tab (they have none).
+    const activeSortOptions = useMemo(
+        () => (selectedTab === "plugins" ? sortOptions.filter((o) => o.sortKey !== "endpointsCount") : sortOptions),
+        [selectedTab],
+    );
+
     const tableCountObj = func.getTabsCount(definedTableTabs, {
         _counts: {
             all: stats.totalAssets,
@@ -171,6 +212,7 @@ function Endpoints() {
             mcp_servers: stats.countsByType[CLIENT_TYPES.MCP_SERVER] || 0,
             llms: stats.countsByType[CLIENT_TYPES.LLM] || 0,
             skills: stats.countsByType[CLIENT_TYPES.SKILL] || 0,
+            plugins: stats.countsByType[CLIENT_TYPES.PLUGIN] || 0,
         },
     });
     const tableTabs = func.getTableTabsContent(
@@ -190,13 +232,15 @@ function Endpoints() {
             // deduped) — this leaner sibling of fetchAndCacheAgenticCollectionsBundle skips
             // getAllCollectionsBasic entirely (see AgenticAssetsPage.jsx's own switch to it).
             // Sensitive info is cached separately since only this page + UsersAndDevices.jsx use it.
-            const [trafficRiskBundle, sensitiveMap] = await Promise.all([
+            const [trafficRiskSettled, sensitiveSettled] = await Promise.allSettled([
                 fetchAndCacheAgenticTrafficRiskBundle({ api, PersistStore }),
                 fetchAndCacheAgenticSensitiveInfo({ api, PersistStore }),
             ]);
             if (!isMountedRef.current) return;
+            logRejected("Endpoints mount", { trafficRisk: trafficRiskSettled, sensitive: sensitiveSettled });
 
-            const { trafficMap = {}, riskScoreMap = {} } = trafficRiskBundle || {};
+            const sensitiveMap = settledValue(sensitiveSettled, {});
+            const { trafficMap = {}, riskScoreMap = {} } = settledValue(trafficRiskSettled, {});
             enrichRef.current = { ...enrichRef.current, trafficMap, riskScoreMap, sensitiveMap };
             setRefreshKey((k) => k + 1); // mount the table now that enrichRef is populated
             setLoading(false);
@@ -321,7 +365,7 @@ function Endpoints() {
                     key={`endpoints-table-${selectedTab}-${refreshKey}`}
                     fetchData={fetchTableData}
                     pageLimit={PAGE_LIMIT}
-                    sortOptions={sortOptions}
+                    sortOptions={activeSortOptions}
                     resourceName={resourceName}
                     filters={filtersDef}
                     headers={headers}

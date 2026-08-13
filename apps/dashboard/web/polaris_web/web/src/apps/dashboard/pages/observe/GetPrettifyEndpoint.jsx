@@ -13,7 +13,9 @@ export const getMethod = (url, method, apiType) => {
         return func.WEBSOCKET_METHOD_LABEL
     }
     if(isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()){
-        if(url.includes("tool")){
+        if(url.includes("/plugin/")){
+            return "PLUGIN";
+        }else if(url.includes("tool")){
             return "TOOL";
         }else if(url.includes("/config/")){
             return "CONFIG";

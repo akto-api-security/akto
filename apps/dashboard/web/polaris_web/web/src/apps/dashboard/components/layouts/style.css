@@ -27,6 +27,7 @@
 .agentic-type-MCP .Polaris-Badge     { background-color: #ECFDF5; color: #0D9488; }
 .agentic-type-LLM .Polaris-Badge     { background-color: #FEFCE8; color: #CA8A04; }
 .agentic-type-SKILL .Polaris-Badge   { background-color: #F9FAFB; color: #6B7280; }
+.agentic-type-PLUGIN .Polaris-Badge  { background-color: #EEF2FF; color: #4F46E5; }
 .agentic-type-PROMPT .Polaris-Badge  { background-color: #E0F7FA; color: #0E7490; }
 .agentic-type-CONFIG .Polaris-Badge  { background-color: #FEFCE8; color: #CA8A04; }
 .agentic-type-TOOL .Polaris-Badge    { background-color: #ECFDF5; color: #0D9488; }

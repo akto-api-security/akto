@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -28,6 +29,7 @@ public final class AgenticObserveUtil {
     public static final String CLIENT_TYPE_AI_AGENT = "AI Agent";
     public static final String CLIENT_TYPE_MCP_SERVER = "MCP Server";
     public static final String CLIENT_TYPE_SKILL = "Skill";
+    public static final String CLIENT_TYPE_PLUGIN = "Plugin";
 
     private static final Set<String> MCP_AGENT_KEYWORDS = new HashSet<>(Arrays.asList(
             "stripe", "aws", "azure", "playwright", "postgres", "atlassian", "docker",
@@ -115,6 +117,43 @@ public final class AgenticObserveUtil {
         return getSkillNames(collection).size();
     }
 
+    // Plugins get their own collection, named <device>.<agentName>.<pluginName> — the same shape an
+    // MCP server uses, so the agent-plugin tag is what tells them apart.
+    public static boolean isPluginCollection(ApiCollection collection) {
+        return collection != null && hasTagKey(collection.getEnvType(), Constants.AKTO_AGENT_PLUGIN_TAG);
+    }
+
+    // The plugin's own name, from its plugin-name tag; falls back to the hostname's trailing segment.
+    public static String getPluginName(ApiCollection collection) {
+        if (!isPluginCollection(collection)) return null;
+        String tagged = getTagValue(collection.getEnvType(), Constants.AKTO_PLUGIN_NAME_TAG);
+        if (StringUtils.isNotBlank(tagged)) return tagged;
+        return extractServiceName(collection.getHostName());
+    }
+
+    // Plugin metadata (version/scope/status/marketplace) lives on the collection's own tags.
+    public static String getPluginTagValue(ApiCollection collection, String tagKey) {
+        return collection != null ? getTagValue(collection.getEnvType(), tagKey) : null;
+    }
+
+    private static boolean hasTagKey(List<CollectionTags> envType, String keyName) {
+        if (envType == null) return false;
+        for (CollectionTags tag : envType) {
+            if (tag != null && keyName.equals(tag.getKeyName())) return true;
+        }
+        return false;
+    }
+
+    private static String getTagValue(List<CollectionTags> envType, String keyName) {
+        if (envType == null) return null;
+        for (CollectionTags tag : envType) {
+            if (tag != null && keyName.equals(tag.getKeyName()) && StringUtils.isNotBlank(tag.getValue())) {
+                return tag.getValue();
+            }
+        }
+        return null;
+    }
+
     public static void mergeViolations(Map<GlobalEnums.Severity, Integer> target, Map<String, Integer> source) {
         if (source == null || source.isEmpty()) {
             return;
@@ -195,6 +234,11 @@ public final class AgenticObserveUtil {
     }
 
     public static String getTypeFromCollection(ApiCollection collection) {
+        // Checked before tags: a plugin collection also carries mcp-client/ai-agent (naming the agent
+        // it belongs to), which would otherwise classify it as that agent.
+        if (isPluginCollection(collection)) {
+            return CLIENT_TYPE_PLUGIN;
+        }
         List<CollectionTags> envType = collection != null ? collection.getEnvType() : null;
         if (envType == null || envType.isEmpty()) {
             return CLIENT_TYPE_MCP_SERVER;

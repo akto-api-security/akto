@@ -30,6 +30,8 @@ import {
     // badge); a real fix would need a small Java-side addition, not done here to bound this change.
     fetchAndCacheAgenticCollectionsBundle,
     fetchAndCacheAgenticSensitiveInfo,
+    settledValue,
+    logRejected,
 } from "./constants";
 import { hasMisconfiguredConfigTag } from "./mcpClientHelper";
 
@@ -195,6 +197,12 @@ function UsersAndDevices() {
         return rows.map((row) => {
             const hasMalicious = (row.uniqueSkillNames || []).some((s) => maliciousSkills.has(s));
             const extraBadges = hasMalicious ? [<Badge key="malicious" size="small" status="critical">Malicious Skills</Badge>] : [];
+            const pluginCount = (row.uniquePluginNames || []).length;
+            if (pluginCount > 0) {
+                extraBadges.push(
+                    <Badge key="plugins" size="small" status="info">{`${pluginCount} ${pluginCount === 1 ? 'plugin' : 'plugins'}`}</Badge>
+                );
+            }
             return {
                 ...row,
                 groupNameDisplay: buildGroupNameDisplay(row, extraBadges),

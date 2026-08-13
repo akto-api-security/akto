@@ -474,12 +474,16 @@ function ApiEndpoints(props) {
         let data = {}
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap,apiInfoSeverityMap)
 
-        // Scope to config-only or skills-only endpoints when navigated from the agent tree.
-        // Config and skill endpoints live in the same collection; this keeps the two views distinct.
+        // Scope to config-only, skills-only, or plugin-only endpoints when navigated from the agent
+        // tree. Config/skill endpoints live inside the agent's own collection, so they need scoping to
+        // stay distinct from its other traffic — plugins now get their own dedicated collection, so
+        // there's nothing else in it to hide from.
         if (agenticView === 'config') {
             allEndpoints = allEndpoints.filter(e => e?.endpoint?.includes('/config/'))
         } else if (agenticView === 'skills') {
             allEndpoints = allEndpoints.filter(e => e?.endpoint?.includes('/skills/'))
+        } else if (agenticView === 'plugins') {
+            allEndpoints = allEndpoints.filter(e => e?.endpoint?.includes('/plugin/'))
         }
 
         // handle code analysis endpoints

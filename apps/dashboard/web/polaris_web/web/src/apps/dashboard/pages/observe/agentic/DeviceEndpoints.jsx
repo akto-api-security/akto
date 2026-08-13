@@ -18,7 +18,7 @@ import { EndpointBrowserTrendChart } from "./TrendCharts";
 import { aggregateViolationCountsByCollectionId, fetchAgenticViolationCountsByHost } from "./agenticObserveApi";
 import { buildModuleDeviceMap } from "./agenticPageBuilders";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
-import { fetchAndCacheAgenticCollectionsBundle } from "./constants";
+import { fetchAndCacheAgenticCollectionsBundle, settledValue, logRejected } from "./constants";
 import NewLayoutTooltip from "./NewLayoutTooltip";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import values from "@/util/values";
@@ -194,6 +194,7 @@ export const TYPE_CLASS_MAP = {
     "MCP Server": "agentic-type-MCP",
     "LLM": "agentic-type-LLM",
     "Skill": "agentic-type-SKILL",
+    "Plugin": "agentic-type-PLUGIN",
     "Tool": "agentic-type-TOOL",
     "Tool Call": "agentic-type-TOOL",
     "Resource": "agentic-type-RESOURCE",
@@ -374,6 +375,7 @@ function TableSection({ onServerFetch, fetchDeviceChildren, collections, startTi
                 getServerSideGroupKey={getServerSideGroupKey}
                 groupDefaultExpanded={0}
                 onServerFetch={onServerFetch}
+                onFetchError={() => func.setToast(true, true, "Failed to load endpoints")}
                 serverSideRowModel
                 getRowId={(params) => params.data.id}
                 height={500}
@@ -449,7 +451,9 @@ export default function DeviceEndpoints() {
         const isMountedRef = { current: true };
         (async () => {
             try {
-                const [collectionsBundle, shieldResult, hostCounts] = await Promise.all([
+                // allSettled, not all: every state setter below sits after this await, so one rejected
+                // member used to blank the whole grid instead of just its own column.
+                const [collectionsSettled, shieldSettled, hostCountsSettled] = await Promise.allSettled([
                     fetchAndCacheAgenticCollectionsBundle({ api, PersistStore }),
                     fetchEndpointShieldUserMetadata(),
                     // Server-aggregated {host: {critical,high,medium,low}} — same aggregate Agentic
@@ -457,6 +461,10 @@ export default function DeviceEndpoints() {
                     fetchAgenticViolationCountsByHost({ startTimestamp, endTimestamp }),
                 ]);
                 if (!isMountedRef.current) return;
+                logRejected("DeviceEndpoints mount", { collections: collectionsSettled, shield: shieldSettled, violations: hostCountsSettled });
+                const collectionsBundle = settledValue(collectionsSettled, {});
+                const shieldResult = settledValue(shieldSettled, {});
+                const hostCounts = settledValue(hostCountsSettled, {});
                 const { collections = [], trafficMap = {}, riskScoreMap = {} } = collectionsBundle || {};
                 const { usernameMap = {}, userMetadataMap = {}, moduleInfos = [] } = shieldResult || {};
                 const violationsByCollectionId = aggregateViolationCountsByCollectionId(hostCounts, collections);

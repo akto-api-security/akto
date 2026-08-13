@@ -485,6 +485,13 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         final Set<String> hostNames = new HashSet<>();
         final Set<String> endpointIds = new HashSet<>();
         final Set<String> skillNames = new HashSet<>();
+        // Only the count is serialized per row, same as skillNames — full list comes from the detail call.
+        final Set<String> pluginNames = new HashSet<>();
+        // Plugin rows only — read off the plugin collection's own tags.
+        String pluginVersion;
+        String pluginScope;
+        String pluginStatus;
+        String pluginMarketplace;
         // Small — bounded by the account's distinct sensitive-data type names (e.g. "Email",
         // "IP Address"), not by member-collection count, so safe to serialize eagerly unlike
         // hostNames/collectionIds/skillNames above. Mirrors constants.js's groupCollectionsByAgent's
@@ -525,6 +532,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     if (StringUtils.isNotBlank(s)) skillNames.add(s);
                 }
             }
+            String cPluginName = AgenticObserveUtil.getPluginName(c);
+            if (cPluginName != null) pluginNames.add(cPluginName);
             if ("agent".equals(rowType) && !isConnectorIngested(envType)) {
                 String serviceName = extractServiceNameForGrouping(hostName);
                 if (serviceName != null && !serviceName.equalsIgnoreCase(groupKey)) {
@@ -567,6 +576,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             g.put("clientType", clientType);
             g.put("endpointsCount", endpointIds.size());
             g.put("skillCount", skillNames.size());
+            g.put("pluginCount", pluginNames.size());
+            if (pluginVersion != null) g.put("pluginVersion", pluginVersion);
+            if (pluginScope != null) g.put("pluginScope", pluginScope);
+            if (pluginStatus != null) g.put("pluginStatus", pluginStatus);
+            if (pluginMarketplace != null) g.put("pluginMarketplace", pluginMarketplace);
             g.put("riskScore", maxRiskScore > 0 ? AgenticObserveUtil.roundRiskScore(maxRiskScore) : null);
             g.put("lastSeenEpoch", maxTrafficTimestamp);
             g.put("hasPersonalAccount", hasPersonalAccount);
@@ -770,7 +784,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     private static Map<String, EndpointGroup> groupCollectionsByEndpointId(List<ApiCollection> collections,
             Map<String, Integer> traffic, Map<String, Double> risk, Map<String, List<String>> sensitive,
             Set<String> maliciousSkillKeys, Map<String, String> usernameMap, String rowType) {
-        boolean useServiceName = "agent".equals(rowType) || "skill".equals(rowType);
+        boolean useServiceName = "agent".equals(rowType) || "skill".equals(rowType) || "plugin".equals(rowType);
         Map<String, EndpointGroup> groups = new LinkedHashMap<>();
         for (ApiCollection c : collections) {
             String hostName = c.getHostName();
@@ -814,15 +828,21 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             child.put("hasMaliciousSkill", childMalicious);
             child.put("skillCount", skillCount);
 
+            // Plugin collections carry the agent's mcp-client/ai-agent tags (naming where the plugin is
+            // installed), so label the child by its own type rather than letting those tags speak.
+            if ("plugin".equals(rowType)) {
+                child.put("type", AgenticObserveUtil.CLIENT_TYPE_PLUGIN);
+            }
+
             EndpointGroup g = groups.computeIfAbsent(deviceId, id -> {
                 EndpointGroup ng = new EndpointGroup(id);
                 ng.username = resolveUsernameByDeviceId(id, usernameMap);
                 return ng;
             });
             g.children.add(child);
-            if (collRisk > g.riskScore) g.riskScore = collRisk;
             if (collTraffic > g.lastSeenEpoch) g.lastSeenEpoch = collTraffic;
             if (childStartTs > 0 && (g.startTs == 0 || childStartTs < g.startTs)) g.startTs = childStartTs;
+            if (collRisk > g.riskScore) g.riskScore = collRisk;
             if (collSensitive != null) g.sensitiveTypes.addAll(collSensitive);
             if (flags[0]) g.hasPersonalAccount = true;
             if (flags[1]) g.hasLocalMcpServer = true;
@@ -1405,6 +1425,27 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 }
             }
 
+            // Plugins get their own collection (<device>.claude-plugin.<name>), like MCP servers — so
+            // this is one group per collection, and the collection belongs to no other group. The
+            // `continue` stops it also becoming an agent/service row off its own mcp-client/ai-agent
+            // tags, which name the agent the plugin is installed on.
+            String pluginName = AgenticObserveUtil.getPluginName(c);
+            if (pluginName != null) {
+                final ApiCollection pc = c;
+                GroupSummary g = groups.computeIfAbsent("plugin|" + pluginName, k -> {
+                    GroupSummary gs = new GroupSummary(pluginName, "plugin");
+                    gs.name = pluginName;
+                    gs.clientType = AgenticObserveUtil.CLIENT_TYPE_PLUGIN;
+                    gs.pluginVersion = AgenticObserveUtil.getPluginTagValue(pc, Constants.AKTO_PLUGIN_VERSION_TAG);
+                    gs.pluginScope = AgenticObserveUtil.getPluginTagValue(pc, Constants.AKTO_PLUGIN_SCOPE_TAG);
+                    gs.pluginStatus = AgenticObserveUtil.getPluginTagValue(pc, Constants.AKTO_PLUGIN_STATUS_TAG);
+                    gs.pluginMarketplace = AgenticObserveUtil.getPluginTagValue(pc, Constants.AKTO_PLUGIN_MARKETPLACE_TAG);
+                    return gs;
+                });
+                g.accumulateCheap(c, hostName, envType, collRisk, collTraffic, deviceId, sensitive);
+                continue;
+            }
+
             if (hostName.contains(AgenticObserveUtil.NOT_ATTACHED_VALUE)) continue; // orphan bucket — not a real agent/service/llm
 
             boolean hasBrowserLlm = hasTagKey(envType, Constants.AKTO_BROWSER_LLM_TAG);
@@ -1485,10 +1526,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             cmp = Comparator.comparingInt(g -> g.endpointIds.size());
         } else if ("skillCount".equals(key)) {
             cmp = Comparator.comparingInt(g -> g.skillNames.size());
+        } else if ("pluginCount".equals(key)) {
+            cmp = Comparator.comparingInt(g -> g.pluginNames.size());
         } else {
             cmp = Comparator.comparingDouble(g -> g.maxRiskScore);
         }
-        return cmp;
+        // Name tiebreak keeps paging stable: plugins/skills mostly share riskScore 0, and an unstable
+        // order under server-side pagination duplicates or skips rows across page turns.
+        return cmp.thenComparing(g -> g.name == null ? "" : g.name, String.CASE_INSENSITIVE_ORDER);
     }
 
     @Setter
@@ -1672,15 +1717,25 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     Set<String> allowed = new HashSet<>(filters.get("type"));
                     all.removeIf(g -> !allowed.contains(g.clientType));
                 }
+                if (filters.containsKey("pluginStatus")) {
+                    Set<String> allowed = new HashSet<>(filters.get("pluginStatus"));
+                    all.removeIf(g -> {
+                        String status = StringUtils.isBlank(g.pluginStatus) ? null
+                                : "enabled".equalsIgnoreCase(g.pluginStatus) ? "enabled" : "disabled";
+                        return status == null || !allowed.contains(status);
+                    });
+                }
                 if (filters.containsKey("tags")) {
                     Set<String> allowedTags = new HashSet<>(filters.get("tags"));
                     Set<String> maliciousKeys = getOrBuildSkillData().maliciousSkillKeys;
                     all.removeIf(g -> {
                         boolean isSkill = "skill".equals(g.rowType);
+                        // Fan-out rows borrow their parent agent collection's flags, so suppress both.
+                        boolean isFanout = isSkill || "plugin".equals(g.rowType);
                         Set<String> groupTags = new HashSet<>();
-                        if (g.hasPersonalAccount && !isSkill) groupTags.add("Contains personal account");
-                        if (g.hasLocalMcpServer && !isSkill) groupTags.add("Local MCP Server");
-                        if (g.hasMisconfiguredConfig && !isSkill) groupTags.add("Misconfigured");
+                        if (g.hasPersonalAccount && !isFanout) groupTags.add("Contains personal account");
+                        if (g.hasLocalMcpServer && !isFanout) groupTags.add("Local MCP Server");
+                        if (g.hasMisconfiguredConfig && !isFanout) groupTags.add("Misconfigured");
                         if (isSkill && StringUtils.isNotBlank(g.name)) {
                             String lname = g.name.toLowerCase(Locale.ROOT);
                             boolean malicious = g.collectionIds.stream()
@@ -1734,6 +1789,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     boolean malicious = g.collectionIds.stream().anyMatch(cid -> maliciousKeys.contains(cid + "|" + lname));
                     if (malicious) row.put("isMalicious", true);
                 }
+                // Plugin discovery carries no risk of its own, and g.maxRiskScore is the AGENT's —
+                // showing it would mark every plugin on a risky agent as risky.
+                if ("plugin".equals(g.rowType)) row.put("riskScore", null);
+                if ("plugin".equals(g.rowType)) row.put("aiInteractions", null);
                 rowsOut.add(row);
             }
             loggerMaker.warnAndAddToDb("[fetchAgenticAssetsSummary-timing] TOTAL=" + (System.currentTimeMillis() - tStart)
@@ -1755,6 +1814,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Getter private List<String> assetHostNames;
     @Getter private List<Integer> assetCollectionIds;
     @Getter private List<String> assetSkillNames;
+    @Getter private List<String> assetPluginNames;
     @Getter private List<String> assetMcpServers;
     @Getter private Map<String, List<Integer>> assetMcpServerCollectionIds;
     @Getter private List<BasicDBObject> assetDevices;
@@ -1807,6 +1867,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 assetHostNames = Collections.emptyList();
                 assetCollectionIds = Collections.emptyList();
                 assetSkillNames = Collections.emptyList();
+                assetPluginNames = Collections.emptyList();
                 assetMcpServers = Collections.emptyList();
                 assetMcpServerCollectionIds = Collections.emptyMap();
                 assetDevices = Collections.emptyList();
@@ -1821,6 +1882,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             assetHostNames = new ArrayList<>(g.hostNames);
             assetCollectionIds = g.collectionIds;
             assetSkillNames = new ArrayList<>(g.skillNames);
+            assetPluginNames = new ArrayList<>(g.pluginNames);
             assetMcpServers = new ArrayList<>(g.serviceNames);
             assetMcpServerCollectionIds = new HashMap<>();
             for (Map.Entry<String, Set<Integer>> e : g.serviceCollectionIds.entrySet()) {
@@ -1842,6 +1904,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             assetHasInlineLlm = false;
             assetInlineToolNames = Collections.emptyList();
             assetMcpComponentCount = 0;
+            // "skill" and "plugin" rows want neither, so they skip the expensive STI query below.
             boolean wantsInlineTopology = "agent".equals(g.rowType);
             boolean wantsComponentCount = "service".equals(g.rowType) || "llm".equals(g.rowType);
             if ((wantsInlineTopology || wantsComponentCount) && !g.collectionIds.isEmpty()) {
@@ -2128,6 +2191,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         List<Map<String, String>> tags = Collections.emptyList();
         int nonSkillCollectionsCount = 0;
         final Set<String> uniqueSkillNames = new HashSet<>();
+        final Set<String> uniquePluginNames = new HashSet<>();
         // Device-row extras (DeviceEndpoints only — null/zero when not populated, e.g. Users-and-Devices).
         String os = null;
         String username = "-";
@@ -2150,6 +2214,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     if (StringUtils.isNotBlank(s)) uniqueSkillNames.add(s.toLowerCase(Locale.ROOT));
                 }
             }
+            // Plugins have their own collection, so nonSkillCollectionsCount above already counted it —
+            // this set is for the "N plugins" badge only, never added to the asset total.
+            String pluginName = AgenticObserveUtil.getPluginName(c);
+            if (pluginName != null) uniquePluginNames.add(pluginName.toLowerCase(Locale.ROOT));
             if (sensitive != null) sensitiveTypes.addAll(sensitive);
             if (collRisk > maxRiskScore) maxRiskScore = collRisk;
             if (collTraffic > maxTrafficTimestamp) maxTrafficTimestamp = collTraffic;
@@ -2181,7 +2249,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             row.put("inventoryScopeLabel", groupName);
             row.put("clientType", sortedTypes.isEmpty() ? "-" : String.join(", ", sortedTypes));
             row.put("hostNames", new ArrayList<>(hostNames));
-            row.put("endpointsCount", isUserGroup ? nonSkillCollectionsCount + uniqueSkillNames.size() : hostNames.size());
+            // Keep in sync with fetchUsersAndDevicesStats' own copy of this sum, or the header tile and
+            // the rows below it disagree.
+            row.put("endpointsCount", isUserGroup
+                    ? nonSkillCollectionsCount + uniqueSkillNames.size()
+                    : hostNames.size());
             row.put("sensitiveInRespTypes", new ArrayList<>(sensitiveTypes));
             row.put("riskScore", maxRiskScore);
             row.put("lastSeenEpoch", maxTrafficTimestamp);
@@ -2200,6 +2272,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             row.put("hasLocalMcpServer", hasLocalMcpServer);
             row.put("hasMisconfiguredConfig", hasMisconfiguredConfig);
             row.put("uniqueSkillNames", new ArrayList<>(uniqueSkillNames));
+            row.put("uniquePluginNames", new ArrayList<>(uniquePluginNames));
             row.put("os", os);
             row.put("username", username);
             BasicDBObject violationsObj = new BasicDBObject();
@@ -2425,6 +2498,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             long usersAgenticAssetsTotal = 0;
             for (HostGroupSummary g : userGroups.values()) {
+                // Mirrors HostGroupSummary.toRow's endpointsCount — change both together.
                 usersAgenticAssetsTotal += g.nonSkillCollectionsCount + g.uniqueSkillNames.size();
             }
             long devicesAgenticAssetsTotal = 0;
@@ -2495,6 +2569,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             });
         } else if ("skillCount".equals(key)) {
             return Comparator.comparingInt(r -> ((Number) r.getOrDefault("skillCount", 0)).intValue());
+        } else if ("pluginCount".equals(key)) {
+            return Comparator.comparingInt(r -> ((Number) r.getOrDefault("pluginCount", 0)).intValue());
         }
         return Comparator.comparing((BasicDBObject r) -> String.valueOf(r.get("endpoint")), String.CASE_INSENSITIVE_ORDER);
     }

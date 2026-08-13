@@ -84,10 +84,12 @@ export function AssetNameCellRenderer({ data }) {
     if (!data) return null;
     // Match old UI: personal-account + local-MCP markers for non-Skill rows; malicious marker for Skills
     const isSkill = data.type === "Skill";
-    const showLocalMcp = data.hasLocalMcpServer && !isSkill;
-    const showPersonal = data.hasPersonalAccount && !isSkill;
+    // Skill/Plugin rows fan out from the agent collection, so they'd inherit its markers otherwise.
+    const isFanout = isSkill || data.type === "Plugin";
+    const showLocalMcp = data.hasLocalMcpServer && !isFanout;
+    const showPersonal = data.hasPersonalAccount && !isFanout;
     const showMalicious = data.isMalicious && isSkill;
-    const showMisconfigured = data.hasMisconfiguredConfig && !isSkill;
+    const showMisconfigured = data.hasMisconfiguredConfig && !isFanout;
     return (
         <HorizontalStack gap="2" blockAlign="center" wrap={false}>
             <AssetIcon type={data.type} assetTagValue={data.assetTagValue} size={24} />

@@ -271,6 +271,7 @@ export default {
             hostNames: resp?.assetHostNames || [],
             collectionIds: resp?.assetCollectionIds || [],
             skillNames: resp?.assetSkillNames || [],
+            pluginNames: resp?.assetPluginNames || [],
             mcpServers: resp?.assetMcpServers || [],
             mcpServerCollectionIds: resp?.assetMcpServerCollectionIds || {},
             devices: resp?.assetDevices || [],
@@ -309,11 +310,13 @@ export default {
     // endpoints, which need those account-wide maps client-fetched once to enrich every row of a
     // big grid, this endpoint computes them itself server-side, scoped to apiCollectionIds — no
     // point requiring the client to fetch/repost a whole-account map for a handful of entries.
-    async fetchAgenticAssetEndpointsPage({ apiCollectionIds, rowType, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters } = {}) {
+    // groupKey names the asset being drilled into — plugin rows need it so their child row can be the
+    // plugin itself rather than the agent collection it was discovered on.
+    async fetchAgenticAssetEndpointsPage({ apiCollectionIds, rowType, groupKey, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetEndpointsPage',
             method: 'post',
-            data: { apiCollectionIds, rowType, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters },
+            data: { apiCollectionIds, rowType, groupKey, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters },
         })
         return {
             endpoints: resp?.endpoints || [],

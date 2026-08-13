@@ -736,6 +736,10 @@ export const buildAgenticInventoryFilterForRow = (row) => {
     if (row.rowType === ROW_TYPES.SKILL && row.groupKey) {
         return createEnvTypeFilter([`${SKILL_TAG_KEY}=${row.groupKey}`], false);
     }
+    // Plugins have their own collections, so filter by hostname like SERVICE above — not by tag.
+    if (row.rowType === ROW_TYPES.PLUGIN && row.hostNames?.length > 0) {
+        return createHostnameFilter(row.hostNames, { inventoryScopeLabel: row.groupName || row.groupKey });
+    }
     return null;
 };
 
@@ -1204,6 +1208,20 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
     PersistStore.getState().setSkillRiskScoreCache({ data: skillScoreMap, maliciousSkills: [...maliciousSkills], maliciousSkillKeys: [...maliciousSkillKeys], misconfiguredSkills: [...misconfiguredSkills], misconfiguredCollectionIds: [...misconfiguredCollectionIds], ts: Date.now() });
     return { skillScoreMap, maliciousSkills, maliciousSkillKeys, misconfiguredSkills, misconfiguredCollectionIds };
 }
+
+// Promise.allSettled helpers — a page's mount batch must degrade per-member, never blank the page.
+export const settledValue = (settled, fallback) =>
+    settled?.status === "fulfilled" && settled.value != null ? settled.value : fallback;
+
+// Rejections are still surfaced; silently swallowing them is what makes an empty page unexplainable.
+export const logRejected = (label, byName) => {
+    Object.entries(byName).forEach(([name, settled]) => {
+        if (settled?.status === "rejected") {
+            // eslint-disable-next-line no-console
+            console.error(`${label}: ${name} failed:`, settled.reason);
+        }
+    });
+};
 
 // In-flight dedup on top of the PersistStore TTL cache below — skillRiskScoreCache/guardrailPolicyNames
 // only do a TTL check, so two pages mounting in the same tick (e.g. the agenticNewLayout redirect chain)

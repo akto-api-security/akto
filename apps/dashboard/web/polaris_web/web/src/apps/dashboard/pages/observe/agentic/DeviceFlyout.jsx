@@ -348,19 +348,25 @@ function OverviewTab({ device, agents, collections, onTabChange, startTimestamp,
         let cancelled = false;
         (async () => {
             try {
-                const entries = await Promise.all(aiAgents.map(async (agent, idx) => {
+                // allSettled at both levels — one failing collection used to blank the tools list for
+                // every agent in the flyout, not just its own.
+                const settled = await Promise.allSettled(aiAgents.map(async (agent, idx) => {
                     const ids = agent.collectionIds || [];
                     if (!ids.length) return [idx, []];
-                    const bundles = await Promise.all(ids.map(id => agenticObserveApi.fetchAgentBuiltinToolsData(id)));
+                    const bundles = await Promise.allSettled(ids.map(id => agenticObserveApi.fetchAgentBuiltinToolsData(id)));
                     const seen = new Set();
                     const tools = [];
-                    bundles.flat().forEach((tool) => {
-                        if (!tool?.name || seen.has(tool.name)) return;
-                        seen.add(tool.name);
-                        tools.push(tool);
+                    bundles.forEach((b) => {
+                        if (b.status !== "fulfilled") return;
+                        (b.value || []).forEach((tool) => {
+                            if (!tool?.name || seen.has(tool.name)) return;
+                            seen.add(tool.name);
+                            tools.push(tool);
+                        });
                     });
                     return [idx, tools];
                 }));
+                const entries = settled.filter((s) => s.status === "fulfilled").map((s) => s.value);
                 if (!cancelled) setAgentTools(Object.fromEntries(entries));
             } catch {
                 if (!cancelled) setAgentTools({});
