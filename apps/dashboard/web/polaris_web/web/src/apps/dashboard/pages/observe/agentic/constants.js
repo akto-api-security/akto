@@ -19,12 +19,13 @@ import {
     getClientTagVariants,
     resolveClientKey,
 } from "./mcpClientHelper";
-export { CLIENT_TAG_ALIASES, getClientTagVariants, resolveClientKey };
 import func from "@/util/func";
 import {
     getResolvedUsernameForCollection,
     DEFAULT_VALUE,
 } from "../api_collections/endpointShieldHelper";
+
+export { CLIENT_TAG_ALIASES, getClientTagVariants, resolveClientKey };
 
 // Table constants
 export const PAGE_LIMIT = 100;
