@@ -114,10 +114,9 @@
             </result>
         </action>
 
-        <!-- Allowlisted proxy to database-abstractor, one literal action per proxied path
-             (see AbstractorProxyAction.ALLOWED_PATHS). Both share the same Action class —
-             adding another proxied endpoint means one more <action> block here plus one
-             entry in ALLOWED_PATHS, no new class needed.
+        <!-- Proxy to database-abstractor, one literal action per proxied path. Both share
+             the same Action class — adding another proxied endpoint means one more
+             <action> block here, no new class needed.
              No "json" interceptor: the action reads the raw request body itself so the
              payload (top-level, not nested under a field name) is forwarded verbatim. -->
         <action name="api/updateModuleInfoForHeartbeat" class="com.akto.action.AbstractorProxyAction" method="proxy">
@@ -125,11 +124,6 @@
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <param name="includeProperties">^success,^message,^data.*</param>
-            </result>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^success,^message</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -143,11 +137,6 @@
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <param name="includeProperties">^success,^message,^data.*</param>
-            </result>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^success,^message</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

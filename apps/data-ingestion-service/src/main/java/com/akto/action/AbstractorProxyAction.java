@@ -13,16 +13,13 @@ import javax.servlet.http.HttpServletRequest;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
- * Allowlisted reverse proxy from data-ingestion-service to the database-abstractor service.
+ * Reverse proxy from data-ingestion-service to the database-abstractor service.
  * Lets callers that must not reach database-abstractor directly (e.g. CLI hooks sending
  * heartbeats) go through data-ingestion-service, which alone has network access to it.
  * The exposed path is identical to the abstractor's own path (see struts.xml) so client
@@ -32,9 +29,10 @@ import java.util.Set;
  * post their payload at the top level (e.g. {@code {"moduleInfo": {...}}}), not nested
  * under a named field, so binding it onto a typed action property would drop it.
  *
- * To proxy another database-abstractor endpoint, add its name to ALLOWED_PATHS here and
- * register one more literal &lt;action&gt; for it in struts.xml (same class, different
- * "subpath" param) — no new Action class needed.
+ * Which abstractor paths are reachable is controlled entirely by struts.xml — "subpath"
+ * is a fixed per-action &lt;param&gt;, never client input. To proxy another endpoint,
+ * register one more literal &lt;action&gt; there (same class, different "subpath" param) —
+ * no new Action class needed.
  */
 @lombok.Getter
 @lombok.Setter
@@ -42,11 +40,6 @@ public class AbstractorProxyAction extends ActionSupport implements ServletReque
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AbstractorProxyAction.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final ObjectMapper objectMapper = new ObjectMapper();
-
-    private static final Set<String> ALLOWED_PATHS = new HashSet<>(Arrays.asList(
-            "updateModuleInfoForHeartbeat",
-            "updateModuleInfoForHeartbeatV2"
-    ));
 
     private static final String ABSTRACTOR_URL = buildAbstractorUrl();
     private static final String ABSTRACTOR_TOKEN = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
@@ -68,13 +61,6 @@ public class AbstractorProxyAction extends ActionSupport implements ServletReque
 
     public String proxy() {
         String normalizedPath = subpath == null ? "" : subpath.replaceAll("^/+", "").replaceAll("/+$", "");
-
-        if (!ALLOWED_PATHS.contains(normalizedPath)) {
-            loggerMaker.warnAndAddToDb("Rejected abstractor proxy request for disallowed path: " + normalizedPath);
-            success = false;
-            message = "Path not allowed";
-            return "FORBIDDEN";
-        }
 
         if (ABSTRACTOR_URL == null) {
             loggerMaker.errorAndAddToDb("DATABASE_ABSTRACTOR_SERVICE_URL not configured; cannot proxy " + normalizedPath);
