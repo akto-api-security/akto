@@ -84,6 +84,32 @@ export async function fetchAgenticViolationCountsByHost({ startTimestamp, endTim
     return byHost;
 }
 
+// Skill-name equivalent of fetchAgenticViolationCountsByHost above — skills aren't attributable
+// by host/collection (a skill's declaring collection is shared with the agent/device that
+// invoked it), so this is keyed by the skill name the backend extracts from each event's
+// /skills/<name> endpoint instead. Same "must not fail the caller's Promise.all" contract.
+export async function fetchAgenticSkillViolationCounts({ startTimestamp, endTimestamp } = {}) {
+    let rows;
+    try {
+        rows = await observeApi.fetchSkillSeverityCounts(startTimestamp, endTimestamp);
+    } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("fetchAgenticSkillViolationCounts failed:", e);
+        rows = [];
+    }
+    const bySkill = {};
+    (rows || []).forEach((r) => {
+        if (!r?.skillName) return;
+        bySkill[r.skillName] = {
+            critical: r.critical || 0,
+            high: r.high || 0,
+            medium: r.medium || 0,
+            low: r.low || 0,
+        };
+    });
+    return bySkill;
+}
+
 // Server-side host->collection attribution (AgenticObserveAction.attributeViolationCountsToCollections)
 // — takes the already-fetched per-host counts and returns them re-keyed by collection id, without the
 // caller needing the account's raw collection list at all. Replaces the old client-side

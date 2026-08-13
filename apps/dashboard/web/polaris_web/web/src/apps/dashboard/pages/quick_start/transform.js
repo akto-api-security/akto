@@ -480,6 +480,18 @@ const amazonQuickObj = {
     />
 }
 
+const gleanObj = {
+    icon: '/public/glean.svg',
+    label: "Glean",
+    text: "Import your Glean assistant interactions and agent activity, seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/glean',
+    key: "GLEAN",
+    component: <BannerComponent
+        content="Import your Glean assistant interactions and agent activity, seamlessly in AKTO."
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/glean'
+    />
+}
+
 const aiAgentGlobalProxy = {
     icon: '/public/aws_bedrock.svg',
     label: "Global Proxy",
@@ -2332,7 +2344,7 @@ const quickStartFunc = {
                 "Endpoint Management": endpointManagement,
                 "MDM Tools": mdmTools,
                 "Agentic Proxies": agenticProxies,
-                "Platform connectors": [anthropicImportObj, openaiImportObj, m365CopilotObj, copilotStudioImportObj, copilotStudioMultiEnvImportObj, amazonQuickObj],
+                "Platform connectors": [anthropicImportObj, openaiImportObj, m365CopilotObj, copilotStudioImportObj, copilotStudioMultiEnvImportObj, amazonQuickObj, gleanObj],
                 "Browser Extension": browserExtensions,
                 "Locally Hosted Models": localHostedModels,
                 "Secure Web Networks": secureWebNetworks,

@@ -4,7 +4,7 @@ import { Outlet, useNavigate } from "react-router-dom"
 import './settings.css'
 import SettingsLeftNav from "./nav/SettingsLeftNav";
 import { useEffect } from "react";
-import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "../../../main/labelHelper";
+import { isEndpointSecurityCategory } from "../../../main/labelHelper";
 
 function SettingsHeader({ onHandleClose }) {
     const buttonComp = (
@@ -28,7 +28,7 @@ const Settings = () => {
     const navigate = useNavigate();
 
     const handleSettingsClose = () => {
-        if (isEndpointSecurityCategory() || isAgenticSecurityCategory()) {
+        if (isEndpointSecurityCategory()) {
             navigate("/dashboard/observe/agentic-assets");
         } else {
             navigate("/dashboard/observe/inventory");

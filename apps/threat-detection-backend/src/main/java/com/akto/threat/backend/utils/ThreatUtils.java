@@ -83,7 +83,8 @@ public class ThreatUtils {
         return new Document("$and", Arrays.asList(nullOrNotExistsCondition, filterIdCondition));
     }
 
-    private static final Pattern SKILLS_ENDPOINT_PATTERN = Pattern.compile("^/skills/");
+    public static final Pattern SKILLS_ENDPOINT_PATTERN = Pattern.compile("^/skills/");
+    public static final int SKILLS_ENDPOINT_PREFIX_LENGTH = "/skills/".length();
 
     // Excludes /skills/<name> endpoint events (skill invocations) from dashboard-level violation
     // aggregations - same partition MaliciousEventService.listMaliciousRequests already applies

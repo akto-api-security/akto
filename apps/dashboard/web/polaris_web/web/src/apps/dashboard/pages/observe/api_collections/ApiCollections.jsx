@@ -37,7 +37,7 @@ import ReactFlow, {
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
 import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../../main/labelHelper";
 import useAgenticFilter, { FILTER_TYPES } from "./useAgenticFilter";
-import { AGENTIC_OBSERVE_BACK_PATHS, INVENTORY_FILTER_KEY, fetchAndCacheSkillApiData } from "../agentic/constants";
+import { AGENTIC_OBSERVE_BACK_PATHS, INVENTORY_FILTER_KEY, fetchAndCacheSkillApiData, fetchAndCacheAgenticTrafficRiskBundle, fetchAndCacheAgenticSensitiveInfo } from "../agentic/constants";
 import AgentEndpointTreeTable from "./AgentEndpointTreeTable";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "./endpointShieldHelper";
 import { sendQuery } from "../../agentic/services/agenticService";
@@ -522,12 +522,32 @@ function ApiCollections(props) {
 
     const navigate = useNavigate();
 
-    // /inventory is deprecated for Atlas/Argus; redirect unless embedded (e.g. McpSecurityPage's tab)
+    // /inventory is deprecated for Atlas (its left-nav always targets /agentic-assets directly, so
+    // reaching /inventory here means a stale link/back-button); redirect unless embedded (e.g.
+    // McpSecurityPage's tab). Argus has NO equivalent grouped page — its own left-nav intentionally
+    // sends it to /inventory, and this component's isArgus-conditional rendering below is its real
+    // view, so it must not be redirected away from itself.
+    //
+    // Exception within Atlas itself: UsersAndDevices.jsx's row click stores a device/agent filter
+    // under INVENTORY_FILTER_KEY *before* navigating here, so this page can render that device's
+    // endpoint tree (AgentEndpointTreeTable, see useTreeView below). Redirecting unconditionally
+    // skipped that tree entirely and sent the user straight to the grouped assets page instead,
+    // discarding the filter/context — so redirect only when there's no such filter, i.e. a stale
+    // link/bookmark/back-button, not a drill-down.
+    const inventoryPageFilters = PersistStore(state => state.filtersMap)?.[INVENTORY_FILTER_KEY];
+    // The specific device/agent hostName list from that filter, when present — lets fetchData's
+    // mount effect below take a scoped path (fetchCollectionsBasicForHostNames, a real DB $in
+    // query) instead of api.getAllCollectionsBasic()'s whole-account fetch, which doesn't scale to
+    // accounts with thousands of devices/collections just to filter down to one device's handful
+    // client-side afterward (useAgenticFilter's hostName branch). Only hostName-type filters have
+    // this scoped alternative; envType/tag-based filters still need the full account fetch to
+    // match tag values, so they keep going through fetchData unchanged.
+    const deviceHostNamesFilter = inventoryPageFilters?.filters?.find(f => f.key === 'hostName' && !f.value?.negated)?.value?.values;
     useEffect(() => {
-        if (!onlyShowCollectionsTable && (isEndpointSecurityCategory() || isAgenticSecurityCategory())) {
+        if (!onlyShowCollectionsTable && isEndpointSecurityCategory() && !inventoryPageFilters) {
             navigate("/dashboard/observe/agentic-assets", { replace: true });
         }
-    }, [navigate]);
+    }, [navigate, inventoryPageFilters]);
 
     const getAgenticObserveBackUrl = () => {
         if (!isEndpointSecurityCategory()) return undefined;
@@ -1118,6 +1138,54 @@ function ApiCollections(props) {
         }
     }
 
+    // Lightweight counterpart to fetchData() above, for the device-tree drill-down (see
+    // deviceHostNamesFilter/useTreeView) — fetches just this device's own collections via a scoped
+    // $in query (fetchCollectionsBasicForHostNames) instead of the whole account
+    // (api.getAllCollectionsBasic()), matching the server-side-scoped pattern already used
+    // elsewhere on Atlas (AgenticAssetsPage.jsx, Endpoints.jsx, UsersAndDevices.jsx). Traffic/risk/
+    // sensitive-data maps still come from the same shared, cached, account-wide bundles those
+    // pages use (fetchAndCacheAgenticTrafficRiskBundle/fetchAndCacheAgenticSensitiveInfo) — those
+    // are already cheap (small id->value maps, not full documents) and likely already warm from
+    // the UsersAndDevices.jsx page the user just navigated from.
+    // Deliberately does NOT touch the global collectionsMap/hostNameMap/tagCollectionsMap/
+    // registryStatusMap PersistStore caches fetchData populates below — those are account-wide by
+    // contract, and overwriting them with just this one device's handful of collections would
+    // corrupt them for every other page that reads them.
+    async function fetchTargetedDeviceCollections(deviceHostNames, isMountedRef) {
+        try {
+            setLoading(true);
+            const [collectionsResp, trafficRiskBundle, sensitiveMap, endpointUsernameMap] = await Promise.all([
+                api.fetchCollectionsBasicForHostNames(deviceHostNames),
+                fetchAndCacheAgenticTrafficRiskBundle({ api, PersistStore }),
+                fetchAndCacheAgenticSensitiveInfo({ api, PersistStore }),
+                fetchEndpointShieldUsernameMap(),
+            ]);
+            if (!isMountedRef.current) return;
+
+            const cacheMaps = {
+                trafficInfoMap: trafficRiskBundle?.trafficMap || {},
+                coverageMap: {},
+                riskScoreMap: trafficRiskBundle?.riskScoreMap || {},
+                severityInfoMap: {},
+                sensitiveInfoMap: sensitiveMap || {},
+                usernameMap: endpointUsernameMap || {},
+            };
+
+            const lightweightData = (collectionsResp?.apiCollections || []).map(c => transformRawCollectionData(c, cacheMaps));
+            const { categorized, envTypeObj } = categorizeCollections(lightweightData);
+
+            setData(categorized);
+            setNormalData(lightweightData);
+            setEnvTypeMap(envTypeObj);
+            setUsernameMap(endpointUsernameMap || {});
+            setSummaryData({ totalEndpoints: 0, totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0, totalAllowedForTesting: 0 });
+            setHasUsageEndpoints(true);
+            setLoading(false);
+        } catch (error) {
+            if (isMountedRef.current) setLoading(false);
+        }
+    }
+
     function disambiguateLabel(key, value) {
         return func.convertToDisambiguateLabelObj(value, null, 2)
     }
@@ -1174,7 +1242,11 @@ function ApiCollections(props) {
     useEffect(() => {
         const isMountedRef = { current: true };
 
-        fetchData(isMountedRef, false); // Use cache on mount
+        if (isEndpointSecurityCategory() && deviceHostNamesFilter?.length > 0) {
+            fetchTargetedDeviceCollections(deviceHostNamesFilter, isMountedRef);
+        } else {
+            fetchData(isMountedRef, false); // Use cache on mount
+        }
         resetFunc();
 
         // Cleanup function to prevent state updates after unmount
