@@ -126,13 +126,16 @@ public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> 
 
         return defaultTestSuites;
     }
-
     public static void insertDefaultTestSuites() {
 
         AccountSettings as = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         int diff = Context.now() - as.getDefaultSuitesLastUpdatedAt();
         if(diff <= Constants.ONE_DAY_TIMESTAMP){
             return;
+        }
+
+        if(as.getDefaultSuitesLastUpdatedAt() == 0){
+            DefaultTestSuitesDao.instance.deleteAll(Filters.empty());
         }
 
         Map<String, Map<String, List<String>>> defaultTestSuitesMap = getDefaultTestSuitesMap(as.getDefaultSuitesLastUpdatedAt());

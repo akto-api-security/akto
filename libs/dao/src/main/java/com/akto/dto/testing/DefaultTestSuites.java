@@ -37,10 +37,8 @@ public class DefaultTestSuites extends TestSuites {
         SEVERITY,
         DURATION,
         MCP_SECURITY,
-        AI_AGENT_SECURITY,
         ATTACK_BASE_TECHNIQUE,
-        ATTACK_STRATEGY,
-        ATTACK_TECHNIQUE
+        ATTACK_STRATEGY
     }
 
     public static final Map<String, List<String>> owaspTop10List = new HashMap<>();
@@ -114,8 +112,8 @@ public class DefaultTestSuites extends TestSuites {
         String[] parts = name.split("-");
         for (String baseTechnique : attackBaseTechniqueList) {
             if (name.toLowerCase().contains(baseTechnique.toLowerCase())) {
-                String lastPart = parts[parts.length -1];
-                if(lastPart.toLowerCase().equals(baseTechnique.toLowerCase())){
+                String lastPart = parts[parts.length - 1].trim();
+                if (lastPart.equalsIgnoreCase(baseTechnique)) {
                     return baseTechnique + "-basic";
                 }
                 return baseTechnique;
