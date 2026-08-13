@@ -19,7 +19,6 @@ public class DefaultTestSuites extends TestSuites {
         testSuitesPerType.put(DefaultSuitesType.DURATION.name(), 2);
         testSuitesPerType.put(DefaultSuitesType.MCP_SECURITY.name(), 8);
         testSuitesPerType.put(DefaultSuitesType.ATTACK_BASE_TECHNIQUE.name(), 13);
-        testSuitesPerType.put(DefaultSuitesType.ATTACK_BASE_TECHNIQUE.name(), 13);
         testSuitesPerType.put(DefaultSuitesType.ATTACK_STRATEGY.name(), 10);
 
     }
