@@ -385,6 +385,8 @@ public class TestExecutor {
 
         // init the singleton class here
         TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed(), testingRun.getRunAutomatedTests());
+        TestingConfigurations.getInstance().setDashboardContext(
+                testingRun.getDashboardContext() != null ? testingRun.getDashboardContext().toString() : null);
 
         Set<Integer> collectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
         List<ApiCollection> apiCollections = dataActor.fetchApiCollectionsByIds(new ArrayList<>(collectionIds), LogDb.TESTING);
@@ -1120,7 +1122,7 @@ public class TestExecutor {
     }
 
     private static final ExecutorService legacyTestTimeoutExecutor = Executors.newCachedThreadPool();
-    private static final int MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS = 5 * 60;
+    private static final int MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS = System.getenv("MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS") != null ? Integer.parseInt(System.getenv("MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS")) : 12 * 60;
 
     /**
      * Executes legacy testing approach (fallback mode)
@@ -1311,6 +1313,10 @@ public class TestExecutor {
         // Add SSRF tracking values to varMap
         if(testRunId != null) {
             varMap.put("testRunId", testRunId.toHexString());
+        }
+        String dashboardContext = TestingConfigurations.getInstance().getDashboardContext();
+        if (dashboardContext != null) {
+            varMap.put("dashboardContext", dashboardContext);
         }
         if(testRunResultSummaryId != null) {
             varMap.put("testRunResultSummaryId", testRunResultSummaryId.toHexString());

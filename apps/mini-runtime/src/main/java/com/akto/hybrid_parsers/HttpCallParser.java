@@ -1650,6 +1650,36 @@ public class HttpCallParser {
         return res;
     }
 
+    /**
+     * Sends the agentic trace for this request to cyborg.
+     *
+     * Kept out of the filter loop's main body so it can also run for traffic the schema filters drop.
+     * A prompt blocked by guardrails is ingested as 4xx, and that is exactly the traffic a trace has
+     * to show - but API discovery should keep ignoring failed responses, so the message is still
+     * dropped for schema purposes.
+     */
+    private void captureAgentTrace(HttpResponseParams httpResponseParam, Map<String, String> tagsMap) {
+        FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(), "AGENT_TRAFFIC_LOGS");
+        boolean allowAnalysis = featureAccess != null && featureAccess.getIsGranted();
+        if (!allowAnalysis || !isAgenticTraffic(tagsMap)
+                || httpResponseParam.getRequestParams().getUrl().contains("skill")) {
+            return;
+        }
+
+        AgentQueryRecord record = AgentQueryRecord.fromHttpResponseParams(
+                httpResponseParam, tagsMap, getDeviceUserMap());
+        if (record == null) {
+            return;
+        }
+
+        loggerMaker.infoAndAddToDb("Storing agent query data " + record.toString());
+        String payload = httpResponseParam.getRequestParams().getPayload();
+        if (payload != null && payload.length() > 3) {
+            loggerMaker.info("Actually storing agent record" + record.getSpanId());
+            dataActor.storeAgentQueryData(record);
+        }
+    }
+
     public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, AccountSettings accountSettings) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
@@ -1678,6 +1708,11 @@ public class HttpCallParser {
                 }
 
                 if (!cond){
+                    // A prompt blocked by guardrails is ingested as 4xx, and that is exactly the
+                    // traffic a trace needs to show. Record the trace before dropping the message, so
+                    // API discovery keeps ignoring failed responses exactly as it did before.
+                    captureAgentTrace(httpResponseParam, parseTagsMap(httpResponseParam.getTags()));
+
                     if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
                         Utils.printUrlDebugLog("Found debug url in filterHttpResponseParams invalid response code "
                                 + httpResponseParam.getRequestParams().getURL() + " response code " + httpResponseParam.getStatusCode());
@@ -1817,23 +1852,8 @@ public class HttpCallParser {
             int apiCollectionId = createApiCollectionId(httpResponseParam, tagsMap);
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
-            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(),"AGENT_TRAFFIC_LOGS");
-            boolean allowAnalysis = featureAccess != null && featureAccess.getIsGranted();
-
             // if traffic is agentic, then send the data to cyborg
-            if (allowAnalysis && isAgenticTraffic(tagsMap) && (!httpResponseParam.getRequestParams().getUrl().contains("skill"))) {
-                AgentQueryRecord record = AgentQueryRecord.fromHttpResponseParams(
-                        httpResponseParam, tagsMap, getDeviceUserMap());
-                if (record != null) {
-                    loggerMaker.infoAndAddToDb("Storing agent query data " + record.toString());
-                    String payload = httpResponseParam.getRequestParams().getPayload();
-                    if(payload.length() > 3){
-                        loggerMaker.info("Actually storing agent record" + record.getSpanId());
-                        dataActor.storeAgentQueryData(record);
-                    }
-                    
-                }
-            }
+            captureAgentTrace(httpResponseParam, tagsMap);
 
             // Parse N8N trace metadata if this is N8N traffic
             if (isN8nTraffic(tagsMap)) {
