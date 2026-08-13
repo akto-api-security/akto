@@ -53,8 +53,8 @@ function TopSection({ stats, violationsBySeverity, totalViolations }) {
                 <VerticalStack>
                     <AgenticStatsCard
                         title="Total Endpoints"
-                        total={stats?.deviceCount ?? 0}
-                        delta={stats?.deltaEndpoints ?? 0}
+                        total={summary?.totalEndpoints ?? 0}
+                        delta={summary?.deltaEndpoints ?? 0}
                         sparklineCounts={sparklines.endpoints}
                         sparklineColor="#7C3AED"
                         sparklineLabels={stats?.monthLabels}

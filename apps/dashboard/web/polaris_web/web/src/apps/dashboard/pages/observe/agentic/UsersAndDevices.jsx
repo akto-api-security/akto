@@ -17,9 +17,9 @@ import NewLayoutTooltip from "./NewLayoutTooltip";
 import {
     getHeaders,
     getSortOptionsWithoutIconColumn,
-    PAGE_LIMIT,
     INVENTORY_PATH,
     INVENTORY_FILTER_KEY,
+    PAGE_LIMIT,
     buildAgenticInventoryFilterForRow,
     fetchAndCacheSkillApiData,
     // Note: this page's malicious-skill badge stays name-only (enrichRef.maliciousSkills), not the

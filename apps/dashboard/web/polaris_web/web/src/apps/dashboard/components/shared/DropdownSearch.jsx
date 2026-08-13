@@ -1,6 +1,6 @@
 import { Autocomplete, Avatar, Icon, Link, TextContainer } from '@shopify/polaris';
 import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import func from "@/util/func";
 function DropdownSearch(props) {
 
@@ -10,8 +10,6 @@ function DropdownSearch(props) {
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
-    const selectedOptionsRef = useRef(selectedOptions);
-    selectedOptionsRef.current = selectedOptions;
     const [inputValue, setInputValue] = useState(value ? value : undefined);
     const [options, setOptions] = useState(deselectedOptions);
     const [loading, setLoading] = useState(false);
@@ -56,12 +54,12 @@ function DropdownSearch(props) {
         }
     }, [deselectedOptions, value, preSelected])
 
-    const updateText = useCallback(
+    // Recomputes the dropdown's visible option list for a given search string, without touching
+    // the text field's own displayed value — used both by actual typing (updateText, below) and by
+    // focus (handleFocusEvent), which needs to refresh options for an empty search without wiping
+    // the "N items selected" summary text currently shown in the field.
+    const refreshOptions = useCallback(
         (value) => {
-            if (!(allowMultiple && value === '' && selectedOptionsRef.current.length > 0)) {
-                setInputValue(value);
-            }
-
             if (!loading) {
                 setLoading(true);
             }
@@ -117,8 +115,16 @@ function DropdownSearch(props) {
         [deselectedOptions, loading],
     );
 
+    const updateText = useCallback(
+        (value) => {
+            setInputValue(value);
+            refreshOptions(value);
+        },
+        [refreshOptions],
+    );
+
     const handleFocusEvent = () => {
-        updateText('');
+        refreshOptions('');
     }
 
     const updateSelection = useCallback(
