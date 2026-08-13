@@ -20,6 +20,7 @@ import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.kafka.Kafka;
+import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.execution.Executor;
@@ -29,7 +30,8 @@ import com.akto.util.Constants;
 public class Producer {
 
     public static final Kafka producer = Constants.IS_NEW_TESTING_ENABLED
-            ? new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT, 3)
+            ? new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT, 3,
+                    KafkaConfig.getKafkaUsername(), KafkaConfig.getKafkaPassword(), KafkaConfig.isKafkaAuthenticationEnabled())
             : null;
     
     private static final LoggerMaker loggerMaker = new LoggerMaker(Producer.class, LogDb.TESTING);

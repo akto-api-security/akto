@@ -31,6 +31,22 @@ public class AgentQueryRecord {
     private final String spanId;
     private final boolean isAtlasTraffic;
 
+    // Guardrail result for this prompt, recorded on the traffic by the ingestion gateway
+    // (Gateway.recordGuardrailVerdict). Not final: set once by setGuardrailVerdict right after the
+    // object is built, so the already long constructor does not grow six more arguments. These names
+    // are the wire contract in both directions - the gateway writes them and Gson sends them to
+    // cyborg unchanged.
+    //
+    // All six stay null when guardrails did not run on this traffic. Gson omits nulls, so cyborg
+    // stores no guardrail keys at all and the trace correctly shows nothing rather than a clean
+    // result for a prompt that was never checked.
+    private Boolean guardrailViolated;
+    private String guardrailAction;
+    private String guardrailPolicy;
+    private String guardrailRule;
+    private String guardrailReason;
+    private String guardrailSeverity;
+
     private static final String HEADER_PREFIX    = "x-akto-installer-";
     private static final String HEADER_DEVICE_ID = "device_id";
     private static final String HEADER_USER_EMAIL = "user_email";
@@ -75,6 +91,30 @@ public class AgentQueryRecord {
     public String getTraceId()           { return traceId; }
     public String getSpanId()            { return spanId; }
     public boolean getIsAtlasTraffic()   { return isAtlasTraffic; }
+
+    public Boolean getGuardrailViolated() { return guardrailViolated; }
+    public String getGuardrailAction()    { return guardrailAction; }
+    public String getGuardrailPolicy()    { return guardrailPolicy; }
+    public String getGuardrailRule()      { return guardrailRule; }
+    public String getGuardrailReason()    { return guardrailReason; }
+    public String getGuardrailSeverity()  { return guardrailSeverity; }
+
+    /** Reads the guardrail result the ingestion gateway recorded on the traffic. Absent for traffic
+     *  that was never checked, and for anything ingested before this was added. */
+    private void setGuardrailVerdict(String verdictJson) {
+        if (verdictJson == null || verdictJson.isEmpty()) return;
+        try {
+            JSONObject v = new JSONObject(verdictJson);
+            this.guardrailViolated = v.optBoolean("guardrailViolated", false);
+            this.guardrailAction   = v.optString("guardrailAction", "");
+            this.guardrailPolicy   = v.optString("guardrailPolicy", "");
+            this.guardrailRule     = v.optString("guardrailRule", "");
+            this.guardrailReason   = v.optString("guardrailReason", "");
+            this.guardrailSeverity = v.optString("guardrailSeverity", "");
+        } catch (JSONException e) {
+            // Malformed verdict must never cost us the trace record.
+        }
+    }
 
     public static AgentQueryRecord fromHttpResponseParams(
             HttpResponseParams p,
@@ -172,7 +212,7 @@ public class AgentQueryRecord {
         int inputTokens  = resolveTokenCount(responsePayload, requestPayload, true);
         int outputTokens = resolveTokenCount(responsePayload, responsePayload, false);
 
-        return new AgentQueryRecord(
+        AgentQueryRecord record = new AgentQueryRecord(
                 null,
                 Context.getActualAccountId(),
                 serviceId,
@@ -189,6 +229,8 @@ public class AgentQueryRecord {
                 // Browser collections are registered source=ENDPOINT, so their traffic reports as Atlas too.
                 isAtlasTraffic || isBrowserExtensionTraffic
         );
+        record.setGuardrailVerdict(p.getGuardrailVerdict());
+        return record;
     }
 
     private static boolean isKnownAtlasSession(String sessionIdentifier) {
@@ -270,6 +312,12 @@ public class AgentQueryRecord {
                 ", payload='" + queryPayload + '\'' +
                 ", body='" + responsePayload + '\'' +
                 ", isAtlasTraffic=" + isAtlasTraffic +
+                ", guardrailViolated=" + guardrailViolated +
+                ", guardrailAction='" + guardrailAction + '\'' +
+                ", guardrailPolicy='" + guardrailPolicy + '\'' +
+                ", guardrailRule='" + guardrailRule + '\'' +
+                ", guardrailReason='" + guardrailReason + '\'' +
+                ", guardrailSeverity='" + guardrailSeverity + '\'' +
                 '}';
     }
 }

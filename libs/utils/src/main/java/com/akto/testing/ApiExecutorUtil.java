@@ -31,12 +31,17 @@ public class ApiExecutorUtil {
     private static final String EXECUTE_ONCE_PER_CONVERSATION = "executeOncePerConversation = true";
     private static final String FEATURE_TEST_PRE_SCRIPT = "TEST_PRE_SCRIPT";
     private static final int SCRIPT_CACHE_TTL_SECONDS = 5 * 60;
+    private static final int CONVERSATION_STATE_TTL_SECONDS = 60 * 60;
+    private static final String CONVERSATION_STATE = "conversationState";
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutorUtil.class, LogDb.TESTING);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     private static Map<String, Integer> lastFetchedMap = new HashMap<>();
     private static Map<String, TestScript> testScriptMap = new HashMap<>();
+
+    /** When true, getCachedScript skips the SaaS feature gate (unit tests only). */
+    private static volatile boolean bypassFeatureCheckForTest = false;
 
     private static String scriptCacheKey(int accountId, TestScript.Type type) {
         return accountId + "_" + (type != null ? type.name() : "ANY");
@@ -46,12 +51,91 @@ public class ApiExecutorUtil {
     private static final Map<String, ScriptResultCache> conversationScriptCache = new ConcurrentHashMap<>();
 
     /**
+     * Value the POST_REQUEST script published for a conversation, handed back to the PRE_REQUEST
+     * script of every later request in the same conversation. The first non-empty value wins, so a
+     * token minted by the opening request (e.g. a chat message id) stays stable for the rest of it.
+     */
+    private static final Map<String, ConversationState> conversationStateMap = new ConcurrentHashMap<>();
+
+    private static final class ConversationState {
+        final String value;
+        final int createdAt;
+
+        ConversationState(String value) {
+            this.value = value;
+            this.createdAt = Context.now();
+        }
+    }
+
+    private static String getConversationState(String conversationId) {
+        if (conversationId == null) return null;
+        ConversationState state = conversationStateMap.get(conversationId);
+        if (state == null) return null;
+        if (Context.now() - state.createdAt > CONVERSATION_STATE_TTL_SECONDS) {
+            conversationStateMap.remove(conversationId);
+            return null;
+        }
+        return state.value;
+    }
+
+    private static void putConversationState(String conversationId, String value) {
+        if (conversationId == null || value == null || value.isEmpty()) return;
+        int now = Context.now();
+        conversationStateMap.entrySet()
+                .removeIf(e -> now - e.getValue().createdAt > CONVERSATION_STATE_TTL_SECONDS);
+        conversationStateMap.putIfAbsent(conversationId, new ConversationState(value));
+    }
+
+    /**
+     * Nashorn never sees commented-out code, so neither should this marker check. Stripping comments
+     * keeps a commented `executeOncePerConversation = true` from silently caching the script result.
+     */
+    static boolean hasExecuteOncePerConversationMarker(String script) {
+        if (script == null) return false;
+        String withoutComments = script.replaceAll("(?s)/\\*.*?\\*/", "").replaceAll("(?m)//.*$", "");
+        return withoutComments.contains(EXECUTE_ONCE_PER_CONVERSATION);
+    }
+
+    /**
+     * Installs PRE/POST scripts for unit tests and bypasses the SaaS feature gate.
+     * Call {@link #resetForTest()} in tearDown. Pass null to leave a type unset without
+     * hitting DataActor (an empty script entry is cached for the TTL window).
+     */
+    static void installScriptsForTest(String preRequestJs, String postRequestJs) {
+        bypassFeatureCheckForTest = true;
+        int accountId = Context.getActualAccountId();
+        cacheScriptForTest(accountId, TestScript.Type.PRE_REQUEST, preRequestJs);
+        cacheScriptForTest(accountId, TestScript.Type.POST_REQUEST, postRequestJs);
+    }
+
+    private static void cacheScriptForTest(int accountId, TestScript.Type type, String javascript) {
+        String key = scriptCacheKey(accountId, type);
+        if (javascript == null || javascript.isEmpty()) {
+            testScriptMap.put(key, null);
+        } else {
+            testScriptMap.put(key, new TestScript("test-" + type.name(), javascript, type, "test", Context.now()));
+        }
+        lastFetchedMap.put(key, Context.now());
+    }
+
+    /** Clears conversation/script caches and disables the test feature bypass. */
+    static void resetForTest() {
+        bypassFeatureCheckForTest = false;
+        conversationStateMap.clear();
+        conversationScriptCache.clear();
+        testScriptMap.clear();
+        lastFetchedMap.clear();
+    }
+
+    /**
      * Returns the script JavaScript for the given type, using 5-min cache. Returns null if feature not granted, or no script.
      */
     private static String getCachedScript(int accountId, TestScript.Type type) {
-        FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, FEATURE_TEST_PRE_SCRIPT);
-        if (!featureAccess.getIsGranted()) {
-            return null;
+        if (!bypassFeatureCheckForTest) {
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, FEATURE_TEST_PRE_SCRIPT);
+            if (!featureAccess.getIsGranted()) {
+                return null;
+            }
         }
         String cacheKey = scriptCacheKey(accountId, type);
         TestScript testScript = testScriptMap.getOrDefault(cacheKey, null);
@@ -98,7 +182,7 @@ public class ApiExecutorUtil {
             }
             
             String conversationId = (testingRunConfig != null) ? testingRunConfig.getConversationId() : null;
-            boolean useConversationCache = conversationId != null && script.contains(EXECUTE_ONCE_PER_CONVERSATION);
+            boolean useConversationCache = conversationId != null && hasExecuteOncePerConversationMarker(script);
             ScriptResultCache cachedForScript = useConversationCache ? conversationScriptCache.get(conversationId) : null;
 
             if (cachedForScript != null) {
@@ -114,6 +198,7 @@ public class ApiExecutorUtil {
             bindings.put("url", originalHttpRequest.getUrl());
             bindings.put("payload", originalHttpRequest.getBody());
             bindings.put("queryParams", originalHttpRequest.getQueryParams());
+            bindings.put(CONVERSATION_STATE, getConversationState(conversationId));
 
             Map<String, Object> out = runScript(script, bindings,
                     "method", "headers", "url", "payload", "queryParams",
@@ -264,7 +349,8 @@ public class ApiExecutorUtil {
     /**
      * Runs the POST_REQUEST test script on the response (e.g. to extract tokens from response).
      * Script context: request (method, headers, url, payload, queryParams), response (statusCode, headers, body).
-     * Script may set statusCode, headers, body to modify the response.
+     * Script may set statusCode, headers, body to modify the response, and conversationState to publish a
+     * value to the PRE_REQUEST script of later requests in the same conversation.
      */
     public static OriginalHttpResponse runPostRequestScript(OriginalHttpRequest request, OriginalHttpResponse response, boolean executeScript,
             TestingRunConfig testingRunConfig) {
@@ -293,7 +379,12 @@ public class ApiExecutorUtil {
                 bindings.put("queryParams", request.getQueryParams());
             }
 
-            Map<String, Object> out = runScript(script, bindings, "statusCode", "headers", "body");
+            Map<String, Object> out = runScript(script, bindings, "statusCode", "headers", "body", CONVERSATION_STATE);
+
+            Object conversationStateObj = out.get(CONVERSATION_STATE);
+            if (conversationStateObj instanceof CharSequence && testingRunConfig != null) {
+                putConversationState(testingRunConfig.getConversationId(), conversationStateObj.toString());
+            }
 
             Object statusCodeObj = out.get("statusCode");
             Map<String, Object> headers = (Map) out.get("headers");

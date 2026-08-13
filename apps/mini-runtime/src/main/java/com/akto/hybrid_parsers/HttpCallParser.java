@@ -1135,7 +1135,7 @@ public class HttpCallParser {
         for(HttpResponseParams httpResponseParams: filteredResponseParams) {
             if (matchesDefaultPayload(httpResponseParams, defaultPayloadMap)) {
                 if (Utils.printDebugUrlLog(httpResponseParams.getRequestParams().getURL())) {
-                    loggerMaker.infoAndAddToDb("Found debug url in filterDefaultPayloads " + httpResponseParams.getRequestParams().getURL());
+                    Utils.printUrlDebugLog("Found debug url in filterDefaultPayloads " + httpResponseParams.getRequestParams().getURL());
                 }
                 continue;
             }
@@ -1283,7 +1283,7 @@ public class HttpCallParser {
 
         // Update the tags in-memory for the apiCollection
         if(Utils.printDebugUrlLog(httpResponseParams.getRequestParams().getURL()) || (Utils.printDebugHostLog(httpResponseParams) != null)) {
-            loggerMaker.infoAndAddToDb("Updating tags in-memory for apiCollectionId: " + apiCollectionId + " with hostNameMapKey: " + hostNameMapKey
+            Utils.printUrlDebugLog("Updating tags in-memory for apiCollectionId: " + apiCollectionId + " with hostNameMapKey: " + hostNameMapKey
                     + " url: " + httpResponseParams.getRequestParams().getURL() + " and tags: " + httpResponseParams.getTags());
         }
 
@@ -1354,7 +1354,7 @@ public class HttpCallParser {
         String log = "Updated tags for apiCollectionId: " + apiCollectionId + " url: " + httpResponseParams.getRequestParams().getURL() + " with tags: " + tagsList + " hostNameMapKey: " + hostNameMapKey;
         printL(log);
         if(Utils.printDebugUrlLog(httpResponseParams.getRequestParams().getURL()) || (Utils.printDebugHostLog(httpResponseParams) != null)) {
-            loggerMaker.warn(log);
+            Utils.printUrlDebugLog(log);
         }
     }
 
@@ -1441,7 +1441,7 @@ public class HttpCallParser {
 
                     apiCollectionId = createCollectionBasedOnHostName(id, hostName, tagList, accessType, true);
                     if(Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL()) || (Utils.printDebugHostLog(httpResponseParam) != null)) {
-                        loggerMaker.infoAndAddToDb("Created collection: " + apiCollectionId + " with hostNameMapKey: " + hostName
+                        Utils.printUrlDebugLog("Created collection: " + apiCollectionId + " with hostNameMapKey: " + hostName
                             + " url: " + httpResponseParam.getRequestParams().getURL() + " and tags: " + httpResponseParam.getTags()
                         );
                     }
@@ -1650,6 +1650,36 @@ public class HttpCallParser {
         return res;
     }
 
+    /**
+     * Sends the agentic trace for this request to cyborg.
+     *
+     * Kept out of the filter loop's main body so it can also run for traffic the schema filters drop.
+     * A prompt blocked by guardrails is ingested as 4xx, and that is exactly the traffic a trace has
+     * to show - but API discovery should keep ignoring failed responses, so the message is still
+     * dropped for schema purposes.
+     */
+    private void captureAgentTrace(HttpResponseParams httpResponseParam, Map<String, String> tagsMap) {
+        FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(), "AGENT_TRAFFIC_LOGS");
+        boolean allowAnalysis = featureAccess != null && featureAccess.getIsGranted();
+        if (!allowAnalysis || !isAgenticTraffic(tagsMap)
+                || httpResponseParam.getRequestParams().getUrl().contains("skill")) {
+            return;
+        }
+
+        AgentQueryRecord record = AgentQueryRecord.fromHttpResponseParams(
+                httpResponseParam, tagsMap, getDeviceUserMap());
+        if (record == null) {
+            return;
+        }
+
+        loggerMaker.infoAndAddToDb("Storing agent query data " + record.toString());
+        String payload = httpResponseParam.getRequestParams().getPayload();
+        if (payload != null && payload.length() > 3) {
+            loggerMaker.info("Actually storing agent record" + record.getSpanId());
+            dataActor.storeAgentQueryData(record);
+        }
+    }
+
     public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, AccountSettings accountSettings) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
@@ -1678,8 +1708,13 @@ public class HttpCallParser {
                 }
 
                 if (!cond){
+                    // A prompt blocked by guardrails is ingested as 4xx, and that is exactly the
+                    // traffic a trace needs to show. Record the trace before dropping the message, so
+                    // API discovery keeps ignoring failed responses exactly as it did before.
+                    captureAgentTrace(httpResponseParam, parseTagsMap(httpResponseParam.getTags()));
+
                     if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                        loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams invalid response code "
+                        Utils.printUrlDebugLog("Found debug url in filterHttpResponseParams invalid response code "
                                 + httpResponseParam.getRequestParams().getURL() + " response code " + httpResponseParam.getStatusCode());
                     }
                     if(Utils.printDebugHostLog(httpResponseParam) != null){
@@ -1693,7 +1728,7 @@ public class HttpCallParser {
             String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(),Constants.AKTO_IGNORE_FLAG);
             if (ignoreAktoFlag != null){
                 if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams ignoreAktoFlag "
+                    Utils.printUrlDebugLog("Found debug url in filterHttpResponseParams ignoreAktoFlag "
                             + httpResponseParam.getRequestParams().getURL());
                 }
                 if(Utils.printDebugHostLog(httpResponseParam) != null){
@@ -1711,7 +1746,7 @@ public class HttpCallParser {
             if(!redundantList.isEmpty()){
                 if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(),regexPattern)){
                     if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                        loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams isRedundantEndpoint "
+                        Utils.printUrlDebugLog("Found debug url in filterHttpResponseParams isRedundantEndpoint "
                                 + httpResponseParam.getRequestParams().getURL() + " pattern " + regexPattern.toString());
                     }
                     if(Utils.printDebugHostLog(httpResponseParam) != null){
@@ -1727,7 +1762,7 @@ public class HttpCallParser {
                 }
                 if(isInvalidContentType(contentType)){
                     if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                        loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams isInvalidContentType "
+                        Utils.printUrlDebugLog("Found debug url in filterHttpResponseParams isInvalidContentType "
                                 + httpResponseParam.getRequestParams().getURL() + " contentType " + contentType);
                     }
                     if(Utils.printDebugHostLog(httpResponseParam) != null){
@@ -1763,7 +1798,7 @@ public class HttpCallParser {
             }
 
             if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams starting advanced filters "
+                Utils.printUrlDebugLog("Found debug url in filterHttpResponseParams starting advanced filters "
                         + httpResponseParam.getRequestParams().getURL());
             }
 
@@ -1776,7 +1811,7 @@ public class HttpCallParser {
 
             if (isAtlasTraffic(tagsMap) || isArgusTraffic(tagsMap) || shouldStoreSnowflakeAgentTrace(tagsMap) || isCopilotTrafficRaw(tagsMap)) {
                 if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams skipping advanced filters for agentic traffic "
+                    Utils.printUrlDebugLog("Found debug url in filterHttpResponseParams skipping advanced filters for agentic traffic "
                             + httpResponseParam.getRequestParams().getURL());
                 }
                 if(Utils.printDebugHostLog(httpResponseParam) != null){
@@ -1790,7 +1825,7 @@ public class HttpCallParser {
                     if(param == null && httpResponseParam != null && httpResponseParam.getRequestParams() != null){
                         loggerMaker.infoAndAddToDb("blocked api " + httpResponseParam.getRequestParams().getURL() + " " + httpResponseParam.getRequestParams().getApiCollectionId() + " " + httpResponseParam.getRequestParams().getMethod());
                         if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                            loggerMaker.infoAndAddToDb(
+                            Utils.printUrlDebugLog(
                                     "Found debug url in filterHttpResponseParams advanced filters, skipping "
                                             + httpResponseParam.getRequestParams().getURL() + " filterType "
                                             + temp.getSecond());
@@ -1805,7 +1840,7 @@ public class HttpCallParser {
                 }else{
                     httpResponseParam = param;
                     if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                        loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams advanced filters, adding "
+                        Utils.printUrlDebugLog("Found debug url in filterHttpResponseParams advanced filters, adding "
                                 + httpResponseParam.getRequestParams().getURL() + " filterType " + temp.getSecond());
                     }
                     if(Utils.printDebugHostLog(httpResponseParam) != null){
@@ -1817,23 +1852,8 @@ public class HttpCallParser {
             int apiCollectionId = createApiCollectionId(httpResponseParam, tagsMap);
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
-            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(),"AGENT_TRAFFIC_LOGS");
-            boolean allowAnalysis = featureAccess != null && featureAccess.getIsGranted();
-
             // if traffic is agentic, then send the data to cyborg
-            if (allowAnalysis && isAgenticTraffic(tagsMap) && (!httpResponseParam.getRequestParams().getUrl().contains("skill"))) {
-                AgentQueryRecord record = AgentQueryRecord.fromHttpResponseParams(
-                        httpResponseParam, tagsMap, getDeviceUserMap());
-                if (record != null) {
-                    loggerMaker.infoAndAddToDb("Storing agent query data " + record.toString());
-                    String payload = httpResponseParam.getRequestParams().getPayload();
-                    if(payload.length() > 3){
-                        loggerMaker.info("Actually storing agent record" + record.getSpanId());
-                        dataActor.storeAgentQueryData(record);
-                    }
-                    
-                }
-            }
+            captureAgentTrace(httpResponseParam, tagsMap);
 
             // Parse N8N trace metadata if this is N8N traffic
             if (isN8nTraffic(tagsMap)) {
