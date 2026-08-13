@@ -65,6 +65,16 @@ public class AllMetrics {
             testingRunLatency = new LatencyMetric("TESTING_RUN_LATENCY", 60, accountId, orgId, moduleType);
             sampleDataFetchLatency = new LatencyMetric("SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId, moduleType);
             multipleSampleDataFetchLatency = new LatencyMetric("MULTIPLE_SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId, moduleType);
+            testingTestsExecutedCount = new SumMetric("TESTING_TESTS_EXECUTED_COUNT", 60, accountId, orgId, moduleType);
+            testingApiHitSuccessCount = new SumMetric("TESTING_API_HIT_SUCCESS_COUNT", 60, accountId, orgId, moduleType);
+            testingApiHitFailureCount = new SumMetric("TESTING_API_HIT_FAILURE_COUNT", 60, accountId, orgId, moduleType);
+            testingIssuesCreatedCriticalCount = new SumMetric("TESTING_ISSUES_CREATED_CRITICAL_COUNT", 60, accountId, orgId, moduleType);
+            testingIssuesCreatedHighCount = new SumMetric("TESTING_ISSUES_CREATED_HIGH_COUNT", 60, accountId, orgId, moduleType);
+            testingIssuesCreatedMediumCount = new SumMetric("TESTING_ISSUES_CREATED_MEDIUM_COUNT", 60, accountId, orgId, moduleType);
+            testingIssuesCreatedLowCount = new SumMetric("TESTING_ISSUES_CREATED_LOW_COUNT", 60, accountId, orgId, moduleType);
+            testingKafkaQueuePending = new GaugeMetric("TESTING_KAFKA_QUEUE_PENDING", 60, accountId, orgId, moduleType);
+            testingKafkaSendFailureCount = new SumMetric("TESTING_KAFKA_SEND_FAILURE_COUNT", 60, accountId, orgId, moduleType);
+            testingRateLimitExceededCount = new SumMetric("TESTING_RATE_LIMIT_EXCEEDED_COUNT", 60, accountId, orgId, moduleType);
         }
 
         // sampleDataFetchCount = new SumMetric("SAMPLE_DATA_FETCH_COUNT", 60, accountId, orgId); // tODO: Do we need this?
@@ -91,7 +101,10 @@ public class AllMetrics {
                 kafkaBytesConsumedRate, cyborgNewApiCount, cyborgTotalApiCount, deltaCatalogNewCount, deltaCatalogTotalCount,
                 cyborgApiPayloadSize, multipleSampleDataFetchLatency, runtimeApiReceivedCount,
                 cpuUsagePercent, heapMemoryUsedMb, heapMemoryMaxMb, nonHeapMemoryUsedMb, threadCount,
-                availableProcessors, totalPhysicalMemoryMb);
+                availableProcessors, totalPhysicalMemoryMb, testingTestsExecutedCount, testingApiHitSuccessCount,
+                testingApiHitFailureCount, testingIssuesCreatedCriticalCount, testingIssuesCreatedHighCount,
+                testingIssuesCreatedMediumCount, testingIssuesCreatedLowCount, testingKafkaQueuePending,
+                testingKafkaSendFailureCount, testingRateLimitExceededCount);
 
         AllMetrics _this = this;
         executorService.scheduleWithFixedDelay(() -> {
@@ -221,6 +234,16 @@ public class AllMetrics {
     private Metric cyborgApiPayloadSize = null;
     private Metric multipleSampleDataFetchLatency = null;
     private Metric runtimeApiReceivedCount = null;
+    private Metric testingTestsExecutedCount = null;
+    private Metric testingApiHitSuccessCount = null;
+    private Metric testingApiHitFailureCount = null;
+    private Metric testingIssuesCreatedCriticalCount = null;
+    private Metric testingIssuesCreatedHighCount = null;
+    private Metric testingIssuesCreatedMediumCount = null;
+    private Metric testingIssuesCreatedLowCount = null;
+    private Metric testingKafkaQueuePending = null;
+    private Metric testingKafkaSendFailureCount = null;
+    private Metric testingRateLimitExceededCount = null;
 
     // Infrastructure metrics (CPU, Memory, Threads)
     private Metric cpuUsagePercent = null;
@@ -392,6 +415,56 @@ public class AllMetrics {
     public void setMultipleSampleDataFetchLatency(float val){
         if(multipleSampleDataFetchLatency != null)
             multipleSampleDataFetchLatency.record(val);
+    }
+
+    public void setTestingTestsExecutedCount(float val){
+        if(testingTestsExecutedCount != null)
+            testingTestsExecutedCount.record(val);
+    }
+
+    public void setTestingApiHitSuccessCount(float val){
+        if(testingApiHitSuccessCount != null)
+            testingApiHitSuccessCount.record(val);
+    }
+
+    public void setTestingApiHitFailureCount(float val){
+        if(testingApiHitFailureCount != null)
+            testingApiHitFailureCount.record(val);
+    }
+
+    public void setTestingIssuesCreatedCriticalCount(float val){
+        if(testingIssuesCreatedCriticalCount != null)
+            testingIssuesCreatedCriticalCount.record(val);
+    }
+
+    public void setTestingIssuesCreatedHighCount(float val){
+        if(testingIssuesCreatedHighCount != null)
+            testingIssuesCreatedHighCount.record(val);
+    }
+
+    public void setTestingIssuesCreatedMediumCount(float val){
+        if(testingIssuesCreatedMediumCount != null)
+            testingIssuesCreatedMediumCount.record(val);
+    }
+
+    public void setTestingIssuesCreatedLowCount(float val){
+        if(testingIssuesCreatedLowCount != null)
+            testingIssuesCreatedLowCount.record(val);
+    }
+
+    public void setTestingKafkaQueuePending(float val){
+        if(testingKafkaQueuePending != null)
+            testingKafkaQueuePending.record(val);
+    }
+
+    public void setTestingKafkaSendFailureCount(float val){
+        if(testingKafkaSendFailureCount != null)
+            testingKafkaSendFailureCount.record(val);
+    }
+
+    public void setTestingRateLimitExceededCount(float val){
+        if(testingRateLimitExceededCount != null)
+            testingRateLimitExceededCount.record(val);
     }
 
     // Traffic Collector profiling metrics - per instance

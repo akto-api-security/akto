@@ -6,6 +6,7 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.AccountSettings;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -49,6 +50,7 @@ public class TestRateLimitGuard {
             return false;
         }
 
+        AllMetrics.instance.setTestingRateLimitExceededCount(1);
         loggerMaker.infoAndAddToDb("Daily test rate limit exceeded (" + usedToday + "/" + limit + ") for account "
                 + Context.accountId.get(), LogDb.TESTING);
 

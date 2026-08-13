@@ -3,8 +3,11 @@ package com.akto.dto.testing;
 import com.akto.dto.testing.info.TestInfo;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class TestResult extends GenericTestResult {
 
@@ -97,6 +100,35 @@ public class TestResult extends GenericTestResult {
             }
             return ret;
         }
+    }
+
+    /*
+     * Error messages that indicate an actual API/network call was attempted but did not
+     * complete successfully, as opposed to errors that mean the test was skipped before
+     * any real API call was made (e.g. NO_PATH, USAGE_EXCEEDED).
+     */
+    private static final Set<String> API_CALL_FAILURE_MESSAGES = new HashSet<>(Arrays.asList(
+        TestError.API_REQUEST_FAILED.getMessage(),
+        TestError.API_REQUEST_FAILED_BEFORE_SENDING.getMessage(),
+        TestError.API_CONNECTION_TIMEOUT.getMessage(),
+        TestError.API_HOST_UNREACHABLE.getMessage(),
+        TestError.API_CONNECTION_REFUSED.getMessage(),
+        TestError.API_SSL_HANDSHAKE_FAILED.getMessage(),
+        TestError.API_RESPONSE_BODY_NULL.getMessage(),
+        TestError.API_RESPONSE_PARSE_FAILED.getMessage(),
+        TestError.SOMETHING_WENT_WRONG.getMessage()
+    ));
+
+    public static boolean isApiCallFailure(List<String> errors) {
+        if (errors == null) {
+            return false;
+        }
+        for (String error : errors) {
+            if (API_CALL_FAILURE_MESSAGES.contains(error)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public TestResult(String message, String originalMessage, List<String> errors, double percentageMatch, boolean isVulnerable,
