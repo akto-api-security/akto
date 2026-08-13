@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Badge, Box, Collapsible, Divider, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons";
 import { ModelChip } from "./LLMCellRenderers";
+import GuardrailVerdict, { GuardrailVerdictBadge } from "./GuardrailVerdict";
 import { formatDurationMs, truncate } from "./constants";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -152,6 +153,7 @@ export default function SpanSection({ span, index }) {
                     </HorizontalStack>
                     {/* right: meta + chevron — never wraps */}
                     <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                        <GuardrailVerdictBadge span={span} />
                         <Text variant="bodySm" color="subdued">{formatDurationMs(span.durationMs)}</Text>
                         {span._model && <ModelChip model={span._model} />}
                         <Icon source={collapsed ? ChevronDownMinor : ChevronUpMinor} color="subdued" />
@@ -165,6 +167,7 @@ export default function SpanSection({ span, index }) {
                     <Divider/>
                 </Box>
                 <VerticalStack gap={"2"}>
+                <GuardrailVerdict span={span} />
                 {inputMessages.length > 0 && (
                     <InputOutputSection
                         label="INPUT"

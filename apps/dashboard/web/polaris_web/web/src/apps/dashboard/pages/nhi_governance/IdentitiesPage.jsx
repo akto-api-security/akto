@@ -1,10 +1,10 @@
-import { useState, useMemo, useReducer, useEffect } from "react";
+import { useState, useMemo, useReducer, useEffect, useCallback } from "react";
 import { IndexFiltersMode } from "@shopify/polaris";
 import { Badge, HorizontalStack, Modal, Text } from "@shopify/polaris";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
 import { produce } from "immer";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
-import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
+import GithubServerTable from "../../components/tables/GithubServerTable";
 import { CellType } from "../../components/tables/rows/GithubRow";
 import SummaryCardInfo from "../../components/shared/SummaryCardInfo";
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
@@ -23,6 +23,13 @@ import SpinnerCentered from "../../components/progress/SpinnerCentered";
 const definedTableTabs = ["All", "Expired", "Disabled"];
 const resourceName = { singular: "identity", plural: "identities" };
 
+// IdentityOverviewGraph renders one ReactFlow node per identity (plus one per agent) with no
+// virtualization — beyond a few hundred nodes it hangs (unresponsive pan/zoom/click). Cap the graph
+// to the most recently discovered identities rather than fetching the whole account (13.8k+ on the
+// Atlas Scale Test account) just to draw a graph. Matches the flyout's existing
+// IDENTITY_VIOLATIONS_LIMIT precedent for "small, deliberately bounded batch, not real pagination".
+const GRAPH_NODE_CAP = 200;
+
 // ── Expiry status renderer ─────────────────────────────────────────────────────
 const expiryComp = (s) => {
     if (!s) return null;
@@ -32,28 +39,6 @@ const expiryComp = (s) => {
         return <Text variant="bodyMd" color="warning" fontWeight="medium">{s}</Text>;
     return <Text variant="bodyMd">{s}</Text>;
 };
-
-const buildTableData = (rawRows, violationIndex = {}) =>
-    rawRows
-        .map((r) => {
-            const v = violationIndex[r.identityName] || { violCrit: 0, violHigh: 0, violMed: 0 };
-            return { ...r, violCrit: v.violCrit, violHigh: v.violHigh, violMed: v.violMed };
-        })
-        .sort((a, b) => {
-            if (b.violCrit !== a.violCrit) return b.violCrit - a.violCrit;
-            return (b.violCrit + b.violHigh + b.violMed) - (a.violCrit + a.violHigh + a.violMed);
-        })
-        .map((r) => ({
-            ...r,
-            id:             r.hexId,
-            totalViolations: r.violCrit + r.violHigh + r.violMed,
-            priorityScore:  r.violCrit * 1000 + (r.violCrit + r.violHigh + r.violMed),
-            identityComp:  <HorizontalStack gap="2" blockAlign="center" wrap={false}><IdentityIcon name={r.identityName} /><Text variant="bodyMd" fontWeight="medium">{r.identityName}</Text></HorizontalStack>,
-            agentComp:     <HorizontalStack gap="2" blockAlign="center" wrap={false}><AgentIcon name={r.agent} /><Text variant="bodyMd">{r.agent}</Text></HorizontalStack>,
-            typeComp:      <Badge>{r.type}</Badge>,
-            violationsComp: <ViolationBubbles critical={r.violCrit} high={r.violHigh} medium={r.violMed} />,
-            expiryComp:    expiryComp(r.expiryStatus),
-        }));
 
 
 // Helper to format expiry status (expiryDate is epoch seconds)
@@ -91,17 +76,25 @@ const transformIdentityForUI = (apiIdentity) => {
     };
 };
 
-// ── Computed summary ───────────────────────────────────────────────────────────
-const makeSummaryItems = (data) => {
-    const total   = data.length;
-    const expired = data.filter((r) => r.expiryStatus && r.expiryStatus.startsWith("Expired")).length;
-    const withV   = data.filter((r) => r.totalViolations > 0).length;
-    return [
-        { title: "Total Identities",          data: total.toLocaleString()   },
-        { title: "Expired Identities",        data: expired.toLocaleString() },
-        { title: "Identities with Violations",data: withV.toLocaleString()   },
-    ];
-};
+// Per-row shaping shared by the table's own server-paginated page and the capped graph batch
+// (identityComp/agentComp/typeComp/violationsComp/expiryComp cell shapes). violationIndex is the
+// same small, cheap, account-wide map (fetchViolationCountsByIdentity) merged into either batch
+// without an extra network call.
+function buildPageRow(apiIdentity, violationIndex) {
+    const r = transformIdentityForUI(apiIdentity);
+    const v = violationIndex[r.hexId] || { violCrit: 0, violHigh: 0, violMed: 0 };
+    return {
+        ...r,
+        id: r.hexId,
+        violCrit: v.violCrit, violHigh: v.violHigh, violMed: v.violMed,
+        totalViolations: v.violCrit + v.violHigh + v.violMed,
+        identityComp: <HorizontalStack gap="2" blockAlign="center" wrap={false}><IdentityIcon name={r.identityName} /><Text variant="bodyMd" fontWeight="medium">{r.identityName}</Text></HorizontalStack>,
+        agentComp: <HorizontalStack gap="2" blockAlign="center" wrap={false}><AgentIcon name={r.agent} /><Text variant="bodyMd">{r.agent}</Text></HorizontalStack>,
+        typeComp: <Badge>{r.type}</Badge>,
+        violationsComp: <ViolationBubbles critical={v.violCrit} high={v.violHigh} medium={v.violMed} />,
+        expiryComp: expiryComp(r.expiryStatus),
+    };
+}
 
 // ── Headers ────────────────────────────────────────────────────────────────────
 const headers = [
@@ -114,9 +107,16 @@ const headers = [
     { text: "Discovered",    value: "discoveredTimestamp", title: "Discovered", type: CellType.TEXT   },
 ];
 
+// Real backend-sortable fields only (NhiGovernanceIdentitiesAction.fetchAllNhiIdentities) — the old
+// "sort by violations" option relied on a client-only computed priorityScore, which isn't something
+// the paginated query can sort by without a $lookup into nhi_violations (identities don't carry a
+// denormalized violation count). Default view (Discovered desc) is set on the Discovered column
+// itself via GithubServerTable's usual initial-sort convention.
 const sortOptions = [
-    { label: "Violations", value: "violations asc",  directionLabel: "Most first",   sortKey: "priorityScore", columnIndex: 4 },
-    { label: "Violations", value: "violations desc", directionLabel: "Least first",  sortKey: "priorityScore", columnIndex: 4 },
+    { label: "Discovered", value: "createdAt desc", directionLabel: "Newest first", sortKey: "createdAt", columnIndex: 6 },
+    { label: "Discovered", value: "createdAt asc",  directionLabel: "Oldest first", sortKey: "createdAt", columnIndex: 6 },
+    { label: "Identity",   value: "identityName asc",  directionLabel: "A-Z", sortKey: "identityName", columnIndex: 0 },
+    { label: "Identity",   value: "identityName desc", directionLabel: "Z-A", sortKey: "identityName", columnIndex: 0 },
 ];
 
 // ── Page ───────────────────────────────────────────────────────────────────────
@@ -138,8 +138,10 @@ export default function IdentitiesPage() {
     const initialSelectedTab  = tableSelectedTab[window.location.pathname] || "all";
 
     // API fetching state
-    const [rawIdentities, setRawIdentities] = useState([]);
     const [rawViolations, setRawViolations] = useState([]);
+    const [graphIdentities, setGraphIdentities] = useState([]);
+    const [graphTotal, setGraphTotal] = useState(0);
+    const [stats, setStats] = useState({ total: 0, expired: 0, disabled: 0, withViolations: 0 });
     const [loading, setLoading] = useState(true);
 
     // UI state
@@ -164,20 +166,28 @@ export default function IdentitiesPage() {
         try {
             setLoading(true);
 
-            const identitiesResponse = await observeRequests.fetchNhiIdentities(startTimestamp, endTimestamp);
-            setRawIdentities(Array.isArray(identitiesResponse) ? identitiesResponse.map(transformIdentityForUI) : []);
-            setLoading(false);
-
+            let violRows = [];
             try {
                 const violationsResponse = await observeRequests.fetchViolationCountsByIdentity();
-                setRawViolations(Array.isArray(violationsResponse) ? violationsResponse : []);
+                violRows = Array.isArray(violationsResponse) ? violationsResponse : [];
             } catch (violErr) {
                 console.error("Error fetching violations for counts:", violErr);
-                setRawViolations([]);
             }
+            setRawViolations(violRows);
+
+            const violatingIdentityIds = [...new Set(violRows.map((r) => r.identityId).filter(Boolean))];
+
+            const [statsRes, graphRes] = await Promise.all([
+                observeRequests.fetchNhiIdentitiesStats(startTimestamp, endTimestamp, violatingIdentityIds),
+                observeRequests.fetchAllNhiIdentities(startTimestamp, endTimestamp, {
+                    skip: 0, limit: GRAPH_NODE_CAP, sortKey: "createdAt", sortOrder: -1,
+                }),
+            ]);
+            setStats(statsRes);
+            setGraphIdentities(graphRes.identities || []);
+            setGraphTotal(graphRes.total || 0);
         } catch (err) {
-            console.error("Error fetching identities:", err);
-            setRawIdentities([]);
+            console.error("Error fetching identities overview:", err);
         } finally {
             setLoading(false);
         }
@@ -188,33 +198,34 @@ export default function IdentitiesPage() {
         fetchData();
     }, [startTimestamp, endTimestamp]);
 
-    // Build violation index from API violations
+    // Build violation index from the server-grouped counts (one row per identity x severity, not one
+    // row per violation document). Keyed by identityId (hexId) — NOT identityName, which is just a
+    // display label and isn't unique (many distinct identities across different agents/owners share
+    // the same name, e.g. every "github-api.Authorization"). Keying by name previously summed
+    // violations across every identity sharing that name into each row's badge.
     const violationIndex = useMemo(() => {
-        return rawViolations.reduce((acc, v) => {
-            if (!v.identities || !Array.isArray(v.identities)) return acc;
-            v.identities.forEach((identity) => {
-                const identityName = identity.identityName;
-                if (!acc[identityName]) acc[identityName] = { violCrit: 0, violHigh: 0, violMed: 0 };
-                if (v.severity === "Critical")     acc[identityName].violCrit++;
-                else if (v.severity === "High")    acc[identityName].violHigh++;
-                else if (v.severity === "Medium")  acc[identityName].violMed++;
-            });
+        return rawViolations.reduce((acc, row) => {
+            const identityId = row.identityId;
+            if (!identityId) return acc;
+            if (!acc[identityId]) acc[identityId] = { violCrit: 0, violHigh: 0, violMed: 0 };
+            const count = row.count || 0;
+            if (row.severity === "Critical")     acc[identityId].violCrit += count;
+            else if (row.severity === "High")    acc[identityId].violHigh += count;
+            else if (row.severity === "Medium")  acc[identityId].violMed += count;
             return acc;
         }, {});
     }, [rawViolations]);
 
-    // Build table data with violation counts
-    const tableData = useMemo(() => {
-        return buildTableData(rawIdentities, violationIndex);
-    }, [rawIdentities, violationIndex]);
+    // Capped batch of the most recently discovered identities, enriched with violation counts —
+    // feeds only the topology graph now. The table below is independently server-paginated via
+    // fetchTableData/fetchAllNhiIdentities and never touches this capped batch.
+    const graphData = useMemo(() => (
+        graphIdentities.map((identity) => buildPageRow(identity, violationIndex))
+    ), [graphIdentities, violationIndex]);
 
-    const dataByTab = useMemo(() => ({
-        "all":      tableData,
-        "expired":  tableData.filter((r) => r.expiryStatus && r.expiryStatus.startsWith("Expired")),
-        "disabled": tableData.filter((r) => r.status === "INACTIVE"),
-    }), [tableData]);
-
-    const tableCountObj = func.getTabsCount(definedTableTabs, dataByTab);
+    const tableCountObj = func.getTabsCount(definedTableTabs, {
+        _counts: { all: stats.total, expired: stats.expired, disabled: stats.disabled },
+    });
     const tableTabs = func.getTableTabsContent(
         definedTableTabs, tableCountObj,
         (tabId) => {
@@ -224,7 +235,24 @@ export default function IdentitiesPage() {
         selectedTab, tabsInfo
     );
 
-    const summaryItems = makeSummaryItems(tableData);
+    const summaryItems = [
+        { title: "Total Identities",           data: stats.total.toLocaleString() },
+        { title: "Expired Identities",         data: stats.expired.toLocaleString() },
+        { title: "Identities with Violations", data: stats.withViolations.toLocaleString() },
+    ];
+
+    // ─── Server-side paginated fetch for the table itself ───────────────────────
+    // Independent of the graph's capped batch above — the table pages through the whole account via
+    // fetchAllNhiIdentities with its own skip/limit/sort/search, never bounded by GRAPH_NODE_CAP.
+    const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
+        const mongoSortOrder = sortOrder === -1 ? 1 : -1; // GithubServerTable: asc=-1/desc=1, inverted vs Mongo
+        const status = selectedTab === "all" ? undefined : (selectedTab === "expired" ? "Expired" : "Disabled");
+        const res = await observeRequests.fetchAllNhiIdentities(startTimestamp, endTimestamp, {
+            skip, limit, sortKey: sortKey || "createdAt", sortOrder: mongoSortOrder, queryValue, status,
+        });
+        const rows = (res.identities || []).map((identity) => buildPageRow(identity, violationIndex));
+        return { value: rows, total: res.total || 0 };
+    }, [startTimestamp, endTimestamp, selectedTab, violationIndex]);
 
     const handleDeleteIdentities = async () => {
         try {
@@ -255,13 +283,14 @@ export default function IdentitiesPage() {
 
                 <IdentityOverviewGraph
                     key="overview-graph"
-                    tableData={tableData}
+                    tableData={graphData}
+                    totalCount={graphTotal}
                     onIdentityClick={(row) => { setSelectedRow(row); setShowDetailsPanel(true); }}
                 />,
 
-                <GithubSimpleTable
-                    key="identities-table"
-                    data={dataByTab[selectedTab]}
+                <GithubServerTable
+                    key={`identities-table-${selectedTab}-${startTimestamp}-${endTimestamp}`}
+                    fetchData={fetchTableData}
                     headers={headers}
                     resourceName={resourceName}
                     sortOptions={sortOptions}
@@ -286,6 +315,7 @@ export default function IdentitiesPage() {
                     ]}
                     onRowClick={(row) => { setSelectedRow(row); setShowDetailsPanel(true); }}
                     rowClickable={true}
+                    supportsNegationFilter={false}
                 />,
             ]}
         />

@@ -57,8 +57,10 @@ const ConditionalApprovalModal = ({
         { label: "Custom", value: "custom" }
     ];
 
-    // Fetch available endpoints
+    // Fetch available endpoints — only when the modal is actually open (this modal is mounted while
+    // closed on the Audit Data page, so an unconditional mount-fetch fired fetchModuleInfo on every load).
     useEffect(() => {
+        if (!isOpen) return;
         const fetchEndpoints = async () => {
             try {
                 const response = await settingRequests.fetchModuleInfo({ moduleType: 'MCP_ENDPOINT_SHIELD' });
@@ -87,7 +89,7 @@ const ConditionalApprovalModal = ({
             }
         };
         fetchEndpoints();
-    }, []);
+    }, [isOpen]);
 
     // Reset form when modal opens/closes
     useEffect(() => {

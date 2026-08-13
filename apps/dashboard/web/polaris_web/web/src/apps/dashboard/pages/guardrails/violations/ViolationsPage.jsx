@@ -4,11 +4,15 @@ import { produce } from "immer";
 import {
     Badge,
     Box,
+    Button,
     Card,
     HorizontalGrid,
     HorizontalStack,
     Modal,
+    RadioButton,
+    Tabs,
     Text,
+    TextField,
     VerticalStack,
 } from "@shopify/polaris";
 
@@ -26,7 +30,10 @@ import func from "@/util/func";
 import values from "@/util/values";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import PersistStore from "@/apps/main/PersistStore";
+import SessionStore from "@/apps/main/SessionStore";
 import LocalStore from "@/apps/main/LocalStorageStore";
+import guardrailApi from "@/apps/dashboard/pages/guardrails/api";
+import { buildApprovedByPolicy, isServerApproved } from "@/apps/dashboard/pages/guardrails/utils";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
 import { isEndpointSecurityCategory } from "@/apps/main/labelHelper";
 
@@ -130,6 +137,16 @@ function EvidenceCellRenderer({ value }) {
     return <Text variant="bodySm" truncate>{value}</Text>;
 }
 
+// Needs Approval tab only. Stops the click from bubbling into the row's onRowClicked (which
+// would otherwise open the ViolationFlyout instead of the approve modal).
+function ApproveCellRenderer({ data, onApprove }) {
+    return (
+        <div onClick={(e) => e.stopPropagation()}>
+            <Button size="slim" onClick={() => onApprove?.(data)}>Approve</Button>
+        </div>
+    );
+}
+
 const STATUS_LABEL = { ACTIVE: "Open", FIXED: "Fixed", IGNORED: "Ignored", UNDER_REVIEW: "In Review" };
 const STATUS_DOT_COLOR = { ACTIVE: "#9642FC", FIXED: "#5BC0DE", IGNORED: "#F5C451", UNDER_REVIEW: "#637381" };
 function StatusCellRenderer({ value }) {
@@ -154,9 +171,10 @@ const DEFAULT_COL_DEF = {
     cellStyle: { display: "flex", alignItems: "center" },
 };
 
-// Column defs are built dynamically so we can inject backend filter values.
-function buildColDefs(filterValues) {
-    return [
+// Column defs are built dynamically so we can inject backend filter values. showApprove/onApprove
+// add the Needs Approval tab's Action column (mirrors SusDataTable.jsx's conditional "Action" header).
+function buildColDefs(filterValues, showApprove, onApprove) {
+    const cols = [
         {
             field: "detected",
             headerName: "Detected",
@@ -224,9 +242,24 @@ function buildColDefs(filterValues) {
             cellRenderer: StatusCellRenderer,
         },
     ];
+    if (showApprove) {
+        cols.push({
+            field: "_approve",
+            headerName: "Action",
+            minWidth: 110,
+            sortable: false,
+            cellRenderer: ApproveCellRenderer,
+            cellRendererParams: { onApprove },
+        });
+    }
+    return cols;
 }
 
-const AUTO_SIZE_STRATEGY = { type: "fitCellContents" };
+// scaleUpToFitGridWidth proportionally stretches columns after content-sizing so they fill the
+// grid width — without it, tabs whose rows all have short/uniform values (e.g. Misconfigured
+// Settings: every row is "Codex" / "codex_config_risk" / "High") size narrower than the grid and
+// leave a blank gutter after the last column.
+const AUTO_SIZE_STRATEGY = { type: "fitCellContents", scaleUpToFitGridWidth: true };
 
 // ─── Data helpers ────────────────────────────────────────────────────────────────
 
@@ -308,11 +341,27 @@ function deriveAgenticType(url, method) {
     return METHOD_TO_TYPE[m] || "Prompt";
 }
 
+// Classify a violation by its POLICY name. This is the grouping used by the "Violations by Type"
+// pie, and the table's Type column uses it too so the two stay consistent (a policy like
+// "llm-test" is LLM in both). Distinct from deriveAgenticType, which classifies by request shape.
+function classifyPolicyType(name) {
+    const lower = (name || "").toLowerCase();
+    if (lower.includes("prompt") || lower.includes("injection"))       return "Prompt";
+    if (lower.includes("skill") || lower.includes("malicious_skill"))  return "Skill";
+    if (lower.includes("config") || lower.includes("setting"))         return "Config";
+    if (lower.includes("tool") || lower.includes("mcp"))               return "Tool";
+    if (lower.includes("llm"))                                         return "LLM";
+    return "Other";
+}
+
 // Transform a single backend event into a table row.
 // Kept lightweight — runs only on the current page of results (not all data).
 function transformEvent(event, collectionsMap, usernameMap) {
     const meta = parseMetadata(event.metadata);
+    // typeLabel (request-shape) still drives evidence/asset-tag logic below;
+    // the Type column itself uses the policy classification so it matches the pie.
     const typeLabel = deriveAgenticType(event.url, event.method);
+    const policyName = meta.policy_name || meta.npolicy_name || event.filterId || "-";
 
     const { req: reqPayload, resp: respPayload } = parseAktoPayload(event.payload);
     const rawBehaviour = respPayload?.error?.data?.behaviour || meta.behaviour || meta.nbehaviour || null;
@@ -338,7 +387,13 @@ function transformEvent(event, collectionsMap, usernameMap) {
         id: event.id,
         apiCollectionId: event.apiCollectionId,
         detected: event.timestamp,
-        type: typeLabel,
+        // Raw filterId/host/behaviour kept as explicit fields (not just folded into policyName/user)
+        // for the Needs Approval tab's client-side filter and "Approve server" action, which need
+        // the exact values the backend expects (approveServerForPolicy takes policyName + serverId).
+        filterId: event.filterId,
+        host: rawHost,
+        behaviourRaw: rawBehaviour,
+        type: classifyPolicyType(policyName),
         violation: meta.rule_violated || meta.nrule_violated || meta.nruleViolated || event.subCategory || event.filterId || "-",
         severity: (event.severity || "HIGH").toUpperCase(),
         evidenceText: primaryValue || normalizeReasonPunctuation(meta.reason) || "-",
@@ -348,7 +403,7 @@ function transformEvent(event, collectionsMap, usernameMap) {
         agenticAssetRaw: rawAsset,
         agenticAssetTag: skillOrToolName ? (typeLabel === "Skill" ? "skill" : typeLabel === "Tool" ? "tool" : agenticAssetTag) : agenticAssetTag,
         action,
-        policyName: meta.policy_name || meta.npolicy_name || event.filterId || "-",
+        policyName,
         _status: event.status || "ACTIVE",
         payload: event.payload || null,
         metadata: event.metadata || null,
@@ -359,11 +414,11 @@ function transformEvent(event, collectionsMap, usernameMap) {
 
 // ─── Dashboard summary section ───────────────────────────────────────────────────
 
-function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, latencyData, startTimestamp, endTimestamp }) {
+function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, currentTab, latencyData, startTimestamp, endTimestamp }) {
     if (summaryLoading) return <SpinnerCentered />;
     if (!summaryData) return null;
 
-    const { severityDistribution, categoryTotal, statusCounts, topPolicies, topHosts, byType } = summaryData;
+    const { severityDistribution, categoryTotal, statusCounts, topPolicies, topHosts, byType, skillsEvaluationsCount, misconfiguredSettingsCount } = summaryData;
 
     const totalBreakdown = ["CRITICAL", "HIGH", "MEDIUM", "LOW"].map(k => ({
         label: k.charAt(0) + k.slice(1).toLowerCase(),
@@ -375,6 +430,13 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
     const otherBreakdown = [
         { label: "Under Review", count: statusCounts.UNDER_REVIEW || 0, color: STATUS_COLORS.UNDER_REVIEW || "#F5A623", key: "UNDER_REVIEW" },
         { label: "Ignored",      count: statusCounts.IGNORED || 0,      color: STATUS_COLORS.IGNORED, key: "IGNORED" },
+        // Skills Evaluations / Misconfigured Settings are partitions of ACTIVE (not real statuses),
+        // fetched the same way the tabs themselves count their rows (skillEvaluationMode/
+        // configEvaluationMode "only") — NOT derived from byType, which excludes /skills/ events
+        // entirely and buckets Config by category text (a skill's "Config Mutation" sub-category
+        // would otherwise get miscounted as Misconfigured Settings).
+        { label: "Skills Evaluations",     count: skillsEvaluationsCount || 0,     color: TYPE_COLORS.Skill,  key: "SKILLS_EVALUATIONS" },
+        { label: "Misconfigured Settings", count: misconfiguredSettingsCount || 0, color: TYPE_COLORS.Config, key: "MISCONFIGURED_SETTINGS" },
     ];
 
     const policyRows = topPolicies.map((item, i) => ({
@@ -423,10 +485,11 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
         </Box>
     );
 
+    const isOtherCardFamily = selectedCard === "other" || selectedCard === "other-view";
     const otherCard = (
         <Box
             className="violations-card-wrap"
-            style={selectedCard === "other" ? { outline: "1px solid var(--p-color-border-critical)" } : undefined}
+            style={isOtherCardFamily ? { outline: "1px solid var(--p-color-border-critical)" } : undefined}
             onClick={onOtherCardClick}
         >
             <AgenticStatsCard
@@ -437,7 +500,10 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
                 deltaColor="subdued"
                 breakdown={otherBreakdown}
                 onFilterClick={onOtherBreakdownClick}
-                activeFilter={selectedCard === "other" ? new Set([activeStatusValue]) : undefined}
+                // currentTab (not activeStatusValue) drives the highlight — activeStatusValue is
+                // hardcoded to "ACTIVE" for Skills Evaluations/Misconfigured Settings/Needs Approval
+                // (required for the backend fetch), so it'd never match those breakdown keys.
+                activeFilter={isOtherCardFamily ? new Set([currentTab.toUpperCase()]) : undefined}
                 bodyGap="4"
             />
         </Box>
@@ -564,8 +630,26 @@ function Violations() {
     const [activeSeverityFilter, setActiveSeverityFilter] = useState(new Set());
     const [activePolicyFilter, setActivePolicyFilter] = useState(new Set());
     const [activeTypeFilter, setActiveTypeFilter] = useState(null);
-    const [selectedCard, setSelectedCard] = useState("open");          // "open" or "other"
-    const [activeStatusValue, setActiveStatusValue] = useState("ACTIVE"); // drives backend statusFilter
+    // Type (pie) filter is driven straight into the server fetch instead of the policyName
+    // set-filter: the pie's subcategory names come from a different endpoint than the set
+    // filter's known values, so setColumnFilterModel would silently drop them.
+    const [activeTypeSubCategories, setActiveTypeSubCategories] = useState([]);
+
+    // Single source of truth for the tab bar, mirroring the old UI's SusDataTable tab ids exactly:
+    // 'active' | 'under_review' | 'ignored' | 'needs_approval' | 'skills_evaluations' |
+    // 'misconfigured_settings'.
+    const [currentTab, setCurrentTab] = useState("active");
+    const isSkillsEvaluationsTab = currentTab === "skills_evaluations";
+    const isNeedsApprovalTab = currentTab === "needs_approval";
+    const isMisconfiguredTab = currentTab === "misconfigured_settings";
+    // Needs Approval, Skills Evaluations, and Misconfigured Settings are all views over ACTIVE
+    // events narrowed by other means (client-side behaviour filter / skillEvaluationMode /
+    // configEvaluationMode below), not their own status value - same convention as
+    // SusDataTable's effectiveStatus.
+    const activeStatusValue = (isSkillsEvaluationsTab || isNeedsApprovalTab || isMisconfiguredTab) ? "ACTIVE" : currentTab.toUpperCase();
+    // Drives the summary cards' outline - neither "open" nor "other" card highlights on these
+    // orthogonal views, since they're not a status.
+    const selectedCard = currentTab === "active" ? "open" : ((isSkillsEvaluationsTab || isNeedsApprovalTab || isMisconfiguredTab) ? "other-view" : "other");
     const gridRef = useRef(null);
     const prevSelectedIdRef = useRef(null);
     const gridFilterKey = useRef(`violations-${Date.now()}`);
@@ -622,8 +706,6 @@ function Violations() {
         });
     }, [startTimestamp, endTimestamp]);
 
-    const colDefs = useMemo(() => buildColDefs(filterValues), [filterValues]);
-
     // ─── Card click → AG Grid column filter ─────────────────────────────────
     const applyGridFilter = useCallback((colId, values) => {
         const api = gridRef.current?.api;
@@ -677,36 +759,114 @@ function Violations() {
         const subCategories = mapping[typeName] || [];
         if (activeTypeFilter === typeName) {
             setActiveTypeFilter(null);
-            applyGridFilter("policyName", []);
+            setActiveTypeSubCategories([]);
         } else {
             setActiveTypeFilter(typeName);
-            applyGridFilter("policyName", subCategories);
+            setActiveTypeSubCategories(subCategories);
         }
-    }, [applyGridFilter, summaryData, activeTypeFilter]);
+    }, [summaryData, activeTypeFilter]);
+
+    // Re-fetch the server-side rows whenever the pie's type filter changes (skip the initial mount).
+    const typeFilterFirstRun = useRef(true);
+    useEffect(() => {
+        if (typeFilterFirstRun.current) { typeFilterFirstRun.current = false; return; }
+        gridRef.current?.api?.refreshServerSide({ purge: true });
+    }, [activeTypeSubCategories]);
 
     // ─── Card selection (Open vs Other) ─────────────────────────────────────
     const [tableKey, setTableKey] = useState(0);
     const triggerTableRefresh = useCallback(() => setTableKey(k => k + 1), []);
 
     const handleOpenCardClick = useCallback(() => {
-        if (selectedCard === "open") return;
-        setSelectedCard("open");
-        setActiveStatusValue("ACTIVE");
+        if (currentTab === "active") return;
+        setCurrentTab("active");
         triggerTableRefresh();
-    }, [selectedCard, triggerTableRefresh]);
+    }, [currentTab, triggerTableRefresh]);
 
     const handleOtherCardClick = useCallback(() => {
-        if (selectedCard === "other") return;
-        setSelectedCard("other");
-        setActiveStatusValue("UNDER_REVIEW");
+        if (currentTab === "under_review" || currentTab === "ignored") return;
+        setCurrentTab("under_review");
         triggerTableRefresh();
-    }, [selectedCard, triggerTableRefresh]);
+    }, [currentTab, triggerTableRefresh]);
 
     const handleOtherBreakdownClick = useCallback((key) => {
-        setSelectedCard("other");
-        setActiveStatusValue(prev => prev === key ? "UNDER_REVIEW" : key);
+        const target = key === "IGNORED" ? "ignored"
+            : key === "SKILLS_EVALUATIONS" ? "skills_evaluations"
+            : key === "MISCONFIGURED_SETTINGS" ? "misconfigured_settings"
+            : "under_review";
+        setCurrentTab(prev => prev === target ? "under_review" : target);
         triggerTableRefresh();
     }, [triggerTableRefresh]);
+
+    const handleTabSelect = useCallback((tabId) => {
+        if (tabId === currentTab) return;
+        setCurrentTab(tabId);
+        triggerTableRefresh();
+    }, [currentTab, triggerTableRefresh]);
+
+    // ─── Needs Approval: inline "Approve server" action ─────────────────────
+    // Mirrors SusDataTable.jsx (old UI) exactly — approveRow holds the raw row being approved.
+    const guardrailApprovedByPolicy = SessionStore((state) => state.guardrailApprovedByPolicy);
+    const setGuardrailApprovedByPolicy = SessionStore((state) => state.setGuardrailApprovedByPolicy);
+    const [approveRow, setApproveRow] = useState(null);
+    const [approveMode, setApproveMode] = useState("ALWAYS"); // ALWAYS | DURATION
+    const [approveDays, setApproveDays] = useState("7");
+    const [approveLoading, setApproveLoading] = useState(false);
+
+    const openInlineApprove = useCallback((row) => {
+        setApproveMode("ALWAYS");
+        setApproveDays("7");
+        setApproveRow(row);
+    }, []);
+
+    // Refetch policies and refresh the approved-servers map (e.g. right after an approve), so the
+    // just-approved server drops off the Needs Approval tab immediately.
+    const refreshApprovedByPolicy = useCallback(async () => {
+        try {
+            const resp = await guardrailApi.fetchGuardrailPolicies();
+            setGuardrailApprovedByPolicy(buildApprovedByPolicy(resp?.guardrailPolicies));
+        } catch (error) {
+            console.error('Error refreshing approved servers:', error);
+        }
+    }, [setGuardrailApprovedByPolicy]);
+
+    useEffect(() => {
+        refreshApprovedByPolicy();
+    }, [refreshApprovedByPolicy]);
+
+    const submitInlineApprove = useCallback(async () => {
+        const policyName = approveRow?.filterId;
+        const serverId = approveRow?.host;
+        if (!policyName) { func.setToast(true, true, "Could not resolve the policy for this event"); return; }
+        if (!serverId || serverId === '-') { func.setToast(true, true, "Could not resolve the server for this event"); return; }
+        let value = 0;
+        if (approveMode === "DURATION") {
+            value = parseInt(approveDays, 10);
+            if (!Number.isInteger(value) || value <= 0) { func.setToast(true, true, "Enter a valid number of days"); return; }
+        }
+        setApproveLoading(true);
+        try {
+            // request util rejects (and toasts the backend error) on non-2xx, so reaching here = success.
+            await guardrailApi.approveServerForPolicy({
+                policyName,
+                approvedServerId: serverId,
+                approvedServerName: serverId,
+                approvalMode: approveMode,
+                approvalValue: value,
+            });
+            const scope = approveMode === "DURATION" ? `for ${value} day(s)` : "always";
+            func.setToast(true, false, `Approved ${serverId} ${scope}`);
+            setApproveRow(null);
+            await refreshApprovedByPolicy();
+            triggerTableRefresh();
+        } catch {
+            // Error toast already surfaced by the request interceptor; keep the modal open.
+        } finally {
+            setApproveLoading(false);
+        }
+    }, [approveRow, approveMode, approveDays, refreshApprovedByPolicy, triggerTableRefresh]);
+
+    const colDefs = useMemo(() => buildColDefs(filterValues, isNeedsApprovalTab, openInlineApprove), [filterValues, isNeedsApprovalTab, openInlineApprove]);
 
     // ─── Fetch summary stats from existing backend APIs ─────────────────────
     // Replaces the old client-side computeSummary() that required all data loaded.
@@ -716,17 +876,56 @@ function Violations() {
         async function loadSummary() {
             setSummaryLoading(true);
             try {
+                // fetchThreatCategoryCount excludes /skills/ events unconditionally on the backend
+                // (ThreatUtils.excludeSkillEndpointFilter), so Skills Evaluations can never be derived
+                // from categoryResp/byType — it'd always read 0. Misconfigured Settings also can't
+                // reliably reuse byType: it buckets by category TEXT (e.g. a skill's "Config Mutation"
+                // sub-category also matches "config"), not by the actual /config/ URL partition. Get
+                // both counts the same way the tabs themselves do: skillEvaluationMode/configEvaluationMode
+                // "only", limit 1, read .total. Atlas (ENDPOINT) only — undefined elsewhere skips the calls.
+                const wantsPartitionCounts = isEndpointSecurityCategory();
+                // getDailyThreatActorsCount's totalActiveStatus (below, dailyResp) excludes /skills/
+                // events server-side (ThreatUtils.excludeSkillEndpointFilter in ThreatActorService.java)
+                // but has NO equivalent config-exclusion filter anywhere in that file, so it overcounts
+                // Active by however many /config/ (Misconfigured Settings) events exist — the table
+                // itself (fetchSuspectSampleData with skillEvaluationMode/configEvaluationMode:
+                // "exclude") excludes both and is the source of truth. Rather than touch the shared
+                // ThreatActorService backend (which also feeds 5+ other dashboard widgets), get the
+                // corrected Active/Under Review/Ignored counts the same way the grid does, scoped to
+                // just this page.
                 const results = await Promise.allSettled([
                     threatDetectionApi.fetchCountBySeverity(startTimestamp, endTimestamp, "ACTIVE"),
                     threatDetectionApi.fetchThreatCategoryCount(startTimestamp, endTimestamp, activeStatusValue),
                     threatDetectionApi.getDailyThreatActorsCount(startTimestamp, endTimestamp, []),
                     threatDetectionApi.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5),
+                    wantsPartitionCounts
+                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "ACTIVE", undefined, undefined, undefined, undefined, undefined, false, [], "only", undefined)
+                        : Promise.resolve(null),
+                    wantsPartitionCounts
+                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "ACTIVE", undefined, undefined, undefined, undefined, undefined, false, [], undefined, "only")
+                        : Promise.resolve(null),
+                    wantsPartitionCounts
+                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "ACTIVE", undefined, undefined, undefined, undefined, undefined, false, [], "exclude", "exclude")
+                        : Promise.resolve(null),
+                    wantsPartitionCounts
+                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "UNDER_REVIEW", undefined, undefined, undefined, undefined, undefined, false, [], "exclude", "exclude")
+                        : Promise.resolve(null),
+                    wantsPartitionCounts
+                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "IGNORED", undefined, undefined, undefined, undefined, undefined, false, [], "exclude", "exclude")
+                        : Promise.resolve(null),
                 ]);
 
                 const severityResp = results[0].status === 'fulfilled' ? results[0].value : {};
                 const categoryResp = results[1].status === 'fulfilled' ? results[1].value : {};
                 const dailyResp    = results[2].status === 'fulfilled' ? results[2].value : {};
                 const topNResp     = results[3].status === 'fulfilled' ? results[3].value : {};
+                const skillsCountResp = results[4].status === 'fulfilled' ? results[4].value : null;
+                const configCountResp = results[5].status === 'fulfilled' ? results[5].value : null;
+                const activeCountResp = results[6].status === 'fulfilled' ? results[6].value : null;
+                const underReviewCountResp = results[7].status === 'fulfilled' ? results[7].value : null;
+                const ignoredCountResp = results[8].status === 'fulfilled' ? results[8].value : null;
+                const skillsEvaluationsCount = skillsCountResp?.total || 0;
+                const misconfiguredSettingsCount = configCountResp?.total || 0;
 
                 // Severity counts
                 const severityDistribution = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
@@ -739,18 +938,24 @@ function Violations() {
                     }
                 });
 
-                // Status counts from daily actors response
+                // Status counts: prefer the corrected, skill+config-excluded totals (activeCountResp
+                // etc.) over dailyResp's raw totalActiveStatus/etc, which overcounts by however many
+                // Misconfigured Settings events exist (see comment above). Falls back to dailyResp
+                // when partition counts aren't applicable (non-Endpoint-Security accounts) or a
+                // request failed.
                 const statusCounts = {
-                    ACTIVE: dailyResp?.totalActiveStatus || 0,
-                    IGNORED: dailyResp?.totalIgnoredStatus || 0,
-                    UNDER_REVIEW: dailyResp?.totalUnderReviewStatus || 0,
+                    ACTIVE: activeCountResp?.total ?? (dailyResp?.totalActiveStatus || 0),
+                    IGNORED: ignoredCountResp?.total ?? (dailyResp?.totalIgnoredStatus || 0),
+                    UNDER_REVIEW: underReviewCountResp?.total ?? (dailyResp?.totalUnderReviewStatus || 0),
                     FIXED: 0,
                 };
 
-                // Top policies from category counts
+                // Top policies from category counts. category over subCategory - subCategory can
+                // be a raw config-path string (e.g. "mcp_servers.computer-use.command" for a
+                // config-risk finding), not a name meant to stand alone as a policy label.
                 const subcategoryMap = {};
                 (categoryResp?.categoryCounts || []).forEach(item => {
-                    const sub = item.subCategory || item.category || "Unknown";
+                    const sub = item.category || item.subCategory || "Unknown";
                     subcategoryMap[sub] = (subcategoryMap[sub] || 0) + (item.count || 0);
                 });
                 const topPolicies = Object.entries(subcategoryMap)
@@ -762,13 +967,7 @@ function Violations() {
                 const byType = {};
                 const typeToSubCategories = {};
                 Object.entries(subcategoryMap).forEach(([name, count]) => {
-                    const lower = name.toLowerCase();
-                    let type = "Other";
-                    if (lower.includes("prompt") || lower.includes("injection")) type = "Prompt";
-                    else if (lower.includes("skill") || lower.includes("malicious_skill")) type = "Skill";
-                    else if (lower.includes("config") || lower.includes("setting")) type = "Config";
-                    else if (lower.includes("tool") || lower.includes("mcp")) type = "Tool";
-                    else if (lower.includes("llm")) type = "LLM";
+                    const type = classifyPolicyType(name);
 
                     if (!byType[type]) byType[type] = { text: 0, color: TYPE_COLORS[type] || "#999", filterKey: type };
                     byType[type].text += count;
@@ -784,7 +983,7 @@ function Violations() {
                     host: h.host || "",
                 }));
 
-                setSummaryData({ severityDistribution, totalCount, categoryTotal, statusCounts, topPolicies, topHosts, byType, typeToSubCategories });
+                setSummaryData({ severityDistribution, totalCount, categoryTotal, statusCounts, topPolicies, topHosts, byType, typeToSubCategories, skillsEvaluationsCount, misconfiguredSettingsCount });
             } catch {
                 setSummaryData(null);
             } finally {
@@ -837,13 +1036,26 @@ function Violations() {
     // Uses the existing fetchSuspectSampleData API that SusDataTable also uses.
     // AgGridTable's onServerFetch mode handles pagination, sort, and search automatically.
     const onServerFetch = useCallback(({ filters, sortKey, sortOrder, skip, limit, searchString }) => {
-        const pageSize = limit || 50;
         const severityFilter = filters?.severity || [];
         const hostFilter = filters?.user || [];
-        // Union the column filter with the "Top Policies" card selection (driven via React state,
-        // not the set-filter, so its values aren't dropped). Both map to the backend latestAttack.
-        const policyFilter = [...new Set([...(filters?.policyName || []), ...activePolicyFilter])];
+        // Union the column filter, the "Top Policies" card selection, and the pie's type filter
+        // (all map to the backend latestAttack).
+        const policyFilter = [...new Set([...(filters?.policyName || []), ...activePolicyFilter, ...activeTypeSubCategories])];
         const statusFilter = activeStatusValue;
+        // Skills Evaluations / Misconfigured Settings partitions (Atlas/ENDPOINT only): "only" on
+        // their own tab, "exclude" on Active (both at once, so Active shows neither) - same
+        // convention as SusDataTable.jsx. Backend applies these only when contextSource ===
+        // ENDPOINT; undefined (no-op) for Agentic accounts or the other tabs.
+        const skillEvaluationMode = isEndpointSecurityCategory()
+            ? (isSkillsEvaluationsTab ? "only" : (currentTab === "active" ? "exclude" : undefined))
+            : undefined;
+        const configEvaluationMode = isEndpointSecurityCategory()
+            ? (isMisconfiguredTab ? "only" : (currentTab === "active" ? "exclude" : undefined))
+            : undefined;
+        // Needs Approval is a CLIENT-side view over ACTIVE events (no server-side "behaviour"
+        // filter exists) — fetch one big page and filter after mapping, same as SusDataTable.jsx.
+        const effectiveSkip = isNeedsApprovalTab ? 0 : skip;
+        const pageSize = isNeedsApprovalTab ? 200 : (limit || 50);
 
         // AgGridTable sends sortOrder: -1 for asc, 1 for desc (opposite of MongoDB convention)
         const mongoSort = sortOrder ? -sortOrder : -1;
@@ -852,7 +1064,7 @@ function Violations() {
         const sort = sortKey ? { [SORT_FIELD_MAP[sortKey] || sortKey]: mongoSort } : { detectedAt: -1 };
 
         return threatDetectionApi.fetchSuspectSampleData(
-            skip,
+            effectiveSkip,
             [],             // ips
             [],             // apiCollectionIds
             [],             // urls
@@ -870,13 +1082,25 @@ function Violations() {
             undefined,      // method
             isSeveritySort, // sortBySeverity — triggers aggregation-based rank sort in backend
             severityFilter.length > 0 ? severityFilter : undefined,
+            skillEvaluationMode,
+            configEvaluationMode,
         ).then(result => {
             const events = result?.maliciousEvents || [];
-            const transformed = events.map(e => transformEvent(e, collectionsMap, usernameMapRef.current));
+            let transformed = events.map(e => transformEvent(e, collectionsMap, usernameMapRef.current));
+            let total = result?.total || 0;
+            // Needs Approval: keep only approval-behaviour rows, and drop rows whose (policy, server)
+            // is already approved for that policy — same filter as SusDataTable.jsx.
+            if (isNeedsApprovalTab) {
+                transformed = transformed.filter(r =>
+                    String(r.behaviourRaw || '').toLowerCase() === 'approval' &&
+                    !isServerApproved(guardrailApprovedByPolicy, r.filterId, r.host)
+                );
+                total = transformed.length;
+            }
             setRows(transformed);
-            return { value: transformed, total: result?.total || 0 };
+            return { value: transformed, total };
         });
-    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activePolicyFilter]);
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, guardrailApprovedByPolicy]);
 
     // Reload the grid when the Top Policies card selection changes (skip the initial mount).
     const policyFilterFirstRun = useRef(true);
@@ -965,16 +1189,47 @@ function Violations() {
         return params.data?.id === selectedViolation?.id ? "violations-row-selected" : undefined;
     }, [selectedViolation]);
 
-    const tableHeading = selectedCard === "open"
-        ? "All Open Violations"
-        : activeStatusValue === "IGNORED"
-            ? "All Ignored Violations"
-            : "All Under Review Violations";
+    // Active/Under Review/Ignored/Skills Evaluations mirror SusDataTable.jsx (old UI) exactly.
+    // Misconfigured Settings is new here - both it and Skills Evaluations are gated to Endpoint
+    // Security, matching where skillEvaluationMode/configEvaluationMode actually take effect
+    // server-side.
+    const tabItems = useMemo(() => {
+        // Live counts (Active/Under Review/Ignored) come straight from the same
+        // getDailyThreatActorsCount response summaryData already holds - matching the tab-count
+        // badges GithubServerTable renders for the old UI's equivalent tabs. Skills Evaluations
+        // and Misconfigured Settings don't get a number (client-side/server-partition views with
+        // no cheap total to show upfront, same as old UI's "Beta" labels).
+        const statusCounts = summaryData?.statusCounts || {};
+        const withCount = (label, key) => {
+            const count = statusCounts[key];
+            return typeof count === "number" ? `${label} (${count.toLocaleString()})` : label;
+        };
+        const items = [
+            { id: "active", content: withCount("Active", "ACTIVE") },
+            { id: "under_review", content: withCount("Under Review", "UNDER_REVIEW") },
+            { id: "ignored", content: withCount("Ignored", "IGNORED") },
+        ];
+        if (isEndpointSecurityCategory()) {
+            // Tabs' `badge` prop is declared in this Polaris version's types but not actually
+            // rendered by the component - `content` is also strictly a string, not a node, so
+            // there's no way to attach a real Badge here. Folding "(Beta)" into the label is the
+            // only thing that reliably renders.
+            items.push({ id: "needs_approval", content: "Needs Approval (Beta)" });
+            items.push({ id: "skills_evaluations", content: "Skills Evaluations (Beta)" });
+            items.push({ id: "misconfigured_settings", content: "Misconfigured Settings (Beta)" });
+        }
+        return items;
+    }, [summaryData]);
+    const selectedTabIndex = Math.max(0, tabItems.findIndex(t => t.id === currentTab));
 
     const tableComponent = (
         <Box key="table" className="violations-table-wrap">
             <Box paddingBlockEnd="3">
-                <Text variant="headingSm">{tableHeading}</Text>
+                <Tabs
+                    tabs={tabItems}
+                    selected={selectedTabIndex}
+                    onSelect={(index) => handleTabSelect(tabItems[index].id)}
+                />
             </Box>
             <AgGridTable
                 key={`violations-grid-${tableKey}-${startTimestamp}-${endTimestamp}`}
@@ -1043,6 +1298,7 @@ function Violations() {
             onOtherCardClick={handleOtherCardClick}
             onOtherBreakdownClick={handleOtherBreakdownClick}
             activeStatusValue={activeStatusValue}
+            currentTab={currentTab}
             latencyData={latencyData}
             startTimestamp={startTimestamp}
             endTimestamp={endTimestamp}
@@ -1066,6 +1322,47 @@ function Violations() {
                 <Text variant="bodyMd" color="subdued">
                     {`This will permanently delete ${bulkSelectedCount} selected event${bulkSelectedCount === 1 ? "" : "s"}. This action cannot be undone.`}
                 </Text>
+            </Modal.Section>
+        </Modal>,
+        <Modal
+            key="approve-server"
+            open={approveRow !== null}
+            onClose={() => setApproveRow(null)}
+            title="Approve server"
+            primaryAction={{ content: "Approve", loading: approveLoading, onAction: submitInlineApprove }}
+            secondaryActions={[{ content: "Cancel", onAction: () => setApproveRow(null) }]}
+        >
+            <Modal.Section>
+                <VerticalStack gap="4">
+                    <Text variant="bodyMd">
+                        Approving <Text as="span" fontWeight="semibold">{approveRow?.host || "this server"}</Text> will
+                        allow it to bypass the <Text as="span" fontWeight="semibold">{approveRow?.filterId || "policy"}</Text> guardrail policy on future requests.
+                    </Text>
+                    <VerticalStack gap="2">
+                        <RadioButton
+                            label="Always"
+                            name="approveMode"
+                            checked={approveMode === "ALWAYS"}
+                            onChange={() => setApproveMode("ALWAYS")}
+                        />
+                        <RadioButton
+                            label="Number of days"
+                            name="approveMode"
+                            checked={approveMode === "DURATION"}
+                            onChange={() => setApproveMode("DURATION")}
+                        />
+                    </VerticalStack>
+                    {approveMode === "DURATION" && (
+                        <TextField
+                            label="Number of days"
+                            type="number"
+                            min={1}
+                            value={approveDays}
+                            onChange={setApproveDays}
+                            autoComplete="off"
+                        />
+                    )}
+                </VerticalStack>
             </Modal.Section>
         </Modal>,
     ];

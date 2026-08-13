@@ -32,6 +32,14 @@ export default {
             data: { startTimestamp, endTimestamp }
         })
     },
+    // Distinct filter-dropdown values (markedBy) — replaces pulling 1000 full audit rows just to derive them.
+    async fetchAuditDataFilterOptions() {
+        return await request({
+            url: '/api/fetchAuditDataFilterOptions',
+            method: 'post',
+            data: {}
+        });
+    },
     async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators, searchString, mergeMcpServers = false, aiAgentName = null, mcpServerName = null) {
         const data = { sortKey, sortOrder, skip, limit, filters, filterOperators, searchString, mergeMcpServers };
         if (typeof aiAgentName === 'string' && aiAgentName.length > 0) data.aiAgentName = aiAgentName;
@@ -97,6 +105,16 @@ export default {
             data: { apiCollectionId: id }
         });
         return resp?.mcpAuditInfoList || [];
+    },
+    // Batch form of fetchMcpAuditInfoByCollection — one request for many collection ids instead of
+    // one request per id. Returns a plain object keyed by collection id (string) -> mcpAuditInfoList.
+    async fetchMcpAuditInfoByCollectionBatch(apiCollectionIds) {
+        const resp = await request({
+            url: '/api/fetchMcpAuditInfoByCollection',
+            method: 'post',
+            data: { apiCollectionIds }
+        });
+        return resp?.mcpAuditInfoListByCollection || {};
     },
 
     async fetchDataTypeNames() {
@@ -220,6 +238,184 @@ export default {
             method: 'post',
             data: {}
         })
+    },
+    // Paginated, sorted, searchable grouped-asset rows for the Agentic Assets "New Layout" table —
+    // replaces computing all ~800 grouped rows client-side on every load (see
+    // atlas-scale-test/DASHBOARD_OPTIMIZATION.md's "paginated server-side aggregation rebuild").
+    // trafficMap/riskScoreMap are the same maps AgenticAssetsPage.jsx already fetches via
+    // fetchAndCacheAgenticCollectionsBundle.
+    // maliciousSkillKeys is NOT sent — AgenticObserveAction computes/caches it itself now
+    // (getOrBuildSkillData) instead of requiring the whole account-wide set (14,218 entries /
+    // ~500KB+ on Atlas Scale Test) to be re-POSTed on every paginated request.
+    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, usernameMap, userMetadataMap } = {}) {
+        const resp = await request({
+            url: '/api/fetchAgenticAssetsSummary',
+            method: 'post',
+            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, usernameMap, userMetadataMap },
+        })
+        return { rows: resp?.rows || [], total: resp?.total || 0 }
+    },
+    // Lazy per-asset detail (hostNames/collectionIds/skillNames/mcpServers/mcpServerCollectionIds/
+    // devices) for exactly ONE group — fetched only when a user opens that asset's flyout, not
+    // shipped for every row of every fetchAgenticAssetsSummary page (that used to make a single
+    // 50-row page 16MB, mostly from raw per-device breakdowns on rows with hundreds of devices).
+    // trafficMap/riskScoreMap/userAnalysisFlatMap enrich the one asset's own device list the same
+    // way fetchAgenticAssetsSummary's rows used to — needed by the Overview tab's topology graph.
+    async fetchAgenticAssetDetail({ groupKey, rowType, trafficMap, riskScoreMap, userAnalysisFlatMap } = {}) {
+        const resp = await request({
+            url: '/api/fetchAgenticAssetDetail',
+            method: 'post',
+            data: { groupKey, rowType, trafficMap, riskScoreMap, userAnalysisFlatMap },
+        })
+        return {
+            hostNames: resp?.assetHostNames || [],
+            collectionIds: resp?.assetCollectionIds || [],
+            skillNames: resp?.assetSkillNames || [],
+            mcpServers: resp?.assetMcpServers || [],
+            mcpServerCollectionIds: resp?.assetMcpServerCollectionIds || {},
+            devices: resp?.assetDevices || [],
+            // Agent rows only — needed by the legacy Endpoints.jsx page's row-click ->
+            // Inventory-filter feature (buildAgenticInventoryFilterForRow); unused by the new
+            // layout's flyout.
+            tagKey: resp?.assetTagKey || null,
+            rawTagValues: resp?.assetRawTagValues || [],
+            // Inline-topology summary for the new layout's Overview tab — computed server-side,
+            // scoped to just this asset's own collections (AgenticObserveAction.fetchAgenticAssetDetail),
+            // so the browser no longer needs its own fetchApiInfosFromSTIs round-trip to derive them.
+            // hasInlineLlm/inlineToolNames populated for "agent" rows, mcpComponentCount for
+            // "service"/"llm" rows; the other stays at its default for whichever type this row isn't.
+            hasInlineLlm: resp?.assetHasInlineLlm || false,
+            inlineToolNames: resp?.assetInlineToolNames || [],
+            mcpComponentCount: resp?.assetMcpComponentCount || 0,
+        }
+    },
+    // Server-side paginated device list for ONE asset's flyout Devices tab — scoped to just
+    // that asset's own apiCollectionIds (cheap), not the whole account. usernameMap is the
+    // same Endpoint Shield map already fetched once for the main grid (fetchEndpointShieldUserMetadata),
+    // reused here so search/sort can work against the resolved person's name, not just deviceId.
+    async fetchAgenticAssetDevicesPage({ apiCollectionIds, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, userAnalysisFlatMap, usernameMap } = {}) {
+        const resp = await request({
+            url: '/api/fetchAgenticAssetDevicesPage',
+            method: 'post',
+            data: { apiCollectionIds, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, userAnalysisFlatMap, usernameMap },
+        })
+        return { devices: resp?.devices || [], total: resp?.total || 0 }
+    },
+    // Server-side paginated, per-device TREE list for ONE asset's legacy-layout row-click page —
+    // the richer sibling of fetchAgenticAssetDevicesPage above: each row is a device with its own
+    // children[] (the individual member collections + their own risk/sensitive/tags), matching
+    // AgentEndpointTreeTable.jsx's expandable UI but scoped/paginated instead of account-wide.
+    // Deliberately does NOT take trafficMap/riskScoreMap/sensitiveMap — unlike the list pages'
+    // endpoints, which need those account-wide maps client-fetched once to enrich every row of a
+    // big grid, this endpoint computes them itself server-side, scoped to apiCollectionIds — no
+    // point requiring the client to fetch/repost a whole-account map for a handful of entries.
+    async fetchAgenticAssetEndpointsPage({ apiCollectionIds, rowType, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters } = {}) {
+        const resp = await request({
+            url: '/api/fetchAgenticAssetEndpointsPage',
+            method: 'post',
+            data: { apiCollectionIds, rowType, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters },
+        })
+        return {
+            endpoints: resp?.endpoints || [],
+            total: resp?.total || 0,
+            distinctEndpointIds: resp?.distinctEndpointIds || [],
+            distinctUsernames: resp?.distinctUsernames || [],
+        }
+    },
+    // Server-side paginated Components list for ONE AI-Agent asset's flyout — merges skills,
+    // built-in tools, and connected MCP servers into one batched, server-sorted/paginated list.
+    // mcpServerNames is asset.mcpServers, already known/cheap client-side, passed through rather
+    // than re-derived server-side.
+    async fetchAgenticComponentsPage({ apiCollectionIds, mcpServerNames, mcpServerCollectionIds, skip, limit, sortKey, sortOrder, queryValue } = {}) {
+        const resp = await request({
+            url: '/api/fetchAgenticComponentsPage',
+            method: 'post',
+            data: { apiCollectionIds, mcpServerNames, mcpServerCollectionIds, skip, limit, sortKey, sortOrder, queryValue },
+        })
+        return { components: resp?.components || [], total: resp?.total || 0 }
+    },
+    // Header-tile stats (asset counts by type) for the Agentic Assets page — same classification
+    // pass as fetchAgenticAssetsSummary, aggregated rather than paginated. Also returns trend/delta
+    // for the Agentic Assets + Violations cards and the Top Used Applications / Top Assets with
+    // Violations lists — all derived server-side from data already fetched at mount, no new fetch.
+    async fetchAgenticAssetsStats({ trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, userAnalysisFlatMap } = {}) {
+        const resp = await request({
+            url: '/api/fetchAgenticAssetsStats',
+            method: 'post',
+            data: { trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, userAnalysisFlatMap },
+        })
+        return {
+            totalAssets: resp?.totalAssets || 0,
+            totalEndpoints: resp?.totalEndpoints || 0,
+            countsByType: resp?.countsByType || {},
+            monthLabels: resp?.monthLabels || [],
+            assetSparkline: resp?.assetSparkline || [],
+            assetDelta: resp?.assetDelta || 0,
+            violationsSparkline: resp?.violationsSparkline || [],
+            violationsDelta: resp?.violationsDelta || 0,
+            topAssetsWithViolations: resp?.topAssetsWithViolations || [],
+            topUsedApplications: resp?.topUsedApplications || [],
+        }
+    },
+    // Paginated, sorted, searchable user/device rows for Users-and-Devices / Endpoints — same
+    // lightweight-summary-first-then-slice shape as fetchAgenticAssetsSummary. groupBy: "user"|"device".
+    async fetchUsersAndDevicesSummary({ groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap, tagsByUsername } = {}) {
+        const resp = await request({
+            url: '/api/fetchUsersAndDevicesSummary',
+            method: 'post',
+            data: { groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap, tagsByUsername },
+        })
+        return { rows: resp?.rows || [], total: resp?.total || 0 }
+    },
+    // Tab-header counts ("Users (N)" / "Devices (N)") for Users-and-Devices / Endpoints, each tab's
+    // "Agentic assets" total, plus distinct device-tag keys for the Tags filter/"Edit device tags" modal.
+    async fetchUsersAndDevicesStats({ trafficMap, riskScoreMap, usernameMap, userMetadataMap, tagsByUsername } = {}) {
+        const resp = await request({
+            url: '/api/fetchUsersAndDevicesStats',
+            method: 'post',
+            data: { trafficMap, riskScoreMap, usernameMap, userMetadataMap, tagsByUsername },
+        })
+        return {
+            usersCount: resp?.usersCount || 0,
+            devicesCount: resp?.devicesCount || 0,
+            usersAgenticAssetsTotal: resp?.usersAgenticAssetsTotal || 0,
+            devicesAgenticAssetsTotal: resp?.devicesAgenticAssetsTotal || 0,
+            usernames: resp?.usernames || [],
+            tagKeys: resp?.tagKeys || [],
+        }
+    },
+    // Paginated top-level device rows for Endpoints' tree grid, or (when parentDeviceId is set) one
+    // device's (device,service) children — see AgenticObserveAction.fetchDeviceEndpointsSummary.
+    async fetchDeviceEndpointsSummary({ parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters, tagsByUsername } = {}) {
+        const resp = await request({
+            url: '/api/fetchDeviceEndpointsSummary',
+            method: 'post',
+            data: { parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters, tagsByUsername },
+        })
+        return { rows: resp?.rows || [], total: resp?.total || 0 }
+    },
+    // Endpoints header stats: trend charts, deltas, Browsers/Endpoints/Users totals — see
+    // AgenticObserveAction.fetchDeviceEndpointsStats.
+    async fetchDeviceEndpointsStats({ usernameMap, deviceMetadataMap, startTimestamp, endTimestamp } = {}) {
+        const resp = await request({
+            url: '/api/fetchDeviceEndpointsStats',
+            method: 'post',
+            data: { usernameMap, deviceMetadataMap, startTimestamp, endTimestamp },
+        })
+        return {
+            deviceCount: resp?.deviceCount || 0,
+            browserDeviceCount: resp?.browserDeviceCount || 0,
+            totalUsers: resp?.totalUsers || 0,
+            monthLabels: resp?.monthLabels || [],
+            osTrend: resp?.osTrend || {},
+            browserTrend: resp?.browserTrend || {},
+            sparklines: resp?.sparklines || {},
+            deltaEndpoints: resp?.deltaEndpoints || 0,
+            deltaBrowsers: resp?.deltaBrowsers || 0,
+            deltaUsers: resp?.deltaUsers || 0,
+            deltaViolations: resp?.deltaViolations || 0,
+            deviceIds: resp?.deviceIds || [],
+        }
     },
     async createCollection(name) {
         return await request({
@@ -397,6 +593,16 @@ export default {
             }
         })
     },
+    // Batch form of fetchApisFromStis — one request for many collection ids instead of one request
+    // per id. Returns a plain object keyed by collection id (string) -> STI list.
+    async fetchApisFromStisBatch(apiCollectionIds) {
+        const resp = await request({
+            url: '/api/fetchApiInfosFromSTIs',
+            method: 'post',
+            data: { apiCollectionIds }
+        })
+        return resp?.listByCollection || {}
+    },
 
     async fetchApiInfosForCollection(apiCollectionId) {
         return await request({
@@ -405,6 +611,25 @@ export default {
             data: {
                 apiCollectionId: apiCollectionId,
             }
+        })
+    },
+    // Batch form of fetchApiInfosForCollection — one request for many collection ids instead of one
+    // request per id. Returns a plain object keyed by collection id (string) -> apiInfoList.
+    async fetchApiInfosForCollectionBatch(apiCollectionIds) {
+        const resp = await request({
+            url: '/api/fetchApiInfosForCollection',
+            method: 'post',
+            data: { apiCollectionIds }
+        })
+        return resp?.apiInfoListByCollection || {}
+    },
+    // ATLAS: single call returning skill risk / malicious / misconfigured maps for the whole account
+    // (replaces the per-collection fetchApiInfosForCollection N+1 on the agentic pages).
+    async fetchAgenticSkillData() {
+        return await request({
+            url: '/api/fetchAgenticSkillData',
+            method: 'post',
+            data: {}
         })
     },
     redactCollection(apiCollectionId, redacted){
@@ -1137,6 +1362,11 @@ export default {
         })
     },
 
+    // Unpaginated — only for CreateNhiPolicyModal's agent/identity dropdown options, which need every
+    // distinct name. The Identities page no longer uses this (it used to, for the topology graph and
+    // summary cards/tab counts, which pulled the whole account — 13.8k+ rows on Atlas Scale Test —
+    // just to draw a handful of nodes or compute four numbers); it now uses fetchAllNhiIdentities
+    // (small, capped) and fetchNhiIdentitiesStats (counts-only) below instead.
     async fetchNhiIdentities(startTimestamp, endTimestamp) {
         const resp = await request({
             url: '/api/fetchNhiIdentities',
@@ -1146,22 +1376,92 @@ export default {
         return resp?.identities || []
     },
 
-    async fetchAllNhiViolations(startTimestamp, endTimestamp) {
+    // Server-side paginated (ATLAS NHI Governance Identities page): pass skip/limit/sortKey/sortOrder/
+    // queryValue/status ("Expired"/"Disabled"/omit-for-"All") to get one page. Returns {identities, total}.
+    // Also used (with a small limit) to feed IdentityOverviewGraph's topology graph.
+    async fetchAllNhiIdentities(startTimestamp, endTimestamp, { skip, limit, sortKey, sortOrder, queryValue, status } = {}) {
+        const resp = await request({
+            url: '/api/fetchAllNhiIdentities',
+            method: 'post',
+            data: { startTimestamp, endTimestamp, skip, limit, sortKey, sortOrder, queryValue, status }
+        })
+        return { identities: resp?.identities || [], total: resp?.total || 0 }
+    },
+
+    // Counts-only (ATLAS NHI Governance Identities page): feeds the summary cards and tab badges
+    // without pulling any identity documents. violatingIdentityIds (optional) is the list of hex ids
+    // already known to have violations, from the cheap fetchViolationCountsByIdentity() call, used to
+    // compute the "Identities with Violations" count server-side. Hex ids, not identityNames — names
+    // aren't unique across identities.
+    async fetchNhiIdentitiesStats(startTimestamp, endTimestamp, violatingIdentityIds) {
+        const resp = await request({
+            url: '/api/fetchNhiIdentitiesStats',
+            method: 'post',
+            data: { startTimestamp, endTimestamp, violatingIdentityIds }
+        })
+        return {
+            total: resp?.statTotal || 0,
+            expired: resp?.statExpired || 0,
+            disabled: resp?.statDisabled || 0,
+            withViolations: resp?.statWithViolations || 0,
+        }
+    },
+
+    // Server-side paginated (ATLAS NHI Governance): pass skip/limit/sortKey/sortOrder/queryValue/status
+    // to get one page; omit them to get the backend's default page (50 rows). Returns {violations, total}
+    // — callers that need charts/tab-counts across the whole range should use fetchNhiViolationsStats
+    // instead of paging through everything.
+    async fetchAllNhiViolations(startTimestamp, endTimestamp, { skip, limit, sortKey, sortOrder, queryValue, status } = {}) {
         const resp = await request({
             url: '/api/fetchAllNhiViolations',
             method: 'post',
-            data: { startTimestamp, endTimestamp }
+            data: { startTimestamp, endTimestamp, skip, limit, sortKey, sortOrder, queryValue, status }
         })
-        return resp?.violations || []
+        return { violations: resp?.violations || [], total: resp?.total || 0 }
     },
 
+    // Server-computed aggregates for the Violations page (severity breakdown, day-bucketed trend,
+    // open/fixed totals) — replaces client-side reduction over the full violations list.
+    async fetchNhiViolationsStats(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/fetchNhiViolationsStats',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp?.stats || {}
+    },
+
+    // Scoped, paginated violations for ONE identity (identity-details flyout) — replaces fetching every
+    // violation account-wide with no time bound just to filter down to a single identity client-side.
+    async fetchViolationsByIdentity(identityId, { skip, limit } = {}) {
+        const resp = await request({
+            url: '/api/fetchViolationsByIdentity',
+            method: 'post',
+            data: { identityId, skip, limit }
+        })
+        return { violations: resp?.violations || [], total: resp?.total || 0, stats: resp?.stats || {} }
+    },
+
+    // Per-identity violation counts, grouped server-side (one row per identityName x severity)
+    // instead of every non-fixed violation document.
     async fetchViolationCountsByIdentity() {
         const resp = await request({
             url: '/api/fetchViolationCountsByIdentity',
             method: 'post',
             data: {}
         })
-        return resp?.violations || []
+        return resp?.identityViolationCounts || []
+    },
+
+    // Per-policy violation counts, grouped server-side (one row per policyId x severity)
+    // instead of every non-fixed violation projected doc.
+    async fetchViolationCountsByPolicy() {
+        const resp = await request({
+            url: '/api/fetchViolationCountsByPolicy',
+            method: 'post',
+            data: {}
+        })
+        return resp?.policyViolationCounts || []
     },
 
     async disableNhiIdentity(identityId) {
@@ -1236,20 +1536,37 @@ export default {
         return resp?.success || false
     },
 
-    async fetchSuspectSampleData({ skip = 0, startTimestamp, endTimestamp, hosts = [], limit = 100000 } = {}) {
+    async fetchSuspectSampleData({ skip = 0, startTimestamp, endTimestamp, hosts = [], limit = 100000, sort, sortBySeverity, searchText, looseHostKeys = [], claudeDeviceIds = [], matchClaudeConfig } = {}) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
             data: {
                 skip, ips: [], urls: [], types: [], apiCollectionIds: [],
-                sort: { detectedAt: -1 },
+                sort: sort || { detectedAt: -1 },
                 ...(startTimestamp ? { startTimestamp } : {}),
                 ...(endTimestamp   ? { endTimestamp }   : {}),
                 latestAttack: [],
                 limit,
                 ...(hosts?.length  ? { hosts }          : {}),
+                ...(sortBySeverity ? { sortBySeverity }  : {}),
+                ...(searchText     ? { searchText }     : {}),
+                ...(looseHostKeys?.length ? { looseHostKeys } : {}),
+                ...(claudeDeviceIds?.length ? { claudeDeviceIds } : {}),
+                ...(matchClaudeConfig ? { matchClaudeConfig } : {}),
             },
         })
+    },
+
+    // Per-host severity counts for the whole date range (every host, not raw events) — lets a caller
+    // attribute violation counts to its own asset/device groupings via the host join key without
+    // pulling every raw malicious-event doc just to run a per-row severity tally client-side.
+    async fetchHostSeverityCounts(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/fetchHostSeverityCounts',
+            method: 'post',
+            data: { startTs: startTimestamp, endTs: endTimestamp },
+        })
+        return resp?.hostSeverityCounts || []
     },
 
 }

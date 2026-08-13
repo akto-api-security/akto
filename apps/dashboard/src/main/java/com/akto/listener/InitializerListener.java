@@ -3692,6 +3692,26 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    private static void migrateTeamRoleToDeviceTags(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getMigrateTeamRoleToDeviceTags() == 0){
+            BackwardCompatibilityUtils.migrateTeamRoleToDeviceTags();
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.MIGRATE_TEAM_ROLE_TO_DEVICE_TAGS, Context.now())
+            );
+        }
+    }
+
+    private static void migrateGuardrailTargetTeamsRolesToTags(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getMigrateGuardrailTargetTeamsRolesToTags() == 0){
+            BackwardCompatibilityUtils.migrateGuardrailTargetTeamsRolesToTags();
+            BackwardCompatibilityDao.instance.updateOne(
+                Filters.eq("_id", backwardCompatibility.getId()),
+                Updates.set(BackwardCompatibility.MIGRATE_GUARDRAIL_TARGET_TEAMS_ROLES_TO_TAGS, Context.now())
+            );
+        }
+    }
+
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
@@ -3703,6 +3723,8 @@ public class InitializerListener implements ServletContextListener {
         markSummariesAsVulnerable(backwardCompatibility);
         moveUserDataFromModuleInfoToAgenticUsers(backwardCompatibility);
         cleanupApiInfoTags(backwardCompatibility);
+        migrateTeamRoleToDeviceTags(backwardCompatibility);
+        migrateGuardrailTargetTeamsRolesToTags(backwardCompatibility);
         dropLastCronRunInfoField(backwardCompatibility);
         cleanupRbacEntriesForDeveloperRole(backwardCompatibility);
         fetchIntegratedConnections(backwardCompatibility);

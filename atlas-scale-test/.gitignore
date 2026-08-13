@@ -1,0 +1,3 @@
+# machine-local state (regenerated per run) — do not commit
+.acct
+traces/devices.json

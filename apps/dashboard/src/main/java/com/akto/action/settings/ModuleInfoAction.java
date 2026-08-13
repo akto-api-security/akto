@@ -5,10 +5,13 @@ import com.akto.dao.AgentUsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AgenticUsers;
+import com.akto.dto.DeviceTag;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.akto.dto.monitoring.ModuleInfoConstants;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 
 import lombok.Getter;
@@ -17,9 +20,12 @@ import lombok.Setter;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 public class ModuleInfoAction extends UserAction {
     private List<ModuleInfo> moduleInfos;
@@ -46,10 +52,7 @@ public class ModuleInfoAction extends UserAction {
     private List<String> usernames;
     @Getter
     @Setter
-    private String team;
-    @Getter
-    @Setter
-    private String userRole;
+    private Map<String, List<String>> tags;
     @Getter
     @Setter
     private String userEmail;
@@ -57,9 +60,149 @@ public class ModuleInfoAction extends UserAction {
     @Getter
     private List<AgenticUsers> agenticUsers;
 
+    // ---- Endpoint Shield server-side pagination (ATLAS) ----
+    @Setter private int skip;
+    @Setter private int limit;
+    @Setter private String sortKey;
+    @Setter private int sortOrder;                 // 1 asc, -1 desc
+    @Setter private List<String> hostnames;
+    @Setter private List<String> deviceIds;
+    @Setter private List<String> oses;
+    @Setter private String queryValue;
+    @Setter private int startTimestamp;
+    @Setter private int endTimestamp;
+    @Getter private long total;
+    @Getter private Map<String, Object> filterOptions;
+
     @Override
     public String execute() {
         return SUCCESS;
+    }
+
+    private static final String AD_DEVICE_ID = ModuleInfo.ADDITIONAL_DATA + ".deviceId";
+    private static final String AD_USERNAME = ModuleInfo.ADDITIONAL_DATA + ".username";
+    private static final String AD_OS = ModuleInfo.ADDITIONAL_DATA + ".os";
+
+    private Bson buildEndpointShieldFilter() {
+        List<Bson> f = new ArrayList<>();
+        f.add(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD.toString()));
+        if (startTimestamp > 0) f.add(Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, startTimestamp));
+        if (endTimestamp > 0) f.add(Filters.lte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, endTimestamp));
+        if (hostnames != null && !hostnames.isEmpty()) f.add(Filters.in(ModuleInfo.NAME, hostnames));
+        if (usernames != null && !usernames.isEmpty()) f.add(Filters.in(AD_USERNAME, usernames));
+        if (deviceIds != null && !deviceIds.isEmpty()) f.add(Filters.in(AD_DEVICE_ID, deviceIds));
+        if (oses != null && !oses.isEmpty()) f.add(Filters.in(AD_OS, oses));
+        if (queryValue != null && !queryValue.trim().isEmpty()) {
+            String q = Pattern.quote(queryValue.trim());
+            f.add(Filters.or(
+                    Filters.regex(ModuleInfo.NAME, q, "i"),
+                    Filters.regex(AD_DEVICE_ID, q, "i"),
+                    Filters.regex(AD_USERNAME, q, "i"),
+                    Filters.regex(ModuleInfoDao.ID, q, "i")
+            ));
+        }
+        return Filters.and(f);
+    }
+
+    private static String mapEndpointShieldSortField(String key) {
+        if (key == null) return ModuleInfo.LAST_HEARTBEAT_RECEIVED;
+        switch (key) {
+            case "hostname": return ModuleInfo.NAME;
+            case "deviceId": return AD_DEVICE_ID;
+            case "username": return AD_USERNAME;
+            case "os": return AD_OS;
+            case "agentVersion": return ModuleInfo.CURRENT_VERSION;
+            case "lastDeployed": return ModuleInfo.STARTED_TS;
+            case "lastHeartbeat":
+            default: return ModuleInfo.LAST_HEARTBEAT_RECEIVED;
+        }
+    }
+
+    /**
+     * Server-side paginated Endpoint Shield agent list (ATLAS). Replaces the old load-all fetchModuleInfo
+     * on that page which pulled every device's full module doc at once (~10MB at 1000 devices).
+     */
+    public String fetchEndpointShieldAgents() {
+        Bson filter = buildEndpointShieldFilter();
+        total = ModuleInfoDao.instance.count(filter);
+
+        String sortField = mapEndpointShieldSortField(sortKey);
+        Bson sort = (sortOrder < 0) ? Sorts.descending(sortField) : Sorts.ascending(sortField);
+
+        int lim = (limit <= 0) ? 20 : Math.min(limit, 200);
+        int sk = Math.max(skip, 0);
+        moduleInfos = ModuleInfoDao.instance.findAll(filter, sk, lim, sort);
+        filterEnvironmentVariables(moduleInfos);
+        allowedEnvFields = computeAllowedEnvFields();
+        return SUCCESS.toUpperCase();
+    }
+
+    /** Distinct filter-dropdown values across ALL endpoint-shield agents (for the paginated table). */
+    public String fetchEndpointShieldFilterOptions() {
+        Bson base = Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD.toString());
+        filterOptions = new HashMap<>();
+        filterOptions.put("hostnames", distinctStrings(ModuleInfo.NAME, base));
+        filterOptions.put("usernames", distinctStrings(AD_USERNAME, base));
+        filterOptions.put("deviceIds", distinctStrings(AD_DEVICE_ID, base));
+        filterOptions.put("oses", distinctStrings(AD_OS, base));
+        return SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Lightweight module-info projection for MCP_ENDPOINT_SHIELD agents (ATLAS) — used by
+     * endpointShieldHelper.js to build a username lookup map + per-device OS/browser display data, not
+     * for the agent's own settings/observability. Excludes env vars/agent-version/heartbeat/etc from the
+     * projection like before, but ALSO collapses each device's `mcpServers` sub-object (clientType/url/
+     * updatedTs per MCP server) down to just the list of collection names — the only field the frontend's
+     * buildUsernameMapFromModuleInfos actually reads from it. That sub-object was the reason the
+     * "projected" response was still ~3MB at 1000-device scale.
+     */
+    public String fetchEndpointShieldUserMetadata() {
+        Bson filter = Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD.toString());
+        Bson projection = Projections.include(
+                ModuleInfoDao.ID, ModuleInfo.NAME,
+                ModuleInfo.ADDITIONAL_DATA + ".username",
+                ModuleInfo.ADDITIONAL_DATA + ".userName",
+                ModuleInfo.ADDITIONAL_DATA + ".user",
+                ModuleInfo.ADDITIONAL_DATA + ".email",
+                ModuleInfo.ADDITIONAL_DATA + ".deviceId",
+                ModuleInfo.ADDITIONAL_DATA + ".endpointId",
+                ModuleInfo.ADDITIONAL_DATA + ".os",
+                ModuleInfo.ADDITIONAL_DATA + ".browserName",
+                ModuleInfo.ADDITIONAL_DATA + ".mcpServers"
+        );
+        List<ModuleInfo> infos = ModuleInfoDao.instance.findAll(filter, projection);
+
+        for (ModuleInfo m : infos) {
+            Map<String, Object> ad = m.getAdditionalData();
+            if (ad == null) continue;
+            Object mcpServersObj = ad.get("mcpServers");
+            if (!(mcpServersObj instanceof Map)) continue;
+
+            List<String> collectionNames = new ArrayList<>();
+            for (Object serverObj : ((Map<?, ?>) mcpServersObj).values()) {
+                if (!(serverObj instanceof Map)) continue;
+                Object collectionName = ((Map<?, ?>) serverObj).get("collectionName");
+                if (collectionName instanceof String && !((String) collectionName).isEmpty()) {
+                    collectionNames.add((String) collectionName);
+                }
+            }
+            ad.remove("mcpServers");
+            ad.put("mcpServerCollectionNames", collectionNames);
+        }
+
+        moduleInfos = infos;
+        return SUCCESS.toUpperCase();
+    }
+
+    private List<String> distinctStrings(String field, Bson filter) {
+        List<String> out = new ArrayList<>();
+        try {
+            for (String v : ModuleInfoDao.instance.getMCollection().distinct(field, filter, String.class)) {
+                if (v != null && !v.isEmpty()) out.add(v);
+            }
+        } catch (Exception ignored) {}
+        return out;
     }
 
     private static final int heartbeatThresholdSeconds = 5 * 60; // 5 minutes
@@ -139,6 +282,21 @@ public class ModuleInfoAction extends UserAction {
 
     public List<Map<String, String>> getAllowedEnvFields() {
         return allowedEnvFields;
+    }
+
+    private List<Map<String, String>> computeAllowedEnvFields() {
+        List<Map<String, String>> fields = new ArrayList<>();
+        for (Map.Entry<ModuleType, Map<String, String>> moduleEntry : ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.entrySet()) {
+            for (Map.Entry<String, String> entry : moduleEntry.getValue().entrySet()) {
+                Map<String, String> field = new HashMap<>();
+                field.put("key", entry.getKey());
+                field.put("label", entry.getValue());
+                field.put("type", getFieldType(entry.getKey()));
+                field.put("moduleCategory", moduleEntry.getKey().toString());
+                fields.add(field);
+            }
+        }
+        return fields;
     }
 
     private String getFieldType(String key) {
@@ -223,7 +381,8 @@ public class ModuleInfoAction extends UserAction {
                     Filters.regex(ModuleInfo.NAME, _DEFAULT_PREFIX_REGEX_STRING),
                     Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.TRAFFIC_COLLECTOR.toString()),
                     Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.AKTO_AGENT_GATEWAY.toString()),
-                    Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.THREAT_DETECTION.toString())
+                    Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.THREAT_DETECTION.toString()),
+                    Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MINI_RUNTIME.toString())
                 )
             );
 
@@ -269,7 +428,9 @@ public class ModuleInfoAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        AgentUsersDao.instance.upsertTagFromDashboard(username, userEmail, team, userRole, getSUser().getLogin());
+        String identityUserName = AgentUsersDao.instance.ensureDashboardIdentity(username, userEmail, getSUser().getLogin());
+        AgentUsersDao.instance.mergeDeviceTags(identityUserName, DeviceTag.SOURCE_MANUAL,
+                tags != null ? tags : Collections.emptyMap(), getSUser().getLogin());
         return SUCCESS.toUpperCase();
     }
 
@@ -280,23 +441,32 @@ public class ModuleInfoAction extends UserAction {
         }
 
         String updatedBy = getSUser().getLogin();
+        Map<String, List<String>> tagsToApply = tags != null ? tags : Collections.emptyMap();
         for (String u : usernames) {
-            AgentUsersDao.instance.upsertTagFromDashboard(u, null, team, userRole, updatedBy);
+            String identityUserName = AgentUsersDao.instance.ensureDashboardIdentity(u, null, updatedBy);
+            AgentUsersDao.instance.mergeDeviceTags(identityUserName, DeviceTag.SOURCE_MANUAL, tagsToApply, updatedBy);
         }
         return SUCCESS.toUpperCase();
     }
 
     public String fetchAgenticUsers() {
         agenticUsers = AgentUsersDao.instance.findAll(Filters.empty());
-        // Overwrite teamName/userRole with SSO values for users not manually pinned,
-        // so callers always see a single consistent effective field.
+
+        // AgenticUsers.devices is only ever backfilled once by a startup migration and never
+        // kept in sync afterwards — overwrite with live devices from module_info (updated every
+        // heartbeat) instead of trusting the stored field.
+        Map<String, Set<String>> liveDevicesByUsername = ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield();
         for (AgenticUsers u : agenticUsers) {
-            if (!AgenticUsers.SOURCE_MANUAL.equals(u.getTeamSource()) && u.getSsoTeamName() != null) {
-                u.setTeamName(u.getSsoTeamName());
-            }
-            if (!AgenticUsers.SOURCE_MANUAL.equals(u.getRoleSource()) && u.getSsoUserRole() != null) {
-                u.setUserRole(u.getSsoUserRole());
-            }
+            Set<String> liveDevices = liveDevicesByUsername.remove(u.getUserName());
+            u.setDevices(liveDevices != null ? new ArrayList<>(liveDevices) : new ArrayList<>());
+        }
+        // Any username reporting devices but with no team/role ever assigned has no AgenticUsers
+        // doc yet — synthesize a lightweight entry so it still shows up as filterable/previewable.
+        for (Map.Entry<String, Set<String>> entry : liveDevicesByUsername.entrySet()) {
+            AgenticUsers synthetic = new AgenticUsers();
+            synthetic.setUserName(entry.getKey());
+            synthetic.setDevices(new ArrayList<>(entry.getValue()));
+            agenticUsers.add(synthetic);
         }
         return SUCCESS.toUpperCase();
     }

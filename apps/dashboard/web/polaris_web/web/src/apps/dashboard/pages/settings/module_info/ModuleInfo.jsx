@@ -1,4 +1,4 @@
-import { Button, LegacyCard, DataTable, Checkbox, Modal, Text, Tooltip, Icon, HorizontalStack } from "@shopify/polaris"
+import { Button, LegacyCard, DataTable, Checkbox, Modal, Text, Tooltip, Icon, HorizontalStack, Banner } from "@shopify/polaris"
 import { AlertMinor } from "@shopify/polaris-icons"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
@@ -13,7 +13,7 @@ const ModuleInfo = () => {
     const [ modalActive, setModalActive ] = useState(false)
     const [ selectedModule, setSelectedModule ] = useState(null)
 
-    const CONFIGURABLE_MODULE_TYPES = ['TRAFFIC_COLLECTOR', 'AKTO_AGENT_GATEWAY', 'THREAT_DETECTION'];
+    const CONFIGURABLE_MODULE_TYPES = ['TRAFFIC_COLLECTOR', 'AKTO_AGENT_GATEWAY', 'THREAT_DETECTION', 'MINI_RUNTIME'];
 
     const fetchModuleInfo = async () => {
         const response = await settingRequests.fetchModuleInfo();
@@ -70,7 +70,13 @@ const ModuleInfo = () => {
 
     const handleSaveEnv = async (moduleId, moduleName, envData) => {
         try {
-            await settingRequests.updateModuleEnvAndReboot(moduleId, moduleName, envData);
+            if (selectedModule?.moduleType === 'MINI_RUNTIME') {
+                await settingRequests.updateRuntimeEnvOverrides(envData);
+                const miniRuntimeIds = moduleInfos.filter(m => m.moduleType === 'MINI_RUNTIME' && canRebootModule(m)).map(m => m.id);
+                await settingRequests.rebootModules(miniRuntimeIds, false);
+            } else {
+                await settingRequests.updateModuleEnvAndReboot(moduleId, moduleName, envData);
+            }
             func.setToast(true, false, "Environment config saved successfully. Module will reboot.");
             handleModalClose();
             await fetchModuleInfo();
@@ -176,6 +182,10 @@ const ModuleInfo = () => {
                 large
             >
                 <Modal.Section>
+                    {selectedModule?.moduleType === 'MINI_RUNTIME' && (
+                        <Banner tone="warning" title="Applies to all instances">
+                        </Banner>
+                    )}
                     <ModuleEnvConfigComponent
                         title="Environment Variables"
                         description={`Configure environment variables for ${selectedModule?.name || 'module'}`}

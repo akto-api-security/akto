@@ -4,7 +4,7 @@ import MarkdownViewer from "../../../components/shared/MarkdownViewer";
 import { stripMarkdownLinks } from "../../../components/shared/markdownUtils";
 import observeApi from "../api";
 
-function buildSkillMarkdown(sampleMessage, skillName) {
+export function buildSkillMarkdown(sampleMessage, skillName) {
     try {
         const parsed = JSON.parse(sampleMessage);
         const bodyStr = parsed?.request?.body || parsed?.requestPayload || "{}";
@@ -22,6 +22,34 @@ function buildSkillMarkdown(sampleMessage, skillName) {
     }
 }
 
+// Skill invocation traffic can land on any of the skill's declaring collections, and the sample
+// storage key's URL format (full hostname vs. path-only) varies by environment — so search every
+// collection and try both URL forms before giving up. Shared by SkillComponentsView (asset opened
+// directly) and SkillDetailPanel (skill drilled into from an Agent/MCP components list) so skill
+// content shows up consistently everywhere in the new UI.
+export async function fetchSkillMarkdownFromCollections(collectionIds, skillName) {
+    for (const collectionId of (collectionIds || [])) {
+        const infoResp = await observeApi.fetchApiInfosForCollection(collectionId);
+        const infos = infoResp?.apiInfoList || [];
+        for (const info of infos) {
+            const url = String(info?.id?.url || "");
+            if (!url.toLowerCase().includes("/skills/")) continue;
+            const method = info?.id?.method || "POST";
+            // Try full URL (with hostname) then path-only — storage format varies by environment
+            const pathOnly = url.replace(/^https?:\/\/[^/]+/, "");
+            for (const candidateUrl of new Set([url, pathOnly])) {
+                const resp = await observeApi.fetchSampleData(candidateUrl, collectionId, method);
+                const samples = (resp?.sampleDataList || []).flatMap(s => s.samples || []);
+                for (const sample of samples) {
+                    const md = buildSkillMarkdown(sample, skillName);
+                    if (md) return md;
+                }
+            }
+        }
+    }
+    return null;
+}
+
 export default function SkillComponentsView({ asset }) {
     const [markdown, setMarkdown] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -33,29 +61,7 @@ export default function SkillComponentsView({ asset }) {
 
         (async () => {
             try {
-                let found = null;
-                for (const collectionId of collectionIds) {
-                    const infoResp = await observeApi.fetchApiInfosForCollection(collectionId);
-                    const infos = infoResp?.apiInfoList || [];
-                    for (const info of infos) {
-                        const url = String(info?.id?.url || "");
-                        if (!url.toLowerCase().includes("/skills/")) continue;
-                        const method = info?.id?.method || "POST";
-                        // Try full URL (with hostname) then path-only — storage format varies by environment
-                        const pathOnly = url.replace(/^https?:\/\/[^/]+/, "");
-                        for (const candidateUrl of new Set([url, pathOnly])) {
-                            const resp = await observeApi.fetchSampleData(candidateUrl, collectionId, method);
-                            const samples = (resp?.sampleDataList || []).flatMap(s => s.samples || []);
-                            for (const sample of samples) {
-                                const md = buildSkillMarkdown(sample, asset.name);
-                                if (md) { found = md; break; }
-                            }
-                            if (found) break;
-                        }
-                        if (found) break;
-                    }
-                    if (found) break;
-                }
+                const found = await fetchSkillMarkdownFromCollections(collectionIds, asset.name);
                 if (!cancelled) setMarkdown(found || "");
             } catch {
                 if (!cancelled) setMarkdown("");

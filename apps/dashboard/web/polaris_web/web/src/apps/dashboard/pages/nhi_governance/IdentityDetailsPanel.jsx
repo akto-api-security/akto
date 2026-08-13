@@ -7,51 +7,53 @@ import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { IdentityIcon, violationsHeaders, violationsSortOptions, transformApiViolations } from "./nhiViolationsData";
 import IdentityGraph from "./IdentityGraph";
 import observeRequests from "../observe/api";
-import { violationIncludesIdentity } from "./identityHelper";
 import func from "@/util/func";
 
 const NHI_VIOLATIONS_PATH = "/dashboard/nhi/violations";
+// A single identity's violations are bounded by usage against that one credential, unlike the
+// account-wide violations stream — one page comfortably covers virtually every identity.
+const IDENTITY_VIOLATIONS_LIMIT = 200;
 
 export default function IdentityDetailsPanel({ row, show, setShow, onUpdated }) {
     const [actionActive, setActionActive] = useState(false);
-    const [allViolations, setAllViolations] = useState([]);
+    const [rawViolations, setRawViolations] = useState([]);
+    const [total, setTotal] = useState(0);
+    const [severityCounts, setSeverityCounts] = useState({});
     const [loading, setLoading] = useState(true);
     const [disabling, setDisabling] = useState(false);
 
-    // Fetch all violations for filtering
+    // Fetch violations scoped to THIS identity only (server-side filter), instead of pulling every
+    // violation account-wide with no time bound and filtering client-side on every panel open.
     useEffect(() => {
         const fetchViolations = async () => {
             try {
                 setLoading(true);
-                const response = await observeRequests.fetchAllNhiViolations();
-
-                if (Array.isArray(response)) {
-                    setAllViolations(response);
-                } else {
-                    setAllViolations([]);
-                }
+                const { violations, total: totalCount, stats } = await observeRequests.fetchViolationsByIdentity(
+                    row.hexId, { limit: IDENTITY_VIOLATIONS_LIMIT }
+                );
+                setRawViolations(Array.isArray(violations) ? violations : []);
+                setTotal(totalCount || 0);
+                setSeverityCounts(stats?.bySeverityOpen || {});
             } catch (err) {
                 console.error("Error fetching violations:", err);
-                setAllViolations([]);
+                setRawViolations([]);
+                setTotal(0);
+                setSeverityCounts({});
             } finally {
                 setLoading(false);
             }
         };
 
-        if (show) {
+        if (show && row?.hexId) {
             fetchViolations();
         }
-    }, [show]);
+    }, [show, row?.hexId]);
 
-    // Transform violations and filter for this identity
-    const identityViolations = useMemo(() => {
-        const transformed = transformApiViolations(allViolations);
-        return transformed.filter((v) => violationIncludesIdentity(v.identities, row.identityName));
-    }, [allViolations, row.identityName]);
-    const violCrit = identityViolations.filter((v) => v.severity === "Critical").length;
-    const violHigh = identityViolations.filter((v) => v.severity === "High").length;
-    const violMed  = identityViolations.filter((v) => v.severity === "Medium").length;
-    const totalViolations = identityViolations.length;
+    const identityViolations = useMemo(() => transformApiViolations(rawViolations), [rawViolations]);
+    const violCrit = severityCounts.Critical || 0;
+    const violHigh = severityCounts.High || 0;
+    const violMed  = severityCounts.Medium || 0;
+    const totalViolations = total;
 
     const handleViolationClick = (violationRow) => {
         sessionStorage.setItem("nhi_pending_violation", JSON.stringify(violationRow));
@@ -152,7 +154,7 @@ export default function IdentityDetailsPanel({ row, show, setShow, onUpdated }) 
     // ── Violations tab ────────────────────────────────────────────────────────
     const violationsTab = {
         id: "violations",
-        content: `Violations ${identityViolations.length > 0 ? identityViolations.length : ""}`.trim(),
+        content: `Violations ${total > 0 ? total : ""}`.trim(),
         component: identityViolations.length > 0 ? (
             <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="4">
                 <GithubSimpleTable

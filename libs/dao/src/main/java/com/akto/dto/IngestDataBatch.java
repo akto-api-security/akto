@@ -29,6 +29,7 @@ public class IngestDataBatch {
     String enabled_graph;
     String tag;
     String _traces;
+    String _guardrail;
     Boolean publishToGuardrails;
 
 }

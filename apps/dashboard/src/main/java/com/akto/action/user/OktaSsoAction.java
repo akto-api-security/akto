@@ -36,6 +36,7 @@ public class OktaSsoAction extends UserAction {
     private String redirectUri;
     private String managementApiToken;
     private Map<String, String> oktaGroupToAktoUserRoleMap;
+    private boolean syncGroupsToUserTags;
     private List<String> oktaGroupNames;
 
     private static boolean hasStoredOktaApiToken(OktaConfig c) {
@@ -130,10 +131,30 @@ public class OktaSsoAction extends UserAction {
             addActionError(validationError);
             return ERROR.toUpperCase();
         }
+
+        // This flag only gates the periodic org-wide sync cron (device-tag writes happen there
+        // exclusively, not at login) — the cron has no login session to read a JWT groups claim
+        // from, so it can only run via the Management API. Reject enabling it without a token.
+        boolean tokenPresentAfterSave;
+        if (incomingToken == null) {
+            tokenPresentAfterSave = hasStoredOktaApiToken(oktaConfig);
+        } else if (incomingToken.trim().isEmpty()) {
+            tokenPresentAfterSave = false;
+        } else if (isMaskedTokenSubmission(incomingToken)) {
+            tokenPresentAfterSave = hasStoredOktaApiToken(oktaConfig);
+        } else {
+            tokenPresentAfterSave = true;
+        }
+        if (syncGroupsToUserTags && !tokenPresentAfterSave) {
+            addActionError("Set a Management API token before enabling group sync.");
+            return ERROR.toUpperCase();
+        }
+
         List<Bson> bsonUpdates = new ArrayList<>();
         bsonUpdates.add(Updates.set("oktaGroupToAktoUserRoleMap", activeMapping));
         bsonUpdates.add(Updates.unset("groupRoleMapping"));
         bsonUpdates.add(Updates.unset("oktaRoleMapping"));
+        bsonUpdates.add(Updates.set(OktaConfig.SYNC_GROUPS_TO_USER_TAGS, syncGroupsToUserTags));
         if (incomingToken != null) {
             if (incomingToken.trim().isEmpty()) {
                 bsonUpdates.add(Updates.unset(OktaConfig.MANAGEMENT_API_TOKEN));
@@ -190,9 +211,11 @@ public class OktaSsoAction extends UserAction {
             this.authorisationServerId = oktaConfig.getAuthorisationServerId();
             this.redirectUri = oktaConfig.getRedirectUri();
             this.oktaGroupToAktoUserRoleMap = oktaConfig.getOktaGroupToAktoUserRoleMap();
+            this.syncGroupsToUserTags = oktaConfig.isSyncGroupsToUserTags();
             this.managementApiToken = hasStoredOktaApiToken(oktaConfig) ? Constants.ASTERISK : null;
         } else {
             this.managementApiToken = null;
+            this.syncGroupsToUserTags = false;
         }
 
         return SUCCESS.toUpperCase();
@@ -236,6 +259,13 @@ public class OktaSsoAction extends UserAction {
     }
     public void setOktaGroupToAktoUserRoleMap(Map<String, String> oktaGroupToAktoUserRoleMap) {
         this.oktaGroupToAktoUserRoleMap = oktaGroupToAktoUserRoleMap;
+    }
+
+    public boolean isSyncGroupsToUserTags() {
+        return syncGroupsToUserTags;
+    }
+    public void setSyncGroupsToUserTags(boolean syncGroupsToUserTags) {
+        this.syncGroupsToUserTags = syncGroupsToUserTags;
     }
 
     public void setManagementApiToken(String managementApiToken) {
