@@ -35,6 +35,7 @@ import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TrafficCollectorsMetrics from "../dashboard/pages/settings/metrics/TrafficCollectorsMetrics";
 import ThreatDetectionMetrics from "../dashboard/pages/settings/metrics/ThreatDetectionMetrics";
 import MiniRuntimeMetrics from "../dashboard/pages/settings/metrics/MiniRuntimeMetrics";
+import MiniTestingMetrics from "../dashboard/pages/settings/metrics/MiniTestingMetrics";
 import AccountJobExecutorMetrics from "../dashboard/pages/settings/metrics/AccountJobExecutorMetrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import PromptHardening from "../dashboard/pages/prompt_hardening/PromptHardening";
@@ -465,6 +466,10 @@ const router = createBrowserRouter([
                     {
                         path: "mini-runtime-metrics",
                         element: <MiniRuntimeMetrics/>,
+                    },
+                    {
+                        path: "mini-testing-metrics",
+                        element: <MiniTestingMetrics/>,
                     },
                     {
                         path: "account-job-executor-metrics",

@@ -73,6 +73,13 @@ public class AllMetrics {
             testingRunLatency = new LatencyMetric("TESTING_RUN_LATENCY", 60, accountId, orgId, moduleType);
             sampleDataFetchLatency = new LatencyMetric("SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId, moduleType);
             multipleSampleDataFetchLatency = new LatencyMetric("MULTIPLE_SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId, moduleType);
+            testingTestsExecutedCount = new SumMetric("TESTING_TESTS_EXECUTED_COUNT", 60, accountId, orgId, moduleType);
+            testingApiHitSuccessCount = new SumMetric("TESTING_API_HIT_SUCCESS_COUNT", 60, accountId, orgId, moduleType);
+            testingApiHitFailureCount = new SumMetric("TESTING_API_HIT_FAILURE_COUNT", 60, accountId, orgId, moduleType);
+            testingIssuesCreatedCount = new SumMetric("TESTING_ISSUES_CREATED_COUNT", 60, accountId, orgId, moduleType);
+            testingKafkaQueuePending = new GaugeMetric("TESTING_KAFKA_QUEUE_PENDING", 60, accountId, orgId, moduleType);
+            testingKafkaSendFailureCount = new SumMetric("TESTING_KAFKA_SEND_FAILURE_COUNT", 60, accountId, orgId, moduleType);
+            testingRateLimitExceededCount = new SumMetric("TESTING_RATE_LIMIT_EXCEEDED_COUNT", 60, accountId, orgId, moduleType);
         }
 
         if(moduleType.equals(ModuleInfo.ModuleType.ACCOUNT_JOB_EXECUTOR.name())){
@@ -106,7 +113,10 @@ public class AllMetrics {
                 cyborgApiPayloadSize, multipleSampleDataFetchLatency, runtimeApiReceivedCount,
                 tdKafkaRecordCount, tdKafkaRecordSize, tdKafkaProcessLatency,
                 cpuUsagePercent, heapMemoryUsedMb, heapMemoryMaxMb, nonHeapMemoryUsedMb, threadCount,
-                availableProcessors, totalPhysicalMemoryMb, accountJobsRunFailed);
+                availableProcessors, totalPhysicalMemoryMb, accountJobsRunFailed,
+                testingTestsExecutedCount, testingApiHitSuccessCount, testingApiHitFailureCount,
+                testingIssuesCreatedCount, testingKafkaQueuePending, testingKafkaSendFailureCount,
+                testingRateLimitExceededCount);
 
         AllMetrics _this = this;
         executorService.scheduleWithFixedDelay(() -> {
@@ -216,6 +226,13 @@ public class AllMetrics {
     private Metric multipleSampleDataFetchLatency = null;
     private Metric runtimeApiReceivedCount = null;
     private Metric accountJobsRunFailed = null;
+    private Metric testingTestsExecutedCount = null;
+    private Metric testingApiHitSuccessCount = null;
+    private Metric testingApiHitFailureCount = null;
+    private Metric testingIssuesCreatedCount = null;
+    private Metric testingKafkaQueuePending = null;
+    private Metric testingKafkaSendFailureCount = null;
+    private Metric testingRateLimitExceededCount = null;
 
     // Infrastructure metrics (CPU, Memory, Threads)
     private Metric cpuUsagePercent = null;
@@ -401,6 +418,41 @@ public class AllMetrics {
     public void setAccountJobsRunFailed(float val){
         if(accountJobsRunFailed != null)
             accountJobsRunFailed.record(val);
+    }
+
+    public void setTestingTestsExecutedCount(float val){
+        if(testingTestsExecutedCount != null)
+            testingTestsExecutedCount.record(val);
+    }
+
+    public void setTestingApiHitSuccessCount(float val){
+        if(testingApiHitSuccessCount != null)
+            testingApiHitSuccessCount.record(val);
+    }
+
+    public void setTestingApiHitFailureCount(float val){
+        if(testingApiHitFailureCount != null)
+            testingApiHitFailureCount.record(val);
+    }
+
+    public void setTestingIssuesCreatedCount(float val){
+        if(testingIssuesCreatedCount != null)
+            testingIssuesCreatedCount.record(val);
+    }
+
+    public void setTestingKafkaQueuePending(float val){
+        if(testingKafkaQueuePending != null)
+            testingKafkaQueuePending.record(val);
+    }
+
+    public void setTestingKafkaSendFailureCount(float val){
+        if(testingKafkaSendFailureCount != null)
+            testingKafkaSendFailureCount.record(val);
+    }
+
+    public void setTestingRateLimitExceededCount(float val){
+        if(testingRateLimitExceededCount != null)
+            testingRateLimitExceededCount.record(val);
     }
 
     private static final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);

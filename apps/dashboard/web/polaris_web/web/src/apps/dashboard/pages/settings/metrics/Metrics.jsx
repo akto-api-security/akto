@@ -149,6 +149,13 @@ function Metrics() {
         'PG_DATA_SIZE_IN_MB',
 
         // Testing metrics
+        'TESTING_TESTS_EXECUTED_COUNT',
+        'TESTING_API_HIT_SUCCESS_COUNT',
+        'TESTING_API_HIT_FAILURE_COUNT',
+        'TESTING_ISSUES_CREATED_COUNT',
+        'TESTING_KAFKA_QUEUE_PENDING',
+        'TESTING_KAFKA_SEND_FAILURE_COUNT',
+        'TESTING_RATE_LIMIT_EXCEEDED_COUNT',
         'TESTING_RUN_COUNT',
         'TESTING_RUN_LATENCY',
         'SAMPLE_DATA_FETCH_LATENCY',
@@ -277,9 +284,9 @@ function Metrics() {
 
     const runtimeMetricsKeys = newMetrics.slice(0, 13);
     const postgresqlMetricsKeys = newMetrics.slice(13, 22);
-    const testingMetricsKeys = newMetrics.slice(22, 26);
-    const cyborgMetricsKeys = newMetrics.slice(26, 29);
-    const dataIngestionMetricsKeys = newMetrics.slice(29, 30);
+    const testingMetricsKeys = newMetrics.slice(22, 33);
+    const cyborgMetricsKeys = newMetrics.slice(33, 36);
+    const dataIngestionMetricsKeys = newMetrics.slice(36, 37);
 
     const tzOffsetMinutes = getTimezoneOffsetMinutes(selectedTimezone);
     const sharedSectionProps = { orderedResult, nameMap, defaultChartOptionsFn: defaultChartOptions, timezoneOffsetMinutes: tzOffsetMinutes };
@@ -345,6 +352,7 @@ function Metrics() {
                                     { label: "Traffic Collectors", value: "TRAFFIC_COLLECTORS" },
                                     { label: "Threat Detection", value: "THREAT_DETECTION" },
                                     { label: "Mini Runtime", value: "MINI_RUNTIME" },
+                                    { label: "Mini Testing", value: "MINI_TESTING" },
                                     { label: "Account Job Executor", value: "ACCOUNT_JOB_EXECUTOR" }
                                 ]}
                                 initial="ALL"
@@ -357,6 +365,9 @@ function Metrics() {
                                     }
                                     if (val === "MINI_RUNTIME") {
                                         navigate("/dashboard/settings/mini-runtime-metrics");
+                                    }
+                                    if (val === "MINI_TESTING") {
+                                        navigate("/dashboard/settings/mini-testing-metrics");
                                     }
                                     if (val === "ACCOUNT_JOB_EXECUTOR") {
                                         navigate("/dashboard/settings/account-job-executor-metrics");
