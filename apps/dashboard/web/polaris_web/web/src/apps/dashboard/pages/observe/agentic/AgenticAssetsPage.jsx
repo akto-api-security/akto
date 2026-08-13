@@ -53,6 +53,7 @@ const SORT_FIELD_MAP = {
   name: "name",
   riskScore: "riskScore",
   endpointCount: "endpointsCount",
+  violations: "violations",
 };
 
 const COL_DEFS = [
@@ -82,8 +83,6 @@ const COL_DEFS = [
     field: "riskScore",
     headerName: "Risk score",
     width: 110,
-    sort: "desc",
-    sortIndex: 0,
     filter: false,
     cellRenderer: RiskScoreCellRenderer,
     cellStyle: { display: "flex", alignItems: "center" },
@@ -116,7 +115,13 @@ const COL_DEFS = [
     field: "violations",
     headerName: "Violations",
     width: 200,
-    sortable: false,
+    // Server-side sort via AgenticObserveAction.violationsTotalForGroup — not a stored field, so
+    // it's computed from the already-fetched violationsByCollectionId/skillViolationsByName maps
+    // rather than a real Mongo sort. Default sort (was riskScore, which ties ~770 skills at the
+    // same score and buried every other asset type under them) — violations is a more actionable
+    // "what needs attention first" ordering and doesn't have that tie problem.
+    sort: "desc",
+    sortIndex: 0,
     filter: false,
     cellRenderer: ViolationsCellRenderer,
     cellStyle: { display: "flex", alignItems: "center" },
@@ -456,7 +461,7 @@ export default function AgenticAssetsPage() {
   // ─── Server-side data fetch for AG Grid ─────────────────────────────────────
   const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString, filters }) => {
     const pageSize = limit || 50;
-    const mappedSortKey = SORT_FIELD_MAP[sortKey] || sortKey || "riskScore";
+    const mappedSortKey = SORT_FIELD_MAP[sortKey] || sortKey || "violations";
     // AG Grid SSRM sends sortOrder: -1 for asc, 1 for desc — opposite of the backend's Mongo
     // convention (1 asc / -1 desc, matching NhiGovernanceViolationsAction's own onServerFetch).
     const mongoSortOrder = sortOrder ? -sortOrder : -1;
