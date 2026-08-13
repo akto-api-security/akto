@@ -114,6 +114,32 @@
             </result>
         </action>
 
+        <!-- Proxy to database-abstractor -->
+        <action name="api/updateModuleInfoForHeartbeat" class="com.akto.action.AbstractorProxyAction" method="proxy">
+            <param name="subpath">updateModuleInfoForHeartbeat</param>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^success,^message,^data.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^success,^message</param>
+            </result>
+        </action>
+
+        <action name="api/updateModuleInfoForHeartbeatV2" class="com.akto.action.AbstractorProxyAction" method="proxy">
+            <param name="subpath">updateModuleInfoForHeartbeatV2</param>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^success,^message,^data.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^success,^message</param>
+            </result>
+        </action>
 
     </package>
 
