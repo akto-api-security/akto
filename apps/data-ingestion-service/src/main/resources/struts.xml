@@ -114,11 +114,7 @@
             </result>
         </action>
 
-        <!-- Proxy to database-abstractor, one literal action per proxied path. Both share
-             the same Action class — adding another proxied endpoint means one more
-             <action> block here, no new class needed.
-             No "json" interceptor: the action reads the raw request body itself so the
-             payload (top-level, not nested under a field name) is forwarded verbatim. -->
+        <!-- Proxy to database-abstractor -->
         <action name="api/updateModuleInfoForHeartbeat" class="com.akto.action.AbstractorProxyAction" method="proxy">
             <param name="subpath">updateModuleInfoForHeartbeat</param>
             <interceptor-ref name="defaultStack" />
