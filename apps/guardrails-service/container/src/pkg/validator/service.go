@@ -994,9 +994,6 @@ func hostFromRequestHeaders(rawHeaders string) string {
 // anomaly detection enabled. Only fires for agentic tool-call paths.
 // Returns a block result if any policy with behaviour "block" triggers an anomaly.
 func (s *Service) checkToolCallAnomaly(ctx context.Context, params *models.ValidateRequestParams, sessionID string, policies []types.Policy, contextSource string) *mcp.ValidationResult {
-	if contextSource != string(types.ContextSourceAgentic) {
-		return nil
-	}
 	if !isToolCallPath(params.Path) {
 		return nil
 	}
@@ -1049,9 +1046,6 @@ func (s *Service) checkToolCallAnomaly(ctx context.Context, params *models.Valid
 // has anomaly detection enabled. Only fires for agentic tool-call paths with 4xx/5xx.
 // Returns a block result if any policy with behaviour "block" triggers an anomaly.
 func (s *Service) checkErrorAnomaly(ctx context.Context, params *models.ValidateRequestParams, sessionID string, policies []types.Policy, contextSource string) *mcp.ValidationResult {
-	if contextSource != string(types.ContextSourceAgentic) {
-		return nil
-	}
 	if !isToolCallPath(params.Path) || !isErrorStatusCode(params.StatusCode) {
 		return nil
 	}
@@ -1946,10 +1940,10 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 	s.schemaFetcher.RefreshIfNeeded()
 
 	type batchPolicyBundle struct {
-		policies        []types.Policy
-		auditPolicies   map[string]*types.AuditPolicy
-		compiledRules   map[string]*regexp.Regexp
-		hasAuditRules   bool
+		policies      []types.Policy
+		auditPolicies map[string]*types.AuditPolicy
+		compiledRules map[string]*regexp.Regexp
+		hasAuditRules bool
 	}
 	policyByContext := make(map[string]batchPolicyBundle)
 
