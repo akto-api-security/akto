@@ -233,6 +233,10 @@ public class AccountSettings {
     @Setter
     private List<String> aiDomains;
 
+    @Getter
+    @Setter
+    private int defaultSuitesLastUpdatedAt;
+
     public static class ProxyPatternInfo {
         private String pattern;
         private String addedBy;

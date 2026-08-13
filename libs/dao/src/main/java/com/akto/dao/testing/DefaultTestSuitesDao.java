@@ -1,8 +1,10 @@
 package com.akto.dao.testing;
 
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsContextDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.DefaultTestSuites;
@@ -10,7 +12,6 @@ import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import org.apache.commons.lang3.StringUtils;
 
@@ -22,29 +23,30 @@ public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> 
 
     public static final DefaultTestSuitesDao instance = new DefaultTestSuitesDao();
 
-    public static Map<String, Map<String, List<String>>> getDefaultTestSuitesMap(boolean isFirstTime, long lastUpdatedDefaultTestSuite, boolean addedNewCategory) {
-        List<YamlTemplate> yamlTemplateList;
-        if (!isFirstTime && !addedNewCategory) {
-            yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.gt(YamlTemplate.CREATED_AT, lastUpdatedDefaultTestSuite), Projections.include(Constants.ID, YamlTemplate.INFO, YamlTemplate.SETTINGS));
-        } else {
-            yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.empty(), Projections.include(Constants.ID, YamlTemplate.INFO, YamlTemplate.SETTINGS));
+    private static String getCategoryName(YamlTemplate yamlTemplate) {
+        if (yamlTemplate.getInfo() == null || yamlTemplate.getInfo().getCategory() == null) {
+            return null;
         }
+        return yamlTemplate.getInfo().getCategory().getName();
+    }
 
-        Map<String, List<String>> owaspSuites = new HashMap<>();
-        for(Map.Entry<String, List<String>> entry : owaspTop10List.entrySet()) {
-            String key = entry.getKey();
-            List<String> categories = entry.getValue();
-
+    private static Map<String, List<String>> buildSuitesByCategory(List<YamlTemplate> yamlTemplateList, Map<String, List<String>> suiteToCategories) {
+        Map<String, List<String>> suites = new HashMap<>();
+        for (Map.Entry<String, List<String>> entry : suiteToCategories.entrySet()) {
             List<String> testSubCategories = new ArrayList<>();
-
-            for(YamlTemplate yamlTemplate : yamlTemplateList) {
-                if(categories.contains(yamlTemplate.getInfo().getCategory().getName())) {
+            for (YamlTemplate yamlTemplate : yamlTemplateList) {
+                if (entry.getValue().contains(getCategoryName(yamlTemplate))) {
                     testSubCategories.add(yamlTemplate.getId());
                 }
             }
-
-            owaspSuites.put(key, testSubCategories);
+            suites.put(entry.getKey(), testSubCategories);
         }
+        return suites;
+    }
+
+    public static Map<String, Map<String, List<String>>> getDefaultTestSuitesMap(long lastUpdatedDefaultTestSuite) {
+        List<YamlTemplate> yamlTemplateList =  YamlTemplateDao.instance.findAll(Filters.gte(YamlTemplate.CREATED_AT, lastUpdatedDefaultTestSuite), Projections.include(Constants.ID, YamlTemplate.INFO, YamlTemplate.SETTINGS));;
+        Map<String, List<String>> owaspSuites = buildSuitesByCategory(yamlTemplateList, owaspTop10List);
 
 
         Map<String, List<String>> testingMethodsSuites = new HashMap<>();
@@ -88,67 +90,29 @@ public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> 
         }
 
         // Add MCP Security suites
-        Map<String, List<String>> mcpSecuritySuites = new HashMap<>();
-        for(Map.Entry<String, List<String>> entry : DefaultTestSuites.mcpSecurityList.entrySet()) {
-            String key = entry.getKey();
-            List<String> categories = entry.getValue();
+        Map<String, List<String>> mcpSecuritySuites = buildSuitesByCategory(yamlTemplateList, DefaultTestSuites.mcpSecurityList);
 
-            List<String> testSubCategories = new ArrayList<>();
+        // Add Attack Strategy suites - grouped by the agentic OWASP top 10 (2026) categories
+        Map<String, List<String>> attackStrategySuites = buildSuitesByCategory(yamlTemplateList, DefaultTestSuites.attackStrategyList);
 
-            for(YamlTemplate yamlTemplate : yamlTemplateList) {
-                if(categories.contains(yamlTemplate.getInfo().getCategory().getName())) {
-                    testSubCategories.add(yamlTemplate.getId());
-                }
-            }
-
-            mcpSecuritySuites.put(key, testSubCategories);
+        // Add Attack Base Technique suites - derived from the base technique that info.name ends with
+        Set<String> attackStrategyCategories = new HashSet<>();
+        for (List<String> categories : DefaultTestSuites.attackStrategyList.values()) {
+            attackStrategyCategories.addAll(categories);
         }
 
-        // Add AI Agent Security suites
-        Map<String, List<String>> aiAgentSecuritySuites = new HashMap<>();
-        for(Map.Entry<String, List<String>> entry : DefaultTestSuites.aiAgentSecurityList.entrySet()) {
-            String key = entry.getKey();
-            List<String> categories = entry.getValue();
-
-            List<String> testSubCategories = new ArrayList<>();
-
-            for(YamlTemplate yamlTemplate : yamlTemplateList) {
-                if(categories.contains(yamlTemplate.getInfo().getCategory().getName())) {
-                    testSubCategories.add(yamlTemplate.getId());
-                }
-            }
-
-            aiAgentSecuritySuites.put(key, testSubCategories);
-        }
-
-        // Add Attack Base Technique and Attack Strategy suites - dynamically derived from info.name
-        Set<String> agenticCategories = new HashSet<>();
-        for (List<String> cats : DefaultTestSuites.aiAgentSecurityList.values()) {
-            agenticCategories.addAll(cats);
-        }
         Map<String, List<String>> attackBaseTechniqueSuites = new HashMap<>();
-        Map<String, List<String>> attackStrategySuites = new HashMap<>();
+        for (String baseTechnique : DefaultTestSuites.attackBaseTechniqueList) {
+            attackBaseTechniqueSuites.put(baseTechnique, new ArrayList<>());
+        }
+        attackBaseTechniqueSuites.put(DefaultTestSuites.OTHERS_SUITE, new ArrayList<>());
+
         for (YamlTemplate yamlTemplate : yamlTemplateList) {
-            if (yamlTemplate.getInfo() == null || yamlTemplate.getInfo().getName() == null) continue;
-            if (!agenticCategories.contains(yamlTemplate.getInfo().getCategory().getName())) continue;
-            String name = yamlTemplate.getInfo().getName();
-            String[] parts = name.split(" - ");
-            if (parts.length >= 3) {
-                String baseTechnique = parts[2].replace("(Cascading Failures)", "").trim();
-                if (!baseTechnique.isEmpty()) {
-                    attackBaseTechniqueSuites.computeIfAbsent(baseTechnique, k -> new ArrayList<>()).add(yamlTemplate.getId());
-                }
-            } else {
-                attackBaseTechniqueSuites.computeIfAbsent("Others", k -> new ArrayList<>()).add(yamlTemplate.getId());
+            if (!attackStrategyCategories.contains(getCategoryName(yamlTemplate))) {
+                continue;
             }
-            if (parts.length >= 4) {
-                String strategy = parts[3].trim();
-                if (!strategy.isEmpty()) {
-                    attackStrategySuites.computeIfAbsent(strategy, k -> new ArrayList<>()).add(yamlTemplate.getId());
-                }
-            } else {
-                attackStrategySuites.computeIfAbsent("Others", k -> new ArrayList<>()).add(yamlTemplate.getId());
-            }
+            String baseTechnique = DefaultTestSuites.resolveAttackBaseTechnique(yamlTemplate.getInfo().getName());
+            attackBaseTechniqueSuites.computeIfAbsent(baseTechnique, k -> new ArrayList<>()).add(yamlTemplate.getId());
         }
 
         Map<String, Map<String, List<String>>> defaultTestSuites = new HashMap<>();
@@ -157,46 +121,21 @@ public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> 
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.SEVERITY.name(), severitySuites);
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.DURATION.name(), durationTestSuites);
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.MCP_SECURITY.name(), mcpSecuritySuites);
-        defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.AI_AGENT_SECURITY.name(), aiAgentSecuritySuites);
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.ATTACK_BASE_TECHNIQUE.name(), attackBaseTechniqueSuites);
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.ATTACK_STRATEGY.name(), attackStrategySuites);
 
         return defaultTestSuites;
     }
 
-    public static void insertDefaultTestSuites(boolean isFirstTime) {
-        long yamlTemplatesCount;
-        long lastUpdatedDefaultTestSuite;
-        if(!isFirstTime) {
-            List<DefaultTestSuites> defaultTestSuites = DefaultTestSuitesDao.instance.findAll(Filters.empty(), 0, 1, Sorts.descending(DefaultTestSuites.CREATED_AT), null);
-            if(!defaultTestSuites.isEmpty()) {
-                lastUpdatedDefaultTestSuite = defaultTestSuites.get(0).getLastUpdated();
-                yamlTemplatesCount = YamlTemplateDao.instance.count(Filters.gt(YamlTemplate.CREATED_AT, lastUpdatedDefaultTestSuite));
-            } else {
-                yamlTemplatesCount = 0;
-                lastUpdatedDefaultTestSuite = 0;
-            }
-        } else {
-            lastUpdatedDefaultTestSuite = 0;
-            yamlTemplatesCount = YamlTemplateDao.instance.count(Filters.empty());
-        }
+    public static void insertDefaultTestSuites() {
 
-
-        List<DefaultTestSuites> defaultTestSuites = DefaultTestSuitesDao.instance.findAll(Filters.empty());
-
-        Set<String> allTestSuitesTemplates = new HashSet<>();
-        for(DefaultTestSuites defaultTestSuite : defaultTestSuites) {
-            allTestSuitesTemplates.addAll(defaultTestSuite.getSubCategoryList());
-        }
-
-        int countOfDefaultTestSuites = DefaultTestSuites.countOfDefaultTestSuites();
-        boolean addedNewCategory = defaultTestSuites.size() != countOfDefaultTestSuites;
-
-        if(yamlTemplatesCount == allTestSuitesTemplates.size() && addedNewCategory) {
+        AccountSettings as = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        int diff = Context.now() - as.getDefaultSuitesLastUpdatedAt();
+        if(diff <= Constants.ONE_DAY_TIMESTAMP){
             return;
         }
 
-        Map<String, Map<String, List<String>>> defaultTestSuitesMap = getDefaultTestSuitesMap(isFirstTime, lastUpdatedDefaultTestSuite, addedNewCategory);
+        Map<String, Map<String, List<String>>> defaultTestSuitesMap = getDefaultTestSuitesMap(as.getDefaultSuitesLastUpdatedAt());
 
         for(DefaultTestSuites.DefaultSuitesType defaultSuitesType : DefaultTestSuites.DefaultSuitesType.values()) {
             Map<String, List<String>> defaultSuiteMap = defaultTestSuitesMap.get(defaultSuitesType.name());
@@ -215,6 +154,7 @@ public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> 
                 );
             }
         }
+        AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), Updates.set("defaultSuitesLastUpdatedAt", Context.now()));
     }
 
     public void saveYamlTestTemplateInDefaultSuite(Info info, String author) {
