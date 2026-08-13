@@ -331,6 +331,7 @@ function EndpointShieldMetadata() {
                         sortOptions={sortOptions}
                         disambiguateLabel={disambiguateLabel}
                         loading={loading}
+                        loadingText="Loading agents..."
                         fetchData={fetchData}
                         filters={filters}
                         hideQueryField={false}

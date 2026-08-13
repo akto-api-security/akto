@@ -1082,6 +1082,7 @@ function AuditData() {
                         sortOptions={sortOptions}
                         disambiguateLabel={disambiguateLabel}
                         loading={loading}
+                        loadingText="Loading audit data..."
                         fetchData={fetchData}
                         filters={filters}
                         hideQueryField={false}
