@@ -355,7 +355,12 @@ public class AccountAction extends UserAction {
                     backwardCompatibility = new BackwardCompatibility();
                     BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
                 }
-                InitializerListener.setBackwardCompatibilities(backwardCompatibility);
+                try {
+                    InitializerListener.setBackwardCompatibilities(backwardCompatibility);
+                    loggerMaker.debugAndAddToDb("Backward compatibilities set for " + newAccountId);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error occurred while setting backward compatibilities");
+                }
                 loggerMaker.debugAndAddToDb("start create indices", LogDb.DASHBOARD);
                 DaoInit.createIndices();
 
