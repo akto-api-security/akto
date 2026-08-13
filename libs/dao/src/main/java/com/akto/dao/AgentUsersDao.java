@@ -1,85 +1,224 @@
 package com.akto.dao;
 
+import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AgenticUsers;
-import com.mongodb.MongoCommandException;
+import com.akto.dto.DeviceTag;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.FindOneAndUpdateOptions;
-import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
-import java.util.ArrayList;
-import java.util.List;
 import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
     public static final AgentUsersDao instance = new AgentUsersDao();
+    private static final Logger logger = LoggerFactory.getLogger(AgentUsersDao.class);
+    private static final int MAX_TAGS_PER_SOURCE = 50;
 
     public void createIndicesIfAbsent() {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-            new String[]{AgenticUsers.TEAM_NAME, AgenticUsers.USER_ROLE}, false);
+            new String[]{AgenticUsers.USER_NAME}, false);
 
-    }
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[]{AgenticUsers.USER_EMAIL}, false);
 
-    public void upsertAgentUser(String userName, String teamName, String userRole, String device, int lastUpdatedAt) {
-        Bson userFilter = Filters.eq(AgenticUsers.USER_NAME, userName);
-        boolean hasTeam = teamName != null && !teamName.isEmpty();
-        boolean hasRole = userRole != null && !userRole.isEmpty();
-
-        List<Bson> updates = new ArrayList<>();
-        updates.add(Updates.setOnInsert(AgenticUsers.USER_NAME, userName));
-        updates.add(Updates.set(AgenticUsers.LAST_UPDATED_AT, lastUpdatedAt));
-        updates.add(Updates.addToSet(AgenticUsers.DEVICES, device));
-        if (hasTeam) updates.add(Updates.set(AgenticUsers.SSO_TEAM_NAME, teamName));
-        if (hasRole) updates.add(Updates.set(AgenticUsers.SSO_USER_ROLE, userRole));
-
-        try {
-            getMCollection().findOneAndUpdate(userFilter, Updates.combine(updates),
-                new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER));
-        } catch (MongoCommandException e) {
-            if (e.getErrorCode() != 11000) throw e;
-            getMCollection().updateOne(userFilter, Updates.combine(updates));
-        }
-
-        // Set effective fields only on first write (when not yet populated)
-        if (hasTeam)
-            getMCollection().updateOne(
-                Filters.and(userFilter, Filters.in(AgenticUsers.TEAM_NAME, null, "")),
-                Updates.set(AgenticUsers.TEAM_NAME, teamName));
-        if (hasRole)
-            getMCollection().updateOne(
-                Filters.and(userFilter, Filters.in(AgenticUsers.USER_ROLE, null, "")),
-                Updates.set(AgenticUsers.USER_ROLE, userRole));
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[]{AgenticUsers.DEVICE_TAGS + "." + DeviceTag.KEY,
+                    AgenticUsers.DEVICE_TAGS + "." + DeviceTag.VALUE}, false);
     }
 
     /**
-     * Returns the flat list of device IDs belonging to users that match any of the
-     * given teams or roles. Pass empty/null lists to get an empty result (not all devices).
+     * Full replace of a source's tags with the given key→values set — deleting any key not
+     * reported, so stale groups don't linger. Correct for SSO, which always reports the
+     * identity's *complete* current group membership on every login. Wrong for a dashboard edit,
+     * which only ever touches specific fields — see mergeDeviceTags for that case.
      */
-    public List<String> findDeviceIdsByTeamsAndRoles(List<String> teams, List<String> roles) {
+    public void upsertDeviceTags(String identityUserName, String source, Map<String, List<String>> keyValues, String lastUpdatedBy) {
+        writeDeviceTags(identityUserName, source, keyValues, lastUpdatedBy, t -> !source.equals(t.getSource()));
+    }
+
+    /**
+     * Only touches the keys present in keyValues — other tags from the same source are left
+     * alone. Used by the dashboard, where a single edit only ever sets specific fields, not the
+     * admin's complete tag set (unlike SSO, which always reports everything every login).
+     */
+    public void mergeDeviceTags(String identityUserName, String source, Map<String, List<String>> keyValues, String lastUpdatedBy) {
+        Set<String> touchedKeys = new HashSet<>();
+        for (String key : keyValues.keySet()) {
+            if (key != null && !key.trim().isEmpty()) touchedKeys.add(key.trim().toLowerCase());
+        }
+        writeDeviceTags(identityUserName, source, keyValues, lastUpdatedBy,
+                t -> !(source.equals(t.getSource()) && touchedKeys.contains(t.getKey())));
+    }
+
+    private void writeDeviceTags(String identityUserName, String source, Map<String, List<String>> keyValues,
+            String lastUpdatedBy, java.util.function.Predicate<DeviceTag> keepExisting) {
+        if (identityUserName == null || identityUserName.trim().isEmpty() || source == null || source.trim().isEmpty()) return;
+        int now = Context.now();
+
+        List<DeviceTag> newTags = new ArrayList<>();
+        outer:
+        for (Map.Entry<String, List<String>> entry : keyValues.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || key.trim().isEmpty() || entry.getValue() == null) continue;
+            for (String rawValue : entry.getValue()) {
+                if (rawValue == null || rawValue.trim().isEmpty()) continue;
+                if (newTags.size() >= MAX_TAGS_PER_SOURCE) {
+                    logger.warn("[{}] tag cap ({}) reached for {} — remaining values dropped", source, MAX_TAGS_PER_SOURCE, identityUserName);
+                    break outer;
+                }
+                newTags.add(new DeviceTag(key.trim().toLowerCase(), rawValue.trim().toLowerCase(), source, now, lastUpdatedBy));
+            }
+        }
+
+        // Baseline: any one doc already sharing this identity has the same deviceTags as its
+        // siblings — this method always writes them identically via updateMany below.
+        AgenticUsers existing = instance.findOne(Filters.eq(AgenticUsers.USER_NAME, identityUserName));
+        List<DeviceTag> existingTags = existing != null && existing.getDeviceTags() != null
+                ? existing.getDeviceTags() : Collections.emptyList();
+
+        List<DeviceTag> merged = existingTags.stream().filter(keepExisting).collect(Collectors.toCollection(ArrayList::new));
+        merged.addAll(newTags);
+
+        instance.updateMany(Filters.eq(AgenticUsers.USER_NAME, identityUserName),
+                Updates.set(AgenticUsers.DEVICE_TAGS, merged));
+    }
+
+    /** Union of every doc matching username, email, or derived username — not first-tier-wins. */
+    private List<AgenticUsers> findAllIdentityMatches(String userName, String userEmail, String derivedUsername) {
+        List<Bson> identityMatchers = new ArrayList<>();
+        identityMatchers.add(Filters.eq(AgenticUsers.USER_NAME, userName));
+        if (userEmail != null && !userEmail.isEmpty()) {
+            identityMatchers.add(Filters.eq(AgenticUsers.USER_EMAIL, userEmail));
+        }
+        if (derivedUsername != null) {
+            identityMatchers.add(Filters.eq(AgenticUsers.USER_NAME, derivedUsername));
+        }
+        return instance.findAll(Filters.or(identityMatchers));
+    }
+
+    private static String deriveUsernameFromEmail(String email) {
+        if (email == null || email.isEmpty() || !email.contains("@")) return null;
+        String local = email.substring(0, email.indexOf('@')).trim();
+        return local.isEmpty() ? null : local;
+    }
+
+    /**
+     * Resolves this SSO identity (union-match across username/email/derived-username,
+     * canonicalizing every match onto the email-derived username so fragments converge over
+     * time), ensures a doc exists, and refreshes email/timestamp. Callers apply tags afterward
+     * via upsertDeviceTags using the returned canonical username.
+     */
+    public String syncSsoIdentity(String userName, String userEmail, String lastUpdatedBy) {
+        if (userName == null || userName.trim().isEmpty()) return null;
+        String trimmedName = userName.trim();
+        String trimmedEmail = userEmail == null ? "" : userEmail.trim();
+        String derivedUsername = deriveUsernameFromEmail(trimmedEmail);
+
+        List<AgenticUsers> matches = findAllIdentityMatches(trimmedName, trimmedEmail, derivedUsername);
+        String identityUserName = derivedUsername != null ? derivedUsername : trimmedName;
+
+        List<Bson> baseUpdates = Arrays.asList(
+                Updates.set(AgenticUsers.USER_NAME, identityUserName),
+                Updates.set(AgenticUsers.USER_EMAIL, trimmedEmail),
+                Updates.set(AgenticUsers.LAST_UPDATED_AT, Context.now()),
+                Updates.set(AgenticUsers.LAST_UPDATED_BY, lastUpdatedBy));
+        if (matches.isEmpty()) {
+            instance.updateOne(Filters.eq(AgenticUsers.USER_NAME, identityUserName), Updates.combine(baseUpdates));
+        } else {
+            List<String> matchedUsernames = matches.stream().map(AgenticUsers::getUserName).distinct().collect(Collectors.toList());
+            instance.updateMany(Filters.in(AgenticUsers.USER_NAME, matchedUsernames), Updates.combine(baseUpdates));
+        }
+        return identityUserName;
+    }
+
+    /**
+     * Exact-username lookup only — the dashboard always sends back the live device-reported
+     * username round-tripped from this DAO's own data, so broader matching (needed for SSO,
+     * where the caller only has an email) doesn't help here. Ensures a doc exists.
+     */
+    public String ensureDashboardIdentity(String userName, String userEmail, String lastUpdatedBy) {
+        if (userName == null || userName.trim().isEmpty()) return null;
+        String trimmedName = userName.trim();
+        String trimmedEmail = userEmail == null ? "" : userEmail.trim();
+
+        AgenticUsers existing = instance.findOne(Filters.eq(AgenticUsers.USER_NAME, trimmedName));
+        if (existing == null) {
+            AgenticUsers newUser = new AgenticUsers();
+            newUser.setUserName(trimmedName);
+            if (!trimmedEmail.isEmpty()) newUser.setUserEmail(trimmedEmail);
+            newUser.setLastUpdatedAt(Context.now());
+            newUser.setLastUpdatedBy(lastUpdatedBy);
+            instance.insertOne(newUser);
+        } else {
+            List<Bson> updates = new ArrayList<>();
+            updates.add(Updates.set(AgenticUsers.LAST_UPDATED_AT, Context.now()));
+            updates.add(Updates.set(AgenticUsers.LAST_UPDATED_BY, lastUpdatedBy));
+            if (!trimmedEmail.isEmpty()) updates.add(Updates.set(AgenticUsers.USER_EMAIL, trimmedEmail));
+            instance.updateMany(Filters.eq(AgenticUsers.USER_NAME, trimmedName), Updates.combine(updates));
+        }
+        return trimmedName;
+    }
+
+    /**
+     * Generalizes findDeviceIdsByTeamsRolesAndDeviceIds to arbitrary tag keys: entries in
+     * tagFilters AND together; within one key, any of its values match (OR).
+     */
+    public List<String> findDeviceIdsByTags(Map<String, List<String>> tagFilters, List<String> deviceIds) {
         List<Bson> conditions = new ArrayList<>();
-        if (teams != null && !teams.isEmpty()) {
-            conditions.add(Filters.or(
-                Filters.and(Filters.eq(AgenticUsers.TEAM_SOURCE, AgenticUsers.SOURCE_MANUAL), Filters.in(AgenticUsers.TEAM_NAME, teams)),
-                Filters.and(Filters.ne(AgenticUsers.TEAM_SOURCE, AgenticUsers.SOURCE_MANUAL), Filters.in(AgenticUsers.SSO_TEAM_NAME, teams))
-            ));
+        if (tagFilters != null) {
+            for (Map.Entry<String, List<String>> entry : tagFilters.entrySet()) {
+                if (entry.getKey() == null || entry.getValue() == null) continue;
+                List<String> values = entry.getValue().stream()
+                        .filter(v -> v != null && !v.trim().isEmpty())
+                        .map(v -> v.trim().toLowerCase())
+                        .collect(Collectors.toList());
+                if (values.isEmpty()) continue;
+                conditions.add(Filters.elemMatch(AgenticUsers.DEVICE_TAGS, Filters.and(
+                        Filters.eq(DeviceTag.KEY, entry.getKey().trim().toLowerCase()),
+                        Filters.in(DeviceTag.VALUE, values))));
+            }
         }
-        if (roles != null && !roles.isEmpty()) {
-            conditions.add(Filters.or(
-                Filters.and(Filters.eq(AgenticUsers.ROLE_SOURCE, AgenticUsers.SOURCE_MANUAL), Filters.in(AgenticUsers.USER_ROLE, roles)),
-                Filters.and(Filters.ne(AgenticUsers.ROLE_SOURCE, AgenticUsers.SOURCE_MANUAL), Filters.in(AgenticUsers.SSO_USER_ROLE, roles))
-            ));
-        }
-        if (conditions.isEmpty()) {
+        boolean hasTagFilters = !conditions.isEmpty();
+        boolean hasDeviceIds = deviceIds != null && !deviceIds.isEmpty();
+        if (!hasTagFilters && !hasDeviceIds) {
             return new ArrayList<>();
         }
 
+        // Device IDs come straight from a dropdown built off live module_info data at pick time —
+        // trust them directly rather than re-deriving through a username/tag join.
+        if (!hasTagFilters) {
+            return new ArrayList<>(new HashSet<>(deviceIds));
+        }
+
+        // module_info is updated on every heartbeat, unlike AgenticUsers.devices which is only
+        // ever backfilled once — resolve devices live instead of trusting the stored field.
+        Map<String, Set<String>> liveDevicesByUsername = ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield();
         Bson userFilter = conditions.size() == 1 ? conditions.get(0) : Filters.and(conditions);
-        List<String> deviceIds = new ArrayList<>();
+        Set<String> tagDeviceIds = new HashSet<>();
         for (AgenticUsers user : instance.findAll(userFilter)) {
-            if (user.getDevices() != null) {
-                deviceIds.addAll(user.getDevices());
+            Set<String> liveDevices = liveDevicesByUsername.get(user.getUserName());
+            if (liveDevices != null) {
+                tagDeviceIds.addAll(liveDevices);
             }
         }
-        return deviceIds;
+
+        if (!hasDeviceIds) {
+            return new ArrayList<>(tagDeviceIds);
+        }
+
+        // Both dimensions given — a device must satisfy the tag match AND be explicitly picked.
+        tagDeviceIds.retainAll(new HashSet<>(deviceIds));
+        return new ArrayList<>(tagDeviceIds);
     }
 
     @Override

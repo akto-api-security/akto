@@ -8,6 +8,12 @@ import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.Projections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.bson.conversions.Bson;
 
 public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
@@ -47,5 +53,23 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
     @Override
     public Class<ModuleInfo> getClassT() {
         return ModuleInfo.class;
+    }
+
+    // Ported from the dashboard's AgentUsersDao.findDeviceIdsByTags live-device join — module_info
+    // is updated on every heartbeat, unlike AgenticUsers.devices which is only ever backfilled
+    // once, so guardrail tag-targeting resolves against this instead of the stored field.
+    public Map<String, Set<String>> fetchUsernameToDeviceIdsForEndpointShield() {
+        List<ModuleInfo> modules = findAll(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD),
+            Projections.include(ModuleInfo.NAME, ModuleInfo.ADDITIONAL_DATA));
+        Map<String, Set<String>> result = new HashMap<>();
+        for (ModuleInfo m : modules) {
+            Map<String, Object> ad = m.getAdditionalData();
+            if (ad == null || ad.get("username") == null) continue;
+            String username = String.valueOf(ad.get("username")).trim();
+            String deviceId = m.getName() == null ? "" : m.getName().trim();
+            if (username.isEmpty() || deviceId.isEmpty()) continue;
+            result.computeIfAbsent(username, k -> new HashSet<>()).add(deviceId);
+        }
+        return result;
     }
 }
