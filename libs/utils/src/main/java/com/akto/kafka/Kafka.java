@@ -47,6 +47,15 @@ public class Kafka {
         }
     }
 
+    public Kafka(String brokerIP, int lingerMS, int batchSize, int maxRequestTimeout, int maxRetries, String username, String password, boolean isAuthenticationEnabled) {
+        producerReady = false;
+        try {
+            setProducer(brokerIP, lingerMS, batchSize, maxRequestTimeout, maxRetries, username, password, isAuthenticationEnabled);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public void sendWithCounter(String message, String topic, AtomicInteger counter) {
         if (!this.producerReady) {
             loggerMaker.errorAndAddToDb("Producer not ready. Cannot send message. Counter will remain incremented. Current counter: " + counter.get());
