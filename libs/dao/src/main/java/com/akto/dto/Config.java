@@ -367,6 +367,17 @@ public abstract class Config {
         private String organizationDomain;
         public static final String ACCOUNT_ID = "accountId";
         private int accountId;
+        /** BSON key for the Okta Management API (SSWS) token. Ported for the periodic user-sync cron. */
+        public static final String MANAGEMENT_API_TOKEN = "managementApiToken";
+        /** SSWS token; persisted in Mongo under {@link #MANAGEMENT_API_TOKEN}. */
+        private String managementApiToken;
+        /**
+         * Master on/off switch for the periodic org-wide cron that syncs Okta groups into
+         * AgenticUsers as a "group" device tag for every org user, not just people who log in.
+         * Requires {@link #managementApiToken}. Defaults to false; the dashboard UI keeps this
+         * disabled until a token is saved.
+         */
+        private boolean syncGroupsToUserTags = false;
 
         public static final String CONFIG_ID = ConfigType.OKTA.name() + CONFIG_SALT;
 
@@ -431,6 +442,24 @@ public abstract class Config {
         }
         public void setAccountId(int accountId) {
             this.accountId = accountId;
+        }
+
+        public String getManagementApiToken() {
+            return managementApiToken;
+        }
+        public void setManagementApiToken(String managementApiToken) {
+            this.managementApiToken = managementApiToken;
+        }
+
+        public boolean isSyncGroupsToUserTags() {
+            return syncGroupsToUserTags;
+        }
+        public void setSyncGroupsToUserTags(boolean syncGroupsToUserTags) {
+            this.syncGroupsToUserTags = syncGroupsToUserTags;
+        }
+
+        public String getManagementBaseUrl() {
+            return "https://" + oktaDomainUrl;
         }
     }
 
