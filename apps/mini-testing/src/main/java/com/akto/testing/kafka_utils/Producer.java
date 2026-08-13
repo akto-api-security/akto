@@ -8,7 +8,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.DeleteTopicsResult;
 import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -144,11 +143,20 @@ public class Producer {
         throw new RuntimeException("Failed to create topic '" + topicName + "' after " + maxRetries + " retries.");
     }
 
+    private static Properties buildAdminProperties(String bootstrapServers) throws ExecutionException {
+        Properties adminProps = KafkaConfig.createAdminProperties(bootstrapServers,
+                KafkaConfig.isKafkaAuthenticationEnabled(), KafkaConfig.getKafkaUsername(), KafkaConfig.getKafkaPassword());
+        if (adminProps == null) {
+            throw new ExecutionException("Kafka authentication is enabled but credentials are missing",
+                    new IllegalStateException("Missing Kafka username/password"));
+        }
+        return adminProps;
+    }
+
     private static void deleteTopic(String bootstrapServers, String topicName) 
             throws ExecutionException, InterruptedException {
 
-        Properties adminProps = new Properties();
-        adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        Properties adminProps = buildAdminProperties(bootstrapServers);
         try (AdminClient adminClient = AdminClient.create(adminProps)) {
             try {
                 ListTopicsResult listTopicsResult = adminClient.listTopics();
@@ -212,8 +220,7 @@ public class Producer {
 
     public static void createTopic(String bootstrapServers, String topicName) 
         throws ExecutionException, InterruptedException, java.util.concurrent.TimeoutException {
-        Properties adminProps = new Properties();
-        adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        Properties adminProps = buildAdminProperties(bootstrapServers);
 
         try (AdminClient adminClient = AdminClient.create(adminProps)) {
             NewTopic newTopic = new NewTopic(topicName, 1, (short) 1); 
