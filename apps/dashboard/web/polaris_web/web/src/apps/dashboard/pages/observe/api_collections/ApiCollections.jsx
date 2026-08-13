@@ -521,7 +521,14 @@ function ApiCollections(props) {
     const userRole = window.USER_ROLE
 
     const navigate = useNavigate();
-    
+
+    // /inventory is deprecated for Atlas/Argus; redirect unless embedded (e.g. McpSecurityPage's tab)
+    useEffect(() => {
+        if (!onlyShowCollectionsTable && (isEndpointSecurityCategory() || isAgenticSecurityCategory())) {
+            navigate("/dashboard/observe/agentic-assets", { replace: true });
+        }
+    }, [navigate]);
+
     const getAgenticObserveBackUrl = () => {
         if (!isEndpointSecurityCategory()) return undefined;
         try {
