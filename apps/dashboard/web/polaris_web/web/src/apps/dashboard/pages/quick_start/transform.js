@@ -1072,14 +1072,15 @@ const cloudflareWarpObj = {
     key: "CLOUDFLARE_WARP",
 }
 
-const zscalerObj = {
-    icon: '/public/zscaler_logo.svg',
-    label: "Zscaler",
-    text: "Zscaler setup is recommended,if your organization uses Zscaler for secure, zero-trust internet and app access.",
-    docsUrl: 'https://docs.akto.io/traffic-connector',
-    component: <AddOnComponenet/>,
-    key: "ZSCALER",
-}
+// Zscaler connector hidden for now
+// const zscalerObj = {
+//     icon: '/public/zscaler_logo.svg',
+//     label: "Zscaler",
+//     text: "Zscaler setup is recommended,if your organization uses Zscaler for secure, zero-trust internet and app access.",
+//     docsUrl: 'https://docs.akto.io/traffic-connector',
+//     component: <AddOnComponenet/>,
+//     key: "ZSCALER",
+// }
 
 const AI_SECURITY_DOCS_BASE_URL = "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/ai-endpoint-shield"
 
@@ -2270,7 +2271,7 @@ const quickStartFunc = {
 
         // Secure Web Networks
         const secureWebNetworks = [
-            cloudflareWarpObj, zscalerObj
+            cloudflareWarpObj, /* zscalerObj */
         ];
 
         const browserExtensions = [
@@ -2378,7 +2379,7 @@ const quickStartFunc = {
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, authenticationTokenObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
-            cloudflareWarpObj, zscalerObj, snowflakeObj,
+            cloudflareWarpObj, /* zscalerObj, */ snowflakeObj,
             intuneEndpointObj, ninjaoneEndpointObj, automoxEndpointObj,
             jamfEndpointObj, kandjiEndpointObj, customEndpointObj,
             microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj, crowdStrikeObj
