@@ -234,7 +234,6 @@ public class Utils {
         } else {
             ret = new HashSet<>(Arrays.asList(debugUrls.split(",")));
         }
-        logger.warn("DEBUG_URLS initialized with: " + ret.toString());
         return ret;
     }
 
