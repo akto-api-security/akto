@@ -14,6 +14,8 @@ const ModuleInfo = () => {
     const [ selectedModule, setSelectedModule ] = useState(null)
 
     const CONFIGURABLE_MODULE_TYPES = ['TRAFFIC_COLLECTOR', 'AKTO_AGENT_GATEWAY', 'THREAT_DETECTION', 'MINI_RUNTIME'];
+    const VIEWABLE_MODULE_TYPES = [...CONFIGURABLE_MODULE_TYPES, 'MINI_TESTING'];
+    const REBOOT_ELIGIBLE_MODULE_TYPES = VIEWABLE_MODULE_TYPES;
 
     const fetchModuleInfo = async () => {
         const response = await settingRequests.fetchModuleInfo();
@@ -55,7 +57,7 @@ const ModuleInfo = () => {
         const twoMinutesAgo = Math.floor(Date.now() / 1000) - 120;
         return module.lastHeartbeatReceived >= twoMinutesAgo &&
                module.name &&
-               (module.name.startsWith('Default_') || module.name.startsWith('akto-mr')|| CONFIGURABLE_MODULE_TYPES.includes(module.moduleType));
+               (module.name.startsWith('Default_') || module.name.startsWith('akto-mr')|| REBOOT_ELIGIBLE_MODULE_TYPES.includes(module.moduleType));
     }
 
     const handleModuleTypeClick = (module) => {
@@ -90,10 +92,10 @@ const ModuleInfo = () => {
     const moduleInfoRows = sortedModuleInfos.map(module => {
         const isEligible = canRebootModule(module);
         const isSelected = selectedModules.includes(module.id);
-        const isConfigurable = CONFIGURABLE_MODULE_TYPES.includes(module.moduleType);
+        const isViewable = VIEWABLE_MODULE_TYPES.includes(module.moduleType);
 
         return [
-            isConfigurable ? (
+            isViewable ? (
                 <button
                     onClick={() => handleModuleTypeClick(module)}
                     style={{ background: 'none', border: 'none', color: '#0070f3', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
@@ -188,10 +190,15 @@ const ModuleInfo = () => {
                     )}
                     <ModuleEnvConfigComponent
                         title="Environment Variables"
-                        description={`Configure environment variables for ${selectedModule?.name || 'module'}`}
+                        description={
+                            CONFIGURABLE_MODULE_TYPES.includes(selectedModule?.moduleType)
+                                ? `Configure environment variables for ${selectedModule?.name || 'module'}`
+                                : `Environment variables for ${selectedModule?.name || 'module'} (read-only)`
+                        }
                         module={selectedModule}
                         allowedEnvFields={allowedEnvFields}
                         onSaveEnv={handleSaveEnv}
+                        readOnly={!CONFIGURABLE_MODULE_TYPES.includes(selectedModule?.moduleType)}
                     />
                 </Modal.Section>
             </Modal>
