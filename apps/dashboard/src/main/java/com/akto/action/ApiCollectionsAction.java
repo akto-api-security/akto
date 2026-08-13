@@ -488,6 +488,62 @@ public class ApiCollectionsAction extends UserAction {
         return Action.NONE;
     }
 
+    // Deliberately NOT named "hostNames"/"hostnames" — this class already has an unrelated
+    // "hostnames" field (line ~2348, on-demand icon fetching) and Struts binds request params by
+    // exact property name, so a near-identical name here would be a silent footgun.
+    @Setter
+    private List<String> deviceHostNames;
+
+    // Same response shape as fetchAllCollectionsBasic (reuses ApiCollectionBasicMixin so the
+    // frontend's existing transformRawCollectionData/categorizeCollections pipeline needs no
+    // changes), but scoped to a specific hostName list via a real DB-level $in filter instead of
+    // findAll(Filters.empty()) — for callers that only need a handful of collections (e.g. one
+    // device's endpoint tree in ApiCollections.jsx/AgentEndpointTreeTable.jsx) and shouldn't pay
+    // for loading the whole account, which doesn't scale to accounts with thousands of collections.
+    public String fetchCollectionsBasicForHostNames() throws Exception {
+        long start = System.currentTimeMillis();
+        if (deviceHostNames == null || deviceHostNames.isEmpty()) {
+            HttpServletResponse httpResponse = ServletActionContext.getResponse();
+            httpResponse.setContentType("application/json");
+            httpResponse.setCharacterEncoding("UTF-8");
+            new ObjectMapper().writeValue(httpResponse.getOutputStream(), Collections.singletonMap("apiCollections", Collections.emptyList()));
+            return Action.NONE;
+        }
+
+        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(ApiCollection.HOST_NAME, deviceHostNames), Projections.exclude(
+                "urls", "conditions", "serviceGraphEdges", "hostNames", "serviceTag",
+                "sampleCollectionsDropped", "redact", "runDependencyAnalyser",
+                "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
+                "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType"
+        ));
+
+        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+
+        for (ApiCollection c : this.apiCollections) {
+            List<CollectionTags> tags = c.getTagsList();
+            if (tags != null) {
+                for (CollectionTags tag : tags) {
+                    tag.setLastUpdatedTs(0);
+                    tag.setSource(null);
+                }
+            }
+        }
+
+        com.akto.util.IconUtils.processIconsForCollections(this.apiCollections);
+
+        HttpServletResponse httpResponse = ServletActionContext.getResponse();
+        httpResponse.setContentType("application/json");
+        httpResponse.setCharacterEncoding("UTF-8");
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.addMixIn(ApiCollection.class, ApiCollectionBasicMixin.class);
+        Map<String, Object> responseBody = new HashMap<>();
+        responseBody.put("apiCollections", this.apiCollections);
+        mapper.writeValue(httpResponse.getOutputStream(), responseBody);
+
+        loggerMaker.infoAndAddToDb("[fetchCollectionsBasicForHostNames] TOTAL took " + (System.currentTimeMillis() - start) + "ms, hostNames=" + deviceHostNames.size() + ", found=" + this.apiCollections.size());
+        return Action.NONE;
+    }
+
     public String fetchCollection() {
         this.apiCollections = new ArrayList<>();
         ApiCollection c = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId));
