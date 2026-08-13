@@ -337,9 +337,8 @@ function ThreatCompliancePage() {
             let maxShowCompliance = 2
             let badge = totalCompliance > maxShowCompliance ? <Badge size="extraSmall">+{totalCompliance - maxShowCompliance}</Badge> : null
 
-            // Extract detection type from metadata
-            const detectionType = threat.detectionType || 'SINGLE_PROMPT';
-            const isSessionBased = detectionType === 'SESSION_CONTEXT';
+            // TEMP: force Single Prompt for all events until backend-resolved detection type ships
+            const isSessionBased = false;
 
             return {
                 key: key,
@@ -520,7 +519,8 @@ function ThreatCompliancePage() {
                     console.error('[ThreatCompliancePage] Error parsing sessionContext:', e);
                 }
 
-                const itemDetectionType = sessionData?.detectionType || 'SINGLE_PROMPT';
+                // TEMP: force Single Prompt for all events until backend-resolved detection type ships
+                const itemDetectionType = 'SINGLE_PROMPT';
                 if (detectionTypeFilter.length > 0 && !detectionTypeFilter.includes(itemDetectionType)) {
                     return;
                 }
@@ -556,7 +556,8 @@ function ThreatCompliancePage() {
                         }],
                         isThreat: true,
                         sessionContext: sessionData,
-                        detectionType: sessionData?.detectionType || 'SINGLE_PROMPT'
+                        // TEMP: force Single Prompt for all events until backend-resolved detection type ships
+                        detectionType: 'SINGLE_PROMPT'
                     });
                 } else {
                     const existingThreat = uniqueThreatsMap.get(key);
