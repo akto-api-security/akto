@@ -302,15 +302,28 @@ public class DbLayer {
         }
         try {
             String userName = String.valueOf(additionalData.get("username"));
-            Object teamObj = additionalData.get("team");
-            Object roleObj = additionalData.get("userRole");
-            String teamName = teamObj == null ? null : StringUtils.trimToNull(teamObj.toString());
-            String userRole = roleObj == null ? null : StringUtils.trimToNull(roleObj.toString());
-            String device = moduleInfo.getName();
-            AgentUsersDao.instance.upsertAgentUser(userName, teamName, userRole, device, Context.now());
+
+            // additionalData's wire keys ("team"/"userRole") are the device's own self-reported
+            // field names, unrelated to (and unchanged by) AgenticUsers' deviceTags redesign —
+            // each one just becomes a single-value deviceTags entry under its tag key ("team"/"role").
+            Map<String, List<String>> deviceTagUpdates = new HashMap<>();
+            putIfPresent(deviceTagUpdates, "team", additionalData.get("team"));
+            putIfPresent(deviceTagUpdates, "role", additionalData.get("userRole"));
+            if (deviceTagUpdates.isEmpty()) return;
+
+            // mergeDeviceTags only updates an existing doc (no upsert) — ensureDashboardIdentity
+            // creates one on the first check-in from a brand-new device-reported user, matching the
+            // dashboard's own AgentUsersDao.ensureDashboardIdentity + mergeDeviceTags call order.
+            AgentUsersDao.instance.ensureDashboardIdentity(userName, null, "device");
+            AgentUsersDao.instance.mergeDeviceTags(userName, "device", deviceTagUpdates, "device");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error syncing agent user from module info: " + e.getMessage(), LogDb.DB_ABS);
         }
+    }
+
+    private static void putIfPresent(Map<String, List<String>> deviceTagUpdates, String tagKey, Object rawValue) {
+        String value = rawValue == null ? null : StringUtils.trimToNull(rawValue.toString());
+        if (value != null) deviceTagUpdates.put(tagKey, Collections.singletonList(value));
     }
 
     public static void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList) {
@@ -3131,11 +3144,11 @@ public class DbLayer {
         }
     }
 
-    public static List<String> findDeviceIdsByTeamsRolesAndDeviceIds(List<String> teams, List<String> roles, List<String> deviceIds) {
+    public static List<String> findDeviceIdsByTags(Map<String, List<String>> tagFilters, List<String> deviceIds) {
         try {
-            return AgentUsersDao.instance.findDeviceIdsByTeamsRolesAndDeviceIds(teams, roles, deviceIds);
+            return AgentUsersDao.instance.findDeviceIdsByTags(tagFilters, deviceIds);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in findDeviceIdsByTeamsRolesAndDeviceIds: " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Error in findDeviceIdsByTags: " + e.getMessage());
             return new ArrayList<>();
         }
     }
