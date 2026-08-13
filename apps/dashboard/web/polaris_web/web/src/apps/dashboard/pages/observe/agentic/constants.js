@@ -849,28 +849,12 @@ export function getRowViolations(collectionIds, violationsByCollectionId) {
     return violationsForCollections(collectionIds, violationsByCollectionId);
 }
 
-// Team breakdown for a server-computed row's device list. Deliberately lighter than
-// buildTeamGroupsForAsset (used by the legacy/agent-group client pipeline): the server's `devices`
-// list only carries deviceId (not full collection objects), so username resolution here uses only
-// the Endpoint Shield deviceId-keyed lookup tier, not the displayName/name-based fallback tiers
-// getResolvedUsernameForCollection also tries. Documented tradeoff, not an oversight.
-export function buildTeamGroupsFromDevices(devices, usernameMap, userMetadataMap) {
-    const teamCounts = {};
-    (devices || []).forEach((d) => {
-        const key = `__deviceId__${String(d.deviceId).toLowerCase()}`;
-        const username = usernameMap?.[key];
-        if (!username || username === DEFAULT_VALUE) return;
-        const team = userMetadataMap[username]?.team;
-        if (!team) return;
-        teamCounts[team] = (teamCounts[team] || 0) + 1;
-    });
-    return Object.entries(teamCounts).map(([name, count]) => ({ name, count }));
-}
-
 // Fills in the two display fields the flyout's Devices tab (AgenticAssetFlyout.jsx's DevicesTab,
 // unchanged since master) reads straight off each device row — username and a formatted lastSeen
-// string — which AgenticObserveAction.buildDevicesForGroup/DeviceAcc don't send back, same
-// deviceId-keyed lookup tier tradeoff as buildTeamGroupsFromDevices above.
+// string — which AgenticObserveAction.buildDevicesForGroup/DeviceAcc don't send back. The server's
+// `devices` list only carries deviceId (not full collection objects), so username resolution here
+// uses only the Endpoint Shield deviceId-keyed lookup tier, not the displayName/name-based fallback
+// tiers getResolvedUsernameForCollection also tries. Documented tradeoff, not an oversight.
 export function enrichDevicesWithUsername(devices, usernameMap) {
     return (devices || []).map((d) => {
         const key = `__deviceId__${String(d.deviceId).toLowerCase()}`;
@@ -885,7 +869,7 @@ export function enrichDevicesWithUsername(devices, usernameMap) {
 }
 
 // AI-interaction tally for a server-computed row's device list — same tradeoff as
-// buildTeamGroupsFromDevices: only the Endpoint Shield deviceId mapping (the primary,
+// enrichDevicesWithUsername above: only the Endpoint Shield deviceId mapping (the primary,
 // highest-coverage match tier), not the hostname-parts-based fallback tiers
 // analysisKeysForCollection also tries, which need per-collection hostnames the server doesn't send
 // back for these rows.
