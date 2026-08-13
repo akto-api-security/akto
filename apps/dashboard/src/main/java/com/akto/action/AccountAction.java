@@ -426,6 +426,26 @@ public class AccountAction extends UserAction {
         return ERROR.toUpperCase();
     }
 
+    private boolean success;
+
+    public boolean getSuccess() {
+        return success;
+    }
+
+    public String initialiseDemoCollections() {
+        try {
+            RuntimeListener.initialiseDemoCollections();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error while initialising demo collections: " + e.getMessage());
+            addActionError(e.getMessage());
+            success = false;
+            return ERROR.toUpperCase();
+        }
+
+        success = true;
+        return SUCCESS.toUpperCase();
+    }
+
     public String getNewAccountName() {
         return newAccountName;
     }
