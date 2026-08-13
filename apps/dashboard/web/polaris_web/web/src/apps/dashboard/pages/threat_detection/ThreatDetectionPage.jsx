@@ -146,13 +146,13 @@ const flaggedData = [
     }
 ]
 
-const ChartComponent = ({ subCategoryCount, severityCountMap, onThreatTypeClick, onSeverityClick }) => {
+const ChartComponent = ({ categoryCount, severityCountMap, onThreatTypeClick, onSeverityClick }) => {
     return (
       <VerticalStack gap={4} columns={2}>
         <HorizontalGrid gap={4} columns={2}>
           <TopThreatTypeChart
             key={"top-threat-types"}
-            data={subCategoryCount}
+            data={categoryCount}
             onBarClick={onThreatTypeClick}
           />
           <InfoCard
@@ -343,7 +343,7 @@ function ThreatDetectionPage() {
     const [showDetails, setShowDetails] = useState(false);
     const [sampleData, setSampleData] = useState([])
     const [showNewTab, setShowNewTab] = useState(false)
-    const [subCategoryCount, setSubCategoryCount] = useState([]);
+    const [categoryCount, setCategoryCount] = useState([]);
     const [severityCountMap, setSeverityCountMap] = useState([]);
     const [moreActions, setMoreActions] = useState(false);
     const [webhookIntegrationModalOpen, setWebhookIntegrationModalOpen] = useState(false);
@@ -506,7 +506,10 @@ function ThreatDetectionPage() {
         const fetchThreatCategoryCount = async () => {
             const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
             const finalObj = threatDetectionFunc.getGraphsData(res);
-            setSubCategoryCount(finalObj.subCategoryCount);
+            // categoryCountRes groups by policy name (category), not the generic rule-type
+            // subCategory (e.g. "UserDefinedLLMRule" shared by many distinct policies) — same
+            // source ThreatApiPage.jsx already uses for this same chart.
+            setCategoryCount(finalObj.categoryCountRes);
           };
 
           const fetchCountBySeverity = async () => {
@@ -720,7 +723,7 @@ function ThreatDetectionPage() {
     // Normal mode - show table, charts, and sidebar
     const components = [
         <ChartComponent
-            subCategoryCount={subCategoryCount}
+            categoryCount={categoryCount}
             severityCountMap={severityCountMap}
             onThreatTypeClick={handleThreatTypeClick}
             onSeverityClick={handleSeverityClick}
