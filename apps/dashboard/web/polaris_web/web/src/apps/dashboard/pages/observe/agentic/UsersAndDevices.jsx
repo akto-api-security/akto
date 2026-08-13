@@ -320,17 +320,19 @@ function UsersAndDevices() {
     // Only manual rows are ever edited/removed here — tags from any other source (e.g. Okta) are
     // shown read-only, since this dashboard action only ever writes manual-source tags and a
     // synced value would just be overwritten again on the next sync anyway.
-    const updateEntryValue = useCallback((key, value) => {
+    // Identified by index, not key — a key can now have multiple manual values (e.g. team=akto
+    // and team=razorpay both applying at once), so key alone no longer uniquely names an entry.
+    const updateEntryValue = useCallback((idx, value) => {
         setEditTagModal((prev) => ({
             ...prev,
-            entries: prev.entries.map((e) => (e.key === key && e.source === 'manual' ? { ...e, value } : e)),
+            entries: prev.entries.map((e, i) => (i === idx && e.source === 'manual' ? { ...e, value } : e)),
         }));
     }, []);
 
-    const removeEntry = useCallback((key) => {
+    const removeEntry = useCallback((idx) => {
         setEditTagModal((prev) => ({
             ...prev,
-            entries: prev.entries.filter((e) => !(e.key === key && e.source === 'manual')),
+            entries: prev.entries.filter((e, i) => !(i === idx && e.source === 'manual')),
         }));
     }, []);
 
@@ -341,10 +343,10 @@ function UsersAndDevices() {
             func.setToast(true, true, "Device tag key cannot be empty");
             return;
         }
-        // Only checked against other manual rows — a manual value is allowed alongside an
-        // existing non-manual value for the same key, they simply coexist.
-        if (editTagModal.entries.some((e) => e.key === key && e.source === 'manual')) {
-            func.setToast(true, true, "This device tag key already has a manual value in the list below.");
+        // A key can have multiple manual values at once (e.g. team=akto and team=razorpay both
+        // apply) — only guard against adding the exact same key+value pair twice.
+        if (editTagModal.entries.some((e) => e.key === key && e.value === value && e.source === 'manual')) {
+            func.setToast(true, true, "This tag already exists.");
             return;
         }
         setEditTagModal((prev) => ({
@@ -362,13 +364,16 @@ function UsersAndDevices() {
             const groupNames = selectedRows.map((r) => r.groupName).filter(Boolean);
 
             // Only manual rows are ever sent — this action only writes the "manual" source, never
-            // touching tags synced in from elsewhere. Empty value = explicit clear. Manual keys
-            // removed from the original prefill are also sent as an explicit clear, so "remove"
-            // actually un-pins the manual override instead of just hiding it locally; a same-key
-            // tag from another source (if any) is untouched either way.
+            // touching tags synced in from elsewhere. A key with no non-empty manual values left
+            // (all cleared, or removed down to nothing) is sent as [] — an explicit clear — so
+            // clearing/removing every value un-pins the manual override instead of just hiding it
+            // locally; a same-key tag from another source (if any) is untouched either way.
             const manualEntries = editTagModal.entries.filter((e) => e.source === 'manual');
             const tags = {};
-            manualEntries.forEach((e) => { tags[e.key] = e.value ? [e.value] : []; });
+            manualEntries.forEach((e) => {
+                if (!(e.key in tags)) tags[e.key] = [];
+                if (e.value) tags[e.key].push(e.value);
+            });
             if (editTagModal.isBulk) {
                 // "Clear all" in bulk mode clears every manually-set key any selected row currently
                 // has — computed from the union of their real tags, never guessed from one row's set.
@@ -384,6 +389,19 @@ function UsersAndDevices() {
             }
 
             await settingRequests.bulkUpdateUserDeviceTag(groupNames, tags);
+
+            // fetchData/loadStats build tagsByUsername from enrichRef.current.userMetadataMap, which
+            // was only ever fetched once at mount — without refreshing it here, the table/stats
+            // refetch below would keep sending the pre-edit tags and the save would look like it
+            // silently did nothing. force=true also bypasses fetchEndpointShieldUserMetadata's TTL
+            // cache, which would otherwise likely still be warm from that same mount fetch.
+            const shieldResult = await fetchEndpointShieldUserMetadata(true);
+            enrichRef.current = {
+                ...enrichRef.current,
+                usernameMap: shieldResult?.usernameMap || {},
+                userMetadataMap: shieldResult?.userMetadataMap || {},
+            };
+
             func.setToast(true, false, "Tags updated successfully");
             closeEditTagModal();
             setRefreshKey((k) => k + 1);
@@ -489,14 +507,14 @@ function UsersAndDevices() {
                                                     label={entry.key}
                                                     labelHidden
                                                     value={entry.value}
-                                                    onChange={isManual ? (v) => updateEntryValue(entry.key, v) : () => {}}
+                                                    onChange={isManual ? (v) => updateEntryValue(idx, v) : () => {}}
                                                     disabled={!isManual}
                                                     autoComplete="off"
                                                 />
                                             </Box>
                                             <Box minWidth="72px">
                                                 {isManual ? (
-                                                    <Button plain destructive icon={DeleteMinor} onClick={() => removeEntry(entry.key)} accessibilityLabel={`Remove ${entry.key}`} />
+                                                    <Button plain destructive icon={DeleteMinor} onClick={() => removeEntry(idx)} accessibilityLabel={`Remove ${entry.key}`} />
                                                 ) : (
                                                     <Badge size="small">{entry.source}</Badge>
                                                 )}

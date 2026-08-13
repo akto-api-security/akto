@@ -108,9 +108,12 @@ let _shieldMetaCache = { ts: 0, data: null };
 let _shieldMetaInflight = null;
 const SHIELD_META_TTL_MS = 3000;
 
-const fetchEndpointShieldUserMetadata = async () => {
+// force=true bypasses the TTL cache (but still joins an in-flight fetch rather than firing a
+// second one) — used right after writing a device tag, where the caller needs the just-saved
+// value back immediately rather than whatever was cached before the write.
+const fetchEndpointShieldUserMetadata = async (force = false) => {
     const now = Date.now();
-    if (_shieldMetaCache.data && now - _shieldMetaCache.ts <= SHIELD_META_TTL_MS) return _shieldMetaCache.data;
+    if (!force && _shieldMetaCache.data && now - _shieldMetaCache.ts <= SHIELD_META_TTL_MS) return _shieldMetaCache.data;
     if (_shieldMetaInflight) return _shieldMetaInflight;
 
     _shieldMetaInflight = (async () => {
