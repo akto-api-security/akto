@@ -536,36 +536,41 @@ function SampleDetails(props) {
 
     // Session Context Tab - shows prompts involved in session-based detection
     const SessionContextComponent = () => {
-        // Determine if this is session-based by checking if sessionId is present and not empty
+
         const sessionId = moreInfoData?.sessionId;
-        const isSessionBased = sessionId && sessionId !== '';
+        const hasSessionId = false;
 
         const [sessionData, setSessionData] = useState(null);
         const [sessionLoading, setSessionLoading] = useState(false);
-        const [sessionError, setSessionError] = useState(null);
+        const [isSessionBased, setIsSessionBased] = useState(hasSessionId);
 
         // Fetch session data from agentic_session_context table API using sessionId
         useEffect(() => {
-            if (isSessionBased) {
+            if (hasSessionId) {
                 setSessionLoading(true);
-                setSessionError(null);
 
                 threatDetectionApi.fetchSessionContext(sessionId)
                     .then((resp) => {
                         if (resp && resp.sessionData) {
                             setSessionData(resp.sessionData);
+                            setIsSessionBased(true);
                         } else {
-                            setSessionError(resp?.errorMessage || "Session data not found");
+                            // No session data found for this id - fall back to single prompt
+                            setIsSessionBased(false);
                         }
                     })
                     .catch((err) => {
-                        setSessionError("Failed to fetch session data");
+                        // Backend couldn't resolve this session (404/422/etc) - fall back to
+                        // single prompt instead of showing an error state.
+                        setIsSessionBased(false);
                     })
                     .finally(() => {
                         setSessionLoading(false);
                     });
+            } else {
+                setIsSessionBased(false);
             }
-        }, [sessionId, isSessionBased]);
+        }, [sessionId, hasSessionId]);
 
         // Parse conversation info from session data
         let sessionPrompts = [];
@@ -634,7 +639,7 @@ function SampleDetails(props) {
                             <Badge status={isSessionBased ? 'info' : 'default'}>
                                 {isSessionBased ? 'Session-based' : 'Single Prompt'}
                             </Badge>
-                            {sessionId && (
+                            {isSessionBased && sessionId && (
                                 <Text variant="bodySm" color="subdued">Session ID: {sessionId}</Text>
                             )}
                         </HorizontalStack>
@@ -654,18 +659,7 @@ function SampleDetails(props) {
                                 </>
                             )}
 
-                            {sessionError && !sessionLoading && (
-                                <>
-                                    <Divider />
-                                    <Box padding={"3"} background="bg-surface-critical" borderRadius="200">
-                                        <Text variant="bodyMd" color="critical">
-                                            {sessionError}
-                                        </Text>
-                                    </Box>
-                                </>
-                            )}
-
-                            {!sessionLoading && !sessionError && sessionSummary && (
+                            {!sessionLoading && sessionSummary && (
                                 <>
                                     <Divider />
                                     <VerticalStack gap={"2"}>
@@ -679,7 +673,7 @@ function SampleDetails(props) {
                                 </>
                             )}
 
-                            {!sessionLoading && !sessionError && blockedReason && (
+                            {!sessionLoading && blockedReason && (
                                 <>
                                     <Divider />
                                     <VerticalStack gap={"2"}>
@@ -694,7 +688,7 @@ function SampleDetails(props) {
                             )}
 
                             {/* Detection Reason - show all reasons from blocked prompts */}
-                            {!sessionLoading && !sessionError && sessionPrompts.some(p => p.detectionReason) && (
+                            {!sessionLoading && sessionPrompts.some(p => p.detectionReason) && (
                                 <>
                                     <Divider />
                                     <VerticalStack gap={"2"}>
