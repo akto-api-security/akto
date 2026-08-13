@@ -527,11 +527,19 @@ function ApiCollections(props) {
     // McpSecurityPage's tab). Argus has NO equivalent grouped page — its own left-nav intentionally
     // sends it to /inventory, and this component's isArgus-conditional rendering below is its real
     // view, so it must not be redirected away from itself.
+    //
+    // Exception within Atlas itself: UsersAndDevices.jsx's row click stores a device/agent filter
+    // under INVENTORY_FILTER_KEY *before* navigating here, so this page can render that device's
+    // endpoint tree (AgentEndpointTreeTable, see useTreeView below). Redirecting unconditionally
+    // skipped that tree entirely and sent the user straight to the grouped assets page instead,
+    // discarding the filter/context — so redirect only when there's no such filter, i.e. a stale
+    // link/bookmark/back-button, not a drill-down.
+    const inventoryPageFilters = PersistStore(state => state.filtersMap)?.[INVENTORY_FILTER_KEY];
     useEffect(() => {
-        if (!onlyShowCollectionsTable && isEndpointSecurityCategory()) {
+        if (!onlyShowCollectionsTable && isEndpointSecurityCategory() && !inventoryPageFilters) {
             navigate("/dashboard/observe/agentic-assets", { replace: true });
         }
-    }, [navigate]);
+    }, [navigate, inventoryPageFilters]);
 
     const getAgenticObserveBackUrl = () => {
         if (!isEndpointSecurityCategory()) return undefined;
