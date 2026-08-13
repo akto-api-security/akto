@@ -247,11 +247,11 @@ export default {
     // maliciousSkillKeys is NOT sent — AgenticObserveAction computes/caches it itself now
     // (getOrBuildSkillData) instead of requiring the whole account-wide set (14,218 entries /
     // ~500KB+ on Atlas Scale Test) to be re-POSTed on every paginated request.
-    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, usernameMap, userMetadataMap } = {}) {
+    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsSummary',
             method: 'post',
-            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, usernameMap, userMetadataMap },
+            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0 }
     },
@@ -338,11 +338,11 @@ export default {
     // pass as fetchAgenticAssetsSummary, aggregated rather than paginated. Also returns trend/delta
     // for the Agentic Assets + Violations cards and the Top Used Applications / Top Assets with
     // Violations lists — all derived server-side from data already fetched at mount, no new fetch.
-    async fetchAgenticAssetsStats({ trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, userAnalysisFlatMap } = {}) {
+    async fetchAgenticAssetsStats({ trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsStats',
             method: 'post',
-            data: { trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, userAnalysisFlatMap },
+            data: { trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap },
         })
         return {
             totalAssets: resp?.totalAssets || 0,
@@ -1567,6 +1567,18 @@ export default {
             data: { startTs: startTimestamp, endTs: endTimestamp },
         })
         return resp?.hostSeverityCounts || []
+    },
+
+    // Skill-name equivalent of fetchHostSeverityCounts above — skills aren't attributable by host
+    // (a skill's declaring collection is shared with the agent/device that invoked it), so this is
+    // keyed by the skill name the backend extracts from each event's /skills/<name> endpoint instead.
+    async fetchSkillSeverityCounts(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/fetchSkillSeverityCounts',
+            method: 'post',
+            data: { startTs: startTimestamp, endTs: endTimestamp },
+        })
+        return resp?.skillSeverityCounts || []
     },
 
 }

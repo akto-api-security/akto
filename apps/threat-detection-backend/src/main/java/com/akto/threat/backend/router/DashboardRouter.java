@@ -23,6 +23,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.De
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchThreatsForActorRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchSkillSeverityCountsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchDashboardTopDataRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ToggleArchivalEnabledRequest;
 import com.akto.threat.backend.service.MaliciousEventService;
@@ -692,6 +693,34 @@ public class DashboardRouter implements ARouter {
                         contextSource,
                         req.getMonthBoundariesList(),
                         req.getHostFilterList()
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+        router
+            .post("/get_skill_severity_counts")
+            .blockingHandler(ctx -> {
+                String contextSource = getContextSourceHeader(ctx);
+
+                RequestBody reqBody = ctx.body();
+                FetchSkillSeverityCountsRequest req = ProtoMessageUtils.<
+                FetchSkillSeverityCountsRequest
+                >toProtoMessage(
+                    FetchSkillSeverityCountsRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                ProtoMessageUtils.toString(
+                    threatActorService.fetchSkillSeverityCounts(
+                        ctx.get("accountId"),
+                        req.getStartTs(),
+                        req.getEndTs(),
+                        contextSource
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });

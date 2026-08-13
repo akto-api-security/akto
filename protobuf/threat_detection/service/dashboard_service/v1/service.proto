@@ -485,6 +485,23 @@ message FetchHostSeverityCountsResponse {
   repeated uint32 monthly_totals = 2;
 }
 
+message FetchSkillSeverityCountsRequest {
+  uint32 start_ts = 1;
+  uint32 end_ts = 2;
+}
+
+message FetchSkillSeverityCountsResponse {
+  message SkillSeverityCount {
+    string skill_name = 1;
+    uint32 critical = 2;
+    uint32 high = 3;
+    uint32 medium = 4;
+    uint32 low = 5;
+  }
+
+  repeated SkillSeverityCount skill_counts = 1;
+}
+
 message FetchDashboardTopDataRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;

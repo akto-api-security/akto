@@ -114,6 +114,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Setter private String parentDeviceId; // blank => paginated top-level device rows; set => that device's (device,service) children
     @Setter private Map<String, Map<String, String>> deviceMetadataMap; // deviceId -> {username, os}
     @Setter private Map<String, Map<String, Integer>> violationsByCollectionId; // collection id (string) -> {critical, high, medium, low}
+    // skill name -> {critical, high, medium, low} — skill invocations aren't attributable by
+    // collection (a skill's declaring collection is shared with the agent/device that invoked it,
+    // so collection-based attribution can't give a skill its own count), so skill rows use this
+    // instead of violationsByCollectionId. See ThreatActorService.fetchSkillSeverityCounts.
+    @Setter private Map<String, Map<String, Integer>> skillViolationsByName;
     @Setter private Map<String, Integer> userAnalysisFlatMap; // "serviceId|deviceId" -> total AI-interaction tokens (see constants.js's buildUserAnalysisFlatMap)
 
     // ---- Server-side pagination for fetchAgenticComponentsPage ----
@@ -192,7 +197,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 if (info == null || info.getId() == null) continue;
                 String url = info.getId().getUrl();
                 if (url == null) url = "";
-                boolean malicious = hasTrueTag(info.getTagsList(), "malicious-skill");
+                boolean malicious = hasTrueTag(info.getTagsList(), "malicious-skill-tag");
                 boolean misconfigured = hasTrueTag(info.getTagsList(), "misconfigured-config");
 
                 int idx = url.indexOf("skills/");
@@ -1357,7 +1362,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             long tStart = System.currentTimeMillis();
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
-                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS)
+                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS)
             );
             long tFindAll = System.currentTimeMillis();
             Map<String, GroupSummary> groups = classifyAllGroups(collections, traffic, risk, sensitive);
@@ -1381,7 +1386,13 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             List<CollectionTags> envType = c.getEnvType();
             String idStr = String.valueOf(c.getId());
             Integer trafficVal = traffic.get(idStr);
-            int collTraffic = trafficVal != null ? trafficVal : 0;
+            // Falls back to the collection's own creation time when it has no directly-attributed
+            // traffic entry (e.g. an MCP server/LLM collection only ever discovered via a tag/config
+            // scan) — otherwise maxTrafficTimestamp stays 0 and the group gets silently dropped by
+            // any date-range filter narrower than "All time" in fetchAgenticAssetsStats/Summary, even
+            // though the asset genuinely exists. Mirrors constants.js's lastSeenOrStartTs (dead code
+            // for this rebuilt page, but the same real bug it was written to fix).
+            int collTraffic = trafficVal != null ? trafficVal : c.getStartTs();
             Double riskVal = risk.get(idStr);
             double collRisk = riskVal != null ? riskVal : 0.0;
             List<String> sensitive = sensitiveMap != null ? sensitiveMap.get(idStr) : null;
@@ -1628,6 +1639,38 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return out;
     }
 
+    // Skill-name equivalent of sumViolationsForCollections above — skill rows use this instead,
+    // since a skill's declaring collection is shared with the agent/device that invoked it, so
+    // collection-based attribution can't give a skill its own count (see skillViolationsByName's
+    // own field comment). Same "null when zero" contract.
+    private static BasicDBObject violationsForSkillName(String skillName, Map<String, Map<String, Integer>> skillViolationsByName) {
+        if (StringUtils.isBlank(skillName) || skillViolationsByName == null) return null;
+        Map<String, Integer> v = skillViolationsByName.get(skillName);
+        if (v == null) return null;
+        int critical = v.getOrDefault("critical", 0);
+        int high = v.getOrDefault("high", 0);
+        int medium = v.getOrDefault("medium", 0);
+        int low = v.getOrDefault("low", 0);
+        if (critical + high + medium + low == 0) return null;
+        BasicDBObject out = new BasicDBObject();
+        out.put("critical", critical);
+        out.put("high", high);
+        out.put("medium", medium);
+        out.put("low", low);
+        return out;
+    }
+
+    // Total violation count for one group, used to make "violations" a real server-side sort key
+    // (see fetchAgenticAssetsSummary's sortKey handling) instead of only a per-page display value.
+    // Skill rows always sort as 0 here, matching the per-row "violations" field above which no
+    // longer surfaces skill-name-keyed violations on this grid at all.
+    private static int violationsTotalForGroup(GroupSummary g, Map<String, Map<String, Integer>> violationsByCollectionId, Map<String, Map<String, Integer>> skillViolationsByName) {
+        if ("skill".equals(g.rowType)) return 0;
+        BasicDBObject v = sumViolationsForCollections(g.collectionIds, violationsByCollectionId);
+        if (v == null) return 0;
+        return v.getInt("critical", 0) + v.getInt("high", 0) + v.getInt("medium", 0) + v.getInt("low", 0);
+    }
+
     /**
      * Paginated, sorted, searchable grouped-asset rows for the Agentic Assets "New Layout" table.
      * Builds lightweight summaries for every group (classifyAllGroups — one pass, no per-device
@@ -1694,7 +1737,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             long total = all.size();
 
-            Comparator<GroupSummary> cmp = buildSummaryComparator(sortKey);
+            // "violations" isn't a stored/indexed field on GroupSummary — it's derived from the
+            // violationsByCollectionId/skillViolationsByName maps the client already fetched once at
+            // mount (see fetchAgenticAssetsStats' identical routing) — so it needs its own branch here
+            // rather than going through buildSummaryComparator, which only knows about GroupSummary's
+            // own fields.
+            Comparator<GroupSummary> cmp = "violations".equals(sortKey)
+                    ? Comparator.comparingInt(g -> violationsTotalForGroup(g, violationsByCollectionId, skillViolationsByName))
+                    : buildSummaryComparator(sortKey);
             if (sortOrder < 0) cmp = cmp.reversed();
             all.sort(cmp);
 
@@ -1727,7 +1777,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 // the raw collectionIds list to the browser just so it can do this same sum — see
                 // toSummaryResponse()'s comment for why collectionIds/hostNames/etc. no longer appear
                 // in this response at all.
-                BasicDBObject violations = sumViolationsForCollections(g.collectionIds, violationsByCollectionId);
+                // Skill rows deliberately carry no "violations" here — same reasoning as the
+                // "Top Assets with Violations" ranking above: skill-name-keyed violation counts
+                // are a different signal (which skill got invoked during an attack) from this
+                // grid's per-asset "how much trouble is this asset in" column, and mixing them in
+                // made ~770 near-identical skill rows dominate a column meant for agents/devices/LLMs.
+                BasicDBObject violations = "skill".equals(g.rowType)
+                        ? null
+                        : sumViolationsForCollections(g.collectionIds, violationsByCollectionId);
                 if (violations != null) row.put("violations", violations);
                 if ("skill".equals(g.rowType) && StringUtils.isNotBlank(g.name)) {
                     String lname = g.name.toLowerCase(Locale.ROOT);
@@ -1957,8 +2014,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // map the frontend already fetched once at mount (aggregateViolationCountsByCollectionId),
             // summed over each group's own collectionIds. No new data source; top-N of what's already
             // available. Computed before the trend fetches below so we know which 5 assets need one.
+            // Skill rows are deliberately excluded from this specific ranking — it's meant to surface
+            // which agent/device/LLM is attracting the most attacks (an actionable "which asset to
+            // triage" leaderboard), and with ~770 skills per account, mixing in skill-name entries
+            // (which have their own accurate count elsewhere — the grid row, the flyout) would drown
+            // out the agent/device signal this widget exists to show.
             List<Map.Entry<GroupSummary, Integer>> violRanked = new ArrayList<>();
             for (GroupSummary g : groups.values()) {
+                if ("skill".equals(g.rowType)) continue;
                 int groupTotal = 0;
                 for (Integer cid : g.collectionIds) {
                     Map<String, Integer> v = violations.get(String.valueOf(cid));
@@ -2338,7 +2401,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
-                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS)
+                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS)
             );
 
             Map<String, HostGroupSummary> groups = classifyHostGroupedRows(collections, groupBy, traffic, risk, sensitive, usernames, userMeta, null, null, false, tagsByUser);
@@ -2415,7 +2478,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, List<Map<String, String>>> tagsByUser = tagsByUsername != null ? tagsByUsername : Collections.emptyMap();
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
-                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS)
+                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS)
             );
 
             Map<String, HostGroupSummary> userGroups = classifyHostGroupedRows(collections, "user", traffic, risk,
@@ -2593,7 +2656,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
-                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS)
+                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS)
             );
 
             if (StringUtils.isNotBlank(parentDeviceId)) {

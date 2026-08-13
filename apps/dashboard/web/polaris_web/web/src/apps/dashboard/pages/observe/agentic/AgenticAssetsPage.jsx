@@ -27,6 +27,7 @@ import api from "../api";
 import agenticObserveApi, {
   fetchAgenticViolationCountsByHost,
   fetchViolationCountsByCollection,
+  fetchAgenticSkillViolationCounts,
 } from "./agenticObserveApi";
 import {
   buildUserAnalysisLookup,
@@ -51,6 +52,7 @@ const SORT_FIELD_MAP = {
   name: "name",
   riskScore: "riskScore",
   endpointCount: "endpointsCount",
+  violations: "violations",
 };
 
 const COL_DEFS = [
@@ -80,8 +82,6 @@ const COL_DEFS = [
     field: "riskScore",
     headerName: "Risk score",
     width: 110,
-    sort: "desc",
-    sortIndex: 0,
     filter: false,
     cellRenderer: RiskScoreCellRenderer,
     cellStyle: { display: "flex", alignItems: "center" },
@@ -114,7 +114,13 @@ const COL_DEFS = [
     field: "violations",
     headerName: "Violations",
     width: 200,
-    sortable: false,
+    // Server-side sort via AgenticObserveAction.violationsTotalForGroup — not a stored field, so
+    // it's computed from the already-fetched violationsByCollectionId/skillViolationsByName maps
+    // rather than a real Mongo sort. Default sort (was riskScore, which ties ~770 skills at the
+    // same score and buried every other asset type under them) — violations is a more actionable
+    // "what needs attention first" ordering and doesn't have that tie problem.
+    sort: "desc",
+    sortIndex: 0,
     filter: false,
     cellRenderer: ViolationsCellRenderer,
     cellStyle: { display: "flex", alignItems: "center" },
@@ -286,6 +292,7 @@ export default function AgenticAssetsPage() {
   // re-renders.
   const enrichRef = useRef({
     violationsByCollectionId: {},
+    skillViolationsByName: {},
     usernameMap: {},
     userMetadataMap: {},
     analysisByKey: new Map(),
@@ -324,9 +331,9 @@ export default function AgenticAssetsPage() {
 
   const loadStats = useCallback(async () => {
     try {
-      const { trafficMap, riskScoreMap, violationsByCollectionId, userAnalysisFlatMap } = enrichRef.current;
+      const { trafficMap, riskScoreMap, violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap } = enrichRef.current;
       const result = await api.fetchAgenticAssetsStats({
-        trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, userAnalysisFlatMap,
+        trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap,
       });
       setStats(result);
     } catch (e) {
@@ -392,18 +399,22 @@ export default function AgenticAssetsPage() {
         // Tier 2 — slow, runs after first paint, patches in without a grid remount.
         Promise.all([
           fetchAgenticViolationCountsByHost({ startTimestamp, endTimestamp }),
+          fetchAgenticSkillViolationCounts({ startTimestamp, endTimestamp }),
           agenticObserveApi.listUserAnalysis().catch(() => []),
         ])
-          .then(async ([hostCounts, userAnalysisList]) => {
+          .then(async ([hostCounts, skillViolationsByName, userAnalysisList]) => {
             if (!isMountedRef.current) return;
             // Host -> collection-id attribution now happens server-side (no raw collection list
-            // needed client-side for this — see attributeViolationCountsToCollections).
+            // needed client-side for this — see attributeViolationCountsToCollections). Skills
+            // aren't attributable by host at all (see skillViolationsByName's own comment), so
+            // fetchAgenticSkillViolationCounts above already returns them keyed by skill name.
             const violationsByCollectionId = await fetchViolationCountsByCollection(hostCounts);
             if (!isMountedRef.current) return;
             const analysisByKey = buildUserAnalysisLookup(userAnalysisList);
             enrichRef.current = {
               ...enrichRef.current,
               violationsByCollectionId,
+              skillViolationsByName,
               analysisByKey,
               userAnalysisFlatMap: buildUserAnalysisFlatMap(analysisByKey),
             };
@@ -439,11 +450,11 @@ export default function AgenticAssetsPage() {
   // ─── Server-side data fetch for AG Grid ─────────────────────────────────────
   const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString, filters }) => {
     const pageSize = limit || 50;
-    const mappedSortKey = SORT_FIELD_MAP[sortKey] || sortKey || "riskScore";
+    const mappedSortKey = SORT_FIELD_MAP[sortKey] || sortKey || "violations";
     // AG Grid SSRM sends sortOrder: -1 for asc, 1 for desc — opposite of the backend's Mongo
     // convention (1 asc / -1 desc, matching NhiGovernanceViolationsAction's own onServerFetch).
     const mongoSortOrder = sortOrder ? -sortOrder : -1;
-    const { trafficMap, riskScoreMap, userAnalysisFlatMap, violationsByCollectionId, usernameMap, userMetadataMap } = enrichRef.current;
+    const { trafficMap, riskScoreMap, userAnalysisFlatMap, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap } = enrichRef.current;
 
     return api.fetchAgenticAssetsSummary({
       skip,
@@ -462,6 +473,10 @@ export default function AgenticAssetsPage() {
       // so the server can compute each row's own violations total in-memory instead of the browser
       // needing every row's raw collectionIds list to do that sum itself.
       violationsByCollectionId,
+      // Skill rows use this instead of violationsByCollectionId — a skill's declaring collection
+      // is shared with the agent/device that invoked it, so collection-based attribution can't
+      // give a skill its own count (see fetchAgenticSkillViolationCounts's own comment).
+      skillViolationsByName,
       // Endpoint Shield maps, so the server can precompute each row's own Teams breakdown/AI
       // interactions total from its own per-device list, instead of sending that raw list (up to
       // hundreds of entries per row) just for the browser to derive these few small values.
