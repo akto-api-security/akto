@@ -1352,51 +1352,73 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             this.builtAt = builtAt;
         }
     }
-    private static final Map<Integer, ScopedMapCacheEntry<Integer>> trafficMapFallbackCache = new ConcurrentHashMap<>();
-    private static final Map<Integer, ScopedMapCacheEntry<Double>> riskScoreMapFallbackCache = new ConcurrentHashMap<>();
+    private static final Map<String, ScopedMapCacheEntry<Integer>> trafficMapFallbackCache = new ConcurrentHashMap<>();
+    private static final Map<String, ScopedMapCacheEntry<Double>> riskScoreMapFallbackCache = new ConcurrentHashMap<>();
+
+    // Both underlying DAO calls RBAC-scope by (userId, accountId) — keyed on accountId alone, one user's restricted view would leak into another's.
+    private static String scopedCacheKey() {
+        return Context.accountId.get() + "_" + Context.userId.get();
+    }
 
     private Map<String, Integer> getOrComputeTrafficMap() {
         if (trafficMap != null && !trafficMap.isEmpty()) return trafficMap;
-        int accountId = Context.accountId.get();
+        String key = scopedCacheKey();
         long now = System.currentTimeMillis();
-        ScopedMapCacheEntry<Integer> existing = trafficMapFallbackCache.get(accountId);
+        ScopedMapCacheEntry<Integer> existing = trafficMapFallbackCache.get(key);
         if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
             return existing.map;
         }
-        try {
-            ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
-            apiCollectionsAction.fetchLastSeenInfoInCollections();
-            Map<Integer, Integer> raw = apiCollectionsAction.getLastTrafficSeenMap();
-            Map<String, Integer> result = new HashMap<>();
-            if (raw != null) raw.forEach((id, ts) -> result.put(String.valueOf(id), ts));
-            trafficMapFallbackCache.put(accountId, new ScopedMapCacheEntry<>(result, now));
-            return result;
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Failed computing traffic map server-side for agentic assets", LogDb.DASHBOARD);
-            return existing != null ? existing.map : Collections.emptyMap();
+        if (trafficMapFallbackCache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
+            trafficMapFallbackCache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
         }
+        // compute() serializes concurrent misses for the same key instead of each racing to Mongo.
+        return trafficMapFallbackCache.compute(key, (k, cached) -> {
+            long recheckNow = System.currentTimeMillis();
+            if (cached != null && (recheckNow - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                return cached;
+            }
+            try {
+                ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+                apiCollectionsAction.fetchLastSeenInfoInCollections();
+                Map<Integer, Integer> raw = apiCollectionsAction.getLastTrafficSeenMap();
+                Map<String, Integer> result = new HashMap<>();
+                if (raw != null) raw.forEach((id, ts) -> result.put(String.valueOf(id), ts));
+                return new ScopedMapCacheEntry<>(result, recheckNow);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed computing traffic map server-side for agentic assets", LogDb.DASHBOARD);
+                return cached != null ? cached : new ScopedMapCacheEntry<>(Collections.emptyMap(), recheckNow);
+            }
+        }).map;
     }
 
     private Map<String, Double> getOrComputeRiskScoreMap() {
         if (riskScoreMap != null && !riskScoreMap.isEmpty()) return riskScoreMap;
-        int accountId = Context.accountId.get();
+        String key = scopedCacheKey();
         long now = System.currentTimeMillis();
-        ScopedMapCacheEntry<Double> existing = riskScoreMapFallbackCache.get(accountId);
+        ScopedMapCacheEntry<Double> existing = riskScoreMapFallbackCache.get(key);
         if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
             return existing.map;
         }
-        try {
-            ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
-            apiCollectionsAction.fetchRiskScoreInfo();
-            Map<Integer, Double> raw = apiCollectionsAction.getRiskScoreOfCollectionsMap();
-            Map<String, Double> result = new HashMap<>();
-            if (raw != null) raw.forEach((id, score) -> result.put(String.valueOf(id), score));
-            riskScoreMapFallbackCache.put(accountId, new ScopedMapCacheEntry<>(result, now));
-            return result;
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Failed computing risk score map server-side for agentic assets", LogDb.DASHBOARD);
-            return existing != null ? existing.map : Collections.emptyMap();
+        if (riskScoreMapFallbackCache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
+            riskScoreMapFallbackCache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
         }
+        return riskScoreMapFallbackCache.compute(key, (k, cached) -> {
+            long recheckNow = System.currentTimeMillis();
+            if (cached != null && (recheckNow - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                return cached;
+            }
+            try {
+                ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+                apiCollectionsAction.fetchRiskScoreInfo();
+                Map<Integer, Double> raw = apiCollectionsAction.getRiskScoreOfCollectionsMap();
+                Map<String, Double> result = new HashMap<>();
+                if (raw != null) raw.forEach((id, score) -> result.put(String.valueOf(id), score));
+                return new ScopedMapCacheEntry<>(result, recheckNow);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed computing risk score map server-side for agentic assets", LogDb.DASHBOARD);
+                return cached != null ? cached : new ScopedMapCacheEntry<>(Collections.emptyMap(), recheckNow);
+            }
+        }).map;
     }
 
     private ClassificationCacheEntry getOrBuildClassification(Map<String, Integer> traffic,
