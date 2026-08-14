@@ -153,6 +153,7 @@ export default function AgenticStatsCard({
     noCard,
     children,
     bodyGap = "2",
+    sparklineWidth = 120,
 }) {
     const inner = (
         <Box paddingInlineStart="5" paddingInlineEnd="5" paddingBlockStart="4" paddingBlockEnd="3">
@@ -161,8 +162,10 @@ export default function AgenticStatsCard({
                     <Text variant="headingSm" fontWeight="semibold">{title}</Text>
                     <InfoTooltipIcon content={titleTooltip} />
                 </HorizontalStack>
-                <HorizontalStack align="space-between" blockAlign="center" gap="3">
-                    <HorizontalStack gap="2" blockAlign="baseline">
+                {/* wrap={false}: in a narrow card (e.g. the 280px Endpoints column) the value
+                    plus a 160px sparkline overflowed and the chart dropped to a second line. */}
+                <HorizontalStack align="space-between" blockAlign="center" gap="3" wrap={false}>
+                    <HorizontalStack gap="2" blockAlign="baseline" wrap={false}>
                         <Text variant="heading2xl" as="p" color={totalColor}>{observeFunc.formatNumberWithCommas(total)}</Text>
                         {delta > 0 && <Text variant="bodySm" color="subdued">+{observeFunc.formatNumberWithCommas(delta)}</Text>}
                         {delta < 0 && <Text variant="bodySm" color="subdued">{observeFunc.formatNumberWithCommas(delta)}</Text>}
@@ -172,7 +175,7 @@ export default function AgenticStatsCard({
                             tickPositions={sparklineCounts}
                             color={sparklineColor}
                             height={40}
-                            width={160}
+                            width={sparklineWidth}
                             labels={sparklineLabels}
                             enableHover
                         />
