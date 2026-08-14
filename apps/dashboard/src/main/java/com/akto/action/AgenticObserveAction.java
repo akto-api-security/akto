@@ -1343,6 +1343,62 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     // slow-path) rebuild rather than running a separate background thread for it.
     private static final int CLASSIFICATION_CACHE_SWEEP_THRESHOLD = 50;
 
+    // Fallback for fetchAgenticAssetsSummary/Stats only: use the client-supplied map if present, else compute it here via ApiCollectionsAction so the client no longer has to fetch+re-POST it.
+    private static final class ScopedMapCacheEntry<V> {
+        final Map<String, V> map;
+        final long builtAt;
+        ScopedMapCacheEntry(Map<String, V> map, long builtAt) {
+            this.map = map;
+            this.builtAt = builtAt;
+        }
+    }
+    private static final Map<Integer, ScopedMapCacheEntry<Integer>> trafficMapFallbackCache = new ConcurrentHashMap<>();
+    private static final Map<Integer, ScopedMapCacheEntry<Double>> riskScoreMapFallbackCache = new ConcurrentHashMap<>();
+
+    private Map<String, Integer> getOrComputeTrafficMap() {
+        if (trafficMap != null && !trafficMap.isEmpty()) return trafficMap;
+        int accountId = Context.accountId.get();
+        long now = System.currentTimeMillis();
+        ScopedMapCacheEntry<Integer> existing = trafficMapFallbackCache.get(accountId);
+        if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+            return existing.map;
+        }
+        try {
+            ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+            apiCollectionsAction.fetchLastSeenInfoInCollections();
+            Map<Integer, Integer> raw = apiCollectionsAction.getLastTrafficSeenMap();
+            Map<String, Integer> result = new HashMap<>();
+            if (raw != null) raw.forEach((id, ts) -> result.put(String.valueOf(id), ts));
+            trafficMapFallbackCache.put(accountId, new ScopedMapCacheEntry<>(result, now));
+            return result;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Failed computing traffic map server-side for agentic assets", LogDb.DASHBOARD);
+            return existing != null ? existing.map : Collections.emptyMap();
+        }
+    }
+
+    private Map<String, Double> getOrComputeRiskScoreMap() {
+        if (riskScoreMap != null && !riskScoreMap.isEmpty()) return riskScoreMap;
+        int accountId = Context.accountId.get();
+        long now = System.currentTimeMillis();
+        ScopedMapCacheEntry<Double> existing = riskScoreMapFallbackCache.get(accountId);
+        if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+            return existing.map;
+        }
+        try {
+            ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+            apiCollectionsAction.fetchRiskScoreInfo();
+            Map<Integer, Double> raw = apiCollectionsAction.getRiskScoreOfCollectionsMap();
+            Map<String, Double> result = new HashMap<>();
+            if (raw != null) raw.forEach((id, score) -> result.put(String.valueOf(id), score));
+            riskScoreMapFallbackCache.put(accountId, new ScopedMapCacheEntry<>(result, now));
+            return result;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Failed computing risk score map server-side for agentic assets", LogDb.DASHBOARD);
+            return existing != null ? existing.map : Collections.emptyMap();
+        }
+    }
+
     private ClassificationCacheEntry getOrBuildClassification(Map<String, Integer> traffic,
             Map<String, Double> risk, Map<String, List<String>> sensitive) {
         int accountId = Context.accountId.get();
@@ -1683,8 +1739,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         response = new BasicDBObject();
         try {
             long tStart = System.currentTimeMillis();
-            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
-            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
+            Map<String, Integer> traffic = getOrComputeTrafficMap();
+            Map<String, Double> risk = getOrComputeRiskScoreMap();
             Map<String, List<String>> sensitive = sensitiveMap != null ? sensitiveMap : Collections.emptyMap();
 
             ClassificationCacheEntry cached = getOrBuildClassification(traffic, risk, sensitive);
@@ -1988,8 +2044,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         response = new BasicDBObject();
         try {
             long tStatsStart = System.currentTimeMillis();
-            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
-            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
+            Map<String, Integer> traffic = getOrComputeTrafficMap();
+            Map<String, Double> risk = getOrComputeRiskScoreMap();
             Map<String, Map<String, Integer>> violations = violationsByCollectionId != null ? violationsByCollectionId : Collections.emptyMap();
 
             // This endpoint doesn't send/read sensitiveMap (no "Sensitive data" breakdown on the

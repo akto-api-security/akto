@@ -110,8 +110,10 @@ function shapeRow(row, { skillScoreMap = {}, misconfiguredSkills = new Set() } =
             </Box>
         ),
         assetTags: [
-            ...(showMalicious ? ["Malicious"] : []),
+            ...(showPersonal ? ["Contains personal account"] : []),
+            ...(showLocalMcp ? ["Local MCP Server"] : []),
             ...(showMisconfigured ? ["Misconfigured"] : []),
+            ...(showMalicious ? ["Malicious Skill"] : []),
         ],
     };
 }
@@ -159,8 +161,10 @@ function Endpoints() {
     // it does NOT surface a UI facet on its own (confirmed via UsersAndDevices.jsx's filtersDef).
     const filtersDef = useMemo(() => [
         { key: "assetTags", label: "Tag", choices: [
-            { label: "Malicious", value: "Malicious" },
+            { label: "Contains personal account", value: "Contains personal account" },
+            { label: "Local MCP Server", value: "Local MCP Server" },
             { label: "Misconfigured", value: "Misconfigured" },
+            { label: "Malicious Skill", value: "Malicious Skill" },
         ] },
     ], []);
 
