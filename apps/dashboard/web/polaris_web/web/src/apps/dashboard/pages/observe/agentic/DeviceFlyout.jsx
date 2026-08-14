@@ -443,7 +443,10 @@ function OverviewTab({ device, agents, collections, onTabChange, startTimestamp,
                     ))}
                 </HorizontalGrid>
 
-                <TopologyGraph device={device} agents={agents} collections={collections} agentTools={agentTools} />
+                <VerticalStack gap="2">
+                    <Text variant="headingXs" color="subdued">Context graph</Text>
+                    <TopologyGraph device={device} agents={agents} collections={collections} agentTools={agentTools} />
+                </VerticalStack>
 
                 <VerticalStack gap="2">
                     <Text variant="headingXs" color="subdued">Risk Analysis</Text>

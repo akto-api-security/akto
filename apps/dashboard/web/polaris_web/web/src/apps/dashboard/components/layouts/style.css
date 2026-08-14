@@ -312,3 +312,11 @@
 .ag-row-group-leaf-indent{
     margin-left: 0px !important;
 }
+
+/* AG Grid row icon: it is a flex item inside HorizontalStack, so without flex-shrink:0
+   it (and the img inside) shrinks as the user narrows the column. */
+.ag-grid-row-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+}

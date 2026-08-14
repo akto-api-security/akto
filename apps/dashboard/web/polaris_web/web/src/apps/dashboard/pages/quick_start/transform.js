@@ -1094,6 +1094,98 @@ const cloudflareWarpObj = {
 //     key: "ZSCALER",
 // }
 
+const claudeDesktopObj = {
+    icon: '/public/claude.svg',
+    label: "Claude Desktop",
+    text: "Secure your Claude Desktop interactions, including Claude Code, with Akto guardrails using Akto hooks.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-cli-hooks',
+    key: "CLAUDE_DESKTOP",
+    component: <BannerComponent
+        content="Secure your Claude Desktop interactions, including Claude Code, with Akto guardrails using Akto hooks."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-cli-hooks'
+    />
+}
+
+const antigravityCliObj = {
+    icon: '/public/antigravity.svg',
+    label: "Antigravity CLI (Coming Soon)",
+    text: "Bring Antigravity CLI agent runs under Akto guardrails with a terminal hook.",
+    key: "ANTIGRAVITY_CLI_HOOK",
+    component: <BannerComponent
+        content="Bring Antigravity CLI agent runs under Akto guardrails with a terminal hook."
+    />
+}
+
+const kiroCliObj = {
+    icon: '/public/kiro.svg',
+    label: "Kiro CLI",
+    text: "Route Kiro CLI agent traffic through Akto to inspect prompts and block policy violations, using Akto hooks.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/kiro-cli-hooks',
+    key: "KIRO_CLI_HOOK",
+    component: <BannerComponent
+        content="Route Kiro CLI agent traffic through Akto to inspect prompts and block policy violations, using Akto hooks."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/kiro-cli-hooks'
+    />
+}
+
+const vsCodeObj = {
+    icon: '/public/vscode.svg',
+    label: "VS Code",
+    text: "Monitor VS Code's built-in AI agent as it plans and edits code, using Akto hooks.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/copilot-cli-hooks',
+    key: "VSCODE_HOOK",
+    component: <BannerComponent
+        content="Monitor VS Code's built-in AI agent as it plans and edits code, using Akto hooks."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/copilot-cli-hooks'
+    />
+}
+
+const kiroObj = {
+    icon: '/public/kiro.svg',
+    label: "Kiro (Coming Soon)",
+    text: "Watch Kiro's spec-driven agent as it plans and edits code, using Akto hooks.",
+    key: "KIRO_HOOK",
+    component: <BannerComponent
+        content="Watch Kiro's spec-driven agent as it plans and edits code, using Akto hooks."
+    />
+}
+
+const chatgptIdeObj = {
+    icon: '/public/chatgpt.png',
+    label: "ChatGPT",
+    text: "Bring ChatGPT coding sessions, formerly Codex, under Akto guardrails using Akto hooks.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/codex-cli-hooks',
+    key: "CHATGPT_IDE_HOOK",
+    component: <BannerComponent
+        content="Bring ChatGPT coding sessions, formerly Codex, under Akto guardrails using Akto hooks."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/codex-cli-hooks'
+    />
+}
+
+const githubCopilotIdeObj = {
+    icon: '/public/githubCopilot.svg',
+    label: "GitHub Copilot",
+    text: "Scan Copilot completions and chat inside your editor for secrets and policy breaches, using Akto hooks.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/copilot-cli-hooks',
+    key: "GITHUB_COPILOT_IDE_HOOK",
+    component: <BannerComponent
+        content="Scan Copilot completions and chat inside your editor for secrets and policy breaches, using Akto hooks."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/copilot-cli-hooks'
+    />
+}
+
+const visualStudioObj = {
+    icon: '/public/visual-studio.svg',
+    label: "Visual Studio",
+    text: "Govern Copilot and other AI assistants running inside Visual Studio, using Akto hooks.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/copilot-cli-hooks',
+    key: "VISUAL_STUDIO_HOOK",
+    component: <BannerComponent
+        content="Govern Copilot and other AI assistants running inside Visual Studio, using Akto hooks."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/copilot-cli-hooks'
+    />
+}
+
 const AI_SECURITY_DOCS_BASE_URL = "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/ai-endpoint-shield"
 
 const createEndpointManagementConnector = (label, key, docsPath, text, icon) => ({
@@ -1182,8 +1274,8 @@ const safariExtensionObj = {
 
 const cursorHookObj = {
     icon: '/public/cursor-ai.svg',
-    label: "Cursor Hook",
-    text: "IDE-level protection monitoring AI-powered code completions in real-time.",
+    label: "Cursor",
+    text: "Inspect Cursor chat, composer and autocomplete requests before they reach the model, using Akto hooks.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/cursor-hooks',
     key: "CURSOR_HOOK",
     component: <CursorHook/>
@@ -1191,13 +1283,13 @@ const cursorHookObj = {
 
 const ampHookObj = {
     icon: '/public/ampcode.svg',
-    label: "Amp Code Hooks",
-    text: "Import your Amp proxy traffic, seamlessly into AKTO.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents',
+    label: "Amp Code",
+    text: "Import Amp Code proxy traffic and hold every agent run to your Akto policies, using Akto hooks.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/amp-hooks',
     key: "AMP_HOOK",
     component: <BannerComponent
-        content="Import your Amp proxy traffic, seamlessly into AKTO."
-        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents'
+        content="Import Amp Code proxy traffic and hold every agent run to your Akto policies, using Akto hooks."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/amp-hooks'
     />
 }
 
@@ -1374,12 +1466,12 @@ const difyImportObj = {
 
 const claudeCodeCliHookObj = {
     icon: '/public/claudeCodeCli.svg',
-    label: "Claude Code CLI Hook",
-    text: "Import your Claude Code CLI proxy traffic, seamlessly into AKTO.",
+    label: "Claude Code CLI",
+    text: "Capture Claude Code CLI sessions, including prompts, tool calls and file edits, using Akto hooks.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-cli-hooks',
     key: "CLAUDE_CODE_CLI_HOOK",
     component: <BannerComponent
-        content="Import your Claude Code CLI proxy traffic, seamlessly in AKTO."
+        content="Capture Claude Code CLI sessions, including prompts, tool calls and file edits, using Akto hooks."
         docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-cli-hooks'
     />
 }
@@ -1400,7 +1492,7 @@ const claudeInferenceHookObj = {
 const claudeCoworkObj = {
     icon: '/public/claude.svg',
     label: "Claude Cowork",
-    text: "Secure your Claude Cowork interactions with Akto guardrails.",
+    text: "Apply Akto guardrails to the shared, multi-user agent sessions in Claude Cowork.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-cowork-connector',
     key: "CLAUDE_COWORK",
     component: <AddOnComponenet/>
@@ -1408,96 +1500,96 @@ const claudeCoworkObj = {
 
 const geminiCliHookObj = {
     icon: '/public/gemini-cli.svg',
-    label: "Gemini CLI Hook",
-    text: "Import your Gemini CLI proxy traffic, seamlessly into AKTO.",
+    label: "Gemini CLI",
+    text: "Stream Gemini CLI prompts and responses into Akto for discovery and policy checks, using Akto hooks.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/gemini-cli-hooks',
     key: "GEMINI_CLI_HOOK",
     component: <BannerComponent
-        content="Import your Gemini CLI proxy traffic, seamlessly in AKTO."
+        content="Stream Gemini CLI prompts and responses into Akto for discovery and policy checks, using Akto hooks."
         docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/gemini-cli-hooks'
     />
 }
 
 const githubCopilotHookObj = {
     icon: '/public/githubCopilot.svg',
-    label: "GitHub Copilot CLI Hook",
-    text: "Import your GitHub Copilot CLI proxy traffic, seamlessly into AKTO.",
+    label: "GitHub Copilot CLI",
+    text: "Govern the shell commands and suggestions GitHub Copilot CLI produces, using Akto hooks.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/copilot-cli-hooks',
     key: "GITHUB_COPILOT_CLI_HOOK",
     component: <BannerComponent
-        content="Import your GitHub Copilot CLI proxy traffic, seamlessly into AKTO."
+        content="Govern the shell commands and suggestions GitHub Copilot CLI produces, using Akto hooks."
         docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/copilot-cli-hooks'
     />
 }
 
 const codexHookObj = {
     icon: '/public/openai.svg',
-    label: "Codex CLI Hook",
-    text: "Monitor and secure OpenAI Codex CLI interactions with Akto guardrails.",
+    label: "Codex CLI",
+    text: "Review OpenAI Codex CLI runs and flag risky commands before they execute, using Akto hooks.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/codex-cli-hooks',
     key: "CODEX_CLI_HOOK",
     component: <BannerComponent
-        content="Monitor and secure OpenAI Codex CLI interactions with Akto guardrails."
+        content="Review OpenAI Codex CLI runs and flag risky commands before they execute, using Akto hooks."
         docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/codex-cli-hooks'
     />
 }
 
 const intellijHookObj = {
     icon: '/public/intellij.svg',
-    label: "IntelliJ/JetBrains Hook (Coming Soon)",
-    text: "IDE-level protection monitoring AI-powered code completions in JetBrains IDEs.",
+    label: "IntelliJ/JetBrains (Coming Soon)",
+    text: "Cover AI assistants across IntelliJ, PyCharm and other JetBrains IDEs, using Akto hooks.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/intellij-hooks',
     key: "INTELLIJ_HOOK",
     component: <BannerComponent
-        content="IDE-level protection monitoring AI-powered code completions in JetBrains IDEs."
+        content="Cover AI assistants across IntelliJ, PyCharm and other JetBrains IDEs, using Akto hooks."
         docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/intellij-hooks'
     />
 }
 
 const antigravityObj = {
     icon: '/public/antigravity.svg',
-    label: "Antigravity Hook (Coming Soon)",
-    text: "Secure your Antigravity AI agent interactions with Akto guardrails.",
+    label: "Antigravity (Coming Soon)",
+    text: "Secure Antigravity's agent-first editor workflows with Akto guardrails, using Akto hooks.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/antigravity-hooks',
     key: "ANTIGRAVITY_HOOK",
     component: <BannerComponent
-        content="Secure your Antigravity AI agent interactions with Akto guardrails."
+        content="Secure Antigravity's agent-first editor workflows with Akto guardrails, using Akto hooks."
         docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/antigravity-hooks'
     />
 }
 
 const neovimHookObj = {
     icon: '/public/neovim.svg',
-    label: "Neovim Hook",
-    text: "IDE-level protection monitoring AI-powered code completions in Neovim.",
+    label: "Neovim",
+    text: "Bring AI completion plugins in Neovim under Akto guardrails with a lightweight hook.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/neovim-hooks',
     key: "NEOVIM_HOOK",
     component: <BannerComponent
-        content="IDE-level protection monitoring AI-powered code completions in Neovim."
+        content="Bring AI completion plugins in Neovim under Akto guardrails with a lightweight hook."
         docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/neovim-hooks'
     />
 }
 
 const openCodeHookObj = {
     icon: '/public/opencode-logo-light.svg',
-    label: "OpenCode Hook",
-    text: "Monitoring AI coding agent of OpenCode with Akto guardrails.",
+    label: "OpenCode",
+    text: "Monitor the OpenCode agent across its desktop app and terminal sessions, using Akto hooks.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/opencode-hooks',
     key: "OPENCODE_HOOK",
     component: <BannerComponent
-        content="Monitoring AI coding agent of OpenCode with Akto guardrails."
+        content="Monitor the OpenCode agent across its desktop app and terminal sessions, using Akto hooks."
         docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/opencode-hooks'
     />
 }
 
 const hermesHookObj = {
     icon: '/public/hermes-agent.svg',
-    label: "Hermes Agent Hook",
-    text: "Monitoring Hermes Agent with Akto guardrails.",
+    label: "Hermes Agent",
+    text: "Trace Hermes Agent runs end to end and apply Akto guardrails to every agent action.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/hermes-hooks',
     key: "HERMES_HOOK",
     component: <BannerComponent
-        content="Monitoring Hermes Agent with Akto guardrails."
+        content="Trace Hermes Agent runs end to end and apply Akto guardrails to every agent action."
         docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/hermes-hooks'
     />
 }
@@ -2291,8 +2383,16 @@ const quickStartFunc = {
         ]
 
         // Endpoint Agents
-        const endpointAgents = [
-            cursorHookObj, claudeCodeCliHookObj, claudeInferenceHookObj, claudeCoworkObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, neovimHookObj, openCodeHookObj, ampHookObj, hermesHookObj,intellijHookObj, antigravityObj,
+        // CLI-only agents. IDE/editor integrations live in agenticIdes below.
+        const agenticClis = [
+            claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, hermesHookObj,
+            kiroCliObj, claudeInferenceHookObj, ampHookObj, antigravityCliObj,
+        ]
+
+        const agenticIdes = [
+            cursorHookObj, vsCodeObj, chatgptIdeObj, githubCopilotIdeObj, visualStudioObj,
+            claudeDesktopObj, claudeCoworkObj, openCodeHookObj, neovimHookObj,
+            intellijHookObj, kiroObj, antigravityObj,
         ]
 
         const localHostedModels = [
@@ -2339,12 +2439,36 @@ const quickStartFunc = {
             // Add mcpWrapperObj to a hidden array for connector lookup only
             const hiddenConnectors = [mcpWrapperObj];
 
+            // Vendor groups intentionally repeat connectors that also appear under
+            // Agentic CLIs / IDEs & Apps, so each vendor page is complete on its own.
+            const anthropicConnectors = [
+                anthropicImportObj, claudeDesktopObj, claudeCoworkObj, claudeCodeCliHookObj, claudeInferenceHookObj,
+            ]
+
+            const openaiConnectors = [
+                openaiImportObj, chatgptIdeObj, codexHookObj,
+            ]
+
+            const awsConnectors = [
+                amazonQuickObj, awsBedrockObj, awsAgentCoreObj,
+            ]
+
+            const microsoftConnectors = [
+                m365CopilotObj, copilotStudioImportObj, copilotStudioMultiEnvImportObj,
+                githubCopilotIdeObj, githubCopilotHookObj,
+            ]
+
             connectors = {
-                "Endpoint Agents": endpointAgents,
+                "Agentic CLIs": agenticClis,
+                "Agentic IDEs & Apps": agenticIdes,
                 "Endpoint Management": endpointManagement,
                 "MDM Tools": mdmTools,
                 "Agentic Proxies": agenticProxies,
-                "Platform connectors": [anthropicImportObj, openaiImportObj, m365CopilotObj, copilotStudioImportObj, copilotStudioMultiEnvImportObj, amazonQuickObj, gleanObj],
+                "Anthropic Suite": anthropicConnectors,
+                "OpenAI Suite": openaiConnectors,
+                "AWS Suite": awsConnectors,
+                "Microsoft Suite": microsoftConnectors,
+                "Platform connectors": [gleanObj],
                 "Browser Extension": browserExtensions,
                 "Locally Hosted Models": localHostedModels,
                 "Secure Web Networks": secureWebNetworks,

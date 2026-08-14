@@ -11,6 +11,7 @@ import func from "@/util/func";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
+import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 import { CollectionIcon } from "../../../components/shared/CollectionIcon";
 import useTable from "@/apps/dashboard/components/tables/TableContext";
 import NewLayoutTooltip from "./NewLayoutTooltip";
@@ -21,8 +22,6 @@ import {
     fetchAndCacheSkillApiData,
     fetchAndCacheAgenticTrafficRiskBundle,
     fetchAndCacheAgenticSensitiveInfo,
-    settledValue,
-    logRejected,
 } from "./constants";
 import { CLIENT_TYPES, ROW_TYPES } from "./mcpClientHelper";
 
@@ -154,8 +153,10 @@ function shapeRow(row, { skillScoreMap = {} } = {}) {
             </HorizontalStack>
         ) : "-",
         assetTags: [
-            ...(showMalicious ? ["Malicious"] : []),
+            ...(showPersonal ? ["Contains personal account"] : []),
+            ...(showLocalMcp ? ["Local MCP Server"] : []),
             ...(showMisconfigured ? ["Misconfigured"] : []),
+            ...(showMalicious ? ["Malicious Skill"] : []),
         ],
     };
 }
@@ -163,6 +164,7 @@ function shapeRow(row, { skillScoreMap = {} } = {}) {
 function Endpoints() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
+    const [tableLoading, setTableLoading] = useState(false);
     const agenticNewLayout = LocalStore((state) => state.agenticNewLayout);
     const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
 
@@ -186,9 +188,12 @@ function Endpoints() {
     // itself — populated once at mount (Tier 1: trafficMap/riskScoreMap/sensitiveMap; Tier 2,
     // async: skill risk/malicious/misconfigured data), read (not reacted to) by fetchTableData.
     const enrichRef = useRef({
-        trafficMap: {}, riskScoreMap: {}, sensitiveMap: {},
+        trafficMap: {}, riskScoreMap: {}, sensitiveMap: {}, usernameMap: {},
         skillScoreMap: {},
     });
+    // Progressively populated from each page's distinctUsernames (server-computed, current page
+    // only) — same pattern as AgenticAssetDevicesPage.jsx's filterChoices/updateFilterChoicesIfChanged.
+    const [usernameChoices, setUsernameChoices] = useState([]);
 
     // headings drives the rendered COLUMNS; headers drives FILTERS/CSV export (GithubServerTable's
     // own convention) — tagFilterHeader is filter-only, so it belongs in headers, not headings.
@@ -208,12 +213,20 @@ function Endpoints() {
     // GithubServerTable renders filter chips from a separate `filters` prop (Polaris IndexFilters
     // shape: {key, label, choices}) — headers' filterKey only feeds filterOperators/CSV export,
     // it does NOT surface a UI facet on its own (confirmed via UsersAndDevices.jsx's filtersDef).
-    const filtersDef = useMemo(() => [
-        { key: "assetTags", label: "Tag", choices: [
-            { label: "Malicious", value: "Malicious" },
-            { label: "Misconfigured", value: "Misconfigured" },
-        ] },
-    ], []);
+    const filtersDef = useMemo(() => {
+        const defs = [
+            { key: "assetTags", label: "Tag", choices: [
+                { label: "Contains personal account", value: "Contains personal account" },
+                { label: "Local MCP Server", value: "Local MCP Server" },
+                { label: "Misconfigured", value: "Misconfigured" },
+                { label: "Malicious Skill", value: "Malicious Skill" },
+            ] },
+        ];
+        if (usernameChoices.length) {
+            defs.push({ key: "username", label: "Username", choices: usernameChoices.map((u) => ({ label: u, value: u })) });
+        }
+        return defs;
+    }, [usernameChoices]);
 
     const activeSortOptions = useMemo(
         () => (selectedTab === "plugins" ? sortOptions.filter((o) => o.sortKey !== "lastSeenEpoch") : sortOptions),
@@ -251,16 +264,16 @@ function Endpoints() {
             // deduped) — this leaner sibling of fetchAndCacheAgenticCollectionsBundle skips
             // getAllCollectionsBasic entirely (see AgenticAssetsPage.jsx's own switch to it).
             // Sensitive info is cached separately since only this page + UsersAndDevices.jsx use it.
-            const [trafficRiskSettled, sensitiveSettled] = await Promise.allSettled([
+            const [trafficRiskBundle, sensitiveMap, shieldResult] = await Promise.all([
                 fetchAndCacheAgenticTrafficRiskBundle({ api, PersistStore }),
                 fetchAndCacheAgenticSensitiveInfo({ api, PersistStore }),
+                fetchEndpointShieldUserMetadata().catch(() => ({})),
             ]);
             if (!isMountedRef.current) return;
-            logRejected("Endpoints mount", { trafficRisk: trafficRiskSettled, sensitive: sensitiveSettled });
 
-            const sensitiveMap = settledValue(sensitiveSettled, {});
-            const { trafficMap = {}, riskScoreMap = {} } = settledValue(trafficRiskSettled, {});
-            enrichRef.current = { ...enrichRef.current, trafficMap, riskScoreMap, sensitiveMap };
+            const { trafficMap = {}, riskScoreMap = {} } = trafficRiskBundle || {};
+            const { usernameMap = {} } = shieldResult || {};
+            enrichRef.current = { ...enrichRef.current, trafficMap, riskScoreMap, sensitiveMap, usernameMap };
             setRefreshKey((k) => k + 1); // mount the table now that enrichRef is populated
             setLoading(false);
 
@@ -294,27 +307,42 @@ function Endpoints() {
     }, []);
 
     const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
-        const { trafficMap, riskScoreMap, sensitiveMap, skillScoreMap } = enrichRef.current;
-        // GithubServerTable: asc=-1/desc=1, inverted vs Mongo (matches AgenticAssetsPage.jsx/
-        // NhiGovernanceIdentitiesAction's own onServerFetch convention).
-        const mongoSortOrder = sortOrder === -1 ? 1 : -1;
-        const clientType = TAB_TO_CLIENT_TYPE[selectedTab];
-        const tagValues = filtersObj?.assetTags;
-        const filters = {};
-        if (clientType) filters.type = [clientType];
-        if (tagValues?.length) filters.tags = tagValues;
+        setTableLoading(true);
+        try {
+            const { trafficMap, riskScoreMap, sensitiveMap, usernameMap, skillScoreMap } = enrichRef.current;
+            // GithubServerTable: asc=-1/desc=1, inverted vs Mongo (matches AgenticAssetsPage.jsx/
+            // NhiGovernanceIdentitiesAction's own onServerFetch convention).
+            const mongoSortOrder = sortOrder === -1 ? 1 : -1;
+            const clientType = TAB_TO_CLIENT_TYPE[selectedTab];
+            const tagValues = filtersObj?.assetTags;
+            const usernameValues = filtersObj?.username;
+            const filters = {};
+            if (clientType) filters.type = [clientType];
+            if (tagValues?.length) filters.tags = tagValues;
+            if (usernameValues?.length) filters.username = usernameValues;
 
-        const res = await api.fetchAgenticAssetsSummary({
-            skip,
-            limit,
-            sortKey: sortKey || "riskScore",
-            sortOrder: mongoSortOrder,
-            queryValue,
-            trafficMap, riskScoreMap, sensitiveMap,
-            filters: Object.keys(filters).length ? filters : undefined,
-        });
-        const rows = (res.rows || []).map((row) => shapeRow(row, { skillScoreMap }));
-        return { value: rows, total: res.total || 0 };
+            const res = await api.fetchAgenticAssetsSummary({
+                skip,
+                limit,
+                sortKey: sortKey || "riskScore",
+                sortOrder: mongoSortOrder,
+                queryValue,
+                trafficMap, riskScoreMap, sensitiveMap, usernameMap,
+                filters: Object.keys(filters).length ? filters : undefined,
+            });
+            // Same progressive-population pattern as AgenticAssetDevicesPage.jsx — union rather than
+            // replace, so choices survive across page turns instead of shrinking to just the current page.
+            const newUsernames = res.distinctUsernames || [];
+            if (newUsernames.length) {
+                setUsernameChoices((prev) => Array.from(new Set([...prev, ...newUsernames])).sort());
+            }
+            // Misconfigured is an Agent/MCP-server-only concept — Skill rows never show it (see
+            // shapeRow's own comment), so no misconfiguredSkills lookup is threaded through here.
+            const rows = (res.rows || []).map((row) => shapeRow(row, { skillScoreMap }));
+            return { value: rows, total: res.total || 0 };
+        } finally {
+            setTableLoading(false);
+        }
     }, [selectedTab]);
 
     const disambiguateLabel = useCallback((key, value) => {
@@ -399,6 +427,8 @@ function Endpoints() {
                     onRowClick={handleRowClick}
                     rowClickable={true}
                     supportsNegationFilter={false}
+                    loading={tableLoading}
+                    loadingText="Loading agentic assets..."
                 />,
             ]}
         />

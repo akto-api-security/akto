@@ -2,8 +2,6 @@ import React, { useState, useMemo, useCallback, useRef, useEffect, useReducer } 
 import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
 import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Badge, Tooltip } from "@shopify/polaris";
-import MisconfiguredConfigIcon from "@/assets/MisconfiguredConfigIcon.svg";
-import PersonLockIcon from "@/assets/PersonLockIcon.svg";
 import LaptopIcon from "@/assets/Laptop.svg";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import AgGridRow from "@/apps/dashboard/components/tables/rows/AgGridRow";
@@ -102,7 +100,7 @@ function TopSection({ stats, violationsBySeverity, totalViolations }) {
             </Card>
             <Card padding="4">
                 <VerticalStack gap="2">
-                    <Text variant="headingMd" fontWeight="semibold" alignment="center">Violations by Severity</Text>
+                    <Text variant="headingMd" fontWeight="semibold">Violations by Severity</Text>
                     <HorizontalStack align="center">
                         <DonutChart
                             data={violationsChartData}
@@ -114,7 +112,7 @@ function TopSection({ stats, violationsBySeverity, totalViolations }) {
                         />
                     </HorizontalStack>
                     {Object.keys(violationsChartData).length > 0 && (
-                        <HorizontalStack gap="3" wrap align="center">
+                        <HorizontalStack gap="3" wrap align="start">
                             {Object.entries(violationsChartData).map(([key, { text, color }]) => (
                                 <HorizontalStack key={key} gap="1" blockAlign="center">
                                     <Box className="agentic-dot" style={{ "--dot-color": color }} />
@@ -135,14 +133,6 @@ export function OsIcon({ os, size = 16 }) {
     if (os === "windows") return <img src="/public/os-windows.svg" width={size} height={size} alt="Windows" style={{ flexShrink: 0 }} />;
     if (os === "linux")   return <img src="/public/os-linux.svg"   width={size} height={size} alt="Linux"   style={{ flexShrink: 0 }} />;
     return                       <img src={LaptopIcon}             width={size} height={size} alt="Device"  style={{ flexShrink: 0 }} />;
-}
-
-function MarkerIcon({ src, label, size = 16 }) {
-    return (
-        <Tooltip content={label} dismissOnMouseOut activatorWrapper="div">
-            <img src={src} width={size} height={size} alt={label} style={{ flexShrink: 0, display: "block" }} />
-        </Tooltip>
-    );
 }
 
 // ─── Cell renderers ───────────────────────────────────────────────────────────
@@ -241,8 +231,8 @@ function UsernameCellInner({ data, node }) {
             warning={
                 (data.hasPersonalAccount || data.hasMisconfiguredConfig) ? (
                     <HorizontalStack gap="1" blockAlign="center" wrap={false}>
-                        {data.hasPersonalAccount && <MarkerIcon src={PersonLockIcon} label="Contains personal account" size={24} />}
-                        {data.hasMisconfiguredConfig && <MarkerIcon src={MisconfiguredConfigIcon} label="Misconfigured config" size={24} />}
+                        {data.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
+                        {data.hasMisconfiguredConfig && <Badge size="small" status="attention">Misconfigured</Badge>}
                     </HorizontalStack>
                 ) : null
             }
@@ -434,7 +424,7 @@ export default function DeviceEndpoints() {
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges[4],
+        values.getRange("last1month"),
     );
     const startTimestamp = Math.floor(Date.parse(currDateRange.period.since) / 1000);
     const endTimestamp = Math.floor(Date.parse(currDateRange.period.until) / 1000);

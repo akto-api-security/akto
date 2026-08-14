@@ -205,7 +205,7 @@ export function getTraceColumnDefs({ showSession, onSessionClick } = {}) {
     ];
 }
 
-// Argus traces table — no user/session/spans/traceId columns, short time format.
+// Argus traces table — no user/spans/traceId columns, short time format.
 export const ARGUS_TRACE_COL_DEFS = [
     {
         headerName: "Time",
@@ -244,7 +244,8 @@ export const ARGUS_TRACE_COL_DEFS = [
     //     ...NO_FILTER,
     // },
     tokensCol,
-    durationCol
+    durationCol,
+    idCol("Session ID", "sessionIdentifier"),
 ];
 
 // Messages table — flat span-level rows.

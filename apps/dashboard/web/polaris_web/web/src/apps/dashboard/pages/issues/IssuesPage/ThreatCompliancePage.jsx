@@ -149,7 +149,7 @@ function ThreatCompliancePage() {
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges.find((r) => r.alias === 'last7days') || values.ranges[2]
+        values.getRange("last1month")
     );
 
     const getTimeEpoch = (key) => {
@@ -337,8 +337,8 @@ function ThreatCompliancePage() {
             let maxShowCompliance = 2
             let badge = totalCompliance > maxShowCompliance ? <Badge size="extraSmall">+{totalCompliance - maxShowCompliance}</Badge> : null
 
-            // TEMP: force Single Prompt for all events until backend-resolved detection type ships
-            const isSessionBased = false;
+            const detectionType = threat.detectionType || 'SINGLE_PROMPT';
+            const isSessionBased = detectionType === 'SESSION_CONTEXT';
 
             return {
                 key: key,
@@ -507,20 +507,7 @@ function ThreatCompliancePage() {
                     return;
                 }
 
-                // Parse sessionContext for detection type filtering
-                let sessionData = {};
-                try {
-                    if (item?.sessionContext) {
-                        sessionData = typeof item.sessionContext === 'string'
-                            ? JSON.parse(item.sessionContext)
-                            : item.sessionContext;
-                    }
-                } catch (e) {
-                    console.error('[ThreatCompliancePage] Error parsing sessionContext:', e);
-                }
-
-                // TEMP: force Single Prompt for all events until backend-resolved detection type ships
-                const itemDetectionType = 'SINGLE_PROMPT';
+                const itemDetectionType = item?.sessionId ? 'SESSION_CONTEXT' : 'SINGLE_PROMPT';
                 if (detectionTypeFilter.length > 0 && !detectionTypeFilter.includes(itemDetectionType)) {
                     return;
                 }
@@ -555,9 +542,7 @@ function ThreatCompliancePage() {
                             threatData: createThreatDataObject(item, complianceData)
                         }],
                         isThreat: true,
-                        sessionContext: sessionData,
-                        // TEMP: force Single Prompt for all events until backend-resolved detection type ships
-                        detectionType: 'SINGLE_PROMPT'
+                        detectionType: itemDetectionType
                     });
                 } else {
                     const existingThreat = uniqueThreatsMap.get(key);

@@ -1,9 +1,5 @@
 import React from "react";
-import { Badge, Box, HorizontalStack, Text, Tooltip } from "@shopify/polaris";
-import McpRedIcon from "@/assets/McpRedIcon.svg";
-import PersonLockIcon from "@/assets/PersonLockIcon.svg";
-import MaliciousSkillIcon from "@/assets/MaliciousSkill.svg";
-import MisconfiguredConfigIcon from "@/assets/MisconfiguredConfigIcon.svg";
+import { Badge, Box, HorizontalStack, Text } from "@shopify/polaris";
 import observeFunc from "../transform";
 import { getRiskStatus } from "./agenticPageBuilders";
 import AssetIcon from "./AssetIcon";
@@ -71,18 +67,9 @@ export function ParamDescCellRenderer({ data }) {
 // Extracted from AgenticAssetsPage to keep that page lean. Inline styles are the AG
 // Grid cell-renderer exception (grid sandbox — Polaris tokens don't reach in).
 
-
-function MarkerIcon({ src, label, size = 16 }) {
-    return (
-        <Tooltip content={label} dismissOnMouseOut activatorWrapper="div">
-            <img src={src} width={size} height={size} alt={label} style={{ flexShrink: 0, display: "block" }} />
-        </Tooltip>
-    );
-}
-
 export function AssetNameCellRenderer({ data }) {
     if (!data) return null;
-    // Match old UI: personal-account + local-MCP markers for non-Skill rows; malicious marker for Skills
+    // Match old UI: personal-account + local-MCP tags for non-Skill rows; malicious tag for Skills
     const isSkill = data.type === "Skill";
     // Skill/Plugin rows fan out from the agent collection, so they'd inherit its markers otherwise.
     const isFanout = isSkill || data.type === "Plugin";
@@ -97,10 +84,10 @@ export function AssetNameCellRenderer({ data }) {
             <Box width="100%" overflowX="hidden">
                 <Text variant="bodySm" fontWeight="medium" truncate>{data.name}</Text>
             </Box>
-            {showLocalMcp && <MarkerIcon src={McpRedIcon} label="Local MCP Server" size={24} />}
-            {showPersonal && <MarkerIcon src={PersonLockIcon} label="Contains personal account" size={24} />}
-            {showMisconfigured && <MarkerIcon src={MisconfiguredConfigIcon} label="Misconfigured config" size={24} />}
-            {showMalicious && <MarkerIcon src={MaliciousSkillIcon} label="Malicious skill" size={24} />}
+            {showPersonal && <Badge size="small" status="warning">Contains personal account</Badge>}
+            {showLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
+            {showMisconfigured && <Badge size="small" status="attention">Misconfigured</Badge>}
+            {showMalicious && <Badge size="small" status="critical">Malicious</Badge>}
         </HorizontalStack>
     );
 }

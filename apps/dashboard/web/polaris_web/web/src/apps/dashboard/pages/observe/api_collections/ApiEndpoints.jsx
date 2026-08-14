@@ -2069,6 +2069,7 @@ function ApiEndpoints(props) {
             ] : [
                 // Hide "Test your Endpoints" banner for Endpoint Security
                 (!isEndpointSecurityCategory() && (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null,
+                dummyAgenticGraph ? <AgentDiscoverGraphWithDummyData key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}
                       {/* <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
@@ -2077,11 +2078,6 @@ function ApiEndpoints(props) {
                           </Modal.Section>
                       </Modal> */}
                   </div>,
-                // Placed after the table (not before it) so this component's own "Loading service
-                // graph..." spinner card doesn't visually front-run the rest of an already-loaded
-                // page — it's a scoped, cheap getCollection(apiCollectionId) call, not something
-                // that should gate the page's first paint.
-                dummyAgenticGraph ? <AgentDiscoverGraphWithDummyData key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
                   <ApiGroupModal
                       key="api-group-modal"
                       showApiGroupModal={showApiGroupModal}
