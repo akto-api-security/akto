@@ -44,8 +44,6 @@ import io.confluent.parallelconsumer.ParallelStreamProcessor;
 
 public class ConsumerUtil {
 
-    private static final int DEBUG_ACCOUNT_ID = 1764738582;
-    private static final int MAX_POLL_INTERVAL_MS = 10000;
     /** If queue stays empty with no processed progress this long, treat remaining expected records as lost. */
     private static final long DRAIN_IDLE_GRACE_MS = 5L * 60L * 1000L;
     private static final long DEBUG_PROGRESS_LOG_INTERVAL_MS = 60_000L;
@@ -53,10 +51,14 @@ public class ConsumerUtil {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ConsumerUtil.class, LogDb.TESTING);
     static Properties properties = com.akto.runtime.utils.Utils.configProperties(Constants.LOCAL_KAFKA_BROKER_URL, Constants.AKTO_KAFKA_GROUP_ID_CONFIG, Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
     static{
-        properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, MAX_POLL_INTERVAL_MS);
+        properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, Constants.MAX_POLL_INTERVAL_MS);
         if (!KafkaConfig.applyAuthenticationPropertiesFromEnv(properties)) {
             loggerMaker.errorAndAddToDb("Kafka authentication is enabled but credentials are missing for testing consumer");
         }
+        loggerMaker.warnAndAddToDb("Kafka consumer config broker=" + Constants.LOCAL_KAFKA_BROKER_URL
+                + " groupId=" + Constants.AKTO_KAFKA_GROUP_ID_CONFIG
+                + " maxPollIntervalMs=" + Constants.MAX_POLL_INTERVAL_MS
+                + " maxPollRecords=" + Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
     }
     private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null;
     public static ExecutorService executor = Executors.newFixedThreadPool(150);
@@ -153,10 +155,34 @@ public class ConsumerUtil {
     }
 
     private static void debugLogToDb(int accountId, String message) {
-        if (accountId != DEBUG_ACCOUNT_ID) {
+        if (!Constants.KAFKA_DEBUG_MODE) {
             return;
         }
-        loggerMaker.insertImportantTestingLog("[DEBUG-CONSUMER-" + DEBUG_ACCOUNT_ID + "] " + message);
+        loggerMaker.warnAndAddToDb("[KAFKA-DEBUG] " + message);
+    }
+
+    private static void shutdownExecutorQuietly(int waitSeconds, boolean force) {
+        ExecutorService current = executor;
+        if (current == null || current.isTerminated()) {
+            return;
+        }
+        if (force) {
+            current.shutdownNow();
+        } else {
+            current.shutdown();
+        }
+        try {
+            if (!current.awaitTermination(waitSeconds, TimeUnit.SECONDS)) {
+                loggerMaker.warnAndAddToDb("executor did not terminate in " + waitSeconds + "s, calling shutdownNow");
+                current.shutdownNow();
+                if (!current.awaitTermination(5, TimeUnit.SECONDS)) {
+                    loggerMaker.warnAndAddToDb("executor still alive after shutdownNow");
+                }
+            }
+        } catch (InterruptedException e) {
+            current.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**
@@ -187,6 +213,7 @@ public class ConsumerUtil {
         }
 
         TestingConfigurations instance = TestingConfigurations.getInstance();
+        shutdownExecutorQuietly(5, true);
         executor = Executors.newFixedThreadPool(instance.getMaxConcurrentRequest());
 
         final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
@@ -224,7 +251,14 @@ public class ConsumerUtil {
         
         if(isConsumerRunning){
             String topicName = Constants.TEST_RESULTS_TOPIC_NAME;
-            consumer = new KafkaConsumer<>(properties); 
+            if (consumer != null) {
+                try {
+                    consumer.close();
+                } catch (Exception e) {
+                    loggerMaker.warnAndAddToDb("Error closing previous kafka consumer: " + e.getMessage());
+                }
+            }
+            consumer = new KafkaConsumer<>(properties);
 
             ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
                 .consumer(consumer)
@@ -237,11 +271,15 @@ public class ConsumerUtil {
 
             parallelConsumer = ParallelStreamProcessor.createEosStreamProcessor(options);
             parallelConsumer.subscribe(Arrays.asList(topicName));
-            debugLogToDb(accountId, "consumer started summaryId=" + summaryIdForTest
+            loggerMaker.warnAndAddToDb("consumer started summaryId=" + summaryIdForTest
                     + " expectedRecords=" + expectedRecords
-                    + " maxConcurrency=" + instance.getMaxConcurrentRequest());
+                    + " maxConcurrency=" + instance.getMaxConcurrentRequest()
+                    + " maxPollIntervalMs=" + Constants.MAX_POLL_INTERVAL_MS
+                    + " poolSize=" + instance.getMaxConcurrentRequest()
+                    + " broker=" + Constants.LOCAL_KAFKA_BROKER_URL);
         }
 
+        boolean consumerFailed = false;
         try {
             if(parallelConsumer != null){
             parallelConsumer.poll(record -> {
@@ -305,12 +343,12 @@ public class ConsumerUtil {
             int lastLoggedPolled = -1;
             while (parallelConsumer != null) {
                 if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId)){
-                    loggerMaker.infoAndAddToDb("Tests have been marked stopped.");
+                    loggerMaker.warnAndAddToDb("Tests have been marked stopped.");
                     executor.shutdownNow();
                     break;
                 }
                 else if ((Context.now() - startTime >= effectiveMaxRunTime)) {
-                    loggerMaker.infoAndAddToDb("Max run time reached. Stopping consumer.");
+                    loggerMaker.warnAndAddToDb("Max run time reached. Stopping consumer.");
                     executor.shutdownNow();
                     break;
                 }
@@ -328,7 +366,7 @@ public class ConsumerUtil {
                 if (nowMs - lastDebugLogMs >= DEBUG_PROGRESS_LOG_INTERVAL_MS
                         && (polled != lastLoggedPolled || processed != lastLoggedProcessed)) {
                     int left = expectedRecords > 0 ? Math.max(0, expectedRecords - processed) : -1;
-                    debugLogToDb(accountId, "polled=" + polled + " executed=" + processed
+                    loggerMaker.warnAndAddToDb("consumer progress polled=" + polled + " executed=" + processed
                             + " expected=" + expectedRecords + " left=" + left
                             + " workRemaining=" + workRemaining);
                     lastDebugLogMs = nowMs;
@@ -340,7 +378,7 @@ public class ConsumerUtil {
                 if (locallyEmpty) {
                     if (expectedRecords > 0 && processed >= expectedRecords) {
                         int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
-                        loggerMaker.insertImportantTestingLog(
+                        loggerMaker.warnAndAddToDb(
                                 "All expected records processed: " + processed + "/" + expectedRecords
                                         + " (workRemaining=0)");
                         executor.shutdown();
@@ -352,7 +390,7 @@ public class ConsumerUtil {
                         drainIdleSinceMs = nowMs;
                     } else if (nowMs - drainIdleSinceMs >= DRAIN_IDLE_GRACE_MS) {
                         int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
-                        loggerMaker.insertImportantTestingLog(
+                        loggerMaker.warnAndAddToDb(
                                 "No progress for " + DRAIN_IDLE_GRACE_MS + "ms with incomplete records: "
                                         + processed + "/" + expectedRecords
                                         + " (workRemaining=0). Completing consumer.");
@@ -367,27 +405,45 @@ public class ConsumerUtil {
             }
 
         } catch (Exception e) {
+            consumerFailed = true;
             String errMsg = "Error in polling records summaryId=" + summaryIdForTest
                     + " polled=" + polledRecords.get()
                     + " executed=" + processedRecords.get()
-                    + " expected=" + expectedRecords;
+                    + " expected=" + expectedRecords
+                    + " errorType=" + e.getClass().getName()
+                    + " cause=" + (e.getCause() != null ? e.getCause().getClass().getName() + ": " + e.getCause().getMessage() : e.getMessage());
             loggerMaker.errorAndAddToDb(e, errMsg);
-            debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
         }finally{
             int finalPolled = polledRecords.get();
             int finalExecuted = processedRecords.get();
             int finalLeft = expectedRecords > 0 ? Math.max(0, expectedRecords - finalExecuted) : -1;
-            debugLogToDb(accountId, "consumer closing polled=" + finalPolled
-                    + " executed=" + finalExecuted + " expected=" + expectedRecords + " left=" + finalLeft);
-            loggerMaker.infoAndAddToDb("Closing consumer as all results have been executed.");
+            loggerMaker.warnAndAddToDb("consumer closing polled=" + finalPolled
+                    + " executed=" + finalExecuted + " expected=" + expectedRecords + " left=" + finalLeft
+                    + " failed=" + consumerFailed);
 
             flushLastTestedUpdates();
+            shutdownExecutorQuietly(consumerFailed ? 5 : 30, consumerFailed);
 
             if(parallelConsumer != null){
-                parallelConsumer.closeDrainFirst();
+                try {
+                    if (consumerFailed) {
+                        parallelConsumer.closeDontDrainFirst();
+                    } else {
+                        parallelConsumer.closeDrainFirst();
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error closing parallel consumer: " + e.getClass().getSimpleName()
+                            + " " + e.getMessage());
+                }
             }
             parallelConsumer = null;
-            consumer.close();
+            if (consumer != null) {
+                try {
+                    consumer.close();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e,"Error closing kafka consumer: " + e.getMessage());
+                }
+            }
             Producer.deleteTestResultsTopic();
             TestingStateStore.clear();
         }
