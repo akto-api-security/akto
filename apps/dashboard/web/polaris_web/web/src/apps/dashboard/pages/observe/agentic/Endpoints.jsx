@@ -119,6 +119,7 @@ function shapeRow(row, { skillScoreMap = {}, misconfiguredSkills = new Set() } =
 function Endpoints() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
+    const [tableLoading, setTableLoading] = useState(false);
     const agenticNewLayout = LocalStore((state) => state.agenticNewLayout);
     const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
 
@@ -232,27 +233,32 @@ function Endpoints() {
     }, []);
 
     const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
-        const { trafficMap, riskScoreMap, sensitiveMap, skillScoreMap, misconfiguredSkills } = enrichRef.current;
-        // GithubServerTable: asc=-1/desc=1, inverted vs Mongo (matches AgenticAssetsPage.jsx/
-        // NhiGovernanceIdentitiesAction's own onServerFetch convention).
-        const mongoSortOrder = sortOrder === -1 ? 1 : -1;
-        const clientType = TAB_TO_CLIENT_TYPE[selectedTab];
-        const tagValues = filtersObj?.assetTags;
-        const filters = {};
-        if (clientType) filters.type = [clientType];
-        if (tagValues?.length) filters.tags = tagValues;
+        setTableLoading(true);
+        try {
+            const { trafficMap, riskScoreMap, sensitiveMap, skillScoreMap, misconfiguredSkills } = enrichRef.current;
+            // GithubServerTable: asc=-1/desc=1, inverted vs Mongo (matches AgenticAssetsPage.jsx/
+            // NhiGovernanceIdentitiesAction's own onServerFetch convention).
+            const mongoSortOrder = sortOrder === -1 ? 1 : -1;
+            const clientType = TAB_TO_CLIENT_TYPE[selectedTab];
+            const tagValues = filtersObj?.assetTags;
+            const filters = {};
+            if (clientType) filters.type = [clientType];
+            if (tagValues?.length) filters.tags = tagValues;
 
-        const res = await api.fetchAgenticAssetsSummary({
-            skip,
-            limit,
-            sortKey: sortKey || "riskScore",
-            sortOrder: mongoSortOrder,
-            queryValue,
-            trafficMap, riskScoreMap, sensitiveMap,
-            filters: Object.keys(filters).length ? filters : undefined,
-        });
-        const rows = (res.rows || []).map((row) => shapeRow(row, { skillScoreMap, misconfiguredSkills }));
-        return { value: rows, total: res.total || 0 };
+            const res = await api.fetchAgenticAssetsSummary({
+                skip,
+                limit,
+                sortKey: sortKey || "riskScore",
+                sortOrder: mongoSortOrder,
+                queryValue,
+                trafficMap, riskScoreMap, sensitiveMap,
+                filters: Object.keys(filters).length ? filters : undefined,
+            });
+            const rows = (res.rows || []).map((row) => shapeRow(row, { skillScoreMap, misconfiguredSkills }));
+            return { value: rows, total: res.total || 0 };
+        } finally {
+            setTableLoading(false);
+        }
     }, [selectedTab]);
 
     const disambiguateLabel = useCallback((key, value) => {
@@ -337,6 +343,8 @@ function Endpoints() {
                     onRowClick={handleRowClick}
                     rowClickable={true}
                     supportsNegationFilter={false}
+                    loading={tableLoading}
+                    loadingText="Loading agentic assets..."
                 />,
             ]}
         />
