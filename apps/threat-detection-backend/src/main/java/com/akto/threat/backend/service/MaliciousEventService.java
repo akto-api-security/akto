@@ -641,10 +641,23 @@ public class MaliciousEventService {
     }
 
     try {
-      List<ListMaliciousRequestsResponse.MaliciousEvent> maliciousEvents = new ArrayList<>();
+      List<MaliciousEventDto> pageEvents = new ArrayList<>();
       while (cursor.hasNext()) {
-        MaliciousEventDto evt = cursor.next();
+        pageEvents.add(cursor.next());
+      }
+
+      Set<String> sessionIdsOnPage = pageEvents.stream()
+          .map(MaliciousEventDto::getSessionId)
+          .filter(id -> id != null && !id.isEmpty())
+          .collect(Collectors.toSet());
+      Set<String> validSessionIds = AgenticSessionContextDao.instance
+          .findExistingSessionIdentifiers(accountId, sessionIdsOnPage);
+
+      List<ListMaliciousRequestsResponse.MaliciousEvent> maliciousEvents = new ArrayList<>();
+      for (MaliciousEventDto evt : pageEvents) {
         String metadata = ThreatUtils.fetchMetadataString(evt.getMetadata() != null ? evt.getMetadata() : "");
+        String resolvedSessionId = (evt.getSessionId() != null && validSessionIds.contains(evt.getSessionId()))
+            ? evt.getSessionId() : "";
 
         maliciousEvents.add(
             ListMaliciousRequestsResponse.MaliciousEvent.newBuilder()
@@ -672,7 +685,7 @@ public class MaliciousEventService {
                 .setHost(evt.getHost() != null ? evt.getHost() : "")
                 .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
                 .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
-                .setSessionId(evt.getSessionId() != null && !evt.getSessionId().isEmpty() ? evt.getSessionId() : "")
+                .setSessionId(resolvedSessionId)
                 .addAllOwaspCategories(evt.getOwaspCategories() != null
                     ? evt.getOwaspCategories().stream()
                         .map(o -> OwaspCategory.newBuilder()

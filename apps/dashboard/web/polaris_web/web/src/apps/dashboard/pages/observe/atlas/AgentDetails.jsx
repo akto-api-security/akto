@@ -504,6 +504,7 @@ function AgentDetails({
                     condensedHeight={true}
                     hideQueryField={true}
                     loading={tabLoading}
+                    loadingText="Loading MCP servers..."
                     pageLimit={10}
                     showFooter={false}
                     onRowClick={handleServerClick}

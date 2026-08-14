@@ -75,6 +75,7 @@ function buildTagsDisplay(tags) {
 function UsersAndDevices() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
+    const [tableLoading, setTableLoading] = useState(false);
     const agenticNewLayout = LocalStore((state) => state.agenticNewLayout);
     const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
 
@@ -211,21 +212,26 @@ function UsersAndDevices() {
     }, [buildGroupNameDisplay]);
 
     const fetchData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
-        const { trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap } = enrichRef.current;
-        const mappedSortKey = SORT_FIELD_MAP[sortKey] || "riskScore";
-        const mongoSortOrder = sortOrder === -1 ? 1 : -1; // GithubServerTable: asc=-1/desc=1, inverted vs Mongo
-        const filters = {};
-        if (filtersObj?.tags?.length) filters.tags = filtersObj.tags;
-        if (filtersObj?.username?.length) filters.username = filtersObj.username;
-        const res = await api.fetchUsersAndDevicesSummary({
-            groupBy: isUsersTab ? "user" : "device",
-            skip, limit, sortKey: mappedSortKey, sortOrder: mongoSortOrder, queryValue, filters,
-            trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap,
-            tagsByUsername: tagsByUsernameFor(userMetadataMap),
-        });
-        const prettified = prettifyRows(res.rows || []);
-        lastRowsRef.current = prettified;
-        return { value: prettified, total: res.total || 0 };
+        setTableLoading(true);
+        try {
+            const { trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap } = enrichRef.current;
+            const mappedSortKey = SORT_FIELD_MAP[sortKey] || "riskScore";
+            const mongoSortOrder = sortOrder === -1 ? 1 : -1; // GithubServerTable: asc=-1/desc=1, inverted vs Mongo
+            const filters = {};
+            if (filtersObj?.tags?.length) filters.tags = filtersObj.tags;
+            if (filtersObj?.username?.length) filters.username = filtersObj.username;
+            const res = await api.fetchUsersAndDevicesSummary({
+                groupBy: isUsersTab ? "user" : "device",
+                skip, limit, sortKey: mappedSortKey, sortOrder: mongoSortOrder, queryValue, filters,
+                trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap,
+                tagsByUsername: tagsByUsernameFor(userMetadataMap),
+            });
+            const prettified = prettifyRows(res.rows || []);
+            lastRowsRef.current = prettified;
+            return { value: prettified, total: res.total || 0 };
+        } finally {
+            setTableLoading(false);
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isUsersTab, prettifyRows, tagsByUsernameFor]);
 
@@ -589,6 +595,8 @@ function UsersAndDevices() {
                         selected={selected}
                         onSelect={handleSelectedTab}
                         supportsNegationFilter={false}
+                        loading={tableLoading}
+                        loadingText={isUsersTab ? "Loading users..." : "Loading devices..."}
                     />,
                 ]}
             />

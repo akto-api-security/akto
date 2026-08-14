@@ -122,6 +122,7 @@ function shapeRow(row, { skillScoreMap = {}, misconfiguredSkills = new Set() } =
 function Endpoints() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
+    const [tableLoading, setTableLoading] = useState(false);
     const agenticNewLayout = LocalStore((state) => state.agenticNewLayout);
     const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
 
@@ -248,35 +249,40 @@ function Endpoints() {
     }, []);
 
     const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
-        const { trafficMap, riskScoreMap, sensitiveMap, usernameMap, skillScoreMap, misconfiguredSkills } = enrichRef.current;
-        // GithubServerTable: asc=-1/desc=1, inverted vs Mongo (matches AgenticAssetsPage.jsx/
-        // NhiGovernanceIdentitiesAction's own onServerFetch convention).
-        const mongoSortOrder = sortOrder === -1 ? 1 : -1;
-        const clientType = TAB_TO_CLIENT_TYPE[selectedTab];
-        const tagValues = filtersObj?.assetTags;
-        const usernameValues = filtersObj?.username;
-        const filters = {};
-        if (clientType) filters.type = [clientType];
-        if (tagValues?.length) filters.tags = tagValues;
-        if (usernameValues?.length) filters.username = usernameValues;
+        setTableLoading(true);
+        try {
+            const { trafficMap, riskScoreMap, sensitiveMap, usernameMap, skillScoreMap, misconfiguredSkills } = enrichRef.current;
+            // GithubServerTable: asc=-1/desc=1, inverted vs Mongo (matches AgenticAssetsPage.jsx/
+            // NhiGovernanceIdentitiesAction's own onServerFetch convention).
+            const mongoSortOrder = sortOrder === -1 ? 1 : -1;
+            const clientType = TAB_TO_CLIENT_TYPE[selectedTab];
+            const tagValues = filtersObj?.assetTags;
+            const usernameValues = filtersObj?.username;
+            const filters = {};
+            if (clientType) filters.type = [clientType];
+            if (tagValues?.length) filters.tags = tagValues;
+            if (usernameValues?.length) filters.username = usernameValues;
 
-        const res = await api.fetchAgenticAssetsSummary({
-            skip,
-            limit,
-            sortKey: sortKey || "riskScore",
-            sortOrder: mongoSortOrder,
-            queryValue,
-            trafficMap, riskScoreMap, sensitiveMap, usernameMap,
-            filters: Object.keys(filters).length ? filters : undefined,
-        });
-        // Same progressive-population pattern as AgenticAssetDevicesPage.jsx — union rather than
-        // replace, so choices survive across page turns instead of shrinking to just the current page.
-        const newUsernames = res.distinctUsernames || [];
-        if (newUsernames.length) {
-            setUsernameChoices((prev) => Array.from(new Set([...prev, ...newUsernames])).sort());
+            const res = await api.fetchAgenticAssetsSummary({
+                skip,
+                limit,
+                sortKey: sortKey || "riskScore",
+                sortOrder: mongoSortOrder,
+                queryValue,
+                trafficMap, riskScoreMap, sensitiveMap, usernameMap,
+                filters: Object.keys(filters).length ? filters : undefined,
+            });
+            // Same progressive-population pattern as AgenticAssetDevicesPage.jsx — union rather than
+            // replace, so choices survive across page turns instead of shrinking to just the current page.
+            const newUsernames = res.distinctUsernames || [];
+            if (newUsernames.length) {
+                setUsernameChoices((prev) => Array.from(new Set([...prev, ...newUsernames])).sort());
+            }
+            const rows = (res.rows || []).map((row) => shapeRow(row, { skillScoreMap, misconfiguredSkills }));
+            return { value: rows, total: res.total || 0 };
+        } finally {
+            setTableLoading(false);
         }
-        const rows = (res.rows || []).map((row) => shapeRow(row, { skillScoreMap, misconfiguredSkills }));
-        return { value: rows, total: res.total || 0 };
     }, [selectedTab]);
 
     const disambiguateLabel = useCallback((key, value) => {
@@ -361,6 +367,8 @@ function Endpoints() {
                     onRowClick={handleRowClick}
                     rowClickable={true}
                     supportsNegationFilter={false}
+                    loading={tableLoading}
+                    loadingText="Loading agentic assets..."
                 />,
             ]}
         />
