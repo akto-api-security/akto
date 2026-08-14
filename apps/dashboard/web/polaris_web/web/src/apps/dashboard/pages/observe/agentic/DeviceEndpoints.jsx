@@ -2,8 +2,6 @@ import React, { useState, useMemo, useCallback, useRef, useEffect, useReducer } 
 import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
 import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Badge, Tooltip } from "@shopify/polaris";
-import MisconfiguredConfigIcon from "@/assets/MisconfiguredConfigIcon.svg";
-import PersonLockIcon from "@/assets/PersonLockIcon.svg";
 import LaptopIcon from "@/assets/Laptop.svg";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import AgGridRow from "@/apps/dashboard/components/tables/rows/AgGridRow";
@@ -137,14 +135,6 @@ export function OsIcon({ os, size = 16 }) {
     return                       <img src={LaptopIcon}             width={size} height={size} alt="Device"  style={{ flexShrink: 0 }} />;
 }
 
-function MarkerIcon({ src, label, size = 16 }) {
-    return (
-        <Tooltip content={label} dismissOnMouseOut activatorWrapper="div">
-            <img src={src} width={size} height={size} alt={label} style={{ flexShrink: 0, display: "block" }} />
-        </Tooltip>
-    );
-}
-
 // ─── Cell renderers ───────────────────────────────────────────────────────────
 
 function SkillBadge({ count }) {
@@ -231,8 +221,8 @@ function UsernameCellInner({ data, node }) {
             warning={
                 (data.hasPersonalAccount || data.hasMisconfiguredConfig) ? (
                     <HorizontalStack gap="1" blockAlign="center" wrap={false}>
-                        {data.hasPersonalAccount && <MarkerIcon src={PersonLockIcon} label="Contains personal account" size={24} />}
-                        {data.hasMisconfiguredConfig && <MarkerIcon src={MisconfiguredConfigIcon} label="Misconfigured config" size={24} />}
+                        {data.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
+                        {data.hasMisconfiguredConfig && <Badge size="small" status="attention">Misconfigured</Badge>}
                     </HorizontalStack>
                 ) : null
             }
