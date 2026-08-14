@@ -208,7 +208,7 @@ public class AgentQueryRecord {
                 : "span_" + UUID.randomUUID().toString();
 
         String requestPayload  = p.getRequestParams().getPayload();
-        String responsePayload = p.getPayload() != null ? p.getPayload() : "";
+        String responsePayload = stripAwsMetadata(p.getPayload() != null ? p.getPayload() : "");
         int inputTokens  = resolveTokenCount(responsePayload, requestPayload, true);
         int outputTokens = resolveTokenCount(responsePayload, responsePayload, false);
 
@@ -262,6 +262,28 @@ public class AgentQueryRecord {
         if (headers == null) return null;
         List<String> values = headers.get(name);
         return (values != null && !values.isEmpty()) ? values.get(0) : null;
+    }
+
+    /**
+     * awsMetadata duplicates what's already captured as structured Trace/Span data by
+     * BedrockAgentTraceParser — it can embed full tool-call outputs (file listings,
+     * page dumps, etc.), so keeping a second raw copy here needlessly bloats the batch
+     * sent to the agent-query-logs service.
+     */
+    private static String stripAwsMetadata(String responsePayload) {
+        if (responsePayload == null || responsePayload.isEmpty()) {
+            return responsePayload;
+        }
+        try {
+            JSONObject obj = new JSONObject(responsePayload);
+            if (!obj.has("awsMetadata")) {
+                return responsePayload;
+            }
+            obj.remove("awsMetadata");
+            return obj.toString();
+        } catch (Exception ignored) {
+            return responsePayload;
+        }
     }
 
     /** Prefer usage block from LLM response JSON; fall back to payload string length. */
