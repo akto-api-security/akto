@@ -364,8 +364,7 @@ public class ConsumerUtil {
                             loggerMaker.warnAndAddToDb(
                                     "All expected records processed: " + processed + "/" + expectedRecords
                                             + " (workRemaining=0)");
-                            executor.shutdown();
-                            executor.awaitTermination(remainingTime, TimeUnit.SECONDS);
+                            shutdownExecutorQuietly(Math.min(remainingTime, 5), true);
                             break;
                         }
 
@@ -385,8 +384,7 @@ public class ConsumerUtil {
                                     "No progress for " + DRAIN_IDLE_GRACE_MS + "ms with incomplete records: "
                                             + processed + "/" + expectedRecords
                                             + " (workRemaining=0). Completing consumer.");
-                            executor.shutdown();
-                            executor.awaitTermination(remainingTime, TimeUnit.SECONDS);
+                            shutdownExecutorQuietly(Math.min(remainingTime, 5), true);
                             break;
                         }
                     } else {
