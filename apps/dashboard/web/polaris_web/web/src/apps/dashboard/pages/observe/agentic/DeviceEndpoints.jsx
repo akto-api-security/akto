@@ -152,6 +152,14 @@ function SkillBadge({ count }) {
     return <Badge>{`${count} ${count === 1 ? "skill" : "skills"}`}</Badge>;
 }
 
+// Agent rows only — how many plugins (their own sibling child rows, not embedded in the agent's
+// own collection) belong to this agent. Gives the same "parent knows about its children" continuity
+// the skills badge above gives, since a plugin's own row has no children of its own to show it in.
+function PluginBadge({ count }) {
+    if (!count) return null;
+    return <Badge status="info">{`${count} ${count === 1 ? "plugin" : "plugins"}`}</Badge>;
+}
+
 function RiskScoreCellRenderer({ value }) {
     if (value == null) return null;
     return <RiskPill score={value} />;
@@ -218,6 +226,7 @@ function UsernameCellInner({ data, node }) {
                     <HorizontalStack gap="2" blockAlign="center" wrap={false}>
                         {coloredBadge}
                         {data.skillCount ? <SkillBadge count={data.skillCount} /> : null}
+                        {data.pluginCount ? <PluginBadge count={data.pluginCount} /> : null}
                     </HorizontalStack>
                 }
             />

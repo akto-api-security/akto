@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import HeadingWithTooltip from '../../../components/shared/HeadingWithTooltip';
 import TooltipText from '../../../components/shared/TooltipText';
 import { FILTER_TYPES } from './useAgenticFilter';
-import { getAgenticCategoryLabel, hasPersonalAccountTag, hasLocalMcpServerTag, hasMisconfiguredConfigTag, getPluginNameForCollection, CLIENT_TYPES } from '../agentic/mcpClientHelper';
+import { getAgenticCategoryLabel, hasPersonalAccountTag, hasLocalMcpServerTag, hasMisconfiguredConfigTag, getPluginNameForCollection, findAssetTag, CLIENT_TYPES } from '../agentic/mcpClientHelper';
 import { skillCollectionKey } from '../agentic/constants';
 import PersistStore from '../../../../main/PersistStore';
 
@@ -437,6 +437,21 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
         });
     }, [isPluginScope, pluginNames, children, childHeaders, navigate]);
 
+    // Plugins live in their own collection (sibling to the agent, not embedded in it), but they still
+    // share the agent's own owner tag (mcp-client/ai-agent) and endpointId — so "how many plugins does
+    // this agent have" is answered by matching siblings in this same device's `children` list, the
+    // same continuity the skills badge below already gives for embedded skills.
+    const pluginCountByAgentTag = useMemo(() => {
+        const counts = {};
+        children.forEach(c => {
+            const pluginName = getPluginNameForCollection(c);
+            if (!pluginName) return;
+            const owner = findAssetTag(c.envTypeOriginal)?.value;
+            if (owner) counts[owner] = (counts[owner] || 0) + 1;
+        });
+        return counts;
+    }, [children]);
+
     const rows = useMemo(() => {
         if (isPluginScope) return [];
         return children.map(child => {
@@ -461,6 +476,9 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
             const childCategory = getAgenticCategoryLabel(child);
             const showsBundledSkills = childCategory === CLIENT_TYPES.AI_AGENT || childCategory === CLIENT_TYPES.MCP_SERVER;
             const bundledSkillsCount = showsBundledSkills && Array.isArray(child.skills) ? child.skills.length : 0;
+            // Only agents (not MCP servers) have plugins under them.
+            const childOwnerTag = childCategory === CLIENT_TYPES.AI_AGENT ? findAssetTag(child.envTypeOriginal)?.value : null;
+            const bundledPluginsCount = childOwnerTag ? (pluginCountByAgentTag[childOwnerTag] || 0) : 0;
             const childHasMaliciousSkill = Array.isArray(child.skills) && child.skills.some(s => maliciousSkillKeys.has(skillCollectionKey(child.id, s)));
             childHeaders.forEach(header => {
                 if (header.value === 'displayNameComp') {
@@ -476,6 +494,9 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
                                 </Box>
                                 {bundledSkillsCount > 0 && (
                                     <Badge size="small" status="info">{`${bundledSkillsCount} ${bundledSkillsCount === 1 ? 'skill' : 'skills'}`}</Badge>
+                                )}
+                                {bundledPluginsCount > 0 && (
+                                    <Badge size="small">{`${bundledPluginsCount} ${bundledPluginsCount === 1 ? 'plugin' : 'plugins'}`}</Badge>
                                 )}
                                 {childHasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
                                 {childHasMaliciousSkill && <Badge size="small" status="critical">Malicious Skills</Badge>}
@@ -508,7 +529,7 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
 
             return cells;
         });
-    }, [isPluginScope, children, handleChildClick, childHeaders, columnConfig, showCategoryColumn, maliciousSkillKeys]);
+    }, [isPluginScope, children, handleChildClick, childHeaders, columnConfig, showCategoryColumn, maliciousSkillKeys, pluginCountByAgentTag]);
 
     const columnContentTypes = useMemo(
         () => ["text", ...childHeaders.map(() => "text")],

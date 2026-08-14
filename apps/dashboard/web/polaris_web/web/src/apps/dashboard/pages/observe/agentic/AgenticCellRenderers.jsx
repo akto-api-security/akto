@@ -110,6 +110,20 @@ export function TypeBadgeCellRenderer({ value }) {
     return <TypeBadge type={value} />;
 }
 
+// Plugin rows only — the parent/child relationship every other row (Agent -> MCP servers, in the
+// flyout's tree) shows via nesting, but a plugin row IS the leaf: this column names its agent
+// directly instead, since "Type" on a plugin row is always just "Plugin".
+export function PluginAgentCellRenderer({ value }) {
+    if (!value) return null;
+    // Already formatted server-side (McpClientRegistry.formatDisplayName) — e.g. "Claude".
+    return (
+        <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+            <AssetIcon type="AI Agent" assetTagValue={value} size={20} />
+            <Text variant="bodySm">{value}</Text>
+        </HorizontalStack>
+    );
+}
+
 export function RiskScoreCellRenderer({ value }) {
     if (value == null) return null;
     return <RiskPill score={value} />;

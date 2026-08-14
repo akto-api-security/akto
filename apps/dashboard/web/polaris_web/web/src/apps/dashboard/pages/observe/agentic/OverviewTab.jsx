@@ -79,6 +79,7 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
             { label: (asset.skillCount || 0) === 1 ? "Skill" : "Skills", value: asset.skillCount || 0 },
             ...(inlineLlmCount > 0 ? [{ label: inlineLlmCount === 1 ? "LLM" : "LLMs", value: inlineLlmCount }] : []),
             ...(inlineToolCount > 0 ? [{ label: inlineToolCount === 1 ? "Tool" : "Tools", value: inlineToolCount }] : []),
+            ...(asset.pluginCount > 0 ? [{ label: asset.pluginCount === 1 ? "Plugin" : "Plugins", value: asset.pluginCount }] : []),
             { label: totalV    === 1 ? "Violation"  : "Violations",  value: totalV },
         ];
         if (asset.type === "MCP Server") {

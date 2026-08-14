@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Box, Text, Badge, HorizontalStack, VerticalStack } from "@shopify/polaris";
+import { Box, Text, Badge, HorizontalStack, VerticalStack, Divider, Spinner } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { TypeBadge, RiskPill, SeverityBadge } from "./AgenticCellRenderers";
 import { ToolDetailPanel, SkillDetailPanel } from "./McpComponentsView";
+import PluginComponentsView from "./PluginComponentsView";
 import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges";
 import agenticObserveApi, { openViolationInThreatActivity } from "./agenticObserveApi";
 import { buildMcpComponentsFromStis } from "./agenticPageBuilders";
@@ -90,7 +91,7 @@ const COMBINED_AGENT_COL_DEFS = [
         suppressHeaderMenuButton: true,
         suppressHeaderFilterButton: true,
         cellRenderer: AgentComponentTypeCellRenderer,
-        cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL", "Tool": "agentic-type-TOOL" })[p.value] || "agentic-type-DEFAULT",
+        cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL", "Plugin": "agentic-type-PLUGIN", "Tool": "agentic-type-TOOL" })[p.value] || "agentic-type-DEFAULT",
         cellStyle: { display: "flex", alignItems: "center" },
     },
     {
@@ -181,6 +182,53 @@ function AgentMcpToolsView({ asset, selectedMcp, goToList, onNavChange, setSelec
     );
 }
 
+// ── Plugin detail drill-down ──────────────────────────────────────────────────
+// Same in-place render as SkillDetailPanel above — the Components list row only carries the
+// plugin's name, so its version/scope/status/marketplace are fetched lazily on selection instead
+// of being embedded in every row of the (otherwise cheap, no-re-derivation) components list.
+
+function usePluginDetail(pluginName) {
+    const [detail, setDetail] = useState(null);
+    const [loading, setLoading] = useState(true);
+    useEffect(() => {
+        if (!pluginName) { setDetail(null); setLoading(false); return; }
+        let cancelled = false;
+        setLoading(true);
+        api.fetchAgenticAssetDetail({ groupKey: pluginName, rowType: "plugin" })
+            .then((found) => { if (!cancelled) setDetail(found); })
+            .catch(() => { if (!cancelled) setDetail(null); })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [pluginName]);
+    return { detail, loading };
+}
+
+function PluginDetailPanel({ plugin }) {
+    const pluginName = plugin?.rawName || plugin?.name;
+    const { detail, loading } = usePluginDetail(pluginName);
+
+    if (loading) {
+        return <Box padding="8"><Spinner accessibilityLabel="Loading plugin" size="small" /></Box>;
+    }
+
+    return (
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <Box paddingInlineStart="3" paddingInlineEnd="3" paddingBlockStart="3" paddingBlockEnd="2">
+                <Text variant="headingSm" as="h3" fontWeight="semibold">{plugin?.name}</Text>
+            </Box>
+            <Divider />
+            <PluginComponentsView
+                asset={{
+                    pluginVersion: detail?.pluginVersion,
+                    pluginScope: detail?.pluginScope,
+                    pluginStatus: detail?.pluginStatus,
+                    pluginMarketplace: detail?.pluginMarketplace,
+                }}
+            />
+        </div>
+    );
+}
+
 // ── Config violations drill-down ──────────────────────────────────────────────
 // Mirrors the MCP tools drill-down: a breadcrumb sub-view listing the individual config
 // violation events; clicking a row opens that event in threat-activity.
@@ -243,6 +291,7 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
     const [selectedMcp,   setSelectedMcp]   = useState(null);
     const [selectedTool,  setSelectedTool]  = useState(null);
     const [selectedSkill, setSelectedSkill] = useState(null);
+    const [selectedPlugin, setSelectedPlugin] = useState(null);
 
     // Server-side paginated — merges skills, built-in tools, and connected MCP servers into one
     // batched query instead of the old per-collection-id N+1 (see AgenticObserveAction.
@@ -254,6 +303,7 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
             apiCollectionIds: asset.collectionIds || [],
             mcpServerNames: asset.mcpServers || [],
             mcpServerCollectionIds: asset.mcpServerCollectionIds || {},
+            pluginNames: asset.pluginNames || [],
             skip,
             limit: limit || 20,
             sortKey,
@@ -263,10 +313,10 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
             value: res.components || [],
             total: res.total || 0,
         }));
-    }, [asset.id, asset.collectionIds, asset.mcpServers, asset.mcpServerCollectionIds]);
+    }, [asset.id, asset.collectionIds, asset.mcpServers, asset.mcpServerCollectionIds, asset.pluginNames]);
 
     const goToList = useCallback(() => {
-        setView("list"); setSelectedMcp(null); setSelectedTool(null); setSelectedSkill(null);
+        setView("list"); setSelectedMcp(null); setSelectedTool(null); setSelectedSkill(null); setSelectedPlugin(null);
         onNavChange?.(null);
     }, [onNavChange]);
 
@@ -316,6 +366,14 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
                 { label: asset.name, onClick: goToList },
                 { label: e.data.name },
             ]);
+        } else if (e.data._type === "Plugin") {
+            // Show the plugin's own metadata inline (same idiom as the skill drill-down above)
+            setSelectedPlugin(e.data);
+            setView("plugin-detail");
+            onNavChange?.([
+                { label: asset.name, onClick: goToList },
+                { label: e.data.name },
+            ]);
         }
     }, [setSelectedMcp, setView, onNavChange, goToList, asset.name]);
 
@@ -349,6 +407,10 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
 
     if (view === "skill-detail" && selectedSkill) {
         return <SkillDetailPanel skill={selectedSkill} collectionIds={asset?.collectionIds} />;
+    }
+
+    if (view === "plugin-detail" && selectedPlugin) {
+        return <PluginDetailPanel plugin={selectedPlugin} />;
     }
 
     if (view === "config-detail") {

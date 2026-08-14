@@ -16,6 +16,7 @@ import AgenticAssetFlyout from "./AgenticAssetFlyout";
 import {
   AssetNameCellRenderer,
   TypeBadgeCellRenderer,
+  PluginAgentCellRenderer,
   RiskScoreCellRenderer,
   ViolationsCellRenderer,
   InteractionsCellRenderer,
@@ -79,6 +80,15 @@ const COL_DEFS = [
     sortable: false,
     cellRenderer: TypeBadgeCellRenderer,
     cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL", "Plugin": "agentic-type-PLUGIN" })[p.value] || "agentic-type-DEFAULT",
+    cellStyle: { display: "flex", alignItems: "center" },
+  },
+  {
+    field: "pluginParentAgent",
+    headerName: "AI Agent",
+    width: 160,
+    filter: false,
+    sortable: false,
+    cellRenderer: PluginAgentCellRenderer,
     cellStyle: { display: "flex", alignItems: "center" },
   },
   {

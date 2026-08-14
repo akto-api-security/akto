@@ -283,6 +283,11 @@ export default {
             collectionIds: resp?.assetCollectionIds || [],
             skillNames: resp?.assetSkillNames || [],
             pluginNames: resp?.assetPluginNames || [],
+            pluginVersion: resp?.assetPluginVersion || null,
+            pluginScope: resp?.assetPluginScope || null,
+            pluginStatus: resp?.assetPluginStatus || null,
+            pluginMarketplace: resp?.assetPluginMarketplace || null,
+            pluginParentAgent: resp?.assetPluginParentAgent || null,
             mcpServers: resp?.assetMcpServers || [],
             mcpServerCollectionIds: resp?.assetMcpServerCollectionIds || {},
             devices: resp?.assetDevices || [],
@@ -338,13 +343,13 @@ export default {
     },
     // Server-side paginated Components list for ONE AI-Agent asset's flyout — merges skills,
     // built-in tools, and connected MCP servers into one batched, server-sorted/paginated list.
-    // mcpServerNames is asset.mcpServers, already known/cheap client-side, passed through rather
-    // than re-derived server-side.
-    async fetchAgenticComponentsPage({ apiCollectionIds, mcpServerNames, mcpServerCollectionIds, skip, limit, sortKey, sortOrder, queryValue } = {}) {
+    // mcpServerNames/pluginNames are asset.mcpServers/asset.pluginNames, already known/cheap
+    // client-side, passed through rather than re-derived server-side.
+    async fetchAgenticComponentsPage({ apiCollectionIds, mcpServerNames, mcpServerCollectionIds, pluginNames, skip, limit, sortKey, sortOrder, queryValue } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticComponentsPage',
             method: 'post',
-            data: { apiCollectionIds, mcpServerNames, mcpServerCollectionIds, skip, limit, sortKey, sortOrder, queryValue },
+            data: { apiCollectionIds, mcpServerNames, mcpServerCollectionIds, pluginNames, skip, limit, sortKey, sortOrder, queryValue },
         })
         return { components: resp?.components || [], total: resp?.total || 0 }
     },

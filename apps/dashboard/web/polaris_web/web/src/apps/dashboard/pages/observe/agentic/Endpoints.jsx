@@ -31,10 +31,14 @@ const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills', '
 // "unknown" is treated as disabled — an unreported status is not proof a plugin is active.
 const isPluginEnabled = (status) => String(status).toLowerCase() === 'enabled';
 
-// Plugins have no endpoints or sensitive data of their own — show their reported metadata instead.
+// Plugins have no endpoints, risk score, or sensitive data of their own — show which agent they
+// belong to instead (the parent/child relationship other rows show via the tree/dropdown), plus
+// their reported metadata.
+const pluginParentAgentHeader = {
+    title: 'AI Agent', text: 'AI Agent', value: 'pluginParentAgentComp', textValue: 'pluginParentAgent', boxWidth: '160px',
+};
 const pluginMetadataHeaders = [
     { title: 'Status', text: 'Status', value: 'pluginStatusComp', textValue: 'pluginStatus', boxWidth: '90px' },
-    { title: 'Version', text: 'Version', value: 'pluginVersion', boxWidth: '90px' },
     { title: 'Scope', text: 'Scope', value: 'pluginScope', boxWidth: '80px' },
     { title: 'Marketplace', text: 'Marketplace', value: 'pluginMarketplace', boxWidth: '160px' },
 ];
@@ -137,6 +141,15 @@ function shapeRow(row, { skillScoreMap = {}, misconfiguredSkills = new Set() } =
                 {isPluginEnabled(row.pluginStatus) ? "enabled" : "disabled"}
             </Badge>
         ) : "-",
+        // Already formatted server-side (McpClientRegistry.formatDisplayName) — e.g. "Claude", not
+        // the raw "claude"/"claudecli" tag value.
+        pluginParentAgent: row.pluginParentAgent || "-",
+        pluginParentAgentComp: isPlugin && row.pluginParentAgent ? (
+            <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+                <CollectionIcon assetTagValue={row.pluginParentAgent} displayName={row.pluginParentAgent} />
+                <Text variant="bodyMd">{row.pluginParentAgent}</Text>
+            </HorizontalStack>
+        ) : "-",
         assetTags: [
             ...(showMalicious ? ["Malicious"] : []),
             ...(showMisconfigured ? ["Misconfigured"] : []),
@@ -179,10 +192,10 @@ function Endpoints() {
     const headings = useMemo(() => {
         const h = getHeaders();
         h[1] = { ...h[1], value: "groupNameDisplay" };
-        // Plugins have no endpoints or sensitive data of their own — swap in their metadata.
         if (selectedTab === "plugins") {
             return [
-                ...h.filter((col) => col.value !== "endpointsCount" && col.value !== "sensitiveSubTypes"),
+                ...h.filter((col) => col.value !== "lastTraffic"),
+                pluginParentAgentHeader,
                 ...pluginMetadataHeaders,
             ];
         }
@@ -199,11 +212,11 @@ function Endpoints() {
         ] },
     ], []);
 
-    // Endpoints sort is meaningless on the plugins tab (they have none).
     const activeSortOptions = useMemo(
-        () => (selectedTab === "plugins" ? sortOptions.filter((o) => o.sortKey !== "endpointsCount") : sortOptions),
+        () => (selectedTab === "plugins" ? sortOptions.filter((o) => o.sortKey !== "lastSeenEpoch") : sortOptions),
         [selectedTab],
     );
+
 
     const tableCountObj = func.getTabsCount(definedTableTabs, {
         _counts: {
