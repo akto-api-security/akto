@@ -29,6 +29,7 @@ public class Cluster {
     public static final String ALERTS_CRON = "alerts-cron";
     public static final String COLLECTION_DESCRIPTION_CRON = "collection-description-cron";
     public static final String ENDPOINT_DESCRIPTION_CRON = "endpoint-description-cron";
+    public static final String AGENT_BASE_RISK_SCORE_CRON_INFO = "agent-base-risk-score-cron-info";
 
     public static final String winnerId = UUID.randomUUID().toString();
 
