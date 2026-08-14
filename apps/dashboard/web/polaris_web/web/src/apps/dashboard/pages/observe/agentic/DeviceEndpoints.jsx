@@ -100,7 +100,7 @@ function TopSection({ stats, violationsBySeverity, totalViolations }) {
             </Card>
             <Card padding="4">
                 <VerticalStack gap="2">
-                    <Text variant="headingMd" fontWeight="semibold" alignment="center">Violations by Severity</Text>
+                    <Text variant="headingMd" fontWeight="semibold">Violations by Severity</Text>
                     <HorizontalStack align="center">
                         <DonutChart
                             data={violationsChartData}
@@ -112,7 +112,7 @@ function TopSection({ stats, violationsBySeverity, totalViolations }) {
                         />
                     </HorizontalStack>
                     {Object.keys(violationsChartData).length > 0 && (
-                        <HorizontalStack gap="3" wrap align="center">
+                        <HorizontalStack gap="3" wrap align="start">
                             {Object.entries(violationsChartData).map(([key, { text, color }]) => (
                                 <HorizontalStack key={key} gap="1" blockAlign="center">
                                     <Box className="agentic-dot" style={{ "--dot-color": color }} />

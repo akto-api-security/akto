@@ -1,3 +1,5 @@
+import func from "./func";
+
 const today = new Date(new Date().setHours(0, 0, 0, 0));
 const todayDayEnd = new Date(new Date().setHours(23, 59, 59, 999));
 const yesterday = new Date(
@@ -96,7 +98,13 @@ const ranges = [
 
 // Look up a preset by alias. Call sites must use this rather than ranges[i] —
 // inserting a preset shifts every index and silently changes page defaults.
-const getRange = (alias) => ranges.find((r) => r.alias === alias) || ranges[0];
+// The demo account always opens on All time: its seeded data spans years, so the
+// normal default would land most pages on an empty range. Doing it here covers
+// every date picker at once instead of a per-page override.
+const getRange = (alias) => {
+    const wanted = func.isDemoAccount() ? "allTime" : alias;
+    return ranges.find((r) => r.alias === wanted) || ranges[0];
+};
 
 const skipList = ["GENERIC", "TRUE", "FALSE","INTEGER_32", "INTEGER_64", "NULL", "OTHER", "DICT", "FLOAT"]
 const DISABLED_AUTO_ACCOUNT_REFRESH = [1747820267,1731351930,1736798101]
