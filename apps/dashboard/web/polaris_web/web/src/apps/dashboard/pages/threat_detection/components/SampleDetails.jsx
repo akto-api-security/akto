@@ -538,7 +538,8 @@ function SampleDetails(props) {
     const SessionContextComponent = () => {
 
         const sessionId = moreInfoData?.sessionId;
-        const hasSessionId = false;
+
+        const hasSessionId = !!(sessionId && sessionId !== '');
 
         const [sessionData, setSessionData] = useState(null);
         const [sessionLoading, setSessionLoading] = useState(false);
@@ -712,7 +713,7 @@ function SampleDetails(props) {
                                 </>
                             )}
 
-                            {!sessionLoading && !sessionError && sessionPrompts.length > 0 && (
+                            {!sessionLoading && sessionPrompts.length > 0 && (
                                 <>
                                     <Divider />
                                     <VerticalStack gap={"4"}>
