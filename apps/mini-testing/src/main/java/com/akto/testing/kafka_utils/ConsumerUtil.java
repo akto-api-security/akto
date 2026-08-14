@@ -44,8 +44,6 @@ import io.confluent.parallelconsumer.ParallelStreamProcessor;
 
 public class ConsumerUtil {
 
-    private static final int DEBUG_ACCOUNT_ID = 1764738582;
-    private static final int MAX_POLL_INTERVAL_MS = 10000;
     /** If queue stays empty with no processed progress this long, treat remaining expected records as lost. */
     private static final long DRAIN_IDLE_GRACE_MS = 5L * 60L * 1000L;
     private static final long DEBUG_PROGRESS_LOG_INTERVAL_MS = 60_000L;
@@ -53,10 +51,14 @@ public class ConsumerUtil {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ConsumerUtil.class, LogDb.TESTING);
     static Properties properties = com.akto.runtime.utils.Utils.configProperties(Constants.LOCAL_KAFKA_BROKER_URL, Constants.AKTO_KAFKA_GROUP_ID_CONFIG, Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
     static{
-        properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, MAX_POLL_INTERVAL_MS);
+        properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, Constants.MAX_POLL_INTERVAL_MS);
         if (!KafkaConfig.applyAuthenticationPropertiesFromEnv(properties)) {
             loggerMaker.errorAndAddToDb("Kafka authentication is enabled but credentials are missing for testing consumer");
         }
+        loggerMaker.warnAndAddToDb("Kafka consumer config broker=" + Constants.LOCAL_KAFKA_BROKER_URL
+                + " groupId=" + Constants.AKTO_KAFKA_GROUP_ID_CONFIG
+                + " maxPollIntervalMs=" + Constants.MAX_POLL_INTERVAL_MS
+                + " maxPollRecords=" + Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
     }
     private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null;
     public static ExecutorService executor = Executors.newFixedThreadPool(150);
@@ -153,10 +155,14 @@ public class ConsumerUtil {
     }
 
     private static void debugLogToDb(int accountId, String message) {
-        if (accountId != DEBUG_ACCOUNT_ID) {
+        if (!Constants.KAFKA_DEBUG_MODE) {
             return;
         }
-        loggerMaker.insertImportantTestingLog("[DEBUG-CONSUMER-" + DEBUG_ACCOUNT_ID + "] " + message);
+        loggerMaker.warnAndAddToDb("[KAFKA-DEBUG] " + message);
+    }
+
+    private static void shutdownExecutorQuietly(int waitSeconds, boolean force) {
+        TestingExecutorLifecycle.shutdownQuietly(executor, waitSeconds, force);
     }
 
     /**
@@ -187,6 +193,7 @@ public class ConsumerUtil {
         }
 
         TestingConfigurations instance = TestingConfigurations.getInstance();
+        shutdownExecutorQuietly(5, true);
         executor = Executors.newFixedThreadPool(instance.getMaxConcurrentRequest());
 
         final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
@@ -222,172 +229,213 @@ public class ConsumerUtil {
          * This happens because the commits to kafka are periodic (5 seconds, default) and not per message.
          */
         
-        if(isConsumerRunning){
-            String topicName = Constants.TEST_RESULTS_TOPIC_NAME;
-            consumer = new KafkaConsumer<>(properties); 
-
-            ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
-                .consumer(consumer)
-                .ordering(ParallelConsumerOptions.ProcessingOrder.UNORDERED) // Use unordered for parallelism
-                .maxConcurrency(instance.getMaxConcurrentRequest()) // Number of threads for parallel processing
-                .commitMode(ParallelConsumerOptions.CommitMode.PERIODIC_CONSUMER_SYNC) // Commit offsets synchronously
-                .batchSize(1) // Number of records to process in each poll
-                .maxFailureHistory(3)
-                .build();
-
-            parallelConsumer = ParallelStreamProcessor.createEosStreamProcessor(options);
-            parallelConsumer.subscribe(Arrays.asList(topicName));
-            debugLogToDb(accountId, "consumer started summaryId=" + summaryIdForTest
-                    + " expectedRecords=" + expectedRecords
-                    + " maxConcurrency=" + instance.getMaxConcurrentRequest());
-        }
-
+        boolean consumerFailed = false;
         try {
-            if(parallelConsumer != null){
-            parallelConsumer.poll(record -> {
-                String threadName = Thread.currentThread().getName();
-                String message = record.value();
-                // Stable id per Kafka record: same record redelivered (e.g. after rebalance/restart) will log the same id again.
-                String recordId = record.getSingleConsumerRecord().topic() + "-p" + record.getSingleConsumerRecord().partition() + "-o" + record.offset();
-                polledRecords.incrementAndGet();
-                loggerMaker.infoAndAddToDb("Thread [" + threadName + "] picked up record recordId=" + recordId + " " + message);
-                debugLogToDb(accountId, "picked up recordId=" + recordId + " polled=" + polledRecords.get());
-                try {
-                    if(!executor.isShutdown()){
-                        Future<?> future = executor.submit(() -> runTestFromMessage(message));
-                        firstRecordRead.set(true);
-                        try {
-                            future.get(maxRunTimeForTests, TimeUnit.SECONDS); 
-                        } catch (TimeoutException e) {
-                            String errMsg = "Task timed out recordId=" + recordId
-                                    + " after " + maxRunTimeForTests + "s";
-                            loggerMaker.errorAndAddToDb(e, errMsg);
-                            debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
-                            future.cancel(true);
-                            createTimedOutResultFromMessage(message);
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            String errMsg = "Task interrupted recordId=" + recordId;
-                            loggerMaker.errorAndAddToDb(e, errMsg);
-                            debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
-                            future.cancel(true);
-                            createTimedOutResultFromMessage(message);
-                        } catch(RejectedExecutionException e){
-                            String errMsg = "Task rejected recordId=" + recordId
-                                    + " (executor shutdown or saturated)";
-                            loggerMaker.errorAndAddToDb(e, errMsg);
-                            debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
-                            future.cancel(true);
-                        } catch (Exception e) {
-                            future.cancel(true);
-                            String errMsg = "Error in task execution recordId=" + recordId;
-                            loggerMaker.errorAndAddToDb(e, errMsg);
-                            debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
+            boolean restartConsumer = isConsumerRunning;
+            while (restartConsumer) {
+                restartConsumer = false;
+                if (parallelConsumer != null) {
+                    try {
+                        parallelConsumer.closeDontDrainFirst();
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error closing parallel consumer: " + e.getClass().getSimpleName()
+                                + " " + e.getMessage());
+                    }
+                    parallelConsumer = null;
+                    firstRecordRead.set(false);
+                }
+                if (consumer != null) {
+                    try {
+                        consumer.close();
+                    } catch (Exception e) {
+                        loggerMaker.warnAndAddToDb("Error closing previous kafka consumer: " + e.getMessage());
+                    }
+                }
+                consumer = new KafkaConsumer<>(properties);
+                ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
+                    .consumer(consumer)
+                    .ordering(ParallelConsumerOptions.ProcessingOrder.UNORDERED)
+                    .maxConcurrency(instance.getMaxConcurrentRequest())
+                    .commitMode(ParallelConsumerOptions.CommitMode.PERIODIC_CONSUMER_SYNC)
+                    .batchSize(1)
+                    .maxFailureHistory(3)
+                    .build();
+                parallelConsumer = ParallelStreamProcessor.createEosStreamProcessor(options);
+                parallelConsumer.subscribe(Arrays.asList(Constants.TEST_RESULTS_TOPIC_NAME));
+                loggerMaker.warnAndAddToDb("consumer started summaryId=" + summaryIdForTest
+                        + " expectedRecords=" + expectedRecords
+                        + " maxConcurrency=" + instance.getMaxConcurrentRequest()
+                        + " maxPollIntervalMs=" + Constants.MAX_POLL_INTERVAL_MS
+                        + " poolSize=" + instance.getMaxConcurrentRequest()
+                        + " broker=" + Constants.LOCAL_KAFKA_BROKER_URL);
+
+                parallelConsumer.poll(record -> {
+                    String threadName = Thread.currentThread().getName();
+                    String message = record.value();
+                    String recordId = record.getSingleConsumerRecord().topic() + "-p" + record.getSingleConsumerRecord().partition() + "-o" + record.offset();
+                    polledRecords.incrementAndGet();
+                    loggerMaker.infoAndAddToDb("Thread [" + threadName + "] picked up record recordId=" + recordId + " " + message);
+                    debugLogToDb(accountId, "picked up recordId=" + recordId + " polled=" + polledRecords.get());
+                    try {
+                        if(!executor.isShutdown()){
+                            Future<?> future = executor.submit(() -> runTestFromMessage(message));
+                            firstRecordRead.set(true);
+                            try {
+                                future.get(maxRunTimeForTests, TimeUnit.SECONDS);
+                            } catch (TimeoutException e) {
+                                String errMsg = "Task timed out recordId=" + recordId
+                                        + " after " + maxRunTimeForTests + "s";
+                                loggerMaker.errorAndAddToDb(e, errMsg);
+                                debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
+                                future.cancel(true);
+                                createTimedOutResultFromMessage(message);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                String errMsg = "Task interrupted recordId=" + recordId;
+                                loggerMaker.errorAndAddToDb(e, errMsg);
+                                debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
+                                future.cancel(true);
+                                createTimedOutResultFromMessage(message);
+                            } catch(RejectedExecutionException e){
+                                String errMsg = "Task rejected recordId=" + recordId
+                                        + " (executor shutdown or saturated)";
+                                loggerMaker.errorAndAddToDb(e, errMsg);
+                                debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
+                                future.cancel(true);
+                            } catch (Exception e) {
+                                future.cancel(true);
+                                String errMsg = "Error in task execution recordId=" + recordId;
+                                loggerMaker.errorAndAddToDb(e, errMsg);
+                                debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
+                            }
                         }
+                    } catch (Exception err) {
+                        String errMsg = "Thread [" + threadName + "] error executing recordId=" + recordId;
+                        loggerMaker.errorAndAddToDb(err, errMsg);
+                        debugLogToDb(accountId, errMsg + " cause=" + err.getMessage());
+                    } finally {
+                        processedRecords.incrementAndGet();
+                        loggerMaker.infoAndAddToDb("Thread [" + threadName + "] finished processing record recordId=" + recordId);
+                        debugLogToDb(accountId, "finished recordId=" + recordId + " executed=" + processedRecords.get());
                     }
-                    
-                } catch (Exception err) {
-                    String errMsg = "Thread [" + threadName + "] error executing recordId=" + recordId;
-                    loggerMaker.errorAndAddToDb(err, errMsg);
-                    debugLogToDb(accountId, errMsg + " cause=" + err.getMessage());
-                } finally {
-                    processedRecords.incrementAndGet();
-                    loggerMaker.infoAndAddToDb("Thread [" + threadName + "] finished processing record recordId=" + recordId);
-                    debugLogToDb(accountId, "finished recordId=" + recordId + " executed=" + processedRecords.get());
-                }
-            });
-        }
+                });
 
-            long drainIdleSinceMs = -1L;
-            int lastProcessedSeen = -1;
-            long lastDebugLogMs = 0L;
-            int lastLoggedProcessed = -1;
-            int lastLoggedPolled = -1;
-            while (parallelConsumer != null) {
-                if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId)){
-                    loggerMaker.infoAndAddToDb("Tests have been marked stopped.");
-                    executor.shutdownNow();
-                    break;
-                }
-                else if ((Context.now() - startTime >= effectiveMaxRunTime)) {
-                    loggerMaker.infoAndAddToDb("Max run time reached. Stopping consumer.");
-                    executor.shutdownNow();
-                    break;
-                }
-
-                int processed = processedRecords.get();
-                if (processed > lastProcessedSeen) {
-                    lastProcessedSeen = processed;
-                    drainIdleSinceMs = -1L;
-                }
-
-                long workRemaining = parallelConsumer.workRemaining();
-                long nowMs = System.currentTimeMillis();
-                int polled = polledRecords.get();
-                // Periodic progress only when counts moved (avoids duplicate spam while idle)
-                if (nowMs - lastDebugLogMs >= DEBUG_PROGRESS_LOG_INTERVAL_MS
-                        && (polled != lastLoggedPolled || processed != lastLoggedProcessed)) {
-                    int left = expectedRecords > 0 ? Math.max(0, expectedRecords - processed) : -1;
-                    debugLogToDb(accountId, "polled=" + polled + " executed=" + processed
-                            + " expected=" + expectedRecords + " left=" + left
-                            + " workRemaining=" + workRemaining);
-                    lastDebugLogMs = nowMs;
-                    lastLoggedPolled = polled;
-                    lastLoggedProcessed = processed;
-                }
-
-                boolean locallyEmpty = firstRecordRead.get() && workRemaining == 0;
-                if (locallyEmpty) {
-                    if (expectedRecords > 0 && processed >= expectedRecords) {
-                        int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
-                        loggerMaker.insertImportantTestingLog(
-                                "All expected records processed: " + processed + "/" + expectedRecords
-                                        + " (workRemaining=0)");
-                        executor.shutdown();
-                        executor.awaitTermination(remainingTime, TimeUnit.SECONDS);
+                long drainIdleSinceMs = -1L;
+                int lastProcessedSeen = -1;
+                long lastDebugLogMs = 0L;
+                int lastLoggedProcessed = -1;
+                int lastLoggedPolled = -1;
+                while (parallelConsumer != null) {
+                    if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId)){
+                        loggerMaker.warnAndAddToDb("Tests have been marked stopped.");
+                        executor.shutdownNow();
+                        break;
+                    }
+                    else if ((Context.now() - startTime >= effectiveMaxRunTime)) {
+                        loggerMaker.warnAndAddToDb("Max run time reached. Stopping consumer.");
+                        executor.shutdownNow();
                         break;
                     }
 
-                    if (drainIdleSinceMs < 0) {
-                        drainIdleSinceMs = nowMs;
-                    } else if (nowMs - drainIdleSinceMs >= DRAIN_IDLE_GRACE_MS) {
-                        int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
-                        loggerMaker.insertImportantTestingLog(
-                                "No progress for " + DRAIN_IDLE_GRACE_MS + "ms with incomplete records: "
-                                        + processed + "/" + expectedRecords
-                                        + " (workRemaining=0). Completing consumer.");
-                        executor.shutdown();
-                        executor.awaitTermination(remainingTime, TimeUnit.SECONDS);
-                        break;
+                    int processed = processedRecords.get();
+                    if (processed > lastProcessedSeen) {
+                        lastProcessedSeen = processed;
+                        drainIdleSinceMs = -1L;
                     }
-                } else {
-                    drainIdleSinceMs = -1L;
+
+                    long workRemaining = parallelConsumer.workRemaining();
+                    long nowMs = System.currentTimeMillis();
+                    int polled = polledRecords.get();
+                    if (nowMs - lastDebugLogMs >= DEBUG_PROGRESS_LOG_INTERVAL_MS
+                            && (polled != lastLoggedPolled || processed != lastLoggedProcessed)) {
+                        int left = expectedRecords > 0 ? Math.max(0, expectedRecords - processed) : -1;
+                        loggerMaker.warnAndAddToDb("consumer progress polled=" + polled + " executed=" + processed
+                                + " expected=" + expectedRecords + " left=" + left
+                                + " workRemaining=" + workRemaining);
+                        lastDebugLogMs = nowMs;
+                        lastLoggedPolled = polled;
+                        lastLoggedProcessed = processed;
+                    }
+
+                    boolean locallyEmpty = firstRecordRead.get() && workRemaining == 0;
+                    if (locallyEmpty) {
+                        if (expectedRecords > 0 && processed >= expectedRecords) {
+                            int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
+                            loggerMaker.warnAndAddToDb(
+                                    "All expected records processed: " + processed + "/" + expectedRecords
+                                            + " (workRemaining=0)");
+                            executor.shutdown();
+                            executor.awaitTermination(remainingTime, TimeUnit.SECONDS);
+                            break;
+                        }
+
+                        if (drainIdleSinceMs < 0) {
+                            drainIdleSinceMs = nowMs;
+                        } else if (nowMs - drainIdleSinceMs >= DRAIN_IDLE_GRACE_MS) {
+                            if (expectedRecords > 0 && processed < expectedRecords) {
+                                loggerMaker.warnAndAddToDb(
+                                        "No progress for " + DRAIN_IDLE_GRACE_MS + "ms with incomplete records: "
+                                                + processed + "/" + expectedRecords
+                                                + " (workRemaining=0). Restarting consumer from last sync commit.");
+                                restartConsumer = true;
+                                break;
+                            }
+                            int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
+                            loggerMaker.warnAndAddToDb(
+                                    "No progress for " + DRAIN_IDLE_GRACE_MS + "ms with incomplete records: "
+                                            + processed + "/" + expectedRecords
+                                            + " (workRemaining=0). Completing consumer.");
+                            executor.shutdown();
+                            executor.awaitTermination(remainingTime, TimeUnit.SECONDS);
+                            break;
+                        }
+                    } else {
+                        drainIdleSinceMs = -1L;
+                    }
+                    Thread.sleep(100);
                 }
-                Thread.sleep(100);
             }
 
         } catch (Exception e) {
+            consumerFailed = true;
             String errMsg = "Error in polling records summaryId=" + summaryIdForTest
                     + " polled=" + polledRecords.get()
                     + " executed=" + processedRecords.get()
-                    + " expected=" + expectedRecords;
+                    + " expected=" + expectedRecords
+                    + " errorType=" + e.getClass().getName()
+                    + " cause=" + (e.getCause() != null ? e.getCause().getClass().getName() + ": " + e.getCause().getMessage() : e.getMessage());
             loggerMaker.errorAndAddToDb(e, errMsg);
-            debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
         }finally{
             int finalPolled = polledRecords.get();
             int finalExecuted = processedRecords.get();
             int finalLeft = expectedRecords > 0 ? Math.max(0, expectedRecords - finalExecuted) : -1;
-            debugLogToDb(accountId, "consumer closing polled=" + finalPolled
-                    + " executed=" + finalExecuted + " expected=" + expectedRecords + " left=" + finalLeft);
-            loggerMaker.infoAndAddToDb("Closing consumer as all results have been executed.");
+            loggerMaker.warnAndAddToDb("consumer closing polled=" + finalPolled
+                    + " executed=" + finalExecuted + " expected=" + expectedRecords + " left=" + finalLeft
+                    + " failed=" + consumerFailed);
 
             flushLastTestedUpdates();
+            shutdownExecutorQuietly(consumerFailed ? 5 : 30, consumerFailed);
 
             if(parallelConsumer != null){
-                parallelConsumer.closeDrainFirst();
+                try {
+                    if (consumerFailed) {
+                        parallelConsumer.closeDontDrainFirst();
+                    } else {
+                        parallelConsumer.closeDrainFirst();
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error closing parallel consumer: " + e.getClass().getSimpleName()
+                            + " " + e.getMessage());
+                }
             }
             parallelConsumer = null;
-            consumer.close();
+            if (consumer != null) {
+                try {
+                    consumer.close();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e,"Error closing kafka consumer: " + e.getMessage());
+                }
+            }
             Producer.deleteTestResultsTopic();
             TestingStateStore.clear();
         }

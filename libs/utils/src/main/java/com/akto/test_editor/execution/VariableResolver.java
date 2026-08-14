@@ -542,6 +542,10 @@ public class VariableResolver {
                     List<String> tempResult = new ArrayList<>();
                     for (String temp : result) {
                         for (Object word : wordList) {
+                            if (Thread.interrupted()) {
+                                Thread.currentThread().interrupt();
+                                throw new RuntimeException("Word list resolution interrupted");
+                            }
                             // TODO: handle case to use numbers as well.
                             String tempWord = temp.replace(wordListKey, word.toString());
                             expression = tempWord;
@@ -551,6 +555,8 @@ public class VariableResolver {
                     result = tempResult;
                     matcher = pattern.matcher(expression);
                 }
+            } catch (RuntimeException e) {
+                throw e;
             } catch (Exception e) {
                 e.printStackTrace();
             }
