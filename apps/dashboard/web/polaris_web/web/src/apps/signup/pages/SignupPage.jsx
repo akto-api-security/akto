@@ -16,7 +16,7 @@ function SignupPage() {
                 <Box paddingBlockStart={"24"} paddingInlineStart={"20"} paddingInlineEnd={"8"}>
                     <VerticalStack gap="6">
                         <Text variant="heading3xl" fontWeight="medium">
-                            {`"It's truly a game-changer and we highly recommend Akto to anyone looking to effortlessly secure their API endpoints."`}
+                            {`"It's truly a game-changer and we highly recommend Akto as an AI Security platform to anyone looking to secure their AI agents, MCPs, LLMs, Agent skills & gen AI apps."`}
                         </Text>
                         <Box>
                             <Text variant="headingLg">— Security team</Text>
