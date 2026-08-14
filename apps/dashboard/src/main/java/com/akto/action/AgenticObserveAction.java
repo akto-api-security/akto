@@ -818,7 +818,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             int skillCount = 0;
             boolean childMalicious = false;
-            if (c.getSkills() != null) {
+            boolean skipSkillsForPluginCollapsedService = "service".equals(rowType)
+                    && AgenticObserveUtil.getOwningPluginName(c) != null;
+            if (c.getSkills() != null && !skipSkillsForPluginCollapsedService) {
                 skillCount = c.getSkills().size();
                 for (String s : c.getSkills()) {
                     if (StringUtils.isNotBlank(s) && maliciousSkillKeys.contains(idStr + "|" + s.toLowerCase(Locale.ROOT))) {
@@ -1673,6 +1675,20 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     });
                     agentGroup.pluginNames.add(pluginKey);
                 }
+
+                if (hasTagKey(envType, Constants.AKTO_MCP_SERVER_TAG)) {
+                    String serverGroupName = extractServiceNameForGrouping(hostName);
+                    if (StringUtils.isNotBlank(serverGroupName)) {
+                        GroupSummary sg = groups.computeIfAbsent("service|" + serverGroupName, k -> {
+                            GroupSummary gs = new GroupSummary(serverGroupName, "service");
+                            gs.name = serverGroupName;
+                            gs.clientType = AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER;
+                            return gs;
+                        });
+                        sg.accumulateCheap(c, hostName, envType, collRisk, collTraffic, deviceId, sensitive);
+                        if (sg.owningPluginName == null) sg.owningPluginName = pluginName;
+                    }
+                }
                 continue;
             }
 
@@ -2292,7 +2308,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     if (!"service".equals(other.rowType) && !"llm".equals(other.rowType)) continue;
                     boolean ownedByThisPlugin = false;
                     for (Integer id : other.collectionIds) {
-                        if (ownCollectionIds.contains(id)) continue;
+
                         ApiCollection c = byId.get(id);
                         // Match by g.name (bare plugin name — a server's plugin-name tag never
                         // carries the owner-agent suffix), NOT groupKey, which is the compound

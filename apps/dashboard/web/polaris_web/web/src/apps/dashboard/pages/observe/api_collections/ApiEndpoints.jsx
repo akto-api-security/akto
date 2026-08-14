@@ -484,6 +484,8 @@ function ApiEndpoints(props) {
             allEndpoints = allEndpoints.filter(e => e?.endpoint?.includes('/skills/'))
         } else if (agenticView === 'plugins') {
             allEndpoints = allEndpoints.filter(e => e?.endpoint?.includes('/plugin/'))
+        } else if (agenticView === 'mcp') {
+            allEndpoints = allEndpoints.filter(e => !e?.endpoint?.includes('/skills/') && !e?.endpoint?.includes('/plugin/'))
         }
 
         // handle code analysis endpoints

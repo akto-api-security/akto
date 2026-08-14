@@ -370,7 +370,7 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
     // row shows only its skills, instead of mixing both.
     const handleChildClick = useCallback((collection) => {
         const childCategory = getAgenticCategoryLabel(collection);
-        const bundlesComponents = childCategory === CLIENT_TYPES.AI_AGENT || childCategory === CLIENT_TYPES.MCP_SERVER;
+        const bundlesComponents = childCategory === CLIENT_TYPES.AI_AGENT || childCategory === CLIENT_TYPES.MCP_SERVER || childCategory === CLIENT_TYPES.SKILL;
         const bundlesSkills = bundlesComponents && Array.isArray(collection?.skills) && collection.skills.length > 0;
         const scope = bundlesSkills ? '?agentic_view=skills' : '';
         if (collection?.nextUrl) {

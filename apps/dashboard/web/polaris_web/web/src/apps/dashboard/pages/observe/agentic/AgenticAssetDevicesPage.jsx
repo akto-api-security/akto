@@ -91,8 +91,9 @@ function ChildrenTable({ children, rowType, misconfiguredChildId, onOpenBundle }
         // Plugin rows: the child IS the plugin's own metadata endpoint — open the bundled
         // components list instead of navigating to its raw endpoint in Inventory.
         if (rowType === "plugin") { onOpenBundle?.(); return; }
-        const bundlesSkills = (rowType === "agent" || rowType === "service") && (child.skillCount || 0) > 0;
-        const scope = bundlesSkills ? "?agentic_view=skills" : "";
+        const bundlesSkills = rowType === "skill" || ((rowType === "agent" || rowType === "service") && (child.skillCount || 0) > 0);
+        const isPluginCollapsedService = rowType === "service" && !!child.owningPluginName;
+        const scope = bundlesSkills ? "?agentic_view=skills" : (isPluginCollapsedService ? "?agentic_view=mcp" : "");
         navigate(`/dashboard/observe/inventory/${child.id}${scope}`);
     }, [navigate, rowType, onOpenBundle]);
 
