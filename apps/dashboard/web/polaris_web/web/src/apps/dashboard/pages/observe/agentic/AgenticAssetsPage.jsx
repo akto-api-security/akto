@@ -148,6 +148,17 @@ const COL_DEFS = [
     filterParams: { values: ["Contains personal account", "Local MCP Server", "Misconfigured", "Malicious Skill"] },
     sortable: false,
   },
+  {
+    field: "severity",
+    headerName: "Severity",
+    hide: true,
+    // Filter-only, same pattern as "tags" above — drives the Violations card's Critical/High/
+    // Medium/Low chips (handleSeverityClick), matched server-side against each group's own
+    // violation counts (AgenticObserveAction.fetchAgenticAssetsSummary's "severity" filter branch).
+    filter: "agSetColumnFilter",
+    filterParams: { values: ["critical", "high", "medium", "low"] },
+    sortable: false,
+  },
 ];
 
 const DEFAULT_COL_DEF = {
@@ -300,6 +311,23 @@ export default function AgenticAssetsPage() {
         const values = [...next];
         const model = values.length > 0 ? { filterType: "set", values } : null;
         gridApi.setColumnFilterModel("type", model).then(() => gridApi.onFilterChanged());
+      }
+      return next;
+    });
+  }, []);
+
+  // Same toggle pattern as handleAssetTypeClick above, driving the hidden "severity" column
+  // filter instead of "type" — wires up the Violations card's Critical/High/Medium/Low chips.
+  const [activeSeverityFilter, setActiveSeverityFilter] = useState(new Set());
+  const handleSeverityClick = useCallback((key) => {
+    setActiveSeverityFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      const gridApi = gridRef.current?.api;
+      if (gridApi) {
+        const values = [...next];
+        const model = values.length > 0 ? { filterType: "set", values } : null;
+        gridApi.setColumnFilterModel("severity", model).then(() => gridApi.onFilterChanged());
       }
       return next;
     });
@@ -585,6 +613,8 @@ export default function AgenticAssetsPage() {
               sparklineColor="#DC2626"
               sparklineLabels={stats.monthLabels}
               breakdown={violBreakdown}
+              onFilterClick={handleSeverityClick}
+              activeFilter={activeSeverityFilter}
               noCard
             />
           </Box>
@@ -603,7 +633,7 @@ export default function AgenticAssetsPage() {
         emptyStateText="No violations"
       />
     </HorizontalGrid>
-  ), [totalAssets, assetTypeBreakdown, violationTotals, violBreakdown, stats, topAppsRows, topViolRows, handleAssetTypeClick, activeTypeFilter]);
+  ), [totalAssets, assetTypeBreakdown, violationTotals, violBreakdown, stats, topAppsRows, topViolRows, handleAssetTypeClick, activeTypeFilter, handleSeverityClick, activeSeverityFilter]);
 
   if (loading) {
     return (

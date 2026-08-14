@@ -264,7 +264,7 @@ export default {
             method: 'post',
             data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap },
         })
-        return { rows: resp?.rows || [], total: resp?.total || 0 }
+        return { rows: resp?.rows || [], total: resp?.total || 0, distinctUsernames: resp?.distinctUsernames || [] }
     },
     // Lazy per-asset detail (hostNames/collectionIds/skillCount/mcpServers/mcpServerCollectionIds/
     // deviceCount+deviceSample) for exactly ONE group — fetched only when a user opens that asset's flyout, not

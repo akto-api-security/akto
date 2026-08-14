@@ -1811,6 +1811,27 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                         return groupTags.stream().noneMatch(allowedTags::contains);
                     });
                 }
+                // "username" — a group matches if ANY of its member devices resolves (via the client's
+                // Endpoint Shield usernameMap) to one of the selected usernames. Mirrors
+                // resolveUsernameByDeviceId's use elsewhere in this class (e.g. fetchAgenticAssetDetail).
+                if (filters.containsKey("username")) {
+                    Set<String> allowedUsernames = new HashSet<>(filters.get("username"));
+                    Map<String, String> resolveMap = usernameMap != null ? usernameMap : Collections.emptyMap();
+                    all.removeIf(g -> g.endpointIds.stream()
+                            .noneMatch(id -> allowedUsernames.contains(resolveUsernameByDeviceId(id, resolveMap))));
+                }
+                // "severity" — drives the Violations card's Critical/High/Medium/Low chips. Skill rows
+                // never carry violations on this grid (see the row-loop's own comment below), so they
+                // never match. Same "null when zero" contract as sumViolationsForCollections itself.
+                if (filters.containsKey("severity")) {
+                    Set<String> allowedSeverities = new HashSet<>(filters.get("severity"));
+                    all.removeIf(g -> {
+                        if ("skill".equals(g.rowType)) return true;
+                        BasicDBObject v = sumViolationsForCollections(g.collectionIds, violationsByCollectionId);
+                        if (v == null) return true;
+                        return allowedSeverities.stream().noneMatch(s -> v.getInt(s, 0) > 0);
+                    });
+                }
             }
 
             long total = all.size();
@@ -1873,6 +1894,19 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
             loggerMaker.warnAndAddToDb("[fetchAgenticAssetsSummary-timing] TOTAL=" + (System.currentTimeMillis() - tStart)
                     + "ms, rows=" + rowsOut.size() + ", accountCollections=" + collections.size());
+
+            // Current-page-only, same as fetchAgenticAssetEndpointsPage's distinctUsernames — the
+            // client accumulates these across page turns to progressively populate the Username filter's
+            // choices (see Endpoints.jsx's updateFilterChoicesIfChanged).
+            Map<String, String> resolveMapForChoices = usernameMap != null ? usernameMap : Collections.emptyMap();
+            Set<String> distinctUsernames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            for (GroupSummary g : page) {
+                for (String id : g.endpointIds) {
+                    String u = resolveUsernameByDeviceId(id, resolveMapForChoices);
+                    if (StringUtils.isNotBlank(u) && !"-".equals(u)) distinctUsernames.add(u);
+                }
+            }
+            response.put("distinctUsernames", new ArrayList<>(distinctUsernames));
 
             response.put("rows", rowsOut);
             response.put("total", total);
