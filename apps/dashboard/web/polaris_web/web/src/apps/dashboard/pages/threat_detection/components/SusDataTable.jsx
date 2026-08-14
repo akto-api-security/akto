@@ -750,8 +750,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       const complianceMapData = resolveComplianceClauseMap(x, needsGuardrailCompliance, threatFiltersMap, guardrailComplianceMap);
       const complianceList = Object.keys(complianceMapData);
 
-      // Determine if this is session-based by checking if sessionId is present and not empty
-      const isSessionBased = x?.sessionId && x.sessionId !== '';
+      // TEMP: force Single Prompt for all events until backend-resolved detection type ships
+      const isSessionBased = false;
 
       let nextUrl = null;
       if (x.refId && x.eventType && x.filterId) {

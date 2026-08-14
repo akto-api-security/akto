@@ -41,6 +41,10 @@ const threatDetectionFunc = {
                   text: usedName,
                   value: categoryRes[x],
                   color: "#A5B4FC",
+                  // For guardrail policy events, category and filterId are the same string (e.g.
+                  // "Block - Confidential Business Information"), so this still works as the
+                  // 'latestAttack' click-to-filter key, same as subcategoryCountRes's filterKey.
+                  filterKey: x,
                 };
             })
             return {
