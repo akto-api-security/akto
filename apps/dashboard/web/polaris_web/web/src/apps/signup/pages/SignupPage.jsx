@@ -4,10 +4,10 @@ import { Box, Text, VerticalStack } from '@shopify/polaris'
 
 function SignupPage() {
 
+    // No border: mainproduct.png ships its own framed card on a purple bleed.
     const imageStyle = {
         width: '953px',
         borderRadius: '12px',
-        border: '6px solid',
         marginTop: '90px'
     }
     return (
@@ -22,7 +22,7 @@ function SignupPage() {
                             <Text variant="headingLg">— Security team</Text>
                             <Text fontWeight="medium" color="subdued">Enterprise SaaS customer</Text>
                         </Box>
-                        <img  src="/public/productss.png" alt='ss' style={{...imageStyle}}/>
+                        <img  src="/public/mainproduct.png" alt='Akto Agentic Discovery' style={{...imageStyle}}/>
                     </VerticalStack>
                 </Box>
             </div>
