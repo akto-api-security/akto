@@ -1811,10 +1811,25 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     @Getter private List<String> assetHostNames;
     @Getter private List<Integer> assetCollectionIds;
-    @Getter private List<String> assetSkillNames;
+    // Count only, not the full name list — the only consumer is the Overview tab's topology graph,
+    // which just needs a "N Skills" summary node (see AssetTopologyGraph.jsx). The actual skill
+    // *names* are never read off this response: the Components tab's fetchAgenticComponentsPage
+    // independently re-derives its own full skill listing straight from apiCollectionIds/STIs when
+    // opened (see its own comment), so shipping g.skillNames here too was pure duplicate payload —
+    // unlike assetMcpServers/assetHostNames below, which ARE consumed as real inputs downstream
+    // (AgentComponentsView's Components-tab fetch and ViolationsTab's own query, respectively).
+    @Getter private int assetSkillCount;
     @Getter private List<String> assetMcpServers;
     @Getter private Map<String, List<Integer>> assetMcpServerCollectionIds;
-    @Getter private List<BasicDBObject> assetDevices;
+    // Count + a small capped sample only, not the full per-device list — mirrors assetSkillCount's
+    // reasoning above. The flyout's Devices tab never reads this at all (it independently calls the
+    // server-paginated fetchAgenticAssetDevicesPage, scoped by assetCollectionIds); the Overview tab
+    // only needs the count (a "Devices: N" stat) and one sample deviceId (a risk-factor deep link);
+    // and the topology graph only ever rendered a handful of device nodes usefully anyway — one
+    // ReactFlow node per device stopped making sense once a group had hundreds/thousands of members.
+    // A group with 1000 devices turned assetDevices into ~260KB of a ~630KB response on its own.
+    @Getter private int assetDeviceCount;
+    @Getter private List<BasicDBObject> assetDeviceSample;
     @Getter private String assetTagKey;
     @Getter private List<String> assetRawTagValues;
     // Inline-topology summary for the flyout's Overview tab — computed here (scoped to just this
@@ -1828,7 +1843,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Getter private int assetMcpComponentCount;
 
     /**
-     * Lazy per-asset detail — hostNames/collectionIds/skillNames/mcpServers/mcpServerCollectionIds/
+     * Lazy per-asset detail — hostNames/collectionIds/skillCount/mcpServers/mcpServerCollectionIds/
      * devices for exactly ONE group (identified by groupKey+rowType, both already on every row
      * fetchAgenticAssetsSummary returns), fetched only when a user actually opens that asset's
      * flyout instead of being shipped for all 50 rows of every page (see toSummaryResponse()'s
@@ -1840,6 +1855,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
      * trafficMap/riskScoreMap/userAnalysisFlatMap are the same account-wide maps already sent to
      * fetchAgenticAssetsSummary/fetchAgenticAssetDevicesPage — reused here for the same per-device
      * enrichment (risk score, last seen, AI interactions) the Overview tab's topology graph needs.
+     * Ships skillCount rather than the full skill-name list (see assetSkillCount's own comment) —
+     * the individual names aren't read by anything downstream of this response. Likewise ships
+     * deviceCount + a small capped deviceSample rather than the full per-device list (see
+     * assetDeviceCount/assetDeviceSample's own comment) — the Devices tab re-fetches its own
+     * paginated device list and never reads this response's devices at all.
      */
     public String fetchAgenticAssetDetail() {
         response = new BasicDBObject();
@@ -1863,10 +1883,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (g == null) {
                 assetHostNames = Collections.emptyList();
                 assetCollectionIds = Collections.emptyList();
-                assetSkillNames = Collections.emptyList();
+                assetSkillCount = 0;
                 assetMcpServers = Collections.emptyList();
                 assetMcpServerCollectionIds = Collections.emptyMap();
-                assetDevices = Collections.emptyList();
+                assetDeviceCount = 0;
+                assetDeviceSample = Collections.emptyList();
                 assetTagKey = null;
                 assetRawTagValues = Collections.emptyList();
                 assetHasInlineLlm = false;
@@ -1877,7 +1898,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             assetHostNames = new ArrayList<>(g.hostNames);
             assetCollectionIds = g.collectionIds;
-            assetSkillNames = new ArrayList<>(g.skillNames);
+            assetSkillCount = g.skillNames.size();
             assetMcpServers = new ArrayList<>(g.serviceNames);
             assetMcpServerCollectionIds = new HashMap<>();
             for (Map.Entry<String, Set<Integer>> e : g.serviceCollectionIds.entrySet()) {
@@ -1889,7 +1910,19 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<Integer, ApiCollection> byId = new HashMap<>();
             for (ApiCollection c : collections) byId.put(c.getId(), c);
             Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
-            assetDevices = buildDevicesForGroup(g, byId, traffic, risk, userAnalysis);
+            // Count comes from the same accumulateDevices() map buildDevicesForGroup uses internally —
+            // that per-collection accumulation pass can't be skipped for the count either way, but we
+            // avoid the more costly per-device toResponse()/serialization step for anything past the
+            // small sample cap below (that's what actually bloated the payload, not the accumulation).
+            Map<String, DeviceAcc> deviceAccs = accumulateDevices(g.collectionIds, byId, traffic, risk, userAnalysis);
+            assetDeviceCount = deviceAccs.size();
+            List<BasicDBObject> deviceSample = new ArrayList<>();
+            int deviceSampleCap = 6;
+            for (DeviceAcc d : deviceAccs.values()) {
+                if (deviceSample.size() >= deviceSampleCap) break;
+                deviceSample.add(d.toResponse());
+            }
+            assetDeviceSample = deviceSample;
 
             // Scoped to just THIS asset's own collectionIds (never account-wide) — same STI
             // aggregation fetchAgenticComponentsPage already runs when the Components tab opens, just
