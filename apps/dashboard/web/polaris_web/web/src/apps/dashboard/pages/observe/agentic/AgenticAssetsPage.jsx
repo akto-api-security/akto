@@ -33,7 +33,6 @@ import {
   buildUserAnalysisLookup,
   buildUserAnalysisFlatMap,
   fetchAndCacheSkillApiData,
-  fetchAndCacheAgenticTrafficRiskBundle,
 } from "./constants";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
@@ -53,6 +52,7 @@ const SORT_FIELD_MAP = {
   riskScore: "riskScore",
   endpointCount: "endpointsCount",
   violations: "violations",
+  lastSeen: "lastSeenEpoch",
 };
 
 const COL_DEFS = [
@@ -130,7 +130,7 @@ const COL_DEFS = [
     headerName: "Last Traffic Seen",
     width: 150,
     filter: false,
-    sortable: false,
+    // Backend already supports sorting by lastSeenEpoch
     cellStyle: {
       display: "flex",
       alignItems: "center",
@@ -195,8 +195,8 @@ function TableSection({
   endTimestamp,
   refreshKey,
   enrichMaps,
+  gridRef,
 }) {
-  const gridRef = useRef(null);
   const didAutoOpenRef = useRef(false);
 
   // ?asset= deep link — best-effort: matches against whatever the grid has already fetched (the
@@ -287,6 +287,24 @@ export default function AgenticAssetsPage() {
   const newLayout = LocalStore((state) => state.agenticNewLayout);
   const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
 
+  // Lifted from TableSection so the breakdown chips below can drive the grid's "type" filter.
+  const gridRef = useRef(null);
+  const [activeTypeFilter, setActiveTypeFilter] = useState(new Set());
+
+  const handleAssetTypeClick = useCallback((key) => {
+    setActiveTypeFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      const gridApi = gridRef.current?.api;
+      if (gridApi) {
+        const values = [...next];
+        const model = values.length > 0 ? { filterType: "set", values } : null;
+        gridApi.setColumnFilterModel("type", model).then(() => gridApi.onFilterChanged());
+      }
+      return next;
+    });
+  }, []);
+
   // Everything shapeRow needs to enrich a server-returned page — populated once at mount, read
   // (not reacted to) by onServerFetch, which AG Grid SSRM calls directly rather than through React
   // re-renders.
@@ -297,8 +315,6 @@ export default function AgenticAssetsPage() {
     userMetadataMap: {},
     analysisByKey: new Map(),
     userAnalysisFlatMap: {},
-    trafficMap: {},
-    riskScoreMap: {},
   });
 
   useEffect(() => {
@@ -331,9 +347,10 @@ export default function AgenticAssetsPage() {
 
   const loadStats = useCallback(async () => {
     try {
-      const { trafficMap, riskScoreMap, violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap } = enrichRef.current;
+      // trafficMap/riskScoreMap no longer sent — backend computes both itself when omitted.
+      const { violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap } = enrichRef.current;
       const result = await api.fetchAgenticAssetsStats({
-        trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap,
+        startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap,
       });
       setStats(result);
     } catch (e) {
@@ -343,51 +360,29 @@ export default function AgenticAssetsPage() {
     }
   }, [startTimestamp, endTimestamp]);
 
-  // Mount-time fetch of everything shapeRow/stats need but the paginated table endpoint doesn't
-  // carry itself, split into two tiers so the page's first paint isn't gated on the slowest call:
-  //   Tier 1 (blocks first paint, both calls measured <500ms): the traffic/risk bundle (needed for
-  //     trafficMap/riskScoreMap, which the date-range filter's maxTrafficTimestamp check depends on)
-  //     and Endpoint Shield username/team data. As soon as these land, the grid mounts and fires its
-  //     own (fast, paginated) fetch. This used to also fetch the account's full raw collection list
-  //     (getAllCollectionsBasic, ~19 fields/doc, several MB on large accounts) just to read id/
-  //     hostName off each one for the violation-count host join below — that join now happens
-  //     server-side (see attributeViolationCountsToCollections), so this page no longer needs the
-  //     collections list at all.
-  //   Tier 2 (patches in after, non-blocking — measured up to ~6s, proxies through
-  //     threat-detection-backend): server-aggregated violation counts and the account-wide
-  //     AI-interaction list. Deliberately does NOT force a grid remount/re-fetch to patch these in
-  //     (same reasoning as the malicious-skill flag below) — they apply on the next natural fetch
-  //     (page change, sort, search, date-range change) instead of paying a second full round trip.
+  // Tier 1 (fast) mounts the grid; Tier 2 (slow, non-blocking) patches in violations/AI-interaction data after.
   useEffect(() => {
-    // Mirrors the redirect effect's own condition above — without this guard, this effect's Tier 1
-    // calls still fire on a cold first-visit-to-new-layout mount even though the redirect effect
-    // (also firing in the same tick) is about to unmount this page in favor of legacy Endpoints.jsx,
-    // wasting a fetchAndCacheAgenticTrafficRiskBundle/fetchEndpointShieldUserMetadata round trip that
-    // nothing here ever gets to use.
+    // Skip on a cold mount that's about to redirect to legacy Endpoints.jsx.
     if (!newLayout) return;
     const isMountedRef = { current: true };
 
     (async () => {
       try {
-        const [trafficRiskBundle, shieldResult] = await Promise.all([
-          fetchAndCacheAgenticTrafficRiskBundle({ api, PersistStore }),
-          fetchEndpointShieldUserMetadata(),
-        ]);
+        const shieldResult = await fetchEndpointShieldUserMetadata();
         if (!isMountedRef.current) return;
 
-        const { trafficMap = {}, riskScoreMap = {} } = trafficRiskBundle || {};
         const { usernameMap = {}, userMetadataMap = {} } = shieldResult || {};
 
         enrichRef.current = {
           ...enrichRef.current,
           usernameMap,
           userMetadataMap,
-          trafficMap,
-          riskScoreMap,
         };
 
-        setRefreshKey((k) => k + 1); // (re)mount the grid now that enrichRef is populated
+        // The only grid remount — Tier 2 used to also bump this, causing an unwanted second refetch.
+        setRefreshKey((k) => k + 1);
         setLoading(false);
+        loadStats(); // fast pass; refined again after Tier 2
 
         // Warms the shared skillRiskScoreCache (PersistStore) that AgentEndpointTreeTable.jsx
         // (Inventory's Agent tree view) reads from — this page no longer needs the result itself:
@@ -419,7 +414,7 @@ export default function AgenticAssetsPage() {
               userAnalysisFlatMap: buildUserAnalysisFlatMap(analysisByKey),
             };
             setHostSeverityCounts(hostCounts);
-            setRefreshKey((k) => k + 1); // re-run loadStats now that Top Used Applications' data is ready
+            loadStats(); // refined pass — no setRefreshKey, so this never remounts the grid
           })
           .catch((e) => {
             // eslint-disable-next-line no-console
@@ -437,15 +432,7 @@ export default function AgenticAssetsPage() {
     return () => {
       isMountedRef.current = false;
     };
-  }, [startTimestamp, endTimestamp, newLayout]);
-
-  useEffect(() => {
-    // refreshKey starts at 0 and only becomes meaningful once the mount effect above has populated
-    // enrichRef (trafficMap/riskScoreMap) and bumped it — skip the otherwise-automatic call this
-    // effect would make on first render, which would run against still-empty enrichment data.
-    if (refreshKey === 0) return;
-    loadStats();
-  }, [loadStats, refreshKey]);
+  }, [startTimestamp, endTimestamp, newLayout, loadStats]);
 
   // ─── Server-side data fetch for AG Grid ─────────────────────────────────────
   const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString, filters }) => {
@@ -454,16 +441,15 @@ export default function AgenticAssetsPage() {
     // AG Grid SSRM sends sortOrder: -1 for asc, 1 for desc — opposite of the backend's Mongo
     // convention (1 asc / -1 desc, matching NhiGovernanceViolationsAction's own onServerFetch).
     const mongoSortOrder = sortOrder ? -sortOrder : -1;
-    const { trafficMap, riskScoreMap, userAnalysisFlatMap, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap } = enrichRef.current;
+    const { userAnalysisFlatMap, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap } = enrichRef.current;
 
+    // trafficMap/riskScoreMap omitted — backend computes both server-side now.
     return api.fetchAgenticAssetsSummary({
       skip,
       limit: pageSize,
       sortKey: mappedSortKey,
       sortOrder: mongoSortOrder,
       queryValue: searchString || undefined,
-      trafficMap,
-      riskScoreMap,
       startTimestamp,
       endTimestamp,
       userAnalysisFlatMap,
@@ -583,6 +569,8 @@ export default function AgenticAssetsPage() {
               sparklineCounts={stats.assetSparkline}
               sparklineLabels={stats.monthLabels}
               breakdown={assetTypeBreakdown}
+              onFilterClick={handleAssetTypeClick}
+              activeFilter={activeTypeFilter}
               noCard
             />
           </Box>
@@ -615,7 +603,7 @@ export default function AgenticAssetsPage() {
         emptyStateText="No violations"
       />
     </HorizontalGrid>
-  ), [totalAssets, assetTypeBreakdown, violationTotals, violBreakdown, stats, topAppsRows, topViolRows]);
+  ), [totalAssets, assetTypeBreakdown, violationTotals, violBreakdown, stats, topAppsRows, topViolRows, handleAssetTypeClick, activeTypeFilter]);
 
   if (loading) {
     return (
@@ -644,6 +632,7 @@ export default function AgenticAssetsPage() {
           endTimestamp={endTimestamp}
           refreshKey={refreshKey}
           enrichMaps={enrichRef.current}
+          gridRef={gridRef}
         />,
       ]}
     />

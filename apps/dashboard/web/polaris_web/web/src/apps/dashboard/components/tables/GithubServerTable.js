@@ -276,13 +276,16 @@ function GithubServerTable(props) {
 
   const handleSort = (col, dir) => {
     let tempSortSelected = props?.sortOptions.filter(x => x.columnIndex === (col + 1))
-    let sortVal = [tempSortSelected[0].value]
-    if(dir.includes("desc")){
-      setSortSelected([tempSortSelected[1].value])
-      sortVal = [tempSortSelected[1].value]
-    }else{
-      setSortSelected([tempSortSelected[0].value])
-    }
+    if (tempSortSelected.length === 0) return
+    // Match by the option's own "asc"/"desc" value suffix rather than array position — some pages'
+    // sortOptions list the desc variant before the asc variant for a given column (e.g. Endpoints.jsx,
+    // to make "highest risk first" the page's default sort), and indexing by [0]/[1] silently picked
+    // the wrong direction on every click for exactly those columns, getting the toggle stuck on one
+    // direction forever (Polaris keeps requesting the direction we never actually select).
+    const wantsDesc = dir.includes("desc")
+    const target = tempSortSelected.find(x => x.value.includes(wantsDesc ? "desc" : "asc")) || tempSortSelected[0]
+    let sortVal = [target.value]
+    setSortSelected(sortVal)
     let copyFilters = filtersMap
     copyFilters[currentPageKey] = {
       'filters': pageFiltersMap?.filters || [],
