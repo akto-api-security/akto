@@ -1,5 +1,6 @@
 import React from "react";
 import { HorizontalStack, Box, Text, Badge } from "@shopify/polaris";
+import "../../layouts/style.css";
 
 export function TypeBadge({ type, tone = "new" }) {
     if (!type) return null;
@@ -21,7 +22,8 @@ export function AgGridRowRenderer(params) {
 export default function AgGridRow({ icon, label, typeBadge, typeBadgeTone = "new", childCount, warning, isBold = false }) {
     return (
         <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-            {icon && <Box>{icon}</Box>}
+            {/* .ag-grid-row-icon keeps the icon from shrinking when the column is narrowed. */}
+            {icon && <Box className="ag-grid-row-icon">{icon}</Box>}
             <Text
                 as="span"
                 variant="bodySm"

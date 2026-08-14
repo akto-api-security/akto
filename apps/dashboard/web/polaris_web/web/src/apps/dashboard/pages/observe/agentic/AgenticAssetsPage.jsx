@@ -357,7 +357,7 @@ export default function AgenticAssetsPage() {
   // traffic, so a narrower default (e.g. Last 1 year) would silently drop them.
   const [currDateRange, dispatchCurrDateRange] = useReducer(
     produce((draft, action) => func.dateRangeReducer(draft, action)),
-    values.ranges[5],
+    values.getRange("last1month"),
   );
   const rawStart = Math.floor(Date.parse(currDateRange.period.since) / 1000);
   const startTimestamp = rawStart <= 1 ? 0 : rawStart;

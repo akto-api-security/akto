@@ -188,7 +188,7 @@ export default function ViolationsPage() {
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges[2]
+        values.getRange("last1month")
     );
 
     const startTimestamp = parseInt(currDateRange.period.since.getTime() / 1000);

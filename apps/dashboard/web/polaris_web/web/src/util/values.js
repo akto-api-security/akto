@@ -40,6 +40,21 @@ const ranges = [
         },
     },
     {
+        title: "Last 1 month",
+        alias: "last1month",
+        period: {
+            since: new Date(
+                new Date(new Date().setDate(today.getDate() - 30)).setHours(
+                    0,
+                    0,
+                    0,
+                    0
+                )
+            ),
+            until: todayDayEnd,
+        },
+    },
+    {
         title: "Last 2 months",
         alias: "recencyPeriod",
         period:{
@@ -79,7 +94,11 @@ const ranges = [
     }
 ];
 
+// Look up a preset by alias. Call sites must use this rather than ranges[i] —
+// inserting a preset shifts every index and silently changes page defaults.
+const getRange = (alias) => ranges.find((r) => r.alias === alias) || ranges[0];
+
 const skipList = ["GENERIC", "TRUE", "FALSE","INTEGER_32", "INTEGER_64", "NULL", "OTHER", "DICT", "FLOAT"]
 const DISABLED_AUTO_ACCOUNT_REFRESH = [1747820267,1731351930,1736798101]
 
-export default { today, yesterday, ranges, yesterdayDayEnd, todayDayEnd , skipList, DISABLED_AUTO_ACCOUNT_REFRESH};
+export default { today, yesterday, ranges, getRange, yesterdayDayEnd, todayDayEnd , skipList, DISABLED_AUTO_ACCOUNT_REFRESH};
