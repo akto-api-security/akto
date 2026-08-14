@@ -1583,9 +1583,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         } else {
             cmp = Comparator.comparingDouble(g -> g.maxRiskScore);
         }
-        // Name tiebreak keeps paging stable: plugins/skills mostly share riskScore 0, and an unstable
-        // order under server-side pagination duplicates or skips rows across page turns.
-        return cmp.thenComparing(g -> g.name == null ? "" : g.name, String.CASE_INSENSITIVE_ORDER);
+        return cmp;
     }
 
     @Setter
