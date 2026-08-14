@@ -427,6 +427,10 @@ public class ApiExecutor {
         OriginalHttpResponse response = null;
 
         for (int limit : BACK_OFF_LIMITS) {
+            if (Thread.currentThread().isInterrupted()) {
+                loggerMaker.error("Request retries aborted because thread is interrupted: " + request.getUrl());
+                break;
+            }
             try {
                 response = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, false);
                 if (response == null) {
@@ -442,6 +446,10 @@ public class ApiExecutor {
                 loggerMaker.error(message);
                 try {
                     Thread.sleep(1000 * limit);
+                } catch (InterruptedException f) {
+                    Thread.currentThread().interrupt();
+                    loggerMaker.error("Backoff sleep interrupted at limit " + limit + ", stopping retries");
+                    break;
                 } catch (Exception f) {
                     String backoffMessage = String.format("Error in exponential backoff at limit %d  : %s", limit, f.toString());
                     loggerMaker.error(backoffMessage);
