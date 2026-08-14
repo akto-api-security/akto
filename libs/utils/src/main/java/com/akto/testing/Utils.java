@@ -556,13 +556,21 @@ public class Utils {
         httpRequest.setQueryParams(queryParams);
     }
 
-    public static void writeJsonContentInFile(String folderName, String fileName, Object content){
+
+    public static boolean writeJsonContentInFile(String folderName, String fileName, Object content){
         try {
-            File file = new File(folderName, fileName);
+            File folder = new File(folderName);
+            if (!folder.exists() && !folder.mkdirs()) {
+                loggerMaker.errorAndAddToDb("Unable to create folder for writing json content: " + folderName);
+                return false;
+            }
+            File file = new File(folder, fileName);
             ObjectMapper objectMapper = new ObjectMapper();
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, content);
+            return true;
         } catch (Exception e) {
-            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "Error writing json content in file " + fileName + ": " + e.getMessage());
+            return false;
         }
     }
     public static void modifyUrlParamOperations(OriginalHttpRequest originalHttpRequest, List<ConditionsType> modifyUrlParams, String operationType) {
@@ -598,15 +606,18 @@ public class Utils {
 
     
     public static <T> T readJsonContentFromFile(String folderName, String fileName, Class<T> valueType) {
-        T result = null;
-        try {
-            File file = new File(folderName, fileName);
-            ObjectMapper objectMapper = new ObjectMapper();
-            result = objectMapper.readValue(file, valueType);
-        } catch (Exception e) {
-            e.printStackTrace();
+        File file = new File(folderName, fileName);
+        if (!file.exists()) {
+            // nothing written yet, not an error
+            return null;
         }
-        return result;
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            return objectMapper.readValue(file, valueType);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error reading json content from file " + fileName + ": " + e.getMessage());
+            return null;
+        }
     }
 
     public static TestingRunResult generateFailedRunResultForMessage(ObjectId testingRunId,ApiInfoKey apiInfoKey, String testSuperType, 
