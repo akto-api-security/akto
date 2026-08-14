@@ -163,7 +163,7 @@ function TestRunsPage(props) {
 
   filters = func.getCollectionFilters(filters)
 
-const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
+const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.getRange("last1month"));
 const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
 }

@@ -413,7 +413,7 @@ export default function DeviceEndpoints() {
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges[4],
+        values.getRange("last1month"),
     );
     const startTimestamp = Math.floor(Date.parse(currDateRange.period.since) / 1000);
     const endTimestamp = Math.floor(Date.parse(currDateRange.period.until) / 1000);
