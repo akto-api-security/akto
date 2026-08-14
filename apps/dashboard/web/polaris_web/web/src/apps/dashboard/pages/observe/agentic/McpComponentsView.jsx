@@ -9,7 +9,7 @@ import observeApi from "../api";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import ApiIssuesTab from "../api_collections/ApiIssuesTab";
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
-import { fetchSkillMarkdownFromCollections } from "./SkillComponentsView";
+import { fetchSkillMarkdownFromCollections, getOwningPluginNameForCollection } from "./SkillComponentsView";
 
 // ── Shared detail panel helpers ───────────────────────────────────────────────
 
@@ -104,29 +104,34 @@ const SKILL_VALUE_EMPTY = <Box padding="8"><VerticalStack gap="1" inlineAlign="c
 // this particular skill row happened to be attributed to), and the sample-storage URL format
 // varies by environment — fetchSkillMarkdownFromCollections already handles both. Falls back to
 // the skill's own apiCollectionId when the caller doesn't have the full collection set on hand.
-function useSkillMarkdown(skill, collectionIds) {
+function useSkillMarkdown(skill, collectionIds, fetchMarkdown = fetchSkillMarkdownFromCollections) {
     const [markdown, setMarkdown] = useState(null);
+    const [owningPluginName, setOwningPluginName] = useState(null);
     const [loading, setLoading] = useState(true);
     const ids = collectionIds?.length ? collectionIds : [skill?.apiCollectionId].filter(Boolean);
     useEffect(() => {
         if (!ids.length) { setMarkdown(""); setLoading(false); return; }
         let cancelled = false;
         setLoading(true);
-        fetchSkillMarkdownFromCollections(ids, skill?.rawName || skill?.name)
-            .then((found) => { if (!cancelled) setMarkdown(found || ""); })
-            .catch(() => { if (!cancelled) setMarkdown(""); })
+        fetchMarkdown(ids, skill?.rawName || skill?.name)
+            .then(({ markdown: found, collectionId }) => {
+                if (cancelled) return;
+                setMarkdown(found || "");
+                setOwningPluginName(getOwningPluginNameForCollection(collectionId));
+            })
+            .catch(() => { if (!cancelled) { setMarkdown(""); setOwningPluginName(null); } })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [skill?.name, skill?.rawName, ids.join(",")]);
-    return { markdown, loading };
+    }, [skill?.name, skill?.rawName, ids.join(","), fetchMarkdown]);
+    return { markdown, owningPluginName, loading };
 }
 
 function SkillValueView({ markdown, loading }) {
     if (loading) return SKILL_VALUE_LOADING;
     if (!markdown) return SKILL_VALUE_EMPTY;
     return (
-        <Box overflowY="scroll" className="agentic-flex-fill">
+        <Box className="agentic-flex-fill">
             <Box paddingBlockStart="5" paddingBlockEnd="5" paddingInlineStart="5" paddingInlineEnd="5">
                 <MarkdownViewer markdown={markdown} />
             </Box>
@@ -134,8 +139,8 @@ function SkillValueView({ markdown, loading }) {
     );
 }
 
-export function SkillDetailPanel({ skill, collectionIds }) {
-    const { markdown, loading } = useSkillMarkdown(skill, collectionIds);
+export function SkillDetailPanel({ skill, collectionIds, hideOwningPlugin, fetchMarkdown, entityLabel = "skill" }) {
+    const { markdown, owningPluginName, loading } = useSkillMarkdown(skill, collectionIds, fetchMarkdown);
     const [selectedTab, setSelectedTab] = useState(0);
     const isThreatEnabled = skill?.isThreatEnabled || false;
 
@@ -151,6 +156,12 @@ export function SkillDetailPanel({ skill, collectionIds }) {
                 <VerticalStack gap="1">
                     <Text variant="headingSm" as="h3" fontWeight="semibold">{skill.name}</Text>
                     {skill.description && <Text variant="bodySm" color="subdued">{skill.description}</Text>}
+                    {!hideOwningPlugin && owningPluginName && (
+                        <HorizontalStack gap="1" blockAlign="center">
+                            <Badge size="small" status="info">{owningPluginName}</Badge>
+                            <Text variant="bodySm" color="subdued">{`uses this ${entityLabel}`}</Text>
+                        </HorizontalStack>
+                    )}
                 </VerticalStack>
             </Box>
             <Divider />
@@ -387,10 +398,18 @@ export default function McpComponentsView({ asset, onNavChange }) {
 
     return (
         <Box className="agentic-flex-fill">
-            {asset?.description && (
+            {(asset?.description || asset?.owningPluginName) && (
                 <>
                     <Box paddingInlineStart="3" paddingInlineEnd="3" paddingBlockStart="3" paddingBlockEnd="3">
-                        <Text variant="bodySm">{asset.description}</Text>
+                        <VerticalStack gap="2">
+                            {asset?.description && <Text variant="bodySm">{asset.description}</Text>}
+                            {asset?.owningPluginName && (
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Badge size="small" status="info">{asset.owningPluginName}</Badge>
+                                    <Text variant="bodySm" color="subdued">uses this MCP Server</Text>
+                                </HorizontalStack>
+                            )}
+                        </VerticalStack>
                     </Box>
                     <Divider />
                 </>

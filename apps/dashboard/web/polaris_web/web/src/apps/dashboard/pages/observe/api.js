@@ -288,8 +288,18 @@ export default {
             pluginStatus: resp?.assetPluginStatus || null,
             pluginMarketplace: resp?.assetPluginMarketplace || null,
             pluginParentAgent: resp?.assetPluginParentAgent || null,
+            // Service/LLM/Skill rows — which plugin bundled this component, if any.
+            owningPluginName: resp?.assetOwningPluginName || null,
+            // Plugin rows only — the MCP servers/skills this plugin bundles.
+            pluginMcpServers: resp?.assetPluginMcpServers || [],
+            pluginMcpServerCollectionIds: resp?.assetPluginMcpServerCollectionIds || {},
+            pluginSkills: resp?.assetPluginSkills || [],
+            pluginAgents: resp?.assetPluginAgents || [],
             mcpServers: resp?.assetMcpServers || [],
             mcpServerCollectionIds: resp?.assetMcpServerCollectionIds || {},
+            // Agent rows only — collectionIds of every plugin this agent owns, so the Components tab
+            // can search plugin-bundled skill content, not just the agent's own collection.
+            pluginCollectionIds: resp?.assetPluginCollectionIds || [],
             devices: resp?.assetDevices || [],
             // Agent rows only — needed by the legacy Endpoints.jsx page's row-click ->
             // Inventory-filter feature (buildAgenticInventoryFilterForRow); unused by the new

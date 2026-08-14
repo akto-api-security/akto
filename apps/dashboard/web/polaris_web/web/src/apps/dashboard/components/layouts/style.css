@@ -251,6 +251,7 @@
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    overflow-y: auto;
 }
 
 /* AiChatSection — flex column with a pinned input row. The expand/collapse flex

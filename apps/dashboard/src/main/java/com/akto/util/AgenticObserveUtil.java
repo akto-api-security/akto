@@ -136,6 +136,11 @@ public final class AgenticObserveUtil {
         return collection != null ? getTagValue(collection.getEnvType(), tagKey) : null;
     }
 
+    // Reverse direction — does this collection belong to a plugin?
+    public static String getOwningPluginName(ApiCollection collection) {
+        return collection != null ? getTagValue(collection.getEnvType(), Constants.AKTO_PLUGIN_NAME_TAG) : null;
+    }
+
     private static boolean hasTagKey(List<CollectionTags> envType, String keyName) {
         if (envType == null) return false;
         for (CollectionTags tag : envType) {
@@ -221,16 +226,24 @@ public final class AgenticObserveUtil {
         if (envType == null) {
             return null;
         }
+        // mcp-server takes priority regardless of tag insertion order — a collection explicitly
+        // tagged as an MCP server (e.g. one that also carries gen-ai from generic LLM-traffic
+        // detection) must classify as "MCP Server", not get swallowed into gen-ai/agent grouping
+        // just because gen-ai happened to be tagged first.
+        CollectionTags fallback = null;
         for (CollectionTags tag : envType) {
             if (tag == null || StringUtils.isBlank(tag.getKeyName())) {
                 continue;
             }
             String key = tag.getKeyName();
-            if (Constants.AKTO_MCP_SERVER_TAG.equals(key) || Constants.AKTO_GEN_AI_TAG.equals(key) || Constants.AKTO_BROWSER_LLM_TAG.equals(key)) {
+            if (Constants.AKTO_MCP_SERVER_TAG.equals(key)) {
                 return tag;
             }
+            if (fallback == null && (Constants.AKTO_GEN_AI_TAG.equals(key) || Constants.AKTO_BROWSER_LLM_TAG.equals(key))) {
+                fallback = tag;
+            }
         }
-        return null;
+        return fallback;
     }
 
     public static String getTypeFromCollection(ApiCollection collection) {

@@ -89,6 +89,7 @@ export function AssetNameCellRenderer({ data }) {
     const showLocalMcp = data.hasLocalMcpServer && !isFanout;
     const showPersonal = data.hasPersonalAccount && !isFanout;
     const showMalicious = data.isMalicious && isSkill;
+    // Misconfigured is an Agent/MCP-server-only concept — Skill (and Plugin) rows never show it.
     const showMisconfigured = data.hasMisconfiguredConfig && !isFanout;
     return (
         <HorizontalStack gap="2" blockAlign="center" wrap={false}>

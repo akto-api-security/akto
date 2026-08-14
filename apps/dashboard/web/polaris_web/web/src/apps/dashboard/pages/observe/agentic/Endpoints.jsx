@@ -94,27 +94,30 @@ function getRiskScoreStatus(riskScore) {
 // fields — those are deliberately not computed for skill rows, matching prettifyGroupData's
 // original client-side behavior. isMalicious for skill rows IS computed server-side already
 // (AgenticObserveAction's own account-wide maliciousSkillKeys cache — no client round-trip needed).
-function shapeRow(row, { skillScoreMap = {}, misconfiguredSkills = new Set() } = {}) {
+function shapeRow(row, { skillScoreMap = {} } = {}) {
     const isSkill = row.rowType === ROW_TYPES.SKILL;
     const isPlugin = row.rowType === ROW_TYPES.PLUGIN;
     // Fan-out rows borrow their parent agent collection's flags, so suppress them on both.
+    // Misconfigured is an Agent/MCP-server-only concept — Skill rows never show it, so it stays
+    // gated on !isFanout unlike owningPluginName below (which the server computes per-skill-group).
     const isFanout = isSkill || isPlugin;
     // Plugin riskScore is already the plugin's own (overwritten server-side), not the agent's.
     const riskScore = isSkill ? (skillScoreMap[row.name] || 0) : (row.riskScore || 0);
-    const isMisconfiguredSkill = isSkill && misconfiguredSkills.has(row.name);
 
     const showPersonal = row.hasPersonalAccount && !isFanout;
     const showLocalMcp = row.hasLocalMcpServer && !isFanout;
-    const showMisconfigured = (row.hasMisconfiguredConfig && !isFanout) || isMisconfiguredSkill;
+    const showMisconfigured = row.hasMisconfiguredConfig && !isFanout;
     const showMalicious = isSkill && row.isMalicious;
+    const owningPluginName = !isPlugin && row.owningPluginName;
 
-    const groupNameDisplay = (showPersonal || showLocalMcp || showMisconfigured || showMalicious) ? (
+    const groupNameDisplay = (showPersonal || showLocalMcp || showMisconfigured || showMalicious || owningPluginName) ? (
         <HorizontalStack gap="2" align="start" wrap={false}>
             <Text>{row.name}</Text>
             {showPersonal && <Badge size="small" status="warning">Contains personal account</Badge>}
             {showLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
             {showMisconfigured && <Badge size="small" status="attention">Misconfigured</Badge>}
             {showMalicious && <Badge size="small" status="critical">Malicious</Badge>}
+            {owningPluginName && <Badge size="small" status="info">{`${owningPluginName} plugin`}</Badge>}
         </HorizontalStack>
     ) : row.name;
 
@@ -184,7 +187,7 @@ function Endpoints() {
     // async: skill risk/malicious/misconfigured data), read (not reacted to) by fetchTableData.
     const enrichRef = useRef({
         trafficMap: {}, riskScoreMap: {}, sensitiveMap: {},
-        skillScoreMap: {}, misconfiguredSkills: new Set(),
+        skillScoreMap: {},
     });
 
     // headings drives the rendered COLUMNS; headers drives FILTERS/CSV export (GithubServerTable's
@@ -235,7 +238,10 @@ function Endpoints() {
             setTableSelectedTab({ ...tableSelectedTab, [window.location.pathname]: tabId });
         },
         selectedTab, tabsInfo,
-    );
+    // Polaris' Tab type has exactly one badge slot (string) — concatenating "Beta" into it would
+    // read as one pill mixing a status label with a count. Put "Beta" in the tab's own label text
+    // instead, so badge stays a clean, separate count pill.
+    ).map((tab) => (tab.id === 'plugins' ? { ...tab, content: `${tab.content} (Beta)` } : tab));
 
     async function fetchData(isMountedRef = { current: true }) {
         try {
@@ -268,12 +274,11 @@ function Endpoints() {
             // maliciousSkillKeys here — "Malicious" (row.isMalicious) is computed server-side in
             // fetchAgenticAssetsSummary (AgenticObserveAction.getOrBuildSkillData's own account-wide
             // cache) instead of requiring the whole set re-POSTed on every paginated request.
-            fetchAndCacheSkillApiData([], { api, PersistStore }).then(({ skillScoreMap, misconfiguredSkills }) => {
+            fetchAndCacheSkillApiData([], { api, PersistStore }).then(({ skillScoreMap }) => {
                 if (!isMountedRef.current) return;
                 enrichRef.current = {
                     ...enrichRef.current,
                     skillScoreMap: skillScoreMap || {},
-                    misconfiguredSkills: misconfiguredSkills || new Set(),
                 };
                 setRefreshKey((k) => k + 1);
             }).catch(() => {});
@@ -289,7 +294,7 @@ function Endpoints() {
     }, []);
 
     const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
-        const { trafficMap, riskScoreMap, sensitiveMap, skillScoreMap, misconfiguredSkills } = enrichRef.current;
+        const { trafficMap, riskScoreMap, sensitiveMap, skillScoreMap } = enrichRef.current;
         // GithubServerTable: asc=-1/desc=1, inverted vs Mongo (matches AgenticAssetsPage.jsx/
         // NhiGovernanceIdentitiesAction's own onServerFetch convention).
         const mongoSortOrder = sortOrder === -1 ? 1 : -1;
@@ -308,7 +313,7 @@ function Endpoints() {
             trafficMap, riskScoreMap, sensitiveMap,
             filters: Object.keys(filters).length ? filters : undefined,
         });
-        const rows = (res.rows || []).map((row) => shapeRow(row, { skillScoreMap, misconfiguredSkills }));
+        const rows = (res.rows || []).map((row) => shapeRow(row, { skillScoreMap }));
         return { value: rows, total: res.total || 0 };
     }, [selectedTab]);
 

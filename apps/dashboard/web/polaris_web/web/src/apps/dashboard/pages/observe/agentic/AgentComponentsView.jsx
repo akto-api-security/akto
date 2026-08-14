@@ -114,8 +114,10 @@ const COMBINED_AGENT_COL_DEFS = [
 const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 
 // ── MCP tools drill-down ──────────────────────────────────────────────────────
+// Exported — PluginComponentsView reuses this unchanged for a plugin's own bundled MCP servers
+// (it only needs selectedMcp.collectionIds/name, nothing agent-specific).
 
-function AgentMcpToolsView({ asset, selectedMcp, goToList, onNavChange, setSelectedTool, setView }) {
+export function AgentMcpToolsView({ asset, selectedMcp, goToList, onNavChange, setSelectedTool, setView }) {
     const [mcpTools, setMcpTools] = useState([]);
 
     useEffect(() => {
@@ -187,25 +189,28 @@ function AgentMcpToolsView({ asset, selectedMcp, goToList, onNavChange, setSelec
 // plugin's name, so its version/scope/status/marketplace are fetched lazily on selection instead
 // of being embedded in every row of the (otherwise cheap, no-re-derivation) components list.
 
-function usePluginDetail(pluginName) {
+// pluginGroupKey is the compound "pluginName|ownerAgent" identity (AgenticObserveAction's
+// classifyAllGroups), not just the plugin's display name — the same plugin name installed under
+// two different agents (e.g. "figma" on both claude and copilot) are genuinely different installs.
+function usePluginDetail(pluginGroupKey) {
     const [detail, setDetail] = useState(null);
     const [loading, setLoading] = useState(true);
     useEffect(() => {
-        if (!pluginName) { setDetail(null); setLoading(false); return; }
+        if (!pluginGroupKey) { setDetail(null); setLoading(false); return; }
         let cancelled = false;
         setLoading(true);
-        api.fetchAgenticAssetDetail({ groupKey: pluginName, rowType: "plugin" })
+        api.fetchAgenticAssetDetail({ groupKey: pluginGroupKey, rowType: "plugin" })
             .then((found) => { if (!cancelled) setDetail(found); })
             .catch(() => { if (!cancelled) setDetail(null); })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [pluginName]);
+    }, [pluginGroupKey]);
     return { detail, loading };
 }
 
-function PluginDetailPanel({ plugin }) {
-    const pluginName = plugin?.rawName || plugin?.name;
-    const { detail, loading } = usePluginDetail(pluginName);
+function PluginDetailPanel({ plugin, onNavChange }) {
+    const pluginGroupKey = plugin?.rawName || plugin?.name;
+    const { detail, loading } = usePluginDetail(pluginGroupKey);
 
     if (loading) {
         return <Box padding="8"><Spinner accessibilityLabel="Loading plugin" size="small" /></Box>;
@@ -219,11 +224,14 @@ function PluginDetailPanel({ plugin }) {
             <Divider />
             <PluginComponentsView
                 asset={{
-                    pluginVersion: detail?.pluginVersion,
-                    pluginScope: detail?.pluginScope,
-                    pluginStatus: detail?.pluginStatus,
-                    pluginMarketplace: detail?.pluginMarketplace,
+                    id: pluginGroupKey,
+                    name: plugin?.name,
+                    collectionIds: detail?.collectionIds || [],
+                    pluginMcpServers: detail?.pluginMcpServers || [],
+                    pluginMcpServerCollectionIds: detail?.pluginMcpServerCollectionIds || {},
+                    pluginSkills: detail?.pluginSkills || [],
                 }}
+                onNavChange={onNavChange}
             />
         </div>
     );
@@ -300,7 +308,7 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
     // build the request.
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
         return api.fetchAgenticComponentsPage({
-            apiCollectionIds: asset.collectionIds || [],
+            apiCollectionIds: [...(asset.collectionIds || []), ...(asset.pluginCollectionIds || [])],
             mcpServerNames: asset.mcpServers || [],
             mcpServerCollectionIds: asset.mcpServerCollectionIds || {},
             pluginNames: asset.pluginNames || [],
@@ -313,7 +321,7 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
             value: res.components || [],
             total: res.total || 0,
         }));
-    }, [asset.id, asset.collectionIds, asset.mcpServers, asset.mcpServerCollectionIds, asset.pluginNames]);
+    }, [asset.id, asset.collectionIds, asset.pluginCollectionIds, asset.mcpServers, asset.mcpServerCollectionIds, asset.pluginNames]);
 
     const goToList = useCallback(() => {
         setView("list"); setSelectedMcp(null); setSelectedTool(null); setSelectedSkill(null); setSelectedPlugin(null);
@@ -410,7 +418,7 @@ export default function AgentComponentsView({ asset, onNavChange, onNavigateToAs
     }
 
     if (view === "plugin-detail" && selectedPlugin) {
-        return <PluginDetailPanel plugin={selectedPlugin} />;
+        return <PluginDetailPanel plugin={selectedPlugin} onNavChange={onNavChange} />;
     }
 
     if (view === "config-detail") {

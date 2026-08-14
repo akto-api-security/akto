@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Box, HorizontalGrid, VerticalStack, Text } from "@shopify/polaris";
+import { Box, HorizontalGrid, VerticalStack, HorizontalStack, Text, Badge } from "@shopify/polaris";
 import { getAgentLinkedComponents } from "./agenticPageBuilders";
 import { findParentAgents } from "./AssetTopologyGraph";
 import AssetTopologyGraph from "./AssetTopologyGraph";
@@ -99,6 +99,14 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
                 { label: totalV     === 1 ? "Violation" : "Violations", value: totalV },
             ];
         }
+        if (asset.type === "Plugin") {
+            const mcpCount = (asset.pluginMcpServers || []).length;
+            const skillCount = (asset.pluginSkills || []).length;
+            return [
+                { label: mcpCount   === 1 ? "MCP Server" : "MCP Servers", value: mcpCount },
+                { label: skillCount === 1 ? "Skill"      : "Skills",      value: skillCount },
+            ];
+        }
         return [
             { label: devCount === 1 ? "Device"    : "Devices",    value: devCount },
             { label: totalV   === 1 ? "Violation" : "Violations", value: totalV },
@@ -109,6 +117,20 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
         { label: "AI Interactions",   value: asset.aiInteractions != null ? Number(asset.aiInteractions).toLocaleString("en-US") : "-" },
         { label: "Last Traffic Seen", value: asset.lastSeen || "-" },
     ], [asset]);
+
+    // Plugins are discovery-only — status/version/scope/marketplace/parent-agent come straight off
+    // the plugin's own tags (no traffic-derived fields apply), so they replace assetDetails instead
+    // of sitting alongside it.
+    const pluginDetails = useMemo(() => {
+        if (asset.type !== "Plugin") return null;
+        return [
+            { label: "Status",      value: asset.pluginStatus ? (String(asset.pluginStatus).toLowerCase() === "enabled" ? "Enabled" : "Disabled") : "-" },
+            { label: "Version",     value: asset.pluginVersion },
+            { label: "Scope",       value: asset.pluginScope },
+            { label: "Marketplace", value: asset.pluginMarketplace },
+            { label: "AI Agent",    value: asset.pluginParentAgent },
+        ];
+    }, [asset]);
 
     return (
         <Box padding="4">
@@ -123,6 +145,16 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
                 </HorizontalGrid>
 
                 <AssetTopologyGraph asset={asset} assetDevices={assetDevices} agenticTreeData={agenticTreeData} agenticFlatData={agenticFlatData} inlineComponents={inlineComponents} />
+
+                {asset.type !== "Plugin" && asset.owningPluginName && (
+                    <VerticalStack gap="3">
+                        <Text variant="headingXs" color="subdued">Plugin Attribution</Text>
+                        <HorizontalStack gap="1" blockAlign="center">
+                            <Badge size="small" status="info">{asset.owningPluginName}</Badge>
+                            <Text variant="bodySm" color="subdued">{asset.type === "Skill" ? "uses this skill" : "uses this MCP Server"}</Text>
+                        </HorizontalStack>
+                    </VerticalStack>
+                )}
 
                 {factors.length > 0 && (
                     <VerticalStack gap="3">
@@ -149,7 +181,7 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
                     </VerticalStack>
                 )}
 
-                <DetailGrid heading="Asset Details" items={assetDetails} columns={3} />
+                <DetailGrid heading={pluginDetails ? "Plugin Details" : "Asset Details"} items={pluginDetails || assetDetails} columns={3} />
             </VerticalStack>
         </Box>
     );
