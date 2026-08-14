@@ -55,8 +55,8 @@ import com.mongodb.BasicDBList;
 import static com.akto.test_editor.execution.Build.modifyRequest;
 import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.testing.kafka_utils.Producer;
+import com.akto.testing.kafka_utils.TestingStateStore;
 import com.akto.dto.testing.info.SingleTestPayload;
-import static com.akto.testing.Utils.writeJsonContentInFile;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
@@ -265,12 +265,12 @@ public class TestExecutor {
 
         BasicDBObject dbObject = new BasicDBObject();
         if(!shouldInitOnly && Constants.IS_NEW_TESTING_ENABLED){
-            dbObject.put("PRODUCER_RUNNING", true);
-            dbObject.put("CONSUMER_RUNNING", false);
-            dbObject.put("accountId", accountId);
-            dbObject.put("summaryId", summaryId.toHexString());
-            dbObject.put("testingRunId", testingRun.getId().toHexString()); 
-            writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
+            dbObject.put(TestingStateStore.PRODUCER_RUNNING, true);
+            dbObject.put(TestingStateStore.CONSUMER_RUNNING, false);
+            dbObject.put(TestingStateStore.ACCOUNT_ID, accountId);
+            dbObject.put(TestingStateStore.SUMMARY_ID, summaryId.toHexString());
+            dbObject.put(TestingStateStore.TESTING_RUN_ID, testingRun.getId().toHexString());
+            TestingStateStore.update(dbObject);
         }
 
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
@@ -555,7 +555,7 @@ public class TestExecutor {
                     if (!shouldContinueTestExecution(summaryId)) {
                         loggerMaker.infoAndAddToDb("Test run time expired during Kafka production; deleting topic and skipping consumer.");
                         Producer.deleteTestResultsTopic();
-                        writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, null);
+                        TestingStateStore.clear();
                     } else if (unsentRecords == totalRecords.get()) {
                         // Check producer status
                         loggerMaker.infoAndAddToDb("Producer status: " + Producer.getProducerStatus());
@@ -572,11 +572,16 @@ public class TestExecutor {
                         loggerMaker.infoAndAddToDb("All records sent successfully to Kafka");
                         
                         // Normal Kafka completion - start consumer
-                        dbObject.put("PRODUCER_RUNNING", false);
-                        dbObject.put("CONSUMER_RUNNING", true);
+                        dbObject.put(TestingStateStore.PRODUCER_RUNNING, false);
+                        dbObject.put(TestingStateStore.CONSUMER_RUNNING, true);
                         dbObject.put(TestingRun.PICKED_UP_TIMESTAMP, runPickedUp);
-                        dbObject.put("testRunMaxTimeSeconds", runMaxSec);
-                        writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
+                        dbObject.put(TestingStateStore.TEST_RUN_MAX_TIME_SECONDS, runMaxSec);
+                        // Successfully sent = total - still-throttled/unacked. Consumer waits for this many.
+                        int expectedRecords = Math.max(0, totalRecords.get() - unsentRecords);
+                        dbObject.put(TestingStateStore.EXPECTED_RECORDS, expectedRecords);
+                        loggerMaker.insertImportantTestingLog("Writing expectedRecords=" + expectedRecords + " for consumer completion check");
+                        TestingStateStore.update(dbObject);
+
                     }
                 }
                 

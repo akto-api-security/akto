@@ -1,6 +1,4 @@
 package com.akto.testing.kafka_utils;
-import static com.akto.testing.Utils.readJsonContentFromFile;
-import static com.akto.testing.Utils.writeJsonContentInFile;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,8 +42,6 @@ import io.confluent.parallelconsumer.ParallelConsumerOptions;
 import io.confluent.parallelconsumer.ParallelStreamProcessor;
 
 public class ConsumerUtil {
-
-    public static final String EXPECTED_RECORDS_KEY = "expectedRecords";
 
     private static final int MAX_POLL_INTERVAL_MS = 10000;
 
@@ -134,25 +130,39 @@ public class ConsumerUtil {
     }
     
     public void init(int maxRunTimeInSeconds) {
+        BasicDBObject currentTestInfo = TestingStateStore.read();
+        final String summaryIdForTest = currentTestInfo != null
+                ? currentTestInfo.getString(TestingStateStore.SUMMARY_ID)
+                : null;
+        if (summaryIdForTest == null) {
+            loggerMaker.errorAndAddToDb("No testing state available, skipping consumer init.");
+            return;
+        }
+
         TestingConfigurations instance = TestingConfigurations.getInstance();
         executor = Executors.newFixedThreadPool(instance.getMaxConcurrentRequest());
-        BasicDBObject currentTestInfo = readJsonContentFromFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, BasicDBObject.class);
-        final String summaryIdForTest = currentTestInfo.getString("summaryId");
+
         final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
         int startTime = Context.now();
         int effectiveMaxRunTime = maxRunTimeInSeconds;
         if (currentTestInfo.containsField(TestingRun.PICKED_UP_TIMESTAMP)) {
             startTime = currentTestInfo.getInt(TestingRun.PICKED_UP_TIMESTAMP, startTime);
         }
-        if (currentTestInfo.containsField("testRunMaxTimeSeconds")) {
-            effectiveMaxRunTime = currentTestInfo.getInt("testRunMaxTimeSeconds", maxRunTimeInSeconds);
+        if (currentTestInfo.containsField(TestingStateStore.TEST_RUN_MAX_TIME_SECONDS)) {
+            effectiveMaxRunTime = currentTestInfo.getInt(TestingStateStore.TEST_RUN_MAX_TIME_SECONDS, maxRunTimeInSeconds);
+        }
+        final int expectedRecords = currentTestInfo.containsField(TestingStateStore.EXPECTED_RECORDS)
+                ? currentTestInfo.getInt(TestingStateStore.EXPECTED_RECORDS)
+                : -1;
+        final int accountId = currentTestInfo.containsField(TestingStateStore.ACCOUNT_ID)
+                ? currentTestInfo.getInt(TestingStateStore.ACCOUNT_ID)
+                : (Context.accountId.get() != null ? Context.accountId.get() : -1);
+        if (accountId > 0) {
+            Context.accountId.set(accountId);
         }
         AtomicBoolean firstRecordRead = new AtomicBoolean(false);
 
-        boolean isConsumerRunning = false;
-        if(currentTestInfo != null){
-            isConsumerRunning = currentTestInfo.getBoolean("CONSUMER_RUNNING");
-        }
+        boolean isConsumerRunning = currentTestInfo.getBoolean(TestingStateStore.CONSUMER_RUNNING, false);
 
         ParallelStreamProcessor<String, String> parallelConsumer = null;
 
@@ -245,7 +255,7 @@ public class ConsumerUtil {
             parallelConsumer = null;
             consumer.close();
             Producer.deleteTestResultsTopic();
-            writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, null);
+            TestingStateStore.clear();
         }
     }
 }
