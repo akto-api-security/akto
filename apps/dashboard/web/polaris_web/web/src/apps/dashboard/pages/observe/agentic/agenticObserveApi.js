@@ -2,7 +2,6 @@ import request from "@/util/request";
 import observeApi from "../api";
 import { buildMcpComponentsFromStis, buildAgentBuiltinToolsFromStis, buildSkillsFlyoutData, normalizeSeverity } from "./agenticPageBuilders";
 import { deviceServiceKey } from "./constants";
-import { isEndpointSecurityCategory } from "@/apps/main/labelHelper";
 
 export { deviceServiceKey };
 
@@ -245,9 +244,11 @@ export function aggregateViolationCountsByCollectionId(hostCounts = {}, collecti
     return byCollection;
 }
 
-// Deep-links to the one activity page that reads these params (ThreatDetectionPage) for Atlas; other categories keep the old route.
+// Deep-links to the one activity page that reads these params (ThreatDetectionPage). All 3 callers
+// live under pages/observe/agentic (Atlas-only) — hardcoded rather than dashboardCategory-gated
+// since these pages have no category check of their own and can load before it's set to ENDPOINT.
 export function openViolationInThreatActivity(row = {}) {
-    const base = isEndpointSecurityCategory() ? "/dashboard/protection/threat-activity" : "/dashboard/guardrails/activity";
+    const base = "/dashboard/protection/threat-activity";
     const { refId, eventType, actor, filterId, status } = row;
     const statusUpper = (status || "ACTIVE").toUpperCase();
     const hash = { UNDER_REVIEW: "under_review", IGNORED: "ignored" }[statusUpper] || "active";

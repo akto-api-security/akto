@@ -1352,51 +1352,73 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             this.builtAt = builtAt;
         }
     }
-    private static final Map<Integer, ScopedMapCacheEntry<Integer>> trafficMapFallbackCache = new ConcurrentHashMap<>();
-    private static final Map<Integer, ScopedMapCacheEntry<Double>> riskScoreMapFallbackCache = new ConcurrentHashMap<>();
+    private static final Map<String, ScopedMapCacheEntry<Integer>> trafficMapFallbackCache = new ConcurrentHashMap<>();
+    private static final Map<String, ScopedMapCacheEntry<Double>> riskScoreMapFallbackCache = new ConcurrentHashMap<>();
+
+    // Both underlying DAO calls RBAC-scope by (userId, accountId) — keyed on accountId alone, one user's restricted view would leak into another's.
+    private static String scopedCacheKey() {
+        return Context.accountId.get() + "_" + Context.userId.get();
+    }
 
     private Map<String, Integer> getOrComputeTrafficMap() {
         if (trafficMap != null && !trafficMap.isEmpty()) return trafficMap;
-        int accountId = Context.accountId.get();
+        String key = scopedCacheKey();
         long now = System.currentTimeMillis();
-        ScopedMapCacheEntry<Integer> existing = trafficMapFallbackCache.get(accountId);
+        ScopedMapCacheEntry<Integer> existing = trafficMapFallbackCache.get(key);
         if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
             return existing.map;
         }
-        try {
-            ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
-            apiCollectionsAction.fetchLastSeenInfoInCollections();
-            Map<Integer, Integer> raw = apiCollectionsAction.getLastTrafficSeenMap();
-            Map<String, Integer> result = new HashMap<>();
-            if (raw != null) raw.forEach((id, ts) -> result.put(String.valueOf(id), ts));
-            trafficMapFallbackCache.put(accountId, new ScopedMapCacheEntry<>(result, now));
-            return result;
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Failed computing traffic map server-side for agentic assets", LogDb.DASHBOARD);
-            return existing != null ? existing.map : Collections.emptyMap();
+        if (trafficMapFallbackCache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
+            trafficMapFallbackCache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
         }
+        // compute() serializes concurrent misses for the same key instead of each racing to Mongo.
+        return trafficMapFallbackCache.compute(key, (k, cached) -> {
+            long recheckNow = System.currentTimeMillis();
+            if (cached != null && (recheckNow - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                return cached;
+            }
+            try {
+                ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+                apiCollectionsAction.fetchLastSeenInfoInCollections();
+                Map<Integer, Integer> raw = apiCollectionsAction.getLastTrafficSeenMap();
+                Map<String, Integer> result = new HashMap<>();
+                if (raw != null) raw.forEach((id, ts) -> result.put(String.valueOf(id), ts));
+                return new ScopedMapCacheEntry<>(result, recheckNow);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed computing traffic map server-side for agentic assets", LogDb.DASHBOARD);
+                return cached != null ? cached : new ScopedMapCacheEntry<>(Collections.emptyMap(), recheckNow);
+            }
+        }).map;
     }
 
     private Map<String, Double> getOrComputeRiskScoreMap() {
         if (riskScoreMap != null && !riskScoreMap.isEmpty()) return riskScoreMap;
-        int accountId = Context.accountId.get();
+        String key = scopedCacheKey();
         long now = System.currentTimeMillis();
-        ScopedMapCacheEntry<Double> existing = riskScoreMapFallbackCache.get(accountId);
+        ScopedMapCacheEntry<Double> existing = riskScoreMapFallbackCache.get(key);
         if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
             return existing.map;
         }
-        try {
-            ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
-            apiCollectionsAction.fetchRiskScoreInfo();
-            Map<Integer, Double> raw = apiCollectionsAction.getRiskScoreOfCollectionsMap();
-            Map<String, Double> result = new HashMap<>();
-            if (raw != null) raw.forEach((id, score) -> result.put(String.valueOf(id), score));
-            riskScoreMapFallbackCache.put(accountId, new ScopedMapCacheEntry<>(result, now));
-            return result;
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Failed computing risk score map server-side for agentic assets", LogDb.DASHBOARD);
-            return existing != null ? existing.map : Collections.emptyMap();
+        if (riskScoreMapFallbackCache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
+            riskScoreMapFallbackCache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
         }
+        return riskScoreMapFallbackCache.compute(key, (k, cached) -> {
+            long recheckNow = System.currentTimeMillis();
+            if (cached != null && (recheckNow - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                return cached;
+            }
+            try {
+                ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+                apiCollectionsAction.fetchRiskScoreInfo();
+                Map<Integer, Double> raw = apiCollectionsAction.getRiskScoreOfCollectionsMap();
+                Map<String, Double> result = new HashMap<>();
+                if (raw != null) raw.forEach((id, score) -> result.put(String.valueOf(id), score));
+                return new ScopedMapCacheEntry<>(result, recheckNow);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed computing risk score map server-side for agentic assets", LogDb.DASHBOARD);
+                return cached != null ? cached : new ScopedMapCacheEntry<>(Collections.emptyMap(), recheckNow);
+            }
+        }).map;
     }
 
     private ClassificationCacheEntry getOrBuildClassification(Map<String, Integer> traffic,
@@ -1789,6 +1811,27 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                         return groupTags.stream().noneMatch(allowedTags::contains);
                     });
                 }
+                // "username" — a group matches if ANY of its member devices resolves (via the client's
+                // Endpoint Shield usernameMap) to one of the selected usernames. Mirrors
+                // resolveUsernameByDeviceId's use elsewhere in this class (e.g. fetchAgenticAssetDetail).
+                if (filters.containsKey("username")) {
+                    Set<String> allowedUsernames = new HashSet<>(filters.get("username"));
+                    Map<String, String> resolveMap = usernameMap != null ? usernameMap : Collections.emptyMap();
+                    all.removeIf(g -> g.endpointIds.stream()
+                            .noneMatch(id -> allowedUsernames.contains(resolveUsernameByDeviceId(id, resolveMap))));
+                }
+                // "severity" — drives the Violations card's Critical/High/Medium/Low chips. Skill rows
+                // never carry violations on this grid (see the row-loop's own comment below), so they
+                // never match. Same "null when zero" contract as sumViolationsForCollections itself.
+                if (filters.containsKey("severity")) {
+                    Set<String> allowedSeverities = new HashSet<>(filters.get("severity"));
+                    all.removeIf(g -> {
+                        if ("skill".equals(g.rowType)) return true;
+                        BasicDBObject v = sumViolationsForCollections(g.collectionIds, violationsByCollectionId);
+                        if (v == null) return true;
+                        return allowedSeverities.stream().noneMatch(s -> v.getInt(s, 0) > 0);
+                    });
+                }
             }
 
             long total = all.size();
@@ -1851,6 +1894,19 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
             loggerMaker.warnAndAddToDb("[fetchAgenticAssetsSummary-timing] TOTAL=" + (System.currentTimeMillis() - tStart)
                     + "ms, rows=" + rowsOut.size() + ", accountCollections=" + collections.size());
+
+            // Current-page-only, same as fetchAgenticAssetEndpointsPage's distinctUsernames — the
+            // client accumulates these across page turns to progressively populate the Username filter's
+            // choices (see Endpoints.jsx's updateFilterChoicesIfChanged).
+            Map<String, String> resolveMapForChoices = usernameMap != null ? usernameMap : Collections.emptyMap();
+            Set<String> distinctUsernames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            for (GroupSummary g : page) {
+                for (String id : g.endpointIds) {
+                    String u = resolveUsernameByDeviceId(id, resolveMapForChoices);
+                    if (StringUtils.isNotBlank(u) && !"-".equals(u)) distinctUsernames.add(u);
+                }
+            }
+            response.put("distinctUsernames", new ArrayList<>(distinctUsernames));
 
             response.put("rows", rowsOut);
             response.put("total", total);

@@ -11,6 +11,7 @@ import func from "@/util/func";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
+import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 import { CollectionIcon } from "../../../components/shared/CollectionIcon";
 import useTable from "@/apps/dashboard/components/tables/TableContext";
 import NewLayoutTooltip from "./NewLayoutTooltip";
@@ -145,9 +146,12 @@ function Endpoints() {
     // itself — populated once at mount (Tier 1: trafficMap/riskScoreMap/sensitiveMap; Tier 2,
     // async: skill risk/malicious/misconfigured data), read (not reacted to) by fetchTableData.
     const enrichRef = useRef({
-        trafficMap: {}, riskScoreMap: {}, sensitiveMap: {},
+        trafficMap: {}, riskScoreMap: {}, sensitiveMap: {}, usernameMap: {},
         skillScoreMap: {}, misconfiguredSkills: new Set(),
     });
+    // Progressively populated from each page's distinctUsernames (server-computed, current page
+    // only) — same pattern as AgenticAssetDevicesPage.jsx's filterChoices/updateFilterChoicesIfChanged.
+    const [usernameChoices, setUsernameChoices] = useState([]);
 
     // headings drives the rendered COLUMNS; headers drives FILTERS/CSV export (GithubServerTable's
     // own convention) — tagFilterHeader is filter-only, so it belongs in headers, not headings.
@@ -160,14 +164,20 @@ function Endpoints() {
     // GithubServerTable renders filter chips from a separate `filters` prop (Polaris IndexFilters
     // shape: {key, label, choices}) — headers' filterKey only feeds filterOperators/CSV export,
     // it does NOT surface a UI facet on its own (confirmed via UsersAndDevices.jsx's filtersDef).
-    const filtersDef = useMemo(() => [
-        { key: "assetTags", label: "Tag", choices: [
-            { label: "Contains personal account", value: "Contains personal account" },
-            { label: "Local MCP Server", value: "Local MCP Server" },
-            { label: "Misconfigured", value: "Misconfigured" },
-            { label: "Malicious Skill", value: "Malicious Skill" },
-        ] },
-    ], []);
+    const filtersDef = useMemo(() => {
+        const defs = [
+            { key: "assetTags", label: "Tag", choices: [
+                { label: "Contains personal account", value: "Contains personal account" },
+                { label: "Local MCP Server", value: "Local MCP Server" },
+                { label: "Misconfigured", value: "Misconfigured" },
+                { label: "Malicious Skill", value: "Malicious Skill" },
+            ] },
+        ];
+        if (usernameChoices.length) {
+            defs.push({ key: "username", label: "Username", choices: usernameChoices.map((u) => ({ label: u, value: u })) });
+        }
+        return defs;
+    }, [usernameChoices]);
 
     const tableCountObj = func.getTabsCount(definedTableTabs, {
         _counts: {
@@ -195,14 +205,16 @@ function Endpoints() {
             // deduped) — this leaner sibling of fetchAndCacheAgenticCollectionsBundle skips
             // getAllCollectionsBasic entirely (see AgenticAssetsPage.jsx's own switch to it).
             // Sensitive info is cached separately since only this page + UsersAndDevices.jsx use it.
-            const [trafficRiskBundle, sensitiveMap] = await Promise.all([
+            const [trafficRiskBundle, sensitiveMap, shieldResult] = await Promise.all([
                 fetchAndCacheAgenticTrafficRiskBundle({ api, PersistStore }),
                 fetchAndCacheAgenticSensitiveInfo({ api, PersistStore }),
+                fetchEndpointShieldUserMetadata().catch(() => ({})),
             ]);
             if (!isMountedRef.current) return;
 
             const { trafficMap = {}, riskScoreMap = {} } = trafficRiskBundle || {};
-            enrichRef.current = { ...enrichRef.current, trafficMap, riskScoreMap, sensitiveMap };
+            const { usernameMap = {} } = shieldResult || {};
+            enrichRef.current = { ...enrichRef.current, trafficMap, riskScoreMap, sensitiveMap, usernameMap };
             setRefreshKey((k) => k + 1); // mount the table now that enrichRef is populated
             setLoading(false);
 
@@ -239,15 +251,17 @@ function Endpoints() {
     const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
         setTableLoading(true);
         try {
-            const { trafficMap, riskScoreMap, sensitiveMap, skillScoreMap, misconfiguredSkills } = enrichRef.current;
+            const { trafficMap, riskScoreMap, sensitiveMap, usernameMap, skillScoreMap, misconfiguredSkills } = enrichRef.current;
             // GithubServerTable: asc=-1/desc=1, inverted vs Mongo (matches AgenticAssetsPage.jsx/
             // NhiGovernanceIdentitiesAction's own onServerFetch convention).
             const mongoSortOrder = sortOrder === -1 ? 1 : -1;
             const clientType = TAB_TO_CLIENT_TYPE[selectedTab];
             const tagValues = filtersObj?.assetTags;
+            const usernameValues = filtersObj?.username;
             const filters = {};
             if (clientType) filters.type = [clientType];
             if (tagValues?.length) filters.tags = tagValues;
+            if (usernameValues?.length) filters.username = usernameValues;
 
             const res = await api.fetchAgenticAssetsSummary({
                 skip,
@@ -255,9 +269,15 @@ function Endpoints() {
                 sortKey: sortKey || "riskScore",
                 sortOrder: mongoSortOrder,
                 queryValue,
-                trafficMap, riskScoreMap, sensitiveMap,
+                trafficMap, riskScoreMap, sensitiveMap, usernameMap,
                 filters: Object.keys(filters).length ? filters : undefined,
             });
+            // Same progressive-population pattern as AgenticAssetDevicesPage.jsx — union rather than
+            // replace, so choices survive across page turns instead of shrinking to just the current page.
+            const newUsernames = res.distinctUsernames || [];
+            if (newUsernames.length) {
+                setUsernameChoices((prev) => Array.from(new Set([...prev, ...newUsernames])).sort());
+            }
             const rows = (res.rows || []).map((row) => shapeRow(row, { skillScoreMap, misconfiguredSkills }));
             return { value: rows, total: res.total || 0 };
         } finally {
