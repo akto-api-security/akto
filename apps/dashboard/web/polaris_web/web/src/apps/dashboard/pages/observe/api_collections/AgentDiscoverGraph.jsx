@@ -641,7 +641,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
       <Box padding="4">
         <VerticalStack gap="4">
           <HorizontalStack align="space-between">
-            <Text variant="headingMd">Architecture</Text>
+            <Text variant="headingMd">Context graph</Text>
             <HorizontalStack gap="2">
               {arcadeGraphData ? (
                 <>
