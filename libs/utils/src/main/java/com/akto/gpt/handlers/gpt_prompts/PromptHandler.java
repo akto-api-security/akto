@@ -45,7 +45,7 @@ public abstract class PromptHandler {
     }
 
     static final String OLLAMA_MODEL = "llama3:8b";
-    public static final Double temperature = 0.1;
+    public static final Double temperature = 0.0;
     public static final int max_tokens = 10000;
 
     /**
