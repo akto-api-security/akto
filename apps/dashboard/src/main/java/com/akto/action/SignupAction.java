@@ -1517,12 +1517,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 Account oldAccount = AccountsDao.instance.findOne("_id", invitationToAccount);
                 user = AccountAction.initializeAccount(userEmail, invitationToAccount, oldAccount.getName(), false, this.scopeRoleMapping);
             }else {
-                // For a brand-new org (e.g. the first user signing up via email), the email
-                // signup path does not initialize scopeRoleMapping, so it can be null here.
-                // Guard against an NPE before assigning the default ADMIN scopes.
-                if (this.scopeRoleMapping == null) {
-                    this.scopeRoleMapping = new HashMap<>();
-                }
                 this.scopeRoleMapping.put("API", RBAC.Role.ADMIN.name());
                 this.scopeRoleMapping.put("ENDPOINT", RBAC.Role.ADMIN.name());
                 this.scopeRoleMapping.put("DAST", RBAC.Role.ADMIN.name());

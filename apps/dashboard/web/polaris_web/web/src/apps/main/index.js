@@ -37,9 +37,15 @@ const currentPath = window.location.pathname;
 const isSignupPage = signupPages.some(page => currentPath.startsWith(page));
 const isWhitelisted = func.isWhiteListedOrganization();
 
+// Open-source self-hosted (local_deploy) deployments have no billing service, so
+// PLAN_TYPE resolves empty and the plan gate below would wrongly block the user.
+// These installs are not SaaS and should never be paywalled.
+const isLocalDeploy = (window.DASHBOARD_MODE || '').toUpperCase() === 'LOCAL_DEPLOY'
+  || window.IS_SAAS === 'false' || window.IS_SAAS === false;
+
 let free = false
-if(isWhitelisted || isSignupPage) {
-  free = false; // Whitelisted users & Signup pages should not block user
+if(isWhitelisted || isSignupPage || isLocalDeploy) {
+  free = false; // Whitelisted users, signup pages & self-hosted local deploys should not block user
 } else {
   // For non-whitelisted, non-signup users, check plan type
   if(window.PLAN_TYPE && ALLOWED_PLANS.includes(window.PLAN_TYPE.toLowerCase())) {
