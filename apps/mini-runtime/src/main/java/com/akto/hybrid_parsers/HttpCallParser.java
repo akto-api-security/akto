@@ -670,6 +670,37 @@ public class HttpCallParser {
         }
     }
 
+    /**
+     * awsMetadata is already fully captured as structured Trace/Span/service-graph data by
+     * BedrockAgentTraceParser by the time this runs — it can embed full tool-call outputs
+     * (file listings, page dumps, etc.), which routinely pushes the sample-data message this
+     * account's Kafka producer ships to database-abstractor past Kafka's default 1MB
+     * max.request.size. That failure is silent (KafkaProducer.doSend() swallows
+     * RecordTooLargeException internally and only logs via a bare, non-persisted
+     * logger.error in the producer callback), so oversized samples vanish with no trace
+     * instead of erroring — stripping it here, before it reaches httpResponseParam.getOrig()
+     * (what APICatalogSync.recordMessage() captures as the sample), avoids that outcome.
+     */
+    private void stripAwsMetadataFromSample(HttpResponseParams httpResponseParam) {
+        try {
+            String updatedPayload = JSONUtils.removeKey(httpResponseParam.getPayload(), "awsMetadata");
+            if (updatedPayload == null || updatedPayload.equals(httpResponseParam.getPayload())) {
+                return;
+            }
+            httpResponseParam.setPayload(updatedPayload);
+            Map<String, Object> origMap = JSONUtils.getMap(httpResponseParam.getOrig());
+            if (origMap != null) {
+                origMap.put("responsePayload", updatedPayload);
+                String updatedOrig = JSONUtils.getString(origMap);
+                if (updatedOrig != null) {
+                    httpResponseParam.setOrig(updatedOrig);
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error stripping awsMetadata from sample payload: " + e.getMessage());
+        }
+    }
+
     private void parseCopilotTrace(HttpResponseParams httpResponseParam) {
         try {
             String traces = httpResponseParam.getTraces();
@@ -1863,6 +1894,7 @@ public class HttpCallParser {
             // Parse Bedrock Agent trace metadata if this is Bedrock Agent traffic
             if (isBedrockAgentTraffic(tagsMap)) {
                 parseBedrockAgentTrace(httpResponseParam);
+                stripAwsMetadataFromSample(httpResponseParam);
             }
 
             // Build service graph edges for Arcade traffic
