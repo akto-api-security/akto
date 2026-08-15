@@ -256,4 +256,21 @@ public class JSONUtils {
             return null;
         }
     }
+
+    /**
+     * Returns json with the given top-level key removed, or the original string
+     * unchanged if it isn't a JSON object, doesn't parse, or doesn't have that key.
+     */
+    public static String removeKey(String json, String key) {
+        if (json == null || json.isEmpty()) {
+            return json;
+        }
+        Map<String, Object> map = getMap(json);
+        if (map == null || !map.containsKey(key)) {
+            return json;
+        }
+        map.remove(key);
+        String updated = getString(map);
+        return updated != null ? updated : json;
+    }
 }
