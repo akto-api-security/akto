@@ -24,10 +24,6 @@ public class OrganizationsDao extends BillingContextDao<Organization>{
 
     public static final OrganizationsDao instance = new OrganizationsDao();
 
-    /**
-     * Order in which entitled modules are considered. The first granted entry is the category a
-     * user lands in; the whole granted subset becomes their scopeRoleMapping.
-     */
     private static final DashboardCategory[] CATEGORY_PRECEDENCE = {
             DashboardCategory.API_SECURITY,
             DashboardCategory.SECURITY_TYPE_AGENTIC,
@@ -35,29 +31,11 @@ public class OrganizationsDao extends BillingContextDao<Organization>{
             DashboardCategory.AKTO_DAST
     };
 
-    /**
-     * True only when STIGG explicitly grants the feature backing this dashboard category.
-     * A missing key counts as NOT granted here — an Argus-only plan publishes
-     * SECURITY_TYPE_AGENTIC and simply omits the others, so treating an absent key as granted
-     * would let API_SECURITY win the precedence below on an entitlement nobody ever bought.
-     * (This is stricter than UsageMetricCalculator.getAccessibleProductScopes(), which defaults
-     * ENDPOINT_SECURITY to granted; that one answers "may they access it", this one answers
-     * "which single module did they actually buy".)
-     */
     private static boolean isCategoryGranted(HashMap<String, FeatureAccess> featureWiseAllowed, DashboardCategory category) {
         FeatureAccess access = featureWiseAllowed.get(category.name());
         return access != null && access.getIsGranted();
     }
 
-    /**
-     * The dashboard category an account should default to, derived from its STIGG entitlements.
-     * Picks the first explicitly granted feature in the order API > Agentic (ARGUS) >
-     * Endpoint (ATLAS) > DAST, so an Argus-only org resolves to Agentic Security and an
-     * Atlas-only org to Endpoint Security, while an org granted API keeps landing on API.
-     * Returns API_SECURITY whenever entitlements are unknown or grant nothing recognisable
-     * (no org, empty feature map, on-prem, or a lookup failure) — including for a brand-new
-     * org, whose STIGG map isn't synced yet.
-     */
     public static DashboardCategory getDefaultDashboardCategoryEnum(int accountId) {
         try {
             Organization organization = instance.findOne(Filters.in(Organization.ACCOUNTS, accountId));
@@ -71,18 +49,15 @@ public class OrganizationsDao extends BillingContextDao<Organization>{
                 }
             }
         } catch (Exception e) {
-            // entitlements unavailable — fall through to the API Security default
         }
 
         return DashboardCategory.API_SECURITY;
     }
 
-    /** Display label of {@link #getDefaultDashboardCategoryEnum}, e.g. "Endpoint Security". */
     public static String getDefaultDashboardCategory(int accountId) {
         return getDefaultDashboardCategoryEnum(accountId).getDashboardCategory();
     }
 
-    /** The RBAC product scope backing a dashboard category, e.g. ENDPOINT_SECURITY -> "ENDPOINT". */
     private static String scopeOf(DashboardCategory category) {
         switch (category) {
             case SECURITY_TYPE_AGENTIC:
@@ -96,13 +71,6 @@ public class OrganizationsDao extends BillingContextDao<Organization>{
         }
     }
 
-    /**
-     * Every RBAC product scope the account is entitled to, in the same precedence order as
-     * {@link #getDefaultDashboardCategoryEnum} so the first entry is the landing category.
-     * An org that bought both Argus and Atlas gets both scopes — seeding only the landing one
-     * would leave the other at NO_ACCESS (see RBAC.getRoleForScope), locking them out of a
-     * module they paid for. Falls back to a single API scope when entitlements are unknown.
-     */
     public static Set<String> getEntitledScopes(int accountId) {
         Set<String> scopes = new LinkedHashSet<>();
         try {

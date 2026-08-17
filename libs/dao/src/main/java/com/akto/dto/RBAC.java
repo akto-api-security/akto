@@ -177,10 +177,6 @@ public class RBAC {
      * Initializes default scope-role mapping if empty.
      * Atlas-configured accounts or matching emails get ENDPOINT (Akto ATLAS) → defaultRole; everyone
      * else gets every scope their org's STIGG plan grants, ordered API > AGENTIC > ENDPOINT > DAST.
-     * All granted scopes are seeded, not just the first: an unlisted scope resolves to NO_ACCESS in
-     * {@link #getRoleForScope}, so an org that bought both Argus and Atlas would lose one of them.
-     * Insertion order is preserved so the first key is the module the user should land in.
-     * Falls back to API whenever entitlements are unknown.
      * Otherwise returns the existing scopeRoleMapping unchanged.
      */
     public static Map<String, String> initializeScopeRoleMapping(
