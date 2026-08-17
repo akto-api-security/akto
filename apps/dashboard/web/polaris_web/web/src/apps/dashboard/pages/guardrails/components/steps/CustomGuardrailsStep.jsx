@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox, HorizontalStack } from "@shopify/polaris";
+import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox, HorizontalStack, Button, Divider } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import ControlInfoIcon from "../ControlInfoIcon";
 import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
@@ -12,24 +12,67 @@ const validateUrl = (url) => {
     return urlPattern.test(url);
 };
 
+const PROMPT_MIN_LENGTH = 10;
+
+export const DEFAULT_REDACTION_REPLACEMENT = "[REDACTED]";
+
+export const newRedactionRule = () => ({
+    enabled: true,
+    userPrompt: "",
+    replacementString: DEFAULT_REDACTION_REPLACEMENT,
+    confidenceScore: 0.5
+});
+
+// The replacement is substituted into the payload and the result is re-serialized as
+// JSON, so a quote or backslash in the marker would corrupt the body downstream.
+const INVALID_REPLACEMENT_CHARS = /["\\]/;
+
+const validateRedactionRules = (rules) => {
+    for (const rule of rules || []) {
+        if (!rule.enabled) continue;
+        const prompt = (rule.userPrompt || "").trim();
+        if (prompt.length === 0) {
+            return "Redaction instruction cannot be empty. Remove the rule or describe what to redact.";
+        }
+        if (prompt.length < PROMPT_MIN_LENGTH) {
+            return `Redaction instruction is too short. Use at least ${PROMPT_MIN_LENGTH} characters so the model can act on it.`;
+        }
+        if (INVALID_REPLACEMENT_CHARS.test(rule.replacementString || "")) {
+            return 'Replacement text cannot contain quotes or backslashes.';
+        }
+    }
+    return null;
+};
+
 export const CustomGuardrailsConfig = {
     number: 6,
     title: "Custom Guardrails",
 
-    validate: ({ enableExternalModel, url }) => {
+    validate: ({ enableExternalModel, url, enableLlmRedaction, redactionRules }) => {
         const hasUrl = enableExternalModel && url && url.trim().length > 0;
         const urlError = hasUrl && !validateUrl(url.trim()) ? "Invalid URL format. Must be a valid http or https URL" : null;
+        const redactionError = enableLlmRedaction ? validateRedactionRules(redactionRules) : null;
+        const errorMessage = urlError || redactionError;
 
         return {
-            isValid: !urlError,
-            errorMessage: urlError
+            isValid: !errorMessage,
+            errorMessage
         };
     },
 
-    getSummary: ({ enableLlmPrompt, llmPrompt, enableExternalModel, url }) => {
+    getSummary: ({ enableLlmPrompt, llmPrompt, enableExternalModel, url, enableLlmRedaction, redactionRules }) => {
         const summaries = [];
         if (enableLlmPrompt && llmPrompt) {
             summaries.push(`LLM: ${llmPrompt.substring(0, 20)}${llmPrompt.length > 20 ? '...' : ''}`);
+        }
+        if (enableLlmRedaction) {
+            const active = (redactionRules || []).filter(r => r.enabled && (r.userPrompt || "").trim());
+            if (active.length === 1) {
+                const p = active[0].userPrompt.trim();
+                summaries.push(`Redact: ${p.substring(0, 20)}${p.length > 20 ? '...' : ''}`);
+            } else if (active.length > 1) {
+                summaries.push(`Redact: ${active.length} rules`);
+            }
         }
         if (enableExternalModel && url) {
             summaries.push(`External: ${url.substring(0, 20)}${url.length > 20 ? '...' : ''}`);
@@ -37,8 +80,6 @@ export const CustomGuardrailsConfig = {
         return summaries.length > 0 ? summaries.join(', ') : null;
     }
 };
-
-const PROMPT_MIN_LENGTH = 10;
 
 const CustomGuardrailsStep = ({
     onTryPrompt,
@@ -52,6 +93,11 @@ const CustomGuardrailsStep = ({
     // LLM rule compliance (controlled by parent)
     llmCompliance,
     setLlmCompliance,
+    // LLM prompt based redaction
+    enableLlmRedaction,
+    setEnableLlmRedaction,
+    redactionRules,
+    setRedactionRules,
     // External model based evaluation
     enableExternalModel,
     setEnableExternalModel,
@@ -132,6 +178,25 @@ const CustomGuardrailsStep = ({
         setLlmCompliance(buildComplianceMap(currentEntry.suggested, newAccepted));
     };
 
+    const updateRedactionRule = (index, patch) => {
+        setRedactionRules((redactionRules || []).map((rule, i) => (i === index ? { ...rule, ...patch } : rule)));
+    };
+
+    const addRedactionRule = () => {
+        setRedactionRules([...(redactionRules || []), newRedactionRule()]);
+    };
+
+    const removeRedactionRule = (index) => {
+        setRedactionRules((redactionRules || []).filter((_, i) => i !== index));
+    };
+
+    const handleEnableLlmRedaction = (checked) => {
+        setEnableLlmRedaction(checked);
+        if (checked && (redactionRules || []).length === 0) {
+            setRedactionRules([newRedactionRule()]);
+        }
+    };
+
     const handleUrlChange = (value) => {
         setUrl(value);
         if (value && value.trim() && !validateUrl(value.trim())) {
@@ -203,6 +268,90 @@ const CustomGuardrailsStep = ({
                                     onAdd={Object.keys(llmRuleCompliance.suggested).length > 0 ? toggleLlmFramework : undefined}
                                 />
                             </FormLayout>
+                        </Box>
+                    )}
+                </Box>
+
+                {/* LLM Prompt Based Redaction */}
+                <Box>
+                    <Checkbox
+                        label={
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text as="span">LLM based redaction</Text>
+                                <ControlInfoIcon
+                                    {...CUSTOM_GUARDRAILS_DESCRIPTIONS.llmRedactionRule}
+                                    onTryPrompt={onTryPrompt}
+                                />
+                            </HorizontalStack>
+                        }
+                        checked={enableLlmRedaction}
+                        onChange={handleEnableLlmRedaction}
+                        helpText="Describe what to mask in plain language. Matching text is replaced in place and the request is allowed through, instead of being blocked."
+                    />
+                    {enableLlmRedaction && (
+                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
+                            <VerticalStack gap="4">
+                                {(redactionRules || []).map((rule, index) => (
+                                    <VerticalStack gap="3" key={index}>
+                                        {index > 0 && <Divider />}
+                                        <FormLayout>
+                                            <TextField
+                                                label={`Redaction instruction${(redactionRules || []).length > 1 ? ` ${index + 1}` : ''}`}
+                                                value={rule.userPrompt}
+                                                onChange={(value) => updateRedactionRule(index, { userPrompt: value })}
+                                                multiline={3}
+                                                placeholder="e.g. Redact customer full names and home addresses"
+                                                helpText="Be specific about what to mask. Anything not described here is left untouched."
+                                            />
+
+                                            <TextField
+                                                label={
+                                                    <HorizontalStack gap="1" blockAlign="center">
+                                                        <Text as="span">Replacement text</Text>
+                                                        <ControlInfoIcon
+                                                            {...CUSTOM_GUARDRAILS_DESCRIPTIONS.redactionReplacement}
+                                                            onTryPrompt={onTryPrompt}
+                                                        />
+                                                    </HorizontalStack>
+                                                }
+                                                value={rule.replacementString}
+                                                onChange={(value) => updateRedactionRule(index, { replacementString: value })}
+                                                placeholder={DEFAULT_REDACTION_REPLACEMENT}
+                                                helpText={`Written in place of each match. A number is appended per distinct value, e.g. ${DEFAULT_REDACTION_REPLACEMENT.replace(']', '_1]')}.`}
+                                            />
+
+                                            <RangeSlider
+                                                label={
+                                                    <HorizontalStack gap="1" blockAlign="center">
+                                                        <Text as="span">Confidence score threshold</Text>
+                                                        <ControlInfoIcon
+                                                            {...CUSTOM_GUARDRAILS_DESCRIPTIONS.redactionConfidenceThreshold}
+                                                            onTryPrompt={onTryPrompt}
+                                                        />
+                                                    </HorizontalStack>
+                                                }
+                                                value={rule.confidenceScore}
+                                                onChange={(value) => updateRedactionRule(index, { confidenceScore: value })}
+                                                min={0}
+                                                max={1}
+                                                step={0.1}
+                                                output
+                                                helpText="Text is only masked if the LLM's confidence that it matches your instruction exceeds this threshold"
+                                            />
+                                        </FormLayout>
+                                        {(redactionRules || []).length > 1 && (
+                                            <HorizontalStack>
+                                                <Button plain destructive onClick={() => removeRedactionRule(index)}>
+                                                    Remove instruction
+                                                </Button>
+                                            </HorizontalStack>
+                                        )}
+                                    </VerticalStack>
+                                ))}
+                                <HorizontalStack>
+                                    <Button onClick={addRedactionRule}>Add another instruction</Button>
+                                </HorizontalStack>
+                            </VerticalStack>
                         </Box>
                     )}
                 </Box>
