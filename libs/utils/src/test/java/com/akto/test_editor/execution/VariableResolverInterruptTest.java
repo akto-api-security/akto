@@ -1,11 +1,12 @@
 package com.akto.test_editor.execution;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -20,13 +21,21 @@ public class VariableResolverInterruptTest {
     }
 
     @Test
-    public void wordListLoopStopsWhenThreadIsInterrupted() throws Exception {
-        List<String> words = new ArrayList<>();
-        for (int i = 0; i < 200_000; i++) {
-            words.add("w" + i);
-        }
+    public void alreadyInterruptedThreadStopsBeforeCartesianWork() {
+        Thread.currentThread().interrupt();
         Map<String, Object> varMap = new HashMap<>();
-        varMap.put("wordList_payload", words);
+        varMap.put("wordList_payload", Collections.singletonList("a"));
+
+        RuntimeException thrown = assertThrows(RuntimeException.class,
+                () -> VariableResolver.resolveWordListVar("${payload}", varMap));
+        assertTrue(thrown.getMessage().contains("interrupted"));
+        assertTrue(Thread.currentThread().isInterrupted(), "must not clear the interrupt flag");
+    }
+
+    @Test
+    public void wordListLoopStopsWhenThreadIsInterrupted() throws Exception {
+        Map<String, Object> varMap = new HashMap<>();
+        varMap.put("wordList_payload", Arrays.asList("a-${payload}", "b-${payload}"));
 
         AtomicBoolean threw = new AtomicBoolean(false);
         Thread worker = new Thread(() -> {
@@ -37,7 +46,6 @@ public class VariableResolverInterruptTest {
             }
         });
         worker.start();
-        Thread.sleep(50);
         worker.interrupt();
         worker.join(2000);
 
