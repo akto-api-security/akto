@@ -155,16 +155,16 @@ function Metrics() {
         'TESTING_ISSUES_CREATED_COUNT',
         'TESTING_KAFKA_QUEUE_PENDING',
         'TESTING_KAFKA_SEND_FAILURE_COUNT',
-        'TESTING_RATE_LIMIT_EXCEEDED_COUNT',
+        // 'TESTING_RATE_LIMIT_EXCEEDED_COUNT',
         'TESTING_RUN_COUNT',
-        'TESTING_RUN_LATENCY',
-        'SAMPLE_DATA_FETCH_LATENCY',
-        'MULTIPLE_SAMPLE_DATA_FETCH_LATENCY',
+        // 'TESTING_RUN_LATENCY',
+        // 'SAMPLE_DATA_FETCH_LATENCY',
+        // 'MULTIPLE_SAMPLE_DATA_FETCH_LATENCY',
 
         // Cyborg metrics
-        'CYBORG_CALL_LATENCY',
-        'CYBORG_CALL_COUNT',
-        'CYBORG_DATA_SIZE',
+        // 'CYBORG_CALL_LATENCY',
+        // 'CYBORG_CALL_COUNT',
+        // 'CYBORG_DATA_SIZE',
         'DATA_INGESTION_API_COUNT',
     ];
 
@@ -284,9 +284,9 @@ function Metrics() {
 
     const runtimeMetricsKeys = newMetrics.slice(0, 13);
     const postgresqlMetricsKeys = newMetrics.slice(13, 22);
-    const testingMetricsKeys = newMetrics.slice(22, 33);
-    const cyborgMetricsKeys = newMetrics.slice(33, 36);
-    const dataIngestionMetricsKeys = newMetrics.slice(36, 37);
+    const testingMetricsKeys = newMetrics.slice(22, 29);
+    const cyborgMetricsKeys = [];
+    const dataIngestionMetricsKeys = newMetrics.slice(29, 30);
 
     const tzOffsetMinutes = getTimezoneOffsetMinutes(selectedTimezone);
     const sharedSectionProps = { orderedResult, nameMap, defaultChartOptionsFn: defaultChartOptions, timezoneOffsetMinutes: tzOffsetMinutes };
