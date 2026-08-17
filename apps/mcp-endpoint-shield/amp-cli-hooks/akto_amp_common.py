@@ -58,6 +58,13 @@ AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "amp")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 # Non-MCP blocked-request ingestion is off by default, matching claude-cli-hooks.
 AKTO_INGEST_NON_MCP_TOOLS = os.getenv("AKTO_INGEST_NON_MCP_TOOLS", "false").lower() == "true"
+# Validate tool OUTPUT before it reaches the model (tool.result can still be replaced).
+AKTO_RESPONSE_GUARDRAILS = os.getenv("AKTO_RESPONSE_GUARDRAILS", "true").lower() == "true"
+# Request-time hooks create a record whose responsePayload is necessarily empty. With
+# this off (the default) the guardrail check does not ingest, so the response-side hook
+# owns one complete request+response record per turn and discovery shows real response
+# bodies. Set true to restore a separate request-time record.
+AKTO_INGEST_ON_REQUEST = os.getenv("AKTO_INGEST_ON_REQUEST", "false").lower() == "true"
 
 # Mirrored paths: /mcp matches JsonRpcUtils.isMcpPath; non-MCP uses /<prefix>/<tool>.
 MCP_INGEST_PATH = os.getenv("MCP_INGEST_PATH", "/mcp")
@@ -105,10 +112,17 @@ def create_ssl_context() -> ssl.SSLContext:
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(*, guardrails: bool = False, ingest_data: bool = False) -> str:
+def build_http_proxy_url(
+    *,
+    guardrails: bool = False,
+    response_guardrails: bool = False,
+    ingest_data: bool = False,
+) -> str:
     params = []
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     params.append(f"akto_connector={AKTO_CONNECTOR}")
     if ingest_data:
         params.append("ingest_data=true")
@@ -216,14 +230,35 @@ def build_tools_call_jsonrpc(mcp_tool_name: str, tool_input: Any, request_id: in
     )
 
 
+def normalize_tool_output(tool_response: Any) -> str:
+    """Flatten a tool result to the text the guardrail should scan.
+
+    Amp does not hand back a bare string: shell_command yields
+    {"output": "...", "exitCode": 0}, and plugin/MCP tools may return content
+    blocks. Mirroring those verbatim buries the text one level too deep
+    ({"body":{"result":{"output":"..."}}}) and the guardrail does not see it, so
+    sensitive tool output silently passes. Unwrap to a plain string instead.
+    """
+    if tool_response is None:
+        return ""
+    if isinstance(tool_response, str):
+        return tool_response
+    if isinstance(tool_response, dict):
+        # shell_command / shell_command_status and similar single-payload wrappers.
+        for key in ("output", "text", "result", "content", "stdout"):
+            if key in tool_response:
+                return normalize_tool_output(tool_response[key])
+        return json.dumps(tool_response)
+    if isinstance(tool_response, list):
+        parts = [normalize_tool_output(item) for item in tool_response]
+        return "\n".join(p for p in parts if p)
+    return str(tool_response)
+
+
 def build_tools_call_result_jsonrpc(tool_response: Any, request_id: int = 1) -> str:
     """JSON-RPC response body for an MCP tools/call result."""
-    if isinstance(tool_response, str):
-        result: Any = {"content": [{"type": "text", "text": tool_response}]}
-    elif isinstance(tool_response, dict):
-        result = tool_response
-    else:
-        result = {"content": [{"type": "text", "text": json.dumps(tool_response)}]}
+    text = normalize_tool_output(tool_response)
+    result: Any = {"content": [{"type": "text", "text": text}]}
     return json.dumps({"jsonrpc": "2.0", "id": request_id, "result": result})
 
 
@@ -344,9 +379,25 @@ class GuardrailsVerdict:
 
 
 def parse_guardrails_verdict(result: Any) -> GuardrailsVerdict:
+    """Read the verdict out of guardrailsResult.
+
+    Akto versions differ in shape: some return the verdict flat, newer ones also
+    nest it under requestResult / responseResult. A denial in ANY section counts
+    as a denial, so a backend that stops populating the flat fields cannot make
+    the guardrail silently fail open.
+    """
     data = result.get("data", {}) if isinstance(result, dict) else {}
     gr = data.get("guardrailsResult", {}) if isinstance(data, dict) else {}
-    return GuardrailsVerdict(
+    if not isinstance(gr, dict):
+        return GuardrailsVerdict()
+
+    sections = [gr]
+    for key in ("requestResult", "responseResult"):
+        section = gr.get(key)
+        if isinstance(section, dict):
+            sections.append(section)
+
+    verdict = GuardrailsVerdict(
         allowed=gr.get("Allowed", True),
         reason=gr.get("Reason", ""),
         behaviour=gr.get("behaviour", "") or gr.get("Behaviour", ""),
@@ -354,9 +405,29 @@ def parse_guardrails_verdict(result: Any) -> GuardrailsVerdict:
         modified_payload=gr.get("ModifiedPayload", ""),
     )
 
+    for section in sections:
+        if section.get("Allowed", True) is False:
+            verdict.allowed = False
+            verdict.reason = verdict.reason or section.get("Reason", "")
+            verdict.behaviour = (
+                verdict.behaviour
+                or section.get("behaviour", "")
+                or section.get("Behaviour", "")
+            )
+        if section.get("Modified", False) and not verdict.modified:
+            verdict.modified = True
+            verdict.modified_payload = section.get("ModifiedPayload", "")
+
+    return verdict
+
 
 def call_guardrails(
-    payload: Dict[str, Any], logger: logging.Logger, *, guardrails: bool = True
+    payload: Dict[str, Any],
+    logger: logging.Logger,
+    *,
+    guardrails: bool = True,
+    response_guardrails: bool = False,
+    ingest_data: bool = True,
 ) -> GuardrailsVerdict:
     """Post to Akto with guardrails on. Fails OPEN on any transport error."""
     if not AKTO_DATA_INGESTION_URL:
@@ -364,7 +435,13 @@ def call_guardrails(
         return GuardrailsVerdict()
     try:
         result = post_payload_json(
-            build_http_proxy_url(guardrails=guardrails, ingest_data=True), payload, logger
+            build_http_proxy_url(
+                guardrails=guardrails,
+                response_guardrails=response_guardrails,
+                ingest_data=ingest_data,
+            ),
+            payload,
+            logger,
         )
         verdict = parse_guardrails_verdict(result)
         logger.info("Guardrails verdict: %s", "ALLOWED" if verdict.allowed else f"DENIED ({verdict.reason})")
