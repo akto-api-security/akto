@@ -244,26 +244,29 @@ export function aggregateViolationCountsByCollectionId(hostCounts = {}, collecti
     return byCollection;
 }
 
-// Open the guardrail activity page deep-linked to a single violation event.
-// Mirrors the URL shape the page expects: event keys as query params, #active hash.
+// Deep-links to the one activity page that reads these params (ThreatDetectionPage). All 3 callers
+// live under pages/observe/agentic (Atlas-only) — hardcoded rather than dashboardCategory-gated
+// since these pages have no category check of their own and can load before it's set to ENDPOINT.
 export function openViolationInThreatActivity(row = {}) {
-    const base = "/dashboard/guardrails/activity";
+    const base = "/dashboard/protection/threat-activity";
     const { refId, eventType, actor, filterId, status } = row;
+    const statusUpper = (status || "ACTIVE").toUpperCase();
+    const hash = { UNDER_REVIEW: "under_review", IGNORED: "ignored" }[statusUpper] || "active";
     if (refId && eventType && actor && filterId) {
         const params = new URLSearchParams();
         params.set("refId", refId);
         params.set("eventType", eventType);
         params.set("actor", actor);
         params.set("filterId", filterId);
-        params.set("eventStatus", (status || "ACTIVE").toUpperCase());
+        params.set("eventStatus", statusUpper);
         const { severity, url, method, ruleViolated } = row;
         if (severity) params.set("severity", String(severity).toUpperCase());
         if (url) params.set("url", url);
         if (method) params.set("method", method);
         if (ruleViolated && ruleViolated !== "-") params.set("ruleViolated", ruleViolated);
-        window.open(`${base}?${params.toString()}#active`, "_blank");
+        window.open(`${base}?${params.toString()}#${hash}`, "_blank");
     } else {
-        window.open(`${base}#active`, "_blank");
+        window.open(`${base}#${hash}`, "_blank");
     }
 }
 

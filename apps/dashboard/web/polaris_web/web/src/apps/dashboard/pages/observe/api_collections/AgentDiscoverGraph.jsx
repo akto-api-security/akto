@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Box, Text, VerticalStack, HorizontalStack, Card, Badge, Icon, Avatar, Spinner } from '@shopify/polaris';
+import { Box, Text, VerticalStack, HorizontalStack, Card, Badge, Icon, Avatar } from '@shopify/polaris';
 import ReactFlow, { Background, Handle, Position, getBezierPath } from 'react-flow-renderer';
 import TooltipText from '../../../components/shared/TooltipText';
 import ShowListInBadge from '../../../components/shared/ShowListInBadge';
@@ -608,18 +608,10 @@ function AgentDiscoverGraph({ apiCollectionId }) {
     setEdges(formattedEdges);
   }, [formattedNodes, formattedEdges]);
 
-  // Show loading spinner
+  // Render nothing while loading — this is a small scoped getCollection() call, and showing a
+  // placeholder card here just flashes-then-vanishes for collections with no graph data at all.
   if (loading) {
-    return (
-      <Card>
-        <Box padding="4">
-          <HorizontalStack align="center" blockAlign="center">
-            <Spinner size="large" />
-            <Text variant="bodyMd" color="subdued">Loading service graph...</Text>
-          </HorizontalStack>
-        </Box>
-      </Card>
-    );
+    return null;
   }
 
   // Don't render if no data at all
@@ -641,7 +633,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
       <Box padding="4">
         <VerticalStack gap="4">
           <HorizontalStack align="space-between">
-            <Text variant="headingMd">Architecture</Text>
+            <Text variant="headingMd">Context graph</Text>
             <HorizontalStack gap="2">
               {arcadeGraphData ? (
                 <>

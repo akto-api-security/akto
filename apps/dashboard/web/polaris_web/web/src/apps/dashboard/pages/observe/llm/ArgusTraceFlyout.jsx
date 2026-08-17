@@ -121,6 +121,7 @@ export default function ArgusTraceFlyout({ trace, onClose }) {
     const metaItems = [
         { label: "Time",        value: formatTs(trace.latestTimestamp) },
         { label: "Application", value: trace.serviceId || "-" },
+        { label: "Session ID",  value: trace.sessionIdentifier || "-" },
     ];
 
     return (

@@ -276,7 +276,7 @@ function AgentDiscoverGraphWithDummyData({ apiCollectionId }) {
       <Box padding="4">
         <VerticalStack gap="4">
           <HorizontalStack align="space-between">
-            <Text variant="headingMd">Architecture</Text>
+            <Text variant="headingMd">Context graph</Text>
             <HorizontalStack gap="2">
               {Object.entries(getCategoryStats()).map(([category, count]) => (
                 <Badge key={category} status="info">

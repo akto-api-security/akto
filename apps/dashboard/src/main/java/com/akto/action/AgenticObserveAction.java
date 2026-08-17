@@ -1343,6 +1343,84 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     // slow-path) rebuild rather than running a separate background thread for it.
     private static final int CLASSIFICATION_CACHE_SWEEP_THRESHOLD = 50;
 
+    // Fallback for fetchAgenticAssetsSummary/Stats only: use the client-supplied map if present, else compute it here via ApiCollectionsAction so the client no longer has to fetch+re-POST it.
+    private static final class ScopedMapCacheEntry<V> {
+        final Map<String, V> map;
+        final long builtAt;
+        ScopedMapCacheEntry(Map<String, V> map, long builtAt) {
+            this.map = map;
+            this.builtAt = builtAt;
+        }
+    }
+    private static final Map<String, ScopedMapCacheEntry<Integer>> trafficMapFallbackCache = new ConcurrentHashMap<>();
+    private static final Map<String, ScopedMapCacheEntry<Double>> riskScoreMapFallbackCache = new ConcurrentHashMap<>();
+
+    // Both underlying DAO calls RBAC-scope by (userId, accountId) — keyed on accountId alone, one user's restricted view would leak into another's.
+    private static String scopedCacheKey() {
+        return Context.accountId.get() + "_" + Context.userId.get();
+    }
+
+    private Map<String, Integer> getOrComputeTrafficMap() {
+        if (trafficMap != null && !trafficMap.isEmpty()) return trafficMap;
+        String key = scopedCacheKey();
+        long now = System.currentTimeMillis();
+        ScopedMapCacheEntry<Integer> existing = trafficMapFallbackCache.get(key);
+        if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+            return existing.map;
+        }
+        if (trafficMapFallbackCache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
+            trafficMapFallbackCache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
+        }
+        // compute() serializes concurrent misses for the same key instead of each racing to Mongo.
+        return trafficMapFallbackCache.compute(key, (k, cached) -> {
+            long recheckNow = System.currentTimeMillis();
+            if (cached != null && (recheckNow - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                return cached;
+            }
+            try {
+                ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+                apiCollectionsAction.fetchLastSeenInfoInCollections();
+                Map<Integer, Integer> raw = apiCollectionsAction.getLastTrafficSeenMap();
+                Map<String, Integer> result = new HashMap<>();
+                if (raw != null) raw.forEach((id, ts) -> result.put(String.valueOf(id), ts));
+                return new ScopedMapCacheEntry<>(result, recheckNow);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed computing traffic map server-side for agentic assets", LogDb.DASHBOARD);
+                return cached != null ? cached : new ScopedMapCacheEntry<>(Collections.emptyMap(), recheckNow);
+            }
+        }).map;
+    }
+
+    private Map<String, Double> getOrComputeRiskScoreMap() {
+        if (riskScoreMap != null && !riskScoreMap.isEmpty()) return riskScoreMap;
+        String key = scopedCacheKey();
+        long now = System.currentTimeMillis();
+        ScopedMapCacheEntry<Double> existing = riskScoreMapFallbackCache.get(key);
+        if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+            return existing.map;
+        }
+        if (riskScoreMapFallbackCache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
+            riskScoreMapFallbackCache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
+        }
+        return riskScoreMapFallbackCache.compute(key, (k, cached) -> {
+            long recheckNow = System.currentTimeMillis();
+            if (cached != null && (recheckNow - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                return cached;
+            }
+            try {
+                ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
+                apiCollectionsAction.fetchRiskScoreInfo();
+                Map<Integer, Double> raw = apiCollectionsAction.getRiskScoreOfCollectionsMap();
+                Map<String, Double> result = new HashMap<>();
+                if (raw != null) raw.forEach((id, score) -> result.put(String.valueOf(id), score));
+                return new ScopedMapCacheEntry<>(result, recheckNow);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed computing risk score map server-side for agentic assets", LogDb.DASHBOARD);
+                return cached != null ? cached : new ScopedMapCacheEntry<>(Collections.emptyMap(), recheckNow);
+            }
+        }).map;
+    }
+
     private ClassificationCacheEntry getOrBuildClassification(Map<String, Integer> traffic,
             Map<String, Double> risk, Map<String, List<String>> sensitive) {
         int accountId = Context.accountId.get();
@@ -1683,8 +1761,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         response = new BasicDBObject();
         try {
             long tStart = System.currentTimeMillis();
-            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
-            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
+            Map<String, Integer> traffic = getOrComputeTrafficMap();
+            Map<String, Double> risk = getOrComputeRiskScoreMap();
             Map<String, List<String>> sensitive = sensitiveMap != null ? sensitiveMap : Collections.emptyMap();
 
             ClassificationCacheEntry cached = getOrBuildClassification(traffic, risk, sensitive);
@@ -1731,6 +1809,27 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                             if (malicious) groupTags.add("Malicious Skill");
                         }
                         return groupTags.stream().noneMatch(allowedTags::contains);
+                    });
+                }
+                // "username" — a group matches if ANY of its member devices resolves (via the client's
+                // Endpoint Shield usernameMap) to one of the selected usernames. Mirrors
+                // resolveUsernameByDeviceId's use elsewhere in this class (e.g. fetchAgenticAssetDetail).
+                if (filters.containsKey("username")) {
+                    Set<String> allowedUsernames = new HashSet<>(filters.get("username"));
+                    Map<String, String> resolveMap = usernameMap != null ? usernameMap : Collections.emptyMap();
+                    all.removeIf(g -> g.endpointIds.stream()
+                            .noneMatch(id -> allowedUsernames.contains(resolveUsernameByDeviceId(id, resolveMap))));
+                }
+                // "severity" — drives the Violations card's Critical/High/Medium/Low chips. Skill rows
+                // never carry violations on this grid (see the row-loop's own comment below), so they
+                // never match. Same "null when zero" contract as sumViolationsForCollections itself.
+                if (filters.containsKey("severity")) {
+                    Set<String> allowedSeverities = new HashSet<>(filters.get("severity"));
+                    all.removeIf(g -> {
+                        if ("skill".equals(g.rowType)) return true;
+                        BasicDBObject v = sumViolationsForCollections(g.collectionIds, violationsByCollectionId);
+                        if (v == null) return true;
+                        return allowedSeverities.stream().noneMatch(s -> v.getInt(s, 0) > 0);
                     });
                 }
             }
@@ -1796,6 +1895,19 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             loggerMaker.warnAndAddToDb("[fetchAgenticAssetsSummary-timing] TOTAL=" + (System.currentTimeMillis() - tStart)
                     + "ms, rows=" + rowsOut.size() + ", accountCollections=" + collections.size());
 
+            // Current-page-only, same as fetchAgenticAssetEndpointsPage's distinctUsernames — the
+            // client accumulates these across page turns to progressively populate the Username filter's
+            // choices (see Endpoints.jsx's updateFilterChoicesIfChanged).
+            Map<String, String> resolveMapForChoices = usernameMap != null ? usernameMap : Collections.emptyMap();
+            Set<String> distinctUsernames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+            for (GroupSummary g : page) {
+                for (String id : g.endpointIds) {
+                    String u = resolveUsernameByDeviceId(id, resolveMapForChoices);
+                    if (StringUtils.isNotBlank(u) && !"-".equals(u)) distinctUsernames.add(u);
+                }
+            }
+            response.put("distinctUsernames", new ArrayList<>(distinctUsernames));
+
             response.put("rows", rowsOut);
             response.put("total", total);
             return SUCCESS.toUpperCase();
@@ -1811,10 +1923,25 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     @Getter private List<String> assetHostNames;
     @Getter private List<Integer> assetCollectionIds;
-    @Getter private List<String> assetSkillNames;
+    // Count only, not the full name list — the only consumer is the Overview tab's topology graph,
+    // which just needs a "N Skills" summary node (see AssetTopologyGraph.jsx). The actual skill
+    // *names* are never read off this response: the Components tab's fetchAgenticComponentsPage
+    // independently re-derives its own full skill listing straight from apiCollectionIds/STIs when
+    // opened (see its own comment), so shipping g.skillNames here too was pure duplicate payload —
+    // unlike assetMcpServers/assetHostNames below, which ARE consumed as real inputs downstream
+    // (AgentComponentsView's Components-tab fetch and ViolationsTab's own query, respectively).
+    @Getter private int assetSkillCount;
     @Getter private List<String> assetMcpServers;
     @Getter private Map<String, List<Integer>> assetMcpServerCollectionIds;
-    @Getter private List<BasicDBObject> assetDevices;
+    // Count + a small capped sample only, not the full per-device list — mirrors assetSkillCount's
+    // reasoning above. The flyout's Devices tab never reads this at all (it independently calls the
+    // server-paginated fetchAgenticAssetDevicesPage, scoped by assetCollectionIds); the Overview tab
+    // only needs the count (a "Devices: N" stat) and one sample deviceId (a risk-factor deep link);
+    // and the topology graph only ever rendered a handful of device nodes usefully anyway — one
+    // ReactFlow node per device stopped making sense once a group had hundreds/thousands of members.
+    // A group with 1000 devices turned assetDevices into ~260KB of a ~630KB response on its own.
+    @Getter private int assetDeviceCount;
+    @Getter private List<BasicDBObject> assetDeviceSample;
     @Getter private String assetTagKey;
     @Getter private List<String> assetRawTagValues;
     // Inline-topology summary for the flyout's Overview tab — computed here (scoped to just this
@@ -1828,7 +1955,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Getter private int assetMcpComponentCount;
 
     /**
-     * Lazy per-asset detail — hostNames/collectionIds/skillNames/mcpServers/mcpServerCollectionIds/
+     * Lazy per-asset detail — hostNames/collectionIds/skillCount/mcpServers/mcpServerCollectionIds/
      * devices for exactly ONE group (identified by groupKey+rowType, both already on every row
      * fetchAgenticAssetsSummary returns), fetched only when a user actually opens that asset's
      * flyout instead of being shipped for all 50 rows of every page (see toSummaryResponse()'s
@@ -1840,6 +1967,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
      * trafficMap/riskScoreMap/userAnalysisFlatMap are the same account-wide maps already sent to
      * fetchAgenticAssetsSummary/fetchAgenticAssetDevicesPage — reused here for the same per-device
      * enrichment (risk score, last seen, AI interactions) the Overview tab's topology graph needs.
+     * Ships skillCount rather than the full skill-name list (see assetSkillCount's own comment) —
+     * the individual names aren't read by anything downstream of this response. Likewise ships
+     * deviceCount + a small capped deviceSample rather than the full per-device list (see
+     * assetDeviceCount/assetDeviceSample's own comment) — the Devices tab re-fetches its own
+     * paginated device list and never reads this response's devices at all.
      */
     public String fetchAgenticAssetDetail() {
         response = new BasicDBObject();
@@ -1863,10 +1995,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (g == null) {
                 assetHostNames = Collections.emptyList();
                 assetCollectionIds = Collections.emptyList();
-                assetSkillNames = Collections.emptyList();
+                assetSkillCount = 0;
                 assetMcpServers = Collections.emptyList();
                 assetMcpServerCollectionIds = Collections.emptyMap();
-                assetDevices = Collections.emptyList();
+                assetDeviceCount = 0;
+                assetDeviceSample = Collections.emptyList();
                 assetTagKey = null;
                 assetRawTagValues = Collections.emptyList();
                 assetHasInlineLlm = false;
@@ -1877,7 +2010,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             assetHostNames = new ArrayList<>(g.hostNames);
             assetCollectionIds = g.collectionIds;
-            assetSkillNames = new ArrayList<>(g.skillNames);
+            assetSkillCount = g.skillNames.size();
             assetMcpServers = new ArrayList<>(g.serviceNames);
             assetMcpServerCollectionIds = new HashMap<>();
             for (Map.Entry<String, Set<Integer>> e : g.serviceCollectionIds.entrySet()) {
@@ -1889,7 +2022,19 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<Integer, ApiCollection> byId = new HashMap<>();
             for (ApiCollection c : collections) byId.put(c.getId(), c);
             Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
-            assetDevices = buildDevicesForGroup(g, byId, traffic, risk, userAnalysis);
+            // Count comes from the same accumulateDevices() map buildDevicesForGroup uses internally —
+            // that per-collection accumulation pass can't be skipped for the count either way, but we
+            // avoid the more costly per-device toResponse()/serialization step for anything past the
+            // small sample cap below (that's what actually bloated the payload, not the accumulation).
+            Map<String, DeviceAcc> deviceAccs = accumulateDevices(g.collectionIds, byId, traffic, risk, userAnalysis);
+            assetDeviceCount = deviceAccs.size();
+            List<BasicDBObject> deviceSample = new ArrayList<>();
+            int deviceSampleCap = 6;
+            for (DeviceAcc d : deviceAccs.values()) {
+                if (deviceSample.size() >= deviceSampleCap) break;
+                deviceSample.add(d.toResponse());
+            }
+            assetDeviceSample = deviceSample;
 
             // Scoped to just THIS asset's own collectionIds (never account-wide) — same STI
             // aggregation fetchAgenticComponentsPage already runs when the Components tab opens, just
@@ -1955,8 +2100,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         response = new BasicDBObject();
         try {
             long tStatsStart = System.currentTimeMillis();
-            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
-            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
+            Map<String, Integer> traffic = getOrComputeTrafficMap();
+            Map<String, Double> risk = getOrComputeRiskScoreMap();
             Map<String, Map<String, Integer>> violations = violationsByCollectionId != null ? violationsByCollectionId : Collections.emptyMap();
 
             // This endpoint doesn't send/read sensitiveMap (no "Sensitive data" breakdown on the

@@ -749,6 +749,55 @@ pick up cold.
   client-side, unlike the rebuilt new layout) firing AFTER the bounce, not something leaking from the
   new layout. Verified live (cleared local storage to simulate a cold first visit): no more duplicate
   traffic/risk/sensitive calls on the redirect path.
+- **The "Loading service graph..." reorder fix above (moving `AgentDiscoverGraph` after the
+  endpoints table) was itself a visible regression** — it moved the "Architecture" card to the
+  bottom of the page, which is not the original design. Reverted the reorder and fixed the actual
+  underlying issue instead: `AgentDiscoverGraph.jsx`'s `loading` branch rendered a full "Loading
+  service graph..." card, then unmounted to nothing for any collection with no service-graph data
+  at all (e.g. a skill-only collection) — a flash-then-vanish, not a real ordering problem. Now
+  returns `null` while loading, so nothing flashes regardless of whether the collection ends up
+  having graph data. Verified live on the exact reported collection
+  (`abigails-macbook-air-155dfaf4.ai-agent.claude`, no graph data): endpoints table renders
+  immediately, nothing flashes above it.
+- **`fetchAgenticAssetDetail` (new-layout Agentic Assets flyout) shipped a 628KB response taking
+  ~13s** for opening a single asset — user correctly diagnosed as "too many things in response"
+  duplicating what each tab already fetches independently on click. Root-caused in two passes:
+  (1) `assetSkillNames` (full skill-name list) was pure duplicate payload — the Components tab's
+  own `fetchAgenticComponentsPage` re-derives its full skill listing from scratch and never reads
+  it; replaced with `assetSkillCount` (int). (2) The dominant contributor, found only after
+  actually pulling the live network response post-fix-#1 and seeing it was STILL 628KB:
+  `assetDevices` (up to 1000 raw device objects, 259KB on its own) was *also* pure duplicate
+  payload — the flyout's Devices tab independently calls the already-paginated
+  `fetchAgenticAssetDevicesPage` and never reads this field at all — and it was additionally
+  causing the Overview tab's topology graph to render one ReactFlow node per device (up to 1000
+  nodes in a small diagram). Replaced with `assetDeviceCount` (int) + `assetDeviceSample` (capped
+  at 6, enough for the topology graph's real nodes + a synthetic "+N more" summary node, and for
+  the personal-account risk-factor deep link's one sample `deviceId`). `assetHostNames` (278KB on
+  the same asset) was investigated and deliberately left alone — the Violations tab needs it as a
+  real query input, not duplicate data; trimming it would need a backend endpoint change (resolve
+  hostnames server-side by groupKey/rowType when that tab opens, instead of shipping the full list
+  eagerly on flyout-open) rather than a field removal, and hasn't been done. **Lesson learned mid-
+  fix**: the running dashboard backend process doesn't auto-reload on `mvn compile` — it kept
+  serving stale pre-fix classes for a while, making the fix look like a no-op live until the
+  process was restarted. Verified live after restart: response for the same asset dropped from
+  628KB to a few KB, all tabs (Overview/Components/Violations/Devices) render correctly, topology
+  graph shows real device nodes without exploding to 1000, zero new console errors.
+- **`GithubServerTable`'s column-header sort arrows were stuck on one direction for Risk score,
+  Endpoints, and Last traffic seen on the old-layout Agentic assets page** — clicking a header
+  never toggled to the other direction. Root cause: `GithubServerTable.js`'s `handleSort` picks the
+  asc/desc variant of a clicked column by array position (`tempSortSelected[0]`/`[1]`), which only
+  works if a page's `sortOptions` array lists the ascending variant before the descending variant
+  for every column — true for every other `sortOptions` array in the codebase (~15 files checked),
+  but `Endpoints.jsx`'s local array listed Risk score/Endpoints/Last traffic seen desc-first (to
+  make "highest risk first" the page's default sort) — exactly the three columns reported, while
+  "Name" (correctly asc-first in the same array) was not reported and sorted fine. Fixed
+  `handleSort` to match by each option's own `"asc"`/`"desc"` value substring instead of array
+  position, so it works regardless of a given page's array ordering — fixes `Endpoints.jsx` without
+  needing to reorder its array (which would have flipped its deliberate default sort) and is a
+  no-op for every already-correctly-ordered page. Verified live: Endpoints and Last traffic seen
+  now correctly alternate ascending/descending on repeated clicks, with real data reordering (e.g.
+  "1 week ago" rows first on desc, pushed to the bottom on asc); spot-checked one unrelated
+  already-correct page (`AuditData.jsx`) for zero regression.
 
 ## High priority — wrong output today
 

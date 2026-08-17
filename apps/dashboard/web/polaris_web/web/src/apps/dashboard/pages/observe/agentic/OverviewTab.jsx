@@ -64,8 +64,9 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
     const factors    = useMemo(() => [...rawFactors].sort((a, b) => (SEV_ORDER[a.severity] ?? 99) - (SEV_ORDER[b.severity] ?? 99)), [rawFactors]);
 
     const stats = useMemo(() => {
-        const devices  = assetDevices[asset.id] || [];
-        const devCount = devices.length;
+        // assetDevices[asset.id] is now just a small capped sample (see AgenticObserveAction's
+        // assetDeviceCount/assetDeviceSample comment) — the real total lives on asset.deviceCount.
+        const devCount = asset.deviceCount || 0;
         const children = asset.type === "AI Agent"
             ? getAgentLinkedComponents(asset, agenticTreeData, agenticFlatData)
             : [];
@@ -121,7 +122,10 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
                     ))}
                 </HorizontalGrid>
 
-                <AssetTopologyGraph asset={asset} assetDevices={assetDevices} agenticTreeData={agenticTreeData} agenticFlatData={agenticFlatData} inlineComponents={inlineComponents} />
+                <VerticalStack gap="3">
+                    <Text variant="headingXs" color="subdued">Context graph</Text>
+                    <AssetTopologyGraph asset={asset} assetDevices={assetDevices} agenticTreeData={agenticTreeData} agenticFlatData={agenticFlatData} inlineComponents={inlineComponents} />
+                </VerticalStack>
 
                 {factors.length > 0 && (
                     <VerticalStack gap="3">
@@ -132,6 +136,7 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
                                 if (f.type === "violation") {
                                     handleClick = () => onTabChange?.(2);
                                 } else if (f.type === "personal_account") {
+                                    // Sample device is fine here — any real deviceId works for this deep link.
                                     const devices = assetDevices[asset.id] || [];
                                     const firstDevice = devices[0];
                                     handleClick = firstDevice

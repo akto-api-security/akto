@@ -264,14 +264,17 @@ export default {
             method: 'post',
             data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap },
         })
-        return { rows: resp?.rows || [], total: resp?.total || 0 }
+        return { rows: resp?.rows || [], total: resp?.total || 0, distinctUsernames: resp?.distinctUsernames || [] }
     },
-    // Lazy per-asset detail (hostNames/collectionIds/skillNames/mcpServers/mcpServerCollectionIds/
-    // devices) for exactly ONE group — fetched only when a user opens that asset's flyout, not
+    // Lazy per-asset detail (hostNames/collectionIds/skillCount/mcpServers/mcpServerCollectionIds/
+    // deviceCount+deviceSample) for exactly ONE group — fetched only when a user opens that asset's flyout, not
     // shipped for every row of every fetchAgenticAssetsSummary page (that used to make a single
     // 50-row page 16MB, mostly from raw per-device breakdowns on rows with hundreds of devices).
     // trafficMap/riskScoreMap/userAnalysisFlatMap enrich the one asset's own device list the same
     // way fetchAgenticAssetsSummary's rows used to — needed by the Overview tab's topology graph.
+    // skillCount (not the full skill-name list) is all the Overview tab's topology graph needs —
+    // the Components tab re-derives its own full skill listing independently when opened (see
+    // AgenticObserveAction.fetchAgenticAssetDetail's own comment), so the names were dead weight.
     async fetchAgenticAssetDetail({ groupKey, rowType, trafficMap, riskScoreMap, userAnalysisFlatMap } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetDetail',
@@ -281,10 +284,16 @@ export default {
         return {
             hostNames: resp?.assetHostNames || [],
             collectionIds: resp?.assetCollectionIds || [],
-            skillNames: resp?.assetSkillNames || [],
+            skillCount: resp?.assetSkillCount || 0,
             mcpServers: resp?.assetMcpServers || [],
             mcpServerCollectionIds: resp?.assetMcpServerCollectionIds || {},
-            devices: resp?.assetDevices || [],
+            // deviceCount is the real total; deviceSample is capped (a handful of entries) — see
+            // AgenticObserveAction's assetDeviceCount/assetDeviceSample comment. The Devices tab
+            // never reads either of these (it fetches its own paginated list); the Overview tab's
+            // "Devices: N" stat and personal-account deep link, and the topology graph's device
+            // nodes, are the only consumers.
+            deviceCount: resp?.assetDeviceCount || 0,
+            deviceSample: resp?.assetDeviceSample || [],
             // Agent rows only — needed by the legacy Endpoints.jsx page's row-click ->
             // Inventory-filter feature (buildAgenticInventoryFilterForRow); unused by the new
             // layout's flyout.

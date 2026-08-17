@@ -42,7 +42,7 @@ function GuardrailDetection() {
                 period: { since: new Date(startTs * 1000), until: new Date(endTs * 1000) },
             };
         }
-        return values.ranges[3];
+        return values.getRange("last1month");
     }, [searchParams]);
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
     const [moreActions, setMoreActions] = useState(false);
