@@ -14,6 +14,7 @@ import ViolationsTab from "./ViolationsTab";
 import McpComponentsView from "./McpComponentsView";
 import AgentComponentsView from "./AgentComponentsView";
 import SkillComponentsView from "./SkillComponentsView";
+import PluginComponentsView from "./PluginComponentsView";
 import "../../../components/layouts/style.css";
 
 // ─── Devices tab (small, kept inline) ────────────────────────────────────────
@@ -80,6 +81,9 @@ function AgenticComponentsTab({ asset, onNavChange, onNavigateToAsset, configVio
     if (asset.type === "AI Agent")   return <AgentComponentsView asset={asset} onNavChange={onNavChange} onNavigateToAsset={onNavigateToAsset} configViolations={configViolations} configRows={configRows} />;
     // Skills: fetch from parent collections then show the skill's own traffic
     if (asset.type === "Skill") return <SkillComponentsView asset={asset} />;
+    // Plugins: discovery-only — components tab lists the bundled MCP servers/skills (same
+    // list/drill-down idiom as an AI Agent's), metadata itself now lives in the Overview tab.
+    if (asset.type === "Plugin") return <PluginComponentsView asset={asset} onNavChange={onNavChange} />;
     // LLMs: their collectionIds are their own collections — show actual LLM API endpoints
     if (asset.type === "LLM") return <McpComponentsView asset={asset} onNavChange={onNavChange} />;
     return <Box padding="4"><Text variant="bodySm" color="subdued">No component data available for this asset type.</Text></Box>;
@@ -215,6 +219,8 @@ export default function AgenticAssetFlyout({
             });
         } else if (asset.type === "MCP Server") {
             componentCount = mcpComponentCount;
+        } else if (asset.type === "Plugin") {
+            componentCount = (asset.pluginMcpServers || []).length + (asset.pluginSkills || []).length;
         }
         return [
             { id: "overview",   content: "Overview" },

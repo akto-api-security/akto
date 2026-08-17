@@ -285,8 +285,24 @@ export default {
             hostNames: resp?.assetHostNames || [],
             collectionIds: resp?.assetCollectionIds || [],
             skillCount: resp?.assetSkillCount || 0,
+            pluginNames: resp?.assetPluginNames || [],
+            pluginVersion: resp?.assetPluginVersion || null,
+            pluginScope: resp?.assetPluginScope || null,
+            pluginStatus: resp?.assetPluginStatus || null,
+            pluginMarketplace: resp?.assetPluginMarketplace || null,
+            pluginParentAgent: resp?.assetPluginParentAgent || null,
+            // Service/LLM/Skill rows — which plugin bundled this component, if any.
+            owningPluginName: resp?.assetOwningPluginName || null,
+            // Plugin rows only — the MCP servers/skills this plugin bundles.
+            pluginMcpServers: resp?.assetPluginMcpServers || [],
+            pluginMcpServerCollectionIds: resp?.assetPluginMcpServerCollectionIds || {},
+            pluginSkills: resp?.assetPluginSkills || [],
+            pluginAgents: resp?.assetPluginAgents || [],
             mcpServers: resp?.assetMcpServers || [],
             mcpServerCollectionIds: resp?.assetMcpServerCollectionIds || {},
+            // Agent rows only — collectionIds of every plugin this agent owns, so the Components tab
+            // can search plugin-bundled skill content, not just the agent's own collection.
+            pluginCollectionIds: resp?.assetPluginCollectionIds || [],
             // deviceCount is the real total; deviceSample is capped (a handful of entries) — see
             // AgenticObserveAction's assetDeviceCount/assetDeviceSample comment. The Devices tab
             // never reads either of these (it fetches its own paginated list); the Overview tab's
@@ -329,11 +345,13 @@ export default {
     // endpoints, which need those account-wide maps client-fetched once to enrich every row of a
     // big grid, this endpoint computes them itself server-side, scoped to apiCollectionIds — no
     // point requiring the client to fetch/repost a whole-account map for a handful of entries.
-    async fetchAgenticAssetEndpointsPage({ apiCollectionIds, rowType, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters } = {}) {
+    // groupKey names the asset being drilled into — plugin rows need it so their child row can be the
+    // plugin itself rather than the agent collection it was discovered on.
+    async fetchAgenticAssetEndpointsPage({ apiCollectionIds, rowType, groupKey, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetEndpointsPage',
             method: 'post',
-            data: { apiCollectionIds, rowType, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters },
+            data: { apiCollectionIds, rowType, groupKey, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters },
         })
         return {
             endpoints: resp?.endpoints || [],
@@ -344,13 +362,13 @@ export default {
     },
     // Server-side paginated Components list for ONE AI-Agent asset's flyout — merges skills,
     // built-in tools, and connected MCP servers into one batched, server-sorted/paginated list.
-    // mcpServerNames is asset.mcpServers, already known/cheap client-side, passed through rather
-    // than re-derived server-side.
-    async fetchAgenticComponentsPage({ apiCollectionIds, mcpServerNames, mcpServerCollectionIds, skip, limit, sortKey, sortOrder, queryValue } = {}) {
+    // mcpServerNames/pluginNames are asset.mcpServers/asset.pluginNames, already known/cheap
+    // client-side, passed through rather than re-derived server-side.
+    async fetchAgenticComponentsPage({ apiCollectionIds, mcpServerNames, mcpServerCollectionIds, pluginNames, skip, limit, sortKey, sortOrder, queryValue } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticComponentsPage',
             method: 'post',
-            data: { apiCollectionIds, mcpServerNames, mcpServerCollectionIds, skip, limit, sortKey, sortOrder, queryValue },
+            data: { apiCollectionIds, mcpServerNames, mcpServerCollectionIds, pluginNames, skip, limit, sortKey, sortOrder, queryValue },
         })
         return { components: resp?.components || [], total: resp?.total || 0 }
     },

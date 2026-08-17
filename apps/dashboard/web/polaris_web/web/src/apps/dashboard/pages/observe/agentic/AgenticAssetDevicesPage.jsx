@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Badge, Box, Button, HorizontalStack, Text, DataTable } from "@shopify/polaris";
+import { ArrowLeftMinor } from "@shopify/polaris-icons";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
+import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubServerTable from "@/apps/dashboard/components/tables/GithubServerTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
@@ -12,6 +14,9 @@ import api from "../api";
 import func from "@/util/func";
 import transform from "../transform";
 import { fetchEndpointShieldUsernameMap } from "../api_collections/endpointShieldHelper";
+import SkillComponentsView from "./SkillComponentsView";
+import { fetchAgentMarkdownFromCollections } from "./PluginComponentsView";
+import { settledValue, logRejected } from "./constants";
 
 /**
  * Endpoint/device-wise view for ONE agentic asset — what clicking a row on the legacy Agentic
@@ -79,14 +84,18 @@ const resourceName = { singular: "endpoint", plural: "endpoints" };
 // useServiceName branch) — no per-type column title to pick here, matching AgentEndpointTreeTable's
 // own ChildrenTable, which never renders its childHeaders' titles either (headings=[] throughout,
 // the parent GithubRow header row is the only visible header).
-function ChildrenTable({ children, rowType, misconfiguredChildId }) {
+function ChildrenTable({ children, rowType, misconfiguredChildId, onOpenBundle }) {
     const navigate = useNavigate();
 
     const handleChildClick = useCallback((child) => {
-        const bundlesSkills = (rowType === "agent" || rowType === "service") && (child.skillCount || 0) > 0;
-        const scope = bundlesSkills ? "?agentic_view=skills" : "";
+        // Plugin rows: the child IS the plugin's own metadata endpoint — open the bundled
+        // components list instead of navigating to its raw endpoint in Inventory.
+        if (rowType === "plugin") { onOpenBundle?.(); return; }
+        const bundlesSkills = rowType === "skill" || ((rowType === "agent" || rowType === "service") && (child.skillCount || 0) > 0);
+        const isPluginCollapsedService = rowType === "service" && !!child.owningPluginName;
+        const scope = bundlesSkills ? "?agentic_view=skills" : (isPluginCollapsedService ? "?agentic_view=mcp" : "");
         navigate(`/dashboard/observe/inventory/${child.id}${scope}`);
-    }, [navigate, rowType]);
+    }, [navigate, rowType, onOpenBundle]);
 
     const handleConfigClick = useCallback(() => {
         if (!misconfiguredChildId) return;
@@ -118,9 +127,11 @@ function ChildrenTable({ children, rowType, misconfiguredChildId }) {
             <div key={`name-${child.id}`} style={{ cursor: "pointer", width: CHILD_COL_WIDTH.name }} onClick={() => handleChildClick(child)}>
                 <HorizontalStack gap="1" align="start" wrap={false}>
                     <Box maxWidth="200px"><TooltipText tooltip={displayValue} text={displayValue} /></Box>
+                    {child.type && <Badge size="small">{child.type}</Badge>}
                     {(child.skillCount || 0) > 0 && (
                         <Badge size="small" status="info">{`${child.skillCount} ${child.skillCount === 1 ? "skill" : "skills"}`}</Badge>
                     )}
+                    {child.owningPluginName && <Badge size="small" status="info">{`Plugin: ${child.owningPluginName}`}</Badge>}
                     {child.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
                     {child.hasMaliciousSkill && <Badge size="small" status="critical">Malicious Skills</Badge>}
                     {child.hasLocalMcpServer && <Badge size="small" status="critical">Local MCP Server</Badge>}
@@ -157,7 +168,76 @@ function ChildrenTable({ children, rowType, misconfiguredChildId }) {
     );
 }
 
-function shapeEndpointRow(row, { rowType }) {
+function PluginBundleContent({ bundle, pluginCollectionId, navigate }) {
+    const [selectedSkill, setSelectedSkill] = useState(null);
+    const [selectedAgent, setSelectedAgent] = useState(null);
+    const servers = bundle?.mcpServers || [];
+    const skills = bundle?.skills || [];
+    const agents = bundle?.agents || [];
+
+    const openServer = (name) => {
+        const ids = bundle?.mcpServerCollectionIds?.[name] || [];
+        if (!ids.length) return;
+        navigate(`/dashboard/observe/inventory/${ids[0]}`);
+    };
+
+    if (selectedSkill) {
+        return (
+            <Box>
+                <Box paddingBlockEnd="3">
+                    <Button plain icon={ArrowLeftMinor} onClick={() => setSelectedSkill(null)} />
+                </Box>
+                <SkillComponentsView asset={{ collectionIds: [pluginCollectionId], name: selectedSkill }} hideOwningPlugin />
+            </Box>
+        );
+    }
+
+    if (selectedAgent) {
+        return (
+            <Box>
+                <Box paddingBlockEnd="3">
+                    <Button plain icon={ArrowLeftMinor} onClick={() => setSelectedAgent(null)} />
+                </Box>
+                <SkillComponentsView
+                    asset={{ collectionIds: [pluginCollectionId], name: selectedAgent }}
+                    hideOwningPlugin
+                    entityLabel="agent"
+                    fetchMarkdown={fetchAgentMarkdownFromCollections}
+                />
+            </Box>
+        );
+    }
+
+    if (servers.length === 0 && skills.length === 0 && agents.length === 0) {
+        return <Box padding="4"><Text variant="bodySm" color="subdued">No components reported for this plugin yet.</Text></Box>;
+    }
+
+    const rows = [
+        ...servers.map((name) => [
+            <div key={`srv-${name}`} style={{ cursor: "pointer" }} onClick={() => openServer(name)}><Text variant="bodyMd">{name}</Text></div>,
+            <div key={`srv-type-${name}`} style={{ cursor: "pointer" }} onClick={() => openServer(name)}><Badge size="small">MCP Server</Badge></div>,
+        ]),
+        ...skills.map((name) => [
+            <div key={`skl-${name}`} style={{ cursor: "pointer" }} onClick={() => setSelectedSkill(name)}><Text variant="bodyMd">{name}</Text></div>,
+            <div key={`skl-type-${name}`} style={{ cursor: "pointer" }} onClick={() => setSelectedSkill(name)}><Badge size="small" status="info">Skill</Badge></div>,
+        ]),
+        ...agents.map((name) => [
+            <div key={`agt-${name}`} style={{ cursor: "pointer" }} onClick={() => setSelectedAgent(name)}><Text variant="bodyMd">{name}</Text></div>,
+            <div key={`agt-type-${name}`} style={{ cursor: "pointer" }} onClick={() => setSelectedAgent(name)}><Badge size="small" status="new">Agent</Badge></div>,
+        ]),
+    ];
+
+    return (
+        <DataTable
+            columnContentTypes={["text", "text"]}
+            headings={["Name", "Type"]}
+            rows={rows}
+            hasZebraStripingOnData
+        />
+    );
+}
+
+function shapeEndpointRow(row, { rowType, onOpenBundle }) {
     const riskScore = row.riskScore || 0;
     const endpointTags = [
         ...(row.hasPersonalAccount ? ["Contains personal account"] : []),
@@ -201,6 +281,7 @@ function shapeEndpointRow(row, { rowType }) {
                 children={children}
                 rowType={rowType}
                 misconfiguredChildId={misconfiguredChildId}
+                onOpenBundle={onOpenBundle}
             />
         ),
     };
@@ -240,6 +321,11 @@ export default function AgenticAssetDevicesPage() {
     const collectionIdsRef = useRef([]);
     const enrichRef = useRef({ usernameMap: {} });
     const [refreshKey, setRefreshKey] = useState(0);
+    // Plugin rows only — the MCP servers/skills this plugin bundles, so old-UI can list them with a
+    // direct redirect link (same server-side data new-UI's PluginComponentsView table shows).
+    const [pluginBundle, setPluginBundle] = useState(null);
+    const [showBundleFlyout, setShowBundleFlyout] = useState(false);
+    const [owningPluginName, setOwningPluginName] = useState(null);
 
     // Endpoint ID/Username filter choices — matches AgentEndpointTreeTable.jsx's own enumerated
     // facets (this asset's device count is small enough to list directly, no distinct-values
@@ -268,15 +354,26 @@ export default function AgenticAssetDevicesPage() {
                 // pull the whole account's map just to read a few entries back out of it.
                 // usernameMap still comes from here since Endpoint Shield's device registry isn't
                 // collection-scoped (it's keyed by physical device, already small account-wide).
-                const [usernameMap, detail] = await Promise.all([
+                // allSettled: a usernameMap failure must not also lose detail.collectionIds, which is
+                // this page's entire collection scope.
+                const [usernameSettled, detailSettled] = await Promise.allSettled([
                     fetchEndpointShieldUsernameMap(),
                     api.fetchAgenticAssetDetail({ groupKey, rowType }),
                 ]);
                 if (cancelled) return;
-                enrichRef.current = { usernameMap };
+                logRejected("AgenticAssetDevicesPage mount", { usernameMap: usernameSettled, detail: detailSettled });
+                enrichRef.current = { usernameMap: settledValue(usernameSettled, {}) };
+                const detail = settledValue(detailSettled, {});
                 collectionIdsRef.current = detail?.collectionIds || [];
+                setPluginBundle(rowType === "plugin" ? {
+                    mcpServers: detail?.pluginMcpServers || [],
+                    mcpServerCollectionIds: detail?.pluginMcpServerCollectionIds || {},
+                    skills: detail?.pluginSkills || [],
+                    agents: detail?.pluginAgents || [],
+                } : null);
+                setOwningPluginName(rowType !== "plugin" ? (detail?.owningPluginName || null) : null);
             } catch {
-                if (!cancelled) collectionIdsRef.current = [];
+                if (!cancelled) { collectionIdsRef.current = []; setPluginBundle(null); setOwningPluginName(null); }
             } finally {
                 if (!cancelled) { setLoading(false); setRefreshKey((k) => k + 1); }
             }
@@ -294,14 +391,15 @@ export default function AgenticAssetDevicesPage() {
         const res = await api.fetchAgenticAssetEndpointsPage({
             apiCollectionIds: collectionIdsRef.current,
             rowType,
+            groupKey,
             skip, limit, sortKey: sortKey || "riskScore", sortOrder: mongoSortOrder, queryValue,
             usernameMap,
             filters: Object.keys(filters).length ? filters : undefined,
         });
         updateFilterChoicesIfChanged(res.distinctEndpointIds || [], res.distinctUsernames || []);
-        const rows = (res.endpoints || []).map((row) => shapeEndpointRow(row, { rowType }));
+        const rows = (res.endpoints || []).map((row) => shapeEndpointRow(row, { rowType, onOpenBundle: () => setShowBundleFlyout(true) }));
         return { value: rows, total: res.total || 0 };
-    }, [rowType, updateFilterChoicesIfChanged]);
+    }, [rowType, groupKey, updateFilterChoicesIfChanged]);
 
     const filtersDef = useMemo(() => {
         const defs = [ENDPOINT_TAGS_FILTER_DEF];
@@ -327,26 +425,51 @@ export default function AgenticAssetDevicesPage() {
     }
 
     return (
-        <PageWithMultipleCards
-            title={pageTitle}
-            primaryAction={exploreModeAction}
-            components={[
-                <GithubServerTable
-                    key={`asset-endpoints-${groupKey}-${rowType}-${refreshKey}`}
-                    fetchData={fetchTableData}
-                    pageLimit={20}
-                    sortOptions={SORT_OPTIONS}
-                    resourceName={resourceName}
-                    filters={filtersDef}
-                    headers={PARENT_HEADERS}
-                    selectable={false}
-                    headings={PARENT_HEADERS}
-                    useNewRow={true}
-                    condensedHeight={true}
-                    disambiguateLabel={disambiguateLabel}
-                    supportsNegationFilter={false}
-                />,
-            ]}
-        />
+        <>
+            <PageWithMultipleCards
+                title={pageTitle}
+                primaryAction={exploreModeAction}
+                components={[
+                    ...(owningPluginName ? [
+                        <Box key="owning-plugin" paddingBlockEnd="2">
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Badge size="small" status="info">{owningPluginName}</Badge>
+                                <Text variant="bodySm" color="subdued">{rowType === "skill" ? "uses this skill" : "uses this MCP Server"}</Text>
+                            </HorizontalStack>
+                        </Box>,
+                    ] : []),
+                    <GithubServerTable
+                        key={`asset-endpoints-${groupKey}-${rowType}-${refreshKey}`}
+                        fetchData={fetchTableData}
+                        pageLimit={20}
+                        sortOptions={SORT_OPTIONS}
+                        resourceName={resourceName}
+                        filters={filtersDef}
+                        headers={PARENT_HEADERS}
+                        selectable={false}
+                        headings={PARENT_HEADERS}
+                        useNewRow={true}
+                        condensedHeight={true}
+                        disambiguateLabel={disambiguateLabel}
+                        supportsNegationFilter={false}
+                    />,
+                ]}
+            />
+            {pluginBundle && (
+                <FlyLayout
+                    title="Plugin Components"
+                    show={showBundleFlyout}
+                    setShow={setShowBundleFlyout}
+                    components={[
+                        <PluginBundleContent
+                            key="plugin-bundle"
+                            bundle={pluginBundle}
+                            pluginCollectionId={collectionIdsRef.current?.[0]}
+                            navigate={navigate}
+                        />,
+                    ]}
+                />
+            )}
+        </>
     );
 }

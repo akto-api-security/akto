@@ -1722,8 +1722,9 @@ function ApiCollections(props) {
               ]
             : []),
     
-        // For agentic filter: show Unique Endpoints and Unique Sources (except for AI Agent/Skill which uses tree view)
+        // For agentic filter: show Unique Endpoints and Unique Sources (except for AI Agent/Skill/Plugin which use tree view)
         ...(activeFilterTitle && activeFilterType !== FILTER_TYPES.AI_AGENT && activeFilterType !== FILTER_TYPES.SKILL
+            && activeFilterType !== FILTER_TYPES.PLUGIN
             ? [
                   {
                       title: "Unique Endpoints",
@@ -1942,7 +1943,8 @@ function ApiCollections(props) {
             });
             // Move source column after Endpoint ID
             modifiedHeaders = moveSourceColumnAfterEndpointId(modifiedHeaders);
-        } else if (activeFilterType === FILTER_TYPES.AI_AGENT || activeFilterType === FILTER_TYPES.SKILL) {
+        } else if (activeFilterType === FILTER_TYPES.AI_AGENT || activeFilterType === FILTER_TYPES.SKILL
+                || activeFilterType === FILTER_TYPES.PLUGIN) {
             modifiedHeaders = modifiedHeaders.filter(h => h.value !== 'urlsCount');
             modifiedHeaders = modifiedHeaders.map(h => {
                 if (h.value === 'displayNameComp') {
@@ -1981,7 +1983,8 @@ function ApiCollections(props) {
         if (activeFilterType === FILTER_TYPES.BROWSER_LLM) {
             // Remove endpoints sorting for LLM
             modifiedSortOptions = modifiedSortOptions.filter(opt => opt.sortKey !== 'urlsCount');
-        } else if (activeFilterType === FILTER_TYPES.AI_AGENT || activeFilterType === FILTER_TYPES.SKILL) {
+        } else if (activeFilterType === FILTER_TYPES.AI_AGENT || activeFilterType === FILTER_TYPES.SKILL
+                || activeFilterType === FILTER_TYPES.PLUGIN) {
             modifiedSortOptions = modifiedSortOptions.filter(opt => opt.sortKey !== 'urlsCount');
         } else if (activeFilterType === FILTER_TYPES.MCP_SERVER) {
             // Change "Endpoints" to "Tools" for MCP Servers
@@ -2111,7 +2114,8 @@ function ApiCollections(props) {
                         activeFilterType === FILTER_TYPES.AI_AGENT || 
                         activeFilterType === FILTER_TYPES.MCP_SERVER || 
                         activeFilterType === FILTER_TYPES.BROWSER_LLM ||
-                        activeFilterType === FILTER_TYPES.SKILL);
+                        activeFilterType === FILTER_TYPES.SKILL ||
+                        activeFilterType === FILTER_TYPES.PLUGIN);
     
     // For agentic filters, use the tree view component grouped by endpoint ID
     const getTableComponent = () => {
@@ -2250,6 +2254,8 @@ function ApiCollections(props) {
                 return `MCP Server - ${activeFilterTitle}`;
             case FILTER_TYPES.SKILL:
                 return `Skill - ${activeFilterTitle}`;
+            case FILTER_TYPES.PLUGIN:
+                return `Plugin - ${activeFilterTitle}`;
             default:
                 return `${activeFilterTitle}`;
         }

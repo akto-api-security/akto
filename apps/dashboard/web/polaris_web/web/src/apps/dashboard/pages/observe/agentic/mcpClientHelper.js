@@ -3,8 +3,8 @@ const ASSET_TAG_KEYS = { MCP_CLIENT: 'mcp-client', AI_AGENT: 'ai-agent', BROWSER
 const SKILL_TAG_KEY = 'skill';
 
 const NOT_ATTACHED_VALUE = 'not-attached';
-const CLIENT_TYPES = { LLM: 'LLM', AI_AGENT: 'AI Agent', MCP_SERVER: 'MCP Server', SKILL: 'Skill' };
-const ROW_TYPES = { AGENT: 'agent', SERVICE: 'service', SKILL: 'skill' };
+const CLIENT_TYPES = { LLM: 'LLM', AI_AGENT: 'AI Agent', MCP_SERVER: 'MCP Server', SKILL: 'Skill', PLUGIN: 'Plugin' };
+const ROW_TYPES = { AGENT: 'agent', SERVICE: 'service', SKILL: 'skill', PLUGIN: 'plugin' };
 const TYPE_TAG_TO_DISPLAY = {
     [TYPE_TAG_KEYS.MCP_SERVER]: CLIENT_TYPES.MCP_SERVER,
     [TYPE_TAG_KEYS.GEN_AI]: CLIENT_TYPES.AI_AGENT,
@@ -147,6 +147,30 @@ const normalizeEnvType = (envType) => {
     return envType;
 };
 
+// Plugins get their own collection, named <device>.<agentName>.<pluginName> — the same shape an MCP
+// server uses, so the agent-plugin tag is what tells them apart.
+// Twin of AgenticObserveUtil.isPluginCollection/getPluginName.
+const AGENT_PLUGIN_TAG_KEY = 'agent-plugin';
+const PLUGIN_NAME_TAG_KEY = 'plugin-name';
+
+const findTagValue = (envType, keyName) => {
+    const tags = normalizeEnvType(envType);
+    return tags.find((tag) => tag.keyName === keyName)?.value || null;
+};
+
+const isPluginCollection = (collection) => {
+    const envType = collection?.envTypeOriginal || collection?.envType;
+    return normalizeEnvType(envType).some((tag) => tag.keyName === AGENT_PLUGIN_TAG_KEY);
+};
+
+const getPluginNameForCollection = (collection) => {
+    if (!isPluginCollection(collection)) return null;
+    const envType = collection?.envTypeOriginal || collection?.envType;
+    return findTagValue(envType, PLUGIN_NAME_TAG_KEY)
+        || collection?.serviceName
+        || null;
+};
+
 const getTypeFromTags = (envType) => {
     const tags = normalizeEnvType(envType);
     if (tags.length === 0) return CLIENT_TYPES.MCP_SERVER;
@@ -196,6 +220,8 @@ const getAgentTypeFromValue = (tagValue) => {
  * Uses raw envType when present, else formatted envType strings from table data.
  */
 const getAgenticCategoryLabel = (collection) => {
+    // Before tags: a plugin collection also carries mcp-client/ai-agent naming its host agent.
+    if (getPluginNameForCollection(collection)) return CLIENT_TYPES.PLUGIN;
     const raw = collection?.envTypeOriginal;
     if (Array.isArray(raw) && raw.length > 0) return getTypeFromTags(raw);
     if (Array.isArray(collection?.skills) && collection.skills.length > 0) return CLIENT_TYPES.SKILL;
@@ -249,6 +275,7 @@ export {
     getMcpServerDisplayName,
     getFriendlyLlmName,
     getTypeFromTags,
+    getPluginNameForCollection,
     findAssetTag,
     findTypeTag,
     hasBrowserLlmTag,

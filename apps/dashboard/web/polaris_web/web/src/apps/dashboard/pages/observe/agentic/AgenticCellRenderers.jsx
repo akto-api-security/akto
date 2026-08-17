@@ -71,10 +71,13 @@ export function AssetNameCellRenderer({ data }) {
     if (!data) return null;
     // Match old UI: personal-account + local-MCP tags for non-Skill rows; malicious tag for Skills
     const isSkill = data.type === "Skill";
-    const showLocalMcp = data.hasLocalMcpServer && !isSkill;
-    const showPersonal = data.hasPersonalAccount && !isSkill;
+    // Skill/Plugin rows fan out from the agent collection, so they'd inherit its markers otherwise.
+    const isFanout = isSkill || data.type === "Plugin";
+    const showLocalMcp = data.hasLocalMcpServer && !isFanout;
+    const showPersonal = data.hasPersonalAccount && !isFanout;
     const showMalicious = data.isMalicious && isSkill;
-    const showMisconfigured = data.hasMisconfiguredConfig && !isSkill;
+    // Misconfigured is an Agent/MCP-server-only concept — Skill (and Plugin) rows never show it.
+    const showMisconfigured = data.hasMisconfiguredConfig && !isFanout;
     return (
         <HorizontalStack gap="2" blockAlign="center" wrap={false}>
             <AssetIcon type={data.type} assetTagValue={data.assetTagValue} size={24} />
@@ -93,6 +96,20 @@ export function AssetNameCellRenderer({ data }) {
 export function TypeBadgeCellRenderer({ value }) {
     if (!value) return null;
     return <TypeBadge type={value} />;
+}
+
+// Plugin rows only — the parent/child relationship every other row (Agent -> MCP servers, in the
+// flyout's tree) shows via nesting, but a plugin row IS the leaf: this column names its agent
+// directly instead, since "Type" on a plugin row is always just "Plugin".
+export function PluginAgentCellRenderer({ value }) {
+    if (!value) return null;
+    // Already formatted server-side (McpClientRegistry.formatDisplayName) — e.g. "Claude".
+    return (
+        <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+            <AssetIcon type="AI Agent" assetTagValue={value} size={20} />
+            <Text variant="bodySm">{value}</Text>
+        </HorizontalStack>
+    );
 }
 
 export function RiskScoreCellRenderer({ value }) {

@@ -3,6 +3,7 @@ import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-re
 import { Box, HorizontalStack, VerticalStack, Text, Card, Icon, Avatar, Tooltip } from "@shopify/polaris";
 import { AutomationMajor, MagicMajor, CustomersMinor } from "@shopify/polaris-icons";
 import MCPIcon from "@/assets/MCP_Icon.svg";
+import PluginIcon from "@/assets/Plugin.svg";
 import { getAgentLinkedComponents } from "./agenticPageBuilders";
 
 export function topoColors(category) {
@@ -12,6 +13,7 @@ export function topoColors(category) {
         case "mcp":      return { borderColor: "#4cbebb", backgroundColor: "#ecfdf5" };
         case "ai-model": return { borderColor: "#ec4899", backgroundColor: "#fdf2f8" };
         case "skill":    return { borderColor: "#7C3AED", backgroundColor: "#F3E8FF" };
+        case "plugin":   return { borderColor: "#4F46E5", backgroundColor: "#EEF2FF" };
         default:         return { borderColor: "#6b7280", backgroundColor: "#f9fafb" };
     }
 }
@@ -23,6 +25,7 @@ export function topoIcon(category) {
         case "mcp":      return MCPIcon;
         case "ai-model": return MagicMajor;
         case "skill":    return AutomationMajor;
+        case "plugin":   return PluginIcon;
         default:         return CustomersMinor;
     }
 }
@@ -81,6 +84,9 @@ export function findParentAgents(asset, agenticFlatData = []) {
             const assetIds = new Set((asset.collectionIds || []).map(Number));
             return (a.collectionIds || []).some(id => assetIds.has(Number(id)));
         }
+        if (asset.type === "Plugin") {
+            return (a.pluginNames || []).some(p => p === asset.name || p.toLowerCase() === asset.name?.toLowerCase());
+        }
         return false;
     });
 }
@@ -119,6 +125,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
             const skillItems = skillCount > 0
                 ? [{ id: "skl-0", cat: "skill", type: "Skill", label: skillCount === 1 ? "1 Skill" : `${skillCount} Skills`, edgeColor: "#7C3AED" }]
                 : [];
+            const pluginItems = (asset.pluginNames || []).map((name, i) => ({ id: `plg-${i}`, cat: "plugin", type: "Plugin", label: name, edgeColor: "#4F46E5" }));
             const inlineItems = (inlineComponents || []).map((item, i) => ({
                 id: item.id || `inline-${i}`,
                 cat: item.cat,
@@ -132,6 +139,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
                 ...mcps.map((m, i) => ({ id: `mcp-${i}`, cat: "mcp",      type: "MCP Server", label: m.name, edgeColor: "#4cbebb" })),
                 ...llms.map((l, i) => ({ id: `llm-${i}`, cat: "ai-model", type: "LLM",        label: l.name, edgeColor: "#ec4899" })),
                 ...skillItems,
+                ...pluginItems,
                 ...inlineItems,
             ];
 
@@ -154,10 +162,15 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
             };
         }
 
-        // MCP / Skill / LLM: show Device → Parent Agent → This Asset
-        const parentAgents = findParentAgents(asset, agenticFlatData);
-        const cat     = asset.type === "MCP Server" ? "mcp" : asset.type === "Skill" ? "skill" : "ai-model";
-        const edgeCol = asset.type === "MCP Server" ? "#4cbebb" : asset.type === "Skill" ? "#7C3AED" : "#ec4899";
+        // MCP / Skill / Plugin / LLM: show Device → Parent Agent → This Asset
+        // agenticFlatData is always [] in this layout, so findParentAgents never matches — a plugin
+        // asset already carries its own parent agent's name directly (pluginParentAgent), so use that
+        // instead of depending on agenticFlatData ever being populated.
+        const parentAgents = asset.type === "Plugin" && asset.pluginParentAgent
+            ? [{ name: asset.pluginParentAgent }]
+            : findParentAgents(asset, agenticFlatData);
+        const cat     = asset.type === "MCP Server" ? "mcp" : asset.type === "Skill" ? "skill" : asset.type === "Plugin" ? "plugin" : "ai-model";
+        const edgeCol = asset.type === "MCP Server" ? "#4cbebb" : asset.type === "Skill" ? "#7C3AED" : asset.type === "Plugin" ? "#4F46E5" : "#ec4899";
 
         if (parentAgents.length > 0) {
             const maxRows   = Math.max(devices.length, parentAgents.length, 1);

@@ -16,6 +16,7 @@ import AgenticAssetFlyout from "./AgenticAssetFlyout";
 import {
   AssetNameCellRenderer,
   TypeBadgeCellRenderer,
+  PluginAgentCellRenderer,
   RiskScoreCellRenderer,
   ViolationsCellRenderer,
   InteractionsCellRenderer,
@@ -33,6 +34,8 @@ import {
   buildUserAnalysisLookup,
   buildUserAnalysisFlatMap,
   fetchAndCacheSkillApiData,
+  settledValue,
+  logRejected,
 } from "./constants";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
@@ -51,6 +54,7 @@ const SORT_FIELD_MAP = {
   name: "name",
   riskScore: "riskScore",
   endpointCount: "endpointsCount",
+  pluginCount: "pluginCount",
   violations: "violations",
   lastSeen: "lastSeenEpoch",
 };
@@ -72,10 +76,19 @@ const COL_DEFS = [
     width: 140,
     // Fixed, small enum (AgenticObserveUtil.CLIENT_TYPE_*) — no need to derive values from data.
     filter: "agSetColumnFilter",
-    filterParams: { values: ["AI Agent", "MCP Server", "LLM", "Skill"] },
+    filterParams: { values: ["AI Agent", "MCP Server", "LLM", "Skill", "Plugin"] },
     sortable: false,
     cellRenderer: TypeBadgeCellRenderer,
-    cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL" })[p.value] || "agentic-type-DEFAULT",
+    cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL", "Plugin": "agentic-type-PLUGIN" })[p.value] || "agentic-type-DEFAULT",
+    cellStyle: { display: "flex", alignItems: "center" },
+  },
+  {
+    field: "pluginParentAgent",
+    headerName: "AI Agent",
+    width: 160,
+    filter: false,
+    sortable: false,
+    cellRenderer: PluginAgentCellRenderer,
     cellStyle: { display: "flex", alignItems: "center" },
   },
   {
@@ -148,6 +161,19 @@ const COL_DEFS = [
     filterParams: { values: ["Contains personal account", "Local MCP Server", "Misconfigured", "Malicious Skill"] },
     sortable: false,
   },
+  // Plugin-only, hidden by default (empty for every other row type) — opt in via the columns panel.
+  {
+    field: "pluginStatus",
+    headerName: "Plugin Status",
+    width: 130,
+    hide: true,
+    filter: "agSetColumnFilter",
+    filterParams: { values: ["enabled", "disabled"] },
+    sortable: false,
+  },
+  { field: "pluginVersion", headerName: "Plugin Version", width: 130, hide: true, filter: false, sortable: false },
+  { field: "pluginScope", headerName: "Plugin Scope", width: 120, hide: true, filter: false, sortable: false },
+  { field: "pluginMarketplace", headerName: "Marketplace", width: 170, hide: true, filter: false, sortable: false },
   {
     field: "severity",
     headerName: "Severity",
@@ -179,11 +205,12 @@ const DEFAULT_COL_DEF = {
 // AgenticObserveAction.GroupSummary.toSummaryResponse()'s and fetchAgenticAssetsSummary's row-loop
 // comments.
 function shapeRow(row) {
-  const isSkill = row.rowType === "skill";
+  // Fan-out rows borrow their parent agent collection's flags, so suppress them on both.
+  const isFanout = row.rowType === "skill" || row.rowType === "plugin";
   const tags = [];
-  if (row.hasPersonalAccount && !isSkill) tags.push("Contains personal account");
-  if (row.hasLocalMcpServer && !isSkill) tags.push("Local MCP Server");
-  if (row.hasMisconfiguredConfig && !isSkill) tags.push("Misconfigured");
+  if (row.hasPersonalAccount && !isFanout) tags.push("Contains personal account");
+  if (row.hasLocalMcpServer && !isFanout) tags.push("Local MCP Server");
+  if (row.hasMisconfiguredConfig && !isFanout) tags.push("Misconfigured");
   if (row.isMalicious) tags.push("Malicious Skill");
 
   return {
@@ -193,6 +220,10 @@ function shapeRow(row) {
     lastSeen: row.lastSeenEpoch > 0 ? func.prettifyEpoch(row.lastSeenEpoch) : "",
     assetTagValue: row.groupKey,
     tags: tags.length ? tags : undefined,
+    // "unknown" reads as disabled — an unreported status isn't proof a plugin is active.
+    pluginStatus: row.pluginStatus
+      ? (String(row.pluginStatus).toLowerCase() === "enabled" ? "enabled" : "disabled")
+      : undefined,
   };
 }
 
@@ -266,6 +297,7 @@ function TableSection({
         paginationPageSize={50}
         paginationPageSizeSelector={[20, 50, 100]}
         onServerFetch={onServerFetch}
+        onFetchError={() => func.setToast(true, true, "Failed to load agentic assets")}
         serverSideRowModel
         getRowId={(params) => params.data.id}
       />
@@ -420,13 +452,17 @@ export default function AgenticAssetsPage() {
         fetchAndCacheSkillApiData([], { api, PersistStore }).catch(() => {});
 
         // Tier 2 — slow, runs after first paint, patches in without a grid remount.
-        Promise.all([
+        Promise.allSettled([
           fetchAgenticViolationCountsByHost({ startTimestamp, endTimestamp }),
           fetchAgenticSkillViolationCounts({ startTimestamp, endTimestamp }),
-          agenticObserveApi.listUserAnalysis().catch(() => []),
+          agenticObserveApi.listUserAnalysis(),
         ])
-          .then(async ([hostCounts, skillViolationsByName, userAnalysisList]) => {
+          .then(async ([hostCountsSettled, skillViolationsSettled, userAnalysisSettled]) => {
             if (!isMountedRef.current) return;
+            logRejected("AgenticAssetsPage tier-2", { violations: hostCountsSettled, skills: skillViolationsSettled, userAnalysis: userAnalysisSettled });
+            const hostCounts = settledValue(hostCountsSettled, {});
+            const skillViolationsByName = settledValue(skillViolationsSettled, {});
+            const userAnalysisList = settledValue(userAnalysisSettled, []);
             // Host -> collection-id attribution now happens server-side (no raw collection list
             // needed client-side for this — see attributeViolationCountsToCollections). Skills
             // aren't attributable by host at all (see skillViolationsByName's own comment), so
@@ -533,6 +569,7 @@ export default function AgenticAssetsPage() {
     { label: "MCP Servers", count: stats.countsByType["MCP Server"] || 0, color: "#4cbebb",  key: "MCP Server" },
     { label: "LLMs",        count: stats.countsByType["LLM"] || 0,        color: "#EAB308",  key: "LLM" },
     { label: "Skills",      count: stats.countsByType["Skill"] || 0,      color: "#D1D5DB",  key: "Skill" },
+    { label: "Plugins",     count: stats.countsByType["Plugin"] || 0,     color: "#4F46E5",  key: "Plugin" },
   ], [stats]);
 
   // Summed from the server-aggregated per-host counts (available at first paint) — independent of
