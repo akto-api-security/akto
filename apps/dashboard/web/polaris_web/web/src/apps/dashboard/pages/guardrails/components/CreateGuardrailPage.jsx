@@ -256,7 +256,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     const [agenticUsers, setAgenticUsers] = useState([]);
     const [usersLoading, setUsersLoading] = useState(false);
-    const [deviceList, setDeviceList] = useState([]);
 
     // Collections data
     const [mcpServers, setMcpServers] = useState([]);
@@ -541,31 +540,19 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         return () => { isActive = false; };
     }, []);
 
-    // Fetch agentic users to populate team/role options, and module infos for device count (Atlas only)
+    // Fetch agentic users to populate team/role/device targeting options (Atlas only). This is
+    // the single source of truth for every "users" display in the wizard — availableDevices and
+    // matchingDeviceRows below are both derived from it, so the "Apply to all" and "Select Device
+    // Tags & Users" popovers always show the same per-device, suffixed data.
     useEffect(() => {
         if (!isEndpointSecurityCategory()) return;
         let isActive = true;
         (async () => {
             setUsersLoading(true);
             try {
-                const [agenticUsersResp, moduleResp] = await Promise.all([
-                    settingsApi.fetchAgenticUsers().catch(() => ({})),
-                    settingsApi.fetchModuleInfo({ moduleType: 'MCP_ENDPOINT_SHIELD' }).catch(() => ({})),
-                ]);
+                const agenticUsersResp = await settingsApi.fetchAgenticUsers().catch(() => ({}));
                 if (!isActive) return;
                 setAgenticUsers(agenticUsersResp?.agenticUsers || []);
-                const seen = new Set();
-                setDeviceList(
-                    (moduleResp?.moduleInfos || []).reduce((acc, m) => {
-                        const ad = m?.additionalData || {};
-                        const label = ad.username || ad.userName || ad.user || m.name || '';
-                        if (label && !seen.has(label)) {
-                            seen.add(label);
-                            acc.push({ label, value: label });
-                        }
-                        return acc;
-                    }, [])
-                );
             } finally {
                 if (isActive) setUsersLoading(false);
             }
@@ -1233,7 +1220,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         usersLoading={usersLoading}
                         applyToAllUsers={applyToAllUsers}
                         setApplyToAllUsers={setApplyToAllUsers}
-                        deviceList={deviceList}
+                        deviceList={availableDevices}
                         showConditionError={leftSteps.has(ServerSettingsConfig.number)}
                         showUserConditionError={leftSteps.has(ServerSettingsConfig.number)}
                     />

@@ -115,6 +115,33 @@ const CountPopover = ({ count, label, items }) => {
     );
 };
 
+// Once (per condition list, per mount) after its options have loaded: drop any selected value
+// that no longer matches a live option for its type (a server/device removed from the list, or a
+// tag value no longer on any user). Without this, a condition's stored value count can silently
+// diverge from what's actually visible/checked/enforceable. `enabled` gates this off for Argus —
+// backward-compat values there may not yet have a matching option.
+const usePruneStaleConditionValues = (enabled, ready, conditions, dispatch, valSets) => {
+    const ranRef = useRef(false);
+    useEffect(() => {
+        if (!enabled || ranRef.current || !ready) return;
+        ranRef.current = true;
+        // Descending order: deleting a higher index never shifts the position of one not yet visited.
+        for (let index = conditions.length - 1; index >= 0; index--) {
+            const c = conditions[index];
+            const valSet = valSets[c.type];
+            if (!valSet) {
+                dispatch({ type: 'delete', index });
+                continue;
+            }
+            if (valSet.size === 0) continue;
+            const valid = (c.values || []).filter(v => valSet.has(v));
+            if (valid.length !== (c.values || []).length) {
+                dispatch({ type: 'updateKey', index, key: 'values', obj: valid });
+            }
+        }
+    }, [ready]);
+};
+
 const ServerSettingsStep = ({
     applyToAllServers,
     setApplyToAllServers,
@@ -250,29 +277,28 @@ const ServerSettingsStep = ({
             selectedBrowserLlms
           );
 
-    // One-time Atlas cleanup: strips stale condition values that don't match a current option.
-    // Skipped for Argus — backward-compat values may not yet have a matching option.
-    const normalizedRef = useRef(false);
-    useEffect(() => {
-        if (!isAtlas) return;
-        if (normalizedRef.current) return;
-        const total = agentOptions.length + mcpOptions.length + llmOptions.length;
-        if (total === 0) return;
-        normalizedRef.current = true;
-        const valSets = {
+    // Agentic Assets: AI Agents / MCP Servers / LLMs.
+    usePruneStaleConditionValues(
+        isAtlas,
+        agentOptions.length + mcpOptions.length + llmOptions.length > 0,
+        agenticConditions, agenticDispatch,
+        {
             AGENT: new Set(agentOptions.map(o => o.value)),
             MCP_SERVER: new Set(mcpOptions.map(o => o.value)),
             LLM: new Set(llmOptions.map(o => o.value)),
-        };
-        agenticConditions.forEach((c, index) => {
-            const valSet = valSets[c.type];
-            if (!valSet || valSet.size === 0) return;
-            const valid = (c.values || []).filter(v => valSet.has(v));
-            if (valid.length !== (c.values || []).length) {
-                agenticDispatch({ type: 'updateKey', index, key: 'values', obj: valid });
-            }
-        });
-    }, [agentOptions.length, mcpOptions.length, llmOptions.length]);
+        }
+    );
+
+    // Device Tags & Users: DEVICE plus any dynamic tag key (team, role, department, ...).
+    usePruneStaleConditionValues(
+        isAtlas,
+        (availableDevices || []).length + (availableTagKeyValues || []).reduce((acc, k) => acc + (k.values || []).length, 0) > 0,
+        userConditions, userDispatch,
+        {
+            DEVICE: new Set((availableDevices || []).map(o => o.value)),
+            ...Object.fromEntries((availableTagKeyValues || []).map(({ key, values }) => [key, new Set(values || [])])),
+        }
+    );
 
     const agenticTypeOptions = [
         { label: `${agentOptions.length > 1 ? 'AI Agents' : 'AI Agent'} [${agentOptions.length}]`, value: 'AGENT', disabled: agentOptions.length === 0 },

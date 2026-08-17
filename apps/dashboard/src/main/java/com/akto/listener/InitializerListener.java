@@ -3692,28 +3692,70 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    private static void migrateTeamRoleToDeviceTags(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getMigrateTeamRoleToDeviceTags() == 0){
-            BackwardCompatibilityUtils.migrateTeamRoleToDeviceTags();
-            BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.MIGRATE_TEAM_ROLE_TO_DEVICE_TAGS, Context.now())
-            );
+    // Per-account "already attempted this JVM lifetime" guard for ensureTeamRoleAndGuardrailTagsMigrated
+    // — without it, an account whose migration keeps failing (or whose BackwardCompatibility doc is
+    // somehow never updated) would re-attempt on every single request that touches
+    // ModuleInfoAction.fetchAgenticUsers, instead of once per process lifetime like the startup path.
+    private static final Set<Integer> attemptedTeamTagsMigrationForAccount = Collections.synchronizedSet(new HashSet<>());
+
+    private static void safeMigrateTeamRoleToDeviceTags(BackwardCompatibility backwardCompatibility){
+        try {
+            if(backwardCompatibility.getMigrateTeamRoleToDeviceTags() == 0){
+                BackwardCompatibilityUtils.migrateTeamRoleToDeviceTags();
+                BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.MIGRATE_TEAM_ROLE_TO_DEVICE_TAGS, Context.now())
+                );
+            }
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "error in migrateTeamRoleToDeviceTags: " + e.getMessage(), LogDb.DASHBOARD);
         }
     }
 
-    private static void migrateGuardrailTargetTeamsRolesToTags(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getMigrateGuardrailTargetTeamsRolesToTags() == 0){
-            BackwardCompatibilityUtils.migrateGuardrailTargetTeamsRolesToTags();
-            BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.MIGRATE_GUARDRAIL_TARGET_TEAMS_ROLES_TO_TAGS, Context.now())
-            );
+    private static void safeMigrateGuardrailTargetTeamsRolesToTags(BackwardCompatibility backwardCompatibility){
+        try {
+            if(backwardCompatibility.getMigrateGuardrailTargetTeamsRolesToTags() == 0){
+                BackwardCompatibilityUtils.migrateGuardrailTargetTeamsRolesToTags();
+                BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.MIGRATE_GUARDRAIL_TARGET_TEAMS_ROLES_TO_TAGS, Context.now())
+                );
+            }
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "error in migrateGuardrailTargetTeamsRolesToTags: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
+    /**
+     * Lazy, self-healing fallback for the two migrations above — call from a frequently-hit request
+     * path (ModuleInfoAction.fetchAgenticUsers) so they still get a chance to run even if this
+     * account's dashboard process never took the one-time, runJobFunctions-gated startup pass (or
+     * that pass errored on some unrelated hook before reaching these two). Safe to call on every
+     * request: the in-memory guard above makes the real work happen at most once per process lifetime,
+     * and the underlying migrations are themselves idempotent (merge into existing tags, never
+     * overwrite) if somehow triggered twice.
+     */
+    public static void ensureTeamRoleAndGuardrailTagsMigrated(){
+        Integer accountId = Context.accountId.get();
+        if (accountId == null || !attemptedTeamTagsMigrationForAccount.add(accountId)) return;
+        try {
+            BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
+            if (backwardCompatibility == null) return;
+            safeMigrateTeamRoleToDeviceTags(backwardCompatibility);
+            safeMigrateGuardrailTargetTeamsRolesToTags(backwardCompatibility);
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "error in ensureTeamRoleAndGuardrailTagsMigrated: " + e.getMessage(), LogDb.DASHBOARD);
         }
     }
 
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
+        // Run first and individually guarded — setBackwardCompatibilities has no per-call isolation,
+        // so an unrelated hook throwing further down would otherwise silently prevent every hook
+        // after it (including these two) from ever running, with no migration-specific error.
+        safeMigrateTeamRoleToDeviceTags(backwardCompatibility);
+        safeMigrateGuardrailTargetTeamsRolesToTags(backwardCompatibility);
+
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
             setOrganizationsInBilling(backwardCompatibility);
@@ -3727,11 +3769,6 @@ public class InitializerListener implements ServletContextListener {
         moveUserDataFromModuleInfoToAgenticUsers(backwardCompatibility);
         logger.debugAndAddToDb("moveUserDataFromModuleInfoToAgenticUsers completed for account: " + Context.accountId.get());
         cleanupApiInfoTags(backwardCompatibility);
-        logger.debugAndAddToDb("cleanupApiInfoTags completed for account: " + Context.accountId.get());
-        migrateTeamRoleToDeviceTags(backwardCompatibility);
-        logger.debugAndAddToDb("migrateTeamRoleToDeviceTags completed for account: " + Context.accountId.get());
-        migrateGuardrailTargetTeamsRolesToTags(backwardCompatibility);
-        logger.debugAndAddToDb("migrateGuardrailTargetTeamsRolesToTags completed for account: " + Context.accountId.get());
         dropLastCronRunInfoField(backwardCompatibility);
         logger.debugAndAddToDb("dropLastCronRunInfoField completed for account: " + Context.accountId.get());
         cleanupRbacEntriesForDeveloperRole(backwardCompatibility);
