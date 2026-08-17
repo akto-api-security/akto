@@ -366,8 +366,13 @@ public class ProfileAction extends UserAction {
         }
 
         if (dashboardCategory == null || !validDashboardCategories.contains(dashboardCategory)) {
-            // Set default dashboard category if not set already
-            dashboardCategory = GlobalEnums.DashboardCategory.API_SECURITY.getDashboardCategory();
+            // No category on the session yet (fresh login/signup), so land the user in the module
+            // their org is actually entitled to instead of always dropping them on API Security.
+            // Runs after fetchAndSaveFeatureWiseAllowed above, so the STIGG map is already current.
+            dashboardCategory = OrganizationsDao.getDefaultDashboardCategory(sessionAccId);
+            if (!validDashboardCategories.contains(dashboardCategory)) {
+                dashboardCategory = GlobalEnums.DashboardCategory.API_SECURITY.getDashboardCategory();
+            }
             request.getSession().setAttribute("dashboardCategory", dashboardCategory);
         }
         userDetails.append("dashboardCategory", dashboardCategory);
