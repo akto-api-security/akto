@@ -1,5 +1,8 @@
 package com.akto.dao.billing;
 
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 
 import org.bson.conversions.Bson;
@@ -7,9 +10,12 @@ import org.bson.conversions.Bson;
 import com.akto.dao.BillingContextDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.util.UsageUtils;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.util.enums.GlobalEnums.DashboardCategory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -17,6 +23,76 @@ import com.mongodb.client.model.Updates;
 public class OrganizationsDao extends BillingContextDao<Organization>{
 
     public static final OrganizationsDao instance = new OrganizationsDao();
+
+    private static final DashboardCategory[] CATEGORY_PRECEDENCE = {
+            DashboardCategory.API_SECURITY,
+            DashboardCategory.SECURITY_TYPE_AGENTIC,
+            DashboardCategory.ENDPOINT_SECURITY,
+            DashboardCategory.AKTO_DAST
+    };
+
+    private static boolean isCategoryGranted(HashMap<String, FeatureAccess> featureWiseAllowed, DashboardCategory category) {
+        FeatureAccess access = featureWiseAllowed.get(category.name());
+        return access != null && access.getIsGranted();
+    }
+
+    public static DashboardCategory getDefaultDashboardCategoryEnum(int accountId) {
+        try {
+            Organization organization = instance.findOne(Filters.in(Organization.ACCOUNTS, accountId));
+            if (organization != null && organization.getFeatureWiseAllowed() != null
+                    && !organization.getFeatureWiseAllowed().isEmpty()) {
+                HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+                for (DashboardCategory category : CATEGORY_PRECEDENCE) {
+                    if (isCategoryGranted(featureWiseAllowed, category)) {
+                        return category;
+                    }
+                }
+            }
+        } catch (Exception e) {
+        }
+
+        return DashboardCategory.API_SECURITY;
+    }
+
+    public static String getDefaultDashboardCategory(int accountId) {
+        return getDefaultDashboardCategoryEnum(accountId).getDashboardCategory();
+    }
+
+    private static String scopeOf(DashboardCategory category) {
+        switch (category) {
+            case SECURITY_TYPE_AGENTIC:
+                return CONTEXT_SOURCE.AGENTIC.name();
+            case ENDPOINT_SECURITY:
+                return CONTEXT_SOURCE.ENDPOINT.name();
+            case AKTO_DAST:
+                return CONTEXT_SOURCE.DAST.name();
+            default:
+                return CONTEXT_SOURCE.API.name();
+        }
+    }
+
+    public static Set<String> getEntitledScopes(int accountId) {
+        Set<String> scopes = new LinkedHashSet<>();
+        try {
+            Organization organization = instance.findOne(Filters.in(Organization.ACCOUNTS, accountId));
+            if (organization != null && organization.getFeatureWiseAllowed() != null
+                    && !organization.getFeatureWiseAllowed().isEmpty()) {
+                HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+                for (DashboardCategory category : CATEGORY_PRECEDENCE) {
+                    if (isCategoryGranted(featureWiseAllowed, category)) {
+                        scopes.add(scopeOf(category));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // entitlements unavailable — fall through to the API default below
+        }
+
+        if (scopes.isEmpty()) {
+            scopes.add(CONTEXT_SOURCE.API.name());
+        }
+        return scopes;
+    }
 
     public static void createIndexIfAbsent() {
         {

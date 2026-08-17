@@ -4,6 +4,7 @@ package com.akto.dto;
 import org.bson.types.ObjectId;
 
 import com.akto.dao.CustomRoleDao;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.rbac.*;
 
 import com.akto.dto.rbac.RbacEnums.Feature;
@@ -15,8 +16,8 @@ import lombok.Setter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -174,17 +175,20 @@ public class RBAC {
 
     /**
      * Initializes default scope-role mapping if empty.
-     * Atlas-configured accounts or matching emails get ENDPOINT (Akto ATLAS) → defaultRole; others get API → defaultRole.
+     * Atlas-configured accounts or matching emails get ENDPOINT (Akto ATLAS) → defaultRole; everyone
+     * else gets every scope their org's STIGG plan grants, ordered API > AGENTIC > ENDPOINT > DAST.
      * Otherwise returns the existing scopeRoleMapping unchanged.
      */
     public static Map<String, String> initializeScopeRoleMapping(
             Map<String, String> scopeRoleMapping, String defaultRole, int accountId, String email) {
         if (scopeRoleMapping == null || scopeRoleMapping.isEmpty()) {
-            Map<String, String> initialized = new HashMap<>();
+            Map<String, String> initialized = new LinkedHashMap<>();
             if (shouldUseAtlasMemberDefaultScope(accountId, email)) {
                 initialized.put(CONTEXT_SOURCE.ENDPOINT.name(), defaultRole);
             } else {
-                initialized.put("API", defaultRole);
+                for (String scope : OrganizationsDao.getEntitledScopes(accountId)) {
+                    initialized.put(scope, defaultRole);
+                }
             }
             return initialized;
         }

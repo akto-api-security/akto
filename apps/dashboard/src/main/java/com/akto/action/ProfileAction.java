@@ -366,8 +366,11 @@ public class ProfileAction extends UserAction {
         }
 
         if (dashboardCategory == null || !validDashboardCategories.contains(dashboardCategory)) {
-            // Set default dashboard category if not set already
-            dashboardCategory = GlobalEnums.DashboardCategory.API_SECURITY.getDashboardCategory();
+            // Set default dashboard category from the org's STIGG entitlements if not set already
+            dashboardCategory = OrganizationsDao.getDefaultDashboardCategory(sessionAccId);
+            if (!validDashboardCategories.contains(dashboardCategory)) {
+                dashboardCategory = GlobalEnums.DashboardCategory.API_SECURITY.getDashboardCategory();
+            }
             request.getSession().setAttribute("dashboardCategory", dashboardCategory);
         }
         userDetails.append("dashboardCategory", dashboardCategory);
