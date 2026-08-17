@@ -428,6 +428,7 @@ export default function LeftNav() {
                         NHI Governance
                     </Text>
                 ),
+                badge: <Badge status="info">Beta</Badge>,
                 icon: SocialAdMajor,
                 onClick: () => {
                     handleSelect("dashboard_nhi_identities");
