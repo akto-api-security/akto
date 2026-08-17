@@ -24,7 +24,15 @@ HEARTBEAT_INTERVAL_S = 30
 _DB_ABSTRACTOR_URL = os.getenv(
     "DATABASE_ABSTRACTOR_SERVICE_URL", "https://cyborg.akto.io"
 ).rstrip("/")
-_AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
+# The abstractor authenticates with DATABASE_ABSTRACTOR_SERVICE_TOKEN, which is a
+# DIFFERENT credential from the guardrails/ingestion token. Falling back to
+# AKTO_API_TOKEN keeps SaaS installs working, but on a deployment that rejects it
+# the device never registers and traces stay empty — hence the status logging in
+# _post_heartbeat, so that failure is visible instead of silent.
+_AKTO_API_TOKEN = (
+    os.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN")
+    or os.getenv("AKTO_API_TOKEN", "")
+)
 _HEARTBEAT_TIMEOUT = 3.0  # short timeout — must not block the hook
 
 
@@ -77,7 +85,8 @@ def _record_send(log_dir: str) -> None:
         pass
 
 
-def _post_heartbeat(payload: dict) -> None:
+def _post_heartbeat(payload: dict) -> tuple:
+    """POST the heartbeat. Returns (status_code, registered)."""
     url = f"{_DB_ABSTRACTOR_URL}/api/updateModuleInfoForHeartbeat"
     data = json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
@@ -88,6 +97,10 @@ def _post_heartbeat(payload: dict) -> None:
     ssl_ctx = ssl._create_unverified_context()
     with urllib.request.urlopen(req, context=ssl_ctx, timeout=_HEARTBEAT_TIMEOUT) as resp:
         resp.read()
+        # Status code is the only reliable signal, matching ClientActor.updateModuleInfo:
+        # a bad or missing token is rejected with 401, and the 200 body is a generic
+        # action payload whose fields (including accountId) say nothing about the outcome.
+        return resp.getcode()
 
 
 def send_heartbeat(log_dir: str, logger=None) -> None:
@@ -127,15 +140,20 @@ def send_heartbeat(log_dir: str, logger=None) -> None:
             }
         }
 
-        _post_heartbeat(payload)
+        status = _post_heartbeat(payload)
         _record_send(log_dir)
 
         if logger:
-            logger.info(
-                f"Heartbeat sent: agentId={agent_id}, "
-                f"deviceId={device_id}, username={username}"
-            )
-
+            if 200 <= status < 300:
+                logger.info(
+                    f"Heartbeat sent (HTTP {status}): agentId={agent_id}, "
+                    f"deviceId={device_id}, username={username}"
+                )
+            else:
+                logger.error(
+                    f"Heartbeat rejected (HTTP {status}) at {_DB_ABSTRACTOR_URL} — "
+                    f"check DATABASE_ABSTRACTOR_SERVICE_URL and the token"
+                )
     except Exception as e:
         if logger:
             logger.debug(f"Heartbeat skipped: {e}")

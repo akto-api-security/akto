@@ -10,6 +10,7 @@ import json
 import sys
 
 from akto_amp_common import (
+    AKTO_INGEST_ON_REQUEST,
     AKTO_SYNC_MODE,
     MODE,
     api_host,
@@ -66,7 +67,11 @@ def main() -> None:
         ingest(build_prompt_payload(prompt, session_info), logger)
         sys.exit(0)
 
-    verdict = call_guardrails(build_prompt_payload(prompt, session_info), logger)
+    verdict = call_guardrails(
+        build_prompt_payload(prompt, session_info),
+        logger,
+        ingest_data=AKTO_INGEST_ON_REQUEST,
+    )
     allowed = apply_warn_resubmit_flow(verdict, "prompt", fingerprint("prompt", prompt), logger)
 
     if not allowed:
