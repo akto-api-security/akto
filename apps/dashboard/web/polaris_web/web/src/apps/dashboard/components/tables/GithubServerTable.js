@@ -275,14 +275,13 @@ function GithubServerTable(props) {
   }, [props?.clientSideDataUpdateKey])
 
   const handleSort = (col, dir) => {
-    let tempSortSelected = props?.sortOptions.filter(x => x.columnIndex === (col + 1))
-    let sortVal = [tempSortSelected[0].value]
-    if(dir.includes("desc")){
-      setSortSelected([tempSortSelected[1].value])
-      sortVal = [tempSortSelected[1].value]
-    }else{
-      setSortSelected([tempSortSelected[0].value])
+    let tempSortSelected = (props?.sortOptions || []).filter(x => x.columnIndex === (col + 1))
+    if(tempSortSelected.length === 0){
+      return
     }
+    const sortOption = dir.includes("desc") ? (tempSortSelected[1] || tempSortSelected[0]) : tempSortSelected[0]
+    const sortVal = [sortOption.value]
+    setSortSelected(sortVal)
     let copyFilters = filtersMap
     copyFilters[currentPageKey] = {
       'filters': pageFiltersMap?.filters || [],

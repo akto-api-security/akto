@@ -588,6 +588,11 @@ public class StartTestAction extends UserAction {
         if (sortKey == null || "".equals(sortKey)) {
             sortKey = TestingRun.SCHEDULE_TIMESTAMP;
         }
+        // A CI/CD test reuses the same testing run for every trigger, so its scheduleTimestamp stays at
+        // creation time while endTimestamp moves with the latest run, which is what the run time column shows.
+        if (testingRunType == TestingRunType.CI_CD && TestingRun.SCHEDULE_TIMESTAMP.equals(sortKey)) {
+            sortKey = TestingRun.END_TIMESTAMP;
+        }
         sortFields.add(sortKey);
 
         return sortOrder == 1 ? Sorts.ascending(sortFields) : Sorts.descending(sortFields);
