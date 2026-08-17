@@ -109,9 +109,9 @@ public class SettingsScanAction extends ActionSupport {
         "SCOPE — permissions.* and sandbox.* fields, plus the single field disableAllHooks: permissions.\n" +
         "defaultMode, permissions.allow / .ask / .deny entries, permissions.additionalDirectories,\n" +
         "sandbox.enabled, sandbox.network.*, sandbox.filesystem.*, sandbox.credentials, sandbox.\n" +
-        "autoAllowBashIfSandboxed, sandbox.excludedCommands, disableAllHooks. The audit trail for MCP fields\n" +
+        "autoAllowBashIfSandboxed, sandbox.excludedCommands, disableAllHooks. Skip the  MCP fields as their audit trails\n" +
         "(allowAllMcpServers, enabledMcpjsonServers, disabledMcpjsonServers, enableAllProjectMcpServers,\n" +
-        "mcpServers entries), statusLine, credentialHelper, and every other hooks field lives elsewhere and\n" +
+        "mcpServers entries), statusLine, credentialHelper,enabledPlugins, and every other hooks field lives elsewhere and\n" +
         "is already covered by that pass.\n" +
         "\n" +
         "Within scope, judge each field the same way as above: does its actual value skip approval, turn\n" +
