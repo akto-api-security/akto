@@ -520,12 +520,14 @@ function AgenticsTab({ deviceId }) {
         }));
     }, [deviceId]);
 
+    // Deep-links to this row's own component page instead of the account-wide asset search.
     const handleRowClick = useCallback((e) => {
         if (!e.data) return;
         if (!isAgentNavigable(e.data)) return;
-        const assetId = e.data.rawServiceName || e.data.endpoint;
-        const params = new URLSearchParams({ asset: assetId, type: e.data.type });
-        window.open(`/dashboard/observe/agentic-assets?${params}`, "_blank");
+        const collectionId = e.data.collectionIds?.[0];
+        if (collectionId == null) return;
+        const scope = e.data.skillCount > 0 ? "?agentic_view=skills" : (e.data.type === "Plugin" ? "?agentic_view=plugins" : "");
+        window.open(`/dashboard/observe/inventory/${collectionId}${scope}`, "_blank");
     }, []);
 
     return (
