@@ -172,6 +172,13 @@ function Endpoints() {
                 { label: "Misconfigured", value: "Misconfigured" },
                 { label: "Malicious Skill", value: "Malicious Skill" },
             ] },
+            // Same values as "Tag" — a separate toggle, merged into the same backend filter below.
+            { key: "endpointTags", label: "Endpoint tags", choices: [
+                { label: "Contains personal account", value: "Contains personal account" },
+                { label: "Local MCP Server", value: "Local MCP Server" },
+                { label: "Misconfigured", value: "Misconfigured" },
+                { label: "Malicious Skill", value: "Malicious Skill" },
+            ] },
         ];
         if (usernameChoices.length) {
             defs.push({ key: "username", label: "Username", choices: usernameChoices.map((u) => ({ label: u, value: u })) });
@@ -257,10 +264,13 @@ function Endpoints() {
             const mongoSortOrder = sortOrder === -1 ? 1 : -1;
             const clientType = TAB_TO_CLIENT_TYPE[selectedTab];
             const tagValues = filtersObj?.assetTags;
+            const endpointTagValues = filtersObj?.endpointTags;
             const usernameValues = filtersObj?.username;
             const filters = {};
             if (clientType) filters.type = [clientType];
-            if (tagValues?.length) filters.tags = tagValues;
+            // Union "Tag" and "Endpoint tags" — two UI filters, one backend field.
+            const combinedTags = [...new Set([...(tagValues || []), ...(endpointTagValues || [])])];
+            if (combinedTags.length) filters.tags = combinedTags;
             if (usernameValues?.length) filters.username = usernameValues;
 
             const res = await api.fetchAgenticAssetsSummary({
