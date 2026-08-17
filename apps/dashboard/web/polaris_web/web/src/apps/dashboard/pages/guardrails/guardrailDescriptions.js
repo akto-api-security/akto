@@ -182,7 +182,7 @@ export const CUSTOM_GUARDRAILS_DESCRIPTIONS = {
         examples: []
     },
     redactionReplacement: {
-        description: 'The marker written in place of each redacted value. A number is appended per distinct value ([REDACTED_1], [REDACTED_2]) so the model downstream can still tell two redacted entities apart.',
+        description: 'The marker written in place of each redacted value, exactly as you enter it. Every match is replaced with this same text [REDACTED].',
         examples: []
     },
     redactionConfidenceThreshold: {

@@ -317,7 +317,7 @@ const CustomGuardrailsStep = ({
                                     value={redactionRule.replacementString}
                                     onChange={(value) => updateRedactionRule({ replacementString: value })}
                                     placeholder={DEFAULT_REDACTION_REPLACEMENT}
-                                    helpText={`Written in place of each match. A number is appended per distinct value, e.g. ${DEFAULT_REDACTION_REPLACEMENT.replace(']', '_1]')}.`}
+                                    helpText={`Written in place of every match, exactly as entered. Defaults to ${DEFAULT_REDACTION_REPLACEMENT} if left blank.`}
                                 />
 
                                 <RangeSlider
