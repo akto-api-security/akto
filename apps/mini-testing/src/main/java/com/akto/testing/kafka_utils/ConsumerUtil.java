@@ -32,6 +32,7 @@ import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
 import com.akto.util.Constants;
@@ -320,44 +321,46 @@ public class ConsumerUtil {
                     }
                 });
 
-                long drainIdleSinceMs = -1L;
-                int lastProcessedSeen = -1;
-                long lastDebugLogMs = 0L;
-                int lastLoggedProcessed = -1;
-                int lastLoggedPolled = -1;
-                while (parallelConsumer != null) {
-                    if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId)){
-                        loggerMaker.warnAndAddToDb("Tests have been marked stopped.");
-                        executor.shutdownNow();
-                        break;
-                    }
-                    else if ((Context.now() - startTime >= effectiveMaxRunTime)) {
-                        loggerMaker.warnAndAddToDb("Max run time reached. Stopping consumer.");
-                        executor.shutdownNow();
-                        break;
-                    }
+            long drainIdleSinceMs = -1L;
+            int lastProcessedSeen = -1;
+            long lastDebugLogMs = 0L;
+            int lastLoggedProcessed = -1;
+            int lastLoggedPolled = -1;
+            while (parallelConsumer != null) {
+                if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId)){
+                    loggerMaker.infoAndAddToDb("Tests have been marked stopped.");
+                    executor.shutdownNow();
+                    break;
+                }
+                else if ((Context.now() - startTime >= effectiveMaxRunTime)) {
+                    loggerMaker.infoAndAddToDb("Max run time reached. Stopping consumer.");
+                    executor.shutdownNow();
+                    break;
+                }
 
-                    int processed = processedRecords.get();
-                    if (processed > lastProcessedSeen) {
-                        lastProcessedSeen = processed;
-                        drainIdleSinceMs = -1L;
-                    }
+                int processed = processedRecords.get();
+                if (processed > lastProcessedSeen) {
+                    lastProcessedSeen = processed;
+                    drainIdleSinceMs = -1L;
+                }
 
-                    long workRemaining = parallelConsumer.workRemaining();
-                    long nowMs = System.currentTimeMillis();
-                    int polled = polledRecords.get();
-                    if (nowMs - lastDebugLogMs >= DEBUG_PROGRESS_LOG_INTERVAL_MS
-                            && (polled != lastLoggedPolled || processed != lastLoggedProcessed)) {
-                        int left = expectedRecords > 0 ? Math.max(0, expectedRecords - processed) : -1;
-                        loggerMaker.warnAndAddToDb("consumer progress polled=" + polled + " executed=" + processed
-                                + " expected=" + expectedRecords + " left=" + left
-                                + " workRemaining=" + workRemaining);
-                        lastDebugLogMs = nowMs;
-                        lastLoggedPolled = polled;
-                        lastLoggedProcessed = processed;
-                    }
+                long workRemaining = parallelConsumer.workRemaining();
+                AllMetrics.instance.setTestingKafkaQueuePending(workRemaining);
+                long nowMs = System.currentTimeMillis();
+                int polled = polledRecords.get();
+                // Periodic progress only when counts moved (avoids duplicate spam while idle)
+                if (nowMs - lastDebugLogMs >= DEBUG_PROGRESS_LOG_INTERVAL_MS
+                        && (polled != lastLoggedPolled || processed != lastLoggedProcessed)) {
+                    int left = expectedRecords > 0 ? Math.max(0, expectedRecords - processed) : -1;
+                    debugLogToDb(accountId, "polled=" + polled + " executed=" + processed
+                            + " expected=" + expectedRecords + " left=" + left
+                            + " workRemaining=" + workRemaining);
+                    lastDebugLogMs = nowMs;
+                    lastLoggedPolled = polled;
+                    lastLoggedProcessed = processed;
+                }
 
-                    boolean locallyEmpty = firstRecordRead.get() && workRemaining == 0;
+                boolean locallyEmpty = firstRecordRead.get() && workRemaining == 0;
                     if (locallyEmpty) {
                         if (expectedRecords > 0 && processed >= expectedRecords) {
                             int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
