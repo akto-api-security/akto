@@ -68,10 +68,7 @@ public class AllMetrics {
             testingTestsExecutedCount = new SumMetric("TESTING_TESTS_EXECUTED_COUNT", 60, accountId, orgId, moduleType);
             testingApiHitSuccessCount = new SumMetric("TESTING_API_HIT_SUCCESS_COUNT", 60, accountId, orgId, moduleType);
             testingApiHitFailureCount = new SumMetric("TESTING_API_HIT_FAILURE_COUNT", 60, accountId, orgId, moduleType);
-            testingIssuesCreatedCriticalCount = new SumMetric("TESTING_ISSUES_CREATED_CRITICAL_COUNT", 60, accountId, orgId, moduleType);
-            testingIssuesCreatedHighCount = new SumMetric("TESTING_ISSUES_CREATED_HIGH_COUNT", 60, accountId, orgId, moduleType);
-            testingIssuesCreatedMediumCount = new SumMetric("TESTING_ISSUES_CREATED_MEDIUM_COUNT", 60, accountId, orgId, moduleType);
-            testingIssuesCreatedLowCount = new SumMetric("TESTING_ISSUES_CREATED_LOW_COUNT", 60, accountId, orgId, moduleType);
+            testingIssuesCreatedCount = new SumMetric("TESTING_ISSUES_CREATED_COUNT", 60, accountId, orgId, moduleType);
             testingKafkaQueuePending = new GaugeMetric("TESTING_KAFKA_QUEUE_PENDING", 60, accountId, orgId, moduleType);
             testingKafkaSendFailureCount = new SumMetric("TESTING_KAFKA_SEND_FAILURE_COUNT", 60, accountId, orgId, moduleType);
             testingRateLimitExceededCount = new SumMetric("TESTING_RATE_LIMIT_EXCEEDED_COUNT", 60, accountId, orgId, moduleType);
@@ -102,8 +99,7 @@ public class AllMetrics {
                 cyborgApiPayloadSize, multipleSampleDataFetchLatency, runtimeApiReceivedCount,
                 cpuUsagePercent, heapMemoryUsedMb, heapMemoryMaxMb, nonHeapMemoryUsedMb, threadCount,
                 availableProcessors, totalPhysicalMemoryMb, testingTestsExecutedCount, testingApiHitSuccessCount,
-                testingApiHitFailureCount, testingIssuesCreatedCriticalCount, testingIssuesCreatedHighCount,
-                testingIssuesCreatedMediumCount, testingIssuesCreatedLowCount, testingKafkaQueuePending,
+                testingApiHitFailureCount, testingIssuesCreatedCount, testingKafkaQueuePending,
                 testingKafkaSendFailureCount, testingRateLimitExceededCount);
 
         AllMetrics _this = this;
@@ -237,10 +233,7 @@ public class AllMetrics {
     private Metric testingTestsExecutedCount = null;
     private Metric testingApiHitSuccessCount = null;
     private Metric testingApiHitFailureCount = null;
-    private Metric testingIssuesCreatedCriticalCount = null;
-    private Metric testingIssuesCreatedHighCount = null;
-    private Metric testingIssuesCreatedMediumCount = null;
-    private Metric testingIssuesCreatedLowCount = null;
+    private Metric testingIssuesCreatedCount = null;
     private Metric testingKafkaQueuePending = null;
     private Metric testingKafkaSendFailureCount = null;
     private Metric testingRateLimitExceededCount = null;
@@ -432,24 +425,9 @@ public class AllMetrics {
             testingApiHitFailureCount.record(val);
     }
 
-    public void setTestingIssuesCreatedCriticalCount(float val){
-        if(testingIssuesCreatedCriticalCount != null)
-            testingIssuesCreatedCriticalCount.record(val);
-    }
-
-    public void setTestingIssuesCreatedHighCount(float val){
-        if(testingIssuesCreatedHighCount != null)
-            testingIssuesCreatedHighCount.record(val);
-    }
-
-    public void setTestingIssuesCreatedMediumCount(float val){
-        if(testingIssuesCreatedMediumCount != null)
-            testingIssuesCreatedMediumCount.record(val);
-    }
-
-    public void setTestingIssuesCreatedLowCount(float val){
-        if(testingIssuesCreatedLowCount != null)
-            testingIssuesCreatedLowCount.record(val);
+    public void setTestingIssuesCreatedCount(float val){
+        if(testingIssuesCreatedCount != null)
+            testingIssuesCreatedCount.record(val);
     }
 
     public void setTestingKafkaQueuePending(float val){

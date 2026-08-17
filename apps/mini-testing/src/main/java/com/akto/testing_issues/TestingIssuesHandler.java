@@ -210,10 +210,8 @@ public class TestingIssuesHandler {
             loggerMaker.infoAndAddToDb(String.format("Increasing the issues count map with summary id %s , HIGH: %d, MEDIUM: %d, LOW: %d", summaryId.toHexString(),countIssuesMap.get("HIGH"), countIssuesMap.get("MEDIUM"), countIssuesMap.get("LOW")), LogDb.TESTING);
         }
 
-        AllMetrics.instance.setTestingIssuesCreatedCriticalCount(countIssuesMap.getOrDefault(Severity.CRITICAL.toString(), 0));
-        AllMetrics.instance.setTestingIssuesCreatedHighCount(countIssuesMap.getOrDefault(Severity.HIGH.toString(), 0));
-        AllMetrics.instance.setTestingIssuesCreatedMediumCount(countIssuesMap.getOrDefault(Severity.MEDIUM.toString(), 0));
-        AllMetrics.instance.setTestingIssuesCreatedLowCount(countIssuesMap.getOrDefault(Severity.LOW.toString(), 0));
+        int totalIssuesCreated = countIssuesMap.values().stream().mapToInt(Integer::intValue).sum();
+        AllMetrics.instance.setTestingIssuesCreatedCount(totalIssuesCreated);
     }
 
     public void handleIssuesCreationFromTestingRunResults(List<TestingRunResult> testingRunResultList, boolean triggeredByTestEditor) {
