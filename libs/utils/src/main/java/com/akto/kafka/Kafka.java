@@ -68,7 +68,6 @@ public class Kafka {
                 if (e != null) {
                     loggerMaker.infoAndAddToDb("Failed to send message to Kafka. Error: " + e.getMessage()+ " for message " +message+ ". Counter will remain incremented. Current counter: " + counter.get());
                 } else {
-                    logger.info(message + " sent to topic " + topic + " with offset " + recordMetadata.offset());
                     counter.decrementAndGet();
                 }
             });

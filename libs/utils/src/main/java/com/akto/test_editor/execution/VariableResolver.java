@@ -70,6 +70,7 @@ public class VariableResolver {
         if (key instanceof String && VariableResolver.isWordListVariable(key, varMap)) {
             varList = (List) VariableResolver.resolveWordListVar(key.toString(), varMap);
             for (int i = 0; i < varList.size(); i++) {
+                throwIfInterrupted();
                 List<Object> vals = VariableResolver.resolveExpression(varMap, varList.get(i).toString());
                 Object wordObject = vals.get(0).toString();
                 try {
@@ -529,6 +530,7 @@ public class VariableResolver {
         List<String> result = new ArrayList<>();
         result.add(expression);
         while (matcher.find()) {
+            throwIfInterrupted();
             try {
                 String match = matcher.group(0);
                 String originalKey = match;
@@ -541,7 +543,9 @@ public class VariableResolver {
                     wordListKey = originalKey;
                     List<String> tempResult = new ArrayList<>();
                     for (String temp : result) {
+                        throwIfInterrupted();
                         for (Object word : wordList) {
+                            throwIfInterrupted();
                             // TODO: handle case to use numbers as well.
                             String tempWord = temp.replace(wordListKey, word.toString());
                             expression = tempWord;
@@ -551,11 +555,19 @@ public class VariableResolver {
                     result = tempResult;
                     matcher = pattern.matcher(expression);
                 }
+            } catch (RuntimeException e) {
+                throw e;
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
         return result;
+    }
+
+    private static void throwIfInterrupted() {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new RuntimeException("Word list resolution interrupted");
+        }
     }
 
     private static Number convertStringToNumber(String str) {
