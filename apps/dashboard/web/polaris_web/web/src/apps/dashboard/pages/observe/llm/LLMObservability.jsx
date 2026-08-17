@@ -52,7 +52,7 @@ export default function LLMObservability() {
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.getRange("last1month")
+        values.ranges[5]
     );
     const [selectedSession, setSelectedSession] = useState(null);
     const [selectedTrace, setSelectedTrace]     = useState(null);

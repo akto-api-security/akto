@@ -678,7 +678,7 @@ function Violations() {
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.getRange("last1month"),
+        values.ranges[4],
     );
 
     const getTimeEpoch = useCallback((key) => {
