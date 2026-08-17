@@ -31,6 +31,7 @@ import com.akto.test_editor.execution.Executor;
 import com.akto.testing.kafka_utils.ConsumerUtil;
 import com.akto.testing.kafka_utils.Producer;
 import com.akto.testing.kafka_utils.TestingConfigurations;
+import com.akto.testing.kafka_utils.TestingStateStore;
 import com.akto.utility.UtilityServer;
 import com.akto.usage.OrgUtils;
 import com.akto.util.Constants;
@@ -44,7 +45,6 @@ import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import static com.akto.testing.Utils.readJsonContentFromFile;
 
 import java.io.File;
 import java.io.IOException;
@@ -327,17 +327,17 @@ public class Main {
         // this will return true if consumer is running and this the latest summary of the testing run
         // and also the summary should be in running state
         try {
-            BasicDBObject currentTestInfo = readJsonContentFromFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, BasicDBObject.class);
+            BasicDBObject currentTestInfo = TestingStateStore.read();
             if(currentTestInfo == null){
                 return null;
             }
-            if(!currentTestInfo.getBoolean("CONSUMER_RUNNING", false)){
+            if(!currentTestInfo.getBoolean(TestingStateStore.CONSUMER_RUNNING, false)){
                 return null;
             }
-            String testingRunId = currentTestInfo.getString("testingRunId");
-            String testingRunSummaryId = currentTestInfo.getString("summaryId");
+            String testingRunId = currentTestInfo.getString(TestingStateStore.TESTING_RUN_ID);
+            String testingRunSummaryId = currentTestInfo.getString(TestingStateStore.SUMMARY_ID);
 
-            int accountID = currentTestInfo.getInt("accountId");
+            int accountID = currentTestInfo.getInt(TestingStateStore.ACCOUNT_ID);
             Context.accountId.set(accountID);
 
             TestingRunResultSummary testingRunResultSummary = dataActor.fetchTestingRunResultSummary(testingRunSummaryId);
@@ -551,8 +551,8 @@ public class Main {
                 Organization organization = OrgUtils.getOrganizationCached(accountId);
                 FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
-                String testingRunSummaryId = currentTestInfo.getString("summaryId");
-                String testingRunId = currentTestInfo.getString("testingRunId");
+                String testingRunSummaryId = currentTestInfo.getString(TestingStateStore.SUMMARY_ID);
+                String testingRunId = currentTestInfo.getString(TestingStateStore.TESTING_RUN_ID);
                 //check if currently running testrun is part of rerun
                 ObjectId summaryId = new ObjectId(testingRunSummaryId);
 
