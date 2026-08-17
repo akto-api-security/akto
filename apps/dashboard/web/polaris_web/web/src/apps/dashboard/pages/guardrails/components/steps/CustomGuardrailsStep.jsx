@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox, HorizontalStack, Button, Divider } from "@shopify/polaris";
+import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox, HorizontalStack, Badge } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import ControlInfoIcon from "../ControlInfoIcon";
 import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
@@ -178,16 +178,17 @@ const CustomGuardrailsStep = ({
         setLlmCompliance(buildComplianceMap(currentEntry.suggested, newAccepted));
     };
 
-    const updateRedactionRule = (index, patch) => {
-        setRedactionRules((redactionRules || []).map((rule, i) => (i === index ? { ...rule, ...patch } : rule)));
-    };
+    // One redaction instruction per policy — create a separate policy for another.
+    // The stored field stays a list so any additional entries a policy already
+    // carries (e.g. pushed by the GitHub workflow source) survive an edit here
+    // untouched rather than being dropped on save.
+    const redactionRule = (redactionRules || [])[0] || newRedactionRule();
 
-    const addRedactionRule = () => {
-        setRedactionRules([...(redactionRules || []), newRedactionRule()]);
-    };
-
-    const removeRedactionRule = (index) => {
-        setRedactionRules((redactionRules || []).filter((_, i) => i !== index));
+    const updateRedactionRule = (patch) => {
+        const current = redactionRules || [];
+        setRedactionRules(current.length === 0
+            ? [{ ...newRedactionRule(), ...patch }]
+            : current.map((rule, i) => (i === 0 ? { ...rule, ...patch } : rule)));
     };
 
     const handleEnableLlmRedaction = (checked) => {
@@ -276,12 +277,15 @@ const CustomGuardrailsStep = ({
                 <Box>
                     <Checkbox
                         label={
-                            <HorizontalStack gap="1" blockAlign="center">
-                                <Text as="span">LLM based redaction</Text>
-                                <ControlInfoIcon
-                                    {...CUSTOM_GUARDRAILS_DESCRIPTIONS.llmRedactionRule}
-                                    onTryPrompt={onTryPrompt}
-                                />
+                            <HorizontalStack gap="2" blockAlign="center">
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text as="span">LLM based redaction</Text>
+                                    <ControlInfoIcon
+                                        {...CUSTOM_GUARDRAILS_DESCRIPTIONS.llmRedactionRule}
+                                        onTryPrompt={onTryPrompt}
+                                    />
+                                </HorizontalStack>
+                                <Badge status="info">Beta</Badge>
                             </HorizontalStack>
                         }
                         checked={enableLlmRedaction}
@@ -290,68 +294,51 @@ const CustomGuardrailsStep = ({
                     />
                     {enableLlmRedaction && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="4">
-                                {(redactionRules || []).map((rule, index) => (
-                                    <VerticalStack gap="3" key={index}>
-                                        {index > 0 && <Divider />}
-                                        <FormLayout>
-                                            <TextField
-                                                label={`Redaction instruction${(redactionRules || []).length > 1 ? ` ${index + 1}` : ''}`}
-                                                value={rule.userPrompt}
-                                                onChange={(value) => updateRedactionRule(index, { userPrompt: value })}
-                                                multiline={3}
-                                                placeholder="e.g. Redact customer full names and home addresses"
-                                                helpText="Be specific about what to mask. Anything not described here is left untouched."
-                                            />
+                            <FormLayout>
+                                <TextField
+                                    label="Redaction instruction"
+                                    value={redactionRule.userPrompt}
+                                    onChange={(value) => updateRedactionRule({ userPrompt: value })}
+                                    multiline={3}
+                                    placeholder="e.g. Redact customer full names and home addresses"
+                                    helpText="Be specific about what to mask. Anything not described here is left untouched. To redact a second, unrelated category, create another policy."
+                                />
 
-                                            <TextField
-                                                label={
-                                                    <HorizontalStack gap="1" blockAlign="center">
-                                                        <Text as="span">Replacement text</Text>
-                                                        <ControlInfoIcon
-                                                            {...CUSTOM_GUARDRAILS_DESCRIPTIONS.redactionReplacement}
-                                                            onTryPrompt={onTryPrompt}
-                                                        />
-                                                    </HorizontalStack>
-                                                }
-                                                value={rule.replacementString}
-                                                onChange={(value) => updateRedactionRule(index, { replacementString: value })}
-                                                placeholder={DEFAULT_REDACTION_REPLACEMENT}
-                                                helpText={`Written in place of each match. A number is appended per distinct value, e.g. ${DEFAULT_REDACTION_REPLACEMENT.replace(']', '_1]')}.`}
+                                <TextField
+                                    label={
+                                        <HorizontalStack gap="1" blockAlign="center">
+                                            <Text as="span">Replacement text</Text>
+                                            <ControlInfoIcon
+                                                {...CUSTOM_GUARDRAILS_DESCRIPTIONS.redactionReplacement}
+                                                onTryPrompt={onTryPrompt}
                                             />
+                                        </HorizontalStack>
+                                    }
+                                    value={redactionRule.replacementString}
+                                    onChange={(value) => updateRedactionRule({ replacementString: value })}
+                                    placeholder={DEFAULT_REDACTION_REPLACEMENT}
+                                    helpText={`Written in place of each match. A number is appended per distinct value, e.g. ${DEFAULT_REDACTION_REPLACEMENT.replace(']', '_1]')}.`}
+                                />
 
-                                            <RangeSlider
-                                                label={
-                                                    <HorizontalStack gap="1" blockAlign="center">
-                                                        <Text as="span">Confidence score threshold</Text>
-                                                        <ControlInfoIcon
-                                                            {...CUSTOM_GUARDRAILS_DESCRIPTIONS.redactionConfidenceThreshold}
-                                                            onTryPrompt={onTryPrompt}
-                                                        />
-                                                    </HorizontalStack>
-                                                }
-                                                value={rule.confidenceScore}
-                                                onChange={(value) => updateRedactionRule(index, { confidenceScore: value })}
-                                                min={0}
-                                                max={1}
-                                                step={0.1}
-                                                output
-                                                helpText="Text is only masked if the LLM's confidence that it matches your instruction exceeds this threshold"
+                                <RangeSlider
+                                    label={
+                                        <HorizontalStack gap="1" blockAlign="center">
+                                            <Text as="span">Confidence score threshold</Text>
+                                            <ControlInfoIcon
+                                                {...CUSTOM_GUARDRAILS_DESCRIPTIONS.redactionConfidenceThreshold}
+                                                onTryPrompt={onTryPrompt}
                                             />
-                                        </FormLayout>
-                                        {(redactionRules || []).length > 1 && (
-                                            <HorizontalStack>
-                                                <Button plain destructive onClick={() => removeRedactionRule(index)}>
-                                                    Remove instruction
-                                                </Button>
-                                            </HorizontalStack>
-                                        )}
-                                    </VerticalStack>
-                                ))}
-                                <HorizontalStack>
-                                    <Button onClick={addRedactionRule}>Add another instruction</Button>
-                                </HorizontalStack>
-                            </VerticalStack>
+                                        </HorizontalStack>
+                                    }
+                                    value={redactionRule.confidenceScore}
+                                    onChange={(value) => updateRedactionRule({ confidenceScore: value })}
+                                    min={0}
+                                    max={1}
+                                    step={0.1}
+                                    output
+                                    helpText="Text is only masked if the LLM's confidence that it matches your instruction exceeds this threshold"
+                                />
+                            </FormLayout>
                         </Box>
                     )}
                 </Box>
