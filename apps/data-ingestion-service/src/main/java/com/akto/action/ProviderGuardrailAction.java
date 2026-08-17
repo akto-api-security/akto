@@ -116,6 +116,13 @@ public class ProviderGuardrailAction extends ActionSupport {
         tag.put("gen-ai", "Gen AI");
         tag.put("ai-agent", provider.toLowerCase());
         tag.put("source", "ENDPOINT");
+        // Resolve this collection to a user on the Users & Devices page. The tag
+        // value must be the raw email local-part (matching agent_users.userName
+        // from SSO's deriveUsernameFromEmail), not the slugified host label.
+        String userName = emailLocalPart(extractEmail(frame.actor));
+        if (userName != null && !userName.trim().isEmpty()) {
+            tag.put("username", userName.trim());
+        }
 
         Map<String, Object> meta = new HashMap<>();
         meta.put("webhook_id", frame.requestId);
