@@ -21,6 +21,12 @@ import okhttp3.ResponseBody;
 
 public abstract class AzureOpenAIPromptHandler {
 
+    private static final String GPT_5_NANO = "gpt-5-nano";
+
+    private static boolean isReasoningModel(String deploymentOrModelName) {
+        return GPT_5_NANO.equalsIgnoreCase(deploymentOrModelName);
+    }
+
     static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
@@ -87,12 +93,17 @@ public abstract class AzureOpenAIPromptHandler {
         JSONObject payload = new JSONObject();
         
         // Set model parameters
-        payload.put("temperature", PromptHandler.temperature);
-        payload.put("top_p", 0.9);
-        payload.put("max_tokens", PromptHandler.max_tokens);
-        payload.put("frequency_penalty", 0);
-        payload.put("presence_penalty", 0.6);
-        
+        if (isReasoningModel(AZURE_OPENAI_DEPLOYMENT)) {
+            payload.put("max_completion_tokens", PromptHandler.max_tokens);
+            payload.put("reasoning_effort", "minimal");
+        } else {
+            payload.put("temperature", PromptHandler.temperature);
+            payload.put("top_p", 0.9);
+            payload.put("max_tokens", PromptHandler.max_tokens);
+            payload.put("frequency_penalty", 0);
+            payload.put("presence_penalty", 0.6);
+        }
+
         // Create messages array
         JSONArray messages = new JSONArray();
         JSONObject systemMessage = new JSONObject();
