@@ -7,7 +7,7 @@ import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
 import { CollectionIcon } from "../../../components/shared/CollectionIcon"
-import React, { useEffect,useState, useRef } from "react"
+import React, { useEffect, useState, useRef, useMemo } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import { CircleTickMajor } from '@shopify/polaris-icons';
@@ -765,6 +765,7 @@ function ApiCollections(props) {
 
                         // Store in PersistStore asynchronously AFTER the UI has rendered
                         setTimeout(() => {
+                            if (!isMountedRef.current) return;
                             setCollectionsMap(collectionsMapNew);
                             setHostNameMap(hostNameMapNew);
                             setTagCollectionsMap(tagCollectionsMapNew);
@@ -910,7 +911,7 @@ function ApiCollections(props) {
 
         // Process data - OPTIMIZATION: For large datasets (>COLLECTIONS_LAZY_RENDER_THRESHOLD items), store RAW data + transform function
         // Transformation happens on-demand in the table for each page (100 items at a time)
-        const shouldOptimize = finalArr.length > COLLECTIONS_LAZY_RENDER_THRESHOLD && func.isApiCollectionsCachingEnabled();
+        const shouldOptimize = finalArr.length > COLLECTIONS_LAZY_RENDER_THRESHOLD;
 
         let dataObj;
         if (shouldOptimize) {
@@ -1010,7 +1011,10 @@ function ApiCollections(props) {
                 .filter(([_, count]) => count > 0)
                 .map(([collectionId, untrackedCount]) => {
                     const collection = collectionMap.get(parseInt(collectionId));
-                    return collection ? {
+                    if (!collection) return null;
+
+                    const apisForCollection = untrackedApiDataMap[collectionId];
+                    const row = {
                         id: collection.id,
                         name: `untracked-${collection.id}`,
                         displayName: collection.displayName,
@@ -1019,16 +1023,39 @@ function ApiCollections(props) {
                         rowStatus: 'critical',
                         nextUrl: null,
                         deactivated: false,
-                        collapsibleRow: untrackedApiDataMap[collectionId] ?
-                            transform.getUntrackedApisCollapsibleRow(untrackedApiDataMap[collectionId]) : null,
-                        collapsibleRowText: untrackedApiDataMap[collectionId] ? untrackedApiDataMap[collectionId].map(x => x.url).join(", ") : null,
                         severityInfo: {},
                         sensitiveInRespTypes: [],
                         detectedTimestamp: 0,
                         startTs: collection.startTs || 0,
                         testedEndpoints: 0,
                         riskScore: 0,
-                    } : null;
+                    };
+                    let builtCollapsibleRow;
+                    let builtCollapsibleRowText;
+                    Object.defineProperty(row, 'collapsibleRow', {
+                        enumerable: true,
+                        get() {
+                            if (builtCollapsibleRow === undefined) {
+                                builtCollapsibleRow = apisForCollection
+                                    ? transform.getUntrackedApisCollapsibleRow(apisForCollection)
+                                    : null;
+                            }
+                            return builtCollapsibleRow;
+                        },
+                    });
+                    Object.defineProperty(row, 'collapsibleRowText', {
+                        enumerable: true,
+                        get() {
+                            if (builtCollapsibleRowText === undefined) {
+                                builtCollapsibleRowText = apisForCollection
+                                    ? apisForCollection.map(x => x.url).join(", ")
+                                    : null;
+                            }
+                            return builtCollapsibleRowText;
+                        },
+                    });
+
+                    return row;
                 })
                 .filter(Boolean);
 
@@ -1074,25 +1101,26 @@ function ApiCollections(props) {
                 // Update the store with new sensitive info
                 setLastFetchedSensitiveResp(newSensitiveInfo);
 
-                // Check if sensitive info actually changed to avoid unnecessary updates
-                const sensitiveInfoChanged = JSON.stringify(sensitiveInfoMap) !== JSON.stringify(newSensitiveInfo.sensitiveInfoMap);
+                
+                const sensitiveInfoChanged = !func.sensitiveInfoMapsLookEqual(sensitiveInfoMap, newSensitiveInfo.sensitiveInfoMap);
 
                 if (sensitiveInfoChanged) {
-                    // Only update sensitive fields in existing data instead of recreating everything
-                    const updatedNormalData = dataObj.normal.map(item => ({
-                        ...item,
-                        sensitiveInRespTypes: newSensitiveInfo.sensitiveInfoMap[item.id] || []
-                    }));
+                    const withUpdatedSensitiveInfo = (item) => {
+                        const tags = newSensitiveInfo.sensitiveInfoMap[item.id] || [];
+                        return {
+                            ...item,
+                            sensitiveInRespTypes: tags,
+                            sensitiveSubTypesVal: tags.join(' ') || '-',
+                        };
+                    };
 
+                    const updatedNormalData = dataObj.normal.map(withUpdatedSensitiveInfo);
                     setNormalData(updatedNormalData);
 
-                    // Update prettified data with new sensitive info
-                    const updatedPrettifyData = dataObj.prettify.map(item => ({
-                        ...item,
-                        sensitiveInRespTypes: newSensitiveInfo.sensitiveInfoMap[item.id] || [],
-                        sensitiveSubTypes: transform.prettifySubtypes(newSensitiveInfo.sensitiveInfoMap[item.id] || [], item.deactivated),
-                        sensitiveSubTypesVal: (newSensitiveInfo.sensitiveInfoMap[item.id] || []).join(' ')
-                    }));
+                  
+                    const updatedPrettifyData = dataObj.prettify === dataObj.normal
+                        ? updatedNormalData
+                        : dataObj.prettify.map(withUpdatedSensitiveInfo);
 
                     // Re-categorize with updated data
                     const { categorized: updatedCategorized } = categorizeCollections(updatedPrettifyData);
@@ -1125,9 +1153,10 @@ function ApiCollections(props) {
 
         if (res.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
             setTimeout(() => {
+                if (!isMountedRef.current) return;
                 setSelectedTab("custom");
                 setSelected(3);
-            }, [100]);
+            }, 100);
         }
         setCollectionsMap(func.mapCollectionIdToName(activeCollections))
         setHostNameMap(func.mapCollectionIdToHostName(activeCollections))
@@ -1138,19 +1167,6 @@ function ApiCollections(props) {
         }
     }
 
-    // Lightweight counterpart to fetchData() above, for the device-tree drill-down (see
-    // deviceHostNamesFilter/useTreeView) — fetches just this device's own collections via a scoped
-    // $in query (fetchCollectionsBasicForHostNames) instead of the whole account
-    // (api.getAllCollectionsBasic()), matching the server-side-scoped pattern already used
-    // elsewhere on Atlas (AgenticAssetsPage.jsx, Endpoints.jsx, UsersAndDevices.jsx). Traffic/risk/
-    // sensitive-data maps still come from the same shared, cached, account-wide bundles those
-    // pages use (fetchAndCacheAgenticTrafficRiskBundle/fetchAndCacheAgenticSensitiveInfo) — those
-    // are already cheap (small id->value maps, not full documents) and likely already warm from
-    // the UsersAndDevices.jsx page the user just navigated from.
-    // Deliberately does NOT touch the global collectionsMap/hostNameMap/tagCollectionsMap/
-    // registryStatusMap PersistStore caches fetchData populates below — those are account-wide by
-    // contract, and overwriting them with just this one device's handful of collections would
-    // corrupt them for every other page that reads them.
     async function fetchTargetedDeviceCollections(deviceHostNames, isMountedRef) {
         try {
             setLoading(true);
@@ -1353,6 +1369,12 @@ function ApiCollections(props) {
 
 
 
+    const normalDataById = useMemo(() => {
+        const map = new Map();
+        normalData.forEach(c => map.set(c.id, c));
+        return map;
+    }, [normalData]);
+
     const promotedBulkActions = (selectedResourcesArr) => {
         let selectedResources;
         if(centerView === CenterViewType.Tree){
@@ -1546,12 +1568,12 @@ function ApiCollections(props) {
         }
 
         const allOutOfTestScopeFalse = selectedResources.every(id => {
-            const collection = normalData.find(c => c.id === id);
+            const collection = normalDataById.get(id);
             return collection && !collection.isOutOfTestingScope;
         })
 
         const allOutOfTestScopeTrue = selectedResources.every(id => {
-            const collection = normalData.find(c => c.id === id);
+            const collection = normalDataById.get(id);
             return collection && collection.isOutOfTestingScope;
         })
 
@@ -1904,11 +1926,6 @@ function ApiCollections(props) {
         return data.filter((x) => (!x?.deactivated && x?.type !== "API_GROUP" && x?.urlsCount > 1));
     }
 
-    // Use titleWithTooltip for Groups tab (selected === 2)
-    // Also conditionally modify headers based on activeFilterType:
-    // - For browser-llm: hide "Total endpoints" column, rename "API collection name" to "LLM source"
-    // - For ai-agent: rename "API collection name" to "Agentic resource name"
-    // - For mcp-server: rename "Total endpoints" to "Total tools", rename "API collection name" to "MCP Server source"
     const getModifiedHeaders = () => {
         let modifiedHeaders = selected === 2 
             ? headers.map(h => h.titleWithTooltip ? {...h, title: h.titleWithTooltip} : h) 
@@ -2030,30 +2047,30 @@ function ApiCollections(props) {
     };
     const dynamicSortOptions = getModifiedSortOptions();
 
-    // Extract available tag keys from collections in envTypeMap
-    const availableTagKeys = new Set();
-    const tagKeyValues = {}; // Store unique values for each tag key
+    const { sortedTagKeys, tagKeyValues } = useMemo(() => {
+        const availableTagKeys = new Set();
+        const values = {}; // Store unique values for each tag key
 
-    Object.values(envTypeMap || {}).forEach((envTypeArray) => {
-        if (Array.isArray(envTypeArray)) {
-            envTypeArray.forEach(tagObj => {
-                if (tagObj?.keyName && tagObj.keyName !== 'envType') {
-                    availableTagKeys.add(tagObj.keyName);
+        Object.values(envTypeMap || {}).forEach((envTypeArray) => {
+            if (Array.isArray(envTypeArray)) {
+                envTypeArray.forEach(tagObj => {
+                    if (tagObj?.keyName && tagObj.keyName !== 'envType') {
+                        availableTagKeys.add(tagObj.keyName);
 
-                    // Collect unique values for each tag key
-                    if (!tagKeyValues[tagObj.keyName]) {
-                        tagKeyValues[tagObj.keyName] = new Set();
+                        // Collect unique values for each tag key
+                        if (!values[tagObj.keyName]) {
+                            values[tagObj.keyName] = new Set();
+                        }
+                        if (tagObj.value) {
+                            values[tagObj.keyName].add(tagObj.value);
+                        }
                     }
-                    if (tagObj.value) {
-                        tagKeyValues[tagObj.keyName].add(tagObj.value);
-                    }
-                }
-            });
-        }
-    });
+                });
+            }
+        });
 
-    // Sort tag keys alphabetically
-    const sortedTagKeys = Array.from(availableTagKeys).sort();
+        return { sortedTagKeys: Array.from(availableTagKeys).sort(), tagKeyValues: values };
+    }, [envTypeMap]);
 
     // Create tag filter definitions for the Filters component
     const tagFilterDefinitions = sortedTagKeys.map(tagKeyName => ({
@@ -2117,6 +2134,25 @@ function ApiCollections(props) {
                         activeFilterType === FILTER_TYPES.SKILL ||
                         activeFilterType === FILTER_TYPES.PLUGIN);
     
+    const filteredDataByTags = useMemo(() => {
+        if (centerView !== CenterViewType.Table) return [];
+        return (data[selectedTab] || []).filter(item => {
+            // Check if item matches ALL applied tag filters
+            return Object.entries(tagFiltersApplied).every(([tagKey, selectedValues]) => {
+                // If no values selected for this filter, show all items
+                if (!selectedValues || selectedValues.length === 0) {
+                    return true;
+                }
+
+                // Check if item's tags contain any of the selected values for this tag key
+                const itemTags = envTypeMap[item.id] || [];
+                return itemTags.some(tag =>
+                    tag.keyName === tagKey && selectedValues.includes(tag.value)
+                );
+            });
+        });
+    }, [centerView, data, selectedTab, tagFiltersApplied, envTypeMap]);
+
     // For agentic filters, use the tree view component grouped by endpoint ID
     const getTableComponent = () => {
         // Tree view for AI Agent, MCP Server, and LLM (grouped by endpoint ID with expandable resources)
@@ -2161,23 +2197,6 @@ function ApiCollections(props) {
             );
         }
         
-        // Filter data based on applied tag filters
-        const filteredDataByTags = (data[selectedTab] || []).filter(item => {
-            // Check if item matches ALL applied tag filters
-            return Object.entries(tagFiltersApplied).every(([tagKey, selectedValues]) => {
-                // If no values selected for this filter, show all items
-                if (!selectedValues || selectedValues.length === 0) {
-                    return true;
-                }
-
-                // Check if item's tags contain any of the selected values for this tag key
-                const itemTags = envTypeMap[item.id] || [];
-                return itemTags.some(tag =>
-                    tag.keyName === tagKey && selectedValues.includes(tag.value)
-                );
-            });
-        });
-
             // Custom filter UI using Polaris Filters component
         const customFilterUI = sortedTagKeys.length > 0 && (
             <div>
