@@ -48,7 +48,7 @@ public class AgentBaseRiskScoreCron {
 
     private static final int PER_ACCOUNT_LIMIT = 200;
     private static final int RECALC_THRSHOLD_SECONDS = 7 * 24 * 60 * 60;
-    private static final int CONCURRENCY = 8;
+    private static final int CONCURRENCY = 1;
 
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
