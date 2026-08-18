@@ -59,6 +59,7 @@ public class LLMProviderClient {
 
         if (isReasoningModel(modelName)) {
             payload.put("max_completion_tokens", PromptHandler.max_tokens);
+            payload.put("reasoning_effort", "minimal");
         } else {
             payload.put("temperature", PromptHandler.temperature);
             payload.put("top_p", 0.9);
@@ -229,7 +230,7 @@ public class LLMProviderClient {
 
         logger.info("Calling Azure OpenAI (env fallback), deployment: " + deployment + ", host: " + host);
 
-        JSONObject payload = buildChatCompletionsPayload(prompt, deployment);
+        JSONObject payload = buildChatCompletionsPayload(prompt, null);
         RequestBody body = RequestBody.create(payload.toString(), JSON_MEDIA_TYPE);
         Request request = new Request.Builder()
                 .url(url)
