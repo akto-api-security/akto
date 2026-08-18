@@ -230,7 +230,7 @@ public class LLMProviderClient {
 
         logger.info("Calling Azure OpenAI (env fallback), deployment: " + deployment + ", host: " + host);
 
-        JSONObject payload = buildChatCompletionsPayload(prompt, null);
+        JSONObject payload = buildChatCompletionsPayload(prompt, deployment);
         RequestBody body = RequestBody.create(payload.toString(), JSON_MEDIA_TYPE);
         Request request = new Request.Builder()
                 .url(url)
