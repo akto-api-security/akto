@@ -13,7 +13,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.bson.Document;
 import org.bson.conversions.Bson;
-import com.akto.DaoInit;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.ApiCollectionsDao;
@@ -217,11 +216,5 @@ public class AgentBaseRiskScoreCron {
             return;
         }
         processAccount(account);
-    }
-
-    public static void main(String[] args) {
-        DaoInit.init(new com.mongodb.ConnectionString("mongodb://localhost:27017"));
-        AgentBaseRiskScoreCron cron = new AgentBaseRiskScoreCron();
-        cron.forceRunForAccount(1_000_000);
     }
 }
