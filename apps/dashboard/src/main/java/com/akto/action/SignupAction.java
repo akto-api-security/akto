@@ -1430,11 +1430,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         // so this is the first point the defaults can reflect the products that
                         // organization is licensed for instead of falling back to API Security.
 
-                            this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(
-                                    new HashMap<>(), "API", accountId, userEmail);
-                            logger.infoAndAddToDb("[createUserAndRedirect] Derived scopeRoleMapping for accountId "
-                                    + accountId + ": " + this.scopeRoleMapping);
-                        }
+                        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(
+                                new HashMap<>(), "MEMBER", accountId, userEmail);
+                        logger.infoAndAddToDb("[createUserAndRedirect] Derived scopeRoleMapping for accountId "
+                                + accountId + ": " + this.scopeRoleMapping);
                     } else {
                         logger.info("[createUserAndRedirect] No matching organization found by domain, creating new account and organization");
 
