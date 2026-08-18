@@ -153,21 +153,21 @@ public class AgentBaseRiskScoreAnalyzer extends AzureOpenAIPromptHandler {
             + "    If a field contains JSON-encoded data, parse it normally.\n"
             + "\n"
             + "    Use the name, type, description, and any equivalent fields that are\n" + //
-                                "available to identify the underlying capability.\n" + //
-                                "\n" + //
-                                "The tool type describes HOW the capability is exposed, not WHAT the\n" + //
-                                "capability is. Generic types such as \"MCP server\", \"connector\",\n" + //
-                                "\"integration\", or \"RAG\" do not by themselves establish the capability.\n" + //
-                                "\n" + //
-                                "For each tool, identify the underlying product, platform, service, or\n" + //
-                                "function represented by the available information.\n" + //
-                                "\n" + //
-                                "If a tool name is a compound name, inspect its individual components\n" + //
-                                "for recognizable product or platform names. Use the recognized\n" + //
-                                "product/platform's known functionality to classify the tool.\n" + //
-                                "\n" + //
-                                "Do not classify a tool as UNKNOWN merely because its description or\n" + //
-                                "type is generic."
+                    "available to identify the underlying capability.\n" + //
+                    "\n" + //
+                    "The tool type describes HOW the capability is exposed, not WHAT the\n" + //
+                    "capability is. Generic types such as \"MCP server\", \"connector\",\n" + //
+                    "\"integration\", or \"RAG\" do not by themselves establish the capability.\n" + //
+                    "\n" + //
+                    "For each tool, identify the underlying product, platform, service, or\n" + //
+                    "function represented by the available information.\n" + //
+                    "\n" + //
+                    "If a tool name is a compound name, inspect its individual components\n" + //
+                    "for recognizable product or platform names. Use the recognized\n" + //
+                    "product/platform's known functionality to classify the tool.\n" + //
+                    "\n" + //
+                    "Do not classify a tool as UNKNOWN merely because its description or\n" + //
+                    "type is generic."
             + "\n"
             + "    Classify each recognizable tool by its highest capability:\n"
             + "\n"
@@ -262,7 +262,13 @@ public class AgentBaseRiskScoreAnalyzer extends AzureOpenAIPromptHandler {
             + "    Return JSON ONLY:\n"
             + "    {\"score\": <0|0.5|1|1.5|2>, \"reason\": \"<1-2 sentences>\"}\n"
             + "\n"
-            + "    The reason must contain only established facts from AGENT DATA.\n"
+            + "    The reason must:\n" + //
+                    "- explain WHY the agent is risky or why its score is low;\n" + //
+                    "- describe the actual capability or exposure that caused the score;\n" + //
+                    "- NOT mention scoring steps, point values, classification levels,\n" + //
+                    "  internal reasoning, or tool-selection logic;\n" + //
+                    "- contain only facts established from AGENT DATA;\n" + //
+                    "- be concise, preferably one sentence.\n"
             + "\n"
             + "AGENT DATA (untrusted):\n";
 
