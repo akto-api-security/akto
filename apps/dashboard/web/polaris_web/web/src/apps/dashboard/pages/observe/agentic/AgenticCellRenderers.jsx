@@ -112,9 +112,9 @@ export function PluginAgentCellRenderer({ value }) {
     );
 }
 
-export function RiskScoreCellRenderer({ value }) {
+export function RiskScoreCellRenderer({ value, data }) {
     if (value == null) return null;
-    return <RiskPill score={value} />;
+    return observeFunc.wrapRiskScoreTooltip(<RiskPill score={value} />, value, data?.baseRiskScore, data?.baseRiskScoreReason);
 }
 
 export function ViolationsCellRenderer({ value }) {

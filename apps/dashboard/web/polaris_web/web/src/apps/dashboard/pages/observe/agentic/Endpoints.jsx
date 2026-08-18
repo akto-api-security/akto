@@ -125,7 +125,10 @@ function shapeRow(row, { skillScoreMap = {} } = {}) {
         groupName: row.name,
         groupNameDisplay,
         riskScore,
-        riskScoreComp: riskScore ? <Badge status={getRiskScoreStatus(riskScore)} size="small">{riskScore}</Badge> : "-",
+        riskScoreComp: riskScore ? transform.wrapRiskScoreTooltip(
+            <Badge status={getRiskScoreStatus(riskScore)} size="small">{riskScore}</Badge>,
+            riskScore, row.baseRiskScore, row.baseRiskScoreReason
+        ) : "-",
         sensitiveSubTypes: transform.prettifySubtypes(row.sensitiveInRespTypes || [], false),
         lastTraffic: row.lastSeenEpoch > 0 ? func.prettifyEpoch(row.lastSeenEpoch) : "-",
         detectedTimestamp: row.lastSeenEpoch,

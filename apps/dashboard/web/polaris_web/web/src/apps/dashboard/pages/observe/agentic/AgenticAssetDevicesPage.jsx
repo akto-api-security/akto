@@ -138,7 +138,10 @@ function ChildrenTable({ children, rowType, misconfiguredChildId, onOpenBundle }
                 </HorizontalStack>
             </div>,
             <div key={`risk-${child.id}`} style={{ cursor: "pointer", width: CHILD_COL_WIDTH.riskScore }} onClick={() => handleChildClick(child)}>
-                <Badge status={transform.getStatus(childRiskScore)} size="small">{childRiskScore}</Badge>
+                {transform.wrapRiskScoreTooltip(
+                    <Badge status={transform.getStatus(childRiskScore)} size="small">{childRiskScore}</Badge>,
+                    childRiskScore, child.baseRiskScore, child.baseRiskScoreReason
+                )}
             </div>,
             <div key={`sensitive-${child.id}`} style={{ cursor: "pointer", width: CHILD_COL_WIDTH.sensitive }} onClick={() => handleChildClick(child)}>
                 {transform.prettifySubtypes(child.sensitiveInRespTypes || [])}
