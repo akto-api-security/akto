@@ -75,6 +75,19 @@ public class ApiCollection {
     int mcpMaliciousnessLastCheck;
     public static final String MCP_MALICIOUSNESS_LAST_CHECK = "mcpMaliciousnessLastCheck";
 
+    // Base risk score for AI agents, derived from serviceGraphEdges via an LLM call.
+    // One of -1, 0, 0.5, 1, 1.5, 2. Boxed (Double) so it stays null (absent in Mongo)
+    // until first scored - this is what the "not yet scored" gate relies on.
+    Double baseRiskScore;
+    public static final String BASE_RISK_SCORE = "baseRiskScore";
+
+    String baseRiskScoreReason;
+    public static final String BASE_RISK_SCORE_REASON = "baseRiskScoreReason";
+
+    // Epoch seconds. Boxed (Integer) for the same "absent means never scored" reason as baseRiskScore.
+    Integer baseRiskScoreCalculatedAt;
+    public static final String BASE_RISK_SCORE_CALCULATED_AT = "baseRiskScoreCalculatedAt";
+
     private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
         "staging", "preprod", "qa", "demo", "dev", "test", "svc", 
         "localhost", "local", "intranet", "lan", "example", "invalid", 
@@ -487,5 +500,29 @@ public class ApiCollection {
 
     public void setMcpMaliciousnessLastCheck(int mcpMaliciousnessLastCheck) {
         this.mcpMaliciousnessLastCheck = mcpMaliciousnessLastCheck;
+    }
+
+    public Double getBaseRiskScore() {
+        return baseRiskScore;
+    }
+
+    public void setBaseRiskScore(Double baseRiskScore) {
+        this.baseRiskScore = baseRiskScore;
+    }
+
+    public String getBaseRiskScoreReason() {
+        return baseRiskScoreReason;
+    }
+
+    public void setBaseRiskScoreReason(String baseRiskScoreReason) {
+        this.baseRiskScoreReason = baseRiskScoreReason;
+    }
+
+    public Integer getBaseRiskScoreCalculatedAt() {
+        return baseRiskScoreCalculatedAt;
+    }
+
+    public void setBaseRiskScoreCalculatedAt(Integer baseRiskScoreCalculatedAt) {
+        this.baseRiskScoreCalculatedAt = baseRiskScoreCalculatedAt;
     }
 }
