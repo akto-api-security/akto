@@ -7,8 +7,8 @@ import java.util.Deque;
 
 /**
  * Mutable per-user state tracked within a session window.
- * Holds the last (sequenceLength - 1) ApiInfoKeys seen for this user,
- * used to emit transition keys on each new API call.
+ * Holds the last maxOrder ApiInfoKeys seen for this user,
+ * used to emit transition keys for all orders 1..maxOrder on each new API call.
  */
 public class UserSessionState {
 

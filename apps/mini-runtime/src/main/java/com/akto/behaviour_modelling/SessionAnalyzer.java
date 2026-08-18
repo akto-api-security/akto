@@ -14,6 +14,7 @@ import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.policies.AktoPolicyNew;
 
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -97,16 +98,20 @@ public class SessionAnalyzer {
 
             Deque<ApiInfoKey> recentApis = state.getRecentApis();
 
-            // Only emit a transition when we have a full context window (sequenceLength - 1 prior APIs).
-            if (recentApis.size() == config.getSequenceLength() - 1) {
-                accumulator.recordTransition(buildTransitionKey(recentApis, apiKey), userId);
+            // Emit transitions for all orders 1..maxOrder where we have enough context.
+            // Order N requires N prior APIs in the deque.
+            int maxOrder = config.getMaxOrder();
+            for (int order = 1; order <= maxOrder; order++) {
+                if (recentApis.size() >= order) {
+                    accumulator.recordTransition(buildTransitionKeyForOrder(recentApis, apiKey, order), userId);
+                }
             }
 
             accumulator.recordApiCall(apiKey, userId);
 
-            // Maintain deque at max size (sequenceLength - 1).
+            // Maintain deque at max size (maxOrder).
             recentApis.addLast(apiKey);
-            if (recentApis.size() >= config.getSequenceLength()) {
+            if (recentApis.size() > maxOrder) {
                 recentApis.removeFirst();
             }
         }
@@ -145,10 +150,27 @@ public class SessionAnalyzer {
         onWindowEnd();
     }
 
-    private TransitionKey buildTransitionKey(Deque<ApiInfoKey> recentApis, ApiInfoKey currentApi) {
-        ApiInfoKey[] sequence = new ApiInfoKey[recentApis.size() + 1];
+    /**
+     * Builds a TransitionKey of length (order + 1) from the last `order` items
+     * in the deque plus the current API.
+     *
+     * Example: deque=[A, B, C, D], currentApi=E, order=2
+     *   → takes last 2 from deque: [C, D]
+     *   → result: [C, D, E] (order-2 transition)
+     */
+    private TransitionKey buildTransitionKeyForOrder(Deque<ApiInfoKey> recentApis, ApiInfoKey currentApi, int order) {
+        ApiInfoKey[] sequence = new ApiInfoKey[order + 1];
+
+        // Iterate from the end of the deque, taking last `order` items
+        int skip = recentApis.size() - order;
         int i = 0;
-        for (ApiInfoKey key : recentApis) {
+        Iterator<ApiInfoKey> it = recentApis.iterator();
+        while (it.hasNext()) {
+            ApiInfoKey key = it.next();
+            if (skip > 0) {
+                skip--;
+                continue;
+            }
             sequence[i++] = key;
         }
         sequence[i] = currentApi;
