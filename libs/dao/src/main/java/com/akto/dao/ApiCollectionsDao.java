@@ -69,6 +69,8 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiCollection.START_TS }, false);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiCollection.NAME }, true);
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiCollection.BASE_RISK_SCORE_CALCULATED_AT }, true);
     }
 
     public ApiCollection getMeta(int apiCollectionId) {

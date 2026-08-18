@@ -20,6 +20,7 @@ public class LLMProviderClient {
 
     private static final LoggerMaker logger = new LoggerMaker(LLMProviderClient.class, LogDb.DASHBOARD);
     private static final MediaType JSON_MEDIA_TYPE = MediaType.parse("application/json");
+    private static final String GPT_5_NANO = "gpt-5-nano";
 
     /**
      * Calls the LLM provider based on model type and returns the extracted content string.
@@ -49,13 +50,23 @@ public class LLMProviderClient {
 
     // --- Shared helpers ---
 
+    static boolean isReasoningModel(String deploymentOrModelName) {
+        return GPT_5_NANO.equalsIgnoreCase(deploymentOrModelName);
+    }
+
     static JSONObject buildChatCompletionsPayload(String prompt, String modelName) throws org.json.JSONException {
         JSONObject payload = new JSONObject();
-        payload.put("temperature", PromptHandler.temperature);
-        payload.put("top_p", 0.9);
-        payload.put("max_tokens", PromptHandler.max_tokens);
-        payload.put("frequency_penalty", 0);
-        payload.put("presence_penalty", 0.6);
+
+        if (isReasoningModel(modelName)) {
+            payload.put("max_completion_tokens", PromptHandler.max_tokens);
+            payload.put("reasoning_effort", "minimal");
+        } else {
+            payload.put("temperature", PromptHandler.temperature);
+            payload.put("top_p", 0.9);
+            payload.put("max_tokens", PromptHandler.max_tokens);
+            payload.put("frequency_penalty", 0);
+            payload.put("presence_penalty", 0.6);
+        }
         payload.put("stream", false);
 
         if (modelName != null && !modelName.isEmpty()) {
@@ -219,7 +230,7 @@ public class LLMProviderClient {
 
         logger.info("Calling Azure OpenAI (env fallback), deployment: " + deployment + ", host: " + host);
 
-        JSONObject payload = buildChatCompletionsPayload(prompt, null);
+        JSONObject payload = buildChatCompletionsPayload(prompt, deployment);
         RequestBody body = RequestBody.create(payload.toString(), JSON_MEDIA_TYPE);
         Request request = new Request.Builder()
                 .url(url)

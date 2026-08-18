@@ -177,6 +177,19 @@ public class ApiCollection {
     Map<String, ServiceGraphEdgeInfo> serviceGraphEdges;
     public static final String SERVICE_GRAPH_EDGES = "serviceGraphEdges";
 
+    // Base risk score for AI agents, derived from serviceGraphEdges via an LLM call.
+    // One of -1, 0, 0.5, 1, 1.5, 2. Boxed (Double) so it stays null (absent in Mongo)
+    // until first scored - this is what the "not yet scored" gate relies on.
+    Double baseRiskScore;
+    public static final String BASE_RISK_SCORE = "baseRiskScore";
+
+    String baseRiskScoreReason;
+    public static final String BASE_RISK_SCORE_REASON = "baseRiskScoreReason";
+
+    // Epoch seconds. Boxed (Integer) for the same "absent means never scored" reason as baseRiskScore.
+    Integer baseRiskScoreCalculatedAt;
+    public static final String BASE_RISK_SCORE_CALCULATED_AT = "baseRiskScoreCalculatedAt";
+
     public ApiCollection() {
     }
 
@@ -585,6 +598,18 @@ public class ApiCollection {
         return false;
     }
 
+    /** First tag value for the given key, or null if absent. */
+    public String getTagValue(String keyName) {
+        if (CollectionUtils.isEmpty(this.getTagsList())) {
+            return null;
+        }
+        return this.getTagsList().stream()
+            .filter(t -> keyName.equals(t.getKeyName()))
+            .map(CollectionTags::getValue)
+            .findFirst()
+            .orElse(null);
+    }
+
     public String getSseCallbackUrl() {
         return sseCallbackUrl;
     }   
@@ -647,5 +672,29 @@ public class ApiCollection {
 
     public void setServiceGraphEdges(Map<String, ServiceGraphEdgeInfo> serviceGraphEdges) {
         this.serviceGraphEdges = serviceGraphEdges;
+    }
+
+    public Double getBaseRiskScore() {
+        return baseRiskScore;
+    }
+
+    public void setBaseRiskScore(Double baseRiskScore) {
+        this.baseRiskScore = baseRiskScore;
+    }
+
+    public String getBaseRiskScoreReason() {
+        return baseRiskScoreReason;
+    }
+
+    public void setBaseRiskScoreReason(String baseRiskScoreReason) {
+        this.baseRiskScoreReason = baseRiskScoreReason;
+    }
+
+    public Integer getBaseRiskScoreCalculatedAt() {
+        return baseRiskScoreCalculatedAt;
+    }
+
+    public void setBaseRiskScoreCalculatedAt(Integer baseRiskScoreCalculatedAt) {
+        this.baseRiskScoreCalculatedAt = baseRiskScoreCalculatedAt;
     }
 }
