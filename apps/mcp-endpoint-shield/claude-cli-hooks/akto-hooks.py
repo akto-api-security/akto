@@ -6,6 +6,12 @@ import sys
 if not os.getenv("LOG_DIR"):
     os.environ["LOG_DIR"] = os.path.expanduser("~/.claude/akto/logs")
 
+try:
+    from akto_heartbeat import send_heartbeat
+except Exception:  # ImportError if absent, SyntaxError if truncated mid-download
+    def send_heartbeat(log_dir, logger=None):
+        pass
+
 from akto_ingestion_utility import run_observability_hook
 
 if __name__ == "__main__":
@@ -14,6 +20,8 @@ if __name__ == "__main__":
         sys.exit(1)
 
     hook = sys.argv[1]
+
+    send_heartbeat(os.path.expanduser(os.environ["LOG_DIR"]))
 
     run_observability_hook(hook)
     print("{}")

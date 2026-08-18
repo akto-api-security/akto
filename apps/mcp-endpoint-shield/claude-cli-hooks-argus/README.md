@@ -31,10 +31,11 @@ for f in akto-validate-prompt.py akto-validate-prompt-wrapper.sh \
   curl -o ~/.claude/hooks/"$f" "${HOOKS_BASE}/${f}"
 done
 
-# Shared session-state/ingestion helper (imported by the hook scripts) and its
-# machine-id dependency, which live outside this connector's directory.
-curl -o ~/.claude/hooks/akto_ingestion_utility.py "${SHIELD_BASE}/shared/akto_ingestion_utility.py"
-curl -o ~/.claude/hooks/akto_machine_id.py "${SHIELD_BASE}/claude-cli-hooks/akto_machine_id.py"
+# Shared modules imported by the hook scripts. All live in shared/, outside this
+# connector's directory, and must land next to the hook scripts.
+for f in akto_ingestion_utility.py akto_machine_id.py; do
+  curl -o ~/.claude/hooks/"$f" "${SHIELD_BASE}/shared/${f}"
+done
 
 chmod +x ~/.claude/hooks/*.sh
 ```

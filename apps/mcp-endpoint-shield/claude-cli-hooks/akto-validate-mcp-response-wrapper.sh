@@ -10,6 +10,7 @@ export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="claude_code_cli"
 export CONTEXT_SOURCE="ENDPOINT"
 export DEVICE_ID="{{DEVICE_ID (optional)}}"
+export DATABASE_ABSTRACTOR_SERVICE_URL="${DATABASE_ABSTRACTOR_SERVICE_URL:-https://cyborg.akto.io}"
 
 # Logging Configuration
 export LOG_LEVEL="INFO"
@@ -21,5 +22,10 @@ export LOG_PAYLOADS="false"
 # Optional: Disable SSL verification (INSECURE - use only for testing)
 # export SSL_VERIFY="false"
 
-# Execute Python hook script
-exec python3 "$HOME/.claude/hooks/akto-validate-mcp-response.py" "$@"
+AKTO_LOG_DIR="${LOG_DIR:-$HOME/.claude/akto/logs}"
+mkdir -p "$AKTO_LOG_DIR" 2>/dev/null
+if ! akto_out=$(python3 "$HOME/.claude/hooks/akto-validate-mcp-response.py" "$@" 2>>"$AKTO_LOG_DIR/wrapper.err"); then
+    printf '{}'
+    exit 0
+fi
+printf '%s' "$akto_out"

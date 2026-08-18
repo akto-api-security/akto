@@ -11,6 +11,7 @@ export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="claude_code_cli"
 export CONTEXT_SOURCE="ENDPOINT"
 export DEVICE_ID="{{DEVICE_ID (optional)}}"
+export DATABASE_ABSTRACTOR_SERVICE_URL="${DATABASE_ABSTRACTOR_SERVICE_URL:-https://cyborg.akto.io}"
 
 # Logging Configuration
 export LOG_LEVEL="INFO"
@@ -20,4 +21,10 @@ export LOG_PAYLOADS="false"
 # export SSL_CERT_PATH="/path/to/ca-bundle.crt"
 # export SSL_VERIFY="false"
 
-exec python3 "$HOME/.claude/hooks/$1" "${@:2}"
+AKTO_LOG_DIR="${LOG_DIR:-$HOME/.claude/akto/logs}"
+mkdir -p "$AKTO_LOG_DIR" 2>/dev/null
+if ! akto_out=$(python3 "$HOME/.claude/hooks/$1" "${@:2}" 2>>"$AKTO_LOG_DIR/wrapper.err"); then
+    printf '{}'
+    exit 0
+fi
+printf '%s' "$akto_out"
