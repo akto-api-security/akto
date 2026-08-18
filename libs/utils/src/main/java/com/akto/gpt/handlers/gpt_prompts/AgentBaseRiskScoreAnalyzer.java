@@ -180,6 +180,7 @@ public class AgentBaseRiskScoreAnalyzer extends AzureOpenAIPromptHandler {
             + "\n"
             + "    LOW:\n"
             + "    read, search, retrieve, list, view, query, or other read-only actions.\n"
+            + "    A LOW tool scores 0 -- never MEDIUM or HIGH.\n"
             + "\n"
             + "    UNKNOWN:\n"
             + "    the available information provides no meaningful signal about the\n"
