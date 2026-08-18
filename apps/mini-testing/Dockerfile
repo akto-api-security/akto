@@ -1,4 +1,4 @@
-FROM eclipse-temurin:17-jre-resolute
+FROM amazoncorretto:8
 WORKDIR /app
 
 RUN apt-get update -y \
