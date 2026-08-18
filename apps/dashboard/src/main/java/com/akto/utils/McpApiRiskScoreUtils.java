@@ -53,17 +53,21 @@ public final class McpApiRiskScoreUtils {
         public final Set<Integer> mcpServerCollectionIds;
         public final Set<Integer> maliciousMcpServerCollectionIds;
         public final Map<String, ComponentRiskAnalysis> componentRiskByTypeAndResource;
+        /** ApiCollection.baseRiskScore (0-2, AI agent risk) by collection id - independent of MCP tagging. */
+        public final Map<Integer, Double> agentBaseRiskScoreByCollectionId;
 
         McpRiskScoreContext(Set<Integer> mcpServerCollectionIds,
                 Set<Integer> maliciousMcpServerCollectionIds,
-                Map<String, ComponentRiskAnalysis> componentRiskByTypeAndResource) {
+                Map<String, ComponentRiskAnalysis> componentRiskByTypeAndResource,
+                Map<Integer, Double> agentBaseRiskScoreByCollectionId) {
             this.mcpServerCollectionIds = mcpServerCollectionIds;
             this.maliciousMcpServerCollectionIds = maliciousMcpServerCollectionIds;
             this.componentRiskByTypeAndResource = componentRiskByTypeAndResource;
+            this.agentBaseRiskScoreByCollectionId = agentBaseRiskScoreByCollectionId;
         }
 
         public boolean isEmpty() {
-            return mcpServerCollectionIds.isEmpty();
+            return mcpServerCollectionIds.isEmpty() && agentBaseRiskScoreByCollectionId.isEmpty();
         }
     }
 
@@ -83,57 +87,81 @@ public final class McpApiRiskScoreUtils {
                 maliciousIds.add(c.getId());
             }
         }
-        if (mcpIds.isEmpty()) {
-            return new McpRiskScoreContext(Collections.emptySet(), Collections.emptySet(), Collections.emptyMap());
-        }
-        Bson auditFilter = Filters.and(
-                Filters.in(McpAuditInfo.TYPE, MCP_AUDIT_TYPES),
-                Filters.in(McpAuditInfo.HOST_COLLECTION_ID, mcpIds));
-        List<McpAuditInfo> audits = Collections.emptyList();
-        try {
-            audits = McpAuditInfoDao.instance.findAll(auditFilter,
-                    Projections.include(
-                            McpAuditInfo.TYPE,
-                            McpAuditInfo.RESOURCE_NAME,
-                            McpAuditInfo.HOST_COLLECTION_ID,
-                            McpAuditInfo.COMPONENT_RISK_ANALYSIS));
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(
-                    "MCP risk: failed to load mcp_audit_info accountId=" + Context.accountId.get() + " : "
-                            + e.getMessage(),
-                    LogDb.DASHBOARD);
-        }
+
         Map<String, ComponentRiskAnalysis> map = new HashMap<>();
         int auditRowsSkippedNoCra = 0;
-        if (audits != null) {
-            for (McpAuditInfo a : audits) {
-                if (a.getResourceName() == null || a.getType() == null) {
-                    continue;
-                }
-                ComponentRiskAnalysis cra = a.getComponentRiskAnalysis();
-                if (cra == null) {
-                    auditRowsSkippedNoCra++;
-                    continue;
-                }
-                String k = a.getHostCollectionId() + "\0" + a.getType() + '\0' + a.getResourceName();
-                ComponentRiskAnalysis existing = map.get(k);
-                if (existing == null) {
-                    map.put(k, copyComponentRiskFlags(cra));
-                } else {
-                    existing.setIsComponentMalicious(
-                            existing.getIsComponentMalicious() || cra.getIsComponentMalicious());
-                    existing.setHasPrivilegedAccess(
-                            existing.getHasPrivilegedAccess() || cra.getHasPrivilegedAccess());
+        int auditRowsLoaded = 0;
+        if (!mcpIds.isEmpty()) {
+            Bson auditFilter = Filters.and(
+                    Filters.in(McpAuditInfo.TYPE, MCP_AUDIT_TYPES),
+                    Filters.in(McpAuditInfo.HOST_COLLECTION_ID, mcpIds));
+            List<McpAuditInfo> audits = Collections.emptyList();
+            try {
+                audits = McpAuditInfoDao.instance.findAll(auditFilter,
+                        Projections.include(
+                                McpAuditInfo.TYPE,
+                                McpAuditInfo.RESOURCE_NAME,
+                                McpAuditInfo.HOST_COLLECTION_ID,
+                                McpAuditInfo.COMPONENT_RISK_ANALYSIS));
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(
+                        "MCP risk: failed to load mcp_audit_info accountId=" + Context.accountId.get() + " : "
+                                + e.getMessage(),
+                        LogDb.DASHBOARD);
+            }
+            auditRowsLoaded = audits == null ? 0 : audits.size();
+            if (audits != null) {
+                for (McpAuditInfo a : audits) {
+                    if (a.getResourceName() == null || a.getType() == null) {
+                        continue;
+                    }
+                    ComponentRiskAnalysis cra = a.getComponentRiskAnalysis();
+                    if (cra == null) {
+                        auditRowsSkippedNoCra++;
+                        continue;
+                    }
+                    String k = a.getHostCollectionId() + "\0" + a.getType() + '\0' + a.getResourceName();
+                    ComponentRiskAnalysis existing = map.get(k);
+                    if (existing == null) {
+                        map.put(k, copyComponentRiskFlags(cra));
+                    } else {
+                        existing.setIsComponentMalicious(
+                                existing.getIsComponentMalicious() || cra.getIsComponentMalicious());
+                        existing.setHasPrivilegedAccess(
+                                existing.getHasPrivilegedAccess() || cra.getHasPrivilegedAccess());
+                    }
                 }
             }
         }
+
+        // Agent base risk score - independent of MCP tagging, any collection can carry one.
+        Map<Integer, Double> agentBaseRiskScoreByCollectionId = new HashMap<>();
+        try {
+            Bson hasBaseRiskScore = Filters.exists(ApiCollection.BASE_RISK_SCORE, true);
+            List<ApiCollection> agentScoredCols = ApiCollectionsDao.instance.findAll(hasBaseRiskScore,
+                    Projections.include(ApiCollection.ID, ApiCollection.BASE_RISK_SCORE));
+            if (agentScoredCols != null) {
+                for (ApiCollection c : agentScoredCols) {
+                    if (c.getBaseRiskScore() != null) {
+                        agentBaseRiskScoreByCollectionId.put(c.getId(), c.getBaseRiskScore());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(
+                    "MCP risk: failed to load agent baseRiskScore collections accountId=" + Context.accountId.get()
+                            + " : " + e.getMessage(),
+                    LogDb.DASHBOARD);
+        }
+
         loggerMaker.debugAndAddToDb(
                 "MCP risk context accountId=" + Context.accountId.get() + " mcpCollections="
                         + mcpIds.size() + " maliciousTaggedCollections=" + maliciousIds.size() + " auditRowsLoaded="
-                        + (audits == null ? 0 : audits.size()) + " auditRiskKeys=" + map.size()
-                        + " auditRowsWithoutComponentRisk=" + auditRowsSkippedNoCra,
+                        + auditRowsLoaded + " auditRiskKeys=" + map.size()
+                        + " auditRowsWithoutComponentRisk=" + auditRowsSkippedNoCra
+                        + " agentBaseRiskScoreCollections=" + agentBaseRiskScoreByCollectionId.size(),
                 LogDb.DASHBOARD);
-        return new McpRiskScoreContext(mcpIds, maliciousIds, map);
+        return new McpRiskScoreContext(mcpIds, maliciousIds, map, agentBaseRiskScoreByCollectionId);
     }
 
     public static float getRiskScoreWithMcpAdjustments(ApiInfo apiInfo, float baseScore, McpRiskScoreContext ctx) {
@@ -142,33 +170,45 @@ public final class McpApiRiskScoreUtils {
             return score;
         }
         int cid = apiInfo.getId().getApiCollectionId();
-        if (!ctx.mcpServerCollectionIds.contains(cid)) {
-            return score;
-        }
+
         boolean malicious = false;
         boolean privileged = false;
-        List<String> nameCandidates = resolveMcpResourceNames(apiInfo);
-        for (String name : nameCandidates) {
-            if (name == null || name.isEmpty()) {
-                continue;
-            }
-            for (String t : MCP_AUDIT_TYPES) {
-                ComponentRiskAnalysis cra = ctx.componentRiskByTypeAndResource.get(cid + "\0" + t + '\0' + name);
-                if (cra == null) {
+        boolean maliciousServerTag = false;
+        int nameCandidateCount = 0;
+
+        if (ctx.mcpServerCollectionIds.contains(cid)) {
+            List<String> nameCandidates = resolveMcpResourceNames(apiInfo);
+            nameCandidateCount = nameCandidates.size();
+            for (String name : nameCandidates) {
+                if (name == null || name.isEmpty()) {
                     continue;
                 }
-                malicious |= cra.getIsComponentMalicious();
-                privileged |= cra.getHasPrivilegedAccess();
+                for (String t : MCP_AUDIT_TYPES) {
+                    ComponentRiskAnalysis cra = ctx.componentRiskByTypeAndResource.get(cid + "\0" + t + '\0' + name);
+                    if (cra == null) {
+                        continue;
+                    }
+                    malicious |= cra.getIsComponentMalicious();
+                    privileged |= cra.getHasPrivilegedAccess();
+                }
             }
+            if (malicious) {
+                score += MCP_COMPONENT_MALICIOUS_SCORE_DELTA;
+            }
+            if (privileged) {
+                score += MCP_COMPONENT_PRIVILEGE_SCORE_DELTA;
+            }
+            maliciousServerTag = ctx.maliciousMcpServerCollectionIds.contains(cid);
         }
-        if (malicious) {
-            score += MCP_COMPONENT_MALICIOUS_SCORE_DELTA;
+
+        // Agent base risk score (0-2, -1 means "couldn't assess" and contributes nothing) - applies
+        // to any collection that's been through AgentBaseRiskScoreCron, MCP-tagged or not.
+        Double agentBaseRiskScore = ctx.agentBaseRiskScoreByCollectionId.get(cid);
+        if (agentBaseRiskScore != null && agentBaseRiskScore > 0) {
+            score += agentBaseRiskScore.floatValue();
         }
-        if (privileged) {
-            score += MCP_COMPONENT_PRIVILEGE_SCORE_DELTA;
-        }
+
         score = Math.min(MCP_RISK_SCORE_CAP, score);
-        boolean maliciousServerTag = ctx.maliciousMcpServerCollectionIds.contains(cid);
         if (maliciousServerTag) {
             score = Math.max(MCP_MALICIOUS_SERVER_COLLECTION_RISK_FLOOR, score);
         }
@@ -178,8 +218,8 @@ public final class McpApiRiskScoreUtils {
                             + cid + " method=" + apiInfo.getId().getMethod() + " url="
                             + truncateForLog(apiInfo.getId().getUrl(), 160) + " baseScore=" + baseScore + " finalScore="
                             + score + " auditMalicious=" + malicious + " auditPrivileged=" + privileged
-                            + " maliciousServerTag=" + maliciousServerTag + " nameCandidates="
-                            + nameCandidates.size(),
+                            + " maliciousServerTag=" + maliciousServerTag + " agentBaseRiskScore=" + agentBaseRiskScore
+                            + " nameCandidates=" + nameCandidateCount,
                     LogDb.DASHBOARD);
         }
         return score;
