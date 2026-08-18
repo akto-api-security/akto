@@ -520,8 +520,7 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	s.logger.Info("Policy cache refreshed with ALL policies",
 		zap.Int("policiesCount", len(policies)),
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
-		zap.Time("lastFetched", s.cache.lastFetched),
-		zap.Any("policies", policies))
+		zap.Time("lastFetched", s.cache.lastFetched))
 
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
@@ -1165,10 +1164,6 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		return nil, nil, nil, false, nil, nil, nil, err
 	}
 
-	s.logger.Debug("Raw guardrail policies response",
-		zap.Int("size", len(rawGuardrailPolicies)),
-		zap.String("raw", string(rawGuardrailPolicies)))
-
 	// Parse the wrapper object containing guardrailPolicies array
 	var response struct {
 		GuardrailPolicies []*mcp.GuardrailsPolicy `json:"guardrailPolicies"`
@@ -1194,7 +1189,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 
 	// [GUARDRAIL_FLOW] 1/3 — fetched & parsed active policies from cyborg.
 	for _, p := range policies {
-		s.logger.Info("[GUARDRAIL_FLOW] fetched policy",
+		s.logger.Debug("[GUARDRAIL_FLOW] fetched policy",
 			zap.String("name", p.Info.Name),
 			zap.String("behaviour", p.Behaviour),
 			zap.Bool("applyToAllServers", p.ApplyToAllServers),
@@ -1204,7 +1199,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 	// Build per-policy anomaly config map so validate-time checks respect scoping.
 	anomalyMap := make(map[string]*anomalyCfg)
 	for _, gp := range response.GuardrailPolicies {
-		s.logger.Info("checking anomaly config in policy",
+		s.logger.Debug("checking anomaly config in policy",
 			zap.String("policyName", gp.Name),
 			zap.Bool("active", gp.Active),
 			zap.Bool("hasAnomalyConfig", gp.AnomalyDetection != nil),
@@ -1217,7 +1212,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 				PolicyName:    gp.Name,
 				Behaviour:     gp.Behaviour,
 			}
-			s.logger.Info("anomaly config added to map",
+			s.logger.Debug("anomaly config added to map",
 				zap.String("policyName", gp.Name),
 				zap.String("behaviour", gp.Behaviour),
 				zap.Int("toolCallLimit", ad.ToolCallLimit),
