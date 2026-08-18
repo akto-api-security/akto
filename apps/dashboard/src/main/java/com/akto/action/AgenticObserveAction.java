@@ -2121,10 +2121,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     if (malicious) row.put("isMalicious", true);
                 }
                 // Plugin discovery carries no risk of its own, and g.maxRiskScore is the AGENT's —
-                // showing it would mark every plugin on a risky agent as risky. baseRiskScore/
-                // baseRiskScoreReason are tracked alongside maxRiskScore (same borrowed-from-the-
-                // agent's-collections provenance), so they get the same treatment — otherwise a
-                // plugin row would still leak the agent's own risk reason via the tooltip.
+                // showing it would mark every plugin on a risky agent as risky.
                 if ("plugin".equals(g.rowType)) {
                     row.put("riskScore", null);
                     row.remove("baseRiskScore");
