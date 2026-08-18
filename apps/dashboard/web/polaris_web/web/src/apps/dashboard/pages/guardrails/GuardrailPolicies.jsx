@@ -642,6 +642,7 @@ function GuardrailPolicies() {
                     ...(guardrailData.targetRoles?.length ? { role: guardrailData.targetRoles } : {}),
                 },
                 targetDeviceIds: guardrailData.targetDeviceIds || [],
+                connectorActorEmails: guardrailData.connectorActorEmails || [],
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
                 behaviour: guardrailData.behaviour != null

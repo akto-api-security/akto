@@ -252,6 +252,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // AgenticUsers (group, role, team, department, ...) is targetable, not just a fixed set.
     const [targetTags, setTargetTags] = useState({});
     const [targetDeviceIds, setTargetDeviceIds] = useState([]);
+    // Raw actor emails for connectors with no real device (e.g. Claude Inference Hooks) - stored
+    // and round-tripped as-is; GuardrailPoliciesAction resolves each into a device label
+    // server-side and folds it into the same targeting resolution as targetDeviceIds.
+    const [connectorActorEmails, setConnectorActorEmails] = useState([]);
     const [enterpriseLicenseComplianceCategories, setEnterpriseLicenseComplianceCategories] = useState([]);
 
     const [agenticUsers, setAgenticUsers] = useState([]);
@@ -377,6 +381,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableToolNameDescriptionMismatch,
         // Step 11
         blockedHosts,
+        blockPersonalAccounts,
         // Step 13
         ignorePhrases,
         // Step 10
@@ -393,6 +398,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         applyToAllUsers,
         targetTags,
         targetDeviceIds,
+        connectorActorEmails,
         enterpriseLicenseComplianceCategories,
         serverScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllServers &&
             (selectedMcpServers || []).length === 0 &&
@@ -864,6 +870,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyToAllUsers(!hasAnyTag && !policy.targetDeviceIds?.length);
         setTargetTags(loadedTargetTags);
         setTargetDeviceIds(policy.targetDeviceIds || []);
+        setConnectorActorEmails(policy.connectorActorEmails || []);
         setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
     };
 
@@ -1002,6 +1009,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     Object.entries(targetTags).filter(([, values]) => (values || []).length > 0)
                 ),
                 targetDeviceIds: applyToAllUsers ? [] : targetDeviceIds,
+                connectorActorEmails,
                 enterpriseLicenseComplianceCategories,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
@@ -1214,6 +1222,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setTargetTags={setTargetTags}
                         targetDeviceIds={targetDeviceIds}
                         setTargetDeviceIds={setTargetDeviceIds}
+                        connectorActorEmails={connectorActorEmails}
+                        setConnectorActorEmails={setConnectorActorEmails}
                         availableTagKeyValues={availableTagKeyValues}
                         availableDevices={availableDevices}
                         matchingDeviceRows={matchingDeviceRows}

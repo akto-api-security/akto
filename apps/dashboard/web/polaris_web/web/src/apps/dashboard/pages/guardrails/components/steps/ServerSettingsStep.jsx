@@ -11,7 +11,6 @@ import { isEndpointSecurityCategory } from "../../../../../main/labelHelper";
 import { produce } from "immer";
 import func from "@/util/func";
 
-
 export const ServerSettingsConfig = {
     number: 10,
     title: "Scope",
@@ -23,7 +22,7 @@ export const ServerSettingsConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTags, targetDeviceIds }) => {
+    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTags, targetDeviceIds, connectorActorEmails }) => {
         const appSettings = (applyOnRequest || applyOnResponse) ?
             ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
         const behaviourSuffix = policyBehaviour ? `Rule behaviour: ${policyBehaviour}` : '';
@@ -48,6 +47,7 @@ export const ServerSettingsConfig = {
                 }
             });
             if (targetDeviceIds?.length > 0) userParts.push(`${targetDeviceIds.length} User${targetDeviceIds.length !== 1 ? 's' : ''}`);
+            if (connectorActorEmails?.length > 0) userParts.push(`${connectorActorEmails.length} connector email${connectorActorEmails.length !== 1 ? 's' : ''}`);
             if (userParts.length > 0) summary += ` | ${userParts.join(', ')}`;
         }
         summary += `${appSettings} ${behaviourSuffix}`;
@@ -174,9 +174,32 @@ const ServerSettingsStep = ({
     deviceList = [],
     showConditionError = false,
     showUserConditionError = false,
+    connectorActorEmails,
+    setConnectorActorEmails,
 }) => {
     const isBlockMode = policyBehaviour === 'block';
     const isAtlas = isEndpointSecurityCategory();
+
+    // Connector-actor scoping (e.g. Claude Inference Hooks): raw emails only, persisted verbatim
+    // as their own field. No slugify/merge here at all — GuardrailPoliciesAction resolves each
+    // email into the device label live traffic would carry and folds it into targetDeviceIds
+    // resolution entirely server-side (DeviceLabelUtil.fromEmail), so this stays a plain
+    // controlled list with no derived state, same as blockedHosts/ignorePhrases elsewhere on this
+    // page - no split-on-load, no race with async device data, nothing to silently lose on refresh.
+    const connectorEmails = connectorActorEmails || [];
+    const [actorEmailInput, setActorEmailInput] = useState("");
+
+    const addConnectorActorEmail = (value) => {
+        const trimmed = (value || "").trim().toLowerCase();
+        setActorEmailInput("");
+        if (trimmed && !connectorEmails.includes(trimmed)) {
+            setConnectorActorEmails([...connectorEmails, trimmed]);
+        }
+    };
+
+    const removeConnectorActorEmail = (index) => {
+        setConnectorActorEmails(connectorEmails.filter((_, i) => i !== index));
+    };
 
     const [agenticConditions, agenticDispatch] = useReducer(conditionsReducer, null, () => {
         const conds = [];
@@ -542,6 +565,45 @@ const ServerSettingsStep = ({
                                         </Box>
                                     )}
                                 </VerticalStack>
+                            </VerticalStack>
+                        </Box>
+                    </Box>
+                )}
+                {isAtlas && (
+                    <Box borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
+                        <Box padding="4">
+                            <VerticalStack gap="3">
+                                <HorizontalStack gap="2" blockAlign="center">
+                                    <Text variant="headingSm">Connector emails</Text>
+                                    <Badge tone="attention">Claude Inference Hooks</Badge>
+                                    <Badge tone="info">Beta</Badge>
+                                </HorizontalStack>
+                                <TextField
+                                    label="Email address"
+                                    labelHidden
+                                    value={actorEmailInput}
+                                    onChange={setActorEmailInput}
+                                    placeholder="e.g. alice@example.com"
+                                    autoComplete="off"
+                                    connectedRight={
+                                        <Button onClick={() => addConnectorActorEmail(actorEmailInput)} disabled={!actorEmailInput.trim()}>
+                                            Add
+                                        </Button>
+                                    }
+                                    onKeyPress={(e) => {
+                                        if (e.key === "Enter") {
+                                            e.preventDefault();
+                                            addConnectorActorEmail(actorEmailInput);
+                                        }
+                                    }}
+                                />
+                                {connectorEmails.length > 0 && (
+                                    <HorizontalStack gap="2" wrap>
+                                        {connectorEmails.map((email, index) => (
+                                            <Tag key={index} onRemove={() => removeConnectorActorEmail(index)}>{email}</Tag>
+                                        ))}
+                                    </HorizontalStack>
+                                )}
                             </VerticalStack>
                         </Box>
                     </Box>

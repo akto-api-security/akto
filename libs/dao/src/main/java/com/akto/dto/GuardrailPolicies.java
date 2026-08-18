@@ -89,6 +89,13 @@ public class GuardrailPolicies {
     // scripts/migrate_guardrail_target_teams_roles_to_tags.js for converting pre-existing
     // policies that used the old fixed targetTeams/targetRoles fields.
     private Map<String, List<String>> targetTags;
+    // Raw actor emails for connectors whose traffic has no real device (e.g. Claude Inference
+    // Hooks) — stored as-is, never slugified here. GuardrailPoliciesAction resolves each into the
+    // device label live traffic would carry (DeviceLabelUtil.fromEmail) and folds it into the
+    // same device-targeting resolution as targetDeviceIds, so it participates in
+    // hasTargeting/applyToDeviceIds identically — kept separate purely so the raw, human-typed
+    // email round-trips for display/editing instead of only ever storing the lossy derived label.
+    private List<String> connectorActorEmails;
     // null (never set) = targetTags/targetDeviceIds all empty, no targeting configured → apply to all devices.
     // Non-null (possibly empty) List = targeting configured → apply only to these device labels;
     // an empty List means targeting resolved to zero matching devices, so apply to none.

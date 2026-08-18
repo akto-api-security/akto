@@ -7,6 +7,7 @@ import com.akto.dao.context.Context;
 import com.akto.gateway.Gateway;
 import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
+import com.akto.util.DeviceLabelUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -196,20 +197,7 @@ public class ProviderGuardrailAction extends ActionSupport {
      * is intentionally omitted.
      */
     private static String buildAgentHost(ParsedRequest frame) {
-        String emailSlug = slugify(emailLocalPart(extractEmail(frame.actor)));
-        if (emailSlug.isEmpty()) {
-            emailSlug = "unknown";
-        }
-        return emailSlug + ".ai-agent." + normalizeApp(frame.application);
-    }
-
-    /** Local part of the email (before "@"); the domain is dropped. */
-    private static String emailLocalPart(String email) {
-        if (email == null) {
-            return null;
-        }
-        int at = email.indexOf('@');
-        return at > 0 ? email.substring(0, at) : email;
+        return DeviceLabelUtil.fromEmail(extractEmail(frame.actor)) + ".ai-agent." + normalizeApp(frame.application);
     }
 
     private static String extractEmail(Map<String, Object> actor) {
@@ -221,14 +209,6 @@ public class ProviderGuardrailAction extends ActionSupport {
             email = actor.get("email");
         }
         return email != null ? email.toString() : null;
-    }
-
-    /** Lowercase; each run of non-alphanumerics -> "-"; trim leading/trailing "-". */
-    private static String slugify(String s) {
-        if (s == null) {
-            return "";
-        }
-        return s.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("(^-+|-+$)", "");
     }
 
     /**
@@ -247,7 +227,7 @@ public class ProviderGuardrailAction extends ActionSupport {
         if (a.equals("claude-ai")) {
             return "claude-app";
         }
-        return slugify(a);
+        return DeviceLabelUtil.slugify(a);
     }
 
     private static String resolveAccountId() {
