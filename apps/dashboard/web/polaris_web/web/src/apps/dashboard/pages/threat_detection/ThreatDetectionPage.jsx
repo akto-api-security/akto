@@ -324,7 +324,8 @@ function ThreatDetectionPage() {
                 return { alias: 'custom', title, period: { since: sinceDate, until: untilDate } };
             }
         }
-            return values.getRange("last1month");
+        const specialAccounts = [1776384040, 1776625569, 1776626846];
+        return specialAccounts.includes(Number(window.ACTIVE_ACCOUNT)) ? values.ranges[4] : values.ranges[2];
     }, [location.state, searchParams]);
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
 

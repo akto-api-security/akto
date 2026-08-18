@@ -52,7 +52,7 @@ function GithubServerTable(props) {
     setSearchParams(newSearchParams, { replace: true });
   };
 
-  const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.getRange("last1month"))
+  const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
   const [hideFilter, setHideFilter] = useState(false)
   const filtersWrapRef = useRef(null)
   const [exportPortalTarget, setExportPortalTarget] = useState(null)

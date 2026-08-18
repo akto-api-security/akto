@@ -213,7 +213,7 @@ function CompliancePage() {
                 return { alias: "custom", title, period: { since: sinceDate, until: untilDate } };
             }
         }
-        return values.getRange("last1month");
+        return values.ranges[5];
     };
     const initialDateRange = getInitialDateRange();
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialDateRange)

@@ -1,5 +1,3 @@
-import func from "./func";
-
 const today = new Date(new Date().setHours(0, 0, 0, 0));
 const todayDayEnd = new Date(new Date().setHours(23, 59, 59, 999));
 const yesterday = new Date(
@@ -32,21 +30,6 @@ const ranges = [
         period: {
             since: new Date(
                 new Date(new Date().setDate(today.getDate() - 6)).setHours(
-                    0,
-                    0,
-                    0,
-                    0
-                )
-            ),
-            until: todayDayEnd,
-        },
-    },
-    {
-        title: "Last 1 month",
-        alias: "last1month",
-        period: {
-            since: new Date(
-                new Date(new Date().setDate(today.getDate() - 30)).setHours(
                     0,
                     0,
                     0,
@@ -96,17 +79,7 @@ const ranges = [
     }
 ];
 
-// Look up a preset by alias. Call sites must use this rather than ranges[i] —
-// inserting a preset shifts every index and silently changes page defaults.
-// The demo account always opens on All time: its seeded data spans years, so the
-// normal default would land most pages on an empty range. Doing it here covers
-// every date picker at once instead of a per-page override.
-const getRange = (alias) => {
-    const wanted = func.isDemoAccount() ? "allTime" : alias;
-    return ranges.find((r) => r.alias === wanted) || ranges[0];
-};
-
 const skipList = ["GENERIC", "TRUE", "FALSE","INTEGER_32", "INTEGER_64", "NULL", "OTHER", "DICT", "FLOAT"]
 const DISABLED_AUTO_ACCOUNT_REFRESH = [1747820267,1731351930,1736798101]
 
-export default { today, yesterday, ranges, getRange, yesterdayDayEnd, todayDayEnd , skipList, DISABLED_AUTO_ACCOUNT_REFRESH};
+export default { today, yesterday, ranges, yesterdayDayEnd, todayDayEnd , skipList, DISABLED_AUTO_ACCOUNT_REFRESH};

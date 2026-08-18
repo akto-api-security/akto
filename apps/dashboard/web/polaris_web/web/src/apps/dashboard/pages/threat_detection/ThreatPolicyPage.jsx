@@ -10,7 +10,7 @@ import {HorizontalGrid} from "@shopify/polaris";
 
 function ThreatPolicyPage() {
 
-    const initialVal = values.getRange("last1month")
+    const initialVal = values.ranges[3]
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
 
     const horizontalComponent = <HorizontalGrid columns={1} gap={2}>
