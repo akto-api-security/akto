@@ -48,7 +48,7 @@ Nothing here is new functionality (SPEC §3): every pinned behavior already exis
 - `hook_runner`, driving the adapter, packaging → Phase 2.
 - Consolidating `device_identity` / `ingest_only` copies into the engine → Phase 2
   (phase 1 only *picks + pins* the canonical behavior).
-- `generate_install_files` (wrapper/settings generation) → Phase 3.
+- `generate_settings` (manifest → settings.json; no wrappers — see SPEC §5.1) → Phase 3.
 - Any real adapter implementation → Phase 3+.
 - **Changing any current behavior.** Phase 1 is additive types + tests only.
 

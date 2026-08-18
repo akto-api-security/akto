@@ -30,7 +30,8 @@ via per-agent **hooks**. A **partial consolidation** already exists in
     `build_*` / `call_guardrails` / `apply_warn_resubmit_flow`.
   - `*-wrapper.sh`/`.ps1` + `settings.json`/`hooks.json` — copied per agent+hook. A
     stray `# Generic Akto Cursor hook wrapper` comment survives in gemini/codex — the
-    literal signature of unreviewed copy-paste.
+    literal signature of unreviewed copy-paste. **The wrappers contain no logic** —
+    they are pure `export`-lines + one `exec` (verified).
 
 ### Two root causes (do not lose these)
 
@@ -72,10 +73,11 @@ agent event ─▶ [SDK: hidden adapter parses]  ─▶  Turn
 - **SDK-maintainer** (rare): adds/fixes a **hidden per-agent adapter** when a new
   agent lands or an existing one changes.
 - **Business-logic developer** (frequent, "anyone"): edits the shaping surface
-  against `Turn`; never opens an adapter, wrapper, or dialect.
+  against `Turn`; never opens an adapter, a manifest, or a dialect.
 
-Target end-state for a connector — **two small inputs**: `adapters/<agent>_adapter.py`
-(hidden) + `manifests/<agent>.toml`. Wrappers and `settings.json` are **generated**.
+Target end-state for a connector — **the only per-agent artifacts are**:
+`adapters/<agent>_adapter.py` (hidden) + `manifests/<agent>.toml`. From the manifest,
+**only `settings.json` is generated** (see §5.1 — there are no per-agent wrappers).
 
 This is **not** greenfield and **not** "leave the utility as-is": reuse the substance,
 replace the shape, fix the packaging. **The SDK adds no new functionality** — it
@@ -92,6 +94,7 @@ relocates and de-duplicates logic that already exists (see §3).
 | device identity | `akto_machine_id.py` (9 copies) |
 | ingest-only | `run_observability_hook` (already shared; 7 entry copies) |
 | transcript reading | `get_last_user_prompt` / `extract_text_*` / chunk buffer (copied) |
+| install config | the `export` lines inside every `*-wrapper.sh` / `.ps1` (copied) |
 | the guardrail **decision** itself | **already on the backend (cyborg)** — the client only calls and interprets |
 
 ## 4. Rationale (decided — do not reopen)
@@ -111,7 +114,7 @@ relocates and de-duplicates logic that already exists (see §3).
 agent_sdk/                        ◀── SDK: hidden complexity (SDK-maintainer only)
   contract.py                     # shared vocabulary: Turn, Decision, Manifest, …
   hook_runner.py                  # runs ONE hook event end-to-end (orchestrator)
-  generate_install_files.py       # manifest → wrapper.sh/.ps1 + settings.json
+  generate_settings.py            # manifest → the agent's settings.json/hooks.json
   engine/                         # shared machinery (stable)
     session_identity.py           # same session/trace/span id across a turn (was resolve_session_info)
     transcript_reader.py          # recover prompt/response from agent logs & streams
@@ -119,6 +122,7 @@ agent_sdk/                        ◀── SDK: hidden complexity (SDK-maintain
     backend_client.py             # build URL + POST /api/http-proxy + parse reply
     guardrail_enforcement.py      # verdict → block/allow/warn + resubmit flow
     ingest_only.py                # fire-and-forget observability (was run_observability_hook)
+    config.py                     # read ~/.akto/config.json (was per-agent env exports)
   adapters/                       # per-agent, HIDDEN
     claude_adapter.py  codex_adapter.py  gemini_adapter.py  cursor_adapter.py  …
 
@@ -128,32 +132,61 @@ business_logic/                   ◀── DEVELOPER SURFACE (agent-agnostic, c
 
 manifests/                        # one tiny file per connector (paths / hooks / OS)
   claude.toml  codex.toml  …
-install_files/                    # GENERATED wrapper + settings (never hand-edited)
+generated/                        # GENERATED settings.json per agent (never hand-edited)
 tests/
   fixtures/<connector>/*.json   characterization/   test_*.py
 ```
 
 **Packaging:** the SDK is one installable Python package. The installer places the
-**package once** + the generated wrapper/settings per agent home — not N self-contained
-dirs carrying copies.
+**package once** + writes **one shared `~/.akto/config.json`** + the **generated
+`settings.json` per agent home** — not N self-contained dirs carrying copies.
+
+### 5.1 Install & invocation model (no per-agent wrappers)
+
+The current `*-wrapper.sh`/`.ps1` files are pure `export`-lines + one `exec` (§1). Both
+halves dissolve:
+
+- **The `export` lines are config.** They are install-level and identical across agents
+  (URL, token, mode, timeout, context source, log level, SSL). They move into **one
+  shared `~/.akto/config.json`**, read by `engine/config.py`. (JSON, not TOML/bash —
+  the reader is Python, JSON is stdlib on the 3.8 floor and cross-platform, which also
+  removes the `.ps1` twin. The only per-agent `export` — `AKTO_CONNECTOR` — becomes an
+  argument; its short tag is derived, not stored.)
+- **The `exec` line is the invocation.** It moves into the agent's `settings.json`,
+  which invokes the SDK directly with the connector and hook kind as **arguments**:
+  ```json
+  { "hooks": { "UserPromptSubmit": [
+      { "command": "python3 -m agent_sdk.hook_runner claude prompt" } ] } }
+  ```
+
+So there are **no generated wrappers**. Optionally, one **static** launcher
+(`akto-run`, installed once, referenced by explicit path) can front the `python -m`
+call to handle interpreter/venv resolution and Windows — it is a single shared asset,
+**not** generated per agent. The only per-agent generated artifact is `settings.json`.
+
+- **Per agent:** `settings.json` (generated from the manifest).
+- **Shared, written once:** the SDK package, `~/.akto/config.json`, optional `akto-run`.
+- **Passed as args:** connector id + hook kind.
 
 **Runtime path (who owns each step):**
 ```
-install_files/claude/run.sh prompt
-  → python -m agent_sdk.hook_runner claude prompt
-      → claude_adapter.parse(event) → Turn         # hidden adapter
-      → engine.session_identity (session/trace/span) # engine
-      → business_logic.build_akto_payload(turn)     # DEVELOPER surface
-      → engine.backend_client POST (guardrail eval on BE) # engine → backend
-      → engine.guardrail_enforcement + adapter.emit_block # engine + hidden dialect
-      → engine.backend_client ingest                # engine
+settings.json → python3 -m agent_sdk.hook_runner claude prompt   # (or via akto-run)
+  → engine.config read ~/.akto/config.json                       # was env exports
+  → claude_adapter.parse(event) → Turn                            # hidden adapter
+  → engine.session_identity (session/trace/span)                  # engine
+  → business_logic.build_akto_payload(turn)                       # DEVELOPER surface
+  → engine.backend_client POST (guardrail eval on BE)             # engine → backend
+  → engine.guardrail_enforcement + adapter.emit_block             # engine + hidden dialect
+  → engine.backend_client ingest                                  # engine
 ```
 
 **Strangler-fig (three seams):**
 1. SDK emits the **existing** `/api/http-proxy` payload → backend untouched (ph 1–4).
 2. Each connector migrates onto its adapter one at a time, shadow-diffed vs its current
    copied output before its old files are deleted.
-3. Generated wrapper/settings replace hand-copied ones per connector at cutover.
+3. At cutover per connector: generated `settings.json` + shared `config.json` replace
+   the hand-copied `settings.json` **and the wrappers are deleted** (`.sh`, `.ps1`,
+   per-hook variants, and their `export` lines) — nothing regenerates them.
 
 ## 6. Canonical model (the interface the utility lacks) — `contract.py`
 
@@ -194,7 +227,7 @@ class Endpoint:                 # per-agent variation that caused the copies
     path: str; hook_header: str
 
 @dataclass
-class Manifest:                 # drives wrapper + settings generation
+class Manifest:                 # drives settings.json generation
     connector: str; home: str; os: list[str]
     hooks: dict[str, HookKind]  # agent event name -> kind
 
@@ -220,7 +253,15 @@ class Adapter(Protocol):        # the ONLY per-agent code (hidden in the SDK)
 ## 7. Constraints & Non-goals
 
 **Constraints**
-- Python 3.11+, standard-library-only in the engine where practical.
+- **Python 3.8+ floor**, standard-library-only in the engine. The hooks run under the
+  customer's `python3` (we don't control the version); existing connectors state 3.8+
+  (some 3.6+), and no code uses 3.10/3.11 features. **CI must run the 3.8 floor**, not
+  just the local interpreter — passing on a newer local Python does not prove
+  compatibility. Corollary: **no `tomllib`** (3.11-only) at runtime.
+- **Config format:** runtime config read on the customer machine (`~/.akto/config.json`)
+  is **JSON** (stdlib on every version, cross-platform → no `.ps1` twin). Manifests are
+  parsed at *build time* on our machines, so they may be `.toml`. Build-time vs runtime
+  is the dividing line.
 - **Reuse, don't rewrite** the proven functions (§3); change behavior only where a
   characterization test proves equivalence.
 - **Fail-open:** engine errors never crash the agent or block traffic. Blocking is a
@@ -234,7 +275,9 @@ class Adapter(Protocol):        # the ONLY per-agent code (hidden in the SDK)
 - ❌ Re-extract `installer_headers` / `resolve_session_info` / the observability runner
   — already shared+adopted. Wrap, don't duplicate.
 - ❌ Keep per-dir bundling of common files (`device_identity`, `ingest_only`, wrappers).
-- ❌ Hand-write wrappers or `settings.json` — generate from the manifest.
+- ❌ **Generate or hand-write per-agent wrappers.** Wrappers are eliminated (§5.1):
+  config → one `config.json`, invocation → `settings.json` args. Only `settings.json`
+  is generated per agent; the launcher (if any) is a single static asset.
 - ❌ Expose adapters as the developer surface — they are hidden SDK internals.
 - ❌ Put guardrail **policy** in the client — it stays on the backend.
 - ❌ OTel for capture (phase-5-optional export only).
@@ -253,10 +296,11 @@ The utility and the copies have **zero tests today** — the unambiguous gap beh
   `ingest_only` entry — **before** changing anything. Phase-1 safety net.
 - **Unit** — `contract.py` + engine logic with injected `backend_client` (no network/fs).
 - **Fixture/contract** — recorded real hook events per agent → assert `Turn` fields.
-- **Generation golden** — manifest → wrapper/settings golden output.
+- **Generation golden** — manifest → `settings.json` golden output.
 - **Shadow** — SDK path runs beside the old hook; diff before cutover.
 - **Smoke (live)** — CI runs the real agent against a canned prompt (phase 5).
 - **Canary** — runtime parse-empty rate per connector + alert (phase 5).
+- **Floor** — CI runs the suite on Python 3.8 (§7), not just the local interpreter.
 
 Acceptance is executable: a phase is done only when its suite is green in CI.
 
@@ -264,15 +308,15 @@ Acceptance is executable: a phase is done only when its suite is green in CI.
 
 | Phase | Deliverable | Suite | Exit gate |
 |---|---|---|---|
-| **1 — Contract + safety net** | `contract.py` (typed model + `Adapter`/`Endpoint`/`Manifest`); characterization tests pinning current utility, one copied path, canonical `device_identity`, `ingest_only` entry | characterization + contract unit | contract defined; current behavior locked; nothing else changed |
-| **2 — Engine + runner** | installable package; `hook_runner` drives the enforcement path *through* the adapter, **reusing** utility functions; consolidate `device_identity` + `ingest_only` into the engine behind shims; generalize warn/resubmit | unit w/ fake adapter + fake `backend_client` | full flow runs with a dummy adapter; characterization green; package installs |
-| **3 — Reference adapter (Claude) + generation + shadow** | `claude_adapter.py` + manifest; `generate_install_files`; shadow-diff vs copied `claude-cli-hooks`; live smoke | fixtures + generation golden + shadow + smoke | shadow clean N days → Claude on SDK; its copies + hand wrappers deleted |
-| **4 — Migrate rest** | codex, gemini(streaming), cursor, github, kiro — one slice each: adapter + manifest + generated files | per-agent fixtures + generation golden + shadow | all CLI connectors on SDK; local `build_*`/`call_guardrails`/`warn`, copied `device_identity`, hand wrappers deleted |
+| **1 — Contract + safety net** | `contract.py` (typed model + `Adapter`/`Endpoint`/`Manifest`); characterization tests pinning current utility, one copied path, canonical `device_identity`, `ingest_only` entry | characterization + contract unit (on 3.8 floor) | contract defined; current behavior locked; nothing else changed |
+| **2 — Engine + runner** | installable package; `hook_runner` drives the enforcement path *through* the adapter, **reusing** utility functions; consolidate `device_identity` + `ingest_only` into the engine behind shims; `engine/config.py` reads `~/.akto/config.json`; generalize warn/resubmit | unit w/ fake adapter + fake `backend_client` | full flow runs with a dummy adapter; characterization green; package installs |
+| **3 — Reference adapter (Claude) + settings generation + shadow** | `claude_adapter.py` + manifest; `generate_settings` (manifest → settings.json); `config.json` for the install; shadow-diff vs copied `claude-cli-hooks`; live smoke | fixtures + settings-generation golden + shadow + smoke | shadow clean N days → Claude on SDK; its copied py **and all wrappers** deleted |
+| **4 — Migrate rest** | codex, gemini(streaming), cursor, github, kiro — one slice each: adapter + manifest + generated settings | per-agent fixtures + generation golden + shadow | all CLI connectors on SDK; local `build_*`/`call_guardrails`/`warn`, copied `device_identity`, **and every `*-wrapper.sh`/`.ps1` + `export` config** deleted |
 | **5 — Discovery + detection** | discovery interface + canary + smoke matrix + optional OTel export | discovery fixtures + canary tests | simulated drift trips canary/CI, names one adapter |
 
 ## 10. Definition of done (per phase)
 
 1. Code merged behind the strangler seam (old path runs until cutover).
-2. Phase's suite green in CI; characterization tests never regress.
+2. Phase's suite green in CI (including the 3.8 floor); characterization tests never regress.
 3. No regression in connectors still on the old path.
 4. Exit gate in §9 met.
