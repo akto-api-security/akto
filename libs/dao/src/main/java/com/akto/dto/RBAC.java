@@ -4,6 +4,9 @@ package com.akto.dto;
 import org.bson.types.ObjectId;
 
 import com.akto.dao.CustomRoleDao;
+import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.rbac.*;
 
 import com.akto.dto.rbac.RbacEnums.Feature;
@@ -172,23 +175,88 @@ public class RBAC {
         return false;
     }
 
+    /* Stigg feature labels gating each product scope. */
+    public static final String FEATURE_SECURITY_TYPE_AGENTIC = "SECURITY_TYPE_AGENTIC";
+    public static final String FEATURE_ENDPOINT_SECURITY = "ENDPOINT_SECURITY";
+    public static final String FEATURE_AKTO_DAST = "AKTO_DAST";
+
+    private static boolean isFeatureGranted(Map<String, FeatureAccess> featureWiseAllowed, String label) {
+        FeatureAccess featureAccess = featureWiseAllowed.get(label);
+        return featureAccess != null && featureAccess.getIsGranted();
+    }
+
     /**
-     * Initializes default scope-role mapping if empty.
-     * Atlas-configured accounts or matching emails get ENDPOINT (Akto ATLAS) → defaultRole; others get API → defaultRole.
-     * Otherwise returns the existing scopeRoleMapping unchanged.
+     * Product scopes the organization is licensed for.
+     *
+     * ARGUS (AGENTIC), ATLAS (ENDPOINT) and DAST are added only when the organization's feature map
+     * grants them. API is the fallback rather than a check of its own, because Stigg emits no API
+     * label to read - it is added only when none of the other products are granted. So an
+     * Atlas + Argus organization defaults its users into Atlas + Argus, while an organization with no
+     * product labels keeps the historical API default.
+     */
+    public static Set<String> getEnabledScopesForOrganization(Organization organization) {
+        Set<String> scopes = new HashSet<>();
+
+        if (organization == null || organization.getFeatureWiseAllowed() == null
+                || organization.getFeatureWiseAllowed().isEmpty()) {
+            // No entitlement data to go on
+            scopes.add(CONTEXT_SOURCE.API.name());
+            return scopes;
+        }
+
+        Map<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+
+        if (isFeatureGranted(featureWiseAllowed, FEATURE_SECURITY_TYPE_AGENTIC)) {
+            scopes.add(CONTEXT_SOURCE.AGENTIC.name());
+        }
+        if (isFeatureGranted(featureWiseAllowed, FEATURE_ENDPOINT_SECURITY)) {
+            scopes.add(CONTEXT_SOURCE.ENDPOINT.name());
+        }
+        if (isFeatureGranted(featureWiseAllowed, FEATURE_AKTO_DAST)) {
+            scopes.add(CONTEXT_SOURCE.DAST.name());
+        }
+
+        if (scopes.isEmpty()) {
+            scopes.add(CONTEXT_SOURCE.API.name());
+        }
+        return scopes;
+    }
+
+    /** Product scopes the organization owning {@code accountId} is licensed for. */
+    public static Set<String> getEnabledScopesForAccount(int accountId) {
+        try {
+            return getEnabledScopesForOrganization(OrganizationsDao.instance.findOneByAccountId(accountId));
+        } catch (Exception e) {
+            Set<String> scopes = new HashSet<>();
+            scopes.add(CONTEXT_SOURCE.API.name());
+            return scopes;
+        }
+    }
+
+    /**
+     * Initializes default scope-role mapping if empty, otherwise returns it unchanged.
      */
     public static Map<String, String> initializeScopeRoleMapping(
             Map<String, String> scopeRoleMapping, String defaultRole, int accountId, String email) {
-        if (scopeRoleMapping == null || scopeRoleMapping.isEmpty()) {
-            Map<String, String> initialized = new HashMap<>();
-            if (shouldUseAtlasMemberDefaultScope(accountId, email)) {
-                initialized.put(CONTEXT_SOURCE.ENDPOINT.name(), defaultRole);
-            } else {
-                initialized.put("API", defaultRole);
-            }
-            return initialized;
+        if (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) {
+            return scopeRoleMapping;
         }
-        return scopeRoleMapping;
+
+        Map<String, String> initialized = new HashMap<>();
+
+        if (shouldUseAtlasMemberDefaultScope(accountId, email)) {
+            initialized.put(CONTEXT_SOURCE.ENDPOINT.name(), defaultRole);
+            return initialized;
+        }else {
+            for (String scope : getEnabledScopesForAccount(accountId)) {
+                initialized.put(scope, defaultRole);
+            }
+        }
+
+        if (initialized.isEmpty()) {
+            initialized.put(CONTEXT_SOURCE.API.name(), defaultRole);
+        }
+        return initialized;
     }
 
     public Role getRoleForScope(CONTEXT_SOURCE scope) {
