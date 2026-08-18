@@ -125,7 +125,17 @@ function shapeRow(row, { skillScoreMap = {} } = {}) {
         groupName: row.name,
         groupNameDisplay,
         riskScore,
-        riskScoreComp: riskScore ? <Badge status={getRiskScoreStatus(riskScore)} size="small">{riskScore}</Badge> : "-",
+        // Skill rows' riskScore comes from skillScoreMap (is-this-skill-malicious), a different
+        // question from baseRiskScore/baseRiskScoreReason (the hosting collection's own Atlas/Argus
+        // capability score) — showing both on the same badge reads as one contradicting the other,
+        // so the tooltip is skill-only-suppressed here even though the data is technically present.
+        riskScoreComp: riskScore ? (isSkill
+            ? <Badge status={getRiskScoreStatus(riskScore)} size="small">{riskScore}</Badge>
+            : transform.wrapRiskScoreTooltip(
+                <Badge status={getRiskScoreStatus(riskScore)} size="small">{riskScore}</Badge>,
+                riskScore, row.baseRiskScore, row.baseRiskScoreReason
+            )
+        ) : "-",
         sensitiveSubTypes: transform.prettifySubtypes(row.sensitiveInRespTypes || [], false),
         lastTraffic: row.lastSeenEpoch > 0 ? func.prettifyEpoch(row.lastSeenEpoch) : "-",
         detectedTimestamp: row.lastSeenEpoch,

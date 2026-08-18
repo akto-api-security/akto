@@ -332,6 +332,8 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
             detectedTimestamp: trafficInfoMap[c.id] || 0,
             riskScore: c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] || 0),
+            baseRiskScore: c.baseRiskScore,
+            baseRiskScoreReason: c.baseRiskScoreReason,
             discovered: func.prettifyEpoch(c.startTs || 0),
             descriptionComp: c.description ? (
                 <Tooltip content={c.description} dismissOnMouseOut>
@@ -457,6 +459,8 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         sensitiveInRespCount: sensitiveTypes.length,
         detectedTimestamp: trafficInfoMap[rawCollection.id] || 0,
         riskScore,
+        baseRiskScore: rawCollection.baseRiskScore,
+        baseRiskScoreReason: rawCollection.baseRiskScoreReason,
         detected,
         discovered,
         coverage: calcCoverage,

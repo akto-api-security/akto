@@ -521,6 +521,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         final Map<String, Set<Integer>> serviceCollectionIds = new HashMap<>();
         final List<Integer> collectionIds = new ArrayList<>();
         double maxRiskScore = 0;
+        Double baseRiskScore;
+        String baseRiskScoreReason;
         int maxTrafficTimestamp = 0;
         boolean hasPersonalAccount = false;
         boolean hasLocalMcpServer = false;
@@ -566,7 +568,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     if ("misconfigured-config".equals(key) && "true".equals(value)) hasMisconfiguredConfig = true;
                 }
             }
-            if (collRisk > maxRiskScore) maxRiskScore = collRisk;
+            if (collRisk > maxRiskScore) {
+                maxRiskScore = collRisk;
+                baseRiskScore = c.getBaseRiskScore();
+                baseRiskScoreReason = c.getBaseRiskScoreReason();
+            }
             if (collTraffic > maxTrafficTimestamp) maxTrafficTimestamp = collTraffic;
         }
 
@@ -597,6 +603,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (pluginParentAgent != null) g.put("pluginParentAgent", pluginParentAgent);
             if (owningPluginName != null) g.put("owningPluginName", owningPluginName);
             g.put("riskScore", maxRiskScore > 0 ? AgenticObserveUtil.roundRiskScore(maxRiskScore) : null);
+            if (baseRiskScoreReason != null) {
+                g.put("baseRiskScore", baseRiskScore);
+                g.put("baseRiskScoreReason", baseRiskScoreReason);
+            }
             g.put("lastSeenEpoch", maxTrafficTimestamp);
             g.put("hasPersonalAccount", hasPersonalAccount);
             g.put("hasLocalMcpServer", hasLocalMcpServer);
@@ -844,6 +854,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             child.put("hasMisconfiguredConfig", flags[2]);
             child.put("hasMaliciousSkill", childMalicious);
             child.put("skillCount", skillCount);
+            child.put("baseRiskScore", c.getBaseRiskScore());
+            child.put("baseRiskScoreReason", c.getBaseRiskScoreReason());
 
             // Plugin collections carry the agent's mcp-client/ai-agent tags (naming where the plugin is
             // installed), so label the child by its own type rather than letting those tags speak.
@@ -913,7 +925,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.in(Constants.ID, ids),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING,
-                            ApiCollection.SKILLS, ApiCollection.START_TS)
+                            ApiCollection.SKILLS, ApiCollection.START_TS, ApiCollection.BASE_RISK_SCORE,
+                            ApiCollection.BASE_RISK_SCORE_REASON)
             );
 
             // Computed here, scoped to just this asset's own `ids` — unlike every other agentic
@@ -1553,7 +1566,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             long tStart = System.currentTimeMillis();
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
-                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS)
+                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS,
+                            ApiCollection.BASE_RISK_SCORE, ApiCollection.BASE_RISK_SCORE_REASON)
             );
             long tFindAll = System.currentTimeMillis();
             Map<String, GroupSummary> groups = classifyAllGroups(collections, traffic, risk, sensitive);
@@ -2107,8 +2121,15 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     if (malicious) row.put("isMalicious", true);
                 }
                 // Plugin discovery carries no risk of its own, and g.maxRiskScore is the AGENT's —
-                // showing it would mark every plugin on a risky agent as risky.
-                if ("plugin".equals(g.rowType)) row.put("riskScore", null);
+                // showing it would mark every plugin on a risky agent as risky. baseRiskScore/
+                // baseRiskScoreReason are tracked alongside maxRiskScore (same borrowed-from-the-
+                // agent's-collections provenance), so they get the same treatment — otherwise a
+                // plugin row would still leak the agent's own risk reason via the tooltip.
+                if ("plugin".equals(g.rowType)) {
+                    row.put("riskScore", null);
+                    row.remove("baseRiskScore");
+                    row.remove("baseRiskScoreReason");
+                }
                 if ("plugin".equals(g.rowType)) row.put("aiInteractions", null);
                 rowsOut.add(row);
             }
