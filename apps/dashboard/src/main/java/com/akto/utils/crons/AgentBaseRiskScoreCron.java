@@ -45,20 +45,20 @@ public class AgentBaseRiskScoreCron {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AgentBaseRiskScoreCron.class, LogDb.DASHBOARD);
 
-    private static final int PER_ACCOUNT_LIMIT = 200;
+    private static final int PER_ACCOUNT_LIMIT = 400;
     private static final int RECALC_THRSHOLD_SECONDS = 7 * 24 * 60 * 60;
     private static final int CONCURRENCY = 1;
 
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void setUpAgentBaseRiskScoreCronScheduler() {
-        scheduler.scheduleWithFixedDelay(this::run, 0, 30, TimeUnit.MINUTES);
+        scheduler.scheduleWithFixedDelay(this::run, 0, 60, TimeUnit.MINUTES);
     }
 
     private void run() {
         try {
             Context.accountId.set(1_000_000);
-            if (!callDibs(Cluster.AGENT_BASE_RISK_SCORE_CRON_INFO, 1500, 60)) {
+            if (!callDibs(Cluster.AGENT_BASE_RISK_SCORE_CRON_INFO, 3300, 60)) {
                 loggerMaker.debugAndAddToDb("Agent base risk score cron dibs not acquired, thus skipping cron");
                 return;
             }
@@ -103,7 +103,7 @@ public class AgentBaseRiskScoreCron {
             } finally {
                 pool.shutdown();
                 try {
-                    pool.awaitTermination(20, TimeUnit.MINUTES);
+                    pool.awaitTermination(45, TimeUnit.MINUTES);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 }
