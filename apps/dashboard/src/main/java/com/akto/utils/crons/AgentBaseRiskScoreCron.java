@@ -2,6 +2,7 @@ package com.akto.utils.crons;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -12,7 +13,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.bson.Document;
 import org.bson.conversions.Bson;
-
+import com.akto.DaoInit;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.ApiCollectionsDao;
@@ -41,18 +42,6 @@ import com.mongodb.client.model.WriteModel;
 
 import static com.akto.task.Cluster.callDibs;
 
-/**
- * Gives every AI agent (an ApiCollection with a non-empty serviceGraphEdges graph) a base risk
- * score via one LLM call per agent, based on what it's wired to. Runs every 30 minutes, capped
- * at PER_ACCOUNT_LIMIT agents per account per tick, newest-created first, and never re-scores an
- * agent within SEVEN_DAYS_SECONDS.
- *
- * The same logical agent can show up as multiple distinct ApiCollection docs (ApiCollection._id
- * is hashCode(hostName), and hostName encodes more than just the agent name), so scores are also
- * cached in a separate collection (see AgentBaseRiskScore), keyed by the agent's "bot-id" tag when
- * present, else its display name - a duplicate is filled in from that cache instead of spending
- * another LLM call.
- */
 public class AgentBaseRiskScoreCron {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AgentBaseRiskScoreCron.class, LogDb.DASHBOARD);
@@ -70,9 +59,6 @@ public class AgentBaseRiskScoreCron {
     private void run() {
         try {
             Context.accountId.set(1_000_000);
-            // Expiry (25 min) is deliberately less than the 30-min cadence, so a stalled/crashed
-            // run can never block the next tick from acquiring the lock - the 7-day DB gate, not
-            // this lock, is what actually prevents double-scoring.
             if (!callDibs(Cluster.AGENT_BASE_RISK_SCORE_CRON_INFO, 1500, 60)) {
                 loggerMaker.debugAndAddToDb("Agent base risk score cron dibs not acquired, thus skipping cron");
                 return;
@@ -83,7 +69,6 @@ public class AgentBaseRiskScoreCron {
         }
     }
 
-    /** Assumes Context.accountId is already set by the caller (AccountTask, or forceRunForAccount). */
     private void processAccount(Account account) {
         int accountId = account.getId();
         try {
@@ -99,16 +84,22 @@ public class AgentBaseRiskScoreCron {
             loggerMaker.infoAndAddToDb("Agent base risk score cron processing accountId=" + accountId
                 + ", candidates=" + candidates.size());
 
-            // Whole cache collection is small (one doc per unique agent in this account) - load
-            // it once up front instead of a DB round trip per candidate.
             Map<String, AgentBaseRiskScore> cacheMap = loadCache();
+
+            Map<String, List<ApiCollection>> byAgentKey = new LinkedHashMap<>();
+            for (ApiCollection collection : candidates) {
+                String agentKey = AgentBaseRiskScoreAnalyzer.extractAgentCacheKey(collection);
+                byAgentKey.computeIfAbsent(agentKey, k -> new ArrayList<>()).add(collection);
+            }
 
             List<WriteModel<ApiCollection>> apiCollectionUpdates = Collections.synchronizedList(new ArrayList<>());
             List<WriteModel<AgentBaseRiskScore>> cacheUpdates = Collections.synchronizedList(new ArrayList<>());
             ExecutorService pool = Executors.newFixedThreadPool(CONCURRENCY);
             try {
-                for (ApiCollection collection : candidates) {
-                    pool.submit(() -> scoreCollection(accountId, collection, cacheMap, apiCollectionUpdates, cacheUpdates));
+                for (Map.Entry<String, List<ApiCollection>> entry : byAgentKey.entrySet()) {
+                    String agentKey = entry.getKey();
+                    List<ApiCollection> group = entry.getValue();
+                    pool.submit(() -> scoreAgentGroup(accountId, agentKey, group, cacheMap, apiCollectionUpdates, cacheUpdates));
                 }
             } finally {
                 pool.shutdown();
@@ -132,7 +123,6 @@ public class AgentBaseRiskScoreCron {
         }
     }
 
-    /** Assumes Context.accountId is already set by the caller. */
     private List<ApiCollection> findCandidates() {
         Bson hasEdges = Filters.and(
             Filters.exists(ApiCollection.SERVICE_GRAPH_EDGES, true),
@@ -155,66 +145,55 @@ public class AgentBaseRiskScoreCron {
         );
     }
 
-
     private Map<String, AgentBaseRiskScore> loadCache() {
         return AgentBaseRiskScoreDao.instance.findAll(Filters.empty()).stream()
                     .collect(Collectors.toMap(AgentBaseRiskScore::getId, Function.identity()));
     }
 
-    /**
-     * Runs on a pool thread, so Context.accountId must be set here - it doesn't cross threads.
-     * cacheMap is read-only here (built once in processAccount, never mutated during scoring) - safe
-     * for concurrent reads from multiple pool threads. Both output lists are synchronized and only
-     * ever appended to, then bulk-written once after the whole pool drains.
-     */
-    private void scoreCollection(int accountId, ApiCollection collection, Map<String, AgentBaseRiskScore> cacheMap,
+    private void scoreAgentGroup(int accountId, String agentKey, List<ApiCollection> group,
+            Map<String, AgentBaseRiskScore> cacheMap,
             List<WriteModel<ApiCollection>> apiCollectionUpdates, List<WriteModel<AgentBaseRiskScore>> cacheUpdates) {
-        int collectionId = collection.getId();
         try {
             Context.accountId.set(accountId);
 
-            String agentKey = AgentBaseRiskScoreAnalyzer.extractAgentCacheKey(collection);
-            AgentBaseRiskScore cached = agentKey != null ? cacheMap.get(agentKey) : null;
+            AgentBaseRiskScore cached = cacheMap.get(agentKey);
             boolean fresh = cached != null && cached.getBaseRiskScoreCalculatedAt() != null
                 && cached.getBaseRiskScoreCalculatedAt() >= Context.now() - RECALC_THRSHOLD_SECONDS;
 
+            double score;
+            String reason;
             if (fresh) {
+                score = cached.getBaseRiskScore();
+                reason = cached.getBaseRiskScoreReason();
+            } else {
+                ApiCollection representative = group.get(0);
+                String agentContextJson = AgentBaseRiskScoreAnalyzer.buildAgentContextJson(representative);
+                BasicDBObject queryData = new BasicDBObject();
+                queryData.put(AgentBaseRiskScoreAnalyzer.AGENT_CONTEXT_JSON, agentContextJson);
+
+                BasicDBObject response = new AgentBaseRiskScoreAnalyzer().handle(queryData);
+                if (response == null || response.containsKey("error") || !response.containsKey(AgentBaseRiskScoreAnalyzer.SCORE)) {
+                    loggerMaker.debugAndAddToDb("Agent base risk score: skipping agentKey=" + agentKey
+                        + " (no usable LLM response), will retry next tick");
+                    return;
+                }
+                score = response.getDouble(AgentBaseRiskScoreAnalyzer.SCORE);
+                reason = response.getString(AgentBaseRiskScoreAnalyzer.REASON);
+            }
+
+            int now = Context.now();
+            for (ApiCollection collection : group) {
                 apiCollectionUpdates.add(new UpdateOneModel<>(
-                    Filters.eq(ApiCollection.ID, collectionId),
+                    Filters.eq(ApiCollection.ID, collection.getId()),
                     Updates.combine(
-                        Updates.set(ApiCollection.BASE_RISK_SCORE, cached.getBaseRiskScore()),
-                        Updates.set(ApiCollection.BASE_RISK_SCORE_REASON, cached.getBaseRiskScoreReason()),
-                        Updates.set(ApiCollection.BASE_RISK_SCORE_CALCULATED_AT, Context.now())
+                        Updates.set(ApiCollection.BASE_RISK_SCORE, score),
+                        Updates.set(ApiCollection.BASE_RISK_SCORE_REASON, reason),
+                        Updates.set(ApiCollection.BASE_RISK_SCORE_CALCULATED_AT, now)
                     )
                 ));
-                return;
             }
 
-            String agentContextJson = AgentBaseRiskScoreAnalyzer.buildAgentContextJson(collection);
-            BasicDBObject queryData = new BasicDBObject();
-            queryData.put(AgentBaseRiskScoreAnalyzer.AGENT_CONTEXT_JSON, agentContextJson);
-
-            BasicDBObject response = new AgentBaseRiskScoreAnalyzer().handle(queryData);
-            if (response == null || response.containsKey("error") || !response.containsKey(AgentBaseRiskScoreAnalyzer.SCORE)) {
-                loggerMaker.debugAndAddToDb("Agent base risk score: skipping collection " + collectionId
-                    + " (no usable LLM response), will retry next tick");
-                return;
-            }
-
-            double score = response.getDouble(AgentBaseRiskScoreAnalyzer.SCORE);
-            String reason = response.getString(AgentBaseRiskScoreAnalyzer.REASON);
-            int now = Context.now();
-
-            apiCollectionUpdates.add(new UpdateOneModel<>(
-                Filters.eq(ApiCollection.ID, collectionId),
-                Updates.combine(
-                    Updates.set(ApiCollection.BASE_RISK_SCORE, score),
-                    Updates.set(ApiCollection.BASE_RISK_SCORE_REASON, reason),
-                    Updates.set(ApiCollection.BASE_RISK_SCORE_CALCULATED_AT, now)
-                )
-            ));
-
-            if (agentKey != null) {
+            if (!fresh) {
                 cacheUpdates.add(new UpdateOneModel<>(
                     Filters.eq(AgentBaseRiskScore.ID, agentKey),
                     Updates.combine(
@@ -226,15 +205,10 @@ public class AgentBaseRiskScoreCron {
                 ));
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error scoring agent base risk for collection " + collectionId + ": " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Error scoring agent base risk for agentKey=" + agentKey + ": " + e.getMessage());
         }
     }
 
-    /**
-     * Manual test entrypoint: runs the exact same processAccount logic for a single account,
-     * bypassing callDibs/AccountTask's all-accounts loop. Not wired into any scheduler - call this
-     * directly when needed.
-     */
     public void forceRunForAccount(int accountId) {
         Context.accountId.set(accountId);
         Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, accountId));
@@ -243,5 +217,11 @@ public class AgentBaseRiskScoreCron {
             return;
         }
         processAccount(account);
+    }
+
+    public static void main(String[] args) {
+        DaoInit.init(new com.mongodb.ConnectionString("mongodb://localhost:27017"));
+        AgentBaseRiskScoreCron cron = new AgentBaseRiskScoreCron();
+        cron.forceRunForAccount(1_000_000);
     }
 }
