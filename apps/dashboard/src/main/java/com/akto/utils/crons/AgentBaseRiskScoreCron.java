@@ -81,11 +81,14 @@ public class AgentBaseRiskScoreCron {
 
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             if (featureAccess == null || !featureAccess.getIsGranted()) {
+                loggerMaker.debugAndAddToDb("Agent base risk score cron: skipping accountId=" + accountId
+                    + " (feature access not granted)");
                 return;
             }
 
             List<ApiCollection> candidates = findCandidates();
             if (candidates.isEmpty()) {
+                loggerMaker.debugAndAddToDb("Agent base risk score cron: no candidates found for accountId=" + accountId);
                 return;
             }
             loggerMaker.infoAndAddToDb("Agent base risk score cron processing accountId=" + accountId
@@ -179,14 +182,29 @@ public class AgentBaseRiskScoreCron {
                 queryData.put(AgentBaseRiskScoreAnalyzer.AGENT_CONTEXT_JSON, agentContextJson);
 
                 BasicDBObject response = new AgentBaseRiskScoreAnalyzer().handle(queryData);
-                if (response == null || response.containsKey("error") || !response.containsKey(AgentBaseRiskScoreAnalyzer.SCORE)) {
-                    loggerMaker.debugAndAddToDb("Agent base risk score: skipping agentKey=" + agentKey
-                        + " (no usable LLM response), will retry next tick");
+                if (response == null) {
+                    loggerMaker.debugAndAddToDb("Agent base risk score: skipping accountId=" + accountId
+                        + ", agentKey=" + agentKey + " (null LLM response), will retry next tick");
+                    return;
+                }
+                if (response.containsKey("error")) {
+                    loggerMaker.debugAndAddToDb("Agent base risk score: skipping accountId=" + accountId
+                        + ", agentKey=" + agentKey + " (LLM error: " + response.getString("error")
+                        + "), will retry next tick");
+                    return;
+                }
+                if (!response.containsKey(AgentBaseRiskScoreAnalyzer.SCORE)) {
+                    loggerMaker.debugAndAddToDb("Agent base risk score: skipping accountId=" + accountId
+                        + ", agentKey=" + agentKey + " (response missing score field: " + response
+                        + "), will retry next tick");
                     return;
                 }
                 score = response.getDouble(AgentBaseRiskScoreAnalyzer.SCORE);
                 reason = response.getString(AgentBaseRiskScoreAnalyzer.REASON);
             }
+
+            loggerMaker.infoAndAddToDb("Agent base risk score: accountId=" + accountId + ", agentKey=" + agentKey
+                + ", fresh=" + fresh + ", score=" + score + ", reason=" + reason);
 
             int now = Context.now();
             for (ApiCollection collection : group) {
@@ -212,7 +230,8 @@ public class AgentBaseRiskScoreCron {
                 ));
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error scoring agent base risk for agentKey=" + agentKey + ": " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Error scoring agent base risk for accountId=" + accountId
+                + ", agentKey=" + agentKey + ": " + e.getMessage());
         }
     }
 
