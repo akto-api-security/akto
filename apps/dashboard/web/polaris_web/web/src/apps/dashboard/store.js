@@ -1,5 +1,6 @@
 import {create} from "zustand"
 import {devtools} from "zustand/middleware"
+import { devtoolsOptions } from "@/apps/main/devtoolsConfig"
 
 let store = (set)=>({
     leftNavCollapsed: false,
@@ -49,7 +50,7 @@ let store = (set)=>({
     
 })
 
-store = devtools(store)
+store = devtools(store, devtoolsOptions("Store"))
 const Store = create(store)
 
 export default Store
