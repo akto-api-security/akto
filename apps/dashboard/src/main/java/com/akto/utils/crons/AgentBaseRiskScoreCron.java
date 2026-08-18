@@ -49,6 +49,10 @@ public class AgentBaseRiskScoreCron {
     private static final int RECALC_THRSHOLD_SECONDS = 7 * 24 * 60 * 60;
     private static final int CONCURRENCY = 1;
 
+    private static final java.util.Set<Integer> ALLOWED_ACCOUNT_IDS = new java.util.HashSet<>(
+        java.util.Arrays.asList(1_783_981_503, 1_000_000)
+    );
+
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void setUpAgentBaseRiskScoreCronScheduler() {
@@ -71,6 +75,10 @@ public class AgentBaseRiskScoreCron {
     private void processAccount(Account account) {
         int accountId = account.getId();
         try {
+            if (!ALLOWED_ACCOUNT_IDS.contains(accountId)) {
+                return;
+            }
+
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             if (featureAccess == null || !featureAccess.getIsGranted()) {
                 return;
