@@ -152,17 +152,22 @@ public class AgentBaseRiskScoreAnalyzer extends AzureOpenAIPromptHandler {
             + "\n"
             + "    If a field contains JSON-encoded data, parse it normally.\n"
             + "\n"
-            + "    Use the name, type, description, and any equivalent fields that are\n"
-            + "    available to identify the underlying capability.\n"
-            + "\n"
-            + "    The tool type describes HOW the capability is exposed, not WHAT the\n"
-            + "    capability is. Generic types such as \"MCP server\", \"connector\",\n"
-            + "    \"integration\", or \"RAG\" do not by themselves establish the capability.\n"
-            + "\n"
-            + "    When a recognizable product, platform, or service appears in any\n"
-            + "    available field, use your own knowledge and its known capabilities together with the other\n"
-            + "    available information to classify the underlying capability. Do not\n"
-            + "    require another field to explicitly confirm it.\n"
+            + "    Use the name, type, description, and any equivalent fields that are\n" + //
+                                "available to identify the underlying capability.\n" + //
+                                "\n" + //
+                                "The tool type describes HOW the capability is exposed, not WHAT the\n" + //
+                                "capability is. Generic types such as \"MCP server\", \"connector\",\n" + //
+                                "\"integration\", or \"RAG\" do not by themselves establish the capability.\n" + //
+                                "\n" + //
+                                "For each tool, identify the underlying product, platform, service, or\n" + //
+                                "function represented by the available information.\n" + //
+                                "\n" + //
+                                "If a tool name is a compound name, inspect its individual components\n" + //
+                                "for recognizable product or platform names. Use the recognized\n" + //
+                                "product/platform's known functionality to classify the tool.\n" + //
+                                "\n" + //
+                                "Do not classify a tool as UNKNOWN merely because its description or\n" + //
+                                "type is generic."
             + "\n"
             + "    Classify each recognizable tool by its highest capability:\n"
             + "\n"
