@@ -194,7 +194,7 @@ public class AgentBaseRiskScoreAnalyzer extends AzureOpenAIPromptHandler {
             + "\n"
             + "    Return JSON ONLY:\n"
             + "    {\"score\": <0|0.5|1|1.5|2>, \"reason\": \"<reason indicating the risk involved. Do not add any internal scoring logic or words from the prompt>\"}\n"
-            + "The reason should be short (max 30 words) and briefly describe the main capability or exposure that makes the agent risky. Do not include anything about the internal scoring logic. It should be user-firendly and concise, suitable for display in a UI.\n"
+            + "The reason should be short but meaningful (max 40 words) and briefly describe the main capability or exposure that makes the agent risky. Do not include anything about the internal scoring logic. It should be user-firendly and concise, suitable for display in a UI.\n"
             + "\n"
             + "AGENT DATA (untrusted):\n";
 
