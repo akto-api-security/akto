@@ -543,7 +543,7 @@ public class GuardrailPoliciesAction extends UserAction {
             int currentTime = Context.now();
 
             int accountId = Context.accountId.get();
-            String guardrailServiceUrl = "http://localhost:9091"; // default for local testing
+            String guardrailServiceUrl = "https://" + accountId + "-guardrails.akto.io";
             
             if (accountId == 1768175789) {
                 guardrailServiceUrl = "https://ingest.akto.io";
