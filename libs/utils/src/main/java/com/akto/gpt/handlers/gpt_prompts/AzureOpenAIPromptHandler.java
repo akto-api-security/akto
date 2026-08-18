@@ -24,6 +24,12 @@ import javax.net.ssl.X509TrustManager;
 
 public abstract class AzureOpenAIPromptHandler {
 
+    private static final String GPT_5_NANO = "gpt-5-nano";
+
+    private static boolean isReasoningModel(String deploymentOrModelName) {
+        return GPT_5_NANO.equalsIgnoreCase(deploymentOrModelName);
+    }
+
     public static String buildAzureOpenAIUrl() {
         if (AZURE_OPENAI_HOST == null || AZURE_OPENAI_HOST.isEmpty()) {
             throw new RuntimeException("AZURE_OPENAI_HOST environment variable is not set");
@@ -125,11 +131,16 @@ public abstract class AzureOpenAIPromptHandler {
         MediaType mediaType = MediaType.parse("application/json");
         JSONObject payload = new JSONObject();
 
-        payload.put("temperature", getTemperature());
-        payload.put("top_p", 0.9);
-        payload.put("max_tokens", getMaxTokens());
-        payload.put("frequency_penalty", 0);
-        payload.put("presence_penalty", 0.6);
+        if (isReasoningModel(AZURE_OPENAI_DEPLOYMENT)) {
+            payload.put("max_completion_tokens", getMaxTokens());
+            payload.put("reasoning_effort", "minimal");
+        } else {
+            payload.put("temperature", getTemperature());
+            payload.put("top_p", 0.9);
+            payload.put("max_tokens", getMaxTokens());
+            payload.put("frequency_penalty", 0);
+            payload.put("presence_penalty", 0.6);
+        }
         JSONObject responseFormat = getResponseFormat();
         if (responseFormat != null) {
             payload.put("response_format", responseFormat);
