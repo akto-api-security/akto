@@ -316,10 +316,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
 
         }else {
-            // Self signup (no invite). There is no accountId yet, so the scope-role mapping is derived
-            // inside createUserAndRedirect once domain matching resolves the account. Initializing it
-            // here would default the user to API Security regardless of the organization's products.
-            this.scopeRoleMapping = null;
+            this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.name(), 0, email);
         }
         createUserAndRedirect(email, name, auth0SignupInfo, 0, Config.ConfigType.AUTH0.toString(), this.scopeRoleMapping);
         code = "";
@@ -983,12 +980,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.info("Skipping OktaLogin.getInstance() - oktaConfig: " + (oktaConfig != null ? "found" : "null") + ", isOnPremDeployment: " + DashboardMode.isOnPremDeployment());
         }
 
-//        if(oktaConfig == null) {
-//            logger.error("No Okta configuration found for accountId: " + accountId + ", redirecting to SSO login page");
-//            logger.info("Redirecting to: " + SSO_URL);
-//            servletResponse.sendRedirect(SSO_URL);
-//            return ERROR.toUpperCase();
-//        }
+       if(oktaConfig == null) {
+           logger.error("No Okta configuration found for accountId: " + accountId + ", redirecting to SSO login page");
+           logger.info("Redirecting to: " + SSO_URL);
+           servletResponse.sendRedirect(SSO_URL);
+           return ERROR.toUpperCase();
+       }
 
         logger.infoAndAddToDb("Okta SSO login initiated for accountId: " + accountId +
                              " with organizationDomain: " + oktaConfig.getOrganizationDomain());
