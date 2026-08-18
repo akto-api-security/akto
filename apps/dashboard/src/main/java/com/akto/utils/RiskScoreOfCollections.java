@@ -224,6 +224,8 @@ public class RiskScoreOfCollections {
                                         .append("method", "$method");
         pipeline.add(Aggregates.group(groupedId,Accumulators.addToSet("subTypes", "$subType")));
 
+        McpApiRiskScoreUtils.McpRiskScoreContext mcpRiskScoreContext = McpApiRiskScoreUtils.buildMcpRiskScoreContext();
+
         MongoCursor<BasicDBObject> stiCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while(stiCursor.hasNext()){
             try {
@@ -238,7 +240,10 @@ public class RiskScoreOfCollections {
                 if(apiInfo == null){
                     continue;
                 }
-                float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, getRiskScoreValueFromSeverityScore(apiInfo.getSeverityScore()));
+                float baseScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, getRiskScoreValueFromSeverityScore(apiInfo.getSeverityScore()));
+                float riskScore = mcpRiskScoreContext.isEmpty()
+                        ? baseScore
+                        : McpApiRiskScoreUtils.getRiskScoreWithMcpAdjustments(apiInfo, baseScore, mcpRiskScoreContext);
                 Bson update = Updates.combine(
                     Updates.set(ApiInfo.IS_SENSITIVE, isSensitive),
                     Updates.set(ApiInfo.RISK_SCORE, riskScore)
