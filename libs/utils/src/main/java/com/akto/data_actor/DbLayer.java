@@ -2417,6 +2417,18 @@ public class DbLayer {
         boolean forwardToNewRelic = NewRelicIntegrationDao.instance.findOne(new BasicDBObject()) != null;
         boolean forwardToOpenTelemetry = OpenTelemetryIntegrationDao.instance.findOne(new BasicDBObject()) != null;
 
+        forwardMetrics(metricData, accountId, forwardToNewRelic, forwardToOpenTelemetry);
+    }
+
+    public static void ingestMetricsDataFromConsumer(List<MetricData> metricData) {
+        MetricDataDao.instance.insertMany(metricData);
+
+        int accountId = Context.accountId.get();
+        IntegrationForwardingFlags flags = getCachedIntegrationFlags(accountId);
+        forwardMetrics(metricData, accountId, flags.forwardToNewRelic, flags.forwardToOpenTelemetry);
+    }
+
+    private static void forwardMetrics(List<MetricData> metricData, int accountId, boolean forwardToNewRelic, boolean forwardToOpenTelemetry) {
         if (forwardToNewRelic) {
             loggerMaker.infoAndAddToDb(String.format("Forwarding %d metrics to New Relic for account %d", metricData.size(), accountId), LogDb.DB_ABS);
             try {
@@ -2454,6 +2466,34 @@ public class DbLayer {
                 loggerMaker.errorAndAddToDb(e, "Error submitting Akto infra metrics task: " + e.getMessage(), LogDb.DB_ABS);
             }
         }
+    }
+
+    private static final Map<Integer, IntegrationForwardingFlags> integrationForwardingFlagsCache = new ConcurrentHashMap<>();
+    private static final int INTEGRATION_FORWARDING_FLAGS_CACHE_TTL_SECONDS = 300;
+
+    private static class IntegrationForwardingFlags {
+        final boolean forwardToNewRelic;
+        final boolean forwardToOpenTelemetry;
+        final int cachedAtSeconds;
+
+        IntegrationForwardingFlags(boolean forwardToNewRelic, boolean forwardToOpenTelemetry, int cachedAtSeconds) {
+            this.forwardToNewRelic = forwardToNewRelic;
+            this.forwardToOpenTelemetry = forwardToOpenTelemetry;
+            this.cachedAtSeconds = cachedAtSeconds;
+        }
+    }
+
+    private static IntegrationForwardingFlags getCachedIntegrationFlags(int accountId) {
+        IntegrationForwardingFlags cached = integrationForwardingFlagsCache.get(accountId);
+        int now = Context.now();
+        if (cached != null && (now - cached.cachedAtSeconds) < INTEGRATION_FORWARDING_FLAGS_CACHE_TTL_SECONDS) {
+            return cached;
+        }
+        boolean forwardToNewRelic = NewRelicIntegrationDao.instance.findOne(new BasicDBObject()) != null;
+        boolean forwardToOpenTelemetry = OpenTelemetryIntegrationDao.instance.findOne(new BasicDBObject()) != null;
+        IntegrationForwardingFlags fresh = new IntegrationForwardingFlags(forwardToNewRelic, forwardToOpenTelemetry, now);
+        integrationForwardingFlagsCache.put(accountId, fresh);
+        return fresh;
     }
     public static void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         Integer accountId = Context.accountId.get();

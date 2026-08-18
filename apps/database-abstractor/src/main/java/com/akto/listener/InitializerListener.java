@@ -10,10 +10,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.akto.DaoInit;
+import com.akto.MetricsKafkaConsumer;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.TestingRunWebhookDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.kafka.MetricsKafkaProducer;
 import com.akto.merging.Cron;
 import com.akto.metrics.AllMetrics;
 import com.akto.util.filter.DictionaryFilter;
@@ -97,6 +99,25 @@ public class InitializerListener implements ServletContextListener {
         if (kafkaUtils.isFastDiscoveryEnabled()) {
             logger.info("Starting fast-discovery consumer in background thread");
             kafkaUtils.startFastDiscoveryConsumer();
+        }
+
+        if (MetricsKafkaProducer.isMetricsKafkaConsumerEnabled()) {
+            logger.info("Starting metrics kafka consumer in background thread");
+            startMetricsKafkaConsumer();
+        }
+    }
+
+    private static void startMetricsKafkaConsumer() {
+        try {
+            MetricsKafkaConsumer metricsKafkaConsumer = new MetricsKafkaConsumer(
+                MetricsKafkaProducer.getMetricsBrokerUrl(),
+                MetricsKafkaProducer.getMetricsTopicName(),
+                MetricsKafkaProducer.getMetricsConsumerGroupId(),
+                MetricsKafkaProducer.getMetricsMaxPollRecords()
+            );
+            metricsKafkaConsumer.start();
+        } catch (Exception e) {
+            logger.error("error starting metrics kafka consumer", e);
         }
     }
 

@@ -89,6 +89,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.CustomAuthUtil;
 import com.akto.utils.KafkaUtils;
+import com.akto.kafka.MetricsKafkaProducer;
 import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
 import com.akto.utils.StiCountAlert;
@@ -3029,8 +3030,9 @@ public class DbAction extends ActionSupport {
 
     public String ingestMetricsData() {
         try {
-            // Then ingest the new metrics
-            DbLayer.ingestMetricsData(metricData);
+            if (!MetricsKafkaProducer.produceIngestMetricsData(metricData, Context.accountId.get())) {
+                DbLayer.ingestMetricsData(metricData);
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in ingestMetricsData: " + e.getMessage());
             return Action.ERROR.toUpperCase();
@@ -3118,7 +3120,9 @@ public class DbAction extends ActionSupport {
 
     public String insertRuntimeMetricsData() {
         try {
-            DbLayer.insertRuntimeMetricsData(metricsData);
+            if (!MetricsKafkaProducer.produceRuntimeMetricsData(metricsData, Context.accountId.get())) {
+                DbLayer.insertRuntimeMetricsData(metricsData);
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertRuntimeMetricsData " + e.toString());
             return Action.ERROR.toUpperCase();

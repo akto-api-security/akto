@@ -17,18 +17,27 @@ public class Kafka {
     public boolean producerReady;
 
     public Kafka(String brokerIP, int lingerMS, int batchSize) {
+        this(brokerIP, lingerMS, batchSize, null, null);
+    }
+
+    
+    public Kafka(String brokerIP, int lingerMS, int batchSize, String acks, String compressionType) {
         producerReady = false;
         try {
-            setProducer(brokerIP, lingerMS, batchSize);
+            setProducer(brokerIP, lingerMS, batchSize, acks, compressionType);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public void send(String message,String topic) {
+    public void send(String message, String topic) {
+        send(null, message, topic);
+    }
+
+    public void send(String key, String message, String topic) {
         if (!this.producerReady) return;
 
-        ProducerRecord<String, String> record = new ProducerRecord<>(topic,message);
+        ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, message);
         producer.send(record, new DemoProducerCallback());
     }
 
@@ -37,7 +46,7 @@ public class Kafka {
         //producer.close(Duration.ofMillis(0)); // close immediately
     }
 
-    private void setProducer(String brokerIP, int lingerMS, int batchSize) {
+    private void setProducer(String brokerIP, int lingerMS, int batchSize, String acks, String compressionType) {
         if (producer != null) close(); // close existing producer connection
 
         int requestTimeoutMs = 5000;
@@ -50,6 +59,12 @@ public class Kafka {
         kafkaProps.put(ProducerConfig.RETRIES_CONFIG, 0);
         kafkaProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, requestTimeoutMs);
         kafkaProps.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, lingerMS + requestTimeoutMs);
+        if (acks != null) {
+            kafkaProps.put(ProducerConfig.ACKS_CONFIG, acks);
+        }
+        if (compressionType != null) {
+            kafkaProps.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, compressionType);
+        }
         producer = new KafkaProducer<String, String>(kafkaProps);
 
         // test if connection successful by sending a test message in a blocking way

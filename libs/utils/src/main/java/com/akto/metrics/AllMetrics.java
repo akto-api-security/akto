@@ -7,6 +7,7 @@ import com.akto.data_actor.DbLayer;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.kafka.MetricsKafkaProducer;
 import com.akto.log.LoggerMaker;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
@@ -598,7 +599,9 @@ public class AllMetrics {
                         if (metrics == null || metrics.isEmpty()) continue;
                         Context.accountId.set(accId);
                         loggerMaker.info("Ingesting TC metrics for accountId: " + accId, LoggerMaker.LogDb.DB_ABS);
-                        DbLayer.ingestMetricsData(metrics);
+                        if (!MetricsKafkaProducer.produceIngestMetricsData(metrics, accId)) {
+                            DbLayer.ingestMetricsData(metrics);
+                        }
                     }
                 }
             }, 0, 120, TimeUnit.SECONDS);
