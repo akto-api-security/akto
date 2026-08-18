@@ -45,8 +45,10 @@ public abstract class AzureOpenAIPromptHandler {
 
     public BasicDBObject handle(BasicDBObject queryData) {
         String handlerName = this.getClass().getSimpleName();
+        logger.info(handlerName + ".handle: starting");
         try {
             validate(queryData);
+            logger.info(handlerName + ".handle: validation passed");
 
             String prompt = getPrompt(queryData);
             logger.info(handlerName + ".handle: prompt built, length=" + (prompt != null ? prompt.length() : 0));
