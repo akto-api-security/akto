@@ -114,6 +114,13 @@ public class GuardrailPolicies {
     // AgentUsersDao.findDeviceIdsByTags, and unioned with that result at fetch time.
     private Map<String, List<String>> targetTags;
 
+    // Raw actor emails for connectors whose traffic has no real device (e.g. Claude Inference
+    // Hooks) — stored as-is, never slugified here. GuardrailPoliciesAction.fetchGuardrailPolicies()
+    // resolves each into the device label live traffic would carry (DeviceLabelUtil.fromEmail) and
+    // folds it into the same targetDeviceIds resolution above, so it participates in
+    // hasTargeting/applyToDeviceIds identically.
+    private List<String> connectorActorEmails;
+
     @BsonIgnore
     private List<String> applyToDeviceIds;
 

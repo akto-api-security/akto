@@ -27,16 +27,26 @@ public class GuardrailPoliciesAction extends ActionSupport {
         try {
             this.guardrailPolicies = DbLayer.fetchGuardrailPolicies(updatedAfter, contextSource);
 
-            // Resolve targetTags/targetDeviceIds → device IDs
+            // Resolve targetTags/targetDeviceIds/connectorActorEmails → device IDs
             for (GuardrailPolicies p : this.guardrailPolicies) {
                 EnterpriseLicenseComplianceCatalog.applyToPolicy(p);
                 boolean hasTagTargeting = p.getTargetTags() != null && !p.getTargetTags().isEmpty();
-                boolean hasTargeting = hasTagTargeting
-                        || (p.getTargetDeviceIds() != null && !p.getTargetDeviceIds().isEmpty());
+                boolean hasDeviceTargeting = p.getTargetDeviceIds() != null && !p.getTargetDeviceIds().isEmpty();
+                boolean hasConnectorTargeting = p.getConnectorActorEmails() != null && !p.getConnectorActorEmails().isEmpty();
+                boolean hasTargeting = hasTagTargeting || hasDeviceTargeting || hasConnectorTargeting;
                 if (hasTargeting) {
                     try {
+                        List<String> effectiveDeviceIds = new java.util.ArrayList<>();
+                        if (hasDeviceTargeting) {
+                            effectiveDeviceIds.addAll(p.getTargetDeviceIds());
+                        }
+                        if (hasConnectorTargeting) {
+                            for (String email : p.getConnectorActorEmails()) {
+                                effectiveDeviceIds.add(com.akto.util.DeviceLabelUtil.fromEmail(email));
+                            }
+                        }
                         p.setApplyToDeviceIds(DbLayer.findDeviceIdsByTags(
-                                p.getTargetTags(), p.getTargetDeviceIds()));
+                                p.getTargetTags(), effectiveDeviceIds));
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Error resolving device IDs for policy " + p.getHexId() + ": " + e.getMessage(), LogDb.DASHBOARD);
                         p.setApplyToDeviceIds(new java.util.ArrayList<>());
