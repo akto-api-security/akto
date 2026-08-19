@@ -35,6 +35,7 @@ import LocalStore from "@/apps/main/LocalStorageStore";
 import guardrailApi from "@/apps/dashboard/pages/guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "@/apps/dashboard/pages/guardrails/utils";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
+import { canUseViolationsNewLayout } from "./newLayoutAccess";
 import { isEndpointSecurityCategory } from "@/apps/main/labelHelper";
 
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "@/apps/dashboard/pages/observe/api_collections/endpointShieldHelper";
@@ -460,10 +461,11 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
         };
     });
 
-    // Latency graph is Akto-internal only (matches the same gate on ThreatDetectionPage.jsx).
+    // Latency graph is Akto-internal only (matches the same gate on ThreatDetectionPage.jsx),
+    // and hidden on the demo account, which has no Agent Gateway writing GUARDRAIL_* metrics.
     // Everyone else gets Open/Other Violations side by side instead of stacked, since there's
     // no third column to fill the space next to them.
-    const isAktoUser = window.USER_NAME?.includes('@akto.io');
+    const isAktoUser = window.USER_NAME?.includes('@akto.io') && !func.isDemoAccount();
 
     const openCard = (
         <Box
@@ -605,7 +607,7 @@ function Violations() {
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
     const legacyPath = isEndpointSecurityCategory() ? "/dashboard/protection/threat-activity" : "/dashboard/guardrails/activity";
-    const canUseNewLayout = func.isDemoAccount() || [1000000, 1726615470, 1779231193].includes(window.ACTIVE_ACCOUNT);
+    const canUseNewLayout = canUseViolationsNewLayout();
 
     useEffect(() => {
         if (!canUseNewLayout || !newLayout) {
