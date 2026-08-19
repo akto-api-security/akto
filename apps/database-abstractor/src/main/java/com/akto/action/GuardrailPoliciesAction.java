@@ -27,26 +27,18 @@ public class GuardrailPoliciesAction extends ActionSupport {
         try {
             this.guardrailPolicies = DbLayer.fetchGuardrailPolicies(updatedAfter, contextSource);
 
-            // Resolve targetTags/targetDeviceIds/connectorActorEmails → device IDs
+            // Resolve targetTags/targetDeviceIds → device IDs
             for (GuardrailPolicies p : this.guardrailPolicies) {
                 EnterpriseLicenseComplianceCatalog.applyToPolicy(p);
                 boolean hasTagTargeting = p.getTargetTags() != null && !p.getTargetTags().isEmpty();
-                boolean hasDeviceTargeting = p.getTargetDeviceIds() != null && !p.getTargetDeviceIds().isEmpty();
-                boolean hasConnectorTargeting = p.getConnectorActorEmails() != null && !p.getConnectorActorEmails().isEmpty();
-                boolean hasTargeting = hasTagTargeting || hasDeviceTargeting || hasConnectorTargeting;
+                boolean hasTargeting = hasTagTargeting
+                        || (p.getTargetDeviceIds() != null && !p.getTargetDeviceIds().isEmpty());
                 if (hasTargeting) {
                     try {
-                        List<String> effectiveDeviceIds = new java.util.ArrayList<>();
-                        if (hasDeviceTargeting) {
-                            effectiveDeviceIds.addAll(p.getTargetDeviceIds());
-                        }
-                        if (hasConnectorTargeting) {
-                            for (String email : p.getConnectorActorEmails()) {
-                                effectiveDeviceIds.add(com.akto.util.DeviceLabelUtil.fromEmail(email));
-                            }
-                        }
-                        p.setApplyToDeviceIds(DbLayer.findDeviceIdsByTags(
-                                p.getTargetTags(), effectiveDeviceIds));
+                        List<String> resolvedDeviceIds = new java.util.ArrayList<>(DbLayer.findDeviceIdsByTags(
+                                p.getTargetTags(), p.getTargetDeviceIds()));
+                        resolvedDeviceIds.addAll(p.resolveInferenceHooksDeviceLabels());
+                        p.setApplyToDeviceIds(resolvedDeviceIds);
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Error resolving device IDs for policy " + p.getHexId() + ": " + e.getMessage(), LogDb.DASHBOARD);
                         p.setApplyToDeviceIds(new java.util.ArrayList<>());
