@@ -35,7 +35,6 @@ import LocalStore from "@/apps/main/LocalStorageStore";
 import guardrailApi from "@/apps/dashboard/pages/guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "@/apps/dashboard/pages/guardrails/utils";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
-import { canUseViolationsNewLayout } from "./newLayoutAccess";
 import { isEndpointSecurityCategory } from "@/apps/main/labelHelper";
 
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "@/apps/dashboard/pages/observe/api_collections/endpointShieldHelper";
@@ -607,14 +606,12 @@ function Violations() {
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
     const legacyPath = isEndpointSecurityCategory() ? "/dashboard/protection/threat-activity" : "/dashboard/guardrails/activity";
-    const canUseNewLayout = canUseViolationsNewLayout();
 
     useEffect(() => {
-        if (!canUseNewLayout || !newLayout) {
-            if (newLayout) setGuardrailViolationsNewLayout(false);
+        if (!newLayout) {
             navigate(legacyPath, { replace: true });
         }
-    }, [navigate, legacyPath, canUseNewLayout, newLayout, setGuardrailViolationsNewLayout]);
+    }, [navigate, legacyPath, newLayout]);
 
     const handleLayoutToggle = useCallback((checked) => {
         setGuardrailViolationsNewLayout(checked);
@@ -1378,7 +1375,7 @@ function Violations() {
                 />
             }
             isFirstPage
-            secondaryActions={canUseNewLayout && <NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />}
+            secondaryActions={<NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />}
             primaryAction={
                 <DateRangeFilter
                     initialDispatch={currDateRange}
