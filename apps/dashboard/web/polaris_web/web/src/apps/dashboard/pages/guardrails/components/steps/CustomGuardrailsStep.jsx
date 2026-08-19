@@ -285,9 +285,6 @@ const CustomGuardrailsStep = ({
                     {enableLlmRedaction && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="4">
-                                {/* No status prop: matches the neutral default used by the
-                                    other guardrail notices (e.g. ServerSettingsStep's browser-LLM
-                                    banner, whose tone="info" is a no-op on Polaris 11). */}
                                 <Banner>
                                     Requires Akto browser extension v1.0.69 or later and is supported
                                     on browser only for now, on claude.ai and chatgpt.com. Support for
