@@ -46,7 +46,6 @@ import {
     CodeDetectionConfig,
     CustomGuardrailsStep,
     CustomGuardrailsConfig,
-    DEFAULT_REDACTION_REPLACEMENT,
     UsageGuardrailsStep,
     UsageGuardrailsConfig,
     AnomalyDetectionStep,
@@ -134,7 +133,6 @@ const buildRedactionRules = (enabled, rules) => {
         .map(r => ({
             enabled: true,
             userPrompt: r.userPrompt.trim(),
-            replacementString: (r.replacementString || "").trim() || DEFAULT_REDACTION_REPLACEMENT,
             confidenceScore: r.confidenceScore ?? 0.5
         }));
 };
@@ -808,7 +806,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         const savedRedactionRules = (policy.redactionRules || []).map(r => ({
             enabled: r.enabled !== false,
             userPrompt: r.userPrompt || "",
-            replacementString: r.replacementString || DEFAULT_REDACTION_REPLACEMENT,
             confidenceScore: r.confidenceScore ?? 0.5
         }));
         setRedactionRules(savedRedactionRules);

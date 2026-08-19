@@ -181,10 +181,6 @@ export const CUSTOM_GUARDRAILS_DESCRIPTIONS = {
         description: 'Write a plain-language instruction describing what to mask; an LLM finds the matching text and replaces it in place, then lets the request through. Example: "Redact customer full names and home addresses." Use this instead of a block rule when the request should still succeed with the sensitive parts removed.',
         examples: []
     },
-    redactionReplacement: {
-        description: 'The marker written in place of each redacted value, exactly as you enter it. Every match is replaced with this same text [REDACTED].',
-        examples: []
-    },
     redactionConfidenceThreshold: {
         description: 'Text is only masked once the LLM\'s confidence that it matches your instruction exceeds this number. Lower it to catch more, raise it to reduce false redactions.',
         examples: []

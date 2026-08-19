@@ -14,18 +14,11 @@ const validateUrl = (url) => {
 
 const PROMPT_MIN_LENGTH = 10;
 
-export const DEFAULT_REDACTION_REPLACEMENT = "[REDACTED]";
-
 export const newRedactionRule = () => ({
     enabled: true,
     userPrompt: "",
-    replacementString: DEFAULT_REDACTION_REPLACEMENT,
     confidenceScore: 0.5
 });
-
-// The replacement is substituted into the payload and the result is re-serialized as
-// JSON, so a quote or backslash in the marker would corrupt the body downstream.
-const INVALID_REPLACEMENT_CHARS = /["\\]/;
 
 const validateRedactionRules = (rules) => {
     for (const rule of rules || []) {
@@ -36,9 +29,6 @@ const validateRedactionRules = (rules) => {
         }
         if (prompt.length < PROMPT_MIN_LENGTH) {
             return `Redaction instruction is too short. Use at least ${PROMPT_MIN_LENGTH} characters so the model can act on it.`;
-        }
-        if (INVALID_REPLACEMENT_CHARS.test(rule.replacementString || "")) {
-            return 'Replacement text cannot contain quotes or backslashes.';
         }
     }
     return null;
@@ -302,22 +292,6 @@ const CustomGuardrailsStep = ({
                                     multiline={3}
                                     placeholder="e.g. Redact customer full names and home addresses"
                                     helpText="Be specific about what to mask. Anything not described here is left untouched. To redact a second, unrelated category, create another policy."
-                                />
-
-                                <TextField
-                                    label={
-                                        <HorizontalStack gap="1" blockAlign="center">
-                                            <Text as="span">Replacement text</Text>
-                                            <ControlInfoIcon
-                                                {...CUSTOM_GUARDRAILS_DESCRIPTIONS.redactionReplacement}
-                                                onTryPrompt={onTryPrompt}
-                                            />
-                                        </HorizontalStack>
-                                    }
-                                    value={redactionRule.replacementString}
-                                    onChange={(value) => updateRedactionRule({ replacementString: value })}
-                                    placeholder={DEFAULT_REDACTION_REPLACEMENT}
-                                    helpText={`Written in place of every match, exactly as entered. Defaults to ${DEFAULT_REDACTION_REPLACEMENT} if left blank.`}
                                 />
 
                                 <RangeSlider

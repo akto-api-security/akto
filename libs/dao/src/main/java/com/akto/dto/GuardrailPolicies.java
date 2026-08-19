@@ -420,13 +420,11 @@ public class GuardrailPolicies {
     public static class RedactionRule {
         private boolean enabled;
         private String userPrompt;
-        private String replacementString;
         private double confidenceScore;
 
-        public RedactionRule(boolean enabled, String userPrompt, String replacementString, double confidenceScore) {
+        public RedactionRule(boolean enabled, String userPrompt, double confidenceScore) {
             this.enabled = enabled;
             this.userPrompt = userPrompt;
-            this.replacementString = replacementString;
             this.confidenceScore = confidenceScore;
         }
     }
