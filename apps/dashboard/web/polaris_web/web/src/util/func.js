@@ -2472,6 +2472,14 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
         year: 'numeric'
       })} ${timeStr}`;
   },
+  // values.ranges has no 30-day preset (it jumps 7 days -> 2 months) and pages pick their
+  // default by index into that array, so a 30-day default is built here instead.
+  getLast30DaysRange(){
+    const until = new Date(new Date().setHours(23, 59, 59, 999));
+    const since = new Date(new Date(new Date().setDate(until.getDate() - 30)).setHours(0, 0, 0, 0));
+    return { title: "Last 30 days", alias: "last30days", period: { since, until } };
+  },
+
   isDemoAccount(){
      return window.ACTIVE_ACCOUNT === 1669322524
   },

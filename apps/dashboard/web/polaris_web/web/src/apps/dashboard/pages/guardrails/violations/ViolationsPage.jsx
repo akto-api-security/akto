@@ -675,9 +675,10 @@ function Violations() {
         };
     }, []);
 
+    // values.ranges has no 30-day preset (it jumps 7 days -> 2 months), so pass the range inline.
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges[4],
+        func.getLast30DaysRange(),
     );
 
     const getTimeEpoch = useCallback((key) => {
