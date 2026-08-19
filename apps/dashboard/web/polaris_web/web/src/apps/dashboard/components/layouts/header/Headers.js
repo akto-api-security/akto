@@ -258,7 +258,9 @@ export default function Header() {
             setNewAccount('')
             resetAll();
             resetStore();
-            window.location.href = "/dashboard/onboarding"
+            // Onboarding flow disabled — see SignUp.jsx.
+            // window.location.href = "/dashboard/onboarding"
+            window.location.href = "/dashboard/observe/inventory"
         })
     }
 
