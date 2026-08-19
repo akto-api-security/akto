@@ -67,6 +67,28 @@ export default {
         return resp
     },
 
+    // Kick off one background comparison of this policy's recent violations: the saved policy
+    // versus the edited draft, over the same events. Returns a runId to poll.
+    // policyName must be the name the violations were recorded under (the pre-edit name), since a
+    // guardrail event's filterId *is* the policy name.
+    async startPolicyReplay({ policy, policyName, hexId }) {
+        const resp = await request({
+            url: '/api/startPolicyReplay',
+            method: 'post',
+            data: { policy, policyName, hexId }
+        })
+        return resp
+    },
+
+    async pollPolicyReplay(runId) {
+        const resp = await request({
+            url: '/api/pollPolicyReplay',
+            method: 'post',
+            data: { runId }
+        })
+        return resp
+    },
+
     async fetchBrowserExtensionConfigs() {
         const resp = await request({
             url: '/api/fetchBrowserExtensionConfigs',

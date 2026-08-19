@@ -16,6 +16,7 @@ import {
 } from "@shopify/polaris-icons";
 import PersistStore from '../../../../main/PersistStore';
 import AgenticSearchInput from '../../agentic/components/AgenticSearchInput';
+import ViolationReplayPanel from './ViolationReplayPanel';
 import guardrailApi from '../api';
 import settingsApi from '../../settings/api';
 import {
@@ -1595,6 +1596,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 </div>
 
                 <div className="guardrail-playground">
+                    {/* Only in edit mode: violations join to a policy by name, so there is nothing
+                        to replay until the policy has been saved at least once. Uses the saved name
+                        rather than the edited one for the same reason. */}
+                    {isEditMode && editingPolicy?.name && (
+                        <ViolationReplayPanel
+                            policyName={editingPolicy.name}
+                            hexId={editingPolicy.hexId}
+                            buildPolicy={() => transformPolicyForBackend(buildPlaygroundPolicyData())}
+                        />
+                    )}
                     <Box padding="5">
                         <Text variant="headingMd" as="h3" fontWeight="semibold">Playground</Text>
                     </Box>
