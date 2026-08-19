@@ -12,6 +12,12 @@ import {
 } from "@shopify/polaris";
 
 import guardrailApi from '../api';
+import Store from '../../../store';
+
+// Accounts this panel is enabled for, while the comparison is still being validated against real
+// traffic. Gated rather than shipped to everyone because a run costs real scanner calls and the
+// counts are only meaningful once a policy has enough recorded violations to compare over.
+const ENABLED_ACCOUNT_IDS = ['1726615470']; // nginx demo
 
 // Cadence for reading run progress. The run itself is one server-side job; this only reads it.
 const POLL_INTERVAL_MS = 2000;
@@ -72,6 +78,7 @@ const MissedPrompt = ({ prompt }) => {
  * @param buildPolicy returns the current form state as a backend policy payload
  */
 const ViolationReplayPanel = ({ policyName, hexId, buildPolicy }) => {
+    const activeAccount = Store(state => state.activeAccount);
     const [status, setStatus] = useState("idle"); // idle | running | done | error
     const [error, setError] = useState("");
     const [result, setResult] = useState(null);
@@ -135,6 +142,11 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy }) => {
             setStatus("error");
         }
     };
+
+    // After the hooks, never before: bailing earlier would change the hook count between renders.
+    if (!ENABLED_ACCOUNT_IDS.includes(String(activeAccount))) {
+        return null;
+    }
 
     const current = result?.currentDetected || 0;
     const modified = result?.modifiedDetected || 0;
