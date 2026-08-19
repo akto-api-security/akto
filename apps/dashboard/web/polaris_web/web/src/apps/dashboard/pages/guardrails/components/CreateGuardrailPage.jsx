@@ -123,6 +123,21 @@ const reverseAgentKeys = (v2Servers, allCollections) => {
     return [...new Set(keys)];
 };
 
+// Normalises the redaction rows into what the backend stores. Always call this and
+// always send the result — the save endpoint only writes fields that are present, so
+// omitting the key when the feature is switched off would leave the previously saved
+// rules live on the policy.
+const buildRedactionRules = (enabled, rules) => {
+    if (!enabled) return [];
+    return (rules || [])
+        .filter(r => r.enabled && (r.userPrompt || "").trim())
+        .map(r => ({
+            enabled: true,
+            userPrompt: r.userPrompt.trim(),
+            confidenceScore: r.confidenceScore ?? 0.5
+        }));
+};
+
 const getLlmServiceKeySet = (allCollections) => {
     const keys = new Set();
     (allCollections || []).forEach(c => {
@@ -211,6 +226,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [llmPrompt, setLlmPrompt] = useState("");
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
     const [llmCompliance, setLlmCompliance] = useState({});
+    const [enableLlmRedaction, setEnableLlmRedaction] = useState(false);
+    const [redactionRules, setRedactionRules] = useState([]);
     const [enableExternalModel, setEnableExternalModel] = useState(false);
     const [url, setUrl] = useState("");
     const [confidenceScore, setConfidenceScore] = useState(25);
@@ -257,7 +274,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     const [agenticUsers, setAgenticUsers] = useState([]);
     const [usersLoading, setUsersLoading] = useState(false);
-    const [deviceList, setDeviceList] = useState([]);
 
     // Collections data
     const [mcpServers, setMcpServers] = useState([]);
@@ -363,6 +379,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableLlmPrompt,
         llmPrompt,
         llmConfidenceScore,
+        enableLlmRedaction,
+        redactionRules,
         enableExternalModel,
         url,
         confidenceScore,
@@ -542,31 +560,19 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         return () => { isActive = false; };
     }, []);
 
-    // Fetch agentic users to populate team/role options, and module infos for device count (Atlas only)
+    // Fetch agentic users to populate team/role/device targeting options (Atlas only). This is
+    // the single source of truth for every "users" display in the wizard — availableDevices and
+    // matchingDeviceRows below are both derived from it, so the "Apply to all" and "Select Device
+    // Tags & Users" popovers always show the same per-device, suffixed data.
     useEffect(() => {
         if (!isEndpointSecurityCategory()) return;
         let isActive = true;
         (async () => {
             setUsersLoading(true);
             try {
-                const [agenticUsersResp, moduleResp] = await Promise.all([
-                    settingsApi.fetchAgenticUsers().catch(() => ({})),
-                    settingsApi.fetchModuleInfo({ moduleType: 'MCP_ENDPOINT_SHIELD' }).catch(() => ({})),
-                ]);
+                const agenticUsersResp = await settingsApi.fetchAgenticUsers().catch(() => ({}));
                 if (!isActive) return;
                 setAgenticUsers(agenticUsersResp?.agenticUsers || []);
-                const seen = new Set();
-                setDeviceList(
-                    (moduleResp?.moduleInfos || []).reduce((acc, m) => {
-                        const ad = m?.additionalData || {};
-                        const label = ad.username || ad.userName || ad.user || m.name || '';
-                        if (label && !seen.has(label)) {
-                            seen.add(label);
-                            acc.push({ label, value: label });
-                        }
-                        return acc;
-                    }, [])
-                );
             } finally {
                 if (isActive) setUsersLoading(false);
             }
@@ -682,6 +688,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setLlmPrompt("");
         setLlmConfidenceScore(0.5);
         setLlmCompliance({});
+        setEnableLlmRedaction(false);
+        setRedactionRules([]);
         setEnableExternalModel(false);
         setUrl("");
         setConfidenceScore(25);
@@ -793,6 +801,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setLlmPrompt(policy.llmRule?.userPrompt || "");
         setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
         setLlmCompliance(policy.llmRule?.compliance || {});
+
+        // LLM redaction. Must be hydrated here or editing an existing policy saves
+        // an empty list back over the stored rules.
+        const savedRedactionRules = (policy.redactionRules || []).map(r => ({
+            enabled: r.enabled !== false,
+            userPrompt: r.userPrompt || "",
+            confidenceScore: r.confidenceScore ?? 0.5
+        }));
+        setRedactionRules(savedRedactionRules);
+        setEnableLlmRedaction(savedRedactionRules.some(r => r.enabled && r.userPrompt.trim()));
 
         // Base Prompt Based Validation (AI Agents)
         setEnableBasePromptRule(policy.basePromptRule?.enabled || false);
@@ -967,6 +985,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     confidenceScore: llmConfidenceScore,
                     compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 },
+                redactionRules: buildRedactionRules(enableLlmRedaction, redactionRules),
                 basePromptRule: {
                     enabled: enableBasePromptRule,
                     confidenceScore: basePromptConfidenceScore
@@ -1146,6 +1165,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setLlmConfidenceScore={setLlmConfidenceScore}
                         llmCompliance={llmCompliance}
                         setLlmCompliance={setLlmCompliance}
+                        enableLlmRedaction={enableLlmRedaction}
+                        setEnableLlmRedaction={setEnableLlmRedaction}
+                        redactionRules={redactionRules}
+                        setRedactionRules={setRedactionRules}
                         enableExternalModel={enableExternalModel}
                         setEnableExternalModel={setEnableExternalModel}
                         url={url}
@@ -1234,7 +1257,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         usersLoading={usersLoading}
                         applyToAllUsers={applyToAllUsers}
                         setApplyToAllUsers={setApplyToAllUsers}
-                        deviceList={deviceList}
+                        deviceList={availableDevices}
                         showConditionError={leftSteps.has(ServerSettingsConfig.number)}
                         showUserConditionError={leftSteps.has(ServerSettingsConfig.number)}
                     />
@@ -1311,6 +1334,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 }
             } : {}),
+            redactionRules: buildRedactionRules(enableLlmRedaction, redactionRules),
             ...(enableBasePromptRule ? {
                 basePromptRule: {
                     enabled: true,

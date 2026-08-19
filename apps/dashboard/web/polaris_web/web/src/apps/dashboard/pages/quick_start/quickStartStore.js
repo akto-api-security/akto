@@ -1,5 +1,6 @@
 import {create} from "zustand"
 import {devtools} from "zustand/middleware"
+import { devtoolsOptions } from "@/apps/main/devtoolsConfig"
 
 let quickStartStore = (set)=>({
     currentConnector: null,
@@ -23,7 +24,7 @@ let quickStartStore = (set)=>({
     },
 })
 
-quickStartStore = devtools(quickStartStore)
+quickStartStore = devtools(quickStartStore, devtoolsOptions("QuickStartStore"))
 const QuickStartStore = create(quickStartStore)
 
 export default QuickStartStore

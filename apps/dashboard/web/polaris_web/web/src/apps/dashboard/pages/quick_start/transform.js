@@ -2455,7 +2455,6 @@ const quickStartFunc = {
 
             const microsoftConnectors = [
                 m365CopilotObj, copilotStudioImportObj, copilotStudioMultiEnvImportObj,
-                githubCopilotIdeObj, githubCopilotHookObj,
             ]
 
             connectors = {

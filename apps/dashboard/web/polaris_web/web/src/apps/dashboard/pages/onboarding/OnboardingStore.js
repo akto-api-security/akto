@@ -1,5 +1,6 @@
 import {create} from "zustand"
 import {devtools} from "zustand/middleware"
+import { devtoolsOptions } from "@/apps/main/devtoolsConfig"
 
 let onboardingStore = (set)=>({
     selectedCollection: null,
@@ -23,7 +24,7 @@ let onboardingStore = (set)=>({
     },
 })
 
-onboardingStore = devtools(onboardingStore)
+onboardingStore = devtools(onboardingStore, devtoolsOptions("OnboardingStore"))
 const OnboardingStore = create(onboardingStore)
 
 export default OnboardingStore

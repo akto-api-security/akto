@@ -103,9 +103,10 @@ const headers = [
   }
 ]
 
+// columnIndex is the 1-based position of the run_time header above
 const sortOptions = [
-  { label: 'Run time', value: 'scheduleTimestamp asc', directionLabel: 'Newest run', sortKey: 'scheduleTimestamp', columnIndex: 4 },
-  { label: 'Run time', value: 'scheduleTimestamp desc', directionLabel: 'Oldest run', sortKey: 'scheduleTimestamp', columnIndex: 4 }
+  { label: 'Run time', value: 'scheduleTimestamp asc', directionLabel: 'Newest run', sortKey: 'scheduleTimestamp', columnIndex: 5 },
+  { label: 'Run time', value: 'scheduleTimestamp desc', directionLabel: 'Oldest run', sortKey: 'scheduleTimestamp', columnIndex: 5 }
 ];
 
 const resourceName = {
@@ -163,7 +164,7 @@ function TestRunsPage(props) {
 
   filters = func.getCollectionFilters(filters)
 
-const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.getRange("last1month"));
+const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
 const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
 }

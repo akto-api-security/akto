@@ -353,14 +353,24 @@ function ApiEndpoints(props) {
     const [savingSystemPrompt, setSavingSystemPrompt] = useState(false)
 
 
-    const isSkillCollection = (apiInfoList || []).some(info => info?.id?.url?.includes('/skills/'))
+
+    const { isSkillCollection, blockedSkillsCount } = useMemo(() => {
+        let hasSkill = false;
+        let blockedCount = 0;
+        (apiInfoList || []).forEach(info => {
+            if (info?.id?.url?.includes('/skills/')) {
+                hasSkill = true;
+                if (info.isSkillBlocked) blockedCount += 1;
+            }
+        });
+        return { isSkillCollection: hasSkill, blockedSkillsCount: blockedCount };
+    }, [apiInfoList]);
 
     // the values used here are defined at the server.
     const baseTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Zombie'] )
     const definedTableTabs = isSkillCollection ? [...baseTableTabs, 'Blocked Skills'] : baseTableTabs
 
     const { tabsInfo } = useTable()
-    const blockedSkillsCount = (apiInfoList || []).filter(info => info?.id?.url?.includes('/skills/') && info.isSkillBlocked).length
     const tableCountObj = { ...func.getTabsCount(definedTableTabs, endpointData), ...(isSkillCollection ? { blocked_skills: blockedSkillsCount } : {}) }
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
@@ -474,10 +484,6 @@ function ApiEndpoints(props) {
         let data = {}
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap,apiInfoSeverityMap)
 
-        // Scope to config-only, skills-only, or plugin-only endpoints when navigated from the agent
-        // tree. Config/skill endpoints live inside the agent's own collection, so they need scoping to
-        // stay distinct from its other traffic — plugins now get their own dedicated collection, so
-        // there's nothing else in it to hide from.
         if (agenticView === 'config') {
             allEndpoints = allEndpoints.filter(e => e?.endpoint?.includes('/config/'))
         } else if (agenticView === 'skills') {

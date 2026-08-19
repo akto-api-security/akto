@@ -1,5 +1,6 @@
 import {create} from "zustand"
 import {devtools} from "zustand/middleware"
+import { devtoolsOptions } from "@/apps/main/devtoolsConfig"
 
 let tableStore = (set)=>({
     selectedItems: [],
@@ -10,6 +11,6 @@ let tableStore = (set)=>({
 
 })
 
-tableStore = devtools(tableStore)
+tableStore = devtools(tableStore, devtoolsOptions("TableStore"))
 const TableStore = create(tableStore)
 export default TableStore

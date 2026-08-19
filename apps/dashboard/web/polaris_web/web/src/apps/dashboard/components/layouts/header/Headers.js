@@ -178,6 +178,12 @@ export default function Header() {
         }
     }, 500), [searchItemsArr]);
 
+    useEffect(() => {
+        return () => {
+            debouncedSearch.cancel();
+        };
+    }, [debouncedSearch]);
+
     const handleSearchChange = useCallback((value) => {
         setSearchValue(value);
         debouncedSearch(value.toLowerCase());

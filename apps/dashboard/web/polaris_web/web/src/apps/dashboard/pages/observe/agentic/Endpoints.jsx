@@ -24,6 +24,7 @@ import {
     fetchAndCacheAgenticSensitiveInfo,
 } from "./constants";
 import { CLIENT_TYPES, ROW_TYPES } from "./mcpClientHelper";
+import MisconfiguredBadge from "./MisconfiguredBadge";
 
 const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills', 'Plugins'];
 
@@ -114,7 +115,7 @@ function shapeRow(row, { skillScoreMap = {} } = {}) {
             <Text>{row.name}</Text>
             {showPersonal && <Badge size="small" status="warning">Contains personal account</Badge>}
             {showLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
-            {showMisconfigured && <Badge size="small" status="attention">Misconfigured</Badge>}
+            {showMisconfigured && <MisconfiguredBadge deviceCount={row.misconfiguredDeviceCount} />}
             {showMalicious && <Badge size="small" status="critical">Malicious</Badge>}
             {owningPluginName && <Badge size="small" status="info">{`${owningPluginName} plugin`}</Badge>}
         </HorizontalStack>

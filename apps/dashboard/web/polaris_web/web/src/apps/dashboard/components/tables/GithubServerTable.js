@@ -52,7 +52,7 @@ function GithubServerTable(props) {
     setSearchParams(newSearchParams, { replace: true });
   };
 
-  const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.getRange("last1month"))
+  const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
   const [hideFilter, setHideFilter] = useState(false)
   const filtersWrapRef = useRef(null)
   const [exportPortalTarget, setExportPortalTarget] = useState(null)
@@ -254,6 +254,9 @@ function GithubServerTable(props) {
 
   useEffect(() => {
     handleSelectedTab(props?.selected)
+  }, [props?.selected])
+
+  useEffect(() => {
     setActiveColumnSort(tableFunc.getColumnSort(sortSelected, props?.sortOptions))
     fetchData(queryValue);
   }, [sortSelected, appliedFilters, page, pageFiltersMap])
@@ -399,9 +402,15 @@ function GithubServerTable(props) {
       changeAppliedFilters(key, { values: [], negated });
     }
   }
-
   const getSortedChoices = (choices) => {
-    return choices.sort((a, b) => (a?.label || a) - (b?.label || b));
+    return [...choices].sort((a, b) => {
+      const labelA = a?.label ?? a;
+      const labelB = b?.label ?? b;
+      if (typeof labelA === 'number' && typeof labelB === 'number') {
+        return labelA - labelB;
+      }
+      return String(labelA).localeCompare(String(labelB), undefined, { numeric: true, sensitivity: 'base' });
+    });
   }
 
   const filters = useMemo(() => {
