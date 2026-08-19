@@ -10,7 +10,6 @@ import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
-import com.akto.util.DeviceLabelUtil;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.enums.GlobalEnums.GuardrailSource;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -104,28 +103,20 @@ public class GuardrailPoliciesAction extends UserAction {
             this.guardrailPolicies = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(skip, limit);
             this.total = GuardrailPoliciesDao.instance.getTotalCount();
 
-            // Resolve targetTags/targetDeviceIds/connectorActorEmails → device IDs fresh on every fetch.
+            // Resolve targetTags/targetDeviceIds → device IDs fresh on every fetch.
             // applyToDeviceIds left null (never set below) = no targeting configured → apply to all devices.
             // applyToDeviceIds set to a List (possibly empty, when targeting matches zero devices)
             // = targeting configured → apply only to the listed device labels; empty means apply to none.
             // null vs. an empty List must stay distinguishable on the wire — do not collapse them.
             for (GuardrailPolicies p : this.guardrailPolicies) {
                 boolean hasTagTargeting = p.getTargetTags() != null && !p.getTargetTags().isEmpty();
-                boolean hasDeviceTargeting = p.getTargetDeviceIds() != null && !p.getTargetDeviceIds().isEmpty();
-                boolean hasConnectorTargeting = p.getConnectorActorEmails() != null && !p.getConnectorActorEmails().isEmpty();
-                boolean hasTargeting = hasTagTargeting || hasDeviceTargeting || hasConnectorTargeting;
+                boolean hasTargeting = hasTagTargeting
+                        || (p.getTargetDeviceIds() != null && !p.getTargetDeviceIds().isEmpty());
                 if (hasTargeting) {
-                    List<String> effectiveDeviceIds = new ArrayList<>();
-                    if (hasDeviceTargeting) {
-                        effectiveDeviceIds.addAll(p.getTargetDeviceIds());
-                    }
-                    if (hasConnectorTargeting) {
-                        for (String email : p.getConnectorActorEmails()) {
-                            effectiveDeviceIds.add(DeviceLabelUtil.fromEmail(email));
-                        }
-                    }
-                    p.setApplyToDeviceIds(AgentUsersDao.instance.findDeviceIdsByTags(
-                            p.getTargetTags(), effectiveDeviceIds));
+                    List<String> resolvedDeviceIds = new ArrayList<>(AgentUsersDao.instance.findDeviceIdsByTags(
+                            p.getTargetTags(), p.getTargetDeviceIds()));
+                    resolvedDeviceIds.addAll(p.resolveInferenceHooksDeviceLabels());
+                    p.setApplyToDeviceIds(resolvedDeviceIds);
                 }
                 EnterpriseLicenseComplianceCatalog.applyToPolicy(p);
             }
@@ -362,9 +353,6 @@ public class GuardrailPoliciesAction extends UserAction {
         }
         if (p.getTargetDeviceIds() != null) {
             updates.add(Updates.set("targetDeviceIds", p.getTargetDeviceIds()));
-        }
-        if (p.getConnectorActorEmails() != null) {
-            updates.add(Updates.set("connectorActorEmails", p.getConnectorActorEmails()));
         }
         if (p.getTargetTags() != null) {
             updates.add(Updates.set("targetTags", p.getTargetTags()));

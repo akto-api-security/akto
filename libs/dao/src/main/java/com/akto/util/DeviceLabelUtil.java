@@ -23,13 +23,10 @@ public class DeviceLabelUtil {
     }
 
     /**
-     * The device label guardrails-service extracts from a request's Host header
-     * (first dot-segment of "{label}.ai-agent.{app}", see
-     * ProviderGuardrailAction#buildAgentHost). Given the same email, always
-     * returns the same label a live request from that actor would carry.
+     * Device-label slug an Inference Hooks request's Host is built from
+     * (see ProviderGuardrailAction.buildAgentHost) — {@code slugify(emailLocalPart(email))}.
      */
     public static String fromEmail(String email) {
-        String slug = slugify(emailLocalPart(email));
-        return slug.isEmpty() ? "unknown" : slug;
+        return slugify(emailLocalPart(email));
     }
 }

@@ -5,9 +5,9 @@ import com.akto.action.guardrail.ProviderAdapter;
 import com.akto.action.guardrail.ProviderRegistry;
 import com.akto.dao.context.Context;
 import com.akto.gateway.Gateway;
+import com.akto.util.DeviceLabelUtil;
 import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
-import com.akto.util.DeviceLabelUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -197,7 +197,11 @@ public class ProviderGuardrailAction extends ActionSupport {
      * is intentionally omitted.
      */
     private static String buildAgentHost(ParsedRequest frame) {
-        return DeviceLabelUtil.fromEmail(extractEmail(frame.actor)) + ".ai-agent." + normalizeApp(frame.application);
+        String emailSlug = DeviceLabelUtil.fromEmail(extractEmail(frame.actor));
+        if (emailSlug.isEmpty()) {
+            emailSlug = "unknown";
+        }
+        return emailSlug + ".ai-agent." + normalizeApp(frame.application);
     }
 
     private static String extractEmail(Map<String, Object> actor) {
