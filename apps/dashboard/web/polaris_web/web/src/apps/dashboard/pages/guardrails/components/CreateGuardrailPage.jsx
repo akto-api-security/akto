@@ -377,7 +377,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableToolNameDescriptionMismatch,
         // Step 11
         blockedHosts,
-        blockPersonalAccounts,
         // Step 13
         ignorePhrases,
         // Step 10
