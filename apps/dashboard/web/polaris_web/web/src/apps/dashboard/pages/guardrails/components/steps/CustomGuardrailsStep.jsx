@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox, HorizontalStack, Badge } from "@shopify/polaris";
+import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox, HorizontalStack, Badge, Banner } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import ControlInfoIcon from "../ControlInfoIcon";
 import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
@@ -284,35 +284,42 @@ const CustomGuardrailsStep = ({
                     />
                     {enableLlmRedaction && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <FormLayout>
-                                <TextField
-                                    label="Redaction instruction"
-                                    value={redactionRule.userPrompt}
-                                    onChange={(value) => updateRedactionRule({ userPrompt: value })}
-                                    multiline={3}
-                                    placeholder="e.g. Redact customer full names and home addresses"
-                                    helpText="Be specific about what to mask. Anything not described here is left untouched. To redact a second, unrelated category, create another policy."
-                                />
+                            <VerticalStack gap="4">
+                                <Banner>
+                                    Requires Akto browser extension v1.0.69 or later and is supported
+                                    on browser only for now, on claude.ai and chatgpt.com. Support for
+                                    Endpoint Shield Agent to come soon.
+                                </Banner>
+                                <FormLayout>
+                                    <TextField
+                                        label="Redaction instruction"
+                                        value={redactionRule.userPrompt}
+                                        onChange={(value) => updateRedactionRule({ userPrompt: value })}
+                                        multiline={3}
+                                        placeholder="e.g. Redact customer full names and home addresses"
+                                        helpText="Be specific about what to mask. Anything not described here is left untouched. To redact a second, unrelated category, create another policy."
+                                    />
 
-                                <RangeSlider
-                                    label={
-                                        <HorizontalStack gap="1" blockAlign="center">
-                                            <Text as="span">Confidence score threshold</Text>
-                                            <ControlInfoIcon
-                                                {...CUSTOM_GUARDRAILS_DESCRIPTIONS.redactionConfidenceThreshold}
-                                                onTryPrompt={onTryPrompt}
-                                            />
-                                        </HorizontalStack>
-                                    }
-                                    value={redactionRule.confidenceScore}
-                                    onChange={(value) => updateRedactionRule({ confidenceScore: value })}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    helpText="Text is only masked if the LLM's confidence that it matches your instruction exceeds this threshold"
-                                />
-                            </FormLayout>
+                                    <RangeSlider
+                                        label={
+                                            <HorizontalStack gap="1" blockAlign="center">
+                                                <Text as="span">Confidence score threshold</Text>
+                                                <ControlInfoIcon
+                                                    {...CUSTOM_GUARDRAILS_DESCRIPTIONS.redactionConfidenceThreshold}
+                                                    onTryPrompt={onTryPrompt}
+                                                />
+                                            </HorizontalStack>
+                                        }
+                                        value={redactionRule.confidenceScore}
+                                        onChange={(value) => updateRedactionRule({ confidenceScore: value })}
+                                        min={0}
+                                        max={1}
+                                        step={0.1}
+                                        output
+                                        helpText="Text is only masked if the LLM's confidence that it matches your instruction exceeds this threshold"
+                                    />
+                                </FormLayout>
+                            </VerticalStack>
                         </Box>
                     )}
                 </Box>
