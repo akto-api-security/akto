@@ -10,6 +10,7 @@ import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithM
 import DeviceFlyout from "./DeviceFlyout";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import { SeverityBadge, RiskPill } from "./AgenticCellRenderers";
+import MisconfiguredBadge from "./MisconfiguredBadge";
 import DonutChart from "../../../components/shared/DonutChart";
 import AgenticStatsCard from "./AgenticStatsCard";
 import { EndpointBrowserTrendChart } from "./TrendCharts";
@@ -232,7 +233,7 @@ function UsernameCellInner({ data, node }) {
                 (data.hasPersonalAccount || data.hasMisconfiguredConfig) ? (
                     <HorizontalStack gap="1" blockAlign="center" wrap={false}>
                         {data.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
-                        {data.hasMisconfiguredConfig && <Badge size="small" status="attention">Misconfigured</Badge>}
+                        {data.hasMisconfiguredConfig && <MisconfiguredBadge />}
                     </HorizontalStack>
                 ) : null
             }

@@ -490,6 +490,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         final Set<String> rawTagValues = new HashSet<>();
         final Set<String> hostNames = new HashSet<>();
         final Set<String> endpointIds = new HashSet<>();
+        final Set<String> misconfiguredEndpointIds = new HashSet<>();
         final Set<String> skillNames = new HashSet<>();
         // Only the count is serialized per row, same as skillNames — full list comes from the detail call.
         final Set<String> pluginNames = new HashSet<>();
@@ -565,7 +566,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                         hasPersonalAccount = true;
                     }
                     if ("local-mcp-server".equals(key)) hasLocalMcpServer = true;
-                    if ("misconfigured-config".equals(key) && "true".equals(value)) hasMisconfiguredConfig = true;
+                    if ("misconfigured-config".equals(key) && "true".equals(value)) {
+                        hasMisconfiguredConfig = true;
+                        if (deviceId != null) misconfiguredEndpointIds.add(deviceId);
+                    }
                 }
             }
             if (collRisk > maxRiskScore) {
@@ -611,6 +615,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             g.put("hasPersonalAccount", hasPersonalAccount);
             g.put("hasLocalMcpServer", hasLocalMcpServer);
             g.put("hasMisconfiguredConfig", hasMisconfiguredConfig);
+            g.put("misconfiguredDeviceCount", misconfiguredEndpointIds.size());
             if (!sensitiveTypes.isEmpty()) g.put("sensitiveInRespTypes", new ArrayList<>(sensitiveTypes));
             return g;
         }

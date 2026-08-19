@@ -4,6 +4,7 @@ import observeFunc from "../transform";
 import { getRiskStatus } from "./agenticPageBuilders";
 import AssetIcon from "./AssetIcon";
 import { TypeBadge } from "@/apps/dashboard/components/tables/rows/AgGridRow";
+import MisconfiguredBadge from "./MisconfiguredBadge";
 import "../../../components/layouts/style.css";
 
 // ─── Shared badges ────────────────────────────────────────────────────────────
@@ -86,7 +87,7 @@ export function AssetNameCellRenderer({ data }) {
             </Box>
             {showPersonal && <Badge size="small" status="warning">Contains personal account</Badge>}
             {showLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
-            {showMisconfigured && <Badge size="small" status="attention">Misconfigured</Badge>}
+            {showMisconfigured && <MisconfiguredBadge deviceCount={data.misconfiguredDeviceCount} />}
             {showMalicious && <Badge size="small" status="critical">Malicious</Badge>}
         </HorizontalStack>
     );
