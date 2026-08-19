@@ -624,6 +624,7 @@ function GuardrailPolicies() {
                 contentFiltering: guardrailData.contentFiltering,
                 // Add LLM policy if present
                 ...(guardrailData.llmRule ? { llmRule: guardrailData.llmRule } : {}),
+                ...(guardrailData.redactionRules ? { redactionRules: guardrailData.redactionRules } : {}),
                 // Add Base Prompt Rule if present
                 ...(guardrailData.basePromptRule ? { basePromptRule: guardrailData.basePromptRule } : {}),
                 // Add Gibberish Detection if present (same pattern as llmRule)

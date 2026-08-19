@@ -307,6 +307,9 @@ public class GuardrailPoliciesAction extends UserAction {
         if (p.getLlmRule() != null) {
             updates.add(Updates.set("llmRule", p.getLlmRule()));
         }
+        if (p.getRedactionRules() != null) {
+            updates.add(Updates.set("redactionRules", p.getRedactionRules()));
+        }
         if (p.getBasePromptRule() != null) {
             updates.add(Updates.set("basePromptRule", p.getBasePromptRule()));
         }

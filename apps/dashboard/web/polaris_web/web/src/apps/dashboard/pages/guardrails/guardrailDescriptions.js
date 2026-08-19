@@ -177,6 +177,18 @@ export const CUSTOM_GUARDRAILS_DESCRIPTIONS = {
         description: 'A prompt is blocked once the LLM\'s own confidence that it violates your rule exceeds this number. Examples assume the rule "Block requests for competitor pricing."',
         examples: []
     },
+    llmRedactionRule: {
+        description: 'Write a plain-language instruction describing what to mask; an LLM finds the matching text and replaces it in place, then lets the request through. Example: "Redact customer full names and home addresses." Use this instead of a block rule when the request should still succeed with the sensitive parts removed.',
+        examples: []
+    },
+    redactionReplacement: {
+        description: 'The marker written in place of each redacted value, exactly as you enter it. Every match is replaced with this same text [REDACTED].',
+        examples: []
+    },
+    redactionConfidenceThreshold: {
+        description: 'Text is only masked once the LLM\'s confidence that it matches your instruction exceeds this number. Lower it to catch more, raise it to reduce false redactions.',
+        examples: []
+    },
     externalModel: {
         description: "Sends each prompt to your own model or API endpoint instead of Akto's built-in detectors. Useful for logic too specific or proprietary to describe as a rule, e.g. a classifier trained to catch attempts to extract your pricing algorithm. See the Confidence score threshold examples below.",
         examples: []
