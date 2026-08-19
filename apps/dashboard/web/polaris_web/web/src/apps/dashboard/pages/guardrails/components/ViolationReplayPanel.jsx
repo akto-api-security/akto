@@ -14,10 +14,7 @@ import {
 import guardrailApi from '../api';
 import Store from '../../../store';
 
-// Accounts this panel is enabled for, while the comparison is still being validated against real
-// traffic. Gated rather than shipped to everyone because a run costs real scanner calls and the
-// counts are only meaningful once a policy has enough recorded violations to compare over.
-const ENABLED_ACCOUNT_IDS = ['1726615470']; // nginx demo
+const ENABLED_ACCOUNT_IDS = [];
 
 // Cadence for reading run progress. The run itself is one server-side job; this only reads it.
 const POLL_INTERVAL_MS = 2000;
