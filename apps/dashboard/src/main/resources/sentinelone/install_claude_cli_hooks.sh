@@ -101,9 +101,9 @@ get_api_token() {
 generate_device_id() {
     local device_name=""
     if [ "$IS_MACOS" = true ]; then
-        device_name=$(scutil --get ComputerName 2>/dev/null | tr ' ' '-')
+        device_name=$(scutil --get ComputerName 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g')
     fi
-    [ -z "$device_name" ] && device_name=$(hostname 2>/dev/null | sed 's/\.local$//' | tr ' ' '-')
+    [ -z "$device_name" ] && device_name=$(hostname 2>/dev/null | sed 's/\.local$//' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g')
 
     local machine_id=""
     # macOS: Try ioreg first
