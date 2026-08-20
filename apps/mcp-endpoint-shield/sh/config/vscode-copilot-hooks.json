@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "hooks": {
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "~/.akto/hooks/akto-hook.sh vscode userPromptSubmitted",
+        "powershell": "powershell -ExecutionPolicy Bypass -File %USERPROFILE%\\.akto\\hooks\\akto-hook.ps1 vscode userPromptSubmitted",
+        "timeoutSec": 30
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "~/.akto/hooks/akto-hook.sh vscode preToolUse",
+        "powershell": "powershell -ExecutionPolicy Bypass -File %USERPROFILE%\\.akto\\hooks\\akto-hook.ps1 vscode preToolUse",
+        "timeoutSec": 30
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "~/.akto/hooks/akto-hook.sh vscode postToolUse",
+        "powershell": "powershell -ExecutionPolicy Bypass -File %USERPROFILE%\\.akto\\hooks\\akto-hook.ps1 vscode postToolUse",
+        "timeoutSec": 30
+      }
+    ]
+  }
+}
