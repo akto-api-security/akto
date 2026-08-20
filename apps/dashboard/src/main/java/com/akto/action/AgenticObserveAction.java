@@ -1734,10 +1734,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (assetTag != null && StringUtils.isNotBlank(assetTag.getValue())
                     && !Constants.AKTO_BROWSER_LLM_AGENT_TAG.equals(assetTag.getKeyName())) {
                 String key = McpClientRegistry.resolveClientKey(assetTag.getValue());
+                boolean isSaasAgent = hasTagKey(envType, Constants.AKTO_SAAS_AGENT_TAG);
                 GroupSummary g = groups.computeIfAbsent("agent|" + key, k -> {
                     GroupSummary gs = new GroupSummary(key, "agent");
                     gs.name = McpClientRegistry.formatDisplayName(key);
-                    gs.clientType = McpClientRegistry.getAgentTypeFromValue(key);
+                    gs.clientType = isSaasAgent ? AgenticObserveUtil.CLIENT_TYPE_SAAS_AGENT : McpClientRegistry.getAgentTypeFromValue(key);
                     return gs;
                 });
                 g.tagKey = assetTag.getKeyName();
