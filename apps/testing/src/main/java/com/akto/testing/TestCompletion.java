@@ -64,7 +64,12 @@ public class TestCompletion {
 
         int accountId = Context.accountId.get();
 
-        Main.raiseMixpanelEvent(summaryId, testingRun, accountId);
+        try {
+            Main.raiseMixpanelEvent(summaryId, testingRun, accountId);
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error raising mixpanel event / sending test completion alerts for testingRunId: "
+                    + testingRun.getHexId() + " summaryId: " + summaryId);
+        }
 
         scheduleAutoTicketCreationJob(testingRun, accountId, summaryId);
 
