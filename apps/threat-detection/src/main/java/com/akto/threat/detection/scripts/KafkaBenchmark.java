@@ -28,12 +28,12 @@ public class KafkaBenchmark {
     public static String FILE_PATH = "sample-payloads/";
     public static String payloadFormat = "json";
     public static String payloadSize = payloadSizes.get(0);
-    public static long numRecords = 10000L;
+    public static long numRecords = 100L;
     
     
     
     public static final String THREAT_TOPIC = "akto.api.logs2";
-    public static final String KAFKA_URL = "localhost:29092";
+    public static final String KAFKA_URL = "localhost:9092";
     private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
     private static KafkaConfig internalKafkaConfig =
         KafkaConfig.newBuilder()
@@ -141,8 +141,66 @@ public class KafkaBenchmark {
         return records;
     }
 
+    public static List<HttpResponseParam> buildFromCurl(long numRecords) {
+        HttpResponseParam.Builder builder = HttpResponseParam.newBuilder();
+        List<HttpResponseParam> records = new ArrayList<>();
+        
+        Map<String, StringList> requestHeaders = new HashMap<>();
+        requestHeaders.put("sec-fetch-mode", StringList.newBuilder().addValues("no-cors").build());
+        requestHeaders.put("referer", StringList.newBuilder().addValues("https://portal.fgeguanajuato.gob.mx/PortalWebEstatal/Inicio/Formularios/index.aspx").build());
+        requestHeaders.put("x-ruxit-apache-servernameports", StringList.newBuilder().addValues("portal.fgeguanajuato.gob.mx:443").build());
+        requestHeaders.put("sec-fetch-site", StringList.newBuilder().addValues("same-origin").build());
+        requestHeaders.put("x-dynatrace-requeststate", StringList.newBuilder().addValues("agentId=0x732d7cbb4db44f88&pathDepth=1").build());
+        requestHeaders.put("accept-language", StringList.newBuilder().addValues("es-US,es-MX;q=0.9,es-419;q=0.8,es;q=0.7").build());
+        requestHeaders.put("cookie", StringList.newBuilder().addValues("****").build());
+        requestHeaders.put("x-forwarded-proto", StringList.newBuilder().addValues("https").build());
+        requestHeaders.put("x-forwarded-port", StringList.newBuilder().addValues("443").build());
+        requestHeaders.put("x-dynatrace-application", StringList.newBuilder().addValues("v=2;appId=d1a23b7b3011b5b8;injectionRule=auto;cookieDomain=fgeguanajuato.gob.mx;rid=-615665846;rpid=-1400787882;en=q9r4at6b").build());
+        requestHeaders.put("x-forwarded-for", StringList.newBuilder().addValues("172.16.4.7").build());
+        requestHeaders.put("accept", StringList.newBuilder().addValues("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8").build());
+        requestHeaders.put("sec-ch-ua", StringList.newBuilder().addValues("\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"").build());
+        requestHeaders.put("sec-ch-ua-mobile", StringList.newBuilder().addValues("?1").build());
+        requestHeaders.put("tracestate", StringList.newBuilder().addValues("4b797e96-c8b59c2d@dt=fw4;2;4db44f88;13e6b18;11;0;0;179;fb3b;2h01;3h4db44f88;4h013e6b18;5h01;7hbbd08611a57d8d28").build());
+        requestHeaders.put("x-forwarded-server", StringList.newBuilder().addValues("portal.fgeguanajuato.gob.mx").build());
+        requestHeaders.put("x-forwarded-host", StringList.newBuilder().addValues("wsc.fgeguanajuato.gob.mx").build());
+        requestHeaders.put("sec-ch-ua-platform", StringList.newBuilder().addValues("\"Android\"").build());
+        requestHeaders.put("traceparent", StringList.newBuilder().addValues("00-ea258eda53592cafcb2eb51657050ac6-bbd08611a57d8d28-01").build());
+        requestHeaders.put("host", StringList.newBuilder().addValues("wsc.fgeguanajuato.gob.mx").build());
+        requestHeaders.put("x-dynatrace", StringList.newBuilder().addValues("FW4;-927622099;2;1303662472;20867864;17;1266253462;377;f76d;2h01;3h4db44f88;4h013e6b18;5h01;6hea258eda53592cafcb2eb51657050ac6;7hbbd08611a57d8d28").build());
+        requestHeaders.put("accept-encoding", StringList.newBuilder().addValues("gzip, deflate, br, zstd").build());
+        requestHeaders.put("sec-fetch-dest", StringList.newBuilder().addValues("image").build());
+        requestHeaders.put("user-agent", StringList.newBuilder().addValues("Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36").build());
+
+        
+        builder.setMethod("GET")
+            .setPath("/pw-vinculados/api/v1/biblioteca/archivos/img?idBoletin=4216")
+            .setType("HTTP/1.1")
+            .putAllRequestHeaders(requestHeaders)
+            .setRequestPayload("")
+            .setResponsePayload("")
+            .setApiCollectionId(123)
+            .setStatusCode(200)
+            .setStatus("OK")
+            .setTime((int) (System.currentTimeMillis() / 1000))
+            .setAktoAccountId("1000000")
+            .setIp("172.16.4.7")
+            .setDestIp("wsc.fgeguanajuato.gob.mx")
+            .setDirection("INBOUND")
+            .setIsPending(false)
+            .setSource("MIRRORING")
+            .setAktoVxlanId("1313121")
+            .build();
+        
+        for (long i = 0; i < numRecords; i++) {
+            HttpResponseParam record = builder.build();
+            records.add(record);
+        }
+
+        return records;
+    }
+
     public static void dumpRecords(String payloadSize, long numRecords) {
-        List<HttpResponseParam> records = buildRecords(payloadSize, numRecords);
+        List<HttpResponseParam> records = buildFromCurl(numRecords);
         System.out.printf("Dumping %,d records of size %s to Kafka \n", records.size(), payloadSize);
         timeFunction(() -> {
             dumpMessagesToKafka(THREAT_TOPIC, records);
