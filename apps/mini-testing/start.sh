@@ -4,6 +4,8 @@
 # (MongoDB POJO codec, etc.). Single-token "=" form.
 exec java \
   -XX:+ExitOnOutOfMemoryError \
+  -XX:MaxRAMPercentage=${MAX_RAM_PCT:-75.0} \
+  ${JAVA_OPTS:-} \
   --add-opens=java.base/java.lang=ALL-UNNAMED \
   --add-opens=java.base/java.util=ALL-UNNAMED \
   --add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
