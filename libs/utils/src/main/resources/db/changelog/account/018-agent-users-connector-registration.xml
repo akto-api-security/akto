@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        AgentUsersDao gained ensureConnectorIdentity (registers/merges a connector-only identity
+        into agent_users on first Inference Hooks contact, tagging it via the existing deviceTags
+        mechanism). No schema change: deviceTags already accepts arbitrary key/value/source
+        combinations by design, and AgenticUsers itself has zero field changes. This changeset
+        exists only to satisfy prod.yml's DAO-migration-required check for the DAO file touched
+        by that change, same as 013-runtime-env-overrides-field.
+    -->
+
+    <changeSet id="018-account-agent-users-connector-registration" author="akto">
+        <empty/>
+    </changeSet>
+
+</databaseChangeLog>
