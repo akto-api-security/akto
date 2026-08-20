@@ -42,6 +42,33 @@ public class ApiExecutor {
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * Per-thread wall-time accumulator for the blocking {@code call.execute()} in {@link #common},
+     * split by destination so mini-testing can attribute a test's wall time to
+     * "waiting on the API under test" vs "waiting on ultron/cyborg (persistence)".
+     * <p>Layout: [0]=target nanos, [1]=target calls, [2]=cyborg/ultron nanos, [3]=cyborg/ultron calls.
+     * Runs on the same worker thread as the test, so mini-testing resets it before {@code runTestNew}
+     * and reads it after. Caveat: HTTP a test fans out onto <i>other</i> threads
+     * (e.g. ParallelGraphExecutor) lands in those threads' accumulators, so multi-exec tests
+     * under-count target-HTTP here.
+     */
+    private static final ThreadLocal<long[]> HTTP_TIMING = ThreadLocal.withInitial(() -> new long[4]);
+
+    /** Zero this thread's HTTP-timing accumulator (call before a unit of work you want to measure). */
+    public static void resetHttpTiming() {
+        long[] a = HTTP_TIMING.get();
+        a[0] = a[1] = a[2] = a[3] = 0L;
+    }
+
+    /** Nanos this thread spent in {@code call.execute()} against the API under test since the last reset. */
+    public static long targetHttpNanos() { return HTTP_TIMING.get()[0]; }
+    /** Number of target-API calls this thread made since the last reset. */
+    public static long targetHttpCalls() { return HTTP_TIMING.get()[1]; }
+    /** Nanos this thread spent in {@code call.execute()} against ultron/cyborg since the last reset. */
+    public static long cyborgHttpNanos() { return HTTP_TIMING.get()[2]; }
+    /** Number of ultron/cyborg calls this thread made since the last reset. */
+    public static long cyborgHttpCalls() { return HTTP_TIMING.get()[3]; }
+
 
     private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol, TLSAuthParam authParam) throws Exception {
 
@@ -78,7 +105,15 @@ public class ApiExecutor {
         String body = null;
         byte[] grpcBody = null;
         try {
-            response = call.execute();
+            long execStartNanos = System.nanoTime();
+            try {
+                response = call.execute();
+            } finally {
+                long execNanos = System.nanoTime() - execStartNanos;
+                long[] httpTiming = HTTP_TIMING.get();
+                if (isCyborgCall) { httpTiming[2] += execNanos; httpTiming[3]++; }
+                else             { httpTiming[0] += execNanos; httpTiming[1]++; }
+            }
 
             ResponseBody responseBody = null;
             if (nonTestingContext) {
