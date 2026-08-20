@@ -169,16 +169,20 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         return trimmedName;
     }
 
-    // Registers a connector-only identity (e.g. a Claude Inference Hooks actor) on first contact
-    // so it's targetable from the dropdown; unlike syncSsoIdentity, a match is a no-op, never a rename.
+    // Registers a connector-only identity on first contact; on any existing-identity match, adds our label instead of inserting a duplicate.
     public void ensureConnectorIdentity(String email, String deviceLabel, String lastUpdatedBy) {
         if (email == null || email.trim().isEmpty() || deviceLabel == null || deviceLabel.trim().isEmpty()) {
             return;
         }
         String trimmedEmail = email.trim();
-        if (!findAllIdentityMatches(deviceLabel, trimmedEmail, null).isEmpty()) {
+
+        List<AgenticUsers> matches = findAllIdentityMatches(deviceLabel, trimmedEmail, trimmedEmail);
+        if (!matches.isEmpty()) {
+            List<String> matchedUsernames = matches.stream().map(AgenticUsers::getUserName).distinct().collect(Collectors.toList());
+            instance.updateMany(Filters.in(AgenticUsers.USER_NAME, matchedUsernames), Updates.addToSet("devices", deviceLabel));
             return;
         }
+
         AgenticUsers newUser = new AgenticUsers();
         newUser.setUserName(deviceLabel);
         newUser.setUserEmail(trimmedEmail);
