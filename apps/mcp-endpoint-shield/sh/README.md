@@ -32,12 +32,14 @@ possible; the only strings the shell side encodes are ones it constructs itself.
 
 ```
 akto-hook.sh              entry point and event pipeline
+install.sh                installer / uninstaller for every detected agent
 lib/json.awk              JSON reader/writer (POSIX awk, no gawk extensions)
+lib/setkey.awk            non-destructive single-key merge, used by the installer
 lib/akto_core.sh          config, logging, HTTP, payload, guardrails, warn flow
 lib/akto_adapters.sh      the per-connector differences, and only those
 ps/akto-hook.ps1          Windows twin (PowerShell 5.1 and 7+)
 config/                   ready-to-use hook configs per agent
-tests/                    132 tests — run tests/run_all.sh
+tests/                    168 tests — run tests/run_all.sh
 ```
 
 `lib/akto_adapters.sh` is the whole of what varies between agents: which stdin
@@ -97,7 +99,29 @@ Taken from each vendor's hook reference, and implemented in `adapter_emit_deny`:
   model. `userPromptSubmit` *cannot* block at all, so a violation is injected into
   the model's context instead (exit 0, stdout becomes context).
 
-## Wiring
+## Installing
+
+```sh
+bash install.sh AKTO_DATA_INGESTION_URL=https://your-akto-host AKTO_API_TOKEN=...
+bash install.sh --dry-run          # show what would change
+bash install.sh --only=cursor      # one agent
+bash install.sh --uninstall
+```
+
+It copies the handler to `~/.akto/hooks`, writes `~/.akto/hooks.env`, and merges
+the hook block into every agent config it finds.
+
+The merge needs no `jq`. `lib/setkey.awk` rewrites one top-level key and copies
+every other key through as its original bytes, so unrelated settings survive
+exactly; a config it cannot parse is left untouched rather than replaced, and every
+file it edits is backed up first. (The Python installers shell out to `jq` and, when
+`jq` is absent, replace the whole settings file — losing the user's other settings.)
+
+GitHub Copilot CLI reads `hooks.json` from the working directory rather than a home
+directory, so it is not auto-detected: copy `config/github-copilot-hooks.json` to
+`<repo>/.github/hooks.json`.
+
+## Wiring by hand
 
 Examples in `config/`. Claude Code, using exec form so no shell is involved:
 
@@ -132,6 +156,10 @@ backend-down, non-JSON stdin and empty stdin.
 bash tests/run_all.sh
 ```
 
+- `test_setkey.sh` — 13 cases over the installer's merge: keys preserved, braces
+  and commas inside string values, unparseable input refused rather than replaced
+- `test_install.sh` — 23 cases: detection, non-destructive merge, backups, the
+  installed handler running from its installed path, idempotency, uninstall
 - `test_json.sh` — 33 cases over `lib/json.awk`: JSON syntax embedded in string
   values, escaped quotes, UTF-8, pretty-printed input, prefix keys, content blocks
 - `test_hooks.sh` — 42 cases end-to-end against a mock ingestion endpoint: allow,
