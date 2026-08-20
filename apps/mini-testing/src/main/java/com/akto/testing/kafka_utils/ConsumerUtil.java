@@ -33,8 +33,13 @@ import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
+import com.akto.testing.kafka_utils.TestRunMetrics.Stage;
+
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
 import com.akto.util.Constants;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
@@ -98,6 +103,10 @@ public class ConsumerUtil {
     /** All observability for the current run. Recreated per init(); set before any task is submitted. */
     private TestRunMetrics metrics;
 
+    /** For per-test CPU accounting (compute vs I/O). Null/unsupported -> CPU is reported as 0. */
+    private static final ThreadMXBean THREAD_MX = ManagementFactory.getThreadMXBean();
+    private static final boolean CPU_TIME_SUPPORTED = THREAD_MX.isThreadCpuTimeSupported();
+
     public static SingleTestPayload parseTestMessage(String message) {
         JSONObject jsonObject = JSON.parseObject(message);
         ObjectId testingRunId = new ObjectId(jsonObject.getString("testingRunId"));
@@ -120,9 +129,13 @@ public class ConsumerUtil {
             TestExecutor executor = new TestExecutor();
 
             TestingConfigurations instance = TestingConfigurations.getInstance();
-            TestConfig testConfig = instance.getTestConfigMap().get(subCategory);
 
+            // LOOKUP: in-memory config + sample-message resolution.
+            long lookupStart = System.nanoTime();
+            TestConfig testConfig = instance.getTestConfigMap().get(subCategory);
             List<String> messagesList = instance.getTestingUtil().getSampleMessages().get(apiInfoKey);
+            metrics.recordStage(Stage.LOOKUP, System.nanoTime() - lookupStart);
+
             int timeNow = Context.now();
             if (messagesList == null || messagesList.isEmpty()) {
                 metrics.markSkipped();
@@ -133,9 +146,23 @@ public class ConsumerUtil {
             } else {
                 String sample = messagesList.get(messagesList.size() - 1);
                 loggerMaker.infoAndAddToDb("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
+
+                // RUN_TEST: full test execution wall + CPU; TARGET_HTTP = the slice blocked on the API under test.
+                ApiExecutor.resetHttpTiming();
+                long runCpuStart = CPU_TIME_SUPPORTED ? THREAD_MX.getCurrentThreadCpuTime() : -1L;
+                long runWallStart = System.nanoTime();
                 TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
+                metrics.recordStage(Stage.RUN_TEST, System.nanoTime() - runWallStart);
+                metrics.recordStage(Stage.TARGET_HTTP, ApiExecutor.targetHttpNanos());
+                if (runCpuStart >= 0) metrics.recordRunTestCpu(THREAD_MX.getCurrentThreadCpuTime() - runCpuStart);
+
+                long persistStart = System.nanoTime();
                 executor.persistTestLogsToDb(runResult != null ? runResult.getTestLogs() : null);
+                metrics.recordStage(Stage.PERSIST_LOGS, System.nanoTime() - persistStart);
+
+                long insertStart = System.nanoTime();
                 executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+                metrics.recordStage(Stage.INSERT_RESULTS, System.nanoTime() - insertStart);
 
                 if (runResult != null && runResult.isVulnerable()) {
                     metrics.markVulnerable();
