@@ -256,6 +256,83 @@ public class DbAction extends ActionSupport {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
 
+    // Scoped to the three Vet Partners MDM hosts from customer-issues/vetpartners/install*.log
+    // (LT-VPP-ACAMPBEL, LT-VPP-CCAN, LT-VPP-CBURNS). Device name is what the agent sends as
+    // moduleInfo.name / agentId; substring match covers the random suffix (e.g. -dce73faa).
+    private static final String[] VETPARTNERS_DEBUG_DEVICE_MARKERS = {
+            "lt-vpp-acampbel", "lt-vpp-ccan", "lt-vpp-cburns"
+    };
+    // Dashboard showed AlexCampbell on ACAMPBEL; MDM C:\Users also had VPP601 / iT1Local /
+    // WsiAccount. Administrator and postgres are omitted — they would match unrelated tenants.
+    private static final String[] VETPARTNERS_DEBUG_USER_MARKERS = {
+            "alexcampbell", "vpp601", "it1local", "wsiaccount"
+    };
+    private static final int ENDPOINT_SHIELD_LOG_PREVIEW_CHARS = 240;
+
+    private static boolean matchesVetPartnersDebug(String... values) {
+        for (String value : values) {
+            if (value == null || value.isEmpty()) {
+                continue;
+            }
+            String lower = value.toLowerCase();
+            for (String marker : VETPARTNERS_DEBUG_DEVICE_MARKERS) {
+                if (lower.contains(marker)) {
+                    return true;
+                }
+            }
+            for (String marker : VETPARTNERS_DEBUG_USER_MARKERS) {
+                if (lower.contains(marker)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static String truncateForDebugLog(String value, int maxChars) {
+        if (value == null) {
+            return "null";
+        }
+        if (value.length() <= maxChars) {
+            return value;
+        }
+        return value.substring(0, maxChars) + "...";
+    }
+
+    private static Object additionalDataValue(ModuleInfo moduleInfo, String key) {
+        if (moduleInfo == null || moduleInfo.getAdditionalData() == null) {
+            return null;
+        }
+        return moduleInfo.getAdditionalData().get(key);
+    }
+
+    private void logEndpointShieldModuleIngest(String api, ModuleInfo moduleInfo) {
+        // Heartbeat is what creates the dashboard row (lastHeartbeatReceived + username).
+        // Skip every other Endpoint Shield agent — this is not a general ingest tracer.
+        if (moduleInfo == null) {
+            return;
+        }
+        Object username = additionalDataValue(moduleInfo, "username");
+        Object deviceId = additionalDataValue(moduleInfo, "deviceId");
+        if (!matchesVetPartnersDebug(
+                moduleInfo.getName(),
+                moduleInfo.getId(),
+                username == null ? null : String.valueOf(username),
+                deviceId == null ? null : String.valueOf(deviceId))) {
+            return;
+        }
+        loggerMaker.infoAndAddToDb(
+                api + " MCP_ENDPOINT_SHIELD"
+                        + " accountId=" + Context.accountId.get()
+                        + " id=" + moduleInfo.getId()
+                        + " name=" + moduleInfo.getName()
+                        + " lastHeartbeat=" + moduleInfo.getLastHeartbeatReceived()
+                        + " username=" + username
+                        + " installStatus=" + additionalDataValue(moduleInfo, "installStatus")
+                        + " deviceId=" + deviceId,
+                LogDb.DB_ABS);
+    }
+
     public List<BulkUpdates> getWritesForTestingRunIssues() {
         return writesForTestingRunIssues;
     }
@@ -562,6 +639,8 @@ public class DbAction extends ActionSupport {
 
     public String updateModuleInfo() {
         try {
+            // Dashboard rows come from this heartbeat (lastHeartbeat + username), not from install logs.
+            logEndpointShieldModuleIngest("updateModuleInfoForHeartbeat", moduleInfo);
             moduleInfo = DbLayer.updateModuleInfo(moduleInfo);
             // TODO: in case of modules with fixed names, reset reboot value, if reboot true;
             StiCountAlert.checkStiCount();
@@ -604,6 +683,7 @@ public class DbAction extends ActionSupport {
     
     public String updateModuleInfoForHeartbeatV2() {
         try {
+            logEndpointShieldModuleIngest("updateModuleInfoForHeartbeatV2", moduleInfo);
             moduleInfo = DbLayer.updateModuleInfoForHeartbeatV2(moduleInfo);
             StiCountAlert.checkStiCount();
         } catch (Exception e) {
@@ -2061,6 +2141,17 @@ public class DbAction extends ActionSupport {
                 log.getString("log"),
                 log.getInt("timestamp")
             );
+            // Agent install/runtime lines for the same three hosts. Auth/Kafka traces were
+            // dropped: the filter has no device identity, and Kafka consume just repeats this.
+            if (matchesVetPartnersDebug(dbLog.getAgentId(), dbLog.getDeviceId(), dbLog.getLog())) {
+                loggerMaker.infoAndAddToDb(
+                        "insertEndpointShieldLog accountId=" + Context.accountId.get()
+                                + " agentId=" + dbLog.getAgentId()
+                                + " deviceId=" + dbLog.getDeviceId()
+                                + " key=" + dbLog.getKey()
+                                + " line=" + truncateForDebugLog(dbLog.getLog(), ENDPOINT_SHIELD_LOG_PREVIEW_CHARS),
+                        LogDb.DB_ABS);
+            }
             // Producer mode: hand off to Kafka and return immediately so the API request
             // isn't blocked on a Mongo insert. The consumer service writes it to Mongo async.
             // Non-Kafka mode: fall back to a direct (w:1) Mongo write.
