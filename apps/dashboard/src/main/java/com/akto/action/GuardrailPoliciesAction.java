@@ -119,8 +119,10 @@ public class GuardrailPoliciesAction extends UserAction {
                 boolean hasTargeting = hasTagTargeting
                         || (p.getTargetDeviceIds() != null && !p.getTargetDeviceIds().isEmpty());
                 if (hasTargeting) {
-                    p.setApplyToDeviceIds(AgentUsersDao.instance.findDeviceIdsByTags(
+                    List<String> resolvedDeviceIds = new ArrayList<>(AgentUsersDao.instance.findDeviceIdsByTags(
                             p.getTargetTags(), p.getTargetDeviceIds()));
+                    resolvedDeviceIds.addAll(p.resolveInferenceHooksDeviceLabels());
+                    p.setApplyToDeviceIds(resolvedDeviceIds);
                 }
                 EnterpriseLicenseComplianceCatalog.applyToPolicy(p);
             }
