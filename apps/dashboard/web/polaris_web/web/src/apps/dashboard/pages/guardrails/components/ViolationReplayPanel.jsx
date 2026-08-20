@@ -8,7 +8,8 @@ import {
     Button,
     Badge,
     Spinner,
-    Divider
+    Divider,
+    ButtonGroup
 } from "@shopify/polaris";
 
 import guardrailApi from '../api';
@@ -77,6 +78,8 @@ const MissedPrompt = ({ prompt }) => {
 const ViolationReplayPanel = ({ policyName, hexId, buildPolicy }) => {
     const activeAccount = Store(state => state.activeAccount);
     const [status, setStatus] = useState("idle"); // idle | running | done | error
+    // VIOLATIONS = this policy's recorded violations. TRACES = recent agent traffic, blocked or not.
+    const [source, setSource] = useState("VIOLATIONS");
     const [error, setError] = useState("");
     const [result, setResult] = useState(null);
 
@@ -129,7 +132,7 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy }) => {
 
         try {
             const resp = await guardrailApi.startPolicyReplay({
-                policy: buildPolicy(), policyName, hexId
+                policy: buildPolicy(), policyName, hexId, source
             });
             const runId = resp?.replayResult?.runId;
             if (!runId) throw new Error("Could not start comparison");
@@ -156,16 +159,30 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy }) => {
         <Box padding="5" borderBlockEndWidth="1" borderColor="border-subdued">
             <VerticalStack gap="3">
                 <HorizontalStack align="space-between" blockAlign="center">
-                    <Text variant="headingMd" as="h3" fontWeight="semibold">Impact on recent violations</Text>
+                    <Text variant="headingMd" as="h3" fontWeight="semibold">
+                        {source === "TRACES" ? "Impact on recent traffic" : "Impact on recent violations"}
+                    </Text>
                     <Button size="slim" onClick={run} loading={running} disabled={running}>
                         {status === "idle" ? "Compare" : "Re-compare"}
                     </Button>
                 </HorizontalStack>
 
+                <ButtonGroup segmented>
+                    <Button size="slim" pressed={source === "VIOLATIONS"} disabled={running}
+                        onClick={() => { setSource("VIOLATIONS"); setStatus("idle"); setResult(null); }}>
+                        Violations
+                    </Button>
+                    <Button size="slim" pressed={source === "TRACES"} disabled={running}
+                        onClick={() => { setSource("TRACES"); setStatus("idle"); setResult(null); }}>
+                        Traffic
+                    </Button>
+                </ButtonGroup>
+
                 {status === "idle" && (
                     <Text variant="bodySm" color="subdued">
-                        Re-run this policy's recent violations through both the saved policy and your
-                        changes, and compare how many each catches.
+                        {source === "TRACES"
+                            ? "Re-run recent agent traffic through both the saved policy and your changes, and compare how many each catches."
+                            : "Re-run this policy's recent violations through both the saved policy and your changes, and compare how many each catches."}
                     </Text>
                 )}
 
@@ -198,7 +215,9 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy }) => {
 
                         {!running && compared === 0 && (
                             <Text variant="bodySm" color="subdued">
-                                No recorded violations could be compared for this policy.
+                                {source === "TRACES"
+                                    ? "No recent traffic could be compared."
+                                    : "No recorded violations could be compared for this policy."}
                             </Text>
                         )}
 
