@@ -33,7 +33,6 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.io.IOException;
-import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
@@ -614,22 +613,29 @@ public class GuardrailPoliciesAction extends UserAction {
             MediaType mediaType = MediaType.parse("application/json");
             RequestBody body = RequestBody.create(requestPayload.toJson(), mediaType);
 
-            Response response;
+            Response response = null;
             try {
                 response = executeGuardrailRequest(validateUrl, body, authToken);
-            } catch (UnknownHostException e) {
+                if (!response.isSuccessful()) {
+                    loggerMaker.info("Guardrail service at " + validateUrl + " returned status " + response.code() + ", falling back");
+                    response.close();
+                    response = null;
+                }
+            } catch (IOException e) {
+                loggerMaker.info("Error calling guardrail service at " + validateUrl + ": " + e.getMessage() + ", falling back");
+            }
+
+            // Any failure to reach/get a successful response from the account's own machine
+            // (unknown host, connection error, gateway error, etc.) falls back to a shared machine.
+            if (response == null) {
                 String fallbackUrl = FALLBACK_GUARDRAIL_SERVICE_URL + "/api/validate/requestWithPolicy";
-                loggerMaker.info("Guardrail service host not found at " + validateUrl + ", falling back to " + fallbackUrl);
                 try {
                     String fallbackAuthToken = generateGuardrailAuthToken(FALLBACK_GUARDRAIL_ACCOUNT_ID);
                     response = executeGuardrailRequest(fallbackUrl, body, fallbackAuthToken);
                 } catch (Exception fallbackException) {
-                    loggerMaker.errorAndAddToDb("Error calling nginx guardrail service at " + fallbackUrl + ": " + fallbackException.getMessage(), LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb("Error calling fallback guardrail service at " + fallbackUrl + ": " + fallbackException.getMessage(), LogDb.DASHBOARD);
                     return ERROR.toUpperCase();
                 }
-            } catch (IOException e) {
-                loggerMaker.errorAndAddToDb("Error calling guardrail service at " + validateUrl + ": " + e.getMessage(), LogDb.DASHBOARD);
-                return ERROR.toUpperCase();
             }
 
             try {
