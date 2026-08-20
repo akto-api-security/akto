@@ -1,8 +1,11 @@
 package com.akto.dto;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.conversions.Bson;
@@ -11,6 +14,7 @@ import org.bson.types.ObjectId;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.Constants;
+import com.akto.util.DeviceLabelUtil;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -223,6 +227,61 @@ public class GuardrailPolicies {
                 .stream()
                 .map(c -> new SelectedServer(String.valueOf(c.getId()), c.getName()))
                 .collect(java.util.stream.Collectors.toList());
+    }
+
+    private static final String AI_AGENT_EMAIL_TAG_KEY = "ai-agent-email";
+    private static final String AI_AGENT_TAG_KEY = "ai-agent";
+
+    // Endpoint-shield tags EVERY agent surface it detects (claude, cursor, codex, copilot, ...)
+    // with ai-agent-email, one collection per surface (hostName "{deviceId}.<source>.<agentName>").
+    // The "ai-agent" tag value on that same collection names the surface — Claude's values are
+    // "claude", "claude-desktop", "claude-cli-user" (see ProviderGuardrailAction.normalizeApp's
+    // matching "claude-code"/"claude-cli*"/"claude-ai" naming) — all start with "claude". Requiring
+    // that prefix keeps this Claude-only (excluding cursor/codex/copilot logins on the same device)
+    // while covering every current and future Claude surface without hardcoding exact names.
+    private static Set<String> findAiAgentEmailsForDevice(String deviceId) {
+        if (deviceId == null || deviceId.trim().isEmpty()) {
+            return new HashSet<>();
+        }
+        Bson filter = Filters.and(
+                Filters.regex(ApiCollection.HOST_NAME, "^" + Pattern.quote(deviceId) + "\\."),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
+                        Filters.eq(CollectionTags.KEY_NAME, AI_AGENT_TAG_KEY),
+                        Filters.regex(CollectionTags.VALUE, "^claude", "i")
+                )),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, AI_AGENT_EMAIL_TAG_KEY))
+        );
+        Set<String> emails = new HashSet<>();
+        for (ApiCollection c : ApiCollectionsDao.instance.findAll(filter, Projections.include(ApiCollection.TAGS_STRING))) {
+            if (c.getTagsList() == null) continue;
+            for (CollectionTags tag : c.getTagsList()) {
+                if (AI_AGENT_EMAIL_TAG_KEY.equals(tag.getKeyName()) && tag.getValue() != null && !tag.getValue().isEmpty()) {
+                    emails.add(tag.getValue());
+                }
+            }
+        }
+        return emails;
+    }
+
+    // Resolves this policy's targetDeviceIds (real devices picked in the dashboard's existing
+    // "Device Tags & Users" dropdown) to the device-label slugs Inference Hooks traffic for that
+    // same person's Claude account is tagged with (see ProviderGuardrailAction.buildAgentHost) —
+    // so picking a device also scopes that person's Claude Inference Hooks requests, with no
+    // separate input. Empty when no devices are targeted, so an "apply to all" policy is unaffected.
+    public List<String> resolveInferenceHooksDeviceLabels() {
+        if (targetDeviceIds == null || targetDeviceIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+        Set<String> labels = new HashSet<>();
+        for (String deviceId : targetDeviceIds) {
+            for (String email : findAiAgentEmailsForDevice(deviceId)) {
+                String label = DeviceLabelUtil.fromEmail(email);
+                if (!label.isEmpty()) {
+                    labels.add(label);
+                }
+            }
+        }
+        return new ArrayList<>(labels);
     }
 
     public GuardrailPolicies(String name, String description, String blockedMessage, String severity, int createdTimestamp,
