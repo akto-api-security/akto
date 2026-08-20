@@ -274,6 +274,18 @@ function GuardrailPolicies() {
         }
     };
 
+    // GithubSimpleTable keys its inner table on data.length and only fetches rows on mount,
+    // so a status toggle (same row count) never re-rendered - the row kept showing the old
+    // "Active" until a manual refresh. Key on content instead of count.
+    const tableRefreshKey = useMemo(() => {
+        const activeCount = tablePolicyData.filter((row) => row.status === "Active").length;
+        const lastUpdated = tablePolicyData.reduce((max, row) => Math.max(
+            max,
+            row.originalData?.updatedTimestamp ?? row.originalData?.createdTimestamp ?? 0,
+        ), 0);
+        return `${tablePolicyData.length}-${activeCount}-${lastUpdated}`;
+    }, [tablePolicyData]);
+
     const modifyData = useCallback((filters, dataSortKey, sortOrder) => {
         const filteredRows = applyAgentFilterToRows(tablePolicyData, filters);
         const systemRows = filteredRows.filter(isSystemPolicy);
@@ -719,7 +731,7 @@ function GuardrailPolicies() {
 
     const components = [
         <GithubSimpleTable
-            key={`policies-table-${tablePolicyData.length}-${agentFilterOptions.length}`}
+            key={`policies-table-${tableRefreshKey}-${agentFilterOptions.length}`}
             resourceName={resourceName}
             useNewRow={true}
             headers={tableHeaders}

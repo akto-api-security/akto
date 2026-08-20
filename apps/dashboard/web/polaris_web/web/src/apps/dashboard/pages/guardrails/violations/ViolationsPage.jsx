@@ -460,10 +460,11 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
         };
     });
 
-    // Latency graph is Akto-internal only (matches the same gate on ThreatDetectionPage.jsx).
+    // Latency graph is Akto-internal only (matches the same gate on ThreatDetectionPage.jsx),
+    // and hidden on the demo account, which has no Agent Gateway writing GUARDRAIL_* metrics.
     // Everyone else gets Open/Other Violations side by side instead of stacked, since there's
     // no third column to fill the space next to them.
-    const isAktoUser = window.USER_NAME?.includes('@akto.io');
+    const isAktoUser = window.USER_NAME?.includes('@akto.io') && !func.isDemoAccount();
 
     const openCard = (
         <Box
@@ -605,14 +606,12 @@ function Violations() {
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
     const legacyPath = isEndpointSecurityCategory() ? "/dashboard/protection/threat-activity" : "/dashboard/guardrails/activity";
-    const canUseNewLayout = func.isDemoAccount() || [1000000, 1726615470, 1779231193].includes(window.ACTIVE_ACCOUNT);
 
     useEffect(() => {
-        if (!canUseNewLayout || !newLayout) {
-            if (newLayout) setGuardrailViolationsNewLayout(false);
+        if (!newLayout) {
             navigate(legacyPath, { replace: true });
         }
-    }, [navigate, legacyPath, canUseNewLayout, newLayout, setGuardrailViolationsNewLayout]);
+    }, [navigate, legacyPath, newLayout]);
 
     const handleLayoutToggle = useCallback((checked) => {
         setGuardrailViolationsNewLayout(checked);
@@ -676,9 +675,10 @@ function Violations() {
         };
     }, []);
 
+    // values.ranges has no 30-day preset (it jumps 7 days -> 2 months), so pass the range inline.
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges[4],
+        func.getLast30DaysRange(),
     );
 
     const getTimeEpoch = useCallback((key) => {
@@ -1376,7 +1376,7 @@ function Violations() {
                 />
             }
             isFirstPage
-            secondaryActions={canUseNewLayout && <NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />}
+            secondaryActions={<NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />}
             primaryAction={
                 <DateRangeFilter
                     initialDispatch={currDateRange}
