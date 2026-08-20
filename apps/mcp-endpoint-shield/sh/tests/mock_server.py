@@ -7,17 +7,19 @@ receives to CAPTURE so the tests can assert on the exact payload sent.
 """
 import json
 import os
+import threading
 import sys
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 VERDICT = os.environ.get("VERDICT", "")
 CAPTURE = os.environ.get("CAPTURE", "/tmp/akto_capture.jsonl")
+_lock = threading.Lock()
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
-        with open(CAPTURE, "a") as f:
+        with _lock, open(CAPTURE, "a") as f:
             f.write(json.dumps({"url": self.path, "body": body.decode("utf-8", "replace")}) + "\n")
 
         verdict = {"Allowed": True}
@@ -37,4 +39,6 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    HTTPServer(("127.0.0.1", int(sys.argv[1])), Handler).serve_forever()
+    # Threaded: the hooks are exercised concurrently, and a single-threaded
+    # server serialises connections and deadlocks the parallel-writer test.
+    ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1])), Handler).serve_forever()

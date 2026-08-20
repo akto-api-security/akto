@@ -31,6 +31,12 @@ for _ in $(seq 1 40); do
     sleep 0.1
 done
 
+TRANSCRIPT=/tmp/akto_parity_transcript.jsonl
+printf '%s\n' \
+  '{"type":"user","message":{"content":"older"}}' \
+  '{"type":"assistant","message":{"content":[{"type":"text","text":"a"}]}}' \
+  '{"type":"user","message":{"content":[{"type":"text","text":"latest "},{"type":"tool_use","name":"t"},{"type":"text","text":"question"}]}}' >"$TRANSCRIPT"
+
 pass=0; fail=0
 deny() { printf '{"Allowed": false, "Reason": "%s", "behaviour": "%s"}\n' "${1:-PII detected}" "${2:-block}" >"$VERDICT"; }
 allow() { echo '{"Allowed": true}' >"$VERDICT"; }
@@ -91,6 +97,44 @@ allow
 cmp_case "quotes in prompt"     claude_code_cli UserPromptSubmit '{"prompt":"say \"hi\" now","session_id":"s1"}'
 cmp_case "newlines in prompt"   claude_code_cli UserPromptSubmit '{"prompt":"line1\nline2","session_id":"s1"}'
 cmp_case "utf8 in prompt"       claude_code_cli UserPromptSubmit '{"prompt":"café ☕ 日本語","session_id":"s1"}'
+
+# Parity on the details that were ported after the first pass.
+deny "SSN found"
+cmp_case "stop with transcript" claude_code_cli Stop \
+  "$(printf '{"last_assistant_message":"the answer","transcript_path":"%s","session_id":"s1"}' "$TRANSCRIPT")"
+cmp_case "non-mcp tool block"   claude_code_cli PreToolUse '{"tool_name":"Bash","tool_input":{"c":"ls"},"session_id":"s1"}'
+cmp_case "mcp tool block"       claude_code_cli PreToolUse '{"tool_name":"mcp__gh__x","tool_input":{},"session_id":"s1"}'
+
+# The wire payloads must agree too, not just the decisions.
+wire() { # wire <connector> <event> <stdin> -> normalised payload from the mock
+    : >"$CAPTURE"
+    printf '%s' "$3" | bash akto-hook.sh "$1" "$2" >/dev/null 2>&1
+    local b; b="$(tail -1 "$CAPTURE")"
+    : >"$CAPTURE"
+    printf '%s' "$3" | pwsh -NoProfile -File ps/akto-hook.ps1 "$1" "$2" >/dev/null 2>&1
+    local p; p="$(tail -1 "$CAPTURE")"
+    printf '%s\n%s' "$b" "$p"
+}
+cmp_wire() { # cmp_wire <desc> <field> <connector> <event> <stdin>
+    local out b p
+    out="$(wire "$3" "$4" "$5")"
+    b="$(printf '%s' "$out" | sed -n 1p | python3 -c 'import json,sys; print(json.dumps(json.loads(json.load(sys.stdin)["body"])["'"$2"'"]))' 2>/dev/null)"
+    p="$(printf '%s' "$out" | sed -n 2p | python3 -c 'import json,sys; print(json.dumps(json.loads(json.load(sys.stdin)["body"])["'"$2"'"]))' 2>/dev/null)"
+    if [ "$b" = "$p" ] && [ -n "$b" ]; then pass=$((pass+1)); else
+        fail=$((fail+1)); printf 'WIRE PARITY FAIL %s (%s)\n  bash: %s\n  pwsh: %s\n' "$1" "$2" "$b" "$p"
+    fi
+}
+allow
+cmp_wire "mcp vxlan is 0"    akto_vxlan_id   claude_code_cli PreToolUse '{"tool_name":"mcp__gh__x","tool_input":{},"session_id":"s1"}'
+cmp_wire "non-mcp vxlan"     akto_vxlan_id   claude_code_cli PreToolUse '{"tool_name":"Bash","tool_input":{},"session_id":"s1"}'
+cmp_wire "mcp mirror path"   path            claude_code_cli PreToolUse '{"tool_name":"mcp__gh__x","tool_input":{},"session_id":"s1"}'
+cmp_wire "non-mcp path"      path            claude_code_cli PreToolUse '{"tool_name":"we ird!","tool_input":{},"session_id":"s1"}'
+cmp_wire "stop request half" requestPayload  claude_code_cli Stop \
+  "$(printf '{"last_assistant_message":"ans","transcript_path":"%s","session_id":"s1"}' "$TRANSCRIPT")"
+cmp_wire "stop response half" responsePayload claude_code_cli Stop \
+  "$(printf '{"last_assistant_message":"ans","transcript_path":"%s","session_id":"s1"}' "$TRANSCRIPT")"
+cmp_wire "prompt payload"    requestPayload  claude_code_cli UserPromptSubmit '{"prompt":"café \"q\" ☕","session_id":"s1"}'
+cmp_wire "tags"              tag             claude_code_cli PreToolUse '{"tool_name":"mcp__gh__x","tool_input":{},"session_id":"s1"}'
 
 echo "----"
 echo "bash/pwsh parity: pass=$pass fail=$fail"

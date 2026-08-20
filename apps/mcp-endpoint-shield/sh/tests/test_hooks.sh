@@ -122,6 +122,54 @@ OUT=$(printf '%s' '{"prompt":"x","session_id":"s1"}' | bash akto-hook.sh claude_
 tc "still blocks when flag unset" '"decision":"block"' "$OUT"
 kill $SERVER 2>/dev/null; wait $SERVER 2>/dev/null
 
+# ── Python-parity details ─────────────────────────────────────────────────────
+CAPTURE=$CAPTURE VERDICT=$VERDICT python3 tests/mock_server.py "$PORT" &
+SERVER=$!
+for _ in $(seq 1 40); do curl -s -o /dev/null "http://127.0.0.1:$PORT" -X POST -d '{}' && break; sleep 0.1; done
+vx() { tail -1 "$CAPTURE" | python3 -c 'import json,sys; print(json.dumps(json.loads(json.load(sys.stdin)["body"])["akto_vxlan_id"]))'; }
+
+allow
+printf '%s' '{"tool_name":"mcp__gh__x","tool_input":{},"session_id":"s1"}' | bash akto-hook.sh claude_code_cli PreToolUse >/dev/null
+t "mcp vxlan is the number 0"     "0"                    "$(vx)"
+printf '%s' '{"prompt":"hi","session_id":"s1"}' | bash akto-hook.sh claude_code_cli UserPromptSubmit >/dev/null
+t "non-mcp vxlan is the label"    '"testbox-abcd1234"'   "$(vx)"
+
+# Stop mirrors the prompt/response pair, with the prompt read from the transcript.
+TR=/tmp/akto_transcript.jsonl
+printf '%s\n' \
+  '{"type":"user","message":{"content":"first question"}}' \
+  '{"type":"assistant","message":{"content":[{"type":"text","text":"reply"}]}}' \
+  '{"type":"user","message":{"content":[{"type":"text","text":"second "},{"type":"tool_use","name":"x"},{"type":"text","text":"question"}]}}' >"$TR"
+printf '{"last_assistant_message":"the answer","transcript_path":"%s","session_id":"s1"}' "$TR" |
+    bash akto-hook.sh claude_code_cli Stop >/dev/null
+pair() { tail -1 "$CAPTURE" | python3 -c '
+import json,sys
+o = json.loads(json.load(sys.stdin)["body"])
+print(json.dumps([json.loads(o["requestPayload"])["body"], json.loads(o["responsePayload"])["body"]]))'; }
+t "stop sends prompt+response pair" '["second question", "the answer"]' "$(pair)"
+
+# Non-MCP tool blocks are not mirrored unless explicitly enabled.
+deny "bad"
+: >"$CAPTURE"
+printf '%s' '{"tool_name":"Bash","tool_input":{"c":"ls"},"session_id":"s1"}' | bash akto-hook.sh claude_code_cli PreToolUse >/dev/null
+t "non-mcp block not ingested by default" "1" "$(wc -l <"$CAPTURE" | tr -d ' ')"
+: >"$CAPTURE"
+AKTO_INGEST_NON_MCP_TOOLS=true bash -c 'printf %s "{\"tool_name\":\"Bash\",\"tool_input\":{\"c\":\"ls\"},\"session_id\":\"s1\"}" | bash akto-hook.sh claude_code_cli PreToolUse' >/dev/null
+t "non-mcp block ingested when enabled" "2" "$(wc -l <"$CAPTURE" | tr -d ' ')"
+: >"$CAPTURE"
+printf '%s' '{"tool_name":"mcp__gh__x","tool_input":{},"session_id":"s1"}' | bash akto-hook.sh claude_code_cli PreToolUse >/dev/null
+t "mcp block always ingested" "2" "$(wc -l <"$CAPTURE" | tr -d ' ')"
+
+# Async mode asks the backend to scan the response instead of blocking.
+allow
+: >"$CAPTURE"
+AKTO_SYNC_MODE=false bash -c 'printf %s "{\"last_assistant_message\":\"x\",\"session_id\":\"s1\"}" | bash akto-hook.sh claude_code_cli Stop' >/dev/null
+tc "async stop sets response_guardrails" "response_guardrails=true" "$(last_url)"
+: >"$CAPTURE"
+AKTO_SYNC_MODE=false bash -c 'printf %s "{\"prompt\":\"x\",\"session_id\":\"s1\"}" | bash akto-hook.sh claude_code_cli UserPromptSubmit' >/dev/null
+case "$(last_url)" in *response_guardrails*) fail=$((fail+1)); echo "FAIL prompt must not set response_guardrails";; *) pass=$((pass+1));; esac
+kill $SERVER 2>/dev/null; wait $SERVER 2>/dev/null
+
 # ── config file supplies defaults, real env wins ──────────────────────────────
 CFG=/tmp/akto_hooks_test.env
 printf 'AKTO_CONNECTOR_VALUE=fromfile\nLOG_PAYLOADS=false\n' >"$CFG"

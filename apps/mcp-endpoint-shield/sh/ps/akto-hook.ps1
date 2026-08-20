@@ -146,9 +146,10 @@ $DeviceLabel = Get-DeviceLabel
 # ── HTTP ──────────────────────────────────────────────────────────────────────
 
 function Get-ProxyUrl {
-    param([bool]$Guardrails, [bool]$Ingest, [string]$ClientHook = '')
+    param([bool]$Guardrails, [bool]$Ingest, [string]$ClientHook = '', [bool]$ResponseGuardrails = $false)
     $q = "akto_connector=$Connector"
-    if ($Guardrails) { $q = "guardrails=true&$q" }
+    if ($Guardrails)         { $q = "guardrails=true&$q" }
+    if ($ResponseGuardrails) { $q = "response_guardrails=true&$q" }
     if ($Ingest)     { $q = "$q&ingest_data=true" }
     if ($ClientHook) { $q = "$q&client_hook=$ClientHook" }
     return "$IngestUrl/api/http-proxy?$q"
@@ -178,7 +179,8 @@ function Invoke-AktoPost {
     $headers = @{ 'Content-Type' = 'application/json' }
     if ($ApiToken) { $headers['Authorization'] = $ApiToken }
     try {
-        $args = @{
+        # Not $args: that is an automatic variable inside a function.
+        $req = @{
             Uri         = $Url
             Method      = 'POST'
             Headers     = $headers
@@ -186,8 +188,8 @@ function Invoke-AktoPost {
             TimeoutSec  = $TimeoutSec
             ErrorAction = 'Stop'
         }
-        if ($PSVersionTable.PSVersion.Major -ge 6) { $args['SkipCertificateCheck'] = $true }
-        $resp = Invoke-WebRequest @args
+        if ($PSVersionTable.PSVersion.Major -ge 6) { $req['SkipCertificateCheck'] = $true }
+        $resp = Invoke-WebRequest @req
         return $resp.Content
     } catch {
         Log-Error "API CALL FAILED: $($_.Exception.Message)"
@@ -203,7 +205,7 @@ function Invoke-AktoPost {
 function New-Payload {
     param(
         [string]$Path, $ReqHeaders, $RespHeaders, $ReqPayload, $RespPayload,
-        $Tags, [string]$StatusCode, [string]$Vxlan
+        $Tags, [string]$StatusCode, $Vxlan
     )
     $o = [ordered]@{
         path            = $Path
@@ -280,9 +282,9 @@ function Invoke-Guardrails {
 }
 
 function Send-Ingest {
-    param([string]$Payload, [string]$ClientHook)
+    param([string]$Payload, [string]$ClientHook, [bool]$ResponseGuardrails = $false)
     if ([string]::IsNullOrEmpty($IngestUrl)) { return }
-    Invoke-AktoPost (Get-ProxyUrl $false $true $ClientHook) $Payload | Out-Null
+    Invoke-AktoPost (Get-ProxyUrl $false $true $ClientHook $ResponseGuardrails) $Payload | Out-Null
 }
 
 # ── Warn / alert resubmit flow ────────────────────────────────────────────────
@@ -375,6 +377,32 @@ function Write-Deny {
             return 0
         }
     }
+}
+
+# ── Transcript ────────────────────────────────────────────────────────────────
+# Mirrors akto_last_user_prompt() in akto_core.sh: the Stop hook mirrors the
+# prompt/response pair, and only the response is on the event.
+
+function Get-LastUserPrompt {
+    param([string]$TranscriptPath)
+    if ([string]::IsNullOrEmpty($TranscriptPath) -or -not (Test-Path -LiteralPath $TranscriptPath)) { return '' }
+    try {
+        $lines = Get-Content -LiteralPath $TranscriptPath -ErrorAction Stop
+    } catch { return '' }
+    for ($i = $lines.Count - 1; $i -ge 0; $i--) {
+        if ([string]::IsNullOrWhiteSpace($lines[$i])) { continue }
+        try { $entry = $lines[$i] | ConvertFrom-Json } catch { continue }
+        if ($entry.type -ne 'user') { continue }
+        $content = $entry.message.content
+        if ($content -is [string]) { if ($content.Trim()) { return $content.Trim() }; continue }
+        $parts = @()
+        foreach ($block in @($content)) {
+            if ($block.type -eq 'text' -and $block.text) { $parts += [string]$block.text }
+        }
+        $joined = ($parts -join '').Trim()
+        if ($joined) { return $joined }
+    }
+    return ''
 }
 
 # ── Event classification ──────────────────────────────────────────────────────
@@ -510,16 +538,22 @@ function New-Headers {
 function Invoke-Blocking {
     param(
         [string]$EmitKind, [string]$Label, [string]$StateName, [string]$MirrorPath,
-        $ReqPayload, $Tags, [bool]$IsMcp, [string]$HostName
+        $ReqPayload, $Tags, [bool]$IsMcp, [string]$HostName, $RespPayload = @{}
     )
+    # MCP traffic carries the bare number 0 here, non-MCP the device label —
+    # matching akto_vxlan_id in the Python hooks.
     $vxlan = $DeviceLabel
-    if ($IsMcp) { $vxlan = '0' }
+    if ($IsMcp) { $vxlan = 0 }
     $respHeaders = [ordered]@{}
     $respHeaders[$HookHeader] = $EventName
 
-    $payload = New-Payload $MirrorPath (New-Headers $HostName) $respHeaders $ReqPayload @{} $Tags '200' $vxlan
+    $payload = New-Payload $MirrorPath (New-Headers $HostName) $respHeaders $ReqPayload $RespPayload $Tags '200' $vxlan
 
-    if ($SyncMode -ne 'true') { Send-Ingest $payload $EventName; return 0 }
+    if ($SyncMode -ne 'true') {
+        # Not blocking: have the backend scan the response asynchronously instead.
+        Send-Ingest $payload $EventName ($EmitKind -eq 'response')
+        return 0
+    }
 
     $gr = Invoke-Guardrails $payload $EventName
     if ($gr.Allowed) {
@@ -557,6 +591,14 @@ function Invoke-Blocking {
         $reason = "Warning!!, $Label blocked, please review it. Send again to bypass. Reason for blocking: $($gr.Reason)"
     } else {
         $reason = "$Label blocked: $($gr.Reason)"
+    }
+
+    # Non-MCP tool blocks are not mirrored unless AKTO_INGEST_NON_MCP_TOOLS=true,
+    # matching ingest_blocked_request() in the Python hooks.
+    $ingestNonMcp = (Get-EnvOr 'AKTO_INGEST_NON_MCP_TOOLS' 'false').ToLower()
+    if ($EmitKind -eq 'tool' -and -not $IsMcp -and $ingestNonMcp -ne 'true') {
+        Log-Info 'Skipping non-MCP blocked-request ingestion (set AKTO_INGEST_NON_MCP_TOOLS=true to re-enable)'
+        return (Write-Deny $EmitKind $reason)
     }
 
     $blockedRespHeaders = [ordered]@{}
@@ -628,7 +670,14 @@ switch ($kind) {
         if ($input_.PSObject.Properties['last_assistant_message']) { $r = $input_.last_assistant_message }
         if (-not $r -and $input_.PSObject.Properties['response']) { $r = $input_.response }
         if ([string]::IsNullOrEmpty([string]$r)) { Log-Info 'No assistant response on this event, allowing'; exit 0 }
-        $rc = Invoke-Blocking 'response' 'Response' 'response' '/v1/messages' @{ body = $r } (New-Tags $false) $false (Get-AtlasHost)
+        # The prompt half of the pair is not on the event; read it back from the
+        # transcript, as the Python Stop hook did.
+        $prompt = ''
+        if ($input_.PSObject.Properties['transcript_path']) {
+            $prompt = Get-LastUserPrompt ([string]$input_.transcript_path)
+        }
+        $rc = Invoke-Blocking 'response' 'Response' 'response' '/v1/messages' `
+            @{ body = $prompt } (New-Tags $false) $false (Get-AtlasHost) @{ body = $r }
     }
     default {
         $respHeaders = [ordered]@{}

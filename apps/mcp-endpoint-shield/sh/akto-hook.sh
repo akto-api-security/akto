@@ -139,18 +139,30 @@ block_reason_text() { # block_reason_text <kind-label> <escaped server reason>
     fi
 }
 
-run_blocking() { # run_blocking <emit-kind> <label> <state-name> <path> <req-payload> <tags> <is_mcp>
+run_blocking() { # run_blocking <emit-kind> <label> <state-name> <path> <req-payload> <tags> <is_mcp> [resp-payload]
     local emit_kind="$1" label="$2" state="$3" path="$4" reqp="$5" tags="$6" is_mcp="$7"
-    local vxlan="$AKTO_DEVICE_LABEL"
+    # Not "${8:-{\}}": bash resolves that default to the literal {\} , not {} .
+    local respp="${8}"
+    [ -z "$respp" ] && respp='{}'
+    # MCP traffic carries the bare number 0 here, non-MCP the quoted device label —
+    # matching akto_vxlan_id in the Python hooks.
+    local vxlan="\"$(jesc "$AKTO_DEVICE_LABEL")\""
     [ "$is_mcp" = "1" ] && vxlan="0"
 
-    local payload
-    payload="$(akto_build_payload "$path" "$(akto_headers)" \
-        "{\"$(jesc "$HOOK_HEADER")\":\"$(jesc "$AKTO_EVENT")\"}" \
-        "$reqp" '{}' "$tags" "200" "$vxlan")"
+    # JSON literals are built here, never written inline inside the nested $( ).
+    # Inside "$( ... )" the outer quotes consume the \" escapes, leaving a bare
+    # {"a":"b","c":"d"} that bash treats as a brace group and splits on the comma.
+    local hdrs resph payload
+    hdrs="$(akto_headers)"
+    resph="$(printf '{"%s":"%s"}' "$(jesc "$HOOK_HEADER")" "$(jesc "$AKTO_EVENT")")"
+    payload="$(akto_build_payload "$path" "$hdrs" "$resph" "$reqp" "$respp" "$tags" "200" "$vxlan")"
 
     if [ "$AKTO_SYNC_MODE" != "true" ]; then
-        akto_ingest "$payload" "$AKTO_EVENT"
+        # Not blocking: ask the backend to scan the response asynchronously instead,
+        # the way the Python Stop hook did.
+        local async_scan=0
+        [ "$emit_kind" = "response" ] && async_scan=1
+        akto_ingest "$payload" "$AKTO_EVENT" "$async_scan"
         return 0
     fi
 
@@ -177,11 +189,21 @@ run_blocking() { # run_blocking <emit-kind> <label> <state-name> <path> <req-pay
     local reason
     reason="$(block_reason_text "$label" "$GR_REASON")"
 
-    # Record the block itself, with the 403 the caller would have seen.
-    akto_ingest "$(akto_build_payload "$path" "$(akto_headers)" \
-        "{\"$(jesc "$HOOK_HEADER")\":\"$(jesc "$AKTO_EVENT")\",\"x-blocked-by\":\"Akto Proxy\"}" \
-        "$reqp" "{\"body\":{\"x-blocked-by\":\"Akto Proxy\",\"reason\":\"$GR_REASON\"}}" \
-        "$tags" "403" "$vxlan")" "$AKTO_EVENT"
+    # Record the block itself, with the 403 the caller would have seen. Non-MCP tool
+    # blocks are not mirrored unless AKTO_INGEST_NON_MCP_TOOLS=true, matching
+    # ingest_blocked_request() in the Python hooks.
+    if [ "$emit_kind" = "tool" ] && [ "$is_mcp" != "1" ] && [ "$AKTO_INGEST_NON_MCP_TOOLS" != "true" ]; then
+        log_info "Skipping non-MCP blocked-request ingestion (set AKTO_INGEST_NON_MCP_TOOLS=true to re-enable)"
+        adapter_emit_deny "$AKTO_CONNECTOR" "$emit_kind" "$reason"
+        return $?
+    fi
+    local blocked_resph blocked_respp blocked_payload
+    blocked_resph="$(printf '{"%s":"%s","x-blocked-by":"Akto Proxy"}' \
+        "$(jesc "$HOOK_HEADER")" "$(jesc "$AKTO_EVENT")")"
+    blocked_respp="$(printf '{"body":{"x-blocked-by":"Akto Proxy","reason":"%s"}}' "$GR_REASON")"
+    blocked_payload="$(akto_build_payload "$path" "$hdrs" "$blocked_resph" \
+        "$reqp" "$blocked_respp" "$tags" "403" "$vxlan")"
+    akto_ingest "$blocked_payload" "$AKTO_EVENT"
 
     adapter_emit_deny "$AKTO_CONNECTOR" "$emit_kind" "$reason"
     return $?
@@ -288,17 +310,25 @@ response)
         log_info "No assistant response on this event, allowing"
         exit 0
     fi
+    # The prompt half of the pair is not on the event; read it back from the
+    # transcript, as the Python Stop hook did.
+    PROMPT="$(akto_last_user_prompt "$(jstr transcript_path)")"
+    [ -z "$PROMPT" ] && PROMPT='""'
     run_blocking response "Response" "response" "/v1/messages" \
-        "{\"body\":$RESP}" "$(akto_tags 0)" 0
+        "{\"body\":$PROMPT}" "$(akto_tags 0)" 0 "{\"body\":$RESP}"
     exit $?
     ;;
 
 observe)
     # Fire-and-forget: mirror the event, never block.
     AKTO_HOST="$(akto_atlas_host)"
-    akto_ingest "$(akto_build_payload "/v1/hooks/$AKTO_EVENT" "$(akto_headers)" \
-        "{\"$(jesc "$HOOK_HEADER")\":\"$(jesc "$AKTO_EVENT")\"}" \
-        "{\"body\":$AKTO_INPUT}" '{}' "$(akto_tags 0)" "200" "$AKTO_DEVICE_LABEL")" "$AKTO_EVENT"
+    OBS_HDRS="$(akto_headers)"
+    OBS_RESPH="$(printf '{"%s":"%s"}' "$(jesc "$HOOK_HEADER")" "$(jesc "$AKTO_EVENT")")"
+    OBS_REQP="{\"body\":$AKTO_INPUT}"
+    OBS_VXLAN="\"$(jesc "$AKTO_DEVICE_LABEL")\""
+    OBS_PAYLOAD="$(akto_build_payload "/v1/hooks/$AKTO_EVENT" "$OBS_HDRS" "$OBS_RESPH" \
+        "$OBS_REQP" '{}' "$(akto_tags 0)" "200" "$OBS_VXLAN")"
+    akto_ingest "$OBS_PAYLOAD" "$AKTO_EVENT"
     log_info "=== $AKTO_CONNECTOR/$AKTO_EVENT completed (observe) ==="
     exit 0
     ;;

@@ -200,9 +200,10 @@ akto_username() {
 
 # ── HTTP ──────────────────────────────────────────────────────────────────────
 
-akto_proxy_url() { # akto_proxy_url <guardrails 0|1> <ingest 0|1> [client_hook]
+akto_proxy_url() { # akto_proxy_url <guardrails 0|1> <ingest 0|1> [client_hook] [response_guardrails 0|1]
     local q="akto_connector=$AKTO_CONNECTOR"
     [ "$1" = "1" ] && q="guardrails=true&$q"
+    [ "$4" = "1" ] && q="response_guardrails=true&$q"
     [ "$2" = "1" ] && q="$q&ingest_data=true"
     [ -n "$3" ] && q="$q&client_hook=$3"
     printf '%s/api/http-proxy?%s' "$AKTO_DATA_INGESTION_URL" "$q"
@@ -249,10 +250,11 @@ http_post_json() { # http_post_json <url> <body>
 akto_build_payload() {
     # $1 path, $2 request-headers JSON, $3 response-headers JSON,
     # $4 request-payload JSON, $5 response-payload JSON, $6 tags JSON,
-    # $7 status code, $8 vxlan id
+    # $7 status code, $8 vxlan id as a RAW JSON token (a quoted label, or bare 0 for
+    #    MCP traffic — the Python hooks send the number there, not the string "0")
     local path="$1" reqh="$2" resph="$3" reqp="$4" respp="$5" tags="$6" code="$7" vxlan="$8"
     cat <<EOF
-{"path":"$(jesc "$path")","requestHeaders":"$(jembed "$reqh")","responseHeaders":"$(jembed "$resph")","method":"POST","requestPayload":"$(jembed "$reqp")","responsePayload":"$(jembed "$respp")","ip":"$(jesc "$(akto_username)")","destIp":"127.0.0.1","time":"$(date +%s)000","statusCode":"$code","type":"HTTP/1.1","status":"$code","akto_account_id":"1000000","akto_vxlan_id":"$(jesc "$vxlan")","is_pending":"false","source":"MIRRORING","direction":null,"process_id":null,"socket_id":null,"daemonset_id":null,"enabled_graph":null,"tag":"$(jembed "$tags")","metadata":"$(jembed "$tags")","contextSource":"$(jesc "$CONTEXT_SOURCE")"}
+{"path":"$(jesc "$path")","requestHeaders":"$(jembed "$reqh")","responseHeaders":"$(jembed "$resph")","method":"POST","requestPayload":"$(jembed "$reqp")","responsePayload":"$(jembed "$respp")","ip":"$(jesc "$(akto_username)")","destIp":"127.0.0.1","time":"$(date +%s)000","statusCode":"$code","type":"HTTP/1.1","status":"$code","akto_account_id":"1000000","akto_vxlan_id":$vxlan,"is_pending":"false","source":"MIRRORING","direction":null,"process_id":null,"socket_id":null,"daemonset_id":null,"enabled_graph":null,"tag":"$(jembed "$tags")","metadata":"$(jembed "$tags")","contextSource":"$(jesc "$CONTEXT_SOURCE")"}
 EOF
 }
 
@@ -300,10 +302,34 @@ akto_guardrails_eval() { # akto_guardrails_eval <payload> [client_hook]
     return 0
 }
 
-akto_ingest() { # akto_ingest <payload> [client_hook]
+akto_ingest() { # akto_ingest <payload> [client_hook] [response_guardrails 0|1]
     [ -n "$AKTO_DATA_INGESTION_URL" ] || return 0
-    http_post_json "$(akto_proxy_url 0 1 "$2")" "$1" >/dev/null 2>&1 || true
+    http_post_json "$(akto_proxy_url 0 1 "$2" "$3")" "$1" >/dev/null 2>&1 || true
     return 0
+}
+
+# ── Transcript ────────────────────────────────────────────────────────────────
+# The Stop hook mirrors the prompt/response pair, and only the response is on the
+# event — the prompt has to come from the JSONL transcript. Returns the last user
+# message as a JSON string (encoded, ready to splice), or nothing.
+
+akto_last_user_prompt() { # akto_last_user_prompt <transcript path>
+    local f="${1/#\~/$HOME}" line content
+    [ -n "$f" ] && [ -f "$f" ] || return 1
+    # Narrow to candidate lines first, then confirm each properly from the last
+    # backwards — a substring match alone would also hit "type":"user" appearing
+    # inside message content.
+    while IFS= read -r line; do
+        [ -n "$line" ] || continue
+        [ "$(jget_from "$line" type)" = '"user"' ] || continue
+        content="$(jget_from "$line" "message.content")" || continue
+        [ -n "$content" ] || continue
+        content="$(printf '%s' "$content" | awk -v mode=textblocks -f "$AKTO_JSON_AWK" 2>/dev/null)"
+        [ -n "$content" ] && [ "$content" != '""' ] && printf '%s' "$content" && return 0
+    done <<EOF
+$(grep -n '"type":[[:space:]]*"user"' "$f" 2>/dev/null | tail -20 | cut -d: -f2- | sed -n '1!G;h;$p')
+EOF
+    return 1
 }
 
 _behaviour_is() { [ "$(printf '%s' "$GR_BEHAVIOUR" | tr '[:upper:]' '[:lower:]')" = "$1" ]; }
@@ -318,7 +344,7 @@ akto_warn_state_path() { printf '%s/akto_%s_warn_pending.json' "$LOG_DIR" "$1"; 
 _warn_pending_has() { grep -qF "\"$2\"" "$1" 2>/dev/null; }
 
 _warn_pending_add() {
-    local f="$1" fp="$2" tmp="$1.tmp"
+    local f="$1" fp="$2" tmp="$1.$$.tmp"
     mkdir -p "$(dirname "$f")" 2>/dev/null
     { printf '{"warn_pending":['
       if [ -f "$f" ]; then
@@ -327,12 +353,14 @@ _warn_pending_add() {
       fi
       printf '"%s"]}\n' "$fp"
     } >"$tmp" 2>/dev/null && mv "$tmp" "$f" 2>/dev/null
+    rm -f "$tmp" 2>/dev/null
 }
 
 _warn_pending_remove() {
-    local f="$1" fp="$2" tmp="$1.tmp"
+    local f="$1" fp="$2" tmp="$1.$$.tmp"
     [ -f "$f" ] || return 0
     sed "s/\"$fp\",\{0,1\}//; s/,\]/]/" "$f" >"$tmp" 2>/dev/null && mv "$tmp" "$f" 2>/dev/null
+    rm -f "$tmp" 2>/dev/null
 }
 
 # Returns 0 to allow, 1 to block. Call only when guardrails said "not allowed".
@@ -364,12 +392,13 @@ akto_session_load() { # akto_session_load <key> <field>
 }
 
 akto_session_save() { # akto_session_save <key> <field> <raw-value>
-    local tmp="$SESSION_STATE_PATH.tmp" existing=""
+    local tmp="$SESSION_STATE_PATH.$$.tmp" existing=""
     mkdir -p "$LOG_DIR" 2>/dev/null
     [ -f "$SESSION_STATE_PATH" ] && existing="$(cat "$SESSION_STATE_PATH" 2>/dev/null)"
     # Single-field rows keep this a whole-file rewrite; the hooks only ever store
     # the current message id, so there is nothing to merge.
     printf '{"%s":{"%s":"%s"}}\n' "$(jesc "$1")" "$(jesc "$2")" "$(jesc "$3")" >"$tmp" 2>/dev/null &&
         mv "$tmp" "$SESSION_STATE_PATH" 2>/dev/null
+    rm -f "$tmp" 2>/dev/null
     return 0
 }

@@ -37,7 +37,7 @@ lib/akto_core.sh          config, logging, HTTP, payload, guardrails, warn flow
 lib/akto_adapters.sh      the per-connector differences, and only those
 ps/akto-hook.ps1          Windows twin (PowerShell 5.1 and 7+)
 config/                   ready-to-use hook configs per agent
-tests/                    86 tests — run tests/run_all.sh
+tests/                    132 tests — run tests/run_all.sh
 ```
 
 `lib/akto_adapters.sh` is the whole of what varies between agents: which stdin
@@ -132,13 +132,22 @@ backend-down, non-JSON stdin and empty stdin.
 bash tests/run_all.sh
 ```
 
-- `test_json.sh` — 33 cases over `lib/json.awk`, including JSON syntax embedded in
-  string values, escaped quotes, UTF-8, pretty-printed input and prefix keys
-- `test_hooks.sh` — 34 cases end-to-end against a mock ingestion endpoint: allow,
-  deny per connector, MCP vs non-MCP paths, warn/alert behaviours, the kill switch
-  and the fail-open guarantees
-- `test_parity.sh` — 19 cases asserting the PowerShell twin makes byte-identical
-  decisions to bash for the same input (skips cleanly when `pwsh` is absent)
+- `test_json.sh` — 33 cases over `lib/json.awk`: JSON syntax embedded in string
+  values, escaped quotes, UTF-8, pretty-printed input, prefix keys, content blocks
+- `test_hooks.sh` — 42 cases end-to-end against a mock ingestion endpoint: allow,
+  deny per connector, MCP vs non-MCP paths, warn/alert behaviours, the kill switch,
+  the fail-open guarantees, and the Python-parity details (bare `0` vxlan for MCP,
+  the Stop prompt/response pair, the non-MCP block gate, `response_guardrails`)
+- `test_hardening.sh` — 27 cases on hostile input and scale: command substitution
+  and backticks in prompts must never execute, 200KB payloads, deep nesting,
+  multi-fingerprint warn state, 8 concurrent writers, malformed input
+- `test_parity.sh` — 30 cases asserting the PowerShell twin makes identical
+  decisions *and* sends identical wire payloads (skips when `pwsh` is absent)
+
+Three bugs these caught, kept as regression cases: `Write-Output` inside a
+value-captured PowerShell function swallows stdout; `substr(s,i,1)` is O(n) in BWK
+awk, making both scan loops quadratic; and a JSON literal written inline inside a
+nested `"$( ... )"` is brace-expanded and split on its commas.
 
 `tests/mock_server.py` is test-only scaffolding; the hooks have no Python
 dependency.
