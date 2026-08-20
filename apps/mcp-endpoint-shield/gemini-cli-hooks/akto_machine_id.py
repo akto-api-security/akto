@@ -5,14 +5,19 @@ Uses only Python standard library modules.
 """
 import os
 import platform
-import pwd
 import subprocess
 import uuid
 import re
 import socket
 
+try:
+    import pwd
+except ImportError:
+    pwd = None
+
 
 _machine_id = None
+
 
 def _resolve_device_name_source() -> str:
     """
@@ -53,7 +58,6 @@ def _resolve_device_name_source() -> str:
         return re.sub(r"[^a-zA-Z0-9]", "-", raw.strip()).lower()
     return ""
 
-
 def _generate_machine_id() -> str:
     """
     Generate a unique machine ID using multiple fallback methods.
@@ -67,6 +71,20 @@ def _generate_machine_id() -> str:
         Machine ID as a lowercase string without separators.
     """
     system = platform.system()
+
+    if system == "Windows":
+        try:
+            import winreg
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Cryptography"
+            )
+            guid, _ = winreg.QueryValueEx(key, "MachineGuid")
+            winreg.CloseKey(key)
+            if guid:
+                return guid.replace("-", "").lower()
+        except Exception:
+            pass
 
     if system == "Darwin":
         try:
@@ -160,9 +178,10 @@ def get_username() -> str:
     current_user = None
     is_root = False
     try:
-        current_uid = os.getuid()
-        current_user = pwd.getpwuid(current_uid).pw_name
-        is_root = current_user == "root" or current_uid == 0
+        if pwd is not None and hasattr(os, "getuid"):
+            current_uid = os.getuid()
+            current_user = pwd.getpwuid(current_uid).pw_name
+            is_root = current_user == "root" or current_uid == 0
     except Exception:
         pass
 
