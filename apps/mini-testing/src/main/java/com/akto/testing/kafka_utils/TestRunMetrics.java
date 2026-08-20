@@ -1,12 +1,14 @@
 package com.akto.testing.kafka_utils;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 
 import com.akto.dao.context.Context;
 import com.akto.log.LoggerMaker;
@@ -43,6 +45,14 @@ public class TestRunMetrics {
         /** Polling/processing threw. */
         ERROR
     }
+
+    /**
+     * Pipeline stages timed per test, so a whole run can be billed by where wall time goes.
+     * RUN_TEST is the full {@code runTestNew} wall; TARGET_HTTP is the slice of it spent blocked on the
+     * API under test (from {@link com.akto.testing.ApiExecutor}); RUN_TEST minus TARGET_HTTP is compute.
+     * PERSIST_LOGS + INSERT_RESULTS are the ultron persistence round-trips ("run away from ultron" cost).
+     */
+    public enum Stage { LOOKUP, RUN_TEST, TARGET_HTTP, PERSIST_LOGS, INSERT_RESULTS }
 
     /** WARN-level progress heartbeat cadence (M*N run-wide progress). */
     private static final long HEARTBEAT_INTERVAL_MS = 30_000L;
@@ -88,6 +98,25 @@ public class TestRunMetrics {
     private final AtomicLong totalDurationMs = new AtomicLong(0);
     private final AtomicLong maxDurationMs = new AtomicLong(0);
     private volatile String slowestLabel = "";
+
+    // Per-stage wall-time bill (nanos summed across all worker threads) + call counts + worst single call.
+    private final EnumMap<Stage, LongAdder> stageNanos = newStageAdders();
+    private final EnumMap<Stage, LongAdder> stageCount = newStageAdders();
+    private final EnumMap<Stage, AtomicLong> stageMaxNanos = newStageMax();
+    /** CPU time (not wall) attributed to RUN_TEST, to separate compute from I/O wait. */
+    private final LongAdder runTestCpuNanos = new LongAdder();
+
+    private static EnumMap<Stage, LongAdder> newStageAdders() {
+        EnumMap<Stage, LongAdder> m = new EnumMap<>(Stage.class);
+        for (Stage s : Stage.values()) m.put(s, new LongAdder());
+        return m;
+    }
+
+    private static EnumMap<Stage, AtomicLong> newStageMax() {
+        EnumMap<Stage, AtomicLong> m = new EnumMap<>(Stage.class);
+        for (Stage s : Stage.values()) m.put(s, new AtomicLong(0));
+        return m;
+    }
 
     /** recordId -> what is currently running, so a stall can name the stuck (api, test) cells and threads. */
     private final ConcurrentHashMap<String, InflightTask> inflightTasks = new ConcurrentHashMap<>();
@@ -144,6 +173,21 @@ public class TestRunMetrics {
 
     public int polled() { return polled.get(); }
 
+    /** Fold one stage's wall-clock (nanos) for one test into the run-wide bill. Thread-safe. */
+    public void recordStage(Stage stage, long nanos) {
+        if (nanos < 0) return;
+        stageNanos.get(stage).add(nanos);
+        stageCount.get(stage).increment();
+        AtomicLong max = stageMaxNanos.get(stage);
+        long prev;
+        while (nanos > (prev = max.get()) && !max.compareAndSet(prev, nanos)) { /* retry */ }
+    }
+
+    /** Fold the CPU time (nanos) a single {@code runTestNew} burned, to split compute from I/O wait. */
+    public void recordRunTestCpu(long nanos) {
+        if (nanos > 0) runTestCpuNanos.add(nanos);
+    }
+
     // ----- lifecycle banners -----
 
     public void logStart(int accountId, int apiCount, int testCount, int poolSize,
@@ -179,6 +223,7 @@ public class TestRunMetrics {
                 + " " + runStats(processed, -1)
                 + " accountedFor=" + accountedFor
                 + " slowest=\"" + slowestLabel + "\"");
+        logCostBreakdown();
     }
 
     // ----- periodic tick from the drain loop (decides internally when to emit) -----
@@ -196,6 +241,7 @@ public class TestRunMetrics {
         if (nowMs - lastHeartbeatMs >= HEARTBEAT_INTERVAL_MS) {
             lastHeartbeatMs = nowMs;
             logProgressHeartbeat(processed, workRemaining);
+            logCostBreakdown();
         }
 
         // Two independent stall triggers, sharing the spam guard + dump:
@@ -277,6 +323,45 @@ public class TestRunMetrics {
                 + " rate=" + String.format("%.1f", rate) + "/s"
                 + (eta >= 0 ? " eta~" + eta + "s" : "")
                 + " " + runStats(processed, workRemaining));
+    }
+
+    /**
+     * WARN-level cost breakdown: of all per-test wall time measured so far, how much went to each stage.
+     * Percentages are of the summed stage wall time (not run wall time — stages overlap across threads).
+     * The single line that answers "what is taking so long": target-HTTP vs ultron vs compute.
+     */
+    private void logCostBreakdown() {
+        long n = stageCount.get(Stage.RUN_TEST).sum();
+        if (n <= 0) return; // nothing measured yet
+
+        long lookup   = stageNanos.get(Stage.LOOKUP).sum();
+        long runTest  = stageNanos.get(Stage.RUN_TEST).sum();
+        long target   = stageNanos.get(Stage.TARGET_HTTP).sum();
+        long persist  = stageNanos.get(Stage.PERSIST_LOGS).sum();
+        long insertRt = stageNanos.get(Stage.INSERT_RESULTS).sum();
+        long runCpu   = runTestCpuNanos.sum();
+        long compute  = Math.max(0, runTest - target);      // runTestNew wall not spent blocked on the target API
+        long ultron   = persist + insertRt;                  // persistence round-trips
+        long billed   = lookup + runTest + ultron;           // total measured wall (RUN_TEST already includes target)
+
+        long avgWallMs = ms(runTest + lookup + ultron) / n;
+        loggerMaker.warnAndAddToDb("TESTRUN COST summaryId=" + summaryId
+                + " n=" + n
+                + " avgPerTestMs=" + avgWallMs
+                + " | LOOKUP=" + pctOf(lookup, billed) + "(" + msPer(lookup, n) + "ms)"
+                + " RUN_TEST=" + pctOf(runTest, billed) + "(" + msPer(runTest, n) + "ms)"
+                + " [TARGET_HTTP=" + pctOf(target, billed) + "(" + msPer(target, n) + "ms, calls/test=" + per(stageCount.get(Stage.TARGET_HTTP).sum(), n) + ")"
+                + " COMPUTE=" + pctOf(compute, billed) + "(" + msPer(compute, n) + "ms, cpu/test=" + msPer(runCpu, n) + "ms)]"
+                + " PERSIST_LOGS=" + pctOf(persist, billed) + "(" + msPer(persist, n) + "ms)"
+                + " INSERT_RESULTS=" + pctOf(insertRt, billed) + "(" + msPer(insertRt, n) + "ms)"
+                + " ULTRON_TOTAL=" + pctOf(ultron, billed) + "(" + msPer(ultron, n) + "ms)");
+    }
+
+    private static long ms(long nanos) { return nanos / 1_000_000L; }
+    private static long msPer(long nanos, long n) { return n > 0 ? (nanos / n) / 1_000_000L : 0; }
+    private static String per(long v, long n) { return n > 0 ? String.format("%.1f", v / (double) n) : "0"; }
+    private static String pctOf(long part, long whole) {
+        return whole > 0 ? (part * 100L / whole) + "%" : "0%";
     }
 
     /** WARN-level dump of the oldest in-flight tasks, fired when the run stalls or the pool clogs. */
