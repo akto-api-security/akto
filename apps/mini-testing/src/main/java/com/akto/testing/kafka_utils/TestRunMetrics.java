@@ -52,6 +52,8 @@ public class TestRunMetrics {
     private static final long STALL_LOG_INTERVAL_MS = 30_000L;
     /** Max number of oldest in-flight tasks to list in a stall dump. */
     private static final int STALL_DUMP_LIMIT = 15;
+    /** A slot is "stuck" if a single task has held it at least this long (live capacity-waste signal). */
+    private static final long STUCK_AGE_MS = 60_000L;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestRunMetrics.class, LogDb.TESTING);
 
@@ -196,11 +198,19 @@ public class TestRunMetrics {
             logProgressHeartbeat(processed, workRemaining);
         }
 
-        if (!inflightTasks.isEmpty()
-                && (nowMs - lastProgressMs) >= STALL_THRESHOLD_MS
-                && (nowMs - lastStallLogMs) >= STALL_LOG_INTERVAL_MS) {
+        // Two independent stall triggers, sharing the spam guard + dump:
+        //   1. progress frozen  -> aggregate processed hasn't moved for STALL_THRESHOLD_MS (total hang)
+        //   2. slots clogged    -> half+ the pool is tied up in tasks older than STUCK_AGE_MS (partial starvation)
+        int pool = poolSize();
+        long stuck = inflightAgeStats()[0];
+        boolean progressFrozen = !inflightTasks.isEmpty() && (nowMs - lastProgressMs) >= STALL_THRESHOLD_MS;
+        boolean slotsClogged = pool > 0 && stuck >= (pool / 2);
+        if ((progressFrozen || slotsClogged) && (nowMs - lastStallLogMs) >= STALL_LOG_INTERVAL_MS) {
             lastStallLogMs = nowMs;
-            logStall(nowMs - lastProgressMs, processed, workRemaining);
+            String reason = progressFrozen
+                    ? "progress_frozen_" + ((nowMs - lastProgressMs) / 1000) + "s"
+                    : "slots_clogged_" + stuck + "/" + pool;
+            logStall(reason, processed, workRemaining);
         }
     }
 
@@ -217,9 +227,30 @@ public class TestRunMetrics {
         return "n/a";
     }
 
+    /** Configured max thread-pool size, or -1 if the executor isn't a ThreadPoolExecutor. */
+    private int poolSize() {
+        return (executor instanceof ThreadPoolExecutor) ? ((ThreadPoolExecutor) executor).getMaximumPoolSize() : -1;
+    }
+
+    /**
+     * Single pass over the in-flight registry: [count of slots held >= STUCK_AGE_MS, oldest age in ms].
+     * This is the live capacity-waste signal — how much of the pool is tied up in slow/hung tests right now.
+     */
+    private long[] inflightAgeStats() {
+        long now = System.currentTimeMillis();
+        long stuck = 0, oldest = 0;
+        for (InflightTask t : inflightTasks.values()) {
+            long age = now - t.startMs;
+            if (age >= STUCK_AGE_MS) stuck++;
+            if (age > oldest) oldest = age;
+        }
+        return new long[]{stuck, oldest};
+    }
+
     /** Canonical run snapshot rendered by every TESTRUN lifecycle line (PROGRESS/STALL/RESTART/END). */
     private String runStats(int processed, long workRemaining) {
         int pct = expectedRecords > 0 ? (int) ((processed * 100L) / expectedRecords) : -1;
+        long[] age = inflightAgeStats();
         return "done=" + processed + "/" + expectedRecords + (pct >= 0 ? " (" + pct + "%)" : "")
                 + " pass=" + passed.get() + " vuln=" + vulnerable.get()
                 + " skip=" + skipped.get() + " timeout=" + timedOut.get()
@@ -227,6 +258,8 @@ public class TestRunMetrics {
                 + " polled=" + polled.get()
                 + " workRemaining=" + workRemaining
                 + " inflight=" + inflightTasks.size()
+                + " stuckSlots=" + age[0]
+                + " oldestInflightMs=" + age[1]
                 + " avgTestMs=" + (durationSamples.get() > 0 ? (totalDurationMs.get() / durationSamples.get()) : -1)
                 + " maxTestMs=" + maxDurationMs.get()
                 + " executor[" + executorStats() + "]";
@@ -246,15 +279,15 @@ public class TestRunMetrics {
                 + " " + runStats(processed, workRemaining));
     }
 
-    /** WARN-level dump of the oldest in-flight tasks when processed count stops advancing. */
-    private void logStall(long noProgressMs, int processed, long workRemaining) {
+    /** WARN-level dump of the oldest in-flight tasks, fired when the run stalls or the pool clogs. */
+    private void logStall(String reason, int processed, long workRemaining) {
         List<InflightTask> tasks = new ArrayList<>(inflightTasks.values());
         tasks.sort((a, b) -> Long.compare(a.startMs, b.startMs)); // oldest first
         long nowMs = System.currentTimeMillis();
 
         StringBuilder sb = new StringBuilder();
         sb.append("TESTRUN STALL summaryId=").append(summaryId)
-                .append(" noProgressFor=").append(noProgressMs / 1000).append("s ")
+                .append(" reason=").append(reason).append(" ")
                 .append(runStats(processed, workRemaining))
                 .append(" oldestTasks=[");
 
