@@ -30,6 +30,8 @@ public class Info {
 
     private Boolean agenticTestingAllowed;
 
+    private Boolean onlySmartTestingAllowed;
+
     public Info(String name, String description, String details, String impact, String remediation, Category category, String subCategory,
             String severity, List<String> tags, List<String> references, List<String> cwe, List<String> cve) {
         this.name = name;
@@ -151,6 +153,14 @@ public class Info {
 
     public void setAgenticTestingAllowed(Boolean agenticTestingAllowed) {
         this.agenticTestingAllowed = agenticTestingAllowed;
+    }
+
+    public Boolean getOnlySmartTestingAllowed() {
+        return onlySmartTestingAllowed;
+    }
+
+    public void setOnlySmartTestingAllowed(Boolean onlySmartTestingAllowed) {
+        this.onlySmartTestingAllowed = onlySmartTestingAllowed;
     }
 
 }
