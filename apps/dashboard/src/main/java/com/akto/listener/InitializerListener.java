@@ -3707,6 +3707,46 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    // Individually try/catch'd for the same reason as safeMigrateTeamRoleToDeviceTags above.
+    // Prioritized to run early so stale descriptions don't linger while other migrations run.
+    private static void safeUnsetApiCollectionDescription(BackwardCompatibility backwardCompatibility) {
+        int accountId = Context.accountId.get();
+        try {
+            if (backwardCompatibility.getUnsetApiCollectionDescription() == 0) {
+                logger.infoAndAddToDb("unsetApiCollectionDescription: starting migration for accountId=" + accountId, LogDb.DASHBOARD);
+                Bson hasDescription = Filters.and(
+                    Filters.exists(ApiCollection.DESCRIPTION, true),
+                    Filters.nin(ApiCollection.DESCRIPTION, Arrays.asList("", null))
+                );
+                Bson isArgusOrAtlasCollection = Filters.or(
+                    Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
+                        Filters.eq(CollectionTags.KEY_NAME, "source"), Filters.eq(CollectionTags.VALUE, "AGENTIC")
+                    )),
+                    Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
+                        Filters.eq(CollectionTags.KEY_NAME, "source"), Filters.eq(CollectionTags.VALUE, "ENDPOINT")
+                    )),
+                    Filters.in(ApiCollection.TAGS_STRING + "." + CollectionTags.KEY_NAME,
+                        Arrays.asList("gen-ai", "ai-agent", "mcp-server", "mcp-client", "browser-llm"))
+                );
+                Bson filter = Filters.and(hasDescription, isArgusOrAtlasCollection);
+                long count = ApiCollectionsDao.instance.getMCollection().countDocuments(filter);
+                logger.infoAndAddToDb("unsetApiCollectionDescription: found " + count + " argus/atlas collections with description for accountId=" + accountId, LogDb.DASHBOARD);
+                if (count > 0) {
+                    ApiCollectionsDao.instance.updateMany(filter, Updates.unset(ApiCollection.DESCRIPTION));
+                }
+                BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.UNSET_API_COLLECTION_DESCRIPTION, Context.now())
+                );
+                logger.infoAndAddToDb("unsetApiCollectionDescription: migration complete for accountId=" + accountId, LogDb.DASHBOARD);
+            } else {
+                logger.infoAndAddToDb("unsetApiCollectionDescription: already executed, skipping for accountId=" + accountId, LogDb.DASHBOARD);
+            }
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "error in unsetApiCollectionDescription: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
 
     private static void removeRagDatabaseTag(BackwardCompatibility backwardCompatibility) {
         int accountId = Context.accountId.get();
@@ -3748,6 +3788,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
+        safeUnsetApiCollectionDescription(backwardCompatibility);
         safeMigrateTeamRoleToDeviceTags(backwardCompatibility);
         safeMigrateGuardrailTargetTeamsRolesToTags(backwardCompatibility);
 

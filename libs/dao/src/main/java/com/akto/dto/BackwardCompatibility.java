@@ -138,6 +138,9 @@ public class BackwardCompatibility {
     public static final String MIGRATE_GUARDRAIL_TARGET_TEAMS_ROLES_TO_TAGS = "migrateGuardrailTargetTeamsRolesToTags";
     private int migrateGuardrailTargetTeamsRolesToTags;
 
+    public static final String UNSET_API_COLLECTION_DESCRIPTION = "unsetApiCollectionDescription";
+    private int unsetApiCollectionDescription;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -577,5 +580,13 @@ public class BackwardCompatibility {
 
     public void setMigrateGuardrailTargetTeamsRolesToTags(int migrateGuardrailTargetTeamsRolesToTags) {
         this.migrateGuardrailTargetTeamsRolesToTags = migrateGuardrailTargetTeamsRolesToTags;
+    }
+
+    public int getUnsetApiCollectionDescription() {
+        return unsetApiCollectionDescription;
+    }
+
+    public void setUnsetApiCollectionDescription(int unsetApiCollectionDescription) {
+        this.unsetApiCollectionDescription = unsetApiCollectionDescription;
     }
 }
