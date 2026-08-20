@@ -9,6 +9,7 @@ import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
+import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.jobs.JobParams;
@@ -589,6 +590,14 @@ public class DbActor extends DataActor {
 
     public void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTs) {
         DbLayer.updateTestingRunAndMarkCompleted(testingRunId, scheduleTs);
+    }
+
+    public List<CustomWebhook> fetchTeamsWebhooksForTestResults() {
+        return DbLayer.fetchTeamsWebhooksForTestResults();
+    }
+
+    public void recordWebhookSendResult(int webhookId, String userEmail, int timestamp, String message, List<String> errors) {
+        DbLayer.recordWebhookSendResult(webhookId, userEmail, timestamp, message, errors);
     }
 
     public void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount) {
