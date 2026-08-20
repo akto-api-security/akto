@@ -30,6 +30,7 @@ public final class AgenticObserveUtil {
     public static final String CLIENT_TYPE_MCP_SERVER = "MCP Server";
     public static final String CLIENT_TYPE_SKILL = "Skill";
     public static final String CLIENT_TYPE_PLUGIN = "Plugin";
+    public static final String CLIENT_TYPE_SAAS_AGENT = "SaaS Agent";
 
     private static final Set<String> MCP_AGENT_KEYWORDS = new HashSet<>(Arrays.asList(
             "stripe", "aws", "azure", "playwright", "postgres", "atlassian", "docker",
@@ -121,6 +122,10 @@ public final class AgenticObserveUtil {
     // MCP server uses, so the agent-plugin tag is what tells them apart.
     public static boolean isPluginCollection(ApiCollection collection) {
         return collection != null && hasTagKey(collection.getEnvType(), Constants.AKTO_AGENT_PLUGIN_TAG);
+    }
+
+    public static boolean hasSaasAgentTag(ApiCollection collection) {
+        return collection != null && hasTagKey(collection.getEnvType(), Constants.AKTO_SAAS_AGENT_TAG);
     }
 
     // The plugin's own name, from its plugin-name tag; falls back to the hostname's trailing segment.
@@ -251,6 +256,9 @@ public final class AgenticObserveUtil {
         // it belongs to), which would otherwise classify it as that agent.
         if (isPluginCollection(collection)) {
             return CLIENT_TYPE_PLUGIN;
+        }
+        if (hasSaasAgentTag(collection)) {
+            return CLIENT_TYPE_SAAS_AGENT;
         }
         List<CollectionTags> envType = collection != null ? collection.getEnvType() : null;
         if (envType == null || envType.isEmpty()) {
