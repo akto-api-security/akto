@@ -35,7 +35,7 @@ import LocalStore from "@/apps/main/LocalStorageStore";
 import guardrailApi from "@/apps/dashboard/pages/guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "@/apps/dashboard/pages/guardrails/utils";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
-import { isEndpointSecurityCategory } from "@/apps/main/labelHelper";
+import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
 
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "@/apps/dashboard/pages/observe/api_collections/endpointShieldHelper";
 import { formatDisplayName } from "@/apps/dashboard/pages/observe/agentic/mcpClientHelper";
@@ -605,7 +605,11 @@ function Violations() {
     const newLayout = LocalStore((state) => state.guardrailViolationsNewLayout);
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
-    const legacyPath = isEndpointSecurityCategory() ? "/dashboard/protection/threat-activity" : "/dashboard/guardrails/activity";
+    // Atlas and Argus both reach Guardrail Activity via /protection/threat-activity
+    // (see LeftNav); only MCP Security / Gen AI use /guardrails/activity.
+    const legacyPath = (isEndpointSecurityCategory() || isAgenticSecurityCategory())
+        ? "/dashboard/protection/threat-activity"
+        : "/dashboard/guardrails/activity";
 
     useEffect(() => {
         if (!newLayout) {
