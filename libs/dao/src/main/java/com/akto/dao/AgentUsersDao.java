@@ -169,7 +169,9 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         return trimmedName;
     }
 
-    // Registers a connector-only identity on first contact; on any existing-identity match, adds our label instead of inserting a duplicate.
+    private static final Map<String, List<String>> INFERENCE_HOOKS_TAG = Collections.singletonMap("connector", Collections.singletonList("inference-hooks"));
+
+    // Registers a connector-only identity on first contact; on any existing-identity match, adds our label and tag instead of inserting a duplicate.
     public void ensureConnectorIdentity(String email, String deviceLabel, String lastUpdatedBy) {
         if (email == null || email.trim().isEmpty() || deviceLabel == null || deviceLabel.trim().isEmpty()) {
             return;
@@ -180,6 +182,9 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         if (!matches.isEmpty()) {
             List<String> matchedUsernames = matches.stream().map(AgenticUsers::getUserName).distinct().collect(Collectors.toList());
             instance.updateMany(Filters.in(AgenticUsers.USER_NAME, matchedUsernames), Updates.addToSet("devices", deviceLabel));
+            for (String matchedUsername : matchedUsernames) {
+                mergeDeviceTags(matchedUsername, DeviceTag.SOURCE_INFERENCE_HOOKS, INFERENCE_HOOKS_TAG, lastUpdatedBy);
+            }
             return;
         }
 
@@ -187,10 +192,10 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         newUser.setUserName(deviceLabel);
         newUser.setUserEmail(trimmedEmail);
         newUser.setDevices(Collections.singletonList(deviceLabel));
-        newUser.setConnectorOnly(true);
         newUser.setLastUpdatedAt(Context.now());
         newUser.setLastUpdatedBy(lastUpdatedBy);
         instance.insertOne(newUser);
+        mergeDeviceTags(deviceLabel, DeviceTag.SOURCE_INFERENCE_HOOKS, INFERENCE_HOOKS_TAG, lastUpdatedBy);
     }
 
     /**

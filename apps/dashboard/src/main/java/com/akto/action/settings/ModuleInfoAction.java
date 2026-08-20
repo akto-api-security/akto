@@ -22,6 +22,7 @@ import org.bson.conversions.Bson;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -459,12 +460,13 @@ public class ModuleInfoAction extends UserAction {
         Map<String, Set<String>> liveDevicesByUsername = ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield();
         for (AgenticUsers u : agenticUsers) {
             Set<String> liveDevices = liveDevicesByUsername.remove(u.getUserName());
-            if (liveDevices != null) {
-                u.setDevices(new ArrayList<>(liveDevices));
-            } else if (!u.isConnectorOnly()) {
-                u.setDevices(new ArrayList<>());
-            }
-            // connectorOnly identities have no heartbeat to overwrite from — keep their stored device.
+            // Inference-hooks-tagged identities have no heartbeat to overwrite from, so their stored devices are kept and unioned with any live ones.
+            boolean fromInferenceHooks = u.getDeviceTags() != null
+                    && u.getDeviceTags().stream().anyMatch(t -> DeviceTag.SOURCE_INFERENCE_HOOKS.equals(t.getSource()));
+            Set<String> devices = new HashSet<>();
+            if (liveDevices != null) devices.addAll(liveDevices);
+            if (fromInferenceHooks && u.getDevices() != null) devices.addAll(u.getDevices());
+            u.setDevices(new ArrayList<>(devices));
         }
         // Any username reporting devices but with no team/role ever assigned has no AgenticUsers
         // doc yet — synthesize a lightweight entry so it still shows up as filterable/previewable.
