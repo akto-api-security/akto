@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -60,8 +61,36 @@ public class ConsumerUtil {
                 + " maxPollRecords=" + Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
     }
     private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null;
-    public static ExecutorService executor = Executors.newFixedThreadPool(150);
-    private static final int maxRunTimeForTests = 5 * 60;
+
+    // ---- perf tunables (env-overridable so we can sweep without recompiling) ----
+    private static int envInt(String name, int def) {
+        try { String v = System.getenv(name); return (v != null && !v.trim().isEmpty()) ? Integer.parseInt(v.trim()) : def; }
+        catch (Exception e) { return def; }
+    }
+    /**
+     * Per-test execution timeout. Was hard-coded 300s; a CPU-starved test that can't finish should be
+     * cut fast (300s slots waste ~60% of capacity). Override with MINI_TESTING_TASK_TIMEOUT_SECONDS.
+     */
+    private static final int maxRunTimeForTests = envInt("MINI_TESTING_TASK_TIMEOUT_SECONDS", 5 * 60);
+    /** Hard cap on worker concurrency (executor pool + parallel-consumer). 0 = use the run's configured value. */
+    private static final int MAX_CONCURRENCY_CAP = envInt("MINI_TESTING_MAX_CONCURRENCY", 0);
+
+    /** Apply the optional concurrency cap to the run's configured maxConcurrentRequest. */
+    private static int effectiveConcurrency(int configured) {
+        return (MAX_CONCURRENCY_CAP > 0) ? Math.min(configured, MAX_CONCURRENCY_CAP) : configured;
+    }
+
+    /** Named daemon threads so jstack/flamegraphs are readable and pools are attributable. */
+    private static ThreadFactory namedThreadFactory(String prefix) {
+        AtomicInteger seq = new AtomicInteger(1);
+        return r -> {
+            Thread t = new Thread(r, prefix + "-" + seq.getAndIncrement());
+            t.setDaemon(true);
+            return t;
+        };
+    }
+
+    public static ExecutorService executor = Executors.newFixedThreadPool(150, namedThreadFactory("mini-test-worker"));
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     private static final ConcurrentHashMap<ApiInfoKey, Integer> testedApisMap = new ConcurrentHashMap<>();
@@ -202,8 +231,9 @@ public class ConsumerUtil {
         }
 
         TestingConfigurations instance = TestingConfigurations.getInstance();
+        int concurrency = effectiveConcurrency(instance.getMaxConcurrentRequest());
         shutdownExecutorQuietly(5, true);
-        executor = Executors.newFixedThreadPool(instance.getMaxConcurrentRequest());
+        executor = Executors.newFixedThreadPool(concurrency, namedThreadFactory("mini-test-worker"));
 
         final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
         int startTime = Context.now();
@@ -231,7 +261,7 @@ public class ConsumerUtil {
         int apiCount = (instance.getTestingUtil() != null && instance.getTestingUtil().getSampleMessages() != null)
                 ? instance.getTestingUtil().getSampleMessages().size() : -1;
         int testCount = instance.getTestConfigMap() != null ? instance.getTestConfigMap().size() : -1;
-        metrics.logStart(accountId, apiCount, testCount, instance.getMaxConcurrentRequest(),
+        metrics.logStart(accountId, apiCount, testCount, concurrency,
                 maxRunTimeForTests, effectiveMaxRunTime);
 
         boolean isConsumerRunning = currentTestInfo.getBoolean(TestingStateStore.CONSUMER_RUNNING, false);
@@ -274,7 +304,7 @@ public class ConsumerUtil {
                 ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
                     .consumer(consumer)
                     .ordering(ParallelConsumerOptions.ProcessingOrder.UNORDERED)
-                    .maxConcurrency(instance.getMaxConcurrentRequest())
+                    .maxConcurrency(concurrency)
                     .commitMode(ParallelConsumerOptions.CommitMode.PERIODIC_CONSUMER_SYNC)
                     .batchSize(1)
                     .maxFailureHistory(3)
