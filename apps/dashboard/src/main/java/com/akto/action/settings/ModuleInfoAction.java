@@ -459,7 +459,12 @@ public class ModuleInfoAction extends UserAction {
         Map<String, Set<String>> liveDevicesByUsername = ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield();
         for (AgenticUsers u : agenticUsers) {
             Set<String> liveDevices = liveDevicesByUsername.remove(u.getUserName());
-            u.setDevices(liveDevices != null ? new ArrayList<>(liveDevices) : new ArrayList<>());
+            if (liveDevices != null) {
+                u.setDevices(new ArrayList<>(liveDevices));
+            } else if (!u.isConnectorOnly()) {
+                u.setDevices(new ArrayList<>());
+            }
+            // connectorOnly identities have no heartbeat to overwrite from — keep their stored device.
         }
         // Any username reporting devices but with no team/role ever assigned has no AgenticUsers
         // doc yet — synthesize a lightweight entry so it still shows up as filterable/previewable.

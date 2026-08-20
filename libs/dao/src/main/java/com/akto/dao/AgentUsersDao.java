@@ -169,6 +169,26 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         return trimmedName;
     }
 
+    // Registers a connector-only identity (e.g. a Claude Inference Hooks actor) on first contact
+    // so it's targetable from the dropdown; unlike syncSsoIdentity, a match is a no-op, never a rename.
+    public void ensureConnectorIdentity(String email, String deviceLabel, String lastUpdatedBy) {
+        if (email == null || email.trim().isEmpty() || deviceLabel == null || deviceLabel.trim().isEmpty()) {
+            return;
+        }
+        String trimmedEmail = email.trim();
+        if (!findAllIdentityMatches(deviceLabel, trimmedEmail, null).isEmpty()) {
+            return;
+        }
+        AgenticUsers newUser = new AgenticUsers();
+        newUser.setUserName(deviceLabel);
+        newUser.setUserEmail(trimmedEmail);
+        newUser.setDevices(Collections.singletonList(deviceLabel));
+        newUser.setConnectorOnly(true);
+        newUser.setLastUpdatedAt(Context.now());
+        newUser.setLastUpdatedBy(lastUpdatedBy);
+        instance.insertOne(newUser);
+    }
+
     /**
      * Generalizes findDeviceIdsByTeamsRolesAndDeviceIds to arbitrary tag keys: entries in
      * tagFilters AND together; within one key, any of its values match (OR).

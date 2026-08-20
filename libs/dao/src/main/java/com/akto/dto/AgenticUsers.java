@@ -19,6 +19,7 @@ public class AgenticUsers {
     public static final String LAST_UPDATED_BY = "lastUpdatedBy";
 
     public static final String DEVICE_TAGS = "deviceTags";
+    public static final String CONNECTOR_ONLY = "connectorOnly";
 
     private String userName;
     private String userEmail;
@@ -28,4 +29,8 @@ public class AgenticUsers {
 
     // Generic key-value tags (team, role, department, arbitrary Okta groups, ...).
     private List<DeviceTag> deviceTags;
+
+    // True when there's no real endpoint-shield device behind this identity (e.g. a Claude
+    // Inference Hooks actor) — keeps stored `devices` from being wiped when there's no live heartbeat.
+    private boolean connectorOnly;
 }
