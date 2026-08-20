@@ -584,16 +584,12 @@ public class HttpCallParser {
         return Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
     }
 
-    private boolean isCopilotTraffic(Map<String, String> tagsMap) {
-        if (tagsMap == null) return false;
-        return Constants.AI_AGENT_SOURCE_COPILOT_STUDIO.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
-    }
-
     private boolean isCopilotTrafficRaw(Map<String,String> tagsMap) {
         try {
             if (tagsMap == null) return false;
             return Constants.AI_AGENT_SOURCE_COPILOT_STUDIO.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE))
-                    || Constants.COPILOT_STUDIO_AI_AGENT_NAME.equalsIgnoreCase(tagsMap.get(Constants.AI_AGENT_APP_NAME));
+                    || Constants.COPILOT_STUDIO_AI_AGENT_NAME.equalsIgnoreCase(tagsMap.get(Constants.AI_AGENT_APP_NAME))
+                    || Constants.COPILOT_STUDIO_AI_AGENT_NAME.equalsIgnoreCase(tagsMap.get(Constants.SAAS_AGENT_TAG_NAME));
         } catch (Exception e) { return false; }
     }
 
