@@ -30,6 +30,7 @@ public abstract class SearchClient {
     protected static final String KEY_TOPIC_HIERARCHY = "topicHierarchy";
     protected static final String KEY_LABEL           = "label";
     protected static final String KEY_COUNT           = "count";
+    protected static final String KEY_MODEL           = "model";
 
     public abstract boolean isConfigured();
 
@@ -146,17 +147,21 @@ public abstract class SearchClient {
         public final long inputTokens;
         public final long outputTokens;
         public final List<Map<String, Object>> topUsers;
+        /** {KEY_MODEL, KEY_COUNT} rows — unique sessions per model, highest first. */
+        public final List<Map<String, Object>> topModels;
         public final List<Map<String, Object>> userBreakdown;
         public final List<Long> sessionSpark;
         public final List<Long> sessionSparkTs;
         public final List<Long> sessionTokenSpark;
         public SessionAggStats(long totalSessions, long inputTokens, long outputTokens,
-                                List<Map<String, Object>> topUsers, List<Map<String, Object>> userBreakdown,
+                                List<Map<String, Object>> topUsers, List<Map<String, Object>> topModels,
+                                List<Map<String, Object>> userBreakdown,
                                 List<Long> sessionSpark, List<Long> sessionSparkTs, List<Long> sessionTokenSpark) {
             this.totalSessions = totalSessions;
             this.inputTokens = inputTokens;
             this.outputTokens = outputTokens;
             this.topUsers = topUsers;
+            this.topModels = topModels;
             this.userBreakdown = userBreakdown;
             this.sessionSpark = sessionSpark;
             this.sessionSparkTs = sessionSparkTs;
