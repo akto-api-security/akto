@@ -15,6 +15,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -56,6 +57,9 @@ public class ConsumerUtil {
 
     private static final ConcurrentHashMap<ApiInfoKey, Integer> testedApisMap = new ConcurrentHashMap<>();
 
+    /** All observability for the current run. Recreated per init(); set before any task is submitted. */
+    private TestRunMetrics metrics;
+
     public static SingleTestPayload parseTestMessage(String message) {
         JSONObject jsonObject = JSON.parseObject(message);
         ObjectId testingRunId = new ObjectId(jsonObject.getString("testingRunId"));
@@ -82,13 +86,21 @@ public class ConsumerUtil {
 
             List<String> messagesList = instance.getTestingUtil().getSampleMessages().get(apiInfoKey);
             int timeNow = Context.now();
-            if(messagesList == null || messagesList.isEmpty()){}
+            if(messagesList == null || messagesList.isEmpty()){
+                metrics.markSkipped();
+            }
             else{
                 String sample = messagesList.get(messagesList.size() - 1);
                 loggerMaker.infoAndAddToDb("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
                 TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
                 executor.persistTestLogsToDb(runResult != null ? runResult.getTestLogs() : null);
                 executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+
+                if (runResult != null && runResult.isVulnerable()) {
+                    metrics.markVulnerable();
+                } else {
+                    metrics.markPassed();
+                }
 
                 testedApisMap.put(apiInfoKey, Context.now());
 
@@ -151,6 +163,20 @@ public class ConsumerUtil {
             effectiveMaxRunTime = currentTestInfo.getInt("testRunMaxTimeSeconds", maxRunTimeInSeconds);
         }
         AtomicBoolean firstRecordRead = new AtomicBoolean(false);
+        AtomicInteger processedRecords = new AtomicInteger(0);
+
+        // Fresh observability for this run. This release's state file has no expectedRecords,
+        // so estimate it as M*N (one message per api x test cell) for progress%/ETA.
+        int accountId = Context.accountId.get() != null ? Context.accountId.get() : -1;
+        int apiCount = (instance.getTestingUtil() != null && instance.getTestingUtil().getSampleMessages() != null)
+                ? instance.getTestingUtil().getSampleMessages().size() : -1;
+        int testCount = instance.getTestConfigMap() != null ? instance.getTestConfigMap().size() : -1;
+        int expectedRecords = (apiCount > 0 && testCount > 0) ? apiCount * testCount : -1;
+        metrics = new TestRunMetrics(summaryIdForTest, startTime, expectedRecords, executor);
+        metrics.logStart(accountId, apiCount, testCount, instance.getMaxConcurrentRequest(),
+                maxRunTimeForTests, effectiveMaxRunTime);
+        TestRunMetrics.StopReason stopReason = TestRunMetrics.StopReason.UNKNOWN;
+        boolean consumerFailed = false;
 
         boolean isConsumerRunning = false;
         if(currentTestInfo != null){
@@ -180,7 +206,8 @@ public class ConsumerUtil {
                 .build();
 
             parallelConsumer = ParallelStreamProcessor.createEosStreamProcessor(options);
-            parallelConsumer.subscribe(Arrays.asList(topicName)); 
+            parallelConsumer.subscribe(Arrays.asList(topicName));
+            metrics.logConsumerUp(1);
         }
 
         try {
@@ -190,42 +217,62 @@ public class ConsumerUtil {
                 String message = record.value();
                 // Stable id per Kafka record: same record redelivered (e.g. after rebalance/restart) will log the same id again.
                 String recordId = record.getSingleConsumerRecord().topic() + "-p" + record.getSingleConsumerRecord().partition() + "-o" + record.offset();
+                metrics.onPolled();
+                String label;
+                try {
+                    SingleTestPayload p = parseTestMessage(message);
+                    label = p.getSubcategory() + " " + p.getApiInfoKey();
+                } catch (Exception ex) {
+                    label = recordId;
+                }
                 loggerMaker.infoAndAddToDb("Thread [" + threadName + "] picked up record recordId=" + recordId + " " + message);
                 try {
                     if(!executor.isShutdown()){
+                        metrics.onSubmit(recordId, label, threadName);
                         Future<?> future = executor.submit(() -> runTestFromMessage(message));
                         firstRecordRead.set(true);
                         try {
-                            future.get(maxRunTimeForTests, TimeUnit.SECONDS); 
+                            future.get(maxRunTimeForTests, TimeUnit.SECONDS);
                         } catch (InterruptedException | TimeoutException e) {
+                            metrics.markTimedOut();
                             loggerMaker.errorAndAddToDb("Task timed out");
                             future.cancel(true);
                             createTimedOutResultFromMessage(message);
                         } catch(RejectedExecutionException e){
+                            metrics.markRejected();
                             future.cancel(true);
                         } catch (Exception e) {
+                            metrics.markErrored();
                             future.cancel(true);
                             loggerMaker.errorAndAddToDb(e, "Error in task execution: " + message);
                         }
                     }
-                    
+
                 } finally {
-                    loggerMaker.infoAndAddToDb("Thread [" + threadName + "] finished processing record recordId=" + recordId);
+                    metrics.onComplete(recordId);
+                    processedRecords.incrementAndGet();
+                    loggerMaker.infoAndAddToDb("Thread [" + threadName + "] finished processing record recordId=" + recordId + " (" + label + ")");
                 }
             });
         }
 
             while (parallelConsumer != null) {
+                long workRemaining = parallelConsumer.workRemaining();
+                metrics.tick(processedRecords.get(), workRemaining);
+
                 if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId)){
+                    stopReason = TestRunMetrics.StopReason.STOPPED;
                     loggerMaker.infoAndAddToDb("Tests have been marked stopped.");
                     executor.shutdownNow();
                     break;
                 }
                 else if ((Context.now() - startTime >= effectiveMaxRunTime)) {
+                    stopReason = TestRunMetrics.StopReason.MAX_RUNTIME;
                     loggerMaker.infoAndAddToDb("Max run time reached. Stopping consumer.");
                     executor.shutdownNow();
                     break;
-                }else if(firstRecordRead.get() && parallelConsumer.workRemaining() == 0){
+                }else if(firstRecordRead.get() && workRemaining == 0){
+                    stopReason = TestRunMetrics.StopReason.ALL_PROCESSED;
                     int remainingTime = Math.min( Math.max(0,effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
                     loggerMaker.infoAndAddToDb("Records are empty now, thus executing final tests");
                     executor.shutdown();
@@ -236,8 +283,11 @@ public class ConsumerUtil {
             }
 
         } catch (Exception e) {
+            consumerFailed = true;
+            stopReason = TestRunMetrics.StopReason.ERROR;
             loggerMaker.errorAndAddToDb(e, "Error in polling records");
         }finally{
+            metrics.logEnd(stopReason, consumerFailed, processedRecords.get());
             loggerMaker.infoAndAddToDb("Closing consumer as all results have been executed.");
 
             flushLastTestedUpdates();
