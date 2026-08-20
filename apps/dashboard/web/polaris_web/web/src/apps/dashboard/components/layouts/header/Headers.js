@@ -148,7 +148,10 @@ export default function Header() {
         : (dashboardCategory || "API Security");
     
     useEffect(() => {
-        if(window.SCOPE_ROLE_MAPPING && Object.keys(window.SCOPE_ROLE_MAPPING).length > 0 && window.location.pathname !== "/dashboard/onboarding"){
+        // Onboarding flow disabled - the `pathname !== "/dashboard/onboarding"` guard that
+        // used to be part of this condition is dead, nothing routes there any more.
+        // if(window.SCOPE_ROLE_MAPPING && Object.keys(window.SCOPE_ROLE_MAPPING).length > 0 && window.location.pathname !== "/dashboard/onboarding"){
+        if(window.SCOPE_ROLE_MAPPING && Object.keys(window.SCOPE_ROLE_MAPPING).length > 0){
             // Only leave categories hidden by scope (API users may use Argus/Atlas without those scopes)
             if(hiddenDashboardCategories.includes(dashboardCategory)){
                 setDashboardCategory(firstAccessibleCategory);
