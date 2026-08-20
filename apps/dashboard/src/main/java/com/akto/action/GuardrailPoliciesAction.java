@@ -98,7 +98,7 @@ public class GuardrailPoliciesAction extends UserAction {
 
     // Some accounts have no <accountId>-guardrails.akto.io machine; for those, fall back to a
     // nginx guardrails machine.
-    private static final int FALLBACK_GUARDRAIL_ACCOUNT_ID = 1753806619;
+    private static final int FALLBACK_GUARDRAIL_ACCOUNT_ID = 1726615470;
     private static final String FALLBACK_GUARDRAIL_SERVICE_URL = "https://" + FALLBACK_GUARDRAIL_ACCOUNT_ID + "-guardrails.akto.io";
 
     public String fetchGuardrailPolicies() {
