@@ -505,7 +505,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">LOGS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User deleted an account job log entry</param>
+                <param name="actionDescription">User deleted an account job</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
