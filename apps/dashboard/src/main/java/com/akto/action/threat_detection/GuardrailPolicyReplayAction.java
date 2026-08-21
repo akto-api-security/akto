@@ -10,7 +10,10 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.http_util.CoreHTTPClient;
+import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.utils.guardrails.PromptSnippet;
+import com.akto.utils.search.SearchClient;
+import com.akto.utils.search.SearchClientFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
@@ -74,8 +77,26 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
 
     /** Must not exceed maxReplayItems in the guardrails service's replay handler. */
     private static final int PAGE_SIZE = 25;
-    /** Violations examined per run, newest first. */
+    /** Items examined per run, newest first. */
     private static final int MAX_VIOLATIONS = 100;
+
+    /**
+     * How far back to look for traces. Violations are fetched with no lower bound because they are
+     * scarce; agent traffic is not, so a bounded window keeps the search cheap.
+     */
+    private static final long TRACE_LOOKBACK_MS = TimeUnit.DAYS.toMillis(30);
+
+    /**
+     * Placeholder request line for a trace-derived envelope. AgentQueryRecord records the prompt but
+     * not the HTTP method/path, so there is nothing real to put here; with no field mapping matching
+     * this path the guardrails service scans the raw payload, which is what we want.
+     */
+    private static final String TRACE_METHOD = "POST";
+    private static final String TRACE_PATH = "/v1/messages";
+    /** Which recent sample to compare over. */
+    static final String SOURCE_VIOLATIONS = "VIOLATIONS";
+    static final String SOURCE_TRACES = "TRACES";
+
     /** Cap on prompt rows retained, so a wholesale regression cannot bloat the response. */
     private static final int MAX_MISSED_ROWS = 50;
 
@@ -126,6 +147,20 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
         }
     }
 
+    /**
+     * One item to compare, normalised so the comparison loop does not care which source it came
+     * from: recorded violations or recent agent traffic.
+     */
+    private static class ReplaySample {
+        final String id;
+        final String envelope;
+
+        ReplaySample(String id, String envelope) {
+            this.id = id;
+            this.envelope = envelope;
+        }
+    }
+
     /** Mutable progress for one comparison run, read by polling while the worker writes it. */
     private static class ReplayRun {
         volatile String status = "RUNNING"; // RUNNING | DONE | FAILED
@@ -154,6 +189,18 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
     /** Optional: the saved policy's id, used to load the baseline. Falls back to policyName. */
     @Setter
     private String hexId;
+
+    /**
+     * Which sample to compare over: {@code VIOLATIONS} (this policy's recorded violations) or
+     * {@code TRACES} (recent agent traffic, whether or not it was blocked).
+     *
+     * <p>They answer different questions. Violations only contain traffic that already matched, so
+     * they can only show detections an edit loses. Traces contain traffic that was never blocked
+     * too, and their payloads are not put through the capture-time anonymization that violations
+     * are — so the counts mean more.
+     */
+    @Setter
+    private String source;
 
     @Setter
     @Getter
@@ -189,6 +236,14 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
         // drifted downward and the cache looked broken. Bucketing both keeps the event set and the
         // cached verdicts describing the same window.
         int endTimestamp = (Context.now() / BASELINE_BUCKET_SECONDS) * BASELINE_BUCKET_SECONDS;
+        boolean useTraces = SOURCE_TRACES.equalsIgnoreCase(source);
+
+        // Fail loudly rather than reporting a clean zero: when trace search is not configured every
+        // query returns empty, which would render as "your policy catches nothing".
+        if (useTraces && !SearchClientFactory.instance().isConfigured()) {
+            addActionError("Trace search is not configured for this environment");
+            return ERROR.toUpperCase();
+        }
 
         String id = UUID.randomUUID().toString();
         ReplayRun run = new ReplayRun();
@@ -201,7 +256,7 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
             Context.accountId.set(accountId);
             Context.contextSource.set(contextSource);
             try {
-                execute(run, saved, editedPayload, contextSource, endTimestamp);
+                execute(run, saved, editedPayload, contextSource, endTimestamp, useTraces);
                 run.status = "DONE";
             } catch (Exception e) {
                 run.status = "FAILED";
@@ -250,7 +305,7 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
 
     /** Walks the violation window a page at a time, updating {@code run} as it goes. */
     private void execute(ReplayRun run, GuardrailPolicies saved, BasicDBObject editedPayload,
-                         CONTEXT_SOURCE contextSource, int endTimestamp) throws Exception {
+                         CONTEXT_SOURCE contextSource, int endTimestamp, boolean useTraces) throws Exception {
         // filterId == the policy's name is the join, and is already exact: only the guardrails flow
         // writes events under a guardrail policy's name. Deliberately NOT filtered by label —
         // production guardrail events are recorded as THREAT, not GUARDRAIL.
@@ -267,25 +322,23 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
         BasicDBObject baselinePayload = cachedBaselineIds != null ? null : serializeBaseline(saved);
         Set<String> baselineIds = new LinkedHashSet<>();
 
-        // One fetch for the whole window, newest first (the fetch sorts by detectedAt desc). The
-        // guardrails service caps a replay request at PAGE_SIZE items, but that is a limit on the
-        // *evaluation* call, not on reading the violations — so this pages the POSTs, not the fetch.
-        List<DashboardMaliciousEvent> allEvents =
-            fetchAllMaliciousEvents(0, endTimestamp, MAX_VIOLATIONS, filters);
+        // One fetch for the whole window, newest first. The guardrails service caps a replay
+        // request at PAGE_SIZE items, but that limits the *evaluation* call, not reading the
+        // sample — so this pages the POSTs, not the fetch.
+        List<ReplaySample> allSamples = useTraces
+            ? fetchTraceSamples(endTimestamp)
+            : fetchViolationSamples(endTimestamp, filters);
 
-        for (int from = 0; from < allEvents.size(); from += PAGE_SIZE) {
-            List<DashboardMaliciousEvent> events =
-                allEvents.subList(from, Math.min(from + PAGE_SIZE, allEvents.size()));
-            run.examined += events.size();
+        for (int from = 0; from < allSamples.size(); from += PAGE_SIZE) {
+            List<ReplaySample> batch =
+                allSamples.subList(from, Math.min(from + PAGE_SIZE, allSamples.size()));
+            run.examined += batch.size();
 
             Map<String, String> promptById = new HashMap<>();
             List<BasicDBObject> items = new ArrayList<>();
-            for (DashboardMaliciousEvent event : events) {
-                if (StringUtils.isBlank(event.getPayload())) {
-                    continue;
-                }
-                promptById.put(event.getId(), PromptSnippet.of(event.getPayload()));
-                items.add(new BasicDBObject("id", event.getId()).append("envelope", event.getPayload()));
+            for (ReplaySample sample : batch) {
+                promptById.put(sample.id, PromptSnippet.of(sample.envelope));
+                items.add(new BasicDBObject("id", sample.id).append("envelope", sample.envelope));
             }
 
             if (!items.isEmpty()) {
@@ -355,6 +408,106 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
     }
 
     // ---------------------------------------------------------------- helpers
+
+    // ------------------------------------------------- sources
+
+    /** This policy's recorded violations, newest first. Rows with no stored payload are dropped. */
+    private List<ReplaySample> fetchViolationSamples(int endTimestamp, Map<String, Object> filters) {
+        List<ReplaySample> out = new ArrayList<>();
+        for (DashboardMaliciousEvent event : fetchAllMaliciousEvents(0, endTimestamp, MAX_VIOLATIONS, filters)) {
+            if (StringUtils.isBlank(event.getPayload())) {
+                continue;
+            }
+            out.add(new ReplaySample(event.getId(), event.getPayload()));
+        }
+        return out;
+    }
+
+    /**
+     * Recent agent traffic, newest first, whether or not it was blocked.
+     *
+     * <p>Uses {@code fetchMessages}, which aggregates by traceId and returns one row per trace
+     * carrying that trace's first prompt. That de-duplication is wanted here: a single chatty
+     * session should not dominate the sample the way it would with a flat per-message fetch.
+     *
+     * <p>No session filter is passed, so this spans recent traffic account-wide. The client returns
+     * up to 500 trace buckets ordered newest-first and has no limit parameter, so the cap is applied
+     * here.
+     *
+     * <p>Goes through {@link SearchClientFactory} rather than Elasticsearch directly so accounts on
+     * the Azure Data Explorer backend work too.
+     */
+    private List<ReplaySample> fetchTraceSamples(int endTimestamp) {
+        long endMs = endTimestamp * 1000L;
+        List<Map<String, Object>> rows = SearchClientFactory.instance().fetchMessages(
+            traceAccountId(), endMs - TRACE_LOOKBACK_MS, endMs,
+            null,   // no filters: not scoped to a session, user or service
+            null);  // atlasTrafficFilter unset: include both
+
+        List<ReplaySample> out = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            if (out.size() >= MAX_VIOLATIONS) {
+                break;
+            }
+            String prompt = asText(row.get(AgentQueryRecord.F_QUERY_PAYLOAD));
+            if (StringUtils.isBlank(prompt)) {
+                continue;
+            }
+            // traceId is the identifier: these rows are one-per-trace and carry no document id.
+            String id = asText(row.get(AgentQueryRecord.F_TRACE_ID));
+            if (StringUtils.isBlank(id)) {
+                id = "trace-" + out.size();
+            }
+            out.add(new ReplaySample(id,
+                traceEnvelope(prompt, asText(row.get(AgentQueryRecord.F_RESPONSE_PAYLOAD)))));
+        }
+        return out;
+    }
+
+    /**
+     * Wraps a recorded prompt in the stored-traffic envelope the guardrails service already parses.
+     *
+     * <p>{@code queryPayload} is passed through untouched because it is <em>already</em> the request
+     * payload JSON — real rows look like {@code {"body": ...}} or {@code {"body":..., "toolName":...}},
+     * the same shape live gateway traffic has. Wrapping it again would bury the prompt one level
+     * deeper than any field mapping or extractor looks.
+     */
+    private static String traceEnvelope(String requestPayload, String responsePayload) {
+        return new BasicDBObject()
+            .append("method", TRACE_METHOD)
+            .append("path", TRACE_PATH)
+            .append("requestPayload", requestPayload)
+            .append("responsePayload", responsePayload == null ? "" : responsePayload)
+            .toJson();
+    }
+
+    /**
+     * Account whose traffic the trace search reads.
+     *
+     * <p>Normally the caller's own account. {@code GUARDRAILS_TRACE_ACCOUNT_ID} overrides it, which
+     * exists only so a local dashboard — whose account has no ingested traffic — can be pointed at
+     * an account that does, to verify the comparison end to end. It makes the numbers meaningless
+     * (the policy comes from one account, the traffic from another), so it must not be set outside
+     * that check.
+     */
+    private static int traceAccountId() {
+        String override = System.getenv("GUARDRAILS_TRACE_ACCOUNT_ID");
+        if (StringUtils.isNotBlank(override)) {
+            try {
+                int parsed = Integer.parseInt(override.trim());
+                loggerMaker.warn("GUARDRAILS_TRACE_ACCOUNT_ID is set: reading traces from account "
+                    + parsed + " instead of " + Context.accountId.get() + " — counts are not meaningful");
+                return parsed;
+            } catch (NumberFormatException e) {
+                loggerMaker.error("GUARDRAILS_TRACE_ACCOUNT_ID is not a number: " + override);
+            }
+        }
+        return Context.accountId.get();
+    }
+
+    private static String asText(Object value) {
+        return value == null ? "" : String.valueOf(value);
+    }
 
     /** The saved version of the policy being edited, or null when it cannot be resolved. */
     private GuardrailPolicies loadSavedPolicy() {
