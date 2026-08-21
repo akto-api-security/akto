@@ -6,6 +6,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.jobs.JobParams;
 import com.akto.dto.metrics.MetricData;
@@ -170,6 +171,10 @@ public abstract class DataActor {
     public abstract TestSourceConfig findTestSourceConfig(String subType);
 
     public abstract void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTs);
+
+    public abstract List<CustomWebhook> fetchTeamsWebhooksForTestResults();
+
+    public abstract void recordWebhookSendResult(int webhookId, String userEmail, int timestamp, String message, List<String> errors);
 
     public abstract Map<ObjectId, TestingRunResultSummary> fetchTestingRunResultSummaryMap(String testingRunId);
 
