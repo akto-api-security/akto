@@ -64,11 +64,6 @@ func main() {
 		os.Setenv("AKTO_API_TOKEN", cfg.DatabaseAbstractorToken)
 	}
 
-	if cfg.ThreatClient.Enabled {
-		runThreatClient(cfg, logger)
-		return
-	}
-
 	if cfg.ThreatKafka.Enabled {
 		producer, err := kafka.NewThreatProducer(cfg, logger)
 		if err != nil {
@@ -201,27 +196,6 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 	if err := router.Run(addr); err != nil {
 		logger.Fatal("Failed to start server", zap.Error(err))
 	}
-}
-
-// runThreatClient runs the guardrails threat client: it consumes buffered
-// malicious events and forwards them to the threat backend, retrying a failing
-// backend without committing so nothing is lost while it is down.
-func runThreatClient(cfg *config.Config, logger *zap.Logger) {
-	logger.Info("Starting in guardrails threat client mode",
-		zap.String("broker", cfg.ThreatClient.BrokerURL),
-		zap.String("topic", cfg.ThreatClient.Topic),
-		zap.String("groupID", cfg.ThreatClient.GroupID))
-
-	client, err := kafka.NewThreatClient(cfg, logger)
-	if err != nil {
-		logger.Fatal("Failed to create threat client", zap.Error(err))
-	}
-
-	if err := client.Start(context.Background()); err != nil && err != context.Canceled {
-		logger.Fatal("Threat client stopped with error", zap.Error(err))
-	}
-
-	logger.Info("Threat client stopped gracefully")
 }
 
 func runKafkaConsumer(cfg *config.Config, validatorService *validator.Service, logger *zap.Logger) {

@@ -30,10 +30,10 @@ type Config struct {
 	KafkaMaxWaitSec     int
 
 	// ThreatKafka buffers malicious events onto Kafka instead of POSTing them
-	// straight to the threat backend, so events survive a backend outage.
+	// straight to the threat backend, so events survive a backend outage. The
+	// Java threat client (apps/threat-detection, GUARDRAILS_THREAT_CLIENT_ENABLED)
+	// drains the topic and forwards to the backend.
 	ThreatKafka ThreatKafkaConfig
-	// ThreatClient drains that buffer and forwards to the threat backend.
-	ThreatClient ThreatClientConfig
 
 	PolicyRefreshIntervalMin int
 
@@ -73,22 +73,6 @@ type ThreatKafkaConfig struct {
 	UseTLS    bool
 	Username  string
 	Password  string
-}
-
-// ThreatClientConfig is the consumer half — the guardrails threat client, which
-// drains the buffer and forwards each event to the threat backend. It retries
-// 5xx indefinitely without committing, so a backend outage costs latency rather
-// than events.
-type ThreatClientConfig struct {
-	Enabled       bool
-	BrokerURL     string
-	Topic         string
-	GroupID       string
-	UseTLS        bool
-	Username      string
-	Password      string
-	MaxBackoffSec int
-	BatchSize     int
 }
 
 type FileConfig struct {
@@ -151,7 +135,6 @@ func LoadConfig() *Config {
 		NhiScanIntervalMin:               getEnvAsInt("NHI_SCAN_INTERVAL_MIN", 30),
 		ValidationTimeoutMs:              getEnvAsInt("GUARDRAILS_VALIDATION_TIMEOUT_MS", 2500),
 		ThreatKafka:                      loadThreatKafkaConfig(),
-		ThreatClient:                     loadThreatClientConfig(),
 		File: FileConfig{
 			Enabled:          getEnvAsBool("FILE_VALIDATION_ENABLED", false),
 			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
@@ -182,10 +165,6 @@ func LoadConfig() *Config {
 // retention can be sized independently.
 const DefaultThreatTopic = "akto.threat_detection.guardrail_events"
 
-// DefaultThreatClientGroupID is distinct from the Java threat-detection
-// module's akto.threat_detection group.
-const DefaultThreatClientGroupID = "akto.guardrails_threat_client"
-
 func loadThreatKafkaConfig() ThreatKafkaConfig {
 	return ThreatKafkaConfig{
 		Enabled: getEnvAsBool("GUARDRAILS_THREAT_KAFKA_ENABLED", false),
@@ -198,23 +177,6 @@ func loadThreatKafkaConfig() ThreatKafkaConfig {
 		// which belong to the traffic consumer and may target another cluster.
 		Username: getEnv("GUARDRAILS_THREAT_KAFKA_USERNAME", getEnv("AKTO_KAFKA_USERNAME", "")),
 		Password: getEnv("GUARDRAILS_THREAT_KAFKA_PASSWORD", getEnv("AKTO_KAFKA_PASSWORD", "")),
-	}
-}
-
-func loadThreatClientConfig() ThreatClientConfig {
-	return ThreatClientConfig{
-		Enabled: getEnvAsBool("GUARDRAILS_THREAT_CLIENT_ENABLED", false),
-		BrokerURL: getEnv("GUARDRAILS_THREAT_CLIENT_KAFKA_BROKER_URL",
-			getEnv("GUARDRAILS_THREAT_KAFKA_BROKER_URL", getEnv("KAFKA_BROKER_URL", ""))),
-		Topic:   getEnv("GUARDRAILS_THREAT_CLIENT_KAFKA_TOPIC", DefaultThreatTopic),
-		GroupID: getEnv("GUARDRAILS_THREAT_CLIENT_KAFKA_GROUP_ID", DefaultThreatClientGroupID),
-		UseTLS:  getEnvAsBool("GUARDRAILS_THREAT_CLIENT_KAFKA_USE_TLS", false),
-		Username: getEnv("GUARDRAILS_THREAT_CLIENT_KAFKA_USERNAME",
-			getEnv("AKTO_KAFKA_USERNAME", "")),
-		Password: getEnv("GUARDRAILS_THREAT_CLIENT_KAFKA_PASSWORD",
-			getEnv("AKTO_KAFKA_PASSWORD", "")),
-		MaxBackoffSec: getEnvAsInt("GUARDRAILS_THREAT_CLIENT_MAX_BACKOFF_SEC", 60),
-		BatchSize:     getEnvAsInt("GUARDRAILS_THREAT_CLIENT_BATCH_SIZE", 100),
 	}
 }
 

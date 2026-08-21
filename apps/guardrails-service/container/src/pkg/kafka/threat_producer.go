@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -97,4 +98,37 @@ func (p *ThreatProducer) write(ctx context.Context, body []byte) error {
 
 func (p *ThreatProducer) Close() error {
 	return p.writer.Close()
+}
+
+// threatEventEnvelope is the minimal view of the buffered body needed for
+// partitioning and logging. The body is forwarded verbatim; this never
+// re-serialises it.
+type threatEventEnvelope struct {
+	MaliciousEvent struct {
+		Actor     string `json:"actor"`
+		SessionID string `json:"sessionId"`
+		FilterID  string `json:"filterId"`
+	} `json:"maliciousEvent"`
+}
+
+func parseEnvelope(body []byte) threatEventEnvelope {
+	var env threatEventEnvelope
+	// A body we cannot parse is still forwarded; the backend is the authority
+	// on what is valid, so this only degrades the partition key and log detail.
+	_ = json.Unmarshal(body, &env)
+	return env
+}
+
+// partitionKey keeps one session's events on one partition, so they stay
+// ordered relative to each other. Falls back to the actor, then to nil (which
+// lets the balancer spread the message).
+func partitionKey(body []byte) []byte {
+	env := parseEnvelope(body)
+	if env.MaliciousEvent.SessionID != "" {
+		return []byte(env.MaliciousEvent.SessionID)
+	}
+	if env.MaliciousEvent.Actor != "" {
+		return []byte(env.MaliciousEvent.Actor)
+	}
+	return nil
 }
