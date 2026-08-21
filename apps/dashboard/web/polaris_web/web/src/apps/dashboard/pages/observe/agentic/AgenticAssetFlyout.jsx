@@ -14,6 +14,7 @@ import ViolationsTab from "./ViolationsTab";
 import McpComponentsView from "./McpComponentsView";
 import AgentComponentsView from "./AgentComponentsView";
 import SkillComponentsView from "./SkillComponentsView";
+import PluginComponentsView from "./PluginComponentsView";
 import "../../../components/layouts/style.css";
 
 // ─── Devices tab (small, kept inline) ────────────────────────────────────────
@@ -80,6 +81,9 @@ function AgenticComponentsTab({ asset, onNavChange, onNavigateToAsset, configVio
     if (asset.type === "AI Agent")   return <AgentComponentsView asset={asset} onNavChange={onNavChange} onNavigateToAsset={onNavigateToAsset} configViolations={configViolations} configRows={configRows} />;
     // Skills: fetch from parent collections then show the skill's own traffic
     if (asset.type === "Skill") return <SkillComponentsView asset={asset} />;
+    // Plugins: discovery-only — components tab lists the bundled MCP servers/skills (same
+    // list/drill-down idiom as an AI Agent's), metadata itself now lives in the Overview tab.
+    if (asset.type === "Plugin") return <PluginComponentsView asset={asset} onNavChange={onNavChange} />;
     // LLMs: their collectionIds are their own collections — show actual LLM API endpoints
     if (asset.type === "LLM") return <McpComponentsView asset={asset} onNavChange={onNavChange} />;
     return <Box padding="4"><Text variant="bodySm" color="subdued">No component data available for this asset type.</Text></Box>;
@@ -107,7 +111,7 @@ export default function AgenticAssetFlyout({
     const [topNav,         setTopNav]         = useState(null);
     const [topNavPicker,   setTopNavPicker]   = useState(null);
 
-    // hostNames/collectionIds/skillNames/mcpServers/mcpServerCollectionIds/devices no longer come
+    // hostNames/collectionIds/skillCount/mcpServers/mcpServerCollectionIds/devices no longer come
     // with the grid row (see AgenticObserveAction.GroupSummary.toSummaryResponse()'s and
     // fetchAgenticAssetsSummary's row-loop comments — sending them for every row of every page used
     // to make a single 50-row page 16MB, mostly from raw per-device breakdowns on rows with hundreds
@@ -127,7 +131,7 @@ export default function AgenticAssetFlyout({
                 });
                 if (!cancelled) setAssetDetail(detail);
             } catch {
-                if (!cancelled) setAssetDetail({ hostNames: [], collectionIds: [], skillNames: [], mcpServers: [], mcpServerCollectionIds: {}, devices: [] });
+                if (!cancelled) setAssetDetail({ hostNames: [], collectionIds: [], skillCount: 0, mcpServers: [], mcpServerCollectionIds: {}, deviceCount: 0, deviceSample: [] });
             }
         })();
         return () => { cancelled = true; };
@@ -140,11 +144,14 @@ export default function AgenticAssetFlyout({
         return { ...rawAsset, ...assetDetail };
     }, [rawAsset, assetDetail]);
 
-    // Id-keyed map for OverviewTab's existing contract (built from the lazily-fetched asset.devices
-    // instead of being threaded in as a prop from the grid — there's only ever one asset open at a
-    // time in this flyout).
+    // Id-keyed map for OverviewTab's existing contract (built from the lazily-fetched
+    // asset.deviceSample — a small capped sample, NOT the full per-device list; see
+    // AgenticObserveAction's assetDeviceCount/assetDeviceSample comment — instead of being threaded
+    // in as a prop from the grid — there's only ever one asset open at a time in this flyout). The
+    // real total lives separately on asset.deviceCount (OverviewTab's "Devices: N" stat uses that,
+    // not this sample's length).
     const assetDevices = useMemo(() => (
-        asset ? { [asset.id]: asset.devices || [] } : {}
+        asset ? { [asset.id]: asset.deviceSample || [] } : {}
     ), [asset]);
 
     // True only for the brief window between opening an asset and its lazy detail landing — the
@@ -201,7 +208,7 @@ export default function AgenticAssetFlyout({
         if (!asset) return [];
         const totalV   = (asset.violations?.critical || 0) + (asset.violations?.high || 0) + (asset.violations?.medium || 0) + (asset.violations?.low || 0);
         // endpointsCount is a cheap scalar already present on the grid row (before the lazy detail
-        // fetch lands), same number (asset.devices).length would give once loaded — avoids the tab
+        // fetch lands), same number asset.deviceCount would give once loaded — avoids the tab
         // badge flashing 0 while assetDetail is still in flight.
         const devCount = asset.endpointsCount || 0;
         let componentCount = 0;
@@ -212,6 +219,8 @@ export default function AgenticAssetFlyout({
             });
         } else if (asset.type === "MCP Server") {
             componentCount = mcpComponentCount;
+        } else if (asset.type === "Plugin") {
+            componentCount = (asset.pluginMcpServers || []).length + (asset.pluginSkills || []).length;
         }
         return [
             { id: "overview",   content: "Overview" },

@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import HeadingWithTooltip from '../../../components/shared/HeadingWithTooltip';
 import TooltipText from '../../../components/shared/TooltipText';
 import { FILTER_TYPES } from './useAgenticFilter';
-import { getAgenticCategoryLabel, hasPersonalAccountTag, hasLocalMcpServerTag, hasMisconfiguredConfigTag, CLIENT_TYPES } from '../agentic/mcpClientHelper';
+import { getAgenticCategoryLabel, hasPersonalAccountTag, hasLocalMcpServerTag, hasMisconfiguredConfigTag, getPluginNameForCollection, findAssetTag, CLIENT_TYPES } from '../agentic/mcpClientHelper';
 import { skillCollectionKey } from '../agentic/constants';
 import PersistStore from '../../../../main/PersistStore';
 
@@ -118,6 +118,7 @@ const getChildColumnConfig = (filterType) => {
         case FILTER_TYPES.BROWSER_LLM:
             return { title: "LLM source", displayField: 'sourceId' };
         case FILTER_TYPES.SKILL:
+        case FILTER_TYPES.PLUGIN:
         case FILTER_TYPES.AI_AGENT:
         default:
             return { title: "Agentic resource name", displayField: 'serviceName' };
@@ -203,6 +204,7 @@ const groupByEndpointId = (collections) => {
                 hasLocalMcpServer: false,
                 hasMisconfiguredConfig: false,
                 hasMaliciousSkill: false,
+                pluginNames: new Set(),
             };
         }
         groups[endpointId].children.push(collection);
@@ -220,6 +222,8 @@ const groupByEndpointId = (collections) => {
         if (hasMisconfiguredConfigTag(collection.envTypeOriginal)) {
             groups[endpointId].hasMisconfiguredConfig = true;
         }
+        const collPluginName = getPluginNameForCollection(collection);
+        if (collPluginName) groups[endpointId].pluginNames.add(collPluginName);
         if (!groups[endpointId].hasMaliciousSkill && Array.isArray(collection.skills)) {
             groups[endpointId].hasMaliciousSkill = collection.skills.some(s => maliciousSkillKeys.has(skillCollectionKey(collection.id, s)));
         }
@@ -252,6 +256,7 @@ const groupByEndpointId = (collections) => {
  */
 const countAgenticAssets = (children, showCategoryColumn) => {
     const skillNames = new Set();
+    const pluginNames = new Set();
     let nonSkillCount = 0;
     children.forEach(child => {
         const category = getAgenticCategoryLabel(child);
@@ -259,28 +264,35 @@ const countAgenticAssets = (children, showCategoryColumn) => {
         if (Array.isArray(child.skills)) {
             child.skills.forEach(s => { if (s) skillNames.add(String(s).toLowerCase()); });
         }
+        const childPluginName = getPluginNameForCollection(child);
+        if (childPluginName) pluginNames.add(String(childPluginName).toLowerCase());
     });
     // When not in the "All" category view, skill collections themselves appear as children.
     // In that case fall back to children.length so standalone Skill rows count correctly.
-    if (!showCategoryColumn && skillNames.size === 0) return children.length;
-    return nonSkillCount + skillNames.size;
+    if (!showCategoryColumn && skillNames.size === 0 && pluginNames.size === 0) return children.length;
+    return nonSkillCount + skillNames.size + pluginNames.size;
 };
 
 /**
  * Prettifies the grouped endpoint data for display
  */
 const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expandedColSpan) => {
+    // Scoped to one plugin: the matched collections are AGENT collections, so their skill/misconfig
+    // flags belong to the agent, not the plugin. Plugins are siblings of skills, not containers.
+    const isPluginScope = filterType === FILTER_TYPES.PLUGIN;
     return groupedData.map(group => {
-        const childCount = countAgenticAssets(group.children, showCategoryColumn);
-        const riskScore = group.riskScore || 0;
-        const hasMisconfiguredConfig = group.hasMisconfiguredConfig || false;
-        const hasMaliciousSkill = group.hasMaliciousSkill || false;
+        const pluginCount = group.pluginNames?.size || 0;
+        const childCount = isPluginScope ? pluginCount : countAgenticAssets(group.children, showCategoryColumn);
+        const riskScore = isPluginScope ? 0 : (group.riskScore || 0);
+        const hasMisconfiguredConfig = !isPluginScope && (group.hasMisconfiguredConfig || false);
+        const hasMaliciousSkill = !isPluginScope && (group.hasMaliciousSkill || false);
 
         const endpointTags = [
-            ...(group.hasPersonalAccount ? ['Contains personal account'] : []),
-            ...(group.hasLocalMcpServer ? ['Local MCP Server'] : []),
+            ...(!isPluginScope && group.hasPersonalAccount ? ['Contains personal account'] : []),
+            ...(!isPluginScope && group.hasLocalMcpServer ? ['Local MCP Server'] : []),
             ...(hasMisconfiguredConfig ? ['Misconfigured'] : []),
             ...(hasMaliciousSkill ? ['Malicious Skills'] : []),
+            ...(!isPluginScope && pluginCount > 0 ? ['Contains Plugins'] : []),
         ];
 
         return {
@@ -307,16 +319,17 @@ const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expand
                         <TooltipText tooltip={group.endpointId} text={group.endpointId} textProps={{variant: 'headingSm'}} />
                     </Box>
                     <Badge size="small" status="new">{childCount}</Badge>
-                    {group.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
-                    {group.hasLocalMcpServer && <Badge size="small" status="critical">Local MCP Server</Badge>}
+                    {!isPluginScope && group.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
+                    {!isPluginScope && group.hasLocalMcpServer && <Badge size="small" status="critical">Local MCP Server</Badge>}
                     {hasMisconfiguredConfig && <Badge size="small" status="attention">Misconfigured</Badge>}
                     {hasMaliciousSkill && <Badge size="small" status="critical">Malicious Skills</Badge>}
+                    {!isPluginScope && pluginCount > 0 && <Badge size="small" status="info">{`${pluginCount} ${pluginCount === 1 ? 'plugin' : 'plugins'}`}</Badge>}
                 </HorizontalStack>
             ),
             ...(showCategoryColumn ? { parentTypeComp: "-" } : {}),
-            riskScoreComp: <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
-            sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes || []),
-            sensitiveSubTypesVal: (group.sensitiveInRespTypes || []).join(' ') || '-',
+            riskScoreComp: isPluginScope ? '-' : <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
+            sensitiveSubTypes: isPluginScope ? '-' : transform.prettifySubtypes(group.sensitiveInRespTypes || []),
+            sensitiveSubTypesVal: isPluginScope ? '-' : ((group.sensitiveInRespTypes || []).join(' ') || '-'),
             lastTraffic: func.prettifyEpoch(group.detectedTimestamp),
             discovered: func.prettifyEpoch(group.startTs === Infinity ? 0 : group.startTs),
             endpointTagsComp: endpointTags.length > 0 ? endpointTags.join(', ') : '-',
@@ -328,6 +341,7 @@ const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expand
                     filterType={filterType}
                     showCategoryColumn={showCategoryColumn}
                     expandedColSpan={expandedColSpan}
+                    pluginNames={isPluginScope ? [...(group.pluginNames || [])] : null}
                     misconfiguredCollectionId={hasMisconfiguredConfig
                         ? (group.children.find(c => hasMisconfiguredConfigTag(c.envTypeOriginal))?.id || null)
                         : null}
@@ -340,10 +354,12 @@ const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expand
 /**
  * Children table component for expanded rows
  */
-const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSpan, misconfiguredCollectionId }) => {
+const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSpan, misconfiguredCollectionId, pluginNames }) => {
     const navigate = useNavigate();
     const childHeaders = getChildHeaders(filterType, showCategoryColumn);
     const columnConfig = getChildColumnConfig(filterType);
+    // Plugin scope: one row per plugin, not per agent collection (which would list the agent's skills).
+    const isPluginScope = Array.isArray(pluginNames);
     const maliciousSkillKeys = useMemo(() => {
         const cached = PersistStore.getState().skillRiskScoreCache;
         return new Set(cached?.maliciousSkillKeys || []);
@@ -354,8 +370,8 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
     // row shows only its skills, instead of mixing both.
     const handleChildClick = useCallback((collection) => {
         const childCategory = getAgenticCategoryLabel(collection);
-        const bundlesSkills = (childCategory === CLIENT_TYPES.AI_AGENT || childCategory === CLIENT_TYPES.MCP_SERVER)
-            && Array.isArray(collection?.skills) && collection.skills.length > 0;
+        const bundlesComponents = childCategory === CLIENT_TYPES.AI_AGENT || childCategory === CLIENT_TYPES.MCP_SERVER || childCategory === CLIENT_TYPES.SKILL;
+        const bundlesSkills = bundlesComponents && Array.isArray(collection?.skills) && collection.skills.length > 0;
         const scope = bundlesSkills ? '?agentic_view=skills' : '';
         if (collection?.nextUrl) {
             navigate(`${collection.nextUrl}${scope}`);
@@ -393,13 +409,60 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
         return cells;
     }, [misconfiguredCollectionId, childHeaders, handleConfigClick]);
 
+    const pluginRows = useMemo(() => {
+        if (!isPluginScope) return null;
+        const target = children[0];
+        return pluginNames.map((pluginName) => {
+            const cells = [<div key={`spacer-${pluginName}`} style={{ width: '32px', minWidth: '32px' }} />];
+            childHeaders.forEach((header) => {
+                const isName = header.value === 'displayNameComp';
+                cells.push(
+                    <div
+                        key={`${header.value}-${pluginName}`}
+                        style={{ cursor: 'pointer', width: header.boxWidth }}
+                        onClick={() => target?.id && navigate(`/dashboard/observe/inventory/${target.id}?agentic_view=plugins`)}
+                    >
+                        {isName ? (
+                            <HorizontalStack gap="1" align="start" wrap={false}>
+                                <Box maxWidth="200px"><TooltipText tooltip={pluginName} text={pluginName} /></Box>
+                                <Badge size="small">Plugin</Badge>
+                            </HorizontalStack>
+                        ) : (header.value === 'agenticCategory' ? (
+                            <Text variant="bodyMd" as="span">Plugin</Text>
+                        ) : '-')}
+                    </div>
+                );
+            });
+            return cells;
+        });
+    }, [isPluginScope, pluginNames, children, childHeaders, navigate]);
+
+    // Plugins live in their own collection (sibling to the agent, not embedded in it), but they still
+    // share the agent's own owner tag (mcp-client/ai-agent) and endpointId — so "how many plugins does
+    // this agent have" is answered by matching siblings in this same device's `children` list, the
+    // same continuity the skills badge below already gives for embedded skills.
+    const pluginCountByAgentTag = useMemo(() => {
+        const counts = {};
+        children.forEach(c => {
+            const pluginName = getPluginNameForCollection(c);
+            if (!pluginName) return;
+            const owner = findAssetTag(c.envTypeOriginal)?.value;
+            if (owner) counts[owner] = (counts[owner] || 0) + 1;
+        });
+        return counts;
+    }, [children]);
+
     const rows = useMemo(() => {
+        if (isPluginScope) return [];
         return children.map(child => {
             const childRiskScore = child.riskScore || 0;
             const prettifiedChild = {
                 ...child,
                 agenticCategory: showCategoryColumn ? getAgenticCategoryLabel(child) : undefined,
-                riskScoreComp: <Badge status={transform.getStatus(childRiskScore)} size="small">{childRiskScore}</Badge>,
+                riskScoreComp: transform.wrapRiskScoreTooltip(
+                    <Badge status={transform.getStatus(childRiskScore)} size="small">{childRiskScore}</Badge>,
+                    childRiskScore, child.baseRiskScore, child.baseRiskScoreReason
+                ),
                 sensitiveSubTypes: transform.prettifySubtypes(child.sensitiveInRespTypes || []),
                 lastTraffic: func.prettifyEpoch(child.detectedTimestamp || 0),
                 discovered: func.prettifyEpoch(child.startTs || 0),
@@ -416,6 +479,9 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
             const childCategory = getAgenticCategoryLabel(child);
             const showsBundledSkills = childCategory === CLIENT_TYPES.AI_AGENT || childCategory === CLIENT_TYPES.MCP_SERVER;
             const bundledSkillsCount = showsBundledSkills && Array.isArray(child.skills) ? child.skills.length : 0;
+            // Only agents (not MCP servers) have plugins under them.
+            const childOwnerTag = childCategory === CLIENT_TYPES.AI_AGENT ? findAssetTag(child.envTypeOriginal)?.value : null;
+            const bundledPluginsCount = childOwnerTag ? (pluginCountByAgentTag[childOwnerTag] || 0) : 0;
             const childHasMaliciousSkill = Array.isArray(child.skills) && child.skills.some(s => maliciousSkillKeys.has(skillCollectionKey(child.id, s)));
             childHeaders.forEach(header => {
                 if (header.value === 'displayNameComp') {
@@ -431,6 +497,9 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
                                 </Box>
                                 {bundledSkillsCount > 0 && (
                                     <Badge size="small" status="info">{`${bundledSkillsCount} ${bundledSkillsCount === 1 ? 'skill' : 'skills'}`}</Badge>
+                                )}
+                                {bundledPluginsCount > 0 && (
+                                    <Badge size="small">{`${bundledPluginsCount} ${bundledPluginsCount === 1 ? 'plugin' : 'plugins'}`}</Badge>
                                 )}
                                 {childHasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
                                 {childHasMaliciousSkill && <Badge size="small" status="critical">Malicious Skills</Badge>}
@@ -463,7 +532,7 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
 
             return cells;
         });
-    }, [children, handleChildClick, childHeaders, columnConfig, showCategoryColumn, maliciousSkillKeys]);
+    }, [isPluginScope, children, handleChildClick, childHeaders, columnConfig, showCategoryColumn, maliciousSkillKeys, pluginCountByAgentTag]);
 
     const columnContentTypes = useMemo(
         () => ["text", ...childHeaders.map(() => "text")],
@@ -474,7 +543,7 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
         <td colSpan={expandedColSpan} style={{ padding: '0px !important' }} className="control-row">
             <Box width="100%">
                 <DataTable
-                    rows={configRow ? [configRow, ...rows] : rows}
+                    rows={isPluginScope ? pluginRows : (configRow ? [configRow, ...rows] : rows)}
                     hasZebraStripingOnData
                     headings={[]}
                     columnContentTypes={columnContentTypes}

@@ -2,8 +2,6 @@ import React, { useState, useMemo, useCallback, useRef, useEffect, useReducer } 
 import { useNavigate } from "react-router-dom";
 import { produce } from "immer";
 import { Card, Box, HorizontalStack, HorizontalGrid, VerticalStack, Text, Divider, Badge, Tooltip } from "@shopify/polaris";
-import MisconfiguredConfigIcon from "@/assets/MisconfiguredConfigIcon.svg";
-import PersonLockIcon from "@/assets/PersonLockIcon.svg";
 import LaptopIcon from "@/assets/Laptop.svg";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import AgGridRow from "@/apps/dashboard/components/tables/rows/AgGridRow";
@@ -12,13 +10,14 @@ import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithM
 import DeviceFlyout from "./DeviceFlyout";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import { SeverityBadge, RiskPill } from "./AgenticCellRenderers";
+import MisconfiguredBadge from "./MisconfiguredBadge";
 import DonutChart from "../../../components/shared/DonutChart";
 import AgenticStatsCard from "./AgenticStatsCard";
 import { EndpointBrowserTrendChart } from "./TrendCharts";
 import { aggregateViolationCountsByCollectionId, fetchAgenticViolationCountsByHost } from "./agenticObserveApi";
 import { buildModuleDeviceMap } from "./agenticPageBuilders";
 import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
-import { fetchAndCacheAgenticCollectionsBundle } from "./constants";
+import { fetchAndCacheAgenticCollectionsBundle, settledValue, logRejected } from "./constants";
 import NewLayoutTooltip from "./NewLayoutTooltip";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import values from "@/util/values";
@@ -102,7 +101,7 @@ function TopSection({ stats, violationsBySeverity, totalViolations }) {
             </Card>
             <Card padding="4">
                 <VerticalStack gap="2">
-                    <Text variant="headingMd" fontWeight="semibold" alignment="center">Violations by Severity</Text>
+                    <Text variant="headingMd" fontWeight="semibold">Violations by Severity</Text>
                     <HorizontalStack align="center">
                         <DonutChart
                             data={violationsChartData}
@@ -114,7 +113,7 @@ function TopSection({ stats, violationsBySeverity, totalViolations }) {
                         />
                     </HorizontalStack>
                     {Object.keys(violationsChartData).length > 0 && (
-                        <HorizontalStack gap="3" wrap align="center">
+                        <HorizontalStack gap="3" wrap align="start">
                             {Object.entries(violationsChartData).map(([key, { text, color }]) => (
                                 <HorizontalStack key={key} gap="1" blockAlign="center">
                                     <Box className="agentic-dot" style={{ "--dot-color": color }} />
@@ -137,19 +136,19 @@ export function OsIcon({ os, size = 16 }) {
     return                       <img src={LaptopIcon}             width={size} height={size} alt="Device"  style={{ flexShrink: 0 }} />;
 }
 
-function MarkerIcon({ src, label, size = 16 }) {
-    return (
-        <Tooltip content={label} dismissOnMouseOut activatorWrapper="div">
-            <img src={src} width={size} height={size} alt={label} style={{ flexShrink: 0, display: "block" }} />
-        </Tooltip>
-    );
-}
-
 // ─── Cell renderers ───────────────────────────────────────────────────────────
 
 function SkillBadge({ count }) {
     if (!count) return null;
     return <Badge>{`${count} ${count === 1 ? "skill" : "skills"}`}</Badge>;
+}
+
+// Agent rows only — how many plugins (their own sibling child rows, not embedded in the agent's
+// own collection) belong to this agent. Gives the same "parent knows about its children" continuity
+// the skills badge above gives, since a plugin's own row has no children of its own to show it in.
+function PluginBadge({ count }) {
+    if (!count) return null;
+    return <Badge status="info">{`${count} ${count === 1 ? "plugin" : "plugins"}`}</Badge>;
 }
 
 function RiskScoreCellRenderer({ value }) {
@@ -194,6 +193,7 @@ export const TYPE_CLASS_MAP = {
     "MCP Server": "agentic-type-MCP",
     "LLM": "agentic-type-LLM",
     "Skill": "agentic-type-SKILL",
+    "Plugin": "agentic-type-PLUGIN",
     "Tool": "agentic-type-TOOL",
     "Tool Call": "agentic-type-TOOL",
     "Resource": "agentic-type-RESOURCE",
@@ -217,6 +217,7 @@ function UsernameCellInner({ data, node }) {
                     <HorizontalStack gap="2" blockAlign="center" wrap={false}>
                         {coloredBadge}
                         {data.skillCount ? <SkillBadge count={data.skillCount} /> : null}
+                        {data.pluginCount ? <PluginBadge count={data.pluginCount} /> : null}
                     </HorizontalStack>
                 }
             />
@@ -231,8 +232,8 @@ function UsernameCellInner({ data, node }) {
             warning={
                 (data.hasPersonalAccount || data.hasMisconfiguredConfig) ? (
                     <HorizontalStack gap="1" blockAlign="center" wrap={false}>
-                        {data.hasPersonalAccount && <MarkerIcon src={PersonLockIcon} label="Contains personal account" size={24} />}
-                        {data.hasMisconfiguredConfig && <MarkerIcon src={MisconfiguredConfigIcon} label="Misconfigured config" size={24} />}
+                        {data.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
+                        {data.hasMisconfiguredConfig && <MisconfiguredBadge />}
                     </HorizontalStack>
                 ) : null
             }
@@ -374,6 +375,7 @@ function TableSection({ onServerFetch, fetchDeviceChildren, collections, startTi
                 getServerSideGroupKey={getServerSideGroupKey}
                 groupDefaultExpanded={0}
                 onServerFetch={onServerFetch}
+                onFetchError={() => func.setToast(true, true, "Failed to load endpoints")}
                 serverSideRowModel
                 getRowId={(params) => params.data.id}
                 height={500}
@@ -449,7 +451,9 @@ export default function DeviceEndpoints() {
         const isMountedRef = { current: true };
         (async () => {
             try {
-                const [collectionsBundle, shieldResult, hostCounts] = await Promise.all([
+                // allSettled, not all: every state setter below sits after this await, so one rejected
+                // member used to blank the whole grid instead of just its own column.
+                const [collectionsSettled, shieldSettled, hostCountsSettled] = await Promise.allSettled([
                     fetchAndCacheAgenticCollectionsBundle({ api, PersistStore }),
                     fetchEndpointShieldUserMetadata(),
                     // Server-aggregated {host: {critical,high,medium,low}} — same aggregate Agentic
@@ -457,6 +461,10 @@ export default function DeviceEndpoints() {
                     fetchAgenticViolationCountsByHost({ startTimestamp, endTimestamp }),
                 ]);
                 if (!isMountedRef.current) return;
+                logRejected("DeviceEndpoints mount", { collections: collectionsSettled, shield: shieldSettled, violations: hostCountsSettled });
+                const collectionsBundle = settledValue(collectionsSettled, {});
+                const shieldResult = settledValue(shieldSettled, {});
+                const hostCounts = settledValue(hostCountsSettled, {});
                 const { collections = [], trafficMap = {}, riskScoreMap = {} } = collectionsBundle || {};
                 const { usernameMap = {}, userMetadataMap = {}, moduleInfos = [] } = shieldResult || {};
                 const violationsByCollectionId = aggregateViolationCountsByCollectionId(hostCounts, collections);

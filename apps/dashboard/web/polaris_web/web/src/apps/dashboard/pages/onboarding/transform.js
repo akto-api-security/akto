@@ -68,6 +68,7 @@ const onFunc = {
             case "HEAD": return `var(--color-head)`;
             case "TOOL": return `var(--color-tool)`;
             case "SKILL": return `var(--color-skill)`;
+            case "PLUGIN": return `var(--color-skill)`;
             case "RESOURCE": return `var(--color-resource)`;
             case "PROMPT": return `var(--color-prompt)`;
             case "SERVER": return `var(--color-server)`;

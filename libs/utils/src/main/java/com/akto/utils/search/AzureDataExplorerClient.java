@@ -65,6 +65,7 @@ public class AzureDataExplorerClient extends SearchClient {
     private static final int SESSIONS_PAGINATED_CAP     = 10_000;
     private static final int MESSAGES_SIZE              = 500;
     private static final int TOP_N_USERS                = 10;
+    private static final int TOP_N_MODELS                = 5;
     private static final int USER_BREAKDOWN_SIZE         = 3;
     private static final int TOP_N_APPS_TRACES           = 10;
     private static final int TRACE_DETAIL_SIZE           = 500;
@@ -232,6 +233,34 @@ public class AzureDataExplorerClient extends SearchClient {
     }
 
     /**
+     * Unique sessions per model, highest first. `model` only exists inside the responsePayload
+     * JSON, so it is projected out with todynamic(); a session is attributed to the model named
+     * by its earliest model-bearing row, matching what the sessions table shows.
+     */
+    private List<Map<String, Object>> queryTopModelsBySessions(String where) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        String kql = ADX_TABLE + " | where " + where
+            + " and " + AgentQueryRecord.F_RESPONSE_PAYLOAD + " contains '\"model\"'"
+            + " | extend " + KEY_MODEL + " = tostring(todynamic(" + AgentQueryRecord.F_RESPONSE_PAYLOAD + ")." + KEY_MODEL + ")"
+            + " | where isnotempty(" + KEY_MODEL + ")"
+            + " | summarize arg_min(" + AgentQueryRecord.F_TIMESTAMP + ", " + KEY_MODEL + ") by " + AgentQueryRecord.F_SESSION_IDENTIFIER
+            + " | summarize " + KEY_COUNT + " = count() by " + KEY_MODEL
+            + " | top " + TOP_N_MODELS + " by " + KEY_COUNT + " desc";
+
+        KustoResultSetTable rs = query(kql);
+        if (rs == null) return out;
+        while (rs.next()) {
+            String model = rs.getString(KEY_MODEL);
+            if (model == null || model.isEmpty()) continue;
+            Map<String, Object> row = new HashMap<>();
+            row.put(KEY_MODEL, model);
+            row.put(KEY_COUNT, rs.getLong(KEY_COUNT));
+            out.add(row);
+        }
+        return out;
+    }
+
+    /**
      * Sessions-only: ES's firstHit filters to "LLM-shaped" rows before picking the earliest one,
      * a predicate that only applies to this one field, not the sibling sum/count metrics — can't
      * share one summarize, so this runs as a second, id-scoped query (bounded by rows.keySet()).
@@ -342,13 +371,14 @@ public class AzureDataExplorerClient extends SearchClient {
                                                  Map<String, List<String>> filters, Boolean atlasTrafficFilter) {
         long aggTotalSessions = 0, aggInputTokens = 0, aggOutputTokens = 0;
         List<Map<String, Object>> aggTopUsers = new ArrayList<>();
+        List<Map<String, Object>> aggTopModels = new ArrayList<>();
         List<Map<String, Object>> aggUserBreakdown = new ArrayList<>();
         List<Long> aggSessionSpark = new ArrayList<>();
         List<Long> aggSessionSparkTs = new ArrayList<>();
         List<Long> aggSessionTokenSpark = new ArrayList<>();
 
         if (!isConfigured()) {
-            return new SessionAggStats(0, 0, 0, aggTopUsers, aggUserBreakdown,
+            return new SessionAggStats(0, 0, 0, aggTopUsers, aggTopModels, aggUserBreakdown,
                 aggSessionSpark, aggSessionSparkTs, aggSessionTokenSpark);
         }
         try {
@@ -397,6 +427,8 @@ public class AzureDataExplorerClient extends SearchClient {
                 aggUserBreakdown.add(entry);
             }
 
+            aggTopModels.addAll(queryTopModelsBySessions(where));
+
             long sparkEndMs = Math.min(endMs, System.currentTimeMillis());
             long[] range = queryDataRange(where, sparkEndMs);
             long intervalMs = sparklineIntervalMs(range[0], range[1]);
@@ -407,7 +439,7 @@ public class AzureDataExplorerClient extends SearchClient {
             logger.error("fetchSessionAggStats error for accountId=" + accountId + ": " + e.getMessage());
         }
         return new SessionAggStats(aggTotalSessions, aggInputTokens, aggOutputTokens,
-            aggTopUsers, aggUserBreakdown, aggSessionSpark, aggSessionSparkTs, aggSessionTokenSpark);
+            aggTopUsers, aggTopModels, aggUserBreakdown, aggSessionSpark, aggSessionSparkTs, aggSessionTokenSpark);
     }
 
     // ── Argus aggregated stats ────────────────────────────────────────────────────

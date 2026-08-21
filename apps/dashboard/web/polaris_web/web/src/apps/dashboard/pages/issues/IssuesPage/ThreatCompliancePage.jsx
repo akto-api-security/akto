@@ -337,7 +337,6 @@ function ThreatCompliancePage() {
             let maxShowCompliance = 2
             let badge = totalCompliance > maxShowCompliance ? <Badge size="extraSmall">+{totalCompliance - maxShowCompliance}</Badge> : null
 
-            // Extract detection type from metadata
             const detectionType = threat.detectionType || 'SINGLE_PROMPT';
             const isSessionBased = detectionType === 'SESSION_CONTEXT';
 
@@ -508,19 +507,7 @@ function ThreatCompliancePage() {
                     return;
                 }
 
-                // Parse sessionContext for detection type filtering
-                let sessionData = {};
-                try {
-                    if (item?.sessionContext) {
-                        sessionData = typeof item.sessionContext === 'string'
-                            ? JSON.parse(item.sessionContext)
-                            : item.sessionContext;
-                    }
-                } catch (e) {
-                    console.error('[ThreatCompliancePage] Error parsing sessionContext:', e);
-                }
-
-                const itemDetectionType = sessionData?.detectionType || 'SINGLE_PROMPT';
+                const itemDetectionType = item?.sessionId ? 'SESSION_CONTEXT' : 'SINGLE_PROMPT';
                 if (detectionTypeFilter.length > 0 && !detectionTypeFilter.includes(itemDetectionType)) {
                     return;
                 }
@@ -555,8 +542,7 @@ function ThreatCompliancePage() {
                             threatData: createThreatDataObject(item, complianceData)
                         }],
                         isThreat: true,
-                        sessionContext: sessionData,
-                        detectionType: sessionData?.detectionType || 'SINGLE_PROMPT'
+                        detectionType: itemDetectionType
                     });
                 } else {
                     const existingThreat = uniqueThreatsMap.get(key);

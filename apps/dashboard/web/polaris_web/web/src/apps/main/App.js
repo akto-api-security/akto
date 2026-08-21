@@ -35,6 +35,7 @@ import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TrafficCollectorsMetrics from "../dashboard/pages/settings/metrics/TrafficCollectorsMetrics";
 import ThreatDetectionMetrics from "../dashboard/pages/settings/metrics/ThreatDetectionMetrics";
 import MiniRuntimeMetrics from "../dashboard/pages/settings/metrics/MiniRuntimeMetrics";
+import MiniTestingMetrics from "../dashboard/pages/settings/metrics/MiniTestingMetrics";
 import AccountJobExecutorMetrics from "../dashboard/pages/settings/metrics/AccountJobExecutorMetrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import PromptHardening from "../dashboard/pages/prompt_hardening/PromptHardening";
@@ -54,7 +55,7 @@ import DefaultPayloads from "../dashboard/pages/settings/default_payloads/Defaul
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
 import Billing from "../dashboard/pages/settings/billing/Billing";
 import SelfHosted from "../dashboard/pages/settings/billing/SelfHosted";
-import Onboarding from "../dashboard/pages/onboarding/Onboarding";
+// import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
 import Slack from "../dashboard/pages/settings/integrations/Slack";
 import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
@@ -467,6 +468,10 @@ const router = createBrowserRouter([
                         element: <MiniRuntimeMetrics/>,
                     },
                     {
+                        path: "mini-testing-metrics",
+                        element: <MiniTestingMetrics/>,
+                    },
+                    {
                         path: "account-job-executor-metrics",
                         element: <AccountJobExecutorMetrics/>,
                     },
@@ -704,10 +709,11 @@ const router = createBrowserRouter([
                 path: "prompt-hardening",
                 element: <PromptHardening/>
             },
-            {
-                path: "onboarding",
-                element: <Onboarding/>
-            },
+            // Onboarding flow disabled — nothing links here any more (see SignUp.jsx).
+            // {
+            //     path: "onboarding",
+            //     element: <Onboarding/>
+            // },
             {
                 // Report routes: Dashboard skips fetchAllSubCategories on these paths.
                 // Each report component fetches only the subcategories it needs (targeted fetch).

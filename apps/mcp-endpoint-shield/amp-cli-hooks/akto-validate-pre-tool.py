@@ -13,7 +13,7 @@ import json
 import sys
 
 from akto_amp_common import (
-    AKTO_INGEST_NON_MCP_TOOLS,
+    AKTO_INGEST_ON_REQUEST,
     AKTO_SYNC_MODE,
     MCP_INGEST_PATH,
     MODE,
@@ -114,28 +114,29 @@ def main() -> None:
         logger.info("Empty tool input, allowing")
         sys.exit(0)
 
-    verdict = call_guardrails(build_tool_payload(tool_name, tool_input, **payload_args), logger)
+    verdict = call_guardrails(
+        build_tool_payload(tool_name, tool_input, **payload_args),
+        logger,
+        ingest_data=AKTO_INGEST_ON_REQUEST,
+    )
     allowed = apply_warn_resubmit_flow(
         verdict, "pretool", fingerprint("tool", tool_name, tool_input), logger
     )
 
     if not allowed:
         emit_block(block_reason_text(verdict, "tool request"), logger)
-        # Non-MCP blocked-request ingestion is opt-in, matching claude-cli-hooks.
-        if is_mcp or AKTO_INGEST_NON_MCP_TOOLS:
-            ingest(
-                mark_blocked(
-                    build_tool_payload(tool_name, tool_input, **payload_args),
-                    verdict.reason,
-                    is_mcp=is_mcp,
-                ),
-                logger,
-            )
-        else:
-            logger.info(
-                "Skipping non-MCP blocked-request ingestion "
-                "(set AKTO_INGEST_NON_MCP_TOOLS=true to re-enable)"
-            )
+        # A blocked call is always ingested, MCP or not. AKTO_INGEST_NON_MCP_TOOLS
+        # suppresses routine built-in tool traffic, not security violations — a block
+        # that left no record would be invisible in the dashboard. A blocked call never
+        # reaches tool.result either, so this is its only record.
+        ingest(
+            mark_blocked(
+                build_tool_payload(tool_name, tool_input, **payload_args),
+                verdict.reason,
+                is_mcp=is_mcp,
+            ),
+            logger,
+        )
         sys.exit(0)
 
     if verdict.modified and verdict.modified_payload:

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PersistStore from '../../../../main/PersistStore';
-import { formatDisplayName, ASSET_TAG_KEYS } from '../agentic/mcpClientHelper';
+import { formatDisplayName, ASSET_TAG_KEYS, getPluginNameForCollection } from '../agentic/mcpClientHelper';
 import { INVENTORY_FILTER_KEY, ASSET_TAG_KEY_VALUES, SKILL_TAG_KEY, extractServiceName, groupDescription } from '../agentic/constants';
 
 /** Agent tag keys that represent the same agent (gen-ai + mcp-server for one click) */
@@ -16,6 +16,7 @@ const FILTER_TYPES = {
     MCP_SERVER: 'mcp-server',
     SERVICE: 'service',
     SKILL: 'skill',
+    PLUGIN: 'plugin',
 };
 
 /**
@@ -150,7 +151,10 @@ const useAgenticFilter = (normalData) => {
                 if (filteredCollections.length > 0) {
                     const firstCollection = filteredCollections[0];
                     const envTypeArr = getFormattedEnvType(firstCollection);
-                    if (envTypeArr.some(tag => tag.startsWith('mcp-server='))) {
+                    // Before the tag sniff: a plugin collection also carries the host agent's tags.
+                    if (getPluginNameForCollection(firstCollection)) {
+                        filterType = FILTER_TYPES.PLUGIN;
+                    } else if (envTypeArr.some(tag => tag.startsWith('mcp-server='))) {
                         filterType = FILTER_TYPES.MCP_SERVER;
                     } else if (envTypeArr.some(tag => tag.startsWith('gen-ai='))) {
                         filterType = FILTER_TYPES.AI_AGENT;

@@ -994,16 +994,27 @@ func hostFromRequestHeaders(rawHeaders string) string {
 // anomaly detection enabled. Only fires for agentic tool-call paths.
 // Returns a block result if any policy with behaviour "block" triggers an anomaly.
 func (s *Service) checkToolCallAnomaly(ctx context.Context, params *models.ValidateRequestParams, sessionID string, policies []types.Policy, contextSource string) *mcp.ValidationResult {
-	if contextSource != string(types.ContextSourceAgentic) {
-		return nil
-	}
 	if !isToolCallPath(params.Path) {
+		s.logger.Info("checkToolCallAnomaly skipped - not a tool call path",
+			zap.String("path", params.Path),
+			zap.String("sessionID", sessionID),
+			zap.String("contextSource", contextSource))
 		return nil
 	}
 	s.cache.mu.RLock()
 	anomalyMap := s.cache.anomalyByPolicy
 	s.cache.mu.RUnlock()
+	s.logger.Info("checkToolCallAnomaly entered evaluation",
+		zap.String("path", params.Path),
+		zap.String("sessionID", sessionID),
+		zap.String("contextSource", contextSource),
+		zap.Int("anomalyMapSize", len(anomalyMap)),
+		zap.Int("policiesCount", len(policies)),
+		zap.Strings("policyNames", policyNames(policies)))
 	if len(anomalyMap) == 0 {
+		s.logger.Info("checkToolCallAnomaly skipped - anomaly map empty",
+			zap.String("path", params.Path),
+			zap.String("sessionID", sessionID))
 		return nil
 	}
 	for _, p := range policies {
@@ -1016,6 +1027,12 @@ func (s *Service) checkToolCallAnomaly(ctx context.Context, params *models.Valid
 			continue
 		}
 		event, breached := s.anomalyDetector.RecordToolCall(ctx, sessionID, cfg.PolicyName, cfg.ToolCallLimit)
+		s.logger.Info("checkToolCallAnomaly recorded tool call",
+			zap.String("policyName", cfg.PolicyName),
+			zap.String("sessionID", sessionID),
+			zap.Int("toolCallLimit", cfg.ToolCallLimit),
+			zap.Bool("breached", breached),
+			zap.Bool("firstFire", event != nil))
 		if breached {
 			details := fmt.Sprintf("Tool call limit exceeded: %d calls per session (policy: %s)", cfg.ToolCallLimit, cfg.PolicyName)
 			s.logger.Warn("Anomaly detected: tool call limit exceeded",
@@ -1049,24 +1066,49 @@ func (s *Service) checkToolCallAnomaly(ctx context.Context, params *models.Valid
 // has anomaly detection enabled. Only fires for agentic tool-call paths with 4xx/5xx.
 // Returns a block result if any policy with behaviour "block" triggers an anomaly.
 func (s *Service) checkErrorAnomaly(ctx context.Context, params *models.ValidateRequestParams, sessionID string, policies []types.Policy, contextSource string) *mcp.ValidationResult {
-	if contextSource != string(types.ContextSourceAgentic) {
-		return nil
-	}
 	if !isToolCallPath(params.Path) || !isErrorStatusCode(params.StatusCode) {
+		s.logger.Info("checkErrorAnomaly skipped - not a tool call path or not an error status",
+			zap.String("path", params.Path),
+			zap.String("statusCode", params.StatusCode),
+			zap.Bool("isToolCallPath", isToolCallPath(params.Path)),
+			zap.Bool("isErrorStatusCode", isErrorStatusCode(params.StatusCode)),
+			zap.String("sessionID", sessionID),
+			zap.String("contextSource", contextSource))
 		return nil
 	}
 	s.cache.mu.RLock()
 	anomalyMap := s.cache.anomalyByPolicy
 	s.cache.mu.RUnlock()
+	s.logger.Info("checkErrorAnomaly entered evaluation",
+		zap.String("path", params.Path),
+		zap.String("statusCode", params.StatusCode),
+		zap.String("sessionID", sessionID),
+		zap.String("contextSource", contextSource),
+		zap.Int("anomalyMapSize", len(anomalyMap)),
+		zap.Int("policiesCount", len(policies)),
+		zap.Strings("policyNames", policyNames(policies)))
 	if len(anomalyMap) == 0 {
+		s.logger.Info("checkErrorAnomaly skipped - anomaly map empty",
+			zap.String("path", params.Path),
+			zap.String("sessionID", sessionID))
 		return nil
 	}
 	for _, p := range policies {
 		cfg, ok := anomalyMap[p.Info.Name]
+		s.logger.Info("checkErrorAnomaly policies loop call - ",
+			zap.String("policyName", p.Info.Name),
+			zap.Bool("isFound", ok))
+
 		if !ok {
 			continue
 		}
 		event, breached := s.anomalyDetector.RecordError(ctx, sessionID, cfg.PolicyName, cfg.ErrorLimit)
+		s.logger.Info("checkErrorAnomaly recorded error",
+			zap.String("policyName", cfg.PolicyName),
+			zap.String("sessionID", sessionID),
+			zap.Int("errorLimit", cfg.ErrorLimit),
+			zap.Bool("breached", breached),
+			zap.Bool("firstFire", event != nil))
 		if breached {
 			details := fmt.Sprintf("Error limit exceeded: %d errors per session (policy: %s)", cfg.ErrorLimit, cfg.PolicyName)
 			s.logger.Warn("Anomaly detected: error limit exceeded",
@@ -1163,7 +1205,10 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 	anomalyMap := make(map[string]*anomalyCfg)
 	for _, gp := range response.GuardrailPolicies {
 		s.logger.Info("checking anomaly config in policy",
-			zap.String("policyName", gp.Name))
+			zap.String("policyName", gp.Name),
+			zap.Bool("active", gp.Active),
+			zap.Bool("hasAnomalyConfig", gp.AnomalyDetection != nil),
+			zap.Bool("anomalyEnabled", gp.AnomalyDetection != nil && gp.AnomalyDetection.Enabled))
 		if gp.Active && gp.AnomalyDetection != nil && gp.AnomalyDetection.Enabled {
 			ad := gp.AnomalyDetection
 			anomalyMap[gp.Name] = &anomalyCfg{
@@ -1172,8 +1217,16 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 				PolicyName:    gp.Name,
 				Behaviour:     gp.Behaviour,
 			}
+			s.logger.Info("anomaly config added to map",
+				zap.String("policyName", gp.Name),
+				zap.String("behaviour", gp.Behaviour),
+				zap.Int("toolCallLimit", ad.ToolCallLimit),
+				zap.Int("errorLimit", ad.ErrorLimit))
 		}
 	}
+	s.logger.Info("anomaly config map built",
+		zap.Int("anomalyMapSize", len(anomalyMap)),
+		zap.Int("totalPoliciesFetched", len(response.GuardrailPolicies)))
 
 	// Compile blocked-host rules from the converted policies (uses policy.BlockedHosts patterns).
 	blockedHostRules := mcp.CompileBlockedHostRules(policies)

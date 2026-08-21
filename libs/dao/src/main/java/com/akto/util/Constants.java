@@ -95,6 +95,14 @@ public class Constants {
     public static final String AKTO_AI_AGENT_TAG = "ai-agent";
     public static final String AKTO_BROWSER_LLM_AGENT_TAG = "browser-llm-agent";
     public static final String AKTO_SKILL_TAG = "skill";
+    public static final String AKTO_SAAS_AGENT_TAG = "saas-agent";
+
+    public static final String AKTO_AGENT_PLUGIN_TAG = "agent-plugin";
+    public static final String AKTO_PLUGIN_NAME_TAG = "plugin-name";
+    public static final String AKTO_PLUGIN_VERSION_TAG = "plugin-version";
+    public static final String AKTO_PLUGIN_SCOPE_TAG = "plugin-scope";
+    public static final String AKTO_PLUGIN_STATUS_TAG = "plugin-status";
+    public static final String AKTO_PLUGIN_MARKETPLACE_TAG = "plugin-marketplace";
     public static final String AKTO_GUARDRAIL_MODE = "mode";
     public static final String AKTO_GUARDRAIL_MODE_INLINE = "inline";
     public static final String AKTO_GUARDRAIL_MODE_OBSERVE = "observe";

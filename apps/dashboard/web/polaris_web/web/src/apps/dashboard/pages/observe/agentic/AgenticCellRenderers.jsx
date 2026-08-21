@@ -1,13 +1,10 @@
 import React from "react";
-import { Badge, Box, HorizontalStack, Text, Tooltip } from "@shopify/polaris";
-import McpRedIcon from "@/assets/McpRedIcon.svg";
-import PersonLockIcon from "@/assets/PersonLockIcon.svg";
-import MaliciousSkillIcon from "@/assets/MaliciousSkill.svg";
-import MisconfiguredConfigIcon from "@/assets/MisconfiguredConfigIcon.svg";
+import { Badge, Box, HorizontalStack, Text } from "@shopify/polaris";
 import observeFunc from "../transform";
 import { getRiskStatus } from "./agenticPageBuilders";
 import AssetIcon from "./AssetIcon";
 import { TypeBadge } from "@/apps/dashboard/components/tables/rows/AgGridRow";
+import MisconfiguredBadge from "./MisconfiguredBadge";
 import "../../../components/layouts/style.css";
 
 // ─── Shared badges ────────────────────────────────────────────────────────────
@@ -71,33 +68,27 @@ export function ParamDescCellRenderer({ data }) {
 // Extracted from AgenticAssetsPage to keep that page lean. Inline styles are the AG
 // Grid cell-renderer exception (grid sandbox — Polaris tokens don't reach in).
 
-
-function MarkerIcon({ src, label, size = 16 }) {
-    return (
-        <Tooltip content={label} dismissOnMouseOut activatorWrapper="div">
-            <img src={src} width={size} height={size} alt={label} style={{ flexShrink: 0, display: "block" }} />
-        </Tooltip>
-    );
-}
-
 export function AssetNameCellRenderer({ data }) {
     if (!data) return null;
-    // Match old UI: personal-account + local-MCP markers for non-Skill rows; malicious marker for Skills
+    // Match old UI: personal-account + local-MCP tags for non-Skill rows; malicious tag for Skills
     const isSkill = data.type === "Skill";
-    const showLocalMcp = data.hasLocalMcpServer && !isSkill;
-    const showPersonal = data.hasPersonalAccount && !isSkill;
+    // Skill/Plugin rows fan out from the agent collection, so they'd inherit its markers otherwise.
+    const isFanout = isSkill || data.type === "Plugin";
+    const showLocalMcp = data.hasLocalMcpServer && !isFanout;
+    const showPersonal = data.hasPersonalAccount && !isFanout;
     const showMalicious = data.isMalicious && isSkill;
-    const showMisconfigured = data.hasMisconfiguredConfig && !isSkill;
+    // Misconfigured is an Agent/MCP-server-only concept — Skill (and Plugin) rows never show it.
+    const showMisconfigured = data.hasMisconfiguredConfig && !isFanout;
     return (
         <HorizontalStack gap="2" blockAlign="center" wrap={false}>
             <AssetIcon type={data.type} assetTagValue={data.assetTagValue} size={24} />
             <Box width="100%" overflowX="hidden">
                 <Text variant="bodySm" fontWeight="medium" truncate>{data.name}</Text>
             </Box>
-            {showLocalMcp && <MarkerIcon src={McpRedIcon} label="Local MCP Server" size={24} />}
-            {showPersonal && <MarkerIcon src={PersonLockIcon} label="Contains personal account" size={24} />}
-            {showMisconfigured && <MarkerIcon src={MisconfiguredConfigIcon} label="Misconfigured config" size={24} />}
-            {showMalicious && <MarkerIcon src={MaliciousSkillIcon} label="Malicious skill" size={24} />}
+            {showPersonal && <Badge size="small" status="warning">Contains personal account</Badge>}
+            {showLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
+            {showMisconfigured && <MisconfiguredBadge deviceCount={data.misconfiguredDeviceCount} />}
+            {showMalicious && <Badge size="small" status="critical">Malicious</Badge>}
         </HorizontalStack>
     );
 }
@@ -106,6 +97,20 @@ export function AssetNameCellRenderer({ data }) {
 export function TypeBadgeCellRenderer({ value }) {
     if (!value) return null;
     return <TypeBadge type={value} />;
+}
+
+// Plugin rows only — the parent/child relationship every other row (Agent -> MCP servers, in the
+// flyout's tree) shows via nesting, but a plugin row IS the leaf: this column names its agent
+// directly instead, since "Type" on a plugin row is always just "Plugin".
+export function PluginAgentCellRenderer({ value }) {
+    if (!value) return null;
+    // Already formatted server-side (McpClientRegistry.formatDisplayName) — e.g. "Claude".
+    return (
+        <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+            <AssetIcon type="AI Agent" assetTagValue={value} size={20} />
+            <Text variant="bodySm">{value}</Text>
+        </HorizontalStack>
+    );
 }
 
 export function RiskScoreCellRenderer({ value }) {

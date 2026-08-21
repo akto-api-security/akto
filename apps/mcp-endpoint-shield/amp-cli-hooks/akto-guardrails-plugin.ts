@@ -7,8 +7,13 @@
  *   session.start -> akto-hooks.py SessionStart   (observational)
  *   agent.start   -> akto-validate-prompt.py      (blocking: cancels the turn)
  *   tool.call     -> akto-validate-pre-tool.py    (blocking: reject-and-continue / modify)
- *   tool.result   -> akto-validate-post-tool.py   (observational)
- *   agent.end     -> akto-validate-response.py    (observational)
+ *   tool.result   -> akto-validate-post-tool.py   (blocking: replaces the tool output)
+ *   agent.end     -> akto-validate-response.py    (observational — see below)
+ *
+ * Amp's agent.end cannot retract or redact an assistant message: its only result is
+ * `{action:'continue'}`, which starts another turn. So the model's final text can be
+ * REPORTED but not blocked. Sensitive content flowing back from tools IS blockable,
+ * at tool.result, which is where file/shell/MCP output enters the conversation.
  *
  * Amp names MCP tools `mcp__<server>__<tool>` (same convention as Claude Code),
  * so the Python side routes MCP vs built-in tools off the tool name alone.
@@ -193,7 +198,66 @@ function runValidator(
 	})
 }
 
+/**
+ * Prompt guardrail, shared by agent.start and session.start.
+ *
+ * LIMITATION: `agent.start` does NOT fire in execute mode (`amp -x`) — verified
+ * against Amp 0.0.1786450425 — so a headless run gets no PROMPT guardrail. The
+ * pending message is readable at session.start, but that event is fire-and-forget
+ * (not in PluginRequestResultMap), so Amp does not await it and a cancel from there
+ * cannot reliably pre-empt the turn. In execute mode enforcement therefore happens
+ * at the tool layer (tool.call / tool.result), which Amp DOES await.
+ *
+ * The dedupe key guards against validating one prompt twice, which would also
+ * consume the warn-resubmit fingerprint and silently auto-allow.
+ */
+async function guardPrompt(
+	validated: Set<string>,
+	prompt: string,
+	threadId: string,
+	messageId: string,
+	ctx: any,
+	source: string,
+): Promise<void> {
+	if (!prompt.trim()) {
+		log('PROMPT_SKIPPED_EMPTY', { threadId, source })
+		return
+	}
+	const key = `${threadId}:${messageId}`
+	if (validated.has(key)) {
+		log('PROMPT_ALREADY_VALIDATED', { threadId, source })
+		return
+	}
+	validated.add(key)
+
+	const result = await runValidator(SCRIPTS.prompt, {
+		prompt,
+		session_id: threadId,
+		conversation_id: threadId,
+		message_id: messageId,
+		cwd: process.cwd(),
+		hook_event_name: 'UserPromptSubmit',
+	})
+
+	// In observe mode the validator only ingests; it never returns a block.
+	if (AKTO_SYNC_MODE && result.decision === 'block') {
+		const reason = result.reason || 'Policy violation'
+		log('PROMPT_BLOCKED', { threadId, reason, source })
+		// Notify first: once the turn is cancelled the UI stops rendering this turn.
+		// ASCII-only — some terminals mangle multi-byte emoji.
+		await ctx.ui.notify(`Akto Guardrails blocked this prompt. ${reason}`).catch(() => {})
+		await ctx.thread.cancel()
+		return
+	}
+
+	log('PROMPT_ALLOWED', { threadId, source })
+}
+
 export default function (amp: PluginAPI) {
+	// thread:message keys already validated, so agent.start and session.start
+	// cannot both validate the same prompt.
+	const validatedPrompts = new Set<string>()
+
 	log('PLUGIN_INIT', {
 		ingestionConfigured: Boolean(AKTO_DATA_INGESTION_URL),
 		syncMode: AKTO_SYNC_MODE,
@@ -219,39 +283,23 @@ export default function (amp: PluginAPI) {
 			},
 			['SessionStart'],
 		)
+
 	})
 
 	// Prompt guardrail. Amp's agent.start result can only APPEND context, so a real
 	// block is `thread.cancel()` — documented as preventing the turn from starting.
 	amp.on('agent.start', async (event, ctx) => {
-		const prompt = event.message || ''
-		if (!prompt.trim()) return
-
-		const result = await runValidator(SCRIPTS.prompt, {
-			prompt,
-			session_id: event.thread.id,
-			conversation_id: event.thread.id,
-			message_id: event.id,
-			cwd: process.cwd(),
-			hook_event_name: 'UserPromptSubmit',
-		})
-
-		// In observe mode the validator only ingests; it never returns a block.
-		if (AKTO_SYNC_MODE && result.decision === 'block') {
-			const reason = result.reason || 'Policy violation'
-			log('PROMPT_BLOCKED', { threadId: event.thread.id, reason })
-			// Notify first: once the turn is cancelled the UI stops rendering this turn.
-			// ASCII-only — some terminals mangle multi-byte emoji.
-			await ctx.ui.notify(`Akto Guardrails blocked this prompt. ${reason}`).catch(() => {})
-			await ctx.thread.cancel()
-			return
-		}
-
-		log('PROMPT_ALLOWED', { threadId: event.thread.id })
+		log('AGENT_START', { threadId: event.thread.id, promptChars: (event.message || '').length })
+		await guardPrompt(
+			validatedPrompts,
+			event.message || '',
+			event.thread.id,
+			String(event.id),
+			ctx,
+			'agent.start',
+		)
 	})
 
-	// Tool guardrail. `reject-and-continue` is Amp's supported hard block: the tool
-	// never runs and the model sees the reason and can choose another route.
 	amp.on('tool.call', async (event) => {
 		const result = await runValidator(SCRIPTS.preTool, {
 			tool_name: event.tool,
@@ -278,10 +326,12 @@ export default function (amp: PluginAPI) {
 		return { action: 'allow' as const }
 	})
 
-	// Observational: the tool already ran, so this only feeds Akto's audit trail.
+	// Response guardrail. The tool already ran and its side effects stand, but the
+	// output has not reached the model yet — so replacing it here keeps sensitive tool
+	// output (file reads, shell output, MCP records) out of the conversation.
 	// Returning undefined keeps Amp's original result untouched.
 	amp.on('tool.result', async (event) => {
-		await runValidator(SCRIPTS.postTool, {
+		const result = await runValidator(SCRIPTS.postTool, {
 			tool_name: event.tool,
 			tool_input: event.input || {},
 			tool_response: event.output ?? {},
@@ -293,12 +343,22 @@ export default function (amp: PluginAPI) {
 			cwd: process.cwd(),
 			hook_event_name: 'PostToolUse',
 		})
+
+		if (AKTO_SYNC_MODE && result.decision === 'block') {
+			const reason = result.reason || 'Policy violation'
+			log('TOOL_RESULT_BLOCKED', { tool: event.tool, reason })
+			return { status: 'error' as const, error: reason }
+		}
+
 		return undefined
 	})
 
-	// Observational: ingest the finished turn. Returning void ends the turn normally.
-	amp.on('agent.end', async (event) => {
-		await runValidator(SCRIPTS.response, {
+	// Response guardrail, report-only. Amp's agent.end result is limited to
+	// `{action:'continue'}`, so a sensitive reply cannot be retracted or redacted —
+	// it has already streamed to the user. A violation is flagged in Akto and shown
+	// to the user, but the text cannot be suppressed.
+	amp.on('agent.end', async (event, ctx) => {
+		const result = await runValidator(SCRIPTS.response, {
 			prompt: event.message || '',
 			response: assistantText(event.messages),
 			status: event.status,
@@ -308,5 +368,12 @@ export default function (amp: PluginAPI) {
 			cwd: process.cwd(),
 			hook_event_name: 'Stop',
 		})
+
+		if (AKTO_SYNC_MODE && result.decision === 'block') {
+			const reason = result.reason || 'Policy violation'
+			log('RESPONSE_FLAGGED', { threadId: event.thread.id, reason })
+			// Best effort: tell the user the reply violated policy. It cannot be unsent.
+			await ctx.ui.notify(`Akto Guardrails flagged this response. ${reason}`).catch(() => {})
+		}
 	})
 }

@@ -239,6 +239,17 @@ export default {
             data: {}
         })
     },
+    // Same response shape as getAllCollectionsBasic (apiCollections array), scoped to a specific
+    // hostName list via a server-side $in query — for ApiCollections.jsx's device-tree drill-down
+    // (see UsersAndDevices.jsx's row click), which only needs one device's handful of collections
+    // and shouldn't pay for loading the whole account's collections to get there.
+    async fetchCollectionsBasicForHostNames(deviceHostNames) {
+        return await request({
+            url: '/api/fetchCollectionsBasicForHostNames',
+            method: 'post',
+            data: { deviceHostNames }
+        })
+    },
     // Paginated, sorted, searchable grouped-asset rows for the Agentic Assets "New Layout" table —
     // replaces computing all ~800 grouped rows client-side on every load (see
     // atlas-scale-test/DASHBOARD_OPTIMIZATION.md's "paginated server-side aggregation rebuild").
@@ -247,20 +258,23 @@ export default {
     // maliciousSkillKeys is NOT sent — AgenticObserveAction computes/caches it itself now
     // (getOrBuildSkillData) instead of requiring the whole account-wide set (14,218 entries /
     // ~500KB+ on Atlas Scale Test) to be re-POSTed on every paginated request.
-    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, usernameMap, userMetadataMap } = {}) {
+    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsSummary',
             method: 'post',
-            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, usernameMap, userMetadataMap },
+            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap },
         })
-        return { rows: resp?.rows || [], total: resp?.total || 0 }
+        return { rows: resp?.rows || [], total: resp?.total || 0, distinctUsernames: resp?.distinctUsernames || [] }
     },
-    // Lazy per-asset detail (hostNames/collectionIds/skillNames/mcpServers/mcpServerCollectionIds/
-    // devices) for exactly ONE group — fetched only when a user opens that asset's flyout, not
+    // Lazy per-asset detail (hostNames/collectionIds/skillCount/mcpServers/mcpServerCollectionIds/
+    // deviceCount+deviceSample) for exactly ONE group — fetched only when a user opens that asset's flyout, not
     // shipped for every row of every fetchAgenticAssetsSummary page (that used to make a single
     // 50-row page 16MB, mostly from raw per-device breakdowns on rows with hundreds of devices).
     // trafficMap/riskScoreMap/userAnalysisFlatMap enrich the one asset's own device list the same
     // way fetchAgenticAssetsSummary's rows used to — needed by the Overview tab's topology graph.
+    // skillCount (not the full skill-name list) is all the Overview tab's topology graph needs —
+    // the Components tab re-derives its own full skill listing independently when opened (see
+    // AgenticObserveAction.fetchAgenticAssetDetail's own comment), so the names were dead weight.
     async fetchAgenticAssetDetail({ groupKey, rowType, trafficMap, riskScoreMap, userAnalysisFlatMap } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetDetail',
@@ -270,10 +284,32 @@ export default {
         return {
             hostNames: resp?.assetHostNames || [],
             collectionIds: resp?.assetCollectionIds || [],
-            skillNames: resp?.assetSkillNames || [],
+            skillCount: resp?.assetSkillCount || 0,
+            pluginNames: resp?.assetPluginNames || [],
+            pluginVersion: resp?.assetPluginVersion || null,
+            pluginScope: resp?.assetPluginScope || null,
+            pluginStatus: resp?.assetPluginStatus || null,
+            pluginMarketplace: resp?.assetPluginMarketplace || null,
+            pluginParentAgent: resp?.assetPluginParentAgent || null,
+            // Service/LLM/Skill rows — which plugin bundled this component, if any.
+            owningPluginName: resp?.assetOwningPluginName || null,
+            // Plugin rows only — the MCP servers/skills this plugin bundles.
+            pluginMcpServers: resp?.assetPluginMcpServers || [],
+            pluginMcpServerCollectionIds: resp?.assetPluginMcpServerCollectionIds || {},
+            pluginSkills: resp?.assetPluginSkills || [],
+            pluginAgents: resp?.assetPluginAgents || [],
             mcpServers: resp?.assetMcpServers || [],
             mcpServerCollectionIds: resp?.assetMcpServerCollectionIds || {},
-            devices: resp?.assetDevices || [],
+            // Agent rows only — collectionIds of every plugin this agent owns, so the Components tab
+            // can search plugin-bundled skill content, not just the agent's own collection.
+            pluginCollectionIds: resp?.assetPluginCollectionIds || [],
+            // deviceCount is the real total; deviceSample is capped (a handful of entries) — see
+            // AgenticObserveAction's assetDeviceCount/assetDeviceSample comment. The Devices tab
+            // never reads either of these (it fetches its own paginated list); the Overview tab's
+            // "Devices: N" stat and personal-account deep link, and the topology graph's device
+            // nodes, are the only consumers.
+            deviceCount: resp?.assetDeviceCount || 0,
+            deviceSample: resp?.assetDeviceSample || [],
             // Agent rows only — needed by the legacy Endpoints.jsx page's row-click ->
             // Inventory-filter feature (buildAgenticInventoryFilterForRow); unused by the new
             // layout's flyout.
@@ -309,11 +345,13 @@ export default {
     // endpoints, which need those account-wide maps client-fetched once to enrich every row of a
     // big grid, this endpoint computes them itself server-side, scoped to apiCollectionIds — no
     // point requiring the client to fetch/repost a whole-account map for a handful of entries.
-    async fetchAgenticAssetEndpointsPage({ apiCollectionIds, rowType, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters } = {}) {
+    // groupKey names the asset being drilled into — plugin rows need it so their child row can be the
+    // plugin itself rather than the agent collection it was discovered on.
+    async fetchAgenticAssetEndpointsPage({ apiCollectionIds, rowType, groupKey, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetEndpointsPage',
             method: 'post',
-            data: { apiCollectionIds, rowType, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters },
+            data: { apiCollectionIds, rowType, groupKey, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters },
         })
         return {
             endpoints: resp?.endpoints || [],
@@ -324,13 +362,13 @@ export default {
     },
     // Server-side paginated Components list for ONE AI-Agent asset's flyout — merges skills,
     // built-in tools, and connected MCP servers into one batched, server-sorted/paginated list.
-    // mcpServerNames is asset.mcpServers, already known/cheap client-side, passed through rather
-    // than re-derived server-side.
-    async fetchAgenticComponentsPage({ apiCollectionIds, mcpServerNames, mcpServerCollectionIds, skip, limit, sortKey, sortOrder, queryValue } = {}) {
+    // mcpServerNames/pluginNames are asset.mcpServers/asset.pluginNames, already known/cheap
+    // client-side, passed through rather than re-derived server-side.
+    async fetchAgenticComponentsPage({ apiCollectionIds, mcpServerNames, mcpServerCollectionIds, pluginNames, skip, limit, sortKey, sortOrder, queryValue } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticComponentsPage',
             method: 'post',
-            data: { apiCollectionIds, mcpServerNames, mcpServerCollectionIds, skip, limit, sortKey, sortOrder, queryValue },
+            data: { apiCollectionIds, mcpServerNames, mcpServerCollectionIds, pluginNames, skip, limit, sortKey, sortOrder, queryValue },
         })
         return { components: resp?.components || [], total: resp?.total || 0 }
     },
@@ -338,11 +376,11 @@ export default {
     // pass as fetchAgenticAssetsSummary, aggregated rather than paginated. Also returns trend/delta
     // for the Agentic Assets + Violations cards and the Top Used Applications / Top Assets with
     // Violations lists — all derived server-side from data already fetched at mount, no new fetch.
-    async fetchAgenticAssetsStats({ trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, userAnalysisFlatMap } = {}) {
+    async fetchAgenticAssetsStats({ trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsStats',
             method: 'post',
-            data: { trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, userAnalysisFlatMap },
+            data: { trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap },
         })
         return {
             totalAssets: resp?.totalAssets || 0,
@@ -1567,6 +1605,18 @@ export default {
             data: { startTs: startTimestamp, endTs: endTimestamp },
         })
         return resp?.hostSeverityCounts || []
+    },
+
+    // Skill-name equivalent of fetchHostSeverityCounts above — skills aren't attributable by host
+    // (a skill's declaring collection is shared with the agent/device that invoked it), so this is
+    // keyed by the skill name the backend extracts from each event's /skills/<name> endpoint instead.
+    async fetchSkillSeverityCounts(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/fetchSkillSeverityCounts',
+            method: 'post',
+            data: { startTs: startTimestamp, endTs: endTimestamp },
+        })
+        return resp?.skillSeverityCounts || []
     },
 
 }

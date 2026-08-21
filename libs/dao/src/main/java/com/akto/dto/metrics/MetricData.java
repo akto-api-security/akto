@@ -72,6 +72,13 @@ public class MetricData {
         TESTING_RUN_LATENCY("Testing Run Latency", "Time taken to complete test runs"),
         SAMPLE_DATA_FETCH_LATENCY("Sample Data Fetch Latency", "Time taken to fetch sample data"),
         MULTIPLE_SAMPLE_DATA_FETCH_LATENCY("Multiple Sample Data Fetch Latency", "Time taken to fetch multiple sample data records"),
+        TESTING_TESTS_EXECUTED_COUNT("Tests Executed", "Number of individual tests executed"),
+        TESTING_API_HIT_SUCCESS_COUNT("Successful API Hits", "Number of test API calls that completed successfully"),
+        TESTING_API_HIT_FAILURE_COUNT("Unsuccessful API Hits", "Number of test API calls that failed at the network/execution level"),
+        TESTING_ISSUES_CREATED_COUNT("Issues Created", "Number of issues created during testing, across all severities"),
+        TESTING_KAFKA_QUEUE_PENDING("Testing Kafka Queue Pending", "Number of test messages remaining in the Kafka consumer queue"),
+        TESTING_KAFKA_SEND_FAILURE_COUNT("Testing Kafka Send Failures", "Number of failures encountered while sending test messages to Kafka"),
+        TESTING_RATE_LIMIT_EXCEEDED_COUNT("Testing Rate Limit Exceeded", "Number of times the daily testing rate limit was exceeded"),
 
         // Cyborg metrics
         CYBORG_CALL_LATENCY("Cyborg Call Latency", "Time taken for Cyborg API calls"),

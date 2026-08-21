@@ -16,6 +16,7 @@ import AgenticAssetFlyout from "./AgenticAssetFlyout";
 import {
   AssetNameCellRenderer,
   TypeBadgeCellRenderer,
+  PluginAgentCellRenderer,
   RiskScoreCellRenderer,
   ViolationsCellRenderer,
   InteractionsCellRenderer,
@@ -27,12 +28,14 @@ import api from "../api";
 import agenticObserveApi, {
   fetchAgenticViolationCountsByHost,
   fetchViolationCountsByCollection,
+  fetchAgenticSkillViolationCounts,
 } from "./agenticObserveApi";
 import {
   buildUserAnalysisLookup,
   buildUserAnalysisFlatMap,
   fetchAndCacheSkillApiData,
-  fetchAndCacheAgenticTrafficRiskBundle,
+  settledValue,
+  logRejected,
 } from "./constants";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
@@ -51,6 +54,9 @@ const SORT_FIELD_MAP = {
   name: "name",
   riskScore: "riskScore",
   endpointCount: "endpointsCount",
+  pluginCount: "pluginCount",
+  violations: "violations",
+  lastSeen: "lastSeenEpoch",
 };
 
 const COL_DEFS = [
@@ -70,18 +76,25 @@ const COL_DEFS = [
     width: 140,
     // Fixed, small enum (AgenticObserveUtil.CLIENT_TYPE_*) — no need to derive values from data.
     filter: "agSetColumnFilter",
-    filterParams: { values: ["AI Agent", "MCP Server", "LLM", "Skill"] },
+    filterParams: { values: ["AI Agent", "SaaS Agent", "MCP Server", "LLM", "Skill", "Plugin"] },
     sortable: false,
     cellRenderer: TypeBadgeCellRenderer,
-    cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL" })[p.value] || "agentic-type-DEFAULT",
+    cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "SaaS Agent": "agentic-type-SAAS_AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL", "Plugin": "agentic-type-PLUGIN" })[p.value] || "agentic-type-DEFAULT",
+    cellStyle: { display: "flex", alignItems: "center" },
+  },
+  {
+    field: "pluginParentAgent",
+    headerName: "AI Agent",
+    width: 160,
+    filter: false,
+    sortable: false,
+    cellRenderer: PluginAgentCellRenderer,
     cellStyle: { display: "flex", alignItems: "center" },
   },
   {
     field: "riskScore",
     headerName: "Risk score",
     width: 110,
-    sort: "desc",
-    sortIndex: 0,
     filter: false,
     cellRenderer: RiskScoreCellRenderer,
     cellStyle: { display: "flex", alignItems: "center" },
@@ -114,7 +127,13 @@ const COL_DEFS = [
     field: "violations",
     headerName: "Violations",
     width: 200,
-    sortable: false,
+    // Server-side sort via AgenticObserveAction.violationsTotalForGroup — not a stored field, so
+    // it's computed from the already-fetched violationsByCollectionId/skillViolationsByName maps
+    // rather than a real Mongo sort. Default sort (was riskScore, which ties ~770 skills at the
+    // same score and buried every other asset type under them) — violations is a more actionable
+    // "what needs attention first" ordering and doesn't have that tie problem.
+    sort: "desc",
+    sortIndex: 0,
     filter: false,
     cellRenderer: ViolationsCellRenderer,
     cellStyle: { display: "flex", alignItems: "center" },
@@ -124,7 +143,7 @@ const COL_DEFS = [
     headerName: "Last Traffic Seen",
     width: 150,
     filter: false,
-    sortable: false,
+    // Backend already supports sorting by lastSeenEpoch
     cellStyle: {
       display: "flex",
       alignItems: "center",
@@ -140,6 +159,30 @@ const COL_DEFS = [
     // string arrays on each row (array-valued field: a row matches if ANY selected tag is present).
     filter: "agSetColumnFilter",
     filterParams: { values: ["Contains personal account", "Local MCP Server", "Misconfigured", "Malicious Skill"] },
+    sortable: false,
+  },
+  // Plugin-only, hidden by default (empty for every other row type) — opt in via the columns panel.
+  {
+    field: "pluginStatus",
+    headerName: "Plugin Status",
+    width: 130,
+    hide: true,
+    filter: "agSetColumnFilter",
+    filterParams: { values: ["enabled", "disabled"] },
+    sortable: false,
+  },
+  { field: "pluginVersion", headerName: "Plugin Version", width: 130, hide: true, filter: false, sortable: false },
+  { field: "pluginScope", headerName: "Plugin Scope", width: 120, hide: true, filter: false, sortable: false },
+  { field: "pluginMarketplace", headerName: "Marketplace", width: 170, hide: true, filter: false, sortable: false },
+  {
+    field: "severity",
+    headerName: "Severity",
+    hide: true,
+    // Filter-only, same pattern as "tags" above — drives the Violations card's Critical/High/
+    // Medium/Low chips (handleSeverityClick), matched server-side against each group's own
+    // violation counts (AgenticObserveAction.fetchAgenticAssetsSummary's "severity" filter branch).
+    filter: "agSetColumnFilter",
+    filterParams: { values: ["critical", "high", "medium", "low"] },
     sortable: false,
   },
 ];
@@ -162,11 +205,12 @@ const DEFAULT_COL_DEF = {
 // AgenticObserveAction.GroupSummary.toSummaryResponse()'s and fetchAgenticAssetsSummary's row-loop
 // comments.
 function shapeRow(row) {
-  const isSkill = row.rowType === "skill";
+  // Fan-out rows borrow their parent agent collection's flags, so suppress them on both.
+  const isFanout = row.rowType === "skill" || row.rowType === "plugin";
   const tags = [];
-  if (row.hasPersonalAccount && !isSkill) tags.push("Contains personal account");
-  if (row.hasLocalMcpServer && !isSkill) tags.push("Local MCP Server");
-  if (row.hasMisconfiguredConfig && !isSkill) tags.push("Misconfigured");
+  if (row.hasPersonalAccount && !isFanout) tags.push("Contains personal account");
+  if (row.hasLocalMcpServer && !isFanout) tags.push("Local MCP Server");
+  if (row.hasMisconfiguredConfig && !isFanout) tags.push("Misconfigured");
   if (row.isMalicious) tags.push("Malicious Skill");
 
   return {
@@ -176,6 +220,10 @@ function shapeRow(row) {
     lastSeen: row.lastSeenEpoch > 0 ? func.prettifyEpoch(row.lastSeenEpoch) : "",
     assetTagValue: row.groupKey,
     tags: tags.length ? tags : undefined,
+    // "unknown" reads as disabled — an unreported status isn't proof a plugin is active.
+    pluginStatus: row.pluginStatus
+      ? (String(row.pluginStatus).toLowerCase() === "enabled" ? "enabled" : "disabled")
+      : undefined,
   };
 }
 
@@ -189,8 +237,8 @@ function TableSection({
   endTimestamp,
   refreshKey,
   enrichMaps,
+  gridRef,
 }) {
-  const gridRef = useRef(null);
   const didAutoOpenRef = useRef(false);
 
   // ?asset= deep link — best-effort: matches against whatever the grid has already fetched (the
@@ -249,6 +297,7 @@ function TableSection({
         paginationPageSize={50}
         paginationPageSizeSelector={[20, 50, 100]}
         onServerFetch={onServerFetch}
+        onFetchError={() => func.setToast(true, true, "Failed to load agentic assets")}
         serverSideRowModel
         getRowId={(params) => params.data.id}
       />
@@ -281,17 +330,51 @@ export default function AgenticAssetsPage() {
   const newLayout = LocalStore((state) => state.agenticNewLayout);
   const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
 
+  // Lifted from TableSection so the breakdown chips below can drive the grid's "type" filter.
+  const gridRef = useRef(null);
+  const [activeTypeFilter, setActiveTypeFilter] = useState(new Set());
+
+  const handleAssetTypeClick = useCallback((key) => {
+    setActiveTypeFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      const gridApi = gridRef.current?.api;
+      if (gridApi) {
+        const values = [...next];
+        const model = values.length > 0 ? { filterType: "set", values } : null;
+        gridApi.setColumnFilterModel("type", model).then(() => gridApi.onFilterChanged());
+      }
+      return next;
+    });
+  }, []);
+
+  // Same toggle pattern as handleAssetTypeClick above, driving the hidden "severity" column
+  // filter instead of "type" — wires up the Violations card's Critical/High/Medium/Low chips.
+  const [activeSeverityFilter, setActiveSeverityFilter] = useState(new Set());
+  const handleSeverityClick = useCallback((key) => {
+    setActiveSeverityFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      const gridApi = gridRef.current?.api;
+      if (gridApi) {
+        const values = [...next];
+        const model = values.length > 0 ? { filterType: "set", values } : null;
+        gridApi.setColumnFilterModel("severity", model).then(() => gridApi.onFilterChanged());
+      }
+      return next;
+    });
+  }, []);
+
   // Everything shapeRow needs to enrich a server-returned page — populated once at mount, read
   // (not reacted to) by onServerFetch, which AG Grid SSRM calls directly rather than through React
   // re-renders.
   const enrichRef = useRef({
     violationsByCollectionId: {},
+    skillViolationsByName: {},
     usernameMap: {},
     userMetadataMap: {},
     analysisByKey: new Map(),
     userAnalysisFlatMap: {},
-    trafficMap: {},
-    riskScoreMap: {},
   });
 
   useEffect(() => {
@@ -324,9 +407,10 @@ export default function AgenticAssetsPage() {
 
   const loadStats = useCallback(async () => {
     try {
-      const { trafficMap, riskScoreMap, violationsByCollectionId, userAnalysisFlatMap } = enrichRef.current;
+      // trafficMap/riskScoreMap no longer sent — backend computes both itself when omitted.
+      const { violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap } = enrichRef.current;
       const result = await api.fetchAgenticAssetsStats({
-        trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, userAnalysisFlatMap,
+        startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap,
       });
       setStats(result);
     } catch (e) {
@@ -336,51 +420,29 @@ export default function AgenticAssetsPage() {
     }
   }, [startTimestamp, endTimestamp]);
 
-  // Mount-time fetch of everything shapeRow/stats need but the paginated table endpoint doesn't
-  // carry itself, split into two tiers so the page's first paint isn't gated on the slowest call:
-  //   Tier 1 (blocks first paint, both calls measured <500ms): the traffic/risk bundle (needed for
-  //     trafficMap/riskScoreMap, which the date-range filter's maxTrafficTimestamp check depends on)
-  //     and Endpoint Shield username/team data. As soon as these land, the grid mounts and fires its
-  //     own (fast, paginated) fetch. This used to also fetch the account's full raw collection list
-  //     (getAllCollectionsBasic, ~19 fields/doc, several MB on large accounts) just to read id/
-  //     hostName off each one for the violation-count host join below — that join now happens
-  //     server-side (see attributeViolationCountsToCollections), so this page no longer needs the
-  //     collections list at all.
-  //   Tier 2 (patches in after, non-blocking — measured up to ~6s, proxies through
-  //     threat-detection-backend): server-aggregated violation counts and the account-wide
-  //     AI-interaction list. Deliberately does NOT force a grid remount/re-fetch to patch these in
-  //     (same reasoning as the malicious-skill flag below) — they apply on the next natural fetch
-  //     (page change, sort, search, date-range change) instead of paying a second full round trip.
+  // Tier 1 (fast) mounts the grid; Tier 2 (slow, non-blocking) patches in violations/AI-interaction data after.
   useEffect(() => {
-    // Mirrors the redirect effect's own condition above — without this guard, this effect's Tier 1
-    // calls still fire on a cold first-visit-to-new-layout mount even though the redirect effect
-    // (also firing in the same tick) is about to unmount this page in favor of legacy Endpoints.jsx,
-    // wasting a fetchAndCacheAgenticTrafficRiskBundle/fetchEndpointShieldUserMetadata round trip that
-    // nothing here ever gets to use.
+    // Skip on a cold mount that's about to redirect to legacy Endpoints.jsx.
     if (!newLayout) return;
     const isMountedRef = { current: true };
 
     (async () => {
       try {
-        const [trafficRiskBundle, shieldResult] = await Promise.all([
-          fetchAndCacheAgenticTrafficRiskBundle({ api, PersistStore }),
-          fetchEndpointShieldUserMetadata(),
-        ]);
+        const shieldResult = await fetchEndpointShieldUserMetadata();
         if (!isMountedRef.current) return;
 
-        const { trafficMap = {}, riskScoreMap = {} } = trafficRiskBundle || {};
         const { usernameMap = {}, userMetadataMap = {} } = shieldResult || {};
 
         enrichRef.current = {
           ...enrichRef.current,
           usernameMap,
           userMetadataMap,
-          trafficMap,
-          riskScoreMap,
         };
 
-        setRefreshKey((k) => k + 1); // (re)mount the grid now that enrichRef is populated
+        // The only grid remount — Tier 2 used to also bump this, causing an unwanted second refetch.
+        setRefreshKey((k) => k + 1);
         setLoading(false);
+        loadStats(); // fast pass; refined again after Tier 2
 
         // Warms the shared skillRiskScoreCache (PersistStore) that AgentEndpointTreeTable.jsx
         // (Inventory's Agent tree view) reads from — this page no longer needs the result itself:
@@ -390,25 +452,33 @@ export default function AgenticAssetsPage() {
         fetchAndCacheSkillApiData([], { api, PersistStore }).catch(() => {});
 
         // Tier 2 — slow, runs after first paint, patches in without a grid remount.
-        Promise.all([
+        Promise.allSettled([
           fetchAgenticViolationCountsByHost({ startTimestamp, endTimestamp }),
-          agenticObserveApi.listUserAnalysis().catch(() => []),
+          fetchAgenticSkillViolationCounts({ startTimestamp, endTimestamp }),
+          agenticObserveApi.listUserAnalysis(),
         ])
-          .then(async ([hostCounts, userAnalysisList]) => {
+          .then(async ([hostCountsSettled, skillViolationsSettled, userAnalysisSettled]) => {
             if (!isMountedRef.current) return;
+            logRejected("AgenticAssetsPage tier-2", { violations: hostCountsSettled, skills: skillViolationsSettled, userAnalysis: userAnalysisSettled });
+            const hostCounts = settledValue(hostCountsSettled, {});
+            const skillViolationsByName = settledValue(skillViolationsSettled, {});
+            const userAnalysisList = settledValue(userAnalysisSettled, []);
             // Host -> collection-id attribution now happens server-side (no raw collection list
-            // needed client-side for this — see attributeViolationCountsToCollections).
+            // needed client-side for this — see attributeViolationCountsToCollections). Skills
+            // aren't attributable by host at all (see skillViolationsByName's own comment), so
+            // fetchAgenticSkillViolationCounts above already returns them keyed by skill name.
             const violationsByCollectionId = await fetchViolationCountsByCollection(hostCounts);
             if (!isMountedRef.current) return;
             const analysisByKey = buildUserAnalysisLookup(userAnalysisList);
             enrichRef.current = {
               ...enrichRef.current,
               violationsByCollectionId,
+              skillViolationsByName,
               analysisByKey,
               userAnalysisFlatMap: buildUserAnalysisFlatMap(analysisByKey),
             };
             setHostSeverityCounts(hostCounts);
-            setRefreshKey((k) => k + 1); // re-run loadStats now that Top Used Applications' data is ready
+            loadStats(); // refined pass — no setRefreshKey, so this never remounts the grid
           })
           .catch((e) => {
             // eslint-disable-next-line no-console
@@ -426,33 +496,24 @@ export default function AgenticAssetsPage() {
     return () => {
       isMountedRef.current = false;
     };
-  }, [startTimestamp, endTimestamp, newLayout]);
-
-  useEffect(() => {
-    // refreshKey starts at 0 and only becomes meaningful once the mount effect above has populated
-    // enrichRef (trafficMap/riskScoreMap) and bumped it — skip the otherwise-automatic call this
-    // effect would make on first render, which would run against still-empty enrichment data.
-    if (refreshKey === 0) return;
-    loadStats();
-  }, [loadStats, refreshKey]);
+  }, [startTimestamp, endTimestamp, newLayout, loadStats]);
 
   // ─── Server-side data fetch for AG Grid ─────────────────────────────────────
   const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString, filters }) => {
     const pageSize = limit || 50;
-    const mappedSortKey = SORT_FIELD_MAP[sortKey] || sortKey || "riskScore";
+    const mappedSortKey = SORT_FIELD_MAP[sortKey] || sortKey || "violations";
     // AG Grid SSRM sends sortOrder: -1 for asc, 1 for desc — opposite of the backend's Mongo
     // convention (1 asc / -1 desc, matching NhiGovernanceViolationsAction's own onServerFetch).
     const mongoSortOrder = sortOrder ? -sortOrder : -1;
-    const { trafficMap, riskScoreMap, userAnalysisFlatMap, violationsByCollectionId, usernameMap, userMetadataMap } = enrichRef.current;
+    const { userAnalysisFlatMap, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap } = enrichRef.current;
 
+    // trafficMap/riskScoreMap omitted — backend computes both server-side now.
     return api.fetchAgenticAssetsSummary({
       skip,
       limit: pageSize,
       sortKey: mappedSortKey,
       sortOrder: mongoSortOrder,
       queryValue: searchString || undefined,
-      trafficMap,
-      riskScoreMap,
       startTimestamp,
       endTimestamp,
       userAnalysisFlatMap,
@@ -462,6 +523,10 @@ export default function AgenticAssetsPage() {
       // so the server can compute each row's own violations total in-memory instead of the browser
       // needing every row's raw collectionIds list to do that sum itself.
       violationsByCollectionId,
+      // Skill rows use this instead of violationsByCollectionId — a skill's declaring collection
+      // is shared with the agent/device that invoked it, so collection-based attribution can't
+      // give a skill its own count (see fetchAgenticSkillViolationCounts's own comment).
+      skillViolationsByName,
       // Endpoint Shield maps, so the server can precompute each row's own Teams breakdown/AI
       // interactions total from its own per-device list, instead of sending that raw list (up to
       // hundreds of entries per row) just for the browser to derive these few small values.
@@ -492,7 +557,7 @@ export default function AgenticAssetsPage() {
 
   const pageTitle = (
     <TitleWithInfo
-      tooltipContent="All agentic assets observed across your environment — AI Agents, MCP Servers, LLMs, and Skills."
+      tooltipContent="All agentic assets observed across your environment — AI Agents, SaaS Agents, MCP Servers, LLMs, and Skills."
       titleText="Agentic assets"
     />
   );
@@ -501,9 +566,11 @@ export default function AgenticAssetsPage() {
 
   const assetTypeBreakdown = useMemo(() => [
     { label: "Agents",      count: stats.countsByType["AI Agent"] || 0,   color: "#9642FC",  key: "AI Agent" },
+    { label: "SaaS Agents", count: stats.countsByType["SaaS Agent"] || 0, color: "#DB2777",  key: "SaaS Agent" },
     { label: "MCP Servers", count: stats.countsByType["MCP Server"] || 0, color: "#4cbebb",  key: "MCP Server" },
     { label: "LLMs",        count: stats.countsByType["LLM"] || 0,        color: "#EAB308",  key: "LLM" },
     { label: "Skills",      count: stats.countsByType["Skill"] || 0,      color: "#D1D5DB",  key: "Skill" },
+    { label: "Plugins",     count: stats.countsByType["Plugin"] || 0,     color: "#4F46E5",  key: "Plugin" },
   ], [stats]);
 
   // Summed from the server-aggregated per-host counts (available at first paint) — independent of
@@ -568,6 +635,8 @@ export default function AgenticAssetsPage() {
               sparklineCounts={stats.assetSparkline}
               sparklineLabels={stats.monthLabels}
               breakdown={assetTypeBreakdown}
+              onFilterClick={handleAssetTypeClick}
+              activeFilter={activeTypeFilter}
               noCard
             />
           </Box>
@@ -582,6 +651,8 @@ export default function AgenticAssetsPage() {
               sparklineColor="#DC2626"
               sparklineLabels={stats.monthLabels}
               breakdown={violBreakdown}
+              onFilterClick={handleSeverityClick}
+              activeFilter={activeSeverityFilter}
               noCard
             />
           </Box>
@@ -600,7 +671,7 @@ export default function AgenticAssetsPage() {
         emptyStateText="No violations"
       />
     </HorizontalGrid>
-  ), [totalAssets, assetTypeBreakdown, violationTotals, violBreakdown, stats, topAppsRows, topViolRows]);
+  ), [totalAssets, assetTypeBreakdown, violationTotals, violBreakdown, stats, topAppsRows, topViolRows, handleAssetTypeClick, activeTypeFilter, handleSeverityClick, activeSeverityFilter]);
 
   if (loading) {
     return (
@@ -629,6 +700,7 @@ export default function AgenticAssetsPage() {
           endTimestamp={endTimestamp}
           refreshKey={refreshKey}
           enrichMaps={enrichRef.current}
+          gridRef={gridRef}
         />,
       ]}
     />

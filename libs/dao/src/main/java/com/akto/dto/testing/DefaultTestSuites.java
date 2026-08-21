@@ -18,9 +18,9 @@ public class DefaultTestSuites extends TestSuites {
         testSuitesPerType.put(DefaultSuitesType.SEVERITY.name(), 4);
         testSuitesPerType.put(DefaultSuitesType.DURATION.name(), 2);
         testSuitesPerType.put(DefaultSuitesType.MCP_SECURITY.name(), 8);
-        testSuitesPerType.put(DefaultSuitesType.AI_AGENT_SECURITY.name(), 16);
-        testSuitesPerType.put(DefaultSuitesType.ATTACK_BASE_TECHNIQUE.name(), 14);
-        testSuitesPerType.put(DefaultSuitesType.ATTACK_STRATEGY.name(), 6);
+        testSuitesPerType.put(DefaultSuitesType.ATTACK_BASE_TECHNIQUE.name(), 13);
+        testSuitesPerType.put(DefaultSuitesType.ATTACK_STRATEGY.name(), 10);
+
     }
 
     public DefaultTestSuites() {}
@@ -36,7 +36,6 @@ public class DefaultTestSuites extends TestSuites {
         SEVERITY,
         DURATION,
         MCP_SECURITY,
-        AI_AGENT_SECURITY,
         ATTACK_BASE_TECHNIQUE,
         ATTACK_STRATEGY
     }
@@ -67,24 +66,59 @@ public class DefaultTestSuites extends TestSuites {
         mcpSecurityList.put("MCP Malicious Code Execution", Arrays.asList("MCP_MALICIOUS_CODE_EXECUTION"));
     }
 
-    public static final Map<String, List<String>> aiAgentSecurityList = new HashMap<>();
+    /* Attack strategy suites, keyed by the agentic OWASP top 10 (2026) categories */
+    public static final Map<String, List<String>> attackStrategyList = new HashMap<>();
     static {
-        aiAgentSecurityList.put("LLM & Prompt Security", Arrays.asList("LLM", "PROMPT_INJECTION"));
-        aiAgentSecurityList.put("Information Disclosure", Arrays.asList("SENSITIVE_INFORMATION_DISCLOSURE", "SYSTEM_PROMPT_LEAKAGE"));
-        aiAgentSecurityList.put("Supply Chain Security", Arrays.asList("SUPPLY_CHAIN"));
-        aiAgentSecurityList.put("Model Integrity", Arrays.asList("DATA_AND_MODEL_POISONING", "VECTOR_AND_EMBEDDING_WEAKNESSES"));
-        aiAgentSecurityList.put("Output Handling", Arrays.asList("IMPROPER_OUTPUT_HANDLING"));
-        aiAgentSecurityList.put("Excessive Agency", Arrays.asList("EXCESSIVE_AGENCY"));
-        aiAgentSecurityList.put("Misinformation", Arrays.asList("MISINFORMATION"));
-        aiAgentSecurityList.put("Resource Management", Arrays.asList("UNBOUNDED_CONSUMPTION"));
-        aiAgentSecurityList.put("Agent Business Alignment", Arrays.asList("AGENTIC_BUSINESS_ALIGNMENT"));
-        aiAgentSecurityList.put("Agent Hallucination & Trustworthiness", Arrays.asList("AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS"));
-        aiAgentSecurityList.put("Agent Safety", Arrays.asList("AGENTIC_SAFETY"));
-        aiAgentSecurityList.put("Agent Security", Arrays.asList("AGENTIC_SECURITY"));
-        aiAgentSecurityList.put("Agent Security - Prompt Injection", Arrays.asList("AGENTIC_SECURITY_PROMPT_INJECTION"));
-        aiAgentSecurityList.put("Agent Security - Agent Exploitation", Arrays.asList("AGENTIC_SECURITY_AGENT_EXPLOITATION"));
-        aiAgentSecurityList.put("Agent Security - Infrastructure", Arrays.asList("AGENTIC_SECURITY_INFRASTRUCTURE"));
-        aiAgentSecurityList.put("Agent Security - Data Exposure & Code Execution", Arrays.asList("AGENTIC_SECURITY_DATA_EXPOSURE", "AGENTIC_SECURITY_CODE_EXECUTION"));
+        attackStrategyList.put("Agent Goal Hijack", Arrays.asList("AGENT_GOAL_HIJACK"));
+        attackStrategyList.put("Tool Misuse and Exploitation", Arrays.asList("TOOL_MISUSE_AND_EXPLOITATION"));
+        attackStrategyList.put("Identity and Privilege Abuse", Arrays.asList("IDENTITY_AND_PRIVILEGE_ABUSE"));
+        attackStrategyList.put("Agentic Supply Chain", Arrays.asList("AGENTIC_SUPPLY_CHAIN"));
+        attackStrategyList.put("Unexpected Code Execution", Arrays.asList("UNEXPECTED_CODE_EXECUTION"));
+        attackStrategyList.put("Memory and Context Poisoning", Arrays.asList("MEMORY_AND_CONTEXT_POISONING"));
+        attackStrategyList.put("Insecure Inter-Agent Communication", Arrays.asList("INSECURE_INTER_AGENT_COMMUNICATION"));
+        attackStrategyList.put("Cascading Failures", Arrays.asList("CASCADING_FAILURES"));
+        attackStrategyList.put("Human-Agent Trust Exploitation", Arrays.asList("HUMAN_AGENT_TRUST_EXPLOITATION"));
+        attackStrategyList.put("Rogue Agents", Arrays.asList("ROGUE_AGENTS"));
+    }
+
+    public static final String OTHERS_SUITE = "Others";
+
+    /* Base attack techniques, matched against the trailing part of info.name */
+    public static final List<String> attackBaseTechniqueList = Arrays.asList(
+            "Base64",
+            "Leetspeak",
+            "Math Problem",
+            "Multilingual",
+            "Prompt Injection",
+            "Roleplay",
+            "ROT13",
+            "Context Poisoning",
+            "Goal Redirection",
+            "Input Bypass",
+            "Permission Escalation",
+            "Semantic Manipulation",
+            "System Override"
+    );
+
+    public static String resolveAttackBaseTechnique(String templateName) {
+        // send 0 if it doesnt contains, 1 if contains and 2 if ends with
+        // ends with:  single shot { base test }, contains multi-shot
+        if (templateName == null) {
+            return OTHERS_SUITE;
+        }
+
+        String name = templateName.trim();
+        String[] parts = name.split("-");
+        for (String baseTechnique : attackBaseTechniqueList) {
+            if (name.toLowerCase().contains(baseTechnique.toLowerCase())) {
+                String lastPart = parts[parts.length - 1].trim();
+                if (lastPart.equalsIgnoreCase(baseTechnique)) {
+                    return baseTechnique + "-basic";
+                }
+                return baseTechnique;
+            }
+        }
+        return OTHERS_SUITE;
     }
 
     public DefaultSuitesType getSuiteType() {

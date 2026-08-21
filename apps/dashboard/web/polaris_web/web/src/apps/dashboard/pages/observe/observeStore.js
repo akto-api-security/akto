@@ -1,5 +1,6 @@
 import {create} from "zustand"
 import {devtools} from "zustand/middleware"
+import { devtoolsOptions } from "@/apps/main/devtoolsConfig"
 
 let observeStore = (set)=>({
 
@@ -24,7 +25,7 @@ let observeStore = (set)=>({
     },
 })
 
-observeStore = devtools(observeStore)
+observeStore = devtools(observeStore, devtoolsOptions("ObserveStore"))
 const ObserveStore = create(observeStore)
 
 export default ObserveStore

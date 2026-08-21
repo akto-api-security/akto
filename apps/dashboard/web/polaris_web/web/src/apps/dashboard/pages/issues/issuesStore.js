@@ -1,5 +1,6 @@
 import {create} from "zustand"
 import {createJSONStorage, devtools, persist} from "zustand/middleware"
+import { devtoolsOptions } from "@/apps/main/devtoolsConfig"
 
 let issuesStore = (set)=>({
     // jira issue fields state 
@@ -38,7 +39,7 @@ let issuesStore = (set)=>({
     },  
 })
 
-issuesStore = devtools(issuesStore)
+issuesStore = devtools(issuesStore, devtoolsOptions("IssuesStore"))
 issuesStore = persist(issuesStore, {name: 'Akto-jira-custom-fields', storage: createJSONStorage(() => sessionStorage)})
 const IssuesStore = create(issuesStore)
 export default IssuesStore
