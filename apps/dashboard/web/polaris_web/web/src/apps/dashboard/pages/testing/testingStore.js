@@ -1,5 +1,6 @@
 import {create} from "zustand"
 import {devtools} from "zustand/middleware"
+import { devtoolsOptions } from "@/apps/main/devtoolsConfig"
 
 let testingStore = (set)=>({
     testRuns: [],
@@ -18,7 +19,7 @@ let testingStore = (set)=>({
     setTestingEndpointsApisList: (testingEndpointsApisList) => set({testingEndpointsApisList: testingEndpointsApisList}),
 })
 
-testingStore = devtools(testingStore)
+testingStore = devtools(testingStore, devtoolsOptions("TestingStore"))
 const TestingStore = create(testingStore)
 export default TestingStore
 

@@ -95,6 +95,11 @@ public class GuardrailPoliciesAction extends UserAction {
     private static final int DEFAULT_FETCH_LIMIT = 20;
     private static final int MAX_FETCH_LIMIT = 100;
 
+    // Some accounts have no <accountId>-guardrails.akto.io machine; for those, fall back to a
+    // nginx guardrails machine.
+    private static final int FALLBACK_GUARDRAIL_ACCOUNT_ID = 1726615470;
+    private static final String FALLBACK_GUARDRAIL_SERVICE_URL = "https://" + FALLBACK_GUARDRAIL_ACCOUNT_ID + "-guardrails.akto.io";
+
     public String fetchGuardrailPolicies() {
         try {
             // Mongo treats limit <= 0 as "unlimited", so clamp instead of passing it through as-is.
@@ -306,6 +311,9 @@ public class GuardrailPoliciesAction extends UserAction {
         }
         if (p.getLlmRule() != null) {
             updates.add(Updates.set("llmRule", p.getLlmRule()));
+        }
+        if (p.getRedactionRules() != null) {
+            updates.add(Updates.set("redactionRules", p.getRedactionRules()));
         }
         if (p.getBasePromptRule() != null) {
             updates.add(Updates.set("basePromptRule", p.getBasePromptRule()));
@@ -595,9 +603,7 @@ public class GuardrailPoliciesAction extends UserAction {
             // Generate short-lived JWT for authenticating with the guardrail service
             String authToken;
             try {
-                Map<String, Object> claims = new HashMap<>();
-                claims.put("accountId", accountId);
-                authToken = JwtAuthenticator.createJWT(claims, "Akto", "invite_user", Calendar.MINUTE, 120);
+                authToken = generateGuardrailAuthToken(accountId);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Failed to generate auth token for guardrail service: " + e.getMessage(), LogDb.DASHBOARD);
                 return ERROR.toUpperCase();
@@ -606,15 +612,33 @@ public class GuardrailPoliciesAction extends UserAction {
             // Call guardrail service using shared HTTP client
             MediaType mediaType = MediaType.parse("application/json");
             RequestBody body = RequestBody.create(requestPayload.toJson(), mediaType);
-            Request request = new Request.Builder()
-                    .url(validateUrl)
-                    .method("POST", body)
-                    .addHeader("Content-Type", "application/json")
-                    .addHeader("Authorization", authToken)
-                    .build();
 
-            // Call guardrail service using shared HTTP client
-            try (Response response = httpClient.newCall(request).execute()) {
+            Response response = null;
+            try {
+                response = executeGuardrailRequest(validateUrl, body, authToken);
+                if (!response.isSuccessful()) {
+                    loggerMaker.info("Guardrail service at " + validateUrl + " returned status " + response.code() + ", falling back");
+                    response.close();
+                    response = null;
+                }
+            } catch (IOException e) {
+                loggerMaker.info("Error calling guardrail service at " + validateUrl + ": " + e.getMessage() + ", falling back");
+            }
+
+            // Any failure to reach/get a successful response from the account's own machine
+            // (unknown host, connection error, gateway error, etc.) falls back to a shared machine.
+            if (response == null) {
+                String fallbackUrl = FALLBACK_GUARDRAIL_SERVICE_URL + "/api/validate/requestWithPolicy";
+                try {
+                    String fallbackAuthToken = generateGuardrailAuthToken(FALLBACK_GUARDRAIL_ACCOUNT_ID);
+                    response = executeGuardrailRequest(fallbackUrl, body, fallbackAuthToken);
+                } catch (Exception fallbackException) {
+                    loggerMaker.errorAndAddToDb("Error calling fallback guardrail service at " + fallbackUrl + ": " + fallbackException.getMessage(), LogDb.DASHBOARD);
+                    return ERROR.toUpperCase();
+                }
+            }
+
+            try {
                 ResponseBody responseBodyObj = response.body();
                 String responseBody = (responseBodyObj != null) ? responseBodyObj.string() : "";
 
@@ -639,14 +663,31 @@ public class GuardrailPoliciesAction extends UserAction {
                     return ERROR.toUpperCase();
                 }
             } catch (IOException e) {
-                loggerMaker.errorAndAddToDb("IO error calling guardrail service at " + validateUrl + ": " + e.getMessage(), LogDb.DASHBOARD);
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("IO error reading guardrail service response: " + e.getMessage(), LogDb.DASHBOARD);
                 return ERROR.toUpperCase();
+            } finally {
+                response.close();
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error in guardrail playground test: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
+    }
+
+    private String generateGuardrailAuthToken(int accountId) throws Exception {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("accountId", accountId);
+        return JwtAuthenticator.createJWT(claims, "Akto", "invite_user", Calendar.MINUTE, 120);
+    }
+
+    private Response executeGuardrailRequest(String url, RequestBody body, String authToken) throws IOException {
+        Request request = new Request.Builder()
+                .url(url)
+                .method("POST", body)
+                .addHeader("Content-Type", "application/json")
+                .addHeader("Authorization", authToken)
+                .build();
+        return httpClient.newCall(request).execute();
     }
 
     /**

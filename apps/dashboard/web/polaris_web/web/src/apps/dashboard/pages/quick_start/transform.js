@@ -447,11 +447,11 @@ const huggingFaceObj = {
 const awsBedrockObj = {
     icon: '/public/aws_bedrock.svg',
     label: "AWS Bedrock",
-    text: "Import your AWS Bedrock AI agents, seamlessly into AKTO.",
+    text: "Import your AWS Bedrock AI agents, seamlessly into Akto.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-aws-bedrock',
     key: "AWS_BEDROCK",
     component : <BannerComponent
-        content="Import your AWS Bedrock AI agents, seamlessly in AKTO."
+        content="Import your AWS Bedrock AI agents, seamlessly in Akto."
         docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-aws-bedrock'
     />
 }
@@ -469,13 +469,13 @@ const awsAgentCoreObj = {
 }
 
 const amazonQuickObj = {
-    icon: '/public/aws.svg',
+    icon: '/public/aws_quick.svg',
     label: "Amazon Quick",
-    text: "Import your Amazon Quick AI agents and conversations, seamlessly into AKTO.",
+    text: "Import your Amazon Quick AI agents and conversations, seamlessly into Akto.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-amazon-quick',
     key: "AMAZON_QUICK",
     component: <BannerComponent
-        content="Import your Amazon Quick AI agents and conversations, seamlessly in AKTO."
+        content="Import your Amazon Quick AI agents and conversations, seamlessly in Akto."
         docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-amazon-quick'
     />
 }
@@ -483,11 +483,11 @@ const amazonQuickObj = {
 const gleanObj = {
     icon: '/public/glean.svg',
     label: "Glean",
-    text: "Import your Glean assistant interactions and agent activity, seamlessly into AKTO.",
+    text: "Import your Glean assistant interactions and agent activity, seamlessly into Akto.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/glean',
     key: "GLEAN",
     component: <BannerComponent
-        content="Import your Glean assistant interactions and agent activity, seamlessly in AKTO."
+        content="Import your Glean assistant interactions and agent activity, seamlessly in Akto."
         docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/glean'
     />
 }
@@ -1142,17 +1142,19 @@ const vsCodeObj = {
 
 const kiroObj = {
     icon: '/public/kiro.svg',
-    label: "Kiro (Coming Soon)",
+    label: "Kiro",
     text: "Watch Kiro's spec-driven agent as it plans and edits code, using Akto hooks.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/kiro-cli-hooks',
     key: "KIRO_HOOK",
     component: <BannerComponent
         content="Watch Kiro's spec-driven agent as it plans and edits code, using Akto hooks."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/kiro-cli-hooks'
     />
 }
 
 const chatgptIdeObj = {
     icon: '/public/chatgpt.png',
-    label: "ChatGPT",
+    label: "ChatGPT Desktop App",
     text: "Bring ChatGPT coding sessions, formerly Codex, under Akto guardrails using Akto hooks.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/codex-cli-hooks',
     key: "CHATGPT_IDE_HOOK",
@@ -1354,11 +1356,11 @@ const copilotStudioMultiEnvImportObj = {
 const m365CopilotObj = {
     icon: '/public/microsoft-copilot.svg',
     label: "Microsoft 365 Copilot",
-    text: "Import your Microsoft 365 Copilot interactions across Teams, Excel and other Office products, seamlessly into AKTO.",
+    text: "Import your Microsoft 365 Copilot interactions across Teams, Excel and other Office products, seamlessly into Akto.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-m365-copilot',
     key: "M365_COPILOT",
     component: <BannerComponent
-        content="Import your Microsoft 365 Copilot interactions across Teams, Excel and other Office products, seamlessly in AKTO."
+        content="Import your Microsoft 365 Copilot interactions across Teams, Excel and other Office products, seamlessly in Akto."
         docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-with-m365-copilot'
     />
 }
@@ -1413,8 +1415,8 @@ const salesforceImportObj = {
 
 const anthropicImportObj = {
     icon: '/public/claude.svg',
-    label: "Anthropic",
-    text: "Use our Anthropic feature to capture traffic from Anthropic and instantly send it to your dashboard for real-time insights.",
+    label: "Claude Compliance API",
+    text: "Pull conversation and usage data from Anthropic's Compliance API to bring employee Claude activity under Akto guardrails.",
     docsUrl: DOCS_URL_ANTHROPIC,
     key: "ANTHROPIC",
     component: <AIAgentConnectorImport
@@ -1429,8 +1431,8 @@ const anthropicImportObj = {
 
 const openaiImportObj = {
     icon: '/public/openai.svg',
-    label: "OpenAI",
-    text: "Use our OpenAI feature to capture traffic from OpenAI and instantly send it to your dashboard for real-time insights.",
+    label: "ChatGPT Compliance API",
+    text: "Pull conversation and usage data from OpenAI's Compliance API to bring employee ChatGPT activity under Akto guardrails.",
     docsUrl: DOCS_URL_OPENAI,
     key: "OPENAI",
     component: <AIAgentConnectorImport
@@ -2392,7 +2394,7 @@ const quickStartFunc = {
         const agenticIdes = [
             cursorHookObj, vsCodeObj, chatgptIdeObj, githubCopilotIdeObj, visualStudioObj,
             claudeDesktopObj, claudeCoworkObj, openCodeHookObj, neovimHookObj,
-            intellijHookObj, kiroObj, antigravityObj,
+            kiroObj, intellijHookObj, antigravityObj,
         ]
 
         const localHostedModels = [
@@ -2449,13 +2451,8 @@ const quickStartFunc = {
                 openaiImportObj, chatgptIdeObj, codexHookObj,
             ]
 
-            const awsConnectors = [
-                amazonQuickObj, awsBedrockObj, awsAgentCoreObj,
-            ]
-
             const microsoftConnectors = [
                 m365CopilotObj, copilotStudioImportObj, copilotStudioMultiEnvImportObj,
-                githubCopilotIdeObj, githubCopilotHookObj,
             ]
 
             connectors = {
@@ -2464,11 +2461,10 @@ const quickStartFunc = {
                 "Endpoint Management": endpointManagement,
                 "MDM Tools": mdmTools,
                 "Agentic Proxies": agenticProxies,
-                "Anthropic Suite": anthropicConnectors,
-                "OpenAI Suite": openaiConnectors,
-                "AWS Suite": awsConnectors,
+                "Claude Suite": anthropicConnectors,
+                "ChatGPT Suite": openaiConnectors,
                 "Microsoft Suite": microsoftConnectors,
-                "Platform connectors": [gleanObj],
+                "Platform connectors": [amazonQuickObj, gleanObj],
                 "Browser Extension": browserExtensions,
                 "Locally Hosted Models": localHostedModels,
                 "Secure Web Networks": secureWebNetworks,

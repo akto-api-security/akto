@@ -17,6 +17,7 @@ import { fetchEndpointShieldUsernameMap } from "../api_collections/endpointShiel
 import SkillComponentsView from "./SkillComponentsView";
 import { fetchAgentMarkdownFromCollections } from "./PluginComponentsView";
 import { settledValue, logRejected } from "./constants";
+import MisconfiguredBadge from "./MisconfiguredBadge";
 
 /**
  * Endpoint/device-wise view for ONE agentic asset — what clicking a row on the legacy Agentic
@@ -109,7 +110,7 @@ function ChildrenTable({ children, rowType, misconfiguredChildId, onOpenBundle }
             <div key="name-config" style={{ cursor: "pointer", width: CHILD_COL_WIDTH.name }} onClick={handleConfigClick}>
                 <HorizontalStack gap="1" align="start" wrap={false}>
                     <Text variant="bodyMd" as="span">config</Text>
-                    <Badge size="small" status="attention">Misconfigured</Badge>
+                    <MisconfiguredBadge />
                 </HorizontalStack>
             </div>,
             <div key="config-empty-risk" style={{ cursor: "pointer", width: CHILD_COL_WIDTH.riskScore }} onClick={handleConfigClick} />,
@@ -138,7 +139,10 @@ function ChildrenTable({ children, rowType, misconfiguredChildId, onOpenBundle }
                 </HorizontalStack>
             </div>,
             <div key={`risk-${child.id}`} style={{ cursor: "pointer", width: CHILD_COL_WIDTH.riskScore }} onClick={() => handleChildClick(child)}>
-                <Badge status={transform.getStatus(childRiskScore)} size="small">{childRiskScore}</Badge>
+                {transform.wrapRiskScoreTooltip(
+                    <Badge status={transform.getStatus(childRiskScore)} size="small">{childRiskScore}</Badge>,
+                    childRiskScore, child.baseRiskScore, child.baseRiskScoreReason
+                )}
             </div>,
             <div key={`sensitive-${child.id}`} style={{ cursor: "pointer", width: CHILD_COL_WIDTH.sensitive }} onClick={() => handleChildClick(child)}>
                 {transform.prettifySubtypes(child.sensitiveInRespTypes || [])}
@@ -261,7 +265,7 @@ function shapeEndpointRow(row, { rowType, onOpenBundle }) {
                 <Badge size="small" status="new">{row.childCount || children.length}</Badge>
                 {row.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
                 {row.hasLocalMcpServer && <Badge size="small" status="critical">Local MCP Server</Badge>}
-                {row.hasMisconfiguredConfig && <Badge size="small" status="attention">Misconfigured</Badge>}
+                {row.hasMisconfiguredConfig && <MisconfiguredBadge />}
                 {row.hasMaliciousSkill && <Badge size="small" status="critical">Malicious Skills</Badge>}
             </HorizontalStack>
         ),

@@ -55,7 +55,7 @@ import DefaultPayloads from "../dashboard/pages/settings/default_payloads/Defaul
 import AuthTypeDetails from "../dashboard/pages/settings/auth_types/AuthTypeDetails";
 import Billing from "../dashboard/pages/settings/billing/Billing";
 import SelfHosted from "../dashboard/pages/settings/billing/SelfHosted";
-import Onboarding from "../dashboard/pages/onboarding/Onboarding";
+// import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
 import Slack from "../dashboard/pages/settings/integrations/Slack";
 import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
@@ -709,10 +709,11 @@ const router = createBrowserRouter([
                 path: "prompt-hardening",
                 element: <PromptHardening/>
             },
-            {
-                path: "onboarding",
-                element: <Onboarding/>
-            },
+            // Onboarding flow disabled — nothing links here any more (see SignUp.jsx).
+            // {
+            //     path: "onboarding",
+            //     element: <Onboarding/>
+            // },
             {
                 // Report routes: Dashboard skips fetchAllSubCategories on these paths.
                 // Each report component fetches only the subcategories it needs (targeted fetch).

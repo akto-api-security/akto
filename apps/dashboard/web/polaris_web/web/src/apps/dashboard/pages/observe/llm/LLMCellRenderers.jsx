@@ -149,7 +149,6 @@ export function TopicCell({ data, isTopic = true }) {
        <ShowListInBadge
             itemsArr={isTopic ? finalTopics : [...subTopics]}
             maxItems={isTopic ? 3 : 4}
-            maxWidth={"80px"}
             useTooltip={true}
         />
     );

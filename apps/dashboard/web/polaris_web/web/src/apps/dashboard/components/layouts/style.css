@@ -24,6 +24,7 @@
    dashboard-wide .badge-wrapper-<SEVERITY> classes). Keeps TypeBadge a plain Polaris
    <Badge> instead of an inline-styled span. */
 .agentic-type-AGENT .Polaris-Badge   { background-color: #F3E8FF; color: #9642FC; }
+.agentic-type-SAAS_AGENT .Polaris-Badge { background-color: #FCE7F3; color: #DB2777; }
 .agentic-type-MCP .Polaris-Badge     { background-color: #ECFDF5; color: #0D9488; }
 .agentic-type-LLM .Polaris-Badge     { background-color: #FEFCE8; color: #CA8A04; }
 .agentic-type-SKILL .Polaris-Badge   { background-color: #F9FAFB; color: #6B7280; }

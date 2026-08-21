@@ -459,7 +459,10 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
             const prettifiedChild = {
                 ...child,
                 agenticCategory: showCategoryColumn ? getAgenticCategoryLabel(child) : undefined,
-                riskScoreComp: <Badge status={transform.getStatus(childRiskScore)} size="small">{childRiskScore}</Badge>,
+                riskScoreComp: transform.wrapRiskScoreTooltip(
+                    <Badge status={transform.getStatus(childRiskScore)} size="small">{childRiskScore}</Badge>,
+                    childRiskScore, child.baseRiskScore, child.baseRiskScoreReason
+                ),
                 sensitiveSubTypes: transform.prettifySubtypes(child.sensitiveInRespTypes || []),
                 lastTraffic: func.prettifyEpoch(child.detectedTimestamp || 0),
                 discovered: func.prettifyEpoch(child.startTs || 0),

@@ -1,6 +1,6 @@
 import { Autocomplete, Avatar, Icon, Link, TextContainer } from '@shopify/polaris';
 import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import func from "@/util/func";
 function DropdownSearch(props) {
 
@@ -10,8 +10,6 @@ function DropdownSearch(props) {
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
-    const selectedOptionsRef = useRef(selectedOptions);
-    selectedOptionsRef.current = selectedOptions;
     const [inputValue, setInputValue] = useState(value ? value : undefined);
     const [options, setOptions] = useState(deselectedOptions);
     const [loading, setLoading] = useState(false);
@@ -58,9 +56,7 @@ function DropdownSearch(props) {
 
     const updateText = useCallback(
         (value) => {
-            if (!(allowMultiple && value === '' && selectedOptionsRef.current.length > 0)) {
-                setInputValue(value);
-            }
+            setInputValue(value);
 
             if (!loading) {
                 setLoading(true);

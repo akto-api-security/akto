@@ -13,7 +13,7 @@ import PersistStore from "@/apps/main/PersistStore";
 import "../../../components/layouts/style.css";
 
 import api from "./api";
-import { formatSparklineLabels, enrichRow } from "./utils";
+import { formatSparklineLabels } from "./utils";
 import { formatCompact, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
 import { ARGUS_TRACE_COL_DEFS } from "./columns";
 import SessionsView from "./SessionsView";
@@ -56,7 +56,6 @@ export default function LLMObservability() {
     );
     const [selectedSession, setSelectedSession] = useState(null);
     const [selectedTrace, setSelectedTrace]     = useState(null);
-    const [sessions, setSessions]     = useState([]);
     const [argusStats, setArgusStats] = useState(null);
     // Aggregated stats from the dedicated endpoint (accurate, not 500-capped)
     const [sessionStats, setSessionStats] = useState(null);
@@ -75,19 +74,13 @@ export default function LLMObservability() {
         let cancelled = false;
         setLoading(true);
         if (!isArgus) {
-            Promise.allSettled([
-                api.fetchSessions(epochs.since, epochs.until, {}),
-                api.fetchSessionStats(epochs.since, epochs.until),
-            ]).then(([sessionResult, statsResult]) => {
-                if (cancelled) return;
-                if (sessionResult.status === "fulfilled") {
-                    setSessions((sessionResult.value || []).map(enrichRow));
-                }
-                if (statsResult.status === "fulfilled") {
-                    setSessionStats(statsResult.value);
-                }
-                setLoading(false);
-            });
+            api.fetchSessionStats(epochs.since, epochs.until)
+                .then(stats => {
+                    if (cancelled) return;
+                    setSessionStats(stats);
+                    setLoading(false);
+                })
+                .catch(() => { if (!cancelled) setLoading(false); });
         } else {
             api.fetchArgusStats(epochs.since, epochs.until)
                 .then(stats => {
@@ -132,22 +125,7 @@ export default function LLMObservability() {
         return entries;
     }, [sessionStats]);
 
-    // Token totals from accurate aggregated stats; fall back to sessions array while loading.
-    const totalInputTokens = useMemo(
-        () => sessionStats != null
-            ? sessionStats.totalInputTokens
-            : sessions.reduce((s, r) => s + (Number(r._inputTokens) || 0), 0),
-        [sessionStats, sessions]
-    );
-
-    const totalOutputTokens = useMemo(
-        () => sessionStats != null
-            ? sessionStats.totalOutputTokens
-            : sessions.reduce((s, r) => s + (Number(r._outputTokens) || 0), 0),
-        [sessionStats, sessions]
-    );
-
-    const totalTokens = totalInputTokens + totalOutputTokens;
+    const totalTokens = (sessionStats?.totalInputTokens || 0) + (sessionStats?.totalOutputTokens || 0);
 
     // Top users by token usage — from aggregated backend stats.
     const topUserRows = useMemo(() => {
@@ -169,33 +147,20 @@ export default function LLMObservability() {
         }));
     }, [sessionStats]);
 
-    // Top models by session count — model is parsed from responsePayload, not a native ES field,
-    // so we compute from the sessions terms-agg data (inherits the 500-session cap).
-    const topModelRows = useMemo(() => {
-        const byModel = {};
-        sessions.forEach(r => {
-            const m = r._model;
-            if (!m) return;
-            if (!byModel[m]) byModel[m] = { count: 0 };
-            byModel[m].count++;
-        });
-        return Object.entries(byModel)
-            .sort((a, b) => b[1].count - a[1].count)
-            .slice(0, 3)
-            .map(([model, { count }]) => ({
-                id: model,
-                name: model,
-                type: "LLM",
-                assetTagValue: model,
-                renderValue: () => (
-                    <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
-                        <Box minHeight="28px">
-                            <Text variant="bodyMd" alignment="end">{count}</Text>
-                        </Box>
-                    </HorizontalStack>
-                ),
-            }));
-    }, [sessions]);
+    // Top models by session count — from aggregated backend stats.
+    const topModelRows = useMemo(() => (sessionStats?.topModels || []).map(({ model, count }) => ({
+        id: model,
+        name: model,
+        type: "LLM",
+        assetTagValue: model,
+        renderValue: () => (
+            <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
+                <Box minHeight="28px">
+                    <Text variant="bodyMd" alignment="end">{count}</Text>
+                </Box>
+            </HorizontalStack>
+        ),
+    })), [sessionStats]);
 
     // ─── Argus graph data (from fetchArgusStats — accurate, not table-page-capped) ──
 
@@ -252,7 +217,7 @@ export default function LLMObservability() {
         });
     }, [argusStats, setSelectedTrace]);
 
-    const totalDisplaySessions = sessionStats?.totalSessions != null ? sessionStats.totalSessions : sessions.length;
+    const totalDisplaySessions = sessionStats?.totalSessions || 0;
 
     const topCards = useMemo(() => isArgus ? (
         <HorizontalGrid key="top-row-argus" columns={3} gap="4">
@@ -325,8 +290,8 @@ export default function LLMObservability() {
                             sparklineColor="#4285F4"
                             sparklineLabels={tokenSparkLabels}
                             breakdown={[
-                                { label: `In: ${formatCompact(totalInputTokens)}`, count: totalInputTokens, color: "#4285F4" },
-                                { label: `Out: ${formatCompact(totalOutputTokens)}`, count: totalOutputTokens, color: "#10A37F" },
+                                { label: `In: ${formatCompact(sessionStats?.totalInputTokens || 0)}`, count: sessionStats?.totalInputTokens || 0, color: "#4285F4" },
+                                { label: `Out: ${formatCompact(sessionStats?.totalOutputTokens || 0)}`, count: sessionStats?.totalOutputTokens || 0, color: "#10A37F" },
                             ]}
                             noCard
                         />
@@ -346,7 +311,7 @@ export default function LLMObservability() {
                 emptyStateText="No model data in this range."
             />
         </HorizontalGrid>
-    ), [isArgus, argusStats, argusTraceSpark, argusTraceBreakdown, argusTokenSpark, argusTraceSparkLabels, argusTotalTokens, argusInputTokens, argusOutputTokens, argusTopAppByInputTokens, argusTopTraceByTokens, totalDisplaySessions, sessionSpark, sessionSparkLabels, sessionBreakdown, totalTokens, totalInputTokens, totalOutputTokens, tokenSpark, tokenSparkLabels, topUserRows, topModelRows]);
+    ), [isArgus, argusStats, argusTraceSpark, argusTraceBreakdown, argusTokenSpark, argusTraceSparkLabels, argusTotalTokens, argusInputTokens, argusOutputTokens, argusTopAppByInputTokens, argusTopTraceByTokens, totalDisplaySessions, sessionSpark, sessionSparkLabels, sessionBreakdown, totalTokens,sessionStats, tokenSpark, tokenSparkLabels, topUserRows, topModelRows]);
 
     return (
         <>

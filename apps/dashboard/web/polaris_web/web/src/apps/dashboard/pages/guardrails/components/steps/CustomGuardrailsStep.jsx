@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox, HorizontalStack } from "@shopify/polaris";
+import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox, HorizontalStack, Badge, Banner } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import ControlInfoIcon from "../ControlInfoIcon";
 import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
@@ -12,24 +12,57 @@ const validateUrl = (url) => {
     return urlPattern.test(url);
 };
 
+const PROMPT_MIN_LENGTH = 10;
+
+export const newRedactionRule = () => ({
+    enabled: true,
+    userPrompt: "",
+    confidenceScore: 0.5
+});
+
+const validateRedactionRules = (rules) => {
+    for (const rule of rules || []) {
+        if (!rule.enabled) continue;
+        const prompt = (rule.userPrompt || "").trim();
+        if (prompt.length === 0) {
+            return "Redaction instruction cannot be empty. Remove the rule or describe what to redact.";
+        }
+        if (prompt.length < PROMPT_MIN_LENGTH) {
+            return `Redaction instruction is too short. Use at least ${PROMPT_MIN_LENGTH} characters so the model can act on it.`;
+        }
+    }
+    return null;
+};
+
 export const CustomGuardrailsConfig = {
     number: 6,
     title: "Custom Guardrails",
 
-    validate: ({ enableExternalModel, url }) => {
+    validate: ({ enableExternalModel, url, enableLlmRedaction, redactionRules }) => {
         const hasUrl = enableExternalModel && url && url.trim().length > 0;
         const urlError = hasUrl && !validateUrl(url.trim()) ? "Invalid URL format. Must be a valid http or https URL" : null;
+        const redactionError = enableLlmRedaction ? validateRedactionRules(redactionRules) : null;
+        const errorMessage = urlError || redactionError;
 
         return {
-            isValid: !urlError,
-            errorMessage: urlError
+            isValid: !errorMessage,
+            errorMessage
         };
     },
 
-    getSummary: ({ enableLlmPrompt, llmPrompt, enableExternalModel, url }) => {
+    getSummary: ({ enableLlmPrompt, llmPrompt, enableExternalModel, url, enableLlmRedaction, redactionRules }) => {
         const summaries = [];
         if (enableLlmPrompt && llmPrompt) {
             summaries.push(`LLM: ${llmPrompt.substring(0, 20)}${llmPrompt.length > 20 ? '...' : ''}`);
+        }
+        if (enableLlmRedaction) {
+            const active = (redactionRules || []).filter(r => r.enabled && (r.userPrompt || "").trim());
+            if (active.length === 1) {
+                const p = active[0].userPrompt.trim();
+                summaries.push(`Redact: ${p.substring(0, 20)}${p.length > 20 ? '...' : ''}`);
+            } else if (active.length > 1) {
+                summaries.push(`Redact: ${active.length} rules`);
+            }
         }
         if (enableExternalModel && url) {
             summaries.push(`External: ${url.substring(0, 20)}${url.length > 20 ? '...' : ''}`);
@@ -37,8 +70,6 @@ export const CustomGuardrailsConfig = {
         return summaries.length > 0 ? summaries.join(', ') : null;
     }
 };
-
-const PROMPT_MIN_LENGTH = 10;
 
 const CustomGuardrailsStep = ({
     onTryPrompt,
@@ -52,6 +83,11 @@ const CustomGuardrailsStep = ({
     // LLM rule compliance (controlled by parent)
     llmCompliance,
     setLlmCompliance,
+    // LLM prompt based redaction
+    enableLlmRedaction,
+    setEnableLlmRedaction,
+    redactionRules,
+    setRedactionRules,
     // External model based evaluation
     enableExternalModel,
     setEnableExternalModel,
@@ -132,6 +168,26 @@ const CustomGuardrailsStep = ({
         setLlmCompliance(buildComplianceMap(currentEntry.suggested, newAccepted));
     };
 
+    // One redaction instruction per policy — create a separate policy for another.
+    // The stored field stays a list so any additional entries a policy already
+    // carries (e.g. pushed by the GitHub workflow source) survive an edit here
+    // untouched rather than being dropped on save.
+    const redactionRule = (redactionRules || [])[0] || newRedactionRule();
+
+    const updateRedactionRule = (patch) => {
+        const current = redactionRules || [];
+        setRedactionRules(current.length === 0
+            ? [{ ...newRedactionRule(), ...patch }]
+            : current.map((rule, i) => (i === 0 ? { ...rule, ...patch } : rule)));
+    };
+
+    const handleEnableLlmRedaction = (checked) => {
+        setEnableLlmRedaction(checked);
+        if (checked && (redactionRules || []).length === 0) {
+            setRedactionRules([newRedactionRule()]);
+        }
+    };
+
     const handleUrlChange = (value) => {
         setUrl(value);
         if (value && value.trim() && !validateUrl(value.trim())) {
@@ -203,6 +259,67 @@ const CustomGuardrailsStep = ({
                                     onAdd={Object.keys(llmRuleCompliance.suggested).length > 0 ? toggleLlmFramework : undefined}
                                 />
                             </FormLayout>
+                        </Box>
+                    )}
+                </Box>
+
+                {/* LLM Prompt Based Redaction */}
+                <Box>
+                    <Checkbox
+                        label={
+                            <HorizontalStack gap="2" blockAlign="center">
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text as="span">LLM based redaction</Text>
+                                    <ControlInfoIcon
+                                        {...CUSTOM_GUARDRAILS_DESCRIPTIONS.llmRedactionRule}
+                                        onTryPrompt={onTryPrompt}
+                                    />
+                                </HorizontalStack>
+                                <Badge status="info">Beta</Badge>
+                            </HorizontalStack>
+                        }
+                        checked={enableLlmRedaction}
+                        onChange={handleEnableLlmRedaction}
+                        helpText="Describe what to mask in plain language. Matching text is replaced in place and the request is allowed through, instead of being blocked."
+                    />
+                    {enableLlmRedaction && (
+                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
+                            <VerticalStack gap="4">
+                                <Banner>
+                                    Requires Akto browser extension v1.0.69 or later. Currently
+                                    supported only via the browser extension. Endpoint Shield
+                                    Agent support is coming soon.
+                                </Banner>
+                                <FormLayout>
+                                    <TextField
+                                        label="Redaction instruction"
+                                        value={redactionRule.userPrompt}
+                                        onChange={(value) => updateRedactionRule({ userPrompt: value })}
+                                        multiline={3}
+                                        placeholder="e.g. Redact customer full names and home addresses"
+                                        helpText="Be specific about what to mask. Anything not described here is left untouched. To redact a second, unrelated category, create another policy."
+                                    />
+
+                                    <RangeSlider
+                                        label={
+                                            <HorizontalStack gap="1" blockAlign="center">
+                                                <Text as="span">Confidence score threshold</Text>
+                                                <ControlInfoIcon
+                                                    {...CUSTOM_GUARDRAILS_DESCRIPTIONS.redactionConfidenceThreshold}
+                                                    onTryPrompt={onTryPrompt}
+                                                />
+                                            </HorizontalStack>
+                                        }
+                                        value={redactionRule.confidenceScore}
+                                        onChange={(value) => updateRedactionRule({ confidenceScore: value })}
+                                        min={0}
+                                        max={1}
+                                        step={0.1}
+                                        output
+                                        helpText="Text is only masked if the LLM's confidence that it matches your instruction exceeds this threshold"
+                                    />
+                                </FormLayout>
+                            </VerticalStack>
                         </Box>
                     )}
                 </Box>

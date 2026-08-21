@@ -16,6 +16,7 @@ import {
 } from "@shopify/polaris-icons";
 import PersistStore from '../../../../main/PersistStore';
 import AgenticSearchInput from '../../agentic/components/AgenticSearchInput';
+import ViolationReplayPanel from './ViolationReplayPanel';
 import guardrailApi from '../api';
 import settingsApi from '../../settings/api';
 import {
@@ -122,6 +123,21 @@ const reverseAgentKeys = (v2Servers, allCollections) => {
     return [...new Set(keys)];
 };
 
+// Normalises the redaction rows into what the backend stores. Always call this and
+// always send the result — the save endpoint only writes fields that are present, so
+// omitting the key when the feature is switched off would leave the previously saved
+// rules live on the policy.
+const buildRedactionRules = (enabled, rules) => {
+    if (!enabled) return [];
+    return (rules || [])
+        .filter(r => r.enabled && (r.userPrompt || "").trim())
+        .map(r => ({
+            enabled: true,
+            userPrompt: r.userPrompt.trim(),
+            confidenceScore: r.confidenceScore ?? 0.5
+        }));
+};
+
 const getLlmServiceKeySet = (allCollections) => {
     const keys = new Set();
     (allCollections || []).forEach(c => {
@@ -210,6 +226,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [llmPrompt, setLlmPrompt] = useState("");
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
     const [llmCompliance, setLlmCompliance] = useState({});
+    const [enableLlmRedaction, setEnableLlmRedaction] = useState(false);
+    const [redactionRules, setRedactionRules] = useState([]);
     const [enableExternalModel, setEnableExternalModel] = useState(false);
     const [url, setUrl] = useState("");
     const [confidenceScore, setConfidenceScore] = useState(25);
@@ -361,6 +379,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableLlmPrompt,
         llmPrompt,
         llmConfidenceScore,
+        enableLlmRedaction,
+        redactionRules,
         enableExternalModel,
         url,
         confidenceScore,
@@ -668,6 +688,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setLlmPrompt("");
         setLlmConfidenceScore(0.5);
         setLlmCompliance({});
+        setEnableLlmRedaction(false);
+        setRedactionRules([]);
         setEnableExternalModel(false);
         setUrl("");
         setConfidenceScore(25);
@@ -779,6 +801,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setLlmPrompt(policy.llmRule?.userPrompt || "");
         setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
         setLlmCompliance(policy.llmRule?.compliance || {});
+
+        // LLM redaction. Must be hydrated here or editing an existing policy saves
+        // an empty list back over the stored rules.
+        const savedRedactionRules = (policy.redactionRules || []).map(r => ({
+            enabled: r.enabled !== false,
+            userPrompt: r.userPrompt || "",
+            confidenceScore: r.confidenceScore ?? 0.5
+        }));
+        setRedactionRules(savedRedactionRules);
+        setEnableLlmRedaction(savedRedactionRules.some(r => r.enabled && r.userPrompt.trim()));
 
         // Base Prompt Based Validation (AI Agents)
         setEnableBasePromptRule(policy.basePromptRule?.enabled || false);
@@ -953,6 +985,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     confidenceScore: llmConfidenceScore,
                     compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 },
+                redactionRules: buildRedactionRules(enableLlmRedaction, redactionRules),
                 basePromptRule: {
                     enabled: enableBasePromptRule,
                     confidenceScore: basePromptConfidenceScore
@@ -1132,6 +1165,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setLlmConfidenceScore={setLlmConfidenceScore}
                         llmCompliance={llmCompliance}
                         setLlmCompliance={setLlmCompliance}
+                        enableLlmRedaction={enableLlmRedaction}
+                        setEnableLlmRedaction={setEnableLlmRedaction}
+                        redactionRules={redactionRules}
+                        setRedactionRules={setRedactionRules}
                         enableExternalModel={enableExternalModel}
                         setEnableExternalModel={setEnableExternalModel}
                         url={url}
@@ -1297,6 +1334,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 }
             } : {}),
+            redactionRules: buildRedactionRules(enableLlmRedaction, redactionRules),
             ...(enableBasePromptRule ? {
                 basePromptRule: {
                     enabled: true,
@@ -1558,6 +1596,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 </div>
 
                 <div className="guardrail-playground">
+                    {/* Only in edit mode: violations join to a policy by name, so there is nothing
+                        to replay until the policy has been saved at least once. Uses the saved name
+                        rather than the edited one for the same reason. */}
+                    {isEditMode && editingPolicy?.name && (
+                        <ViolationReplayPanel
+                            policyName={editingPolicy.name}
+                            hexId={editingPolicy.hexId}
+                            buildPolicy={() => transformPolicyForBackend(buildPlaygroundPolicyData())}
+                        />
+                    )}
                     <Box padding="5">
                         <Text variant="headingMd" as="h3" fontWeight="semibold">Playground</Text>
                     </Box>

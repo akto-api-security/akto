@@ -24,8 +24,9 @@ import {
     fetchAndCacheAgenticSensitiveInfo,
 } from "./constants";
 import { CLIENT_TYPES, ROW_TYPES } from "./mcpClientHelper";
+import MisconfiguredBadge from "./MisconfiguredBadge";
 
-const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills', 'Plugins'];
+const definedTableTabs = ['All', 'AI Agents', 'SaaS Agents', 'MCP Servers', 'LLMs', 'Skills', 'Plugins'];
 
 // "unknown" is treated as disabled — an unreported status is not proof a plugin is active.
 const isPluginEnabled = (status) => String(status).toLowerCase() === 'enabled';
@@ -45,6 +46,7 @@ const pluginMetadataHeaders = [
 const TAB_TO_CLIENT_TYPE = {
     all: undefined,
     ai_agents: CLIENT_TYPES.AI_AGENT,
+    saas_agents: CLIENT_TYPES.SAAS_AGENT,
     mcp_servers: CLIENT_TYPES.MCP_SERVER,
     llms: CLIENT_TYPES.LLM,
     skills: CLIENT_TYPES.SKILL,
@@ -114,7 +116,7 @@ function shapeRow(row, { skillScoreMap = {} } = {}) {
             <Text>{row.name}</Text>
             {showPersonal && <Badge size="small" status="warning">Contains personal account</Badge>}
             {showLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
-            {showMisconfigured && <Badge size="small" status="attention">Misconfigured</Badge>}
+            {showMisconfigured && <MisconfiguredBadge deviceCount={row.misconfiguredDeviceCount} />}
             {showMalicious && <Badge size="small" status="critical">Malicious</Badge>}
             {owningPluginName && <Badge size="small" status="info">{`${owningPluginName} plugin`}</Badge>}
         </HorizontalStack>
@@ -238,6 +240,7 @@ function Endpoints() {
         _counts: {
             all: stats.totalAssets,
             ai_agents: stats.countsByType[CLIENT_TYPES.AI_AGENT] || 0,
+            saas_agents: stats.countsByType[CLIENT_TYPES.SAAS_AGENT] || 0,
             mcp_servers: stats.countsByType[CLIENT_TYPES.MCP_SERVER] || 0,
             llms: stats.countsByType[CLIENT_TYPES.LLM] || 0,
             skills: stats.countsByType[CLIENT_TYPES.SKILL] || 0,
