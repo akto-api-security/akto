@@ -464,6 +464,7 @@ public class DbAction extends ActionSupport {
     ApiInfo apiInfo;
     EndpointLogicalGroup endpointLogicalGroup;
     List<TestingRunIssues> testingRunIssues;
+    @Getter @Setter
     List<CustomWebhook> customWebhooks;
     int webhookId;
     String userEmail;
