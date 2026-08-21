@@ -1641,7 +1641,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		Modified:        finalPayload != "" && finalPayload != payload,
 		ModifiedPayload: finalPayload,
 		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
-		Metadata:        types.ThreatMetadata{},
+		Metadata:        blockMetadataFromResponse(processResult.BlockedResponse),
 		Behaviour:       processResult.Behaviour,
 	}
 
@@ -1815,7 +1815,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		Modified:        finalResponsePayload != "" && finalResponsePayload != responseBody,
 		ModifiedPayload: finalResponsePayload,
 		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
-		Metadata:        types.ThreatMetadata{},
+		Metadata:        blockMetadataFromResponse(processResult.BlockedResponse),
 		Behaviour:       processResult.Behaviour,
 	}
 
@@ -1971,8 +1971,8 @@ func (s *Service) ValidateRequestWithPolicy(
 		Allowed:         !processResult.IsBlocked,
 		Modified:        finalPayload != "" && finalPayload != preRedactionPayload,
 		ModifiedPayload: finalPayload,
-		Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
-		Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
+		Reason:          "", // TODO: Extract from BlockedResponse when library is updated
+		Metadata:        blockMetadataFromResponse(processResult.BlockedResponse),
 		Behaviour:       processResult.Behaviour,
 	}
 
@@ -2159,7 +2159,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 					Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != data.RequestPayload,
 					ModifiedPayload: processResult.ModifiedPayload,
 					Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
-					Metadata:        types.ThreatMetadata{},
+					Metadata:        blockMetadataFromResponse(processResult.BlockedResponse),
 					Behaviour:       processResult.Behaviour,
 				}
 				result.RequestAllowed = reqResult.Allowed
@@ -2183,7 +2183,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 					Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != data.ResponsePayload,
 					ModifiedPayload: processResult.ModifiedPayload,
 					Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
-					Metadata:        types.ThreatMetadata{},
+					Metadata:        blockMetadataFromResponse(processResult.BlockedResponse),
 					Behaviour:       processResult.Behaviour,
 				}
 				result.ResponseAllowed = respResult.Allowed
@@ -2283,6 +2283,30 @@ type ValidationBatchResult struct {
 	ResponseModifiedPayload string `json:"responseModifiedPayload,omitempty"`
 	ResponseReason          string `json:"responseReason,omitempty"`
 	ResponseError           string `json:"responseError,omitempty"`
+}
+
+// blockMetadataFromResponse pulls the detection detail out of the BlockedResponse
+// map produced by mcp-endpoint-shield's CreateBlockedResponse. error.data.reason
+// holds the scanner/LLM explanation that threat activity already reports, while
+// error.message is the operator-configured BlockedMessage surfaced as Reason.
+// Returns a zero ThreatMetadata when the payload carries no detection reason.
+func blockMetadataFromResponse(blocked map[string]any) types.ThreatMetadata {
+	metadata := types.ThreatMetadata{}
+	if blocked == nil {
+		return metadata
+	}
+	errObj, ok := blocked["error"].(map[string]any)
+	if !ok {
+		return metadata
+	}
+	data, ok := errObj["data"].(map[string]any)
+	if !ok {
+		return metadata
+	}
+	if reason, ok := data["reason"].(string); ok {
+		metadata.Reason = reason
+	}
+	return metadata
 }
 
 // extractReasonFromBlockedResponse drills into the BlockedResponse map
