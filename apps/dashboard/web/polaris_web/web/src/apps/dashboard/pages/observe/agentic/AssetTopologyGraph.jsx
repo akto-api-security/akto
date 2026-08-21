@@ -3,6 +3,7 @@ import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-re
 import { Box, HorizontalStack, VerticalStack, Text, Card, Icon, Avatar, Tooltip } from "@shopify/polaris";
 import { AutomationMajor, MagicMajor, CustomersMinor } from "@shopify/polaris-icons";
 import MCPIcon from "@/assets/MCP_Icon.svg";
+import PluginIcon from "@/assets/Plugin.svg";
 import { getAgentLinkedComponents } from "./agenticPageBuilders";
 
 export function topoColors(category) {
@@ -12,6 +13,7 @@ export function topoColors(category) {
         case "mcp":      return { borderColor: "#4cbebb", backgroundColor: "#ecfdf5" };
         case "ai-model": return { borderColor: "#ec4899", backgroundColor: "#fdf2f8" };
         case "skill":    return { borderColor: "#7C3AED", backgroundColor: "#F3E8FF" };
+        case "plugin":   return { borderColor: "#4F46E5", backgroundColor: "#EEF2FF" };
         default:         return { borderColor: "#6b7280", backgroundColor: "#f9fafb" };
     }
 }
@@ -23,6 +25,7 @@ export function topoIcon(category) {
         case "mcp":      return MCPIcon;
         case "ai-model": return MagicMajor;
         case "skill":    return AutomationMajor;
+        case "plugin":   return PluginIcon;
         default:         return CustomersMinor;
     }
 }
@@ -81,8 +84,25 @@ export function findParentAgents(asset, agenticFlatData = []) {
             const assetIds = new Set((asset.collectionIds || []).map(Number));
             return (a.collectionIds || []).some(id => assetIds.has(Number(id)));
         }
+        if (asset.type === "Plugin") {
+            return (a.pluginNames || []).some(p => p === asset.name || p.toLowerCase() === asset.name?.toLowerCase());
+        }
         return false;
     });
+}
+
+// devices here is only ever a small server-capped sample now (see AgenticObserveAction's
+// assetDeviceCount/assetDeviceSample comment), not the full per-device list — appends a synthetic
+// "+N more" summary node (same "external"/User visual as a real device node) whenever the real
+// total (deviceCount) exceeds the sample shipped, so a group with hundreds/thousands of devices
+// doesn't silently render as if it only had a handful.
+function buildDeviceItems(devices, deviceCount) {
+    const items = devices.map((d, i) => ({ id: `dev-${i}`, label: d.username || d.endpoint, type: "User" }));
+    const extra = Math.max(0, (deviceCount || 0) - devices.length);
+    if (extra > 0) {
+        items.push({ id: "dev-more", label: `+${extra} more`, type: "More" });
+    }
+    return items;
 }
 
 export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], inlineComponents = [], nodes: externalNodes, edges: externalEdges }) {
@@ -91,15 +111,21 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
             return { nodes: externalNodes, edges: externalEdges, height: GRAPH_H };
         }
 
-        const devices = assetDevices[asset.id] || [];
+        const devices = buildDeviceItems(assetDevices[asset.id] || [], asset.deviceCount);
         const COL1 = 40, COL2 = 230, COL3 = 420;
 
         if (asset.type === "AI Agent") {
             const children = getAgentLinkedComponents(asset, agenticTreeData, agenticFlatData);
             const mcps = children.filter(c => c.type === "MCP Server");
             const llms = children.filter(c => c.type === "LLM");
-            const names = asset.skillNames || [];
-            const skillItems = names.map((name, i) => ({ id: `skl-${i}`, cat: "skill", type: "Skill", label: name, edgeColor: "#7C3AED" }));
+            // Single summary node (not one per skill name) — the flyout's detail fetch only ships
+            // skillCount now, not the full name list (Components tab re-derives the actual names
+            // independently when opened; see AgenticObserveAction.fetchAgenticAssetDetail's comment).
+            const skillCount = asset.skillCount || 0;
+            const skillItems = skillCount > 0
+                ? [{ id: "skl-0", cat: "skill", type: "Skill", label: skillCount === 1 ? "1 Skill" : `${skillCount} Skills`, edgeColor: "#7C3AED" }]
+                : [];
+            const pluginItems = (asset.pluginNames || []).map((name, i) => ({ id: `plg-${i}`, cat: "plugin", type: "Plugin", label: name, edgeColor: "#4F46E5" }));
             const inlineItems = (inlineComponents || []).map((item, i) => ({
                 id: item.id || `inline-${i}`,
                 cat: item.cat,
@@ -113,6 +139,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
                 ...mcps.map((m, i) => ({ id: `mcp-${i}`, cat: "mcp",      type: "MCP Server", label: m.name, edgeColor: "#4cbebb" })),
                 ...llms.map((l, i) => ({ id: `llm-${i}`, cat: "ai-model", type: "LLM",        label: l.name, edgeColor: "#ec4899" })),
                 ...skillItems,
+                ...pluginItems,
                 ...inlineItems,
             ];
 
@@ -125,20 +152,25 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
                 height: GRAPH_H,
                 nodes: [
                     { id: "agent", type: "topoNode", draggable: false, position: { x: COL2, y: agentY }, data: { component: { category: "agent", type: "AI Agent", label: asset.name } } },
-                    ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: COL1, y: devOffset + i * NODE_H }, data: { component: { category: "external", type: "User", label: d.username || d.endpoint } } })),
+                    ...devices.map((d, i) => ({ id: d.id, type: "topoNode", draggable: false, position: { x: COL1, y: devOffset + i * NODE_H }, data: { component: { category: "external", type: d.type, label: d.label } } })),
                     ...col3Items.map((item, i) => ({ id: item.id, type: "topoNode", draggable: false, position: { x: COL3, y: i * NODE_H }, data: { component: { category: item.cat, type: item.type, label: item.label } } })),
                 ],
                 edges: [
-                    ...devices.map((_, i)   => ({ id: `e-d${i}-a`,     source: `dev-${i}`, target: "agent",   type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } })),
+                    ...devices.map(d => ({ id: `e-${d.id}-a`,   source: d.id, target: "agent",   type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } })),
                     ...col3Items.map(item   => ({ id: `e-a-${item.id}`, source: "agent",    target: item.id,  type: "smoothstep", style: { stroke: item.edgeColor, strokeWidth: 1.5 } })),
                 ],
             };
         }
 
-        // MCP / Skill / LLM: show Device → Parent Agent → This Asset
-        const parentAgents = findParentAgents(asset, agenticFlatData);
-        const cat     = asset.type === "MCP Server" ? "mcp" : asset.type === "Skill" ? "skill" : "ai-model";
-        const edgeCol = asset.type === "MCP Server" ? "#4cbebb" : asset.type === "Skill" ? "#7C3AED" : "#ec4899";
+        // MCP / Skill / Plugin / LLM: show Device → Parent Agent → This Asset
+        // agenticFlatData is always [] in this layout, so findParentAgents never matches — a plugin
+        // asset already carries its own parent agent's name directly (pluginParentAgent), so use that
+        // instead of depending on agenticFlatData ever being populated.
+        const parentAgents = asset.type === "Plugin" && asset.pluginParentAgent
+            ? [{ name: asset.pluginParentAgent }]
+            : findParentAgents(asset, agenticFlatData);
+        const cat     = asset.type === "MCP Server" ? "mcp" : asset.type === "Skill" ? "skill" : asset.type === "Plugin" ? "plugin" : "ai-model";
+        const edgeCol = asset.type === "MCP Server" ? "#4cbebb" : asset.type === "Skill" ? "#7C3AED" : asset.type === "Plugin" ? "#4F46E5" : "#ec4899";
 
         if (parentAgents.length > 0) {
             const maxRows   = Math.max(devices.length, parentAgents.length, 1);
@@ -152,10 +184,10 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
                 nodes: [
                     { id: "asset", type: "topoNode", draggable: false, position: { x: COL3, y: assetY }, data: { component: { category: cat, type: asset.type, label: asset.name } } },
                     ...parentAgents.map((a, i) => ({ id: `agt-${i}`, type: "topoNode", draggable: false, position: { x: COL2, y: agOffset + i * NODE_H }, data: { component: { category: "agent", type: "AI Agent", label: a.name } } })),
-                    ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: COL1, y: devOffset + i * NODE_H }, data: { component: { category: "external", type: "User", label: d.username || d.endpoint } } })),
+                    ...devices.map((d, i) => ({ id: d.id, type: "topoNode", draggable: false, position: { x: COL1, y: devOffset + i * NODE_H }, data: { component: { category: "external", type: d.type, label: d.label } } })),
                 ],
                 edges: [
-                    ...devices.map((_, i) => ({ id: `e-d${i}-a0`, source: `dev-${i}`, target: "agt-0", type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } })),
+                    ...devices.map(d => ({ id: `e-${d.id}-a0`, source: d.id, target: "agt-0", type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } })),
                     ...parentAgents.map((_, i) => ({ id: `e-a${i}-as`, source: `agt-${i}`, target: "asset", type: "smoothstep", style: { stroke: edgeCol, strokeWidth: 1.5 } })),
                 ],
             };
@@ -169,9 +201,9 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
             height: GRAPH_H,
             nodes: [
                 { id: "asset", type: "topoNode", draggable: false, position: { x: COL2, y: assetY }, data: { component: { category: cat, type: asset.type, label: asset.name } } },
-                ...devices.map((d, i) => ({ id: `dev-${i}`, type: "topoNode", draggable: false, position: { x: COL1, y: i * NODE_H }, data: { component: { category: "external", type: "User", label: d.username || d.endpoint } } })),
+                ...devices.map((d, i) => ({ id: d.id, type: "topoNode", draggable: false, position: { x: COL1, y: i * NODE_H }, data: { component: { category: "external", type: d.type, label: d.label } } })),
             ],
-            edges: devices.map((_, i) => ({ id: `e-d${i}-a`, source: `dev-${i}`, target: "asset", type: "smoothstep", style: { stroke: edgeCol, strokeWidth: 1.5 } })),
+            edges: devices.map(d => ({ id: `e-${d.id}-a`, source: d.id, target: "asset", type: "smoothstep", style: { stroke: edgeCol, strokeWidth: 1.5 } })),
         };
     }, [asset, assetDevices, agenticTreeData, agenticFlatData, inlineComponents, externalNodes, externalEdges]);
 

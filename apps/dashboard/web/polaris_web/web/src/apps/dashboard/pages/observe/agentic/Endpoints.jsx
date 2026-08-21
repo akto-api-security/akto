@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from "react"
 import { IndexFiltersMode, Box, Badge, HorizontalStack, Text } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
-import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
+import GithubServerTable from "@/apps/dashboard/components/tables/GithubServerTable";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo";
@@ -11,36 +11,162 @@ import func from "@/util/func";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
+import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 import { CollectionIcon } from "../../../components/shared/CollectionIcon";
 import useTable from "@/apps/dashboard/components/tables/TableContext";
 import NewLayoutTooltip from "./NewLayoutTooltip";
 import {
     getHeaders,
-    sortOptions,
     resourceName,
-    INVENTORY_PATH,
-    INVENTORY_FILTER_KEY,
     PAGE_LIMIT,
-    groupCollectionsByAgent,
-    groupCollectionsByService,
-    groupCollectionsByLLM,
-    groupCollectionsBySkill,
-    extractEndpointId,
-    buildAgenticInventoryFilterForRow,
     fetchAndCacheSkillApiData,
-    skillCollectionKey,
+    fetchAndCacheAgenticTrafficRiskBundle,
+    fetchAndCacheAgenticSensitiveInfo,
 } from "./constants";
-import { CLIENT_TYPES, ROW_TYPES, hasPersonalAccountTag } from "./mcpClientHelper";
+import { CLIENT_TYPES, ROW_TYPES } from "./mcpClientHelper";
+import MisconfiguredBadge from "./MisconfiguredBadge";
 
-const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills'];
+const definedTableTabs = ['All', 'AI Agents', 'SaaS Agents', 'MCP Servers', 'LLMs', 'Skills', 'Plugins'];
 
-// Restrict free-text search to the asset-name column only. Rows carry large nested objects
-// (collections, etc.); a broad flatten-every-field match is slow enough to freeze the UI.
-const SEARCH_KEYS = ["groupName"];
+// "unknown" is treated as disabled — an unreported status is not proof a plugin is active.
+const isPluginEnabled = (status) => String(status).toLowerCase() === 'enabled';
+
+// Plugins have no endpoints, risk score, or sensitive data of their own — show which agent they
+// belong to instead (the parent/child relationship other rows show via the tree/dropdown), plus
+// their reported metadata.
+const pluginParentAgentHeader = {
+    title: 'AI Agent', text: 'AI Agent', value: 'pluginParentAgentComp', textValue: 'pluginParentAgent', boxWidth: '160px',
+};
+const pluginMetadataHeaders = [
+    { title: 'Status', text: 'Status', value: 'pluginStatusComp', textValue: 'pluginStatus', boxWidth: '90px' },
+    { title: 'Scope', text: 'Scope', value: 'pluginScope', boxWidth: '80px' },
+    { title: 'Marketplace', text: 'Marketplace', value: 'pluginMarketplace', boxWidth: '160px' },
+];
+
+const TAB_TO_CLIENT_TYPE = {
+    all: undefined,
+    ai_agents: CLIENT_TYPES.AI_AGENT,
+    saas_agents: CLIENT_TYPES.SAAS_AGENT,
+    mcp_servers: CLIENT_TYPES.MCP_SERVER,
+    llms: CLIENT_TYPES.LLM,
+    skills: CLIENT_TYPES.SKILL,
+    plugins: CLIENT_TYPES.PLUGIN,
+};
+
+
+// Real backend-sortable fields only (AgenticObserveAction.buildSummaryComparator) — "Type" isn't
+// supported server-side (matches the new layout's own SORT_FIELD_MAP in AgenticAssetsPage.jsx,
+// which doesn't offer it either), so it's dropped here rather than silently falling back to
+// risk-score sort. Default (first option) is Risk score, highest first.
+// columnIndex is headings' 0-based array position + 1 (GithubServerTable.handleSort's own
+// convention — confirmed against this same file's default `sortOptions` export, which uses
+// 2/4/5/7 for these identical columns), NOT the raw headings position.
+const sortOptions = [
+    { label: "Risk score", value: "riskScore desc", directionLabel: "Highest", sortKey: "riskScore", columnIndex: 5 },
+    { label: "Risk score", value: "riskScore asc", directionLabel: "Lowest", sortKey: "riskScore", columnIndex: 5 },
+    { label: "Name", value: "name asc", directionLabel: "A-Z", sortKey: "name", columnIndex: 2 },
+    { label: "Name", value: "name desc", directionLabel: "Z-A", sortKey: "name", columnIndex: 2 },
+    { label: "Endpoints", value: "endpointsCount desc", directionLabel: "Highest", sortKey: "endpointsCount", columnIndex: 4 },
+    { label: "Endpoints", value: "endpointsCount asc", directionLabel: "Lowest", sortKey: "endpointsCount", columnIndex: 4 },
+    { label: "Last traffic seen", value: "lastSeenEpoch desc", directionLabel: "Newest", sortKey: "lastSeenEpoch", columnIndex: 7 },
+    { label: "Last traffic seen", value: "lastSeenEpoch asc", directionLabel: "Oldest", sortKey: "lastSeenEpoch", columnIndex: 7 },
+];
+
+// Filter-only header (not a visible column) for the malicious/misconfigured tags on skills —
+// drives the "Tag" filter facet server-side (AgenticObserveAction.fetchAgenticAssetsSummary's
+// "tags" Set Filter branch) instead of the old client-side facet over a fully-loaded array.
+const tagFilterHeader = {
+    title: "Tag", text: "Tag", value: "assetTags",
+    filterKey: "assetTags", filterLabel: "Tag", showFilter: true,
+};
+
+function getRiskScoreStatus(riskScore) {
+    if (riskScore >= 4.5) return "critical";
+    if (riskScore >= 4) return "attention";
+    if (riskScore >= 2.5) return "warning";
+    if (riskScore > 0) return "info";
+    return "success";
+}
+
+// Turns one server-computed row (AgenticObserveAction.fetchAgenticAssetsSummary) into the shape
+// this page's headers/cell-renderers expect — mirrors AgenticAssetsPage.jsx's own shapeRow (the
+// new layout). Skill rows' risk score and misconfigured badge come from a separate, skill-name-
+// keyed enrichment call (fetchAndCacheSkillApiData), not classifyAllGroups' collection-tag-based
+// fields — those are deliberately not computed for skill rows, matching prettifyGroupData's
+// original client-side behavior. isMalicious for skill rows IS computed server-side already
+// (AgenticObserveAction's own account-wide maliciousSkillKeys cache — no client round-trip needed).
+function shapeRow(row, { skillScoreMap = {} } = {}) {
+    const isSkill = row.rowType === ROW_TYPES.SKILL;
+    const isPlugin = row.rowType === ROW_TYPES.PLUGIN;
+    // Fan-out rows borrow their parent agent collection's flags, so suppress them on both.
+    // Misconfigured is an Agent/MCP-server-only concept — Skill rows never show it, so it stays
+    // gated on !isFanout unlike owningPluginName below (which the server computes per-skill-group).
+    const isFanout = isSkill || isPlugin;
+    // Plugin riskScore is already the plugin's own (overwritten server-side), not the agent's.
+    const riskScore = isSkill ? (skillScoreMap[row.name] || 0) : (row.riskScore || 0);
+
+    const showPersonal = row.hasPersonalAccount && !isFanout;
+    const showLocalMcp = row.hasLocalMcpServer && !isFanout;
+    const showMisconfigured = row.hasMisconfiguredConfig && !isFanout;
+    const showMalicious = isSkill && row.isMalicious;
+    const owningPluginName = !isPlugin && row.owningPluginName;
+
+    const groupNameDisplay = (showPersonal || showLocalMcp || showMisconfigured || showMalicious || owningPluginName) ? (
+        <HorizontalStack gap="2" align="start" wrap={false}>
+            <Text>{row.name}</Text>
+            {showPersonal && <Badge size="small" status="warning">Contains personal account</Badge>}
+            {showLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
+            {showMisconfigured && <MisconfiguredBadge deviceCount={row.misconfiguredDeviceCount} />}
+            {showMalicious && <Badge size="small" status="critical">Malicious</Badge>}
+            {owningPluginName && <Badge size="small" status="info">{`${owningPluginName} plugin`}</Badge>}
+        </HorizontalStack>
+    ) : row.name;
+
+    return {
+        ...row,
+        groupName: row.name,
+        groupNameDisplay,
+        riskScore,
+        riskScoreComp: riskScore ? <Badge status={getRiskScoreStatus(riskScore)} size="small">{riskScore}</Badge> : "-",
+        sensitiveSubTypes: transform.prettifySubtypes(row.sensitiveInRespTypes || [], false),
+        lastTraffic: row.lastSeenEpoch > 0 ? func.prettifyEpoch(row.lastSeenEpoch) : "-",
+        detectedTimestamp: row.lastSeenEpoch,
+        iconComp: (
+            <Box>
+                <CollectionIcon assetTagValue={row.groupKey} displayName={row.name} />
+            </Box>
+        ),
+        pluginVersion: row.pluginVersion || "-",
+        pluginScope: row.pluginScope || "-",
+        pluginMarketplace: row.pluginMarketplace || "-",
+        pluginStatus: row.pluginStatus || "",
+        pluginStatusComp: isPlugin ? (
+            <Badge size="small" status={isPluginEnabled(row.pluginStatus) ? "success" : "warning"}>
+                {isPluginEnabled(row.pluginStatus) ? "enabled" : "disabled"}
+            </Badge>
+        ) : "-",
+        // Already formatted server-side (McpClientRegistry.formatDisplayName) — e.g. "Claude", not
+        // the raw "claude"/"claudecli" tag value.
+        pluginParentAgent: row.pluginParentAgent || "-",
+        pluginParentAgentComp: isPlugin && row.pluginParentAgent ? (
+            <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+                <CollectionIcon assetTagValue={row.pluginParentAgent} displayName={row.pluginParentAgent} />
+                <Text variant="bodyMd">{row.pluginParentAgent}</Text>
+            </HorizontalStack>
+        ) : "-",
+        assetTags: [
+            ...(showPersonal ? ["Contains personal account"] : []),
+            ...(showLocalMcp ? ["Local MCP Server"] : []),
+            ...(showMisconfigured ? ["Misconfigured"] : []),
+            ...(showMalicious ? ["Malicious Skill"] : []),
+        ],
+    };
+}
 
 function Endpoints() {
     const navigate = useNavigate();
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [tableLoading, setTableLoading] = useState(false);
     const agenticNewLayout = LocalStore((state) => state.agenticNewLayout);
     const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
 
@@ -49,14 +175,9 @@ function Endpoints() {
             navigate("/dashboard/observe/agentic-assets", { replace: true });
         }
     }, [navigate, agenticNewLayout]);
-    const [data, setData] = useState({ all: [], 'ai_agents': [], 'mcp_servers': [], llms: [], skills: [] });
-    // Skill risk scores/badges arrive asynchronously (after the initial render). When they land,
-    // applySkillRiskScores rewrites the source rows (data.skills) and bumps skillEnrichVersion; that
-    // version is fed to the table as callFromOutside, which re-derives its rows from the now-enriched
-    // source using the current search query — so badges appear without remounting or wiping the
-    // search. Reading the source (not patching a stale snapshot) avoids the first-load race.
-    const [skillEnrichVersion, setSkillEnrichVersion] = useState(0);
-    const [summaryData, setSummaryData] = useState({ totalAssets: 0, totalEndpoints: 0 });
+
+    const [stats, setStats] = useState({ totalAssets: 0, totalEndpoints: 0, countsByType: {} });
+    const [refreshKey, setRefreshKey] = useState(0);
 
     const { tabsInfo } = useTable();
     const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
@@ -65,236 +186,118 @@ function Endpoints() {
     const [selectedTab, setSelectedTab] = useState(initialSelectedTab);
     const [selected, setSelected] = useState(func.getTableTabIndexById(1, definedTableTabs, initialSelectedTab));
 
-    const setAllCollections = PersistStore((state) => state.setAllCollections);
-    const filtersMap = PersistStore((state) => state.filtersMap);
-    const setFiltersMap = PersistStore((state) => state.setFiltersMap);
+    // Everything fetchTableData/shapeRow need but the paginated table endpoint doesn't carry
+    // itself — populated once at mount (Tier 1: trafficMap/riskScoreMap/sensitiveMap; Tier 2,
+    // async: skill risk/malicious/misconfigured data), read (not reacted to) by fetchTableData.
+    const enrichRef = useRef({
+        trafficMap: {}, riskScoreMap: {}, sensitiveMap: {}, usernameMap: {},
+        skillScoreMap: {},
+    });
+    // Progressively populated from each page's distinctUsernames (server-computed, current page
+    // only) — same pattern as AgenticAssetDevicesPage.jsx's filterChoices/updateFilterChoicesIfChanged.
+    const [usernameChoices, setUsernameChoices] = useState([]);
 
-    // Ref so the Skills tab effect can read current skills without being a dep
-    const dataRef = useRef(data);
-    useEffect(() => { dataRef.current = data; }, [data]);
-
-    const tableCountObj = func.getTabsCount(definedTableTabs, data);
-    const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo);
-
-    const handleSelectedTab = (selectedIndex) => {
-        setSelected(selectedIndex);
-    };
-
-    const headers = useMemo(() => {
+    // headings drives the rendered COLUMNS; headers drives FILTERS/CSV export (GithubServerTable's
+    // own convention) — tagFilterHeader is filter-only, so it belongs in headers, not headings.
+    const headings = useMemo(() => {
         const h = getHeaders();
         h[1] = { ...h[1], value: "groupNameDisplay" };
+        if (selectedTab === "plugins") {
+            return [
+                ...h.filter((col) => col.value !== "lastTraffic"),
+                pluginParentAgentHeader,
+                ...pluginMetadataHeaders,
+            ];
+        }
         return h;
-    }, []);
+    }, [selectedTab]);
+    const headers = useMemo(() => [...headings, tagFilterHeader], [headings]);
+    // GithubServerTable renders filter chips from a separate `filters` prop (Polaris IndexFilters
+    // shape: {key, label, choices}) — headers' filterKey only feeds filterOperators/CSV export,
+    // it does NOT surface a UI facet on its own (confirmed via UsersAndDevices.jsx's filtersDef).
+    const filtersDef = useMemo(() => {
+        const defs = [
+            { key: "assetTags", label: "Tag", choices: [
+                { label: "Contains personal account", value: "Contains personal account" },
+                { label: "Local MCP Server", value: "Local MCP Server" },
+                { label: "Misconfigured", value: "Misconfigured" },
+                { label: "Malicious Skill", value: "Malicious Skill" },
+            ] },
+        ];
+        if (usernameChoices.length) {
+            defs.push({ key: "username", label: "Username", choices: usernameChoices.map((u) => ({ label: u, value: u })) });
+        }
+        return defs;
+    }, [usernameChoices]);
 
-    // Default the view to Risk score (highest first) instead of Name A-Z. Two quirks handled here
-    // (page-scoped — the shared sortOptions export is left untouched for other pages):
-    //  1. getInitialSortSelected picks sortOptions[0] when there's no persisted sort, so the
-    //     highest-risk option must be first.
-    //  2. The legacy client-side numeric sort is INVERTED vs its labels: func.sortFunc orders
-    //     numbers as sortOrder*(a-b) and "desc" maps to sortOrder=1 → ascending (lowest first).
-    //     So the value that actually shows highest-first for a numeric field is "riskScore asc".
-    //     Swap the two Risk score option VALUES so each directionLabel matches real behavior.
-    const riskFirstSortOptions = useMemo(() => {
-        const swapped = sortOptions.map((o) => {
-            if (o.sortKey !== "riskScore") return o;
-            if (o.directionLabel === "Highest") return { ...o, value: "riskScore asc" };
-            if (o.directionLabel === "Lowest") return { ...o, value: "riskScore desc" };
-            return o;
-        });
-        const riskHighest = swapped.find((o) => o.sortKey === "riskScore" && o.directionLabel === "Highest");
-        return riskHighest ? [riskHighest, ...swapped.filter((o) => o !== riskHighest)] : swapped;
-    }, []);
-
-    // Filter-only header (not a visible column) for the malicious/misconfigured tags we add on
-    // skills. Kept out of `headings` so it drives the filter facet without rendering a column.
-    const tagFilterHeader = useMemo(() => ({
-        title: "Tag", text: "Tag", value: "assetTags",
-        filterKey: "assetTags", filterLabel: "Tag", showFilter: true,
-    }), []);
-
-    // Only expose the tag filter once enriched rows actually carry tags. Adding the header changes
-    // the transform filter-choices cache key, so the "Malicious" choice appears after async
-    // enrichment rather than being cached-empty from the pre-enrichment first render.
-    const hasAssetTags = useMemo(
-        () => (data.skills || []).some((r) => (r.assetTags || []).length > 0),
-        [data.skills],
-    );
-    const filterHeaders = useMemo(
-        () => (hasAssetTags ? [...headers, tagFilterHeader] : headers),
-        [headers, tagFilterHeader, hasAssetTags],
+    const activeSortOptions = useMemo(
+        () => (selectedTab === "plugins" ? sortOptions.filter((o) => o.sortKey !== "lastSeenEpoch") : sortOptions),
+        [selectedTab],
     );
 
-    const getRiskScoreStatus = useCallback((riskScore) => {
-        if (riskScore >= 4.5) return "critical";
-        if (riskScore >= 4) return "attention";
-        if (riskScore >= 2.5) return "warning";
-        if (riskScore > 0) return "info";
-        return "success";
-    }, []);
 
-    const prettifyGroupData = useCallback((groups) => {
-        return groups.map((group) => {
-            const showPersonal = group.hasPersonalAccount && group.rowType !== ROW_TYPES.SKILL;
-            const showLocalMcp = group.hasLocalMcpServer && group.rowType !== ROW_TYPES.SKILL;
-            const showMisconfigured = group.hasMisconfiguredConfig && group.rowType !== ROW_TYPES.SKILL;
-            const groupNameDisplay = (showPersonal || showLocalMcp || showMisconfigured)
-                ? (
-                    <HorizontalStack gap="2" align="start" wrap={false}>
-                        <Text>{group.groupName}</Text>
-                        {showPersonal && <Badge size="small" status="warning">Contains personal account</Badge>}
-                        {showLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
-                        {showMisconfigured && <Badge size="small" status="attention">Misconfigured</Badge>}
-                    </HorizontalStack>
-                )
-                : group.groupName;
-            return ({
-            ...group,
-            groupNameDisplay,
-            iconComp: (
-                <Box>
-                    <CollectionIcon
-                        hostName={group.firstCollection?.hostName}
-                        assetTagValue={group.tagValue}
-                        displayName={group.groupName}
-                    />
-                </Box>
-            ),
-            sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes || [], false),
-            riskScoreComp: group.riskScore !== null
-                ? <Badge status={getRiskScoreStatus(group.riskScore)} size="small">{group.riskScore}</Badge>
-                : "-",
-            });
-        });
-    }, [getRiskScoreStatus]);
-
-    const applySkillRiskScores = useCallback((scoreMap, maliciousSkillKeys, misconfiguredSkills, isMountedRef) => {
-        if (!isMountedRef.current) return;
-        setData((prev) => {
-            const updatedSkills = prev.skills.map((row) => {
-                const riskScore = scoreMap[row.groupName] || 0;
-                // Scoped to this row's own collections: the skill is malicious only where it was
-                // actually tagged, not because another user has a skill of the same name.
-                const isMalicious = (row.collections || []).some((c) => maliciousSkillKeys.has(skillCollectionKey(c.id, row.groupName)));
-                const isMisconfigured = misconfiguredSkills.has(row.groupName);
-                const groupNameDisplay = (
-                    <HorizontalStack gap="2" align="start" wrap={false}>
-                        <Text>{row.groupName}</Text>
-                        {isMalicious && <Badge size="small" status="critical">Malicious</Badge>}
-                        {isMisconfigured && <Badge size="small" status="attention">Misconfigured</Badge>}
-                    </HorizontalStack>
-                );
-                return {
-                    ...row,
-                    riskScore,
-                    maxRiskScore: riskScore,
-                    isMalicious,
-                    isMisconfigured,
-                    // Filterable tag values (drives the "Tag" filter facet). Array so a row can
-                    // carry more than one tag; empty for clean skills so no facet value is added.
-                    assetTags: [
-                        ...(isMalicious ? ["Malicious"] : []),
-                        ...(isMisconfigured ? ["Misconfigured"] : []),
-                    ],
-                    groupNameDisplay,
-                    riskScoreComp: riskScore
-                        ? <Badge status={getRiskScoreStatus(riskScore)} size="small">{riskScore}</Badge>
-                        : "-",
-                };
-            });
-            return {
-                ...prev,
-                skills: updatedSkills,
-                all: prev.all.map((row) => {
-                    if (row.clientType !== CLIENT_TYPES.SKILL) return row;
-                    return updatedSkills.find((s) => s.id === row.id) || row;
-                }),
-            };
-        });
-        // Bump the version fed to the table as callFromOutside → it re-derives from the enriched
-        // data.skills with the current query, so badges show without remount or search loss.
-        setSkillEnrichVersion((v) => v + 1);
-    }, [getRiskScoreStatus]);
-
-    const enrichSkillsWithApiRiskScores = useCallback(async (skillRows, isMountedRef = { current: true }) => {
-        if (!skillRows.length) return;
-
-        const allCollectionIds = [];
-        skillRows.forEach((row) => {
-            (row.collections || []).forEach((c) => {
-                if (!allCollectionIds.includes(c.id)) allCollectionIds.push(c.id);
-            });
-        });
-
-        const { skillScoreMap, maliciousSkillKeys, misconfiguredSkills } = await fetchAndCacheSkillApiData(allCollectionIds, { api, PersistStore });
-
-        if (!isMountedRef.current) return;
-        applySkillRiskScores(skillScoreMap, maliciousSkillKeys || new Set(), misconfiguredSkills || new Set(), isMountedRef);
-    }, [applySkillRiskScores]);
+    const tableCountObj = func.getTabsCount(definedTableTabs, {
+        _counts: {
+            all: stats.totalAssets,
+            ai_agents: stats.countsByType[CLIENT_TYPES.AI_AGENT] || 0,
+            saas_agents: stats.countsByType[CLIENT_TYPES.SAAS_AGENT] || 0,
+            mcp_servers: stats.countsByType[CLIENT_TYPES.MCP_SERVER] || 0,
+            llms: stats.countsByType[CLIENT_TYPES.LLM] || 0,
+            skills: stats.countsByType[CLIENT_TYPES.SKILL] || 0,
+            plugins: stats.countsByType[CLIENT_TYPES.PLUGIN] || 0,
+        },
+    });
+    const tableTabs = func.getTableTabsContent(
+        definedTableTabs, tableCountObj,
+        (tabId) => {
+            setSelectedTab(tabId);
+            setTableSelectedTab({ ...tableSelectedTab, [window.location.pathname]: tabId });
+        },
+        selectedTab, tabsInfo,
+    // Polaris' Tab type has exactly one badge slot (string) — concatenating "Beta" into it would
+    // read as one pill mixing a status label with a count. Put "Beta" in the tab's own label text
+    // instead, so badge stays a clean, separate count pill.
+    ).map((tab) => (tab.id === 'plugins' ? { ...tab, content: `${tab.content} (Beta)` } : tab));
 
     async function fetchData(isMountedRef = { current: true }) {
         try {
             setLoading(true);
 
-            const [
-                apiCollectionsResp,
-                trafficInfoResp,
-                riskScoreResp,
-                sensitiveInfoResp,
-            ] = await Promise.all([
-                api.getAllCollectionsBasic(),
-                api.getLastTrafficSeen(),
-                api.getRiskScoreInfo(),
-                api.getSensitiveInfoForCollections(),
+            // getLastTrafficSeen/getRiskScoreInfo are cached (PersistStore, 2-min TTL, in-flight-
+            // deduped) — this leaner sibling of fetchAndCacheAgenticCollectionsBundle skips
+            // getAllCollectionsBasic entirely (see AgenticAssetsPage.jsx's own switch to it).
+            // Sensitive info is cached separately since only this page + UsersAndDevices.jsx use it.
+            const [trafficRiskBundle, sensitiveMap, shieldResult] = await Promise.all([
+                fetchAndCacheAgenticTrafficRiskBundle({ api, PersistStore }),
+                fetchAndCacheAgenticSensitiveInfo({ api, PersistStore }),
+                fetchEndpointShieldUserMetadata().catch(() => ({})),
             ]);
-
             if (!isMountedRef.current) return;
 
-            const collections = apiCollectionsResp.apiCollections || [];
-            setAllCollections(collections);
-
-            const trafficMap = trafficInfoResp || {};
-            const riskScoreMap = riskScoreResp?.riskScoreOfCollectionsMap || {};
-            const sensitiveMap = sensitiveInfoResp?.sensitiveSubtypesInCollection || {};
-
-            const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap, riskScoreMap);
-            const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);
-            const llmGroups = groupCollectionsByLLM(collections, trafficMap, sensitiveMap, riskScoreMap);
-            const skillGroups = groupCollectionsBySkill(collections, trafficMap, sensitiveMap, riskScoreMap);
-
-            const prettifiedAgents = prettifyGroupData(agentGroups);
-            const prettifiedServices = prettifyGroupData(serviceGroups);
-            const prettifiedLlms = prettifyGroupData(llmGroups);
-            const prettifiedSkills = prettifyGroupData(skillGroups);
-
-            const agentGroupKeys = new Set(prettifiedAgents.map((a) => a.groupKey));
-            const servicesToShow = prettifiedServices.filter((s) => !agentGroupKeys.has(s.groupKey));
-
-            const allData = [...prettifiedAgents, ...servicesToShow, ...prettifiedLlms, ...prettifiedSkills];
-
-            const uniqueEndpointIds = new Set();
-            collections.forEach((c) => {
-                if (c.deactivated) return;
-                const hostName = c.hostName || c.displayName || c.name;
-                const endpointId = extractEndpointId(hostName);
-                if (endpointId) uniqueEndpointIds.add(endpointId);
-            });
-
-            setSummaryData({
-                totalAssets: allData.length,
-                totalEndpoints: uniqueEndpointIds.size
-            });
-
-            setData({
-                all: allData,
-                ai_agents: allData.filter(r => r.clientType === CLIENT_TYPES.AI_AGENT),
-                mcp_servers: allData.filter(r => r.clientType === CLIENT_TYPES.MCP_SERVER),
-                llms: allData.filter(r => r.clientType === CLIENT_TYPES.LLM),
-                skills: prettifiedSkills,
-            });
+            const { trafficMap = {}, riskScoreMap = {} } = trafficRiskBundle || {};
+            const { usernameMap = {} } = shieldResult || {};
+            enrichRef.current = { ...enrichRef.current, trafficMap, riskScoreMap, sensitiveMap, usernameMap };
+            setRefreshKey((k) => k + 1); // mount the table now that enrichRef is populated
             setLoading(false);
 
-            // Async enrichment — updates skill risk scores after initial render
-            enrichSkillsWithApiRiskScores(prettifiedSkills, isMountedRef);
+            api.fetchAgenticAssetsStats({ trafficMap, riskScoreMap }).then((result) => {
+                if (isMountedRef.current) setStats(result);
+            }).catch(() => {});
+
+            // Async enrichment — single account-wide call (no per-collection N+1), updates skill risk
+            // scores/misconfigured flags after initial render, then re-fetches the current table page
+            // (via refreshKey) so badges appear without losing sort/search/tab. Doesn't read
+            // maliciousSkillKeys here — "Malicious" (row.isMalicious) is computed server-side in
+            // fetchAgenticAssetsSummary (AgenticObserveAction.getOrBuildSkillData's own account-wide
+            // cache) instead of requiring the whole set re-POSTed on every paginated request.
+            fetchAndCacheSkillApiData([], { api, PersistStore }).then(({ skillScoreMap }) => {
+                if (!isMountedRef.current) return;
+                enrichRef.current = {
+                    ...enrichRef.current,
+                    skillScoreMap: skillScoreMap || {},
+                };
+                setRefreshKey((k) => k + 1);
+            }).catch(() => {});
         } catch {
             setLoading(false);
         }
@@ -306,84 +309,76 @@ function Endpoints() {
         return () => { isMountedRef.current = false; };
     }, []);
 
-    // Re-enrich on Skills tab switch; reads latest skills via ref to avoid dep loop
-    useEffect(() => {
-        if (selectedTab !== "skills") return;
-        const isMountedRef = { current: true };
-        enrichSkillsWithApiRiskScores(dataRef.current.skills, isMountedRef);
-        return () => { isMountedRef.current = false; };
-    }, [selectedTab, enrichSkillsWithApiRiskScores]);
+    const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
+        setTableLoading(true);
+        try {
+            const { trafficMap, riskScoreMap, sensitiveMap, usernameMap, skillScoreMap } = enrichRef.current;
+            // GithubServerTable: asc=-1/desc=1, inverted vs Mongo (matches AgenticAssetsPage.jsx/
+            // NhiGovernanceIdentitiesAction's own onServerFetch convention).
+            const mongoSortOrder = sortOrder === -1 ? 1 : -1;
+            const clientType = TAB_TO_CLIENT_TYPE[selectedTab];
+            const tagValues = filtersObj?.assetTags;
+            const usernameValues = filtersObj?.username;
+            const filters = {};
+            if (clientType) filters.type = [clientType];
+            if (tagValues?.length) filters.tags = tagValues;
+            if (usernameValues?.length) filters.username = usernameValues;
+
+            const res = await api.fetchAgenticAssetsSummary({
+                skip,
+                limit,
+                sortKey: sortKey || "riskScore",
+                sortOrder: mongoSortOrder,
+                queryValue,
+                trafficMap, riskScoreMap, sensitiveMap, usernameMap,
+                filters: Object.keys(filters).length ? filters : undefined,
+            });
+            // Same progressive-population pattern as AgenticAssetDevicesPage.jsx — union rather than
+            // replace, so choices survive across page turns instead of shrinking to just the current page.
+            const newUsernames = res.distinctUsernames || [];
+            if (newUsernames.length) {
+                setUsernameChoices((prev) => Array.from(new Set([...prev, ...newUsernames])).sort());
+            }
+            // Misconfigured is an Agent/MCP-server-only concept — Skill rows never show it (see
+            // shapeRow's own comment), so no misconfiguredSkills lookup is threaded through here.
+            const rows = (res.rows || []).map((row) => shapeRow(row, { skillScoreMap }));
+            return { value: rows, total: res.total || 0 };
+        } finally {
+            setTableLoading(false);
+        }
+    }, [selectedTab]);
 
     const disambiguateLabel = useCallback((key, value) => {
         return func.convertToDisambiguateLabelObj(value, null, 2);
     }, []);
 
+    // Row click navigates immediately (no await first) to a dedicated, paginated device/endpoint
+    // view scoped to just this one asset — groupKey/rowType/name/type travel via query params, the
+    // destination page does its own lazy fetchAgenticAssetDetail + fetchAgenticAssetDevicesPage.
+    // Deliberately NOT navigating to Inventory any more: that needed the whole account's collections
+    // (getAllCollectionsBasic) just to build a filter, and navigating only after that resolved made
+    // every click feel like it froze for several seconds with no feedback. Navigating first means the
+    // loading spinner the user sees is on the new page, not a stuck click on this one.
     const handleRowClick = useCallback((row) => {
-        const updatedFiltersMap = { ...filtersMap };
-        const filterPayload = buildAgenticInventoryFilterForRow(row);
-        if (filterPayload) {
-            updatedFiltersMap[INVENTORY_FILTER_KEY] = filterPayload;
-        } else {
-            delete updatedFiltersMap[INVENTORY_FILTER_KEY];
-        }
-        delete updatedFiltersMap[`${INVENTORY_FILTER_KEY}agent-tree/`];
-
-        setFiltersMap(updatedFiltersMap);
-
-        setTableSelectedTab({
-            ...tableSelectedTab,
-            [INVENTORY_PATH]: "hostname"
+        const params = new URLSearchParams({
+            groupKey: row.groupKey || "",
+            rowType: row.rowType || "",
+            name: row.name || "",
+            type: row.clientType || "",
         });
-
-        setTimeout(() => navigate(INVENTORY_PATH), 0);
-    }, [filtersMap, setFiltersMap, navigate, tableSelectedTab, setTableSelectedTab]);
+        navigate(`/dashboard/observe/agentic-assets-legacy/devices?${params.toString()}`);
+    }, [navigate]);
 
     const summaryItems = useMemo(() => [
         {
             title: "Agentic assets",
-            data: transform.formatNumberWithCommas(summaryData.totalAssets),
+            data: transform.formatNumberWithCommas(stats.totalAssets),
         },
         {
             title: "Total endpoints",
-            data: transform.formatNumberWithCommas(summaryData.totalEndpoints),
+            data: transform.formatNumberWithCommas(stats.totalEndpoints),
         },
-    ], [summaryData]);
-
-    const summaryComponent = useMemo(() => (
-        <SummaryCardInfo summaryItems={summaryItems} key="summary" />
-    ), [summaryItems]);
-
-    const tableComponent = useMemo(() => {
-        const commonTabProps = { tableTabs, onSelect: handleSelectedTab, selected };
-        const isSkills = selectedTab === "skills";
-        return (
-            <GithubSimpleTable
-                key="table"
-                pageLimit={PAGE_LIMIT}
-                data={data[selectedTab]}
-                searchKeys={SEARCH_KEYS}
-                // Skills tab keeps a constant table key (hardCodedKey) so it never remounts — the
-                // risk-first sort set on mount stays put, and async risk-score/badge enrichment shows
-                // via callFromOutside (re-derives from the now-enriched data.skills with the current
-                // query) instead of a remount. Both sort and search survive enrichment.
-                hardCodedKey={isSkills}
-                callFromOutside={isSkills ? skillEnrichVersion : undefined}
-                sortOptions={riskFirstSortOptions}
-                resourceName={resourceName}
-                filters={[]}
-                headers={filterHeaders}
-                selectable={false}
-                mode={IndexFiltersMode.Default}
-                headings={headers}
-                useNewRow={true}
-                condensedHeight={true}
-                disambiguateLabel={disambiguateLabel}
-                prettifyPageData={(pageData) => pageData}
-                onRowClick={handleRowClick}
-                {...commonTabProps}
-            />
-        );
-    }, [data, selectedTab, skillEnrichVersion, headers, filterHeaders, riskFirstSortOptions, disambiguateLabel, handleRowClick, tableTabs, selected]);
+    ], [stats]);
 
     const pageTitle = useMemo(() => (
         <TitleWithInfo
@@ -413,7 +408,32 @@ function Endpoints() {
             title={pageTitle}
             isFirstPage={true}
             secondaryActions={layoutToggle}
-            components={[summaryComponent, tableComponent]}
+            components={[
+                <SummaryCardInfo summaryItems={summaryItems} key="summary" />,
+                <GithubServerTable
+                    key={`endpoints-table-${selectedTab}-${refreshKey}`}
+                    fetchData={fetchTableData}
+                    pageLimit={PAGE_LIMIT}
+                    sortOptions={activeSortOptions}
+                    resourceName={resourceName}
+                    filters={filtersDef}
+                    headers={headers}
+                    selectable={false}
+                    mode={IndexFiltersMode.Default}
+                    headings={headings}
+                    useNewRow={true}
+                    condensedHeight={true}
+                    disambiguateLabel={disambiguateLabel}
+                    tableTabs={tableTabs}
+                    onSelect={(i) => setSelected(i)}
+                    selected={selected}
+                    onRowClick={handleRowClick}
+                    rowClickable={true}
+                    supportsNegationFilter={false}
+                    loading={tableLoading}
+                    loadingText="Loading agentic assets..."
+                />,
+            ]}
         />
     );
 }

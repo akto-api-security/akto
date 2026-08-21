@@ -274,6 +274,18 @@ function GuardrailPolicies() {
         }
     };
 
+    // GithubSimpleTable keys its inner table on data.length and only fetches rows on mount,
+    // so a status toggle (same row count) never re-rendered - the row kept showing the old
+    // "Active" until a manual refresh. Key on content instead of count.
+    const tableRefreshKey = useMemo(() => {
+        const activeCount = tablePolicyData.filter((row) => row.status === "Active").length;
+        const lastUpdated = tablePolicyData.reduce((max, row) => Math.max(
+            max,
+            row.originalData?.updatedTimestamp ?? row.originalData?.createdTimestamp ?? 0,
+        ), 0);
+        return `${tablePolicyData.length}-${activeCount}-${lastUpdated}`;
+    }, [tablePolicyData]);
+
     const modifyData = useCallback((filters, dataSortKey, sortOrder) => {
         const filteredRows = applyAgentFilterToRows(tablePolicyData, filters);
         const systemRows = filteredRows.filter(isSystemPolicy);
@@ -437,14 +449,16 @@ function GuardrailPolicies() {
 
         // User targeting (Atlas only)
         if (isEndpointSecurityCategory()) {
-            const targetTeams = policy.targetTeams || [];
-            const targetRoles = policy.targetRoles || [];
-            if (targetTeams.length === 0 && targetRoles.length === 0) {
+            const targetTags = policy.targetTags || {};
+            const targetDeviceIds = policy.targetDeviceIds || [];
+            const tagKeyCount = Object.keys(targetTags).filter(k => (targetTags[k] || []).length > 0).length;
+            if (tagKeyCount === 0 && targetDeviceIds.length === 0) {
                 details.push({ label: "Target Users", value: "All users" });
             } else {
-                const userParts = [];
-                if (targetTeams.length > 0) userParts.push(`${targetTeams.length} Team${targetTeams.length !== 1 ? 's' : ''}`);
-                if (targetRoles.length > 0) userParts.push(`${targetRoles.length} Role${targetRoles.length !== 1 ? 's' : ''}`);
+                const userParts = Object.entries(targetTags)
+                    .filter(([, values]) => (values || []).length > 0)
+                    .map(([key, values]) => `${values.length} ${key.charAt(0).toUpperCase()}${key.slice(1)}${values.length !== 1 ? 's' : ''}`);
+                if (targetDeviceIds.length > 0) userParts.push(`${targetDeviceIds.length} User${targetDeviceIds.length !== 1 ? 's' : ''}`);
                 details.push({ label: "Target Users", value: userParts.join(", ") });
             }
         }
@@ -622,6 +636,7 @@ function GuardrailPolicies() {
                 contentFiltering: guardrailData.contentFiltering,
                 // Add LLM policy if present
                 ...(guardrailData.llmRule ? { llmRule: guardrailData.llmRule } : {}),
+                ...(guardrailData.redactionRules ? { redactionRules: guardrailData.redactionRules } : {}),
                 // Add Base Prompt Rule if present
                 ...(guardrailData.basePromptRule ? { basePromptRule: guardrailData.basePromptRule } : {}),
                 // Add Gibberish Detection if present (same pattern as llmRule)
@@ -634,8 +649,12 @@ function GuardrailPolicies() {
                 ...(guardrailData.tokenLimitDetection ? { tokenLimitDetection: guardrailData.tokenLimitDetection } : {}),
                 ...(guardrailData.anomalyDetection ? { anomalyDetection: guardrailData.anomalyDetection } : {}),
                 applyToAllServers: guardrailData.applyToAllServers ?? true,
-                targetTeams: guardrailData.targetTeams || [],
-                targetRoles: guardrailData.targetRoles || [],
+                // Prefer targetTags; fall back to converting a legacy export's targetTeams/targetRoles.
+                targetTags: guardrailData.targetTags || {
+                    ...(guardrailData.targetTeams?.length ? { team: guardrailData.targetTeams } : {}),
+                    ...(guardrailData.targetRoles?.length ? { role: guardrailData.targetRoles } : {}),
+                },
+                targetDeviceIds: guardrailData.targetDeviceIds || [],
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
                 behaviour: guardrailData.behaviour != null
@@ -712,7 +731,7 @@ function GuardrailPolicies() {
 
     const components = [
         <GithubSimpleTable
-            key={`policies-table-${tablePolicyData.length}-${agentFilterOptions.length}`}
+            key={`policies-table-${tableRefreshKey}-${agentFilterOptions.length}`}
             resourceName={resourceName}
             useNewRow={true}
             headers={tableHeaders}

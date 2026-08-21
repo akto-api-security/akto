@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        GuardrailPolicies dropped the old fixed targetTeams/targetRoles fields in favor of the
+        generic targetTags model. A policy scoped to a team/role via the old fields has no
+        targetTags after upgrade, and GuardrailPoliciesAction treats a policy with no targeting
+        configured as "apply to all devices" — without this backfill, a previously scoped policy
+        would silently start applying everywhere. Run after 014 so the "team"/"role" tag keys
+        line up with what that migration writes onto agent_users.
+
+        Only touches documents that still carry a non-empty targetTeams/targetRoles array, and
+        merges into any existing targetTags rather than overwriting: an existing key already set
+        (e.g. through the new UI before this migration runs) always wins over the legacy value, so
+        nothing already configured is clobbered. A policy whose legacy arrays are both empty is
+        left untouched even if the fields still exist on the document.
+
+        Idempotent: a second run leaves targetTags unchanged since every legacy key it would add
+        is already present.
+
+        Not reversible — the merge can't tell which keys came from this backfill afterwards.
+    -->
+
+    <changeSet id="015-account-guardrail-policies-migrate-target-teams-roles-to-tags" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="guardrail_policies"/>
+        </preConditions>
+        <mongodb:runCommand>
+            <mongodb:command>{
+                "update": "guardrail_policies",
+                "updates": [
+                    {
+                        "q": {
+                            "$or": [
+                                { "targetTeams": { "$exists": true } },
+                                { "targetRoles": { "$exists": true } }
+                            ]
+                        },
+                        "u": [
+                            {
+                                "$set": {
+                                    "targetTags": {
+                                        "$mergeObjects": [
+                                            { "$cond": [ { "$gt": [ { "$size": { "$ifNull": [ "$targetTeams", [] ] } }, 0 ] },
+                                                { "team": { "$map": { "input": "$targetTeams", "as": "t", "in": { "$toLower": { "$trim": { "input": "$$t" } } } } } }, {} ] },
+                                            { "$cond": [ { "$gt": [ { "$size": { "$ifNull": [ "$targetRoles", [] ] } }, 0 ] },
+                                                { "role": { "$map": { "input": "$targetRoles", "as": "r", "in": { "$toLower": { "$trim": { "input": "$$r" } } } } } }, {} ] },
+                                            { "$ifNull": [ "$targetTags", {} ] }
+                                        ]
+                                    }
+                                }
+                            }
+                        ],
+                        "multi": true
+                    }
+                ]
+            }</mongodb:command>
+        </mongodb:runCommand>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

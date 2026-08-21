@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Badge, Box, Collapsible, Divider, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons";
 import { ModelChip } from "./LLMCellRenderers";
+import GuardrailVerdict, { GuardrailVerdictBadge } from "./GuardrailVerdict";
 import { formatDurationMs, truncate } from "./constants";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -14,55 +15,91 @@ function tryFormatJson(str) {
     catch (_) { return str; }
 }
 
+// Normalizes a payload that is a single turn object rather than a provider messages array —
+// the shape agent/MCP spans emit: { role, text, tool_calls, tool_results }.
+// Returns null when the payload is not that shape.
+function agentTurnMessage(obj, fallbackRole) {
+    if (!obj || typeof obj !== "object") return null;
+    const hasTurnFields = typeof obj.text === "string"
+        || Array.isArray(obj.tool_calls) || Array.isArray(obj.tool_results);
+    if (!hasTurnFields) return null;
+    return {
+        role:         obj.role || fallbackRole,
+        content:      obj.text || "",
+        tool_calls:   obj.tool_calls,
+        tool_results: obj.tool_results,
+    };
+}
+
+function messageText(msg) {
+    if (typeof msg.content === "string") return msg.content;
+    if (Array.isArray(msg.content)) return msg.content.map(c => c.text || "").filter(Boolean).join("\n");
+    return typeof msg.text === "string" ? msg.text : "";
+}
+
 // ─── Message content ──────────────────────────────────────────────────────────
 
-function ToolCallBlock({ tc }) {
+function ToolBlock({ label, name, body, status }) {
     return (
         <Box background="bg-subdued" borderRadius="2" padding="2" borderWidth="1" borderColor="border-subdued">
             <VerticalStack gap="1">
                 <HorizontalStack gap="2" blockAlign="center">
-                    <Text variant="bodySm" color="subdued" fontWeight="semibold">TOOL CALL</Text>
-                    <Text variant="bodySm" fontWeight="semibold">{tc.function?.name}</Text>
+                    <Text variant="bodySm" color="subdued" fontWeight="semibold">{label}</Text>
+                    {name && <Text variant="bodySm" fontWeight="semibold" breakWord>{name}</Text>}
+                    {status && <Badge status={status.tone} size="small">{status.label}</Badge>}
                 </HorizontalStack>
-                {tc.function?.arguments && (
-                    <Text variant="bodySm" color="subdued" breakWord>
-                        {tryFormatJson(tc.function.arguments)}
-                    </Text>
-                )}
+                {body && <Text variant="bodySm" color="subdued" breakWord>{tryFormatJson(body)}</Text>}
             </VerticalStack>
         </Box>
+    );
+}
+
+// OpenAI sends { function: { name, arguments } }; agent/MCP spans send { name, input }.
+function ToolCallBlock({ tc }) {
+    const args = tc.function?.arguments ?? tc.input ?? tc.arguments;
+    return (
+        <ToolBlock
+            label="TOOL CALL"
+            name={tc.function?.name || tc.name}
+            body={typeof args === "string" ? args : (args !== undefined ? JSON.stringify(args) : "")}
+        />
+    );
+}
+
+function ToolResultBlock({ tr }) {
+    const out = tr.output ?? tr.content;
+    return (
+        <ToolBlock
+            label="TOOL RESULT"
+            name={tr.name}
+            body={typeof out === "string" ? out : (out !== undefined ? JSON.stringify(out) : "")}
+            status={tr.is_error ? { tone: "critical", label: "Error" } : null}
+        />
     );
 }
 
 function MessageContent({ msg }) {
     if (!msg) return null;
 
-    if (msg.tool_calls?.length) {
-        return (
-            <VerticalStack gap="2">
-                {msg.tool_calls.map((tc, i) => <ToolCallBlock key={i} tc={tc} />)}
-            </VerticalStack>
-        );
-    }
+    const toolCalls   = Array.isArray(msg.tool_calls)   ? msg.tool_calls   : [];
+    const toolResults = Array.isArray(msg.tool_results) ? msg.tool_results : [];
+    const text        = messageText(msg);
 
-    if (msg.role === "tool") {
+    // Legacy tool role: the whole content is the raw result payload.
+    if (msg.role === "tool" && !toolCalls.length && !toolResults.length) {
         const raw = typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content || "");
-        return (
-            <Box background="bg-subdued" borderRadius="2" padding="2" borderWidth="1" borderColor="border-subdued">
-                <Text variant="bodySm" color="subdued" breakWord>
-                    {tryFormatJson(raw)}
-                </Text>
-            </Box>
-        );
+        return raw ? <ToolBlock label="TOOL RESULT" body={raw} /> : null;
     }
 
-    const text = typeof msg.content === "string"
-        ? msg.content
-        : Array.isArray(msg.content)
-            ? msg.content.map(c => c.text || "").filter(Boolean).join("\n")
-            : "";
-    if (!text) return null;
-    return <Text variant="bodySm" breakWord>{text}</Text>;
+    if (!text && !toolCalls.length && !toolResults.length) return null;
+
+    return (
+        <VerticalStack gap="2">
+            {text && <Text variant="bodySm" breakWord>{text}</Text>}
+            {toolCalls.map((tc, i)   => <ToolCallBlock   key={`call-${i}`}   tc={tc} />)}
+            {toolResults.map((tr, i) => <ToolResultBlock key={`result-${i}`} tr={tr} />)}
+        </VerticalStack>
+    );
 }
 
 // ─── Message row ──────────────────────────────────────────────────────────────
@@ -113,6 +150,8 @@ export default function SpanSection({ span, index }) {
             try {
                 const obj = JSON.parse(span.queryPayload);
                 if (Array.isArray(obj.messages) && obj.messages.length) return obj.messages;
+                const turn = agentTurnMessage(obj, "user");
+                if (turn) return [turn];
             } catch (_) {}
         }
         if (span._promptText) return [{ role: "user", content: span._promptText }];
@@ -126,6 +165,8 @@ export default function SpanSection({ span, index }) {
                 if (Array.isArray(obj.choices) && obj.choices[0]?.message) {
                     return [obj.choices[0].message];
                 }
+                const turn = agentTurnMessage(obj, "assistant");
+                if (turn) return [turn];
             } catch (_) {}
         }
         if (span._responseText) return [{ role: "assistant", content: span._responseText }];
@@ -152,6 +193,7 @@ export default function SpanSection({ span, index }) {
                     </HorizontalStack>
                     {/* right: meta + chevron — never wraps */}
                     <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                        <GuardrailVerdictBadge span={span} />
                         <Text variant="bodySm" color="subdued">{formatDurationMs(span.durationMs)}</Text>
                         {span._model && <ModelChip model={span._model} />}
                         <Icon source={collapsed ? ChevronDownMinor : ChevronUpMinor} color="subdued" />
@@ -165,6 +207,7 @@ export default function SpanSection({ span, index }) {
                     <Divider/>
                 </Box>
                 <VerticalStack gap={"2"}>
+                <GuardrailVerdict span={span} />
                 {inputMessages.length > 0 && (
                     <InputOutputSection
                         label="INPUT"

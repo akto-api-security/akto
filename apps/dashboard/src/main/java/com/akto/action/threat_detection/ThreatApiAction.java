@@ -19,6 +19,8 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse.ActorsCount;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchDashboardTopDataResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchSkillSeverityCountsResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.List;
@@ -59,6 +61,8 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
 
   @Getter List<TopApiData> topApis;
   @Getter List<TopHostData> topHosts;
+  @Getter List<HostSeverityCount> hostSeverityCounts;
+  @Getter List<SkillSeverityCount> skillSeverityCounts;
 
   @Getter List<DashboardTopActorData> dashboardTopActors;
   @Getter List<DashboardTopApiData> dashboardTopApis;
@@ -385,6 +389,91 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
                         smr.getAttacks()
                     )).collect(Collectors.toList());
               });
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
+  // Per-host severity counts for the whole date range (every host, not top-N) — lets a caller attribute
+  // violation counts to its own asset/device groupings via the host join key without pulling every raw
+  // malicious-event doc (up to the 100k cap, tens of MB) to the browser to run a per-row severity tally.
+  public String fetchHostSeverityCounts() {
+    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_host_severity_counts", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTs);
+        put("end_ts", endTs);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
+
+      ProtoMessageUtils.<FetchHostSeverityCountsResponse>toProtoMessage(
+        FetchHostSeverityCountsResponse.class, responseBody)
+          .ifPresent(
+              m -> this.hostSeverityCounts = m.getHostCountsList().stream()
+                  .map(smr -> new HostSeverityCount(
+                      smr.getHost(),
+                      smr.getCritical(),
+                      smr.getHigh(),
+                      smr.getMedium(),
+                      smr.getLow()
+                  )).collect(Collectors.toList()));
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
+  // Per-skill-name severity counts for the whole date range — the skill-name equivalent of
+  // fetchHostSeverityCounts above. Skill invocations aren't attributable by host/collection (a
+  // skill's declaring collection is shared with the agent/device that invoked it), so this is
+  // keyed by the skill name extracted server-side from the /skills/<name> endpoint instead.
+  public String fetchSkillSeverityCounts() {
+    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_skill_severity_counts", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTs);
+        put("end_ts", endTs);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
+
+      ProtoMessageUtils.<FetchSkillSeverityCountsResponse>toProtoMessage(
+        FetchSkillSeverityCountsResponse.class, responseBody)
+          .ifPresent(
+              m -> this.skillSeverityCounts = m.getSkillCountsList().stream()
+                  .map(smr -> new SkillSeverityCount(
+                      smr.getSkillName(),
+                      smr.getCritical(),
+                      smr.getHigh(),
+                      smr.getMedium(),
+                      smr.getLow()
+                  )).collect(Collectors.toList()));
     } catch (Exception e) {
       e.printStackTrace();
       return ERROR.toUpperCase();

@@ -28,6 +28,7 @@ public class IngestionAction extends ActionSupport {
         try {
             printLogs("ingestData batch size " + batchData.size());
             for (IngestDataBatch payload: batchData) {
+                logPayloadSize(payload);
                 printLogs("Inserting data to kafka...");
 
                 // Adding this if we are getting empty method from traffic connector
@@ -57,6 +58,25 @@ public class IngestionAction extends ActionSupport {
         } catch (Exception e) {
             return tag;
         }
+    }
+
+    /**
+     * One line per received payload, so real traffic sizes are visible without
+     * guessing. Sums only the fields that actually carry bulk — the conversation and
+     * the trace — since those are what push a record past the ingest and Kafka
+     * limits; the rest of the record is a few hundred bytes of metadata.
+     */
+    private static void logPayloadSize(IngestDataBatch payload) {
+        long bytes = len(payload.getRequestPayload()) + len(payload.getResponsePayload())
+                + len(payload.getRequestHeaders()) + len(payload.getResponseHeaders())
+                + len(payload.getTag()) + len(payload.getPath());
+        printLogs(String.format("payload received: %,d bytes / %.3f MB (request %,d, response %,d)",
+                bytes, bytes / (1024.0 * 1024.0),
+                len(payload.getRequestPayload()), len(payload.getResponsePayload())));
+    }
+
+    private static long len(String s) {
+        return s == null ? 0 : s.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
     }
 
     public static void printLogs(String msg) {
@@ -92,5 +112,5 @@ public class IngestionAction extends ActionSupport {
         success = true;
         return Action.SUCCESS.toUpperCase();
     }
-    
+
 }

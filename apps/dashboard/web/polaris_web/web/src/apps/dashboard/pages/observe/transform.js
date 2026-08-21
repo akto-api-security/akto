@@ -433,6 +433,23 @@ const transform = {
         }
     },
 
+    // Suppressed when either score is 0/falsy — a "0" risk-score badge showing a non-zero base
+    // score (or vice versa) in its tooltip reads as contradictory, so both have to be meaningfully
+    // non-zero before the extra context is worth surfacing.
+    wrapRiskScoreTooltip(badge, riskScore, baseRiskScore, baseRiskScoreReason){
+        if(!baseRiskScoreReason || !riskScore || !baseRiskScore) return badge;
+        return (
+            <Tooltip dismissOnMouseOut content={
+                <Box>
+                    <Text>Base score: {baseRiskScore}</Text>
+                    <Text>Remarks: {baseRiskScoreReason}</Text>
+                </Box>
+            }>
+                {badge}
+            </Tooltip>
+        );
+    },
+
     getIssuesList(severityInfo){
         const sortedSeverityInfo = func.sortObjectBySeverity(severityInfo)
         return (
@@ -584,9 +601,10 @@ const transform = {
             const outOfTestingScopeComp = c.outOfTestingScopeComp || (c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>));
 
             // Risk score component - for untracked tab, show blank
+            const riskScoreBadge = <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>;
             const riskScoreComp = isUntrackedTab
                 ? <Text></Text>
-                : (isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>);
+                : (isLoading ? loadingComp : this.wrapRiskScoreTooltip(riskScoreBadge, c.riskScore, c.baseRiskScore, c.baseRiskScoreReason));
 
             // Create iconComp for collections if not already present
             const showIcon = isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory() || ((isApiSecurityCategory() || isDastCategory()) && c.hostName);

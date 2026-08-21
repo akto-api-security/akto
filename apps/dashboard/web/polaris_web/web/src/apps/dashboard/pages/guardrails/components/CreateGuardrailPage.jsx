@@ -16,6 +16,7 @@ import {
 } from "@shopify/polaris-icons";
 import PersistStore from '../../../../main/PersistStore';
 import AgenticSearchInput from '../../agentic/components/AgenticSearchInput';
+import ViolationReplayPanel from './ViolationReplayPanel';
 import guardrailApi from '../api';
 import settingsApi from '../../settings/api';
 import {
@@ -67,6 +68,15 @@ import "./createGuardrailPage.css";
 const expandGroupsToV2 = (selectedKeys) =>
     (selectedKeys || []).filter(key => key).map(key => ({ id: key, name: key }));
 
+// deviceId is the agent's device label, "{hostname}-{first8ofMachineID}" — the unique,
+// stable part is the segment after the LAST hyphen (the hostname itself may contain hyphens).
+// Falls back to a plain prefix slice for any value that doesn't follow that format.
+const deviceIdSuffix = (deviceId) => {
+    if (!deviceId) return '';
+    const idx = deviceId.lastIndexOf('-');
+    return idx >= 0 ? deviceId.slice(idx + 1) : deviceId.slice(0, 8);
+};
+
 // Agents: expand each selected canonical group key (e.g. 'claude2') into every raw wire-level
 // tag value it aliases. The guardrails-service matches on the raw client-type segment the client
 // sends — it never sees this dashboard's canonical grouping key — so we must store the raw values.
@@ -111,6 +121,21 @@ const reverseAgentKeys = (v2Servers, allCollections) => {
         return resolveClientKey(s.name || String(s.id || ''));
     });
     return [...new Set(keys)];
+};
+
+// Normalises the redaction rows into what the backend stores. Always call this and
+// always send the result — the save endpoint only writes fields that are present, so
+// omitting the key when the feature is switched off would leave the previously saved
+// rules live on the policy.
+const buildRedactionRules = (enabled, rules) => {
+    if (!enabled) return [];
+    return (rules || [])
+        .filter(r => r.enabled && (r.userPrompt || "").trim())
+        .map(r => ({
+            enabled: true,
+            userPrompt: r.userPrompt.trim(),
+            confidenceScore: r.confidenceScore ?? 0.5
+        }));
 };
 
 const getLlmServiceKeySet = (allCollections) => {
@@ -201,6 +226,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [llmPrompt, setLlmPrompt] = useState("");
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
     const [llmCompliance, setLlmCompliance] = useState({});
+    const [enableLlmRedaction, setEnableLlmRedaction] = useState(false);
+    const [redactionRules, setRedactionRules] = useState([]);
     const [enableExternalModel, setEnableExternalModel] = useState(false);
     const [url, setUrl] = useState("");
     const [confidenceScore, setConfidenceScore] = useState(25);
@@ -239,13 +266,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     // Step 12: User targeting
     const [applyToAllUsers, setApplyToAllUsers] = useState(true);
-    const [targetTeams, setTargetTeams] = useState([]);
-    const [targetRoles, setTargetRoles] = useState([]);
+    // Generic device-tag targeting: { [tagKey]: [selectedValues] }. Any tag key present on
+    // AgenticUsers (group, role, team, department, ...) is targetable, not just a fixed set.
+    const [targetTags, setTargetTags] = useState({});
+    const [targetDeviceIds, setTargetDeviceIds] = useState([]);
     const [enterpriseLicenseComplianceCategories, setEnterpriseLicenseComplianceCategories] = useState([]);
 
     const [agenticUsers, setAgenticUsers] = useState([]);
     const [usersLoading, setUsersLoading] = useState(false);
-    const [deviceList, setDeviceList] = useState([]);
 
     // Collections data
     const [mcpServers, setMcpServers] = useState([]);
@@ -256,17 +284,59 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // Get collections from PersistStore
     const allCollections = PersistStore(state => state.allCollections);
 
-    const availableTeams = useMemo(() => {
-        const teams = new Set();
-        (agenticUsers || []).forEach(u => { if (u.teamName) teams.add(u.teamName); });
-        return Array.from(teams).sort();
+    // Every device-tag key/value pair seen across AgenticUsers — powers the dynamic
+    // tag-key picker below (any key is targetable, e.g. group, role, team, department).
+    const availableTagKeyValues = useMemo(() => {
+        const map = new Map();
+        (agenticUsers || []).forEach(u => {
+            (u.deviceTags || []).forEach(t => {
+                if (!t?.key || !t.value) return;
+                if (!map.has(t.key)) map.set(t.key, new Set());
+                map.get(t.key).add(t.value);
+            });
+        });
+        return Array.from(map.entries())
+            .map(([key, values]) => ({ key, values: Array.from(values).sort() }))
+            .sort((a, b) => a.key.localeCompare(b.key));
     }, [agenticUsers]);
 
-    const availableRoles = useMemo(() => {
-        const roles = new Set();
-        (agenticUsers || []).forEach(u => { if (u.userRole) roles.add(u.userRole); });
-        return Array.from(roles).sort();
+    // One dropdown option per device (not per username) — usernames can repeat across devices
+    // (or even across different people), so the device ID is the actual selectable/stored value.
+    // Devices with no ID (agenticUsers[].devices already excludes them, see ModuleInfoDao) are
+    // never in this list, so there's nothing un-targetable to show.
+    const availableDevices = useMemo(() => {
+        const options = [];
+        (agenticUsers || []).forEach(u => {
+            (u.devices || []).forEach(deviceId => {
+                if (!deviceId) return;
+                options.push({ label: `${u.userName || u.userEmail} · ${deviceIdSuffix(deviceId)}`, value: deviceId });
+            });
+        });
+        return options.sort((a, b) => a.label.localeCompare(b.label));
     }, [agenticUsers]);
+
+    // Flatten agenticUsers[].devices into per-device rows, then filter by the same
+    // AND-across-type / OR-within-type semantics used server-side to resolve applyToDeviceIds —
+    // this is what powers the live "applies to N devices" preview in the wizard.
+    const matchingDeviceRows = useMemo(() => {
+        const rows = [];
+        (agenticUsers || []).forEach(u => {
+            (u.devices || []).forEach(deviceId => {
+                rows.push({ deviceId, username: u.userName, tags: u.deviceTags || [] });
+            });
+        });
+        if (applyToAllUsers) return rows;
+        const tagKeys = Object.keys(targetTags || {}).filter(k => (targetTags[k] || []).length > 0);
+        const deviceSet = new Set(targetDeviceIds);
+        if (tagKeys.length === 0 && deviceSet.size === 0) return [];
+        return rows.filter(r => {
+            const matchesAllTagKeys = tagKeys.every(k => {
+                const valueSet = new Set(targetTags[k]);
+                return r.tags.some(t => t.key === k && valueSet.has(t.value));
+            });
+            return matchesAllTagKeys && (deviceSet.size === 0 || deviceSet.has(r.deviceId));
+        });
+    }, [agenticUsers, applyToAllUsers, targetTags, targetDeviceIds]);
 
     // Create validation state object
     const getStoredStateData = () => ({
@@ -309,6 +379,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableLlmPrompt,
         llmPrompt,
         llmConfidenceScore,
+        enableLlmRedaction,
+        redactionRules,
         enableExternalModel,
         url,
         confidenceScore,
@@ -339,16 +411,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         applyOnResponse,
         policyBehaviour,
         applyToAllUsers,
-        targetTeams,
-        targetRoles,
+        targetTags,
+        targetDeviceIds,
         enterpriseLicenseComplianceCategories,
         serverScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllServers &&
             (selectedMcpServers || []).length === 0 &&
             (selectedAgentServers || []).length === 0 &&
             (selectedBrowserLlms || []).length === 0,
         userScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllUsers &&
-            (targetTeams || []).length === 0 &&
-            (targetRoles || []).length === 0,
+            Object.values(targetTags || {}).every(values => !(values || []).length) &&
+            (targetDeviceIds || []).length === 0,
     });
 
     const getStepsWithSummary = () => {
@@ -488,31 +560,19 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         return () => { isActive = false; };
     }, []);
 
-    // Fetch agentic users to populate team/role options, and module infos for device count (Atlas only)
+    // Fetch agentic users to populate team/role/device targeting options (Atlas only). This is
+    // the single source of truth for every "users" display in the wizard — availableDevices and
+    // matchingDeviceRows below are both derived from it, so the "Apply to all" and "Select Device
+    // Tags & Users" popovers always show the same per-device, suffixed data.
     useEffect(() => {
         if (!isEndpointSecurityCategory()) return;
         let isActive = true;
         (async () => {
             setUsersLoading(true);
             try {
-                const [agenticUsersResp, moduleResp] = await Promise.all([
-                    settingsApi.fetchAgenticUsers().catch(() => ({})),
-                    settingsApi.fetchModuleInfo({ moduleType: 'MCP_ENDPOINT_SHIELD' }).catch(() => ({})),
-                ]);
+                const agenticUsersResp = await settingsApi.fetchAgenticUsers().catch(() => ({}));
                 if (!isActive) return;
                 setAgenticUsers(agenticUsersResp?.agenticUsers || []);
-                const seen = new Set();
-                setDeviceList(
-                    (moduleResp?.moduleInfos || []).reduce((acc, m) => {
-                        const ad = m?.additionalData || {};
-                        const label = ad.username || ad.userName || ad.user || m.name || '';
-                        if (label && !seen.has(label)) {
-                            seen.add(label);
-                            acc.push({ label, value: label });
-                        }
-                        return acc;
-                    }, [])
-                );
             } finally {
                 if (isActive) setUsersLoading(false);
             }
@@ -628,6 +688,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setLlmPrompt("");
         setLlmConfidenceScore(0.5);
         setLlmCompliance({});
+        setEnableLlmRedaction(false);
+        setRedactionRules([]);
         setEnableExternalModel(false);
         setUrl("");
         setConfidenceScore(25);
@@ -650,8 +712,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyOnRequest(false);
         setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
         setApplyToAllUsers(true);
-        setTargetTeams([]);
-        setTargetRoles([]);
+        setTargetTags({});
         setEnterpriseLicenseComplianceCategories([]);
     };
 
@@ -741,6 +802,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
         setLlmCompliance(policy.llmRule?.compliance || {});
 
+        // LLM redaction. Must be hydrated here or editing an existing policy saves
+        // an empty list back over the stored rules.
+        const savedRedactionRules = (policy.redactionRules || []).map(r => ({
+            enabled: r.enabled !== false,
+            userPrompt: r.userPrompt || "",
+            confidenceScore: r.confidenceScore ?? 0.5
+        }));
+        setRedactionRules(savedRedactionRules);
+        setEnableLlmRedaction(savedRedactionRules.some(r => r.enabled && r.userPrompt.trim()));
+
         // Base Prompt Based Validation (AI Agents)
         setEnableBasePromptRule(policy.basePromptRule?.enabled || false);
         setBasePromptConfidenceScore(policy.basePromptRule?.confidenceScore ?? 0.5);
@@ -820,9 +891,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             caseSensitive: !!entry.caseSensitive
         })));
 
-        setApplyToAllUsers(!policy.targetTeams?.length && !policy.targetRoles?.length);
-        setTargetTeams(policy.targetTeams || []);
-        setTargetRoles(policy.targetRoles || []);
+        const loadedTargetTags = policy.targetTags || {};
+        const hasAnyTag = Object.values(loadedTargetTags).some(values => (values || []).length > 0);
+        setApplyToAllUsers(!hasAnyTag && !policy.targetDeviceIds?.length);
+        setTargetTags(loadedTargetTags);
+        setTargetDeviceIds(policy.targetDeviceIds || []);
         setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
     };
 
@@ -912,6 +985,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     confidenceScore: llmConfidenceScore,
                     compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 },
+                redactionRules: buildRedactionRules(enableLlmRedaction, redactionRules),
                 basePromptRule: {
                     enabled: enableBasePromptRule,
                     confidenceScore: basePromptConfidenceScore
@@ -957,8 +1031,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 ignorePhrases: cleanedIgnorePhrases,
                 applyOnResponse,
                 applyOnRequest,
-                targetTeams: applyToAllUsers ? [] : targetTeams,
-                targetRoles: applyToAllUsers ? [] : targetRoles,
+                targetTags: applyToAllUsers ? {} : Object.fromEntries(
+                    Object.entries(targetTags).filter(([, values]) => (values || []).length > 0)
+                ),
+                targetDeviceIds: applyToAllUsers ? [] : targetDeviceIds,
                 enterpriseLicenseComplianceCategories,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
@@ -1089,6 +1165,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setLlmConfidenceScore={setLlmConfidenceScore}
                         llmCompliance={llmCompliance}
                         setLlmCompliance={setLlmCompliance}
+                        enableLlmRedaction={enableLlmRedaction}
+                        setEnableLlmRedaction={setEnableLlmRedaction}
+                        redactionRules={redactionRules}
+                        setRedactionRules={setRedactionRules}
                         enableExternalModel={enableExternalModel}
                         setEnableExternalModel={setEnableExternalModel}
                         url={url}
@@ -1167,16 +1247,17 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         collectionsLoading={collectionsLoading}
                         policyBehaviour={policyBehaviour}
                         setPolicyBehaviour={setPolicyBehaviour}
-                        targetTeams={targetTeams}
-                        setTargetTeams={setTargetTeams}
-                        targetRoles={targetRoles}
-                        setTargetRoles={setTargetRoles}
-                        availableTeams={availableTeams}
-                        availableRoles={availableRoles}
+                        targetTags={targetTags}
+                        setTargetTags={setTargetTags}
+                        targetDeviceIds={targetDeviceIds}
+                        setTargetDeviceIds={setTargetDeviceIds}
+                        availableTagKeyValues={availableTagKeyValues}
+                        availableDevices={availableDevices}
+                        matchingDeviceRows={matchingDeviceRows}
                         usersLoading={usersLoading}
                         applyToAllUsers={applyToAllUsers}
                         setApplyToAllUsers={setApplyToAllUsers}
-                        deviceList={deviceList}
+                        deviceList={availableDevices}
                         showConditionError={leftSteps.has(ServerSettingsConfig.number)}
                         showUserConditionError={leftSteps.has(ServerSettingsConfig.number)}
                     />
@@ -1194,12 +1275,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         onTryPrompt={handleSamplePayloadClick}
                         enterpriseLicenseComplianceCategories={enterpriseLicenseComplianceCategories}
                         setEnterpriseLicenseComplianceCategories={setEnterpriseLicenseComplianceCategories}
-                        targetTeams={targetTeams}
-                        setTargetTeams={setTargetTeams}
-                        targetRoles={targetRoles}
-                        setTargetRoles={setTargetRoles}
-                        availableTeams={availableTeams}
-                        availableRoles={availableRoles}
                         usersLoading={usersLoading}
                         applyToAllUsers={applyToAllUsers}
                         setApplyToAllUsers={setApplyToAllUsers}
@@ -1259,6 +1334,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 }
             } : {}),
+            redactionRules: buildRedactionRules(enableLlmRedaction, redactionRules),
             ...(enableBasePromptRule ? {
                 basePromptRule: {
                     enabled: true,
@@ -1520,6 +1596,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 </div>
 
                 <div className="guardrail-playground">
+                    {/* Only in edit mode: violations join to a policy by name, so there is nothing
+                        to replay until the policy has been saved at least once. Uses the saved name
+                        rather than the edited one for the same reason. */}
+                    {isEditMode && editingPolicy?.name && (
+                        <ViolationReplayPanel
+                            policyName={editingPolicy.name}
+                            hexId={editingPolicy.hexId}
+                            buildPolicy={() => transformPolicyForBackend(buildPlaygroundPolicyData())}
+                        />
+                    )}
                     <Box padding="5">
                         <Text variant="headingMd" as="h3" fontWeight="semibold">Playground</Text>
                     </Box>

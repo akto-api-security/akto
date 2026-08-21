@@ -100,6 +100,7 @@ export default {
             totalInputTokens:  r?.aggInputTokens      || 0,
             totalOutputTokens: r?.aggOutputTokens     || 0,
             topUsers:          r?.aggTopUsers         || [],
+            topModels:         r?.aggTopModels        || [],
             userBreakdown:     r?.aggUserBreakdown    || [],
             sessionSpark:      r?.aggSessionSpark?.length      ? r.aggSessionSpark      : [0],
             sessionSparkTs:    r?.aggSessionSparkTs            || [],

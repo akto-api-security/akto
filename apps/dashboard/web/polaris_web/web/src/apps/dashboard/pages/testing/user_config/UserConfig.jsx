@@ -15,6 +15,7 @@ import InfoCard from "../../dashboard/new_components/InfoCard";
 import LocalStore from "../../../../main/LocalStorageStore";
 import func from "@/util/func"
 import SampleData from "../../../components/shared/SampleData";
+import { isApiSecurityCategory, isAgenticSecurityCategory } from "../../../../main/labelHelper";
 
 function UserConfig() {
 
@@ -23,6 +24,7 @@ function UserConfig() {
     const [isLoading, setIsLoading] = useState(true)
     const [hardcodedOpen, setHardcodedOpen] = useState(true);
     const [initialLimit, setInitialLimit] = useState(0);
+    const [initialLimitAgentic, setInitialLimitAgentic] = useState(0);
     const [preRequestScript, setPreRequestScript] = useState({ javascript: "" });
     const [preRequestScriptInitial, setPreRequestScriptInitial] = useState({ message: "" });
     const preRequestScriptContentRef = useRef("");
@@ -56,6 +58,7 @@ function UserConfig() {
         if(window.USER_ROLE === 'ADMIN') {
             await settingRequests.fetchAdminSettings().then((resp)=> {
                 setInitialLimit(resp.accountSettings.globalRateLimit);
+                setInitialLimitAgentic(resp.accountSettings.globalRateLimitAgentic);
                 const val = resp?.accountSettings?.timeForScheduledSummaries === undefined || resp?.accountSettings?.timeForScheduledSummaries === 0 ? (120*60) : resp?.accountSettings?.timeForScheduledSummaries
                 setInitialDeltaTime(val/60)
                 LocalStore.getState().setDefaultIgnoreSummaryTime(val)
@@ -147,6 +150,20 @@ function UserConfig() {
         setToastConfig({ isActive: true, isError: false, message: `Global rate limit set successfully` })
     }
 
+    const handleSelectAgentic = async(limit) => {
+        setInitialLimitAgentic(limit)
+        await api.updateGlobalRateLimitAgentic(limit)
+        setToastConfig({ isActive: true, isError: false, message: `Argus rate limit set successfully` })
+    }
+
+    const getRateLimitHelperText = (limit) => limit === 0
+        ? "No limit is applied"
+        : `This rate limit allows ${limit.toLocaleString()} requests per day`
+
+    const getRateLimitHelperTextAgentic = (limit) => limit === 0
+        ? "No limit is applied"
+        : `This limit allows ${limit.toLocaleString()} probes per day`
+
     const handleUpdateDeltaTime = async(limit) => {
         setInitialDeltaTime(limit);
         LocalStore.getState().setDefaultIgnoreSummaryTime(limit * 60)
@@ -208,21 +225,40 @@ function UserConfig() {
         </LegacyCard>
     )
 
+    const rateLimitCardTitle = isAgenticSecurityCategory() ? "Configure max probes per day" : "Configure rate limit"
+
     const rateLimit = (
-        <LegacyCard sectioned title="Configure global rate limit" key="globalRateLimit">
+        <LegacyCard sectioned title={rateLimitCardTitle} key="globalRateLimit">
             <Divider />
-            <LegacyCard.Section>
-                <div style={{ display: "grid", gridTemplateColumns: "max-content max-content", gap: "10px", alignItems: "center" }}>
-                    <Dropdown
-                        selected={handleSelect}
-                        menuItems={dropdownItems}
-                        initial={initialLimit}
-                    />
+            {isApiSecurityCategory() && (
+                <LegacyCard.Section>
+                    <LegacyStack vertical spacing="tight">
+                        <div style={{ display: "grid", gridTemplateColumns: "max-content max-content", gap: "10px", alignItems: "center" }}>
+                            <Dropdown
+                                selected={handleSelect}
+                                menuItems={dropdownItems}
+                                initial={initialLimit}
+                            />
+                        </div>
+                        <Text variant="bodySm" color="subdued">{getRateLimitHelperText(initialLimit)}</Text>
+                    </LegacyStack>
+                </LegacyCard.Section>
+            )}
 
-                </div>
-            </LegacyCard.Section>
-
-            
+            {isAgenticSecurityCategory() && (
+                <LegacyCard.Section>
+                    <LegacyStack vertical spacing="tight">
+                        <div style={{ display: "grid", gridTemplateColumns: "max-content max-content", gap: "10px", alignItems: "center" }}>
+                            <Dropdown
+                                selected={handleSelectAgentic}
+                                menuItems={dropdownItems}
+                                initial={initialLimitAgentic}
+                            />
+                        </div>
+                        <Text variant="bodySm" color="subdued">{getRateLimitHelperTextAgentic(initialLimitAgentic)}</Text>
+                    </LegacyStack>
+                </LegacyCard.Section>
+            )}
         </LegacyCard>
     )
 

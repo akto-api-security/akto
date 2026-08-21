@@ -24,9 +24,11 @@
    dashboard-wide .badge-wrapper-<SEVERITY> classes). Keeps TypeBadge a plain Polaris
    <Badge> instead of an inline-styled span. */
 .agentic-type-AGENT .Polaris-Badge   { background-color: #F3E8FF; color: #9642FC; }
+.agentic-type-SAAS_AGENT .Polaris-Badge { background-color: #FCE7F3; color: #DB2777; }
 .agentic-type-MCP .Polaris-Badge     { background-color: #ECFDF5; color: #0D9488; }
 .agentic-type-LLM .Polaris-Badge     { background-color: #FEFCE8; color: #CA8A04; }
 .agentic-type-SKILL .Polaris-Badge   { background-color: #F9FAFB; color: #6B7280; }
+.agentic-type-PLUGIN .Polaris-Badge  { background-color: #EEF2FF; color: #4F46E5; }
 .agentic-type-PROMPT .Polaris-Badge  { background-color: #E0F7FA; color: #0E7490; }
 .agentic-type-CONFIG .Polaris-Badge  { background-color: #FEFCE8; color: #CA8A04; }
 .agentic-type-TOOL .Polaris-Badge    { background-color: #ECFDF5; color: #0D9488; }
@@ -250,6 +252,7 @@
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    overflow-y: auto;
 }
 
 /* AiChatSection — flex column with a pinned input row. The expand/collapse flex
@@ -309,4 +312,12 @@
 
 .ag-row-group-leaf-indent{
     margin-left: 0px !important;
+}
+
+/* AG Grid row icon: it is a flex item inside HorizontalStack, so without flex-shrink:0
+   it (and the img inside) shrinks as the user narrows the column. */
+.ag-grid-row-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
 }

@@ -18,148 +18,52 @@ import dashboardApi from './api'
 import api from '../observe/api'
 import func from '@/util/func'
 import values from '@/util/values'
-import { getTypeFromTags, CLIENT_TYPES, formatDisplayName, getMcpServerDisplayName, getFriendlyLlmName } from '../observe/agentic/mcpClientHelper'
-import { extractEndpointId } from '../observe/agentic/constants'
+import { extractEndpointId, groupCollectionsByAgent, groupCollectionsByService, groupCollectionsByLLM, fetchAndCacheAgenticCollectionsBundle } from '../observe/agentic/constants'
+import PersistStore from '../../../main/PersistStore'
 import { GridLayout, verticalCompactor } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 import './endpoint-posture.css'
 
-const cleanHostname = (hostname) => {
-    if (!hostname) return hostname
-
-    const parts = hostname.split('.')
-
-    // Need at least 2 parts to have a prefix (id.domain)
-    if (parts.length >= 2) {
-        const firstPart = parts[0]
-
-        // Check if first part looks like an ID:
-        // - At least 12 characters long (UUIDs, hashes, session IDs are typically 12+)
-        // - Contains only alphanumeric characters (no hyphens or special chars)
-        // - Doesn't look like a common subdomain (www, api, app, etc.)
-        const isLikelyId = firstPart.length >= 12 &&
-                          /^[a-zA-Z0-9]+$/.test(firstPart) &&
-                          !/^(www|api|app|dev|staging|prod|test)$/i.test(firstPart)
-
-        if (isLikelyId) {
-            // Remove the first part and return the rest
-            return parts.slice(1).join('.')
-        }
-    }
-
-    // Return original if no ID pattern found
-    return hostname
-}
-
-const BROWSER_PREFIXES = ['safari','chrome','firefox','edge','brave','opera', 'vivaldi','arc','crios','fxios','edgios']
-
-const getMcpServerName = (displayName) => {
-    if (!displayName || !displayName.includes('.')) return displayName
-    const parts = displayName.split('.')
-    return parts.length >= 2 ? parts.slice(1).join('.') : displayName
-}
-
-const getLlmName = (displayName) => {
-    if (!displayName || !displayName.includes('.')) return displayName
-    const parts = displayName.split('.')
-    const first = (parts[0] || '').toLowerCase()
-    if (BROWSER_PREFIXES.includes(first)) {
-        return parts.slice(1).join('.')
-    }
-    return displayName
-}
-
-const getAgentNameFromMcpDisplayName = (displayName) => {
-    if (!displayName || !displayName.includes('.')) return null
-    const parts = displayName.split('.')
-    return parts.length >= 2 ? parts[0] : null
-}
+// Reuses the same tag-based detection as the Agentic Assets "AI Agents"/"MCP Servers"/"LLMs"
+// tabs (groupCollectionsByAgent/Service/LLM), rather than a separate hostname-parsing heuristic -
+// that used to disagree with the canonical grouping and surface things like "MCP"/"AWS Labs"/
+// "Docs" as if they were agents (picked up from inside a remote MCP server's own domain name).
+const toWidgetRows = (groups, topN) =>
+    groups
+        .map(g => ({
+            name: g.groupName,
+            value: g.endpointsCount ?? (g.collections || []).length,
+            hostName: g.collections?.[0]?.hostName,
+            url: null,
+            hostNames: (g.collections || []).map(c => c.hostName).filter(Boolean),
+            filterGroupName: g.groupName,
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, topN)
 
 const processAgenticCollections = (collections, topN = 10) => {
-    const typeGroups = {
-        [CLIENT_TYPES.MCP_SERVER]: {},
-        [CLIENT_TYPES.LLM]: {},
-        [CLIENT_TYPES.AI_AGENT]: {},
-        agentNames: {}
-    }
-
     const uniqueEndpointIds = new Set()
-
-    const ensureGroup = (group, key, displayLabel) => {
-        if (!group[key]) {
-            group[key] = { name: displayLabel ?? key, count: 0, endpoints: new Set(), hostNames: new Set(), domain: key }
-        }
-        return group[key]
-    }
-
     collections.forEach(c => {
         if (c.deactivated) return
-
-        const clientType = getTypeFromTags(c.envType)
-        const rawDisplayName = c.displayName || c.name
-        const hostName = c.hostName || rawDisplayName
-        const displayName = cleanHostname(rawDisplayName)
-        const endpointId = extractEndpointId(hostName)
-
-        if (endpointId) {
-            uniqueEndpointIds.add(endpointId)
-        }
-
-        if (clientType === CLIENT_TYPES.MCP_SERVER) {
-            const mcpServerName = getMcpServerName(displayName)
-            const g = ensureGroup(typeGroups[CLIENT_TYPES.MCP_SERVER], mcpServerName, getMcpServerDisplayName(mcpServerName))
-            g.count++
-            if (endpointId) g.endpoints.add(endpointId)
-            g.hostNames.add(hostName)
-
-            const agentName = getAgentNameFromMcpDisplayName(displayName)
-            if (agentName) {
-                const label = formatDisplayName(agentName)
-                const gAgent = ensureGroup(typeGroups.agentNames, agentName, label)
-                gAgent.count++
-                if (endpointId) gAgent.endpoints.add(endpointId)
-                gAgent.hostNames.add(hostName)
-            }
-        } else if (clientType === CLIENT_TYPES.LLM) {
-            const llmName = getLlmName(displayName)
-            const g = ensureGroup(typeGroups[CLIENT_TYPES.LLM], llmName, getFriendlyLlmName(llmName))
-            g.count++
-            if (endpointId) g.endpoints.add(endpointId)
-            g.hostNames.add(hostName)
-        } else if (clientType === CLIENT_TYPES.AI_AGENT) {
-            const g = ensureGroup(typeGroups[CLIENT_TYPES.AI_AGENT], displayName, displayName)
-            g.count++
-            if (endpointId) g.endpoints.add(endpointId)
-            g.hostNames.add(hostName)
-        }
+        const endpointId = extractEndpointId(c.hostName || c.displayName || c.name)
+        if (endpointId) uniqueEndpointIds.add(endpointId)
     })
 
-    const processGroup = (group, groupType) =>
-        Object.values(group)
-            .map(g => {
-                const matches = (hostName) => {
-                    if (!hostName || typeof hostName !== 'string') return false
-                    if (groupType === CLIENT_TYPES.MCP_SERVER || groupType === CLIENT_TYPES.LLM) {
-                        return hostName === g.domain || hostName.endsWith('.' + g.domain)
-                    }
-                    if (groupType === 'aiAgent') {
-                        return hostName.includes('.' + g.domain + '.')
-                    }
-                    return true
-                }
-                const hostNamesList = [...g.hostNames].filter(matches)
-                const url = null
-                const filterGroupName = groupType === 'aiAgent' ? g.name : g.domain
-                return { name: g.name, value: g.endpoints.size || g.count, hostName: [...g.hostNames][0], url, hostNames: hostNamesList, filterGroupName }
-            })
-            .sort((a, b) => b.value - a.value)
-            .slice(0, topN)
+    const agentGroups = groupCollectionsByAgent(collections)
+    const serviceGroups = groupCollectionsByService(collections)
+    const llmGroups = groupCollectionsByLLM(collections)
+
+    // A service already represented as an agent (e.g. an MCP server the agent itself hosts)
+    // shouldn't also double-count as a separate "MCP server" entry - same dedup the Agentic
+    // Assets page applies between its Agent and Service groups.
+    const agentGroupKeys = new Set(agentGroups.map(a => a.groupKey))
+    const servicesToShow = serviceGroups.filter(s => !agentGroupKeys.has(s.groupKey))
 
     return {
-        mcpServers: processGroup(typeGroups[CLIENT_TYPES.MCP_SERVER], CLIENT_TYPES.MCP_SERVER),
-        llms: processGroup(typeGroups[CLIENT_TYPES.LLM], CLIENT_TYPES.LLM),
-        aiAgents: processGroup(typeGroups.agentNames).length > 0 ? processGroup(typeGroups.agentNames, 'aiAgent') : processGroup(typeGroups[CLIENT_TYPES.AI_AGENT], 'aiAgent'),
+        mcpServers: toWidgetRows(servicesToShow, topN),
+        llms: toWidgetRows(llmGroups, topN),
+        aiAgents: toWidgetRows(agentGroups, topN),
         totalEndpoints: uniqueEndpointIds.size
     }
 }
@@ -273,17 +177,20 @@ function EndpointPosture() {
                 const startTimestamp = getTimeEpoch("since")
                 const endTimestamp = getTimeEpoch("until")
 
-                // Fetch data from existing APIs in parallel
+                // Fetch data from existing APIs in parallel. getAllCollectionsBasic (via the cached
+                // bundle) is cached (PersistStore, 2-min TTL, in-flight-deduped) and shared with
+                // AgenticAssetsPage/UsersAndDevices/Endpoints/DeviceEndpoints — this page doesn't need
+                // traffic/risk itself, but reuses the same shared cache entry those pages populate.
                 const [
                     guardrailResponse,
-                    collectionsResponse
+                    collectionsBundle
                 ] = await Promise.all([
                     dashboardApi.fetchGuardrailData(startTimestamp, endTimestamp),
-                    api.getAllCollectionsBasic()
+                    fetchAndCacheAgenticCollectionsBundle({ api, PersistStore })
                 ])
 
                 // Process collections to get component data (like Endpoints.jsx does)
-                const collections = collectionsResponse?.apiCollections || []
+                const collections = collectionsBundle?.collections || []
                 const { mcpServers, llms, aiAgents, totalEndpoints } = processAgenticCollections(collections, 10)
 
                 // Extract values from guardrail response
@@ -713,8 +620,8 @@ function EndpointPosture() {
             isFirstPage={true}
             title={
                 <TitleWithInfo
-                    titleText="Endpoint Security Dashboard"
-                    tooltipContent="Monitor and manage your endpoint security from this centralized dashboard. Drag cards to reposition and hover over corners to resize."
+                    titleText="AI Security Posture"
+                    tooltipContent="Monitor and manage your AI security posture from this centralized dashboard. Drag cards to reposition and hover over corners to resize."
                     docsUrl="https://docs.akto.io/endpoint-security"
                 />
             }

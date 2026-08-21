@@ -13,17 +13,21 @@ export const getMethod = (url, method, apiType) => {
         return func.WEBSOCKET_METHOD_LABEL
     }
     if(isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()){
-        if(url.includes("tool")){
+        // Path only — a query string (e.g. Gemini's "bl=...-server_...") can false-match these keywords.
+        const path = String(url || "").split("?")[0];
+        if(path.includes("/plugin/")){
+            return "PLUGIN";
+        }else if(path.includes("tool")){
             return "TOOL";
-        }else if(url.includes("/config/")){
+        }else if(path.includes("/config/")){
             return "CONFIG";
-        }else if(url.includes("skill")){
+        }else if(path.includes("skill")){
             return "SKILL";
-        }else if(url.includes("resource")){
+        }else if(path.includes("resource")){
             return "RESOURCE";
-        }else if(url.includes("prompt")){
+        }else if(path.includes("prompt")){
             return "PROMPT";
-        }else if(url.includes("server")){
+        }else if(path.includes("server")){
             return "SERVER";
         }
         } else if (url.includes("v1/hooks")){

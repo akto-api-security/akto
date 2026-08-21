@@ -159,7 +159,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const guardrailApprovedByPolicy = SessionStore((state) => state.guardrailApprovedByPolicy);
   const setGuardrailApprovedByPolicy = SessionStore((state) => state.setGuardrailApprovedByPolicy);
   const needsGuardrailCompliance = label === LABELS.GUARDRAIL || isAgenticSecurityCategory() || isEndpointSecurityCategory();
-  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, needs_approval: 3, training: 4, skills_evaluations: 4 };
+  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, needs_approval: 3, training: 4, skills_evaluations: 4, misconfigured_settings: 5 };
   const resolvedInitialTab = initialTab || 'active';
   const [currentTab, setCurrentTab] = useState(resolvedInitialTab);
   const [selected, setSelected] = useState(tabIndexMap[resolvedInitialTab] || 0)
@@ -337,7 +337,20 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       index: baseTabs.length + guardrailExtraTabs.length
     });
   }
-  const tableTabs = [...baseTabs, ...guardrailExtraTabs, ...skillsExtraTabs]
+  // "Misconfigured Settings" — events whose latestApiEndpoint contains "/config/" (config-scanner
+  // findings, e.g. "/codex/config/mcp_servers.computer-use.command"), filtered server-side via the
+  // same "only"/"exclude" convention as Skills Evaluations. Endpoint (Atlas) only.
+  const configExtraTabs = [];
+  if (isEndpointSecurityCategory()) {
+    configExtraTabs.push({
+      content: 'Misconfigured Settings',
+      badge: 'Beta',
+      onAction: () => { setCurrentTab('misconfigured_settings'); },
+      id: 'misconfigured_settings',
+      index: baseTabs.length + guardrailExtraTabs.length + skillsExtraTabs.length
+    });
+  }
+  const tableTabs = [...baseTabs, ...guardrailExtraTabs, ...skillsExtraTabs, ...configExtraTabs]
 
   const handleSelectedTab = (selectedIndex) => {
     setLoading(true)
@@ -632,17 +645,23 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     // Fetch active events with a high limit (single page) and filter after mapping.
     const isNeedsApproval = currentTab === 'needs_approval';
     const isSkillsEvaluations = currentTab === 'skills_evaluations';
+    const isMisconfiguredSettings = currentTab === 'misconfigured_settings';
     // Needs Approval is a client-side view (fetch a big page, filter after mapping). Skills
-    // Evaluations is now SERVER-paginated: it shows ACTIVE events narrowed to the skill-evaluation
-    // set by the backend (x-skill-eval-mode header), so totals/pagination are correct.
+    // Evaluations / Misconfigured Settings are SERVER-paginated: each shows ACTIVE events narrowed
+    // to its own partition by the backend (x-skill-eval-mode / x-config-eval-mode headers), so
+    // totals/pagination are correct.
     const isClientSideView = isNeedsApproval;
-    const effectiveStatus = (isNeedsApproval || isSkillsEvaluations) ? 'ACTIVE' : currentTab.toUpperCase();
+    const effectiveStatus = (isNeedsApproval || isSkillsEvaluations || isMisconfiguredSettings) ? 'ACTIVE' : currentTab.toUpperCase();
     const effectiveSkip = isClientSideView ? 0 : skip;
     const effectiveLimit = isClientSideView ? 200 : limit;
-    // Skills Evaluations partition (Atlas only): "only" on the Skills Evaluations tab, "exclude" on
-    // the Active tab. Backend applies it (gated to contextSource=ENDPOINT); undefined elsewhere.
+    // Skills Evaluations / Misconfigured Settings partitions (Atlas only): "only" on their own tab,
+    // "exclude" on the Active tab so neither shows up there. Backend applies each independently
+    // (gated to contextSource=ENDPOINT); undefined elsewhere.
     const skillEvaluationMode = isEndpointSecurityCategory()
       ? (isSkillsEvaluations ? 'only' : (currentTab === 'active' ? 'exclude' : undefined))
+      : undefined;
+    const configEvaluationMode = isEndpointSecurityCategory()
+      ? (isMisconfiguredSettings ? 'only' : (currentTab === 'active' ? 'exclude' : undefined))
       : undefined;
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
@@ -715,7 +734,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       undefined,
       undefined,
       severityFilter,
-      skillEvaluationMode
+      skillEvaluationMode,
+      configEvaluationMode
     );
 
     // Store the total count for filtered results
@@ -730,7 +750,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       const complianceMapData = resolveComplianceClauseMap(x, needsGuardrailCompliance, threatFiltersMap, guardrailComplianceMap);
       const complianceList = Object.keys(complianceMapData);
 
-      // Determine if this is session-based by checking if sessionId is present and not empty
       const isSessionBased = x?.sessionId && x.sessionId !== '';
 
       let nextUrl = null;

@@ -8,7 +8,6 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 
 import com.akto.dao.AccountsDao;
-import com.akto.dao.AgentUsersDao;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
@@ -27,6 +26,7 @@ import com.akto.dto.RBAC;
 import com.akto.dto.SignupInfo;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.sso.SAMLConfig;
 import com.akto.listener.InitializerListener;
@@ -39,6 +39,7 @@ import com.akto.notifications.slack.SlackSender;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.DashboardMode;
 import com.akto.util.Util;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.Auth0;
 import com.akto.utils.GithubLogin;
@@ -316,7 +317,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
         }else {
             this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.name(), 0, email);
-            // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
         }
         createUserAndRedirect(email, name, auth0SignupInfo, 0, Config.ConfigType.AUTH0.toString(), this.scopeRoleMapping);
         code = "";
@@ -597,11 +597,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             List<String> oktaGroups = resolveOktaGroups(oktaConfig, oktaUserId, accessToken);
             Map<String, String> oktaGroupToAktoUserRoleMap = oktaConfig.getOktaGroupToAktoUserRoleMap();
             String resolvedRole = fetchOktaRole(oktaGroups, oktaGroupToAktoUserRoleMap);
-            String actualOktaRole = extractOktaRoleGroupName(oktaGroups, oktaGroupToAktoUserRoleMap);
-            String team = extractOktaTeamName(oktaGroups, oktaGroupToAktoUserRoleMap);
             logger.infoAndAddToDb("[Okta SSO] email=" + email + ", username=" + username + ", oktaGroups=" + oktaGroups
-                    + ", team=" + team + ", actualOktaRole=" + actualOktaRole + ", dashboardRole=" + resolvedRole);
-            enrichAgenticUserFromSso(username, email, team, actualOktaRole, "okta");
+                    + ", dashboardRole=" + resolvedRole);
+
             createUserAndRedirect(email, username, new SignupInfo.OktaSignupInfo(accessToken, username), accountId, Config.ConfigType.OKTA.toString(), resolvedRole, this.scopeRoleMapping);
             code = "";
         } catch (Exception e) {
@@ -751,39 +749,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             return RBAC.Role.MEMBER.name();
         }
         return resolveAktoRoleFromOktaGroupNames(groups, oktaGroupToAktoUserRoleMap);
-    }
-
-    /**
-     * Extracts the organisational team name from Okta groups.
-     * Groups mapped to an Akto role in {@code oktaGroupToAktoUserRoleMap} are skipped —
-     * the first remaining group is the team.
-     */
-    private String extractOktaTeamName(List<String> groups, Map<String, String> oktaGroupToAktoUserRoleMap) {
-        return groups.stream()
-                .filter(g -> oktaGroupToAktoUserRoleMap == null || !oktaGroupToAktoUserRoleMap.containsKey(g))
-                .findFirst()
-                .orElse("");
-    }
-
-    /**
-     * Raw Okta group that this user's role is coming from — the first group present in
-     * {@code oktaGroupToAktoUserRoleMap} — passed to AgenticUsers as-is, with no RBAC mapping.
-     */
-    private String extractOktaRoleGroupName(List<String> groups, Map<String, String> oktaGroupToAktoUserRoleMap) {
-        if (oktaGroupToAktoUserRoleMap == null || oktaGroupToAktoUserRoleMap.isEmpty()) return "";
-        return groups.stream()
-                .filter(oktaGroupToAktoUserRoleMap::containsKey)
-                .findFirst()
-                .orElse("");
-    }
-
-    /**
-     * Persists SSO-derived team/role into AgenticUsers.
-     * Respects manual dashboard overrides — fields pinned as "manual" are never overwritten.
-     * Call this from every {@code registerViaXxx} method that has team/role data.
-     */
-    private void enrichAgenticUserFromSso(String userName, String userEmail, String teamName, String userRole, String provider) {
-        AgentUsersDao.instance.upsertTagFromSso(userName, userEmail, teamName, userRole, provider);
     }
 
     private static List<String> extractOktaGroupNamesFromApiResponse(List<Map<String, Object>> groupsList) {
@@ -1015,12 +980,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.info("Skipping OktaLogin.getInstance() - oktaConfig: " + (oktaConfig != null ? "found" : "null") + ", isOnPremDeployment: " + DashboardMode.isOnPremDeployment());
         }
 
-        if(oktaConfig == null) {
-            logger.error("No Okta configuration found for accountId: " + accountId + ", redirecting to SSO login page");
-            logger.info("Redirecting to: " + SSO_URL);
-            servletResponse.sendRedirect(SSO_URL);
-            return ERROR.toUpperCase();
-        }
+       if(oktaConfig == null) {
+           logger.error("No Okta configuration found for accountId: " + accountId + ", redirecting to SSO login page");
+           logger.info("Redirecting to: " + SSO_URL);
+           servletResponse.sendRedirect(SSO_URL);
+           return ERROR.toUpperCase();
+       }
 
         logger.infoAndAddToDb("Okta SSO login initiated for accountId: " + accountId +
                              " with organizationDomain: " + oktaConfig.getOrganizationDomain());
@@ -1369,8 +1334,11 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.info("[createUserAndRedirect] Signup record created, logging in user");
             LoginAction.loginUser(signupUserInfo.getUser(), servletResponse, false, servletRequest);
             servletRequest.setAttribute("username", userEmail);
-            logger.infoAndAddToDb("[createUserAndRedirect] Redirecting to /dashboard/onboarding");
-            servletResponse.sendRedirect("/dashboard/onboarding");
+            // Onboarding flow disabled - land new users on the dashboard directly.
+            // logger.infoAndAddToDb("[createUserAndRedirect] Redirecting to /dashboard/onboarding");
+            // servletResponse.sendRedirect("/dashboard/onboarding");
+            logger.infoAndAddToDb("[createUserAndRedirect] Redirecting to /dashboard/observe/inventory");
+            servletResponse.sendRedirect("/dashboard/observe/inventory");
         } else {
             logger.infoAndAddToDb("[createUserAndRedirect] Path: " + (user == null ? "NEW USER" : "EXISTING USER") + " with shouldLogin=true or existing user");
             logger.info("[createUserAndRedirect] invitationToAccount: " + invitationToAccount);
@@ -1457,6 +1425,15 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         if (UsageMetricCalculator.isRbacFeatureAvailable(invitationToAccount)) {
                             invitedRole = fetchDefaultInviteRole(invitationToAccount, RBAC.Role.GUEST.name());
                         }
+
+                        // Self signup joining an existing organization. The account is only known here,
+                        // so this is the first point the defaults can reflect the products that
+                        // organization is licensed for instead of falling back to API Security.
+
+                        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(
+                                new HashMap<>(), "MEMBER", accountId, userEmail);
+                        logger.infoAndAddToDb("[createUserAndRedirect] Derived scopeRoleMapping for accountId "
+                                + accountId + ": " + this.scopeRoleMapping);
                     } else {
                         logger.info("[createUserAndRedirect] No matching organization found by domain, creating new account and organization");
 
@@ -1551,8 +1528,15 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("[createUserAndRedirect] Initializing account for new user");
             if(!newOrgSetup){
                 Account oldAccount = AccountsDao.instance.findOne("_id", invitationToAccount);
+
+
                 user = AccountAction.initializeAccount(userEmail, invitationToAccount, oldAccount.getName(), false, this.scopeRoleMapping);
             }else {
+                // First user of a brand new organization owns every product. Self signup leaves the
+                // mapping unset until an account is matched, so it can legitimately be null here.
+                if (this.scopeRoleMapping == null) {
+                    this.scopeRoleMapping = new HashMap<>();
+                }
                 this.scopeRoleMapping.put("API", RBAC.Role.ADMIN.name());
                 this.scopeRoleMapping.put("ENDPOINT", RBAC.Role.ADMIN.name());
                 this.scopeRoleMapping.put("DAST", RBAC.Role.ADMIN.name());
@@ -1587,8 +1571,11 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.info("[createUserAndRedirect] Logging in new user");
             LoginAction.loginUser(user, servletResponse, true, servletRequest);
             servletRequest.setAttribute("username", userEmail);
-            logger.infoAndAddToDb("[createUserAndRedirect] Redirecting new user to /dashboard/onboarding");
-            servletResponse.sendRedirect("/dashboard/onboarding");
+            // Onboarding flow disabled - land new users on the dashboard directly.
+            // logger.infoAndAddToDb("[createUserAndRedirect] Redirecting new user to /dashboard/onboarding");
+            // servletResponse.sendRedirect("/dashboard/onboarding");
+            logger.infoAndAddToDb("[createUserAndRedirect] Redirecting new user to /dashboard/observe/inventory");
+            servletResponse.sendRedirect("/dashboard/observe/inventory");
 
             String dashboardMode = DashboardMode.getActualDashboardMode().toString();
             String distinct_id = userEmail + "_" + dashboardMode;

@@ -26,9 +26,11 @@ public class TeamsAlert {
         String headingText = "Akto test run results for " + data.getTitle();
 
         body.append(CardTextBlock.createTextBlock(headingText, true, "bolder"));
+        body.append(",");
 
         String tableHeading = "Issue list: ";
         body.append(CardTextBlock.createTextBlock(tableHeading, true, "default"));
+        body.append(",");
 
         List<List<String>> tableData = new ArrayList<>();
 
@@ -39,6 +41,7 @@ public class TeamsAlert {
         tableData.add(Arrays.asList("Low", String.valueOf(data.getLow())));
 
         body.append(CardDataTable.createTable(tableData));
+        body.append(",");
 
         String dashboardLink = "View the complete results on Akto: " + webhook.getDashboardUrl() + "/dashboard/testing/"
                 + data.getViewOnAktoURL() + "#vulnerable";

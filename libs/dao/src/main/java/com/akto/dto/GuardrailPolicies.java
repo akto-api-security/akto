@@ -56,6 +56,8 @@ public class GuardrailPolicies {
 
     private LLMRule llmRule;
 
+    private List<RedactionRule> redactionRules;
+
     // Step 6.5: Base Prompt Rule - for checking intent of user input in agent base prompts with placeholders
     private BasePromptRule basePromptRule;
 
@@ -80,11 +82,16 @@ public class GuardrailPolicies {
     private boolean applyOnRequest;
     private boolean applyToAllServers;
 
-    // Team/Role targeting — controls which agentic users this policy applies to.
+    // Tag/Device targeting — controls which agentic users/devices this policy applies to.
+    // targetDeviceIds holds explicitly-picked device IDs (dropdown shows them labeled by username,
+    // but the stored value is the device ID itself — usernames aren't a reliable unique identity).
     // applyToDeviceIds is resolved at fetch time (not stored) by the dashboard before serving to the enforcement layer.
-    private List<String> targetTeams;
-    private List<String> targetRoles;
-    // null (never set) = targetTeams/targetRoles both empty, no targeting configured → apply to all devices.
+    private List<String> targetDeviceIds;
+    // Arbitrary device-tag key → values — AND across keys, OR within one key's values. See
+    // scripts/migrate_guardrail_target_teams_roles_to_tags.js for converting pre-existing
+    // policies that used the old fixed targetTeams/targetRoles fields.
+    private Map<String, List<String>> targetTags;
+    // null (never set) = targetTags/targetDeviceIds all empty, no targeting configured → apply to all devices.
     // Non-null (possibly empty) List = targeting configured → apply only to these device labels;
     // an empty List means targeting resolved to zero matching devices, so apply to none.
     // null and an empty List are NOT interchangeable — consumers must not use a collapsed
@@ -401,6 +408,21 @@ public class GuardrailPolicies {
         private Map<String, List<String>> compliance;
 
         public LLMRule(boolean enabled, String userPrompt, double confidenceScore) {
+            this.enabled = enabled;
+            this.userPrompt = userPrompt;
+            this.confidenceScore = confidenceScore;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class RedactionRule {
+        private boolean enabled;
+        private String userPrompt;
+        private double confidenceScore;
+
+        public RedactionRule(boolean enabled, String userPrompt, double confidenceScore) {
             this.enabled = enabled;
             this.userPrompt = userPrompt;
             this.confidenceScore = confidenceScore;

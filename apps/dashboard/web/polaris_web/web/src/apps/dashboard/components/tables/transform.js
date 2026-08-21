@@ -1,8 +1,39 @@
 import func from "@/util/func";
 import PersistStore from "../../../main/PersistStore";
 
-// Cache for filter choices to avoid recomputing on every render
-const filterChoicesCache = new Map();
+// Small bounded-LRU Map factory. This module holds derived data (filter choices, id lists) keyed
+// off a cheap fingerprint of the input rather than the row data itself, shared across every
+// GithubServerTable instance in the app — an unbounded Map here pins every dataset shape ever seen
+// (e.g. up to ~120k {label,value}/{id} objects per shape) for the lifetime of the tab. A small LRU
+// keeps the common case (a handful of tabs/pages within one table) cache-hot while bounding total
+// retention across however many tables/tabs/accounts get visited in one session.
+const createBoundedCache = (maxSize) => {
+  const cache = new Map();
+  return {
+    get(key) {
+      if (!cache.has(key)) return undefined;
+      const value = cache.get(key);
+      // Refresh recency on read (re-inserting moves a Map key to the end of iteration order).
+      cache.delete(key);
+      cache.set(key, value);
+      return value;
+    },
+    set(key, value) {
+      cache.set(key, value);
+      if (cache.size > maxSize) {
+        // Map iteration order is insertion order, so the first key is the least recently used.
+        const oldestKey = cache.keys().next().value;
+        cache.delete(oldestKey);
+      }
+    },
+  };
+};
+
+const filterChoicesCache = createBoundedCache(15);
+// fullDataIds only depends on the fully filtered+sorted array, which is unchanged across a plain
+// page turn (only the .slice() for the visible page changes) — caching it means paging through a
+// large result set stops reallocating one {id} object per row on every page.
+const fullDataIdsCache = createBoundedCache(15);
 
 const tableFunc = {
     // NEW: Enhanced version with lazy prettification support
@@ -73,8 +104,9 @@ const tableFunc = {
         const cacheKey = `${dataFingerprint}_${props.headers.map(h => `${h.value}:${h.filterKey || ''}:${h.filterLabel || ''}`).join('_')}`;
 
         let filtersFromHeaders;
-        if (filterChoicesCache.has(cacheKey)) {
-          filtersFromHeaders = filterChoicesCache.get(cacheKey);
+        const cachedFilterChoices = filterChoicesCache.get(cacheKey);
+        if (cachedFilterChoices !== undefined) {
+          filtersFromHeaders = cachedFilterChoices;
         } else {
           filtersFromHeaders = props.headers.filter((header) => {
             return header.showFilter
@@ -253,7 +285,15 @@ const tableFunc = {
 
           // Slice only if necessary
           let final2Data = (totalLength <= limit) ? finalData : finalData.slice(startIndex, endIndex);
-          let fullDataIds= finalData.map((x) => ({id: x?.id}));
+          const fullDataIdsFingerprint = finalData.length > 0
+            ? `${finalData.length}:${finalData[0]?.id ?? ''}:${finalData[finalData.length - 1]?.id ?? ''}`
+            : '0';
+          const fullDataIdsCacheKey = `${fullDataIdsFingerprint}_${props.headers.map(h => h.value).join('_')}`;
+          let fullDataIds = fullDataIdsCache.get(fullDataIdsCacheKey);
+          if (fullDataIds === undefined) {
+            fullDataIds = finalData.map((x) => ({id: x?.id}));
+            fullDataIdsCache.set(fullDataIdsCacheKey, fullDataIds);
+          }
 
           // Use actualTotal if provided (for memory-optimized large datasets), otherwise use calculated length
           const reportedTotal = actualTotal !== undefined ? actualTotal : totalLength;
