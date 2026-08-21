@@ -47,6 +47,7 @@ import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -2012,8 +2013,14 @@ public class ClientActor extends DataActor {
             BasicDBObject payloadObj;
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBObject testingRunResultsummaryMap = (BasicDBObject) payloadObj.get("testingRunResultsummaryMap");
-                return objectMapper.readValue(testingRunResultsummaryMap.toJson(), Map.class);
+                BasicDBObject testingRunResultSummaryMap = (BasicDBObject) payloadObj.get("testingRunResultSummaryMap");
+                Map<String, TestingRunResultSummary> rawMap = objectMapper.readValue(testingRunResultSummaryMap.toJson(),
+                        new TypeReference<Map<String, TestingRunResultSummary>>() {});
+                Map<ObjectId, TestingRunResultSummary> summaryMap = new HashMap<>();
+                for (Map.Entry<String, TestingRunResultSummary> entry : rawMap.entrySet()) {
+                    summaryMap.put(new ObjectId(entry.getKey()), entry.getValue());
+                }
+                return summaryMap;
             } catch(Exception e) {
                 return null;
             }

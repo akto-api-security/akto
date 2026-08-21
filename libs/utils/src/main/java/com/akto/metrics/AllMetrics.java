@@ -29,7 +29,7 @@ public class AllMetrics {
         this.accountId = accountId;
 
         Organization organization = OrgUtils.getOrganizationCached(accountId);
-        String orgId = organization.getId();
+        String orgId = organization == null ? null : organization.getId();
         this.orgId = orgId;
 
         if(LogDb.RUNTIME.equals(module)){

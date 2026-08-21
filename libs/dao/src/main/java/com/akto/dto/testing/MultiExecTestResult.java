@@ -8,7 +8,12 @@ import com.akto.dto.testing.TestResult.TestError;
 
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
+// Cancels the custom @JsonDeserialize inherited from GenericTestResult - without this, deserializing
+// this concrete class re-enters GenericTestResultDeserializer and recurses infinitely.
+@JsonDeserialize(using = JsonDeserializer.None.class)
 public class MultiExecTestResult extends GenericTestResult {
 
     Map<String, NodeResult> nodeResultMap;

@@ -108,7 +108,8 @@ public class TestCompletion {
         }
 
         Map<ObjectId, TestingRunResultSummary> summaryMap = dataActor.fetchTestingRunResultSummaryMap(testingRun.getId().toHexString());
-        TestingRunResultSummary testingRunResultSummary = summaryMap != null ? summaryMap.get(summaryId) : null;
+
+        TestingRunResultSummary testingRunResultSummary = summaryMap != null ? summaryMap.get(testingRun.getId()) : null;
         if (testingRunResultSummary == null) {
             return;
         }
