@@ -519,6 +519,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         return steps;
     };
 
+    const [formSeedVersion, setFormSeedVersion] = useState(0);
+
     const steps = getStepsWithSummary();
 
     useEffect(() => {
@@ -594,6 +596,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         } else if (!editingPolicy) {
             resetForm();
         }
+        // Tells the change preview which state counts as "unedited".
+        setFormSeedVersion(v => v + 1);
     }, [isEditMode, isPreset, editingPolicy]);
 
     const filterCollections = () => {
@@ -1596,14 +1600,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 </div>
 
                 <div className="guardrail-playground">
-                    {/* Only in edit mode: violations join to a policy by name, so there is nothing
-                        to replay until the policy has been saved at least once. Uses the saved name
-                        rather than the edited one for the same reason. */}
+                    {/* Edit mode only: violations join to a policy by its saved name. */}
                     {isEditMode && editingPolicy?.name && (
                         <ViolationReplayPanel
                             policyName={editingPolicy.name}
                             hexId={editingPolicy.hexId}
                             buildPolicy={() => transformPolicyForBackend(buildPlaygroundPolicyData())}
+                            policyState={getStoredStateData()}
+                            seedVersion={formSeedVersion}
                         />
                     )}
                     <Box padding="5">
