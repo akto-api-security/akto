@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import api from "../api";
@@ -151,6 +151,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const endTimestamp = getTimeEpoch("until");
 
   const [loading, setLoading] = useState(true);
+  const misconfigRowMetaRef = useRef({});
   const collectionsMap = PersistStore((state) => state.collectionsMap);
   const hostNameMap = PersistStore((state) => state.hostNameMap);
   const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
@@ -508,6 +509,29 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   // Simplified handler functions using the generic handlers
   const handleBulkIgnore = (selectedIds) => handleBulkOperation(selectedIds, 'ignore', 'IGNORED');
   const handleBulkDelete = (selectedIds) => handleBulkOperation(selectedIds, 'delete');
+  const handleMisconfigGroupDelete = async (selectedIds) => {
+    const validIds = (selectedIds || []).filter(id => id != null && id !== '');
+    if (validIds.length === 0) {
+      func.setToast(true, true, 'No valid events selected');
+      return;
+    }
+
+    try {
+      for (const id of validIds) {
+        const meta = misconfigRowMetaRef.current[id];
+        if (meta?.host && meta?.actor && meta?.url) {
+          await threatDetectionRequests.deleteMaliciousEvents({ hosts: [meta.host], actors: [meta.actor], urls: [meta.url] });
+        } else {
+          await threatDetectionRequests.deleteMaliciousEvents({ eventIds: [id] });
+        }
+      }
+      if (triggerRefresh) {
+        triggerRefresh();
+      }
+    } catch (error) {
+      func.setToast(true, true, 'Error deleting events');
+    }
+  };
   const handleBulkMarkForReview = (selectedIds) => handleBulkOperation(selectedIds, 'markForReview', 'UNDER_REVIEW');
   const handleBulkRemoveFromReview = (selectedIds) => handleBulkOperation(selectedIds, 'removeFromReview', 'ACTIVE');
   const handleBulkMarkForTraining = async (selectedIds) => {
@@ -587,7 +611,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
               ignore: () => handleBulkIgnore(selectedIds),
               removeFromReview: () => handleBulkRemoveFromReview(selectedIds),
               reactivate: () => handleBulkRemoveFromReview(selectedIds),
-              delete: () => handleBulkDelete(selectedIds),
+              delete: () => (currentTab === 'misconfigured_settings' ? handleMisconfigGroupDelete(selectedIds) : handleBulkDelete(selectedIds)),
               markForTraining: () => handleBulkMarkForTraining(selectedIds)
             };
             func.showConfirmationModal(message, label, handlers[actionType]);
@@ -742,7 +766,13 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     setTotalFilteredCount(res.total || 0);
 //    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
+    if (isMisconfiguredSettings) {
+      misconfigRowMetaRef.current = {};
+    }
     let ret = (res?.maliciousEvents || []).map((x) => {
+      if (isMisconfiguredSettings) {
+        misconfigRowMetaRef.current[x.id] = { host: x.host, actor: x.actor, url: x.url };
+      }
       const severity = (isAgenticSecurityCategory() || isEndpointSecurityCategory())
         ? (x?.severity || "HIGH")
         : (x?.severity || threatFiltersMap[x?.filterId]?.severity || "HIGH")
