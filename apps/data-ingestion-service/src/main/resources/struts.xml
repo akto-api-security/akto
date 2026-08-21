@@ -17,7 +17,10 @@
         <default-action-ref name="healthCheck" />
 
         <action name="api/ingestData" class="com.akto.action.IngestionAction" method="ingestData">
-            <interceptor-ref name="json"/>
+            <interceptor-ref name="json">
+                <param name="maxStringLength">5242880</param>
+                <param name="maxLength">10485760</param>
+            </interceptor-ref>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <param name="includeProperties">^success.*</param>
