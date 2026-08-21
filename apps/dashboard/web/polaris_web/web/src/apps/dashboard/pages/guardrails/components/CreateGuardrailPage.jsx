@@ -1600,11 +1600,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 </div>
 
                 <div className="guardrail-playground">
-                    {/* Edit mode only: violations join to a policy by its saved name. */}
-                    {isEditMode && editingPolicy?.name && (
+                    {/* Editing compares against the saved policy, so it must join by the saved
+                        name; a new policy has nothing to compare and measures traffic instead. */}
+                    {(!isEditMode || editingPolicy?.name) && (
                         <ViolationReplayPanel
-                            policyName={editingPolicy.name}
-                            hexId={editingPolicy.hexId}
+                            policyName={isEditMode ? editingPolicy.name : name}
+                            hexId={isEditMode ? editingPolicy.hexId : ""}
+                            isNewPolicy={!isEditMode}
                             buildPolicy={() => transformPolicyForBackend(buildPlaygroundPolicyData())}
                             policyState={getStoredStateData()}
                             seedVersion={formSeedVersion}

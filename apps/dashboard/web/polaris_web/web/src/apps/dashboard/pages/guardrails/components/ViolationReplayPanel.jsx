@@ -65,12 +65,15 @@ const POLL_TIMEOUT_MS = 10 * 60 * 1000;
  * @param buildPolicy current form state as a backend policy payload
  * @param policyState raw form state, used to detect edits
  * @param seedVersion bumped when the form is loaded from the saved policy
+ * @param isNewPolicy no saved policy to compare against, so report one count, not a difference
  */
-const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, seedVersion = 0 }) => {
+const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, seedVersion = 0,
+    isNewPolicy = false }) => {
     const activeAccount = Store(state => state.activeAccount);
     const [status, setStatus] = useState("idle"); // idle | running | done | error
     // VIOLATIONS = recorded violations. TRACES = recent agent traffic.
-    const [source, setSource] = useState("VIOLATIONS");
+    // Violations join to a policy by name, so a new policy has none — only traffic can be replayed.
+    const [source, setSource] = useState(isNewPolicy ? "TRACES" : "VIOLATIONS");
     const [error, setError] = useState("");
     const [detailsOpen, setDetailsOpen] = useState(false);
     // Sticky: switching sample clears the counts but must keep the tabs.
@@ -86,8 +89,15 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, see
     latestSignature.current = signature;
     // State, not a ref: the button must re-render with it.
     const [savedSignature, setSavedSignature] = useState(null);
-    useEffect(() => { setSavedSignature(latestSignature.current); }, [seedVersion]);
+    // This effect first runs before the parent seeds the form, so its first reading is a blank
+    // policy — the reference for "any rule configured at all", which a preset satisfies on arrival.
+    const blankSignature = useRef(null);
+    useEffect(() => {
+        if (blankSignature.current === null) blankSignature.current = latestSignature.current;
+        setSavedSignature(latestSignature.current);
+    }, [seedVersion]);
     const hasDetectionChanges = savedSignature !== null && signature !== savedSignature;
+    const hasAnyRule = blankSignature.current !== null && signature !== blankSignature.current;
 
     const clearTimer = useCallback(() => {
         if (timer.current) {
@@ -165,16 +175,25 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, see
     const delta = modified - current;
     const running = status === "running";
     const idle = status === "idle" && !hasCompared;
-    // missedByDraft is lost detections only, so every row is detected -> missed.
-    const rows = (result?.missedByDraft || []).map(m => ({
-        id: m.id, prompt: m.prompt, wasDetected: true, nowDetected: false
-    }));
+    // Editing lists lost detections; a new policy has no baseline, so it lists caught ones instead.
+    const rows = isNewPolicy
+        ? (result?.gainedByDraft || []).map(g => ({ ...g, wasDetected: false, nowDetected: true }))
+        : (result?.missedByDraft || []).map(m => ({ ...m, wasDetected: true, nowDetected: false }));
     // A zero delta can still hide prompts that moved both ways.
-    const hasDiff = rows.length > 0 || delta !== 0;
+    // New-policy detail is only ever the listed rows, so never offer an empty table.
+    const hasDiff = isNewPolicy ? rows.length > 0 : (rows.length > 0 || delta !== 0);
+    // Naming or describing a policy is not a guardrail, so it cannot enable the run on its own.
+    const named = !!(policyName || "").trim();
+    const canRun = isNewPolicy ? (named && hasAnyRule) : hasDetectionChanges;
+    const blockedReason = isNewPolicy
+        ? (!named
+            ? "Name your policy to run an impact analysis."
+            : "Configure a guardrail rule to run an impact analysis.")
+        : "Change a guardrail rule to compare it against the saved policy.";
 
     const compareButton = (
-        <Button size="slim" onClick={run} loading={running} disabled={running || !hasDetectionChanges}>
-            {hasCompared ? "Re-compare" : "Compare"}
+        <Button size="slim" onClick={run} loading={running} disabled={running || !canRun}>
+            {hasCompared ? (isNewPolicy ? "Re-run" : "Re-compare") : (isNewPolicy ? "Run" : "Compare")}
         </Button>
     );
 
@@ -184,20 +203,22 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, see
                 <HorizontalStack align="space-between" blockAlign="center">
                     <HorizontalStack gap="1" blockAlign="center">
                         <Text variant="headingMd" as="h3" fontWeight="semibold">
-                            Change impact analysis
+                            {isNewPolicy ? "Impact analysis" : "Change impact analysis"}
                         </Text>
-                        <InfoTooltipIcon content="Re-runs a recent sample through the saved policy and your unsaved draft, then shows which prompts changed verdict." />
+                        <InfoTooltipIcon content={isNewPolicy
+                            ? "Runs recent agent traffic through this policy to show how much of it would be caught."
+                            : "Re-runs a recent sample through the saved policy and your unsaved draft, then shows which prompts changed verdict."} />
                     </HorizontalStack>
                     {/* Renaming or rewording a message cannot move a verdict. */}
-                    {hasDetectionChanges ? compareButton : (
-                        <Tooltip content="Change a guardrail rule to compare it against the saved policy.">
+                    {canRun ? compareButton : (
+                        <Tooltip content={blockedReason}>
                             <div>{compareButton}</div>
                         </Tooltip>
                     )}
                 </HorizontalStack>
 
-                {/* Tabs only mean something once there are counts. */}
-                {!idle && (
+                {/* Tabs only mean something once there are counts, and only traffic applies to a new policy. */}
+                {!idle && !isNewPolicy && (
                     <ButtonGroup segmented>
                         {REPLAY_SOURCE_TABS.map(tab => (
                             <Button key={tab.id} size="slim" pressed={source === tab.id} disabled={running}
@@ -223,16 +244,23 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, see
                     <VerticalStack gap="4">
                         {/* Progress lives in the Re-compare button alone. */}
                         <HorizontalStack gap="5" blockAlign="center">
+                            {!isNewPolicy && (
+                                <VerticalStack gap="1">
+                                    <Text variant="bodySm" color="subdued">Saved policy</Text>
+                                    <Text variant="headingLg" as="p">{current}</Text>
+                                </VerticalStack>
+                            )}
                             <VerticalStack gap="1">
-                                <Text variant="bodySm" color="subdued">Saved policy</Text>
-                                <Text variant="headingLg" as="p">{current}</Text>
-                            </VerticalStack>
-                            <VerticalStack gap="1">
-                                <Text variant="bodySm" color="subdued">Your changes</Text>
+                                <Text variant="bodySm" color="subdued">
+                                    {isNewPolicy ? "Would be caught" : "Your changes"}
+                                </Text>
                                 {/* Badge sits with the number it qualifies. */}
                                 <HorizontalStack gap="2" blockAlign="center">
                                     <Text variant="headingLg" as="p">{modified}</Text>
-                                    {!running && compared > 0 && (
+                                    {isNewPolicy && !running && compared > 0 && (
+                                        <Text variant="bodySm" color="subdued">{`of ${compared} compared`}</Text>
+                                    )}
+                                    {!running && !isNewPolicy && compared > 0 && (
                                         <Badge status={delta > 0 ? "success" : delta < 0 ? "critical" : "info"}>
                                             {delta === 0 ? "no change" : `${delta > 0 ? "+" : ""}${delta}`}
                                         </Badge>
@@ -240,6 +268,13 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, see
                                 </HorizontalStack>
                             </VerticalStack>
                         </HorizontalStack>
+
+                        {/* Names the sample, so the count is not read as an industry benchmark. */}
+                        {isNewPolicy && !running && compared > 0 && (
+                            <Text variant="bodySm" color="subdued">
+                                Your own agent traffic, from the last 30 days.
+                            </Text>
+                        )}
 
                         {!running && status === "done" && compared > 0 && (
                             <Box>
@@ -257,9 +292,11 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, see
 
                         {!running && compared === 0 && (
                             <Text variant="bodySm" color="subdued">
-                                {source === "TRACES"
-                                    ? "No recent traffic could be compared."
-                                    : "No recorded violations could be compared for this policy."}
+                                {isNewPolicy
+                                    ? "No recent traffic could be analysed."
+                                    : source === "TRACES"
+                                        ? "No recent traffic could be compared."
+                                        : "No recorded violations could be compared for this policy."}
                             </Text>
                         )}
 
@@ -272,6 +309,7 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, see
                 onClose={() => setDetailsOpen(false)}
                 source={source}
                 onSourceChange={changeSource}
+                isNewPolicy={isNewPolicy}
                 result={result}
                 rows={rows}
             />

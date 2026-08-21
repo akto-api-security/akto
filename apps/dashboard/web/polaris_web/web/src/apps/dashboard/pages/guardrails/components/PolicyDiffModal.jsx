@@ -49,26 +49,30 @@ const DraftVerdictCellRenderer = ({ data }) => {
 // border. Set both explicitly, and use the same padding on every column so rows line up.
 const CELL_STYLE = { lineHeight: "18px", paddingTop: "10px", paddingBottom: "10px" };
 
-const COL_DEFS = [
-    {
-        field: "prompt", headerName: "Prompt", flex: 1, minWidth: 320,
-        // Prompts run long; wrap rather than truncate, since recognising the prompt is the point.
-        wrapText: true, autoHeight: true, sortable: false, filter: false,
-        cellStyle: { ...CELL_STYLE, whiteSpace: "normal" }
-    },
-    {
-        field: "wasDetected", headerName: "Saved", width: 130, filter: false,
-        cellRenderer: SavedVerdictCellRenderer, cellStyle: CELL_STYLE
-    },
-    {
-        field: "nowDetected", headerName: "Draft", width: 130, filter: false,
-        cellRenderer: DraftVerdictCellRenderer, cellStyle: CELL_STYLE
-    },
-    // {
-    //     field: "ruleName", headerName: "Rule that changed", width: 210,
-    //     cellRenderer: RuleCellRenderer, cellStyle: CELL_STYLE
-    // }
-];
+const PROMPT_COL = {
+    field: "prompt", headerName: "Prompt", flex: 1, minWidth: 320,
+    // Prompts run long; wrap rather than truncate, since recognising the prompt is the point.
+    wrapText: true, autoHeight: true, sortable: false, filter: false,
+    cellStyle: { ...CELL_STYLE, whiteSpace: "normal" }
+};
+
+const SAVED_COL = {
+    field: "wasDetected", headerName: "Saved", width: 130, filter: false,
+    cellRenderer: SavedVerdictCellRenderer, cellStyle: CELL_STYLE
+};
+
+const DRAFT_COL = {
+    field: "nowDetected", headerName: "Draft", width: 130, filter: false,
+    cellRenderer: DraftVerdictCellRenderer, cellStyle: CELL_STYLE
+};
+
+// A new policy has no saved verdict to sit beside, so that column is dropped entirely.
+const COL_DEFS = [PROMPT_COL, SAVED_COL, DRAFT_COL];
+const NEW_POLICY_COL_DEFS = [PROMPT_COL, { ...DRAFT_COL, headerName: "This policy" }];
+// {
+//     field: "ruleName", headerName: "Rule that changed", width: 210,
+//     cellRenderer: RuleCellRenderer, cellStyle: CELL_STYLE
+// }
 
 const DEFAULT_COL_DEF = { resizable: true, sortable: true };
 
@@ -91,20 +95,23 @@ const getRowStyle = ({ data }) => {
  * Only changed rows appear: unchanged ones are the bulk of any sample and say nothing about the
  * edit. The two totals above still count the whole sample.
  */
-const PolicyDiffModal = ({ open, onClose, source, onSourceChange, result, rows }) => {
+const PolicyDiffModal = ({ open, onClose, source, onSourceChange, result, rows, isNewPolicy = false }) => {
     const gridRef = useRef(null);
 
     const current = result?.currentDetected || 0;
     const modified = result?.modifiedDetected || 0;
     const delta = modified - current;
+    const compared = result?.compared || 0;
     const unit = source === "TRACES" ? "requests" : "violations";
+    // Names the sample, so the totals do not read as a benchmark against someone else's traffic.
+    const sampleNote = `Measured against ${compared} of your own recent agent ${unit} from the last 30 days.`;
 
     const changedRows = useMemo(() => rows.filter(r => r.wasDetected !== r.nowDetected), [rows]);
     // const gained = changedRows.filter(r => r.nowDetected).length;
 
     const exportCsv = () => {
         gridRef.current?.api?.exportDataAsCsv({
-            fileName: `change-impact-analysis-${source.toLowerCase()}.csv`
+            fileName: `${isNewPolicy ? "impact" : "change-impact"}-analysis-${source.toLowerCase()}.csv`
         });
     };
 
@@ -113,40 +120,53 @@ const PolicyDiffModal = ({ open, onClose, source, onSourceChange, result, rows }
             large
             open={open}
             onClose={onClose}
-            title="Change impact analysis"
+            title={isNewPolicy ? "Impact analysis" : "Change impact analysis"}
             primaryAction={{ content: "Export CSV", onAction: exportCsv, disabled: changedRows.length === 0 }}
             secondaryActions={[{ content: "Close", onAction: onClose }]}
         >
             <Modal.Section>
                 <VerticalStack gap="4">
-                    <ButtonGroup segmented>
+                    {!isNewPolicy && <ButtonGroup segmented>
                         {REPLAY_SOURCE_TABS.map(tab => (
                             <Button key={tab.id} size="slim" pressed={source === tab.id}
                                 onClick={() => onSourceChange(tab.id)}>
                                 {tab.content}
                             </Button>
                         ))}
-                    </ButtonGroup>
+                    </ButtonGroup>}
 
                     {/* Deltas sit with the draft number they describe, not adrift at the row's end. */}
                     <HorizontalStack gap="8" blockAlign="start">
-                        <VerticalStack gap="0">
-                            <Text variant="bodySm" color="subdued">Saved policy</Text>
-                            <Text variant="headingLg" as="p">{current}</Text>
-                        </VerticalStack>
+                        {!isNewPolicy && (
+                            <VerticalStack gap="0">
+                                <Text variant="bodySm" color="subdued">Saved policy</Text>
+                                <Text variant="headingLg" as="p">{current}</Text>
+                            </VerticalStack>
+                        )}
                         <VerticalStack gap="1">
-                            <Text variant="bodySm" color="subdued">Your changes</Text>
+                            <Text variant="bodySm" color="subdued">
+                                {isNewPolicy ? "Would be caught" : "Your changes"}
+                            </Text>
                             <HorizontalStack gap="2" blockAlign="center">
                                 <Text variant="headingLg" as="p">{modified}</Text>
-                                <Badge status={delta > 0 ? "success" : delta < 0 ? "critical" : "info"}>
-                                    {delta === 0 ? "no change" : `${delta > 0 ? "+" : ""}${delta}`}
-                                </Badge>
+                                {isNewPolicy && compared > 0 && (
+                                    <Text variant="bodySm" color="subdued">{`of ${compared} compared`}</Text>
+                                )}
+                                {!isNewPolicy && (
+                                    <Badge status={delta > 0 ? "success" : delta < 0 ? "critical" : "info"}>
+                                        {delta === 0 ? "no change" : `${delta > 0 ? "+" : ""}${delta}`}
+                                    </Badge>
+                                )}
                                 {/* Needs the full per-item verdict list from the replay action,
                                     which today returns counters plus missedByDraft only.
                                 {gained > 0 && <Badge status="success">{`+${gained} newly caught`}</Badge>} */}
                             </HorizontalStack>
                         </VerticalStack>
                     </HorizontalStack>
+
+                    {isNewPolicy && compared > 0 && (
+                        <Text variant="bodySm" color="subdued">{sampleNote}</Text>
+                    )}
 
                     <VerticalStack gap="2">
                         {/* Box owns the border and radius; AgGridTable draws neither, so the two
@@ -156,7 +176,7 @@ const PolicyDiffModal = ({ open, onClose, source, onSourceChange, result, rows }
                             <AgGridTable
                                 gridRef={gridRef}
                                 rowData={changedRows}
-                                columnDefs={COL_DEFS}
+                                columnDefs={isNewPolicy ? NEW_POLICY_COL_DEFS : COL_DEFS}
                                 defaultColDef={DEFAULT_COL_DEF}
                                 getRowStyle={getRowStyle}
                                 rowSelection="single"
@@ -174,7 +194,9 @@ const PolicyDiffModal = ({ open, onClose, source, onSourceChange, result, rows }
 
                         {changedRows.length === 0 && (
                             <Text variant="bodySm" color="subdued">
-                                {`No ${unit} changed verdict in this sample.`}
+                                {isNewPolicy
+                                    ? `No ${unit} would be caught in this sample.`
+                                    : `No ${unit} changed verdict in this sample.`}
                             </Text>
                         )}
                     </VerticalStack>
