@@ -184,7 +184,7 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, see
                 <HorizontalStack align="space-between" blockAlign="center">
                     <HorizontalStack gap="1" blockAlign="center">
                         <Text variant="headingMd" as="h3" fontWeight="semibold">
-                            Change preview
+                            Change impact analysis
                         </Text>
                         <InfoTooltipIcon content="Re-runs a recent sample through the saved policy and your unsaved draft, then shows which prompts changed verdict." />
                     </HorizontalStack>

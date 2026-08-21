@@ -110,7 +110,7 @@ export const normalizePiiTypesFromPolicy = (policy) =>
             p.minMatchCount != null && Number(p.minMatchCount) >= 1 ? Number(p.minMatchCount) : 1
     }));
 
-// Which sample a policy-change preview replays. Violations only contain traffic that already
+// Which sample the change impact analysis replays. Violations only contain traffic that already
 // matched, so they can only show detections an edit loses; traffic also reveals ones it newly
 // introduces. Lives here so the panel and its details modal share one definition without
 // importing each other.

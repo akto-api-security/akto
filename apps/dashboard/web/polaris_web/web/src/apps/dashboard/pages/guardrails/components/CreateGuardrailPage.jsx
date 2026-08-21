@@ -596,7 +596,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         } else if (!editingPolicy) {
             resetForm();
         }
-        // Tells the change preview which state counts as "unedited".
+        // Tells the change impact analysis which state counts as "unedited".
         setFormSeedVersion(v => v + 1);
     }, [isEditMode, isPreset, editingPolicy]);
 

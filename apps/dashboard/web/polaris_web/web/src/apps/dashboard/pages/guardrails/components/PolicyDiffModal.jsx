@@ -104,7 +104,7 @@ const PolicyDiffModal = ({ open, onClose, source, onSourceChange, result, rows }
 
     const exportCsv = () => {
         gridRef.current?.api?.exportDataAsCsv({
-            fileName: `change-preview-${source.toLowerCase()}.csv`
+            fileName: `change-impact-analysis-${source.toLowerCase()}.csv`
         });
     };
 
@@ -113,7 +113,7 @@ const PolicyDiffModal = ({ open, onClose, source, onSourceChange, result, rows }
             large
             open={open}
             onClose={onClose}
-            title="Change preview"
+            title="Change impact analysis"
             primaryAction={{ content: "Export CSV", onAction: exportCsv, disabled: changedRows.length === 0 }}
             secondaryActions={[{ content: "Close", onAction: onClose }]}
         >
