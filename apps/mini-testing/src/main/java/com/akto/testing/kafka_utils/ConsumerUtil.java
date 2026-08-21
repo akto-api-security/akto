@@ -387,7 +387,7 @@ public class ConsumerUtil {
                             } catch (Exception e) {
                                 metrics.markErrored();
                                 future.cancel(true);
-                                String errMsg = "Error in task execution recordId=" + recordId;
+                                String errMsg = "Error in task execution recordId=" + recordId + "cause=" + e.getMessage();
                                 loggerMaker.errorAndAddToDb(e, errMsg);
                                 debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
                             }
