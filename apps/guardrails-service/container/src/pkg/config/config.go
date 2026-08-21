@@ -29,6 +29,12 @@ type Config struct {
 	KafkaBatchLingerSec int
 	KafkaMaxWaitSec     int
 
+	// ThreatKafka buffers malicious events onto Kafka instead of POSTing them
+	// straight to the threat backend, so events survive a backend outage. The
+	// Java threat client (apps/threat-detection, GUARDRAILS_THREAT_CLIENT_ENABLED)
+	// drains the topic and forwards to the backend.
+	ThreatKafka ThreatKafkaConfig
+
 	PolicyRefreshIntervalMin int
 
 	McpAllowedListRefreshIntervalMin int
@@ -55,6 +61,18 @@ type Config struct {
 	ValidationTimeoutMs int
 
 	File FileConfig
+}
+
+// ThreatKafkaConfig is the producer half of the malicious-event buffer, read by
+// guardrails-service running in HTTP mode. When Enabled is false the service
+// keeps POSTing threat reports directly to the threat backend.
+type ThreatKafkaConfig struct {
+	Enabled   bool
+	BrokerURL string
+	Topic     string
+	UseTLS    bool
+	Username  string
+	Password  string
 }
 
 type FileConfig struct {
@@ -116,6 +134,7 @@ func LoadConfig() *Config {
 		NhiEnabled:                       getEnvAsBool("NHI_ENABLED", true),
 		NhiScanIntervalMin:               getEnvAsInt("NHI_SCAN_INTERVAL_MIN", 30),
 		ValidationTimeoutMs:              getEnvAsInt("GUARDRAILS_VALIDATION_TIMEOUT_MS", 2500),
+		ThreatKafka:                      loadThreatKafkaConfig(),
 		File: FileConfig{
 			Enabled:          getEnvAsBool("FILE_VALIDATION_ENABLED", false),
 			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
@@ -137,6 +156,27 @@ func LoadConfig() *Config {
 				MaxVideoBytes: getEnvAsInt("MEDIA_MAX_VIDEO_BYTES", 25*1024*1024),
 			},
 		},
+	}
+}
+
+// DefaultThreatTopic is the buffer topic. Producer and threat client must agree
+// on it; it is deliberately separate from the traffic-detector's
+// akto.threat_detection.alerts so a guardrails backlog cannot starve alerts and
+// retention can be sized independently.
+const DefaultThreatTopic = "akto.threat_detection.guardrail_events"
+
+func loadThreatKafkaConfig() ThreatKafkaConfig {
+	return ThreatKafkaConfig{
+		Enabled: getEnvAsBool("GUARDRAILS_THREAT_KAFKA_ENABLED", false),
+		// Falls back to the traffic consumer's broker: most installs run one.
+		BrokerURL: getEnv("GUARDRAILS_THREAT_KAFKA_BROKER_URL", getEnv("KAFKA_BROKER_URL", "")),
+		Topic:     getEnv("GUARDRAILS_THREAT_KAFKA_TOPIC", DefaultThreatTopic),
+		UseTLS:    getEnvAsBool("GUARDRAILS_THREAT_KAFKA_USE_TLS", false),
+		// AKTO_KAFKA_* are the names the Helm charts and the Java modules
+		// already use. Deliberately not chained to KAFKA_USERNAME/PASSWORD,
+		// which belong to the traffic consumer and may target another cluster.
+		Username: getEnv("GUARDRAILS_THREAT_KAFKA_USERNAME", getEnv("AKTO_KAFKA_USERNAME", "")),
+		Password: getEnv("GUARDRAILS_THREAT_KAFKA_PASSWORD", getEnv("AKTO_KAFKA_PASSWORD", "")),
 	}
 }
 

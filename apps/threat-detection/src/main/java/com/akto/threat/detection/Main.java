@@ -40,6 +40,7 @@ import com.akto.threat.detection.ip_api_counter.DistributionDataForwardLayer;
 import com.akto.threat.detection.ip_api_counter.DistributionStreamConsumer;
 import com.akto.threat.detection.tasks.ConfigPoller;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
+import com.akto.threat.detection.tasks.SendGuardrailEventsToBackend;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.utils.Utils;
@@ -52,6 +53,9 @@ import com.akto.dto.billing.Organization;
 public class Main {
 
   private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
+  // Separate group so guardrail-forwarder lag is measured, scaled and rebalanced
+  // independently of the traffic detector's.
+  private static final String GUARDRAIL_CONSUMER_GROUP_ID = "akto.guardrails_threat_client";
   private static final List<String> KAFKA_NUMERIC_METRICS = Arrays.asList(
       "records-lag-max", "records-consumed-rate", "fetch-latency-avg", "bytes-consumed-rate");
   private static final LoggerMaker logger = new LoggerMaker(Main.class, LogDb.THREAT_DETECTION);
@@ -67,6 +71,21 @@ public class Main {
 
 
   public static void main(String[] args) throws Exception {
+
+    // Guardrail-forwarder mode drains the malicious-event buffer written by
+    // guardrails-service and forwards it to the threat backend. It detects
+    // nothing, so it deliberately skips the whole detector boot sequence:
+    // no Mongo, no Redis, no Postgres, no Hyperscan, no ConfigPoller.
+    //
+    // It also skips validateAndInitializeDeployment() on purpose. In hybrid
+    // deployments that blocks forever when cyborg is unreachable
+    // (fetchOrganization returns null on any error, then sleeps and retries),
+    // which would mean a cyborg outage stops the buffer from draining - the
+    // exact failure this buffer exists to survive. Do not "restore" it here.
+    if (isGuardrailForwarderMode()) {
+      runGuardrailForwarder();
+      return;
+    }
 
     boolean isHybridDeployment = RuntimeMode.isHybridDeployment();
     validateAndInitializeDeployment(isHybridDeployment);
@@ -154,6 +173,40 @@ public class Main {
 
   }
 
+  private static boolean isGuardrailForwarderMode() {
+    return "true".equalsIgnoreCase(
+        System.getenv().getOrDefault("GUARDRAILS_THREAT_CLIENT_ENABLED", "false"));
+  }
+
+  private static void runGuardrailForwarder() {
+    // Account id comes from the abstractor token in the environment, not from a
+    // cyborg call, so this still resolves while cyborg is down.
+    Context.accountId.set(ClientActor.getAccountId());
+
+    String bootstrapServerEnvVar =
+        System.getenv("GUARDRAILS_THREAT_CLIENT_KAFKA_BROKER_URL") != null
+            ? "GUARDRAILS_THREAT_CLIENT_KAFKA_BROKER_URL"
+            : "AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER";
+
+    String topic =
+        System.getenv()
+            .getOrDefault(
+                "GUARDRAILS_THREAT_CLIENT_KAFKA_TOPIC", KafkaTopic.ThreatDetection.GUARDRAIL_EVENTS);
+    String groupId =
+        System.getenv()
+            .getOrDefault("GUARDRAILS_THREAT_CLIENT_KAFKA_GROUP_ID", GUARDRAIL_CONSUMER_GROUP_ID);
+    int batchSize =
+        Integer.parseInt(
+            System.getenv().getOrDefault("GUARDRAILS_THREAT_CLIENT_BATCH_SIZE", "100"));
+
+    KafkaConfig kafkaConfig = createKafkaConfig(bootstrapServerEnvVar, batchSize, 100, 0, groupId);
+
+    logger.warnAndAddToDb(
+        "Starting guardrails threat client. topic=" + topic + " groupId=" + groupId);
+
+    new SendGuardrailEventsToBackend(kafkaConfig, topic).run();
+  }
+
     private static void startModuleConfigPoller() {
       // Start config poller (polls Cyborg for env updates and restarts on changes)
       logger.infoAndAddToDb("Starting ConfigPoller for threat-detection");
@@ -234,8 +287,12 @@ public class Main {
   }
 
   private static KafkaConfig createKafkaConfig(String bootstrapServerEnvVar, int maxPollRecords, int pollDurationMilli, int fetchMaxBytes) {
+    return createKafkaConfig(bootstrapServerEnvVar, maxPollRecords, pollDurationMilli, fetchMaxBytes, CONSUMER_GROUP_ID);
+  }
+
+  private static KafkaConfig createKafkaConfig(String bootstrapServerEnvVar, int maxPollRecords, int pollDurationMilli, int fetchMaxBytes, String groupId) {
     return KafkaConfig.newBuilder()
-        .setGroupId(CONSUMER_GROUP_ID)
+        .setGroupId(groupId)
         .setBootstrapServers(System.getenv(bootstrapServerEnvVar))
         .setConsumerConfig(
             KafkaConsumerConfig.newBuilder()
