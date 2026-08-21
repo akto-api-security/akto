@@ -536,11 +536,11 @@ public class VariableResolver {
         String wordListKey = null;
 
         // instrumentation (no behavior change): measure CPU + string sizes this call burns
-        long instrWallStart = System.currentTimeMillis();
-        long instrCpuStart = THREAD_MX.isCurrentThreadCpuTimeSupported() ? THREAD_MX.getCurrentThreadCpuTime() : -1L;
-        int startExprLen = expression.length();
-        int k = 0;
-        StringBuilder varInfo = new StringBuilder();
+        // long instrWallStart = System.currentTimeMillis();
+        // long instrCpuStart = THREAD_MX.isCurrentThreadCpuTimeSupported() ? THREAD_MX.getCurrentThreadCpuTime() : -1L;
+        // int startExprLen = expression.length();
+        // int k = 0;
+        // StringBuilder varInfo = new StringBuilder();
 
         Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
         Matcher matcher = pattern.matcher(expression);
@@ -560,15 +560,15 @@ public class VariableResolver {
                     wordListKey = originalKey;
 
                     // record this var's size + biggest value length (measurement only)
-                    k++;
-                    int n = (wordList == null) ? 0 : wordList.size();
-                    int maxValLen = 0;
-                    if (wordList != null) {
-                        for (Object w : wordList) {
-                            if (w != null) maxValLen = Math.max(maxValLen, w.toString().length());
-                        }
-                    }
-                    varInfo.append(match).append(":N=").append(n).append(",maxLen=").append(maxValLen).append("; ");
+                    // k++;
+                    // int n = (wordList == null) ? 0 : wordList.size();
+                    // int maxValLen = 0;
+                    // if (wordList != null) {
+                    //     for (Object w : wordList) {
+                    //         if (w != null) maxValLen = Math.max(maxValLen, w.toString().length());
+                    //     }
+                    // }
+                    // varInfo.append(match).append(":N=").append(n).append(",maxLen=").append(maxValLen).append("; ");
 
                     List<String> tempResult = new ArrayList<>();
                     for (String temp : result) {
@@ -590,21 +590,20 @@ public class VariableResolver {
                 e.printStackTrace();
             }
         }
-        long instrCpuMs = (instrCpuStart >= 0) ? (THREAD_MX.getCurrentThreadCpuTime() - instrCpuStart) / 1_000_000L : -1L;
-        long instrWallMs = System.currentTimeMillis() - instrWallStart;
-        if (instrCpuMs >= WORDLIST_CPU_LOG_THRESHOLD_MS || (instrCpuMs < 0 && instrWallMs >= WORDLIST_CPU_LOG_THRESHOLD_MS)) {
-            int maxResultLen = 0;
-            for (String s : result) {
-                if (s != null) maxResultLen = Math.max(maxResultLen, s.length());
-            }
-            loggerMaker.warnAndAddToDb("WORDLIST-CPU subcategory=" + varMap.get("testSubType")
-                    + " api=" + varMap.get("apiInfoKey")
-                    + " cpuMs=" + instrCpuMs + " wallMs=" + instrWallMs
-                    + " startExprLen=" + startExprLen
-                    + " k=" + k + " vars=[" + varInfo.toString().trim() + "]"
-                    + " finalResults=" + result.size()
-                    + " maxResultLen=" + maxResultLen);
-        }
+        // long instrCpuMs = (instrCpuStart >= 0) ? (THREAD_MX.getCurrentThreadCpuTime() - instrCpuStart) / 1_000_000L : -1L;
+        // long instrWallMs = System.currentTimeMillis() - instrWallStart;
+        // if (instrCpuMs >= WORDLIST_CPU_LOG_THRESHOLD_MS || (instrCpuMs < 0 && instrWallMs >= WORDLIST_CPU_LOG_THRESHOLD_MS)) {
+        //     int maxResultLen = 0;
+        //     for (String s : result) {
+        //         if (s != null) maxResultLen = Math.max(maxResultLen, s.length());
+        //     }
+        //     loggerMaker.warnAndAddToDb("WORDLIST-CPU subcategory=" + varMap.get("testSubType")
+        //             + " api=" + varMap.get("apiInfoKey")
+        //             + " cpuMs=" + instrCpuMs + " wallMs=" + instrWallMs
+        //             + " startExprLen=" + startExprLen
+        //             + " finalResults=" + result.size()
+        //             + " maxResultLen=" + maxResultLen);
+        // }
         return result;
     }
 
