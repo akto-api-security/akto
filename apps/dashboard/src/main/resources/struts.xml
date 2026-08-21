@@ -505,6 +505,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">LOGS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted an account job log entry</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -609,6 +610,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">LOGS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted module info logs</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -2067,6 +2069,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated audit data settings</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -2110,6 +2113,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User created a guardrail policy</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -2132,6 +2136,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted guardrail policies</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -2176,6 +2181,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User created a config field policy</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -2198,6 +2204,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User approved a server for guardrail policy</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -2220,6 +2227,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted config field policies</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -2242,6 +2250,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User bulk updated agent proxy guardrail settings</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -3948,6 +3957,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated crawler status</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -4097,6 +4107,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User uploaded a crawler frame</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">AKTO_DAST</param>
@@ -4157,6 +4168,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User uploaded a crawler graph</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">AKTO_DAST</param>
@@ -5218,6 +5230,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated collection access for a user</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -5924,6 +5937,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User toggled case-sensitive API matching</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5945,6 +5959,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User switched the testing module</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -5966,6 +5981,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User toggled merging of API versions</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -6457,6 +6473,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_RESULTS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User modified a testing run configuration</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -8594,6 +8611,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User saved Datadog integration configuration</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -8617,6 +8635,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User added a file inspection rule</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -8657,6 +8676,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted a file inspection rule</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -8695,6 +8715,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User queued a remote command for an endpoint</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -8755,6 +8776,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User cancelled a queued remote endpoint command</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -9682,6 +9704,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ASK_GPT</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted Ask GPT conversation history</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -10857,6 +10880,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User saved Jira priority field mapping</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">JIRA_INTEGRATION</param>
@@ -12230,6 +12254,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">THREAT_PROTECTION</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted all malicious events</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -12292,6 +12317,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">THREAT_PROTECTION</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated a malicious event's status</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -12324,6 +12350,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">THREAT_PROTECTION</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted selected malicious events</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -13846,6 +13873,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted duplicate host entries</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -14207,6 +14235,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User reset another user's password</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -14802,6 +14831,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">AI_AGENTS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User fed data to an AI agent</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -14862,6 +14892,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">AI_AGENTS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User fetched all agent running details</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -14893,6 +14924,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">AI_AGENTS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User received data from an AI agent</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -14922,6 +14954,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">AI_AGENTS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated agent health check status</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -14950,6 +14983,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">AI_AGENTS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User checked which module an agent should run</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -17088,7 +17122,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="">User reverted a de-merged API.</param>
+                <param name="actionDescription">User reverted a de-merged API</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -17177,6 +17211,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User created a general Azure Boards work item</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -17279,6 +17314,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">NHI_DATA</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User saved an NHI governance policy</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">NHI_GOVERNANCE</param>
@@ -17308,6 +17344,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">NHI_DATA</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted NHI governance policies</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">NHI_GOVERNANCE</param>
@@ -17598,6 +17635,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">NHI_DATA</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User disabled a non-human identity</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">NHI_GOVERNANCE</param>
@@ -17627,6 +17665,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">NHI_DATA</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted non-human identities</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">NHI_GOVERNANCE</param>
@@ -17656,6 +17695,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">NHI_DATA</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User marked an NHI violation as fixed</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">NHI_GOVERNANCE</param>
@@ -17685,6 +17725,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">NHI_DATA</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User reopened an NHI governance violation</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">NHI_GOVERNANCE</param>
@@ -17714,6 +17755,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">NHI_DATA</param>
                 <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User created a Jira ticket from a violation</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">NHI_GOVERNANCE</param>
