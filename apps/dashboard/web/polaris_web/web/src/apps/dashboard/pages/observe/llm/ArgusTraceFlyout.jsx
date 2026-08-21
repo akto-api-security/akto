@@ -16,8 +16,6 @@ function toSeconds(ts) {
     return ts > 1e10 ? Math.floor(ts / 1000) : ts;
 }
 
-const promptWord = (n) => (n === 1 ? "prompt" : "prompts");
-
 function formatTs(ts) {
     if (!ts) return "-";
     const ms = ts > 1e10 ? ts : ts * 1000;
@@ -177,11 +175,11 @@ export default function ArgusTraceFlyout({ trace, onClose }) {
                                 <Text variant="bodySm" color="subdued" fontWeight="semibold">GUARDRAIL</Text>
                                 {violatingSpans.length === 0 ? (
                                     <Badge status="success" size="small">
-                                        {`All ${evaluatedSpans.length} ${promptWord(evaluatedSpans.length)} passed`}
+                                        {evaluatedSpans.length === 1 ? "Prompt passed" : `All ${evaluatedSpans.length} prompts passed`}
                                     </Badge>
                                 ) : (
                                     <Badge status={summaryStatus} size="small">
-                                        {`${violatingSpans.length} of ${evaluatedSpans.length} ${promptWord(evaluatedSpans.length)} hit a policy`}
+                                        {evaluatedSpans.length === 1 ? "Prompt hit a policy" : `${violatingSpans.length} of ${evaluatedSpans.length} prompts hit a policy`}
                                     </Badge>
                                 )}
                             </HorizontalStack>
