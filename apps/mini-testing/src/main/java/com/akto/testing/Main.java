@@ -454,6 +454,10 @@ public class Main {
                 }
             });
             runModule();
+        } catch (Throwable t) {
+            loggerMaker.errorAndAddToDb("Fatal error in mini-testing runModule for "
+                    + customMiniTestingServiceName + ": " + t.getMessage());
+            throw t;
         } finally {
             if (PrometheusMetricsHandler.isModuleBusy()) {
                 loggerMaker.errorAndAddToDb("Module found busy while shutting down mini-testing: " + customMiniTestingServiceName);
