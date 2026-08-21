@@ -32,6 +32,8 @@ import com.akto.dao.graph.SvcToSvcGraphEdgesDao;
 import com.akto.dao.graph.SvcToSvcGraphNodesDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
+import com.akto.dao.notifications.CustomWebhooksDao;
+import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dao.agentic_sessions.SessionDocumentDao;
 import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.dao.testing.config.TestSuiteDao;
@@ -43,6 +45,8 @@ import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.notifications.SlackWebhook;
+import com.akto.dto.notifications.CustomWebhook;
+import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.settings.DataControlSettings;
 import com.mongodb.BasicDBList;
@@ -1947,6 +1951,19 @@ public class DbLayer {
         TestingRunDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq("_id", id),  completedUpdate
         );
+    }
+
+    public static List<CustomWebhook> fetchTeamsWebhooksForTestResults() {
+        return CustomWebhooksDao.instance.findAll(
+                Filters.and(
+                        Filters.eq(CustomWebhook.WEBHOOK_TYPE, CustomWebhook.WebhookType.MICROSOFT_TEAMS.name()),
+                        Filters.in(CustomWebhook.SELECTED_WEBHOOK_OPTIONS, CustomWebhook.WebhookOptions.TESTING_RUN_RESULTS.name())));
+    }
+
+    public static void recordWebhookSendResult(int webhookId, String userEmail, int timestamp, String message, List<String> errors) {
+        CustomWebhooksDao.instance.updateOne(Filters.eq("_id", webhookId), Updates.set("lastSentTimestamp", timestamp));
+        CustomWebhookResult webhookResult = new CustomWebhookResult(webhookId, userEmail, timestamp, message, errors);
+        CustomWebhooksResultDao.instance.insertOne(webhookResult);
     }
 
     public static List<TestingRunIssues> fetchOpenIssues(String summaryId) {

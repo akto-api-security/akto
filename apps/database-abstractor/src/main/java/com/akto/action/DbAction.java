@@ -32,6 +32,7 @@ import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
 import com.akto.dao.ApiSequencesDao;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
+import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
@@ -463,6 +464,11 @@ public class DbAction extends ActionSupport {
     ApiInfo apiInfo;
     EndpointLogicalGroup endpointLogicalGroup;
     List<TestingRunIssues> testingRunIssues;
+    List<CustomWebhook> customWebhooks;
+    int webhookId;
+    String userEmail;
+    String message;
+    List<String> errors;
     List<AccessMatrixTaskInfo> accessMatrixTaskInfos;
     List<SampleData> sampleDatas;
     SampleData sampleData;
@@ -3093,6 +3099,26 @@ public class DbAction extends ActionSupport {
             DbLayer.updateTestingRunAndMarkCompleted(testingRunId, scheduleTs);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateTestingRunAndMarkCompleted " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchTeamsWebhooksForTestResults() {
+        try {
+            customWebhooks = DbLayer.fetchTeamsWebhooksForTestResults();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchTeamsWebhooksForTestResults " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String recordWebhookSendResult() {
+        try {
+            DbLayer.recordWebhookSendResult(webhookId, userEmail, timestamp, message, errors);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in recordWebhookSendResult " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();

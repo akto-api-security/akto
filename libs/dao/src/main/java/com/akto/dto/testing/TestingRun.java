@@ -60,6 +60,9 @@ public class TestingRun {
     public static final String SEND_SLACK_ALERT = "sendSlackAlert";
     private boolean sendSlackAlert = false;
 
+    public static final String SEND_MS_TEAMS_ALERT = "sendMsTeamsAlert";
+    private boolean sendMsTeamsAlert = false;
+
     public static final String DO_NOT_MARK_ISSUES_AS_FIXED = "doNotMarkIssuesAsFixed";
     private boolean doNotMarkIssuesAsFixed = false;
 
@@ -234,6 +237,18 @@ public class TestingRun {
 
     public void setSendSlackAlert(boolean sendSlackAlert) {
         this.sendSlackAlert = sendSlackAlert;
+    }
+
+    public boolean isSendMsTeamsAlert() {
+        return sendMsTeamsAlert;
+    }
+
+    public boolean getSendMsTeamsAlert() {
+        return sendMsTeamsAlert;
+    }
+
+    public void setSendMsTeamsAlert(boolean sendMsTeamsAlert) {
+        this.sendMsTeamsAlert = sendMsTeamsAlert;
     }
 
     public String getMiniTestingServiceName() {
