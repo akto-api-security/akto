@@ -11,9 +11,13 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.concurrent.ConcurrentHashMap;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
 
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.HttpRequestParams;
@@ -38,6 +42,12 @@ public class VariableResolver {
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
     private static final ConcurrentHashMap<ApiInfoKey, SampleData> sampleDataCache = new ConcurrentHashMap<>();
     private static final int MAX_CACHE_SIZE = 1000;
+
+    // --- instrumentation: per-call CPU + string sizes in word-list resolution (no behavior change) ---
+    private static final LoggerMaker loggerMaker = new LoggerMaker(VariableResolver.class, LogDb.TESTING);
+    private static final ThreadMXBean THREAD_MX = ManagementFactory.getThreadMXBean();
+    /** Log a WORDLIST-CPU line when a single resolveWordListVar call burns at least this many CPU ms. */
+    private static final long WORDLIST_CPU_LOG_THRESHOLD_MS = 50L;
 
     public static Object getValue(Map<String, Object> varMap, String key) {
         if (!varMap.containsKey(key)) {
@@ -524,44 +534,78 @@ public class VariableResolver {
 
         List<String> wordList = new ArrayList<>();
         String wordListKey = null;
+        return wordList;
 
-        Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
-        Matcher matcher = pattern.matcher(expression);
-        List<String> result = new ArrayList<>();
-        result.add(expression);
-        while (matcher.find()) {
-            throwIfInterrupted();
-            try {
-                String match = matcher.group(0);
-                String originalKey = match;
-                match = match.substring(2, match.length());
-                match = match.substring(0, match.length() - 1);
+        // instrumentation (no behavior change): measure CPU + string sizes this call burns
+        // long instrWallStart = System.currentTimeMillis();
+        // long instrCpuStart = THREAD_MX.isCurrentThreadCpuTimeSupported() ? THREAD_MX.getCurrentThreadCpuTime() : -1L;
+        // int startExprLen = expression.length();
+        // int k = 0;
+        // StringBuilder varInfo = new StringBuilder();
 
-                Boolean isWordListVar = varMap.containsKey("wordList_" + match);
-                if (isWordListVar) {
-                    wordList = (List<String>) varMap.get("wordList_" + match);
-                    wordListKey = originalKey;
-                    List<String> tempResult = new ArrayList<>();
-                    for (String temp : result) {
-                        throwIfInterrupted();
-                        for (Object word : wordList) {
-                            throwIfInterrupted();
-                            // TODO: handle case to use numbers as well.
-                            String tempWord = temp.replace(wordListKey, word.toString());
-                            expression = tempWord;
-                            tempResult.add(tempWord);
-                        }
-                    }
-                    result = tempResult;
-                    matcher = pattern.matcher(expression);
-                }
-            } catch (RuntimeException e) {
-                throw e;
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        return result;
+        // Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
+        // Matcher matcher = pattern.matcher(expression);
+        // List<String> result = new ArrayList<>();
+        // result.add(expression);
+        // while (matcher.find()) {
+        //     throwIfInterrupted();
+        //     try {
+        //         String match = matcher.group(0);
+        //         String originalKey = match;
+        //         match = match.substring(2, match.length());
+        //         match = match.substring(0, match.length() - 1);
+
+        //         Boolean isWordListVar = varMap.containsKey("wordList_" + match);
+        //         if (isWordListVar) {
+        //             wordList = (List<String>) varMap.get("wordList_" + match);
+        //             wordListKey = originalKey;
+
+        //             // record this var's size + biggest value length (measurement only)
+        //             // k++;
+        //             // int n = (wordList == null) ? 0 : wordList.size();
+        //             // int maxValLen = 0;
+        //             // if (wordList != null) {
+        //             //     for (Object w : wordList) {
+        //             //         if (w != null) maxValLen = Math.max(maxValLen, w.toString().length());
+        //             //     }
+        //             // }
+        //             // varInfo.append(match).append(":N=").append(n).append(",maxLen=").append(maxValLen).append("; ");
+
+        //             List<String> tempResult = new ArrayList<>();
+        //             for (String temp : result) {
+        //                 throwIfInterrupted();
+        //                 for (Object word : wordList) {
+        //                     throwIfInterrupted();
+        //                     // TODO: handle case to use numbers as well.
+        //                     String tempWord = temp.replace(wordListKey, word.toString());
+        //                     expression = tempWord;
+        //                     tempResult.add(tempWord);
+        //                 }
+        //             }
+        //             result = tempResult;
+        //             matcher = pattern.matcher(expression);
+        //         }
+        //     } catch (RuntimeException e) {
+        //         throw e;
+        //     } catch (Exception e) {
+        //         e.printStackTrace();
+        //     }
+        // }
+        // long instrCpuMs = (instrCpuStart >= 0) ? (THREAD_MX.getCurrentThreadCpuTime() - instrCpuStart) / 1_000_000L : -1L;
+        // long instrWallMs = System.currentTimeMillis() - instrWallStart;
+        // if (instrCpuMs >= WORDLIST_CPU_LOG_THRESHOLD_MS || (instrCpuMs < 0 && instrWallMs >= WORDLIST_CPU_LOG_THRESHOLD_MS)) {
+        //     int maxResultLen = 0;
+        //     for (String s : result) {
+        //         if (s != null) maxResultLen = Math.max(maxResultLen, s.length());
+        //     }
+        //     loggerMaker.warnAndAddToDb("WORDLIST-CPU subcategory=" + varMap.get("testSubType")
+        //             + " api=" + varMap.get("apiInfoKey")
+        //             + " cpuMs=" + instrCpuMs + " wallMs=" + instrWallMs
+        //             + " startExprLen=" + startExprLen
+        //             + " finalResults=" + result.size()
+        //             + " maxResultLen=" + maxResultLen);
+        // }
+        // return result;
     }
 
     private static void throwIfInterrupted() {
