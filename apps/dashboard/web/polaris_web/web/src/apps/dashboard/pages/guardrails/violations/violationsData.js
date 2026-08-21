@@ -1,3 +1,4 @@
+import { isEndpointSecurityCategory } from "@/apps/main/labelHelper";
 // ─── Flyout detail helpers ───────────────────────────────────────────────────────
 
 function _parseAktoOuter(payloadStr) {
@@ -278,9 +279,12 @@ export function buildFallbackDetail(row) {
             text: evidenceText,
             highlights: undefined,
             mono: evidenceIsMono,
-            author: row.type === "Prompt" ? (row.user || undefined) : undefined,
+            // Atlas only: row.user is a real device user there. On Argus it's a host fragment
+            // (e.g. "slash2-api" from slash2-api.concierge.razorpay.com), which reads as a
+            // person's name next to an avatar - misleading, and the asset is already shown.
+            author: (isEndpointSecurityCategory() && row.type === "Prompt") ? (row.user || undefined) : undefined,
             assetName: row.type === "Skill" ? (row.agenticAsset || undefined) : undefined,
-            apiCollectionId: row.type === "Skill" ? (row.apiCollectionId || undefined) : undefined,
+            apiCollectionId: (row.type === "Skill" && row.assetLinkable) ? (row.apiCollectionId || undefined) : undefined,
         },
         triggerReason,
         policyName,

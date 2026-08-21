@@ -13,6 +13,7 @@ import {
     Tabs,
     Text,
     TextField,
+    Tooltip,
     VerticalStack,
 } from "@shopify/polaris";
 
@@ -34,8 +35,9 @@ import SessionStore from "@/apps/main/SessionStore";
 import LocalStore from "@/apps/main/LocalStorageStore";
 import guardrailApi from "@/apps/dashboard/pages/guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "@/apps/dashboard/pages/guardrails/utils";
+import { resolveComplianceClauseMap, mergePolicyComplianceMap } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
-import { isEndpointSecurityCategory } from "@/apps/main/labelHelper";
+import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
 
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "@/apps/dashboard/pages/observe/api_collections/endpointShieldHelper";
 import { formatDisplayName } from "@/apps/dashboard/pages/observe/agentic/mcpClientHelper";
@@ -126,6 +128,28 @@ function UserCellRenderer({ value, data }) {
     );
 }
 
+function RuleViolatedCellRenderer({ value }) {
+    if (!value || value === "-") return <Text variant="bodySm" color="subdued">-</Text>;
+    return <Text variant="bodySm" truncate>{value}</Text>;
+}
+
+// Frameworks only (not every clause) - the flyout shows the full clause list per framework.
+function ComplianceCellRenderer({ data }) {
+    const frameworks = Object.keys(data?.complianceMap || {});
+    if (frameworks.length === 0) return <Text variant="bodySm" color="subdued">-</Text>;
+    const [first, ...rest] = frameworks;
+    return (
+        <HorizontalStack gap="1" wrap={false} blockAlign="center">
+            <Badge size="small">{first}</Badge>
+            {rest.length > 0 && (
+                <Tooltip content={rest.join(", ")} dismissOnMouseOut>
+                    <Badge size="small">{`+${rest.length}`}</Badge>
+                </Tooltip>
+            )}
+        </HorizontalStack>
+    );
+}
+
 function ActionCellRenderer({ value }) {
     if (!value) return null;
     const status = value === "Blocked" ? "critical" : "warning";
@@ -204,15 +228,21 @@ function buildColDefs(filterValues, showApprove, onApprove) {
             filter: "agSetColumnFilter",
             filterParams: { values: ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
             cellRenderer: SeverityCellRenderer,
+            // Critical first by default. Declared on the column (rather than defaulting inside
+            // onServerFetch) so the header's sort indicator matches what's actually requested:
+            // asc here means ascending severityRank, and the backend ranks CRITICAL as 1.
+            sort: "asc",
         },
-        {
+        // Atlas only: the username map comes from Endpoint Shield metadata, which Argus has no
+        // equivalent of - there the column would just repeat the host shown in Agentic Asset.
+        ...(isEndpointSecurityCategory() ? [{
             field: "user",
             headerName: "User",
             minWidth: 140,
             filter: "agSetColumnFilter",
             filterParams: { values: filterValues.hosts || [] },
             cellRenderer: UserCellRenderer,
-        },
+        }] : []),
         {
             field: "agenticAsset",
             headerName: "Agentic Asset",
@@ -233,6 +263,20 @@ function buildColDefs(filterValues, showApprove, onApprove) {
             minWidth: 160,
             filter: "agSetColumnFilter",
             filterParams: { values: filterValues.subCategory || [] },
+        },
+        {
+            field: "violation",
+            headerName: "Rule Violated",
+            minWidth: 150,
+            sortable: false,
+            cellRenderer: RuleViolatedCellRenderer,
+        },
+        {
+            field: "complianceMap",
+            headerName: "Compliance",
+            minWidth: 140,
+            sortable: false,
+            cellRenderer: ComplianceCellRenderer,
         },
         {
             field: "_status",
@@ -356,7 +400,7 @@ function classifyPolicyType(name) {
 
 // Transform a single backend event into a table row.
 // Kept lightweight — runs only on the current page of results (not all data).
-function transformEvent(event, collectionsMap, usernameMap) {
+function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceMap) {
     const meta = parseMetadata(event.metadata);
     // typeLabel (request-shape) still drives evidence/asset-tag logic below;
     // the Type column itself uses the policy classification so it matches the pie.
@@ -386,6 +430,9 @@ function transformEvent(event, collectionsMap, usernameMap) {
     return {
         id: event.id,
         apiCollectionId: event.apiCollectionId,
+        // Only link the asset when its collection actually resolves - events can carry ids that
+        // aren't in api_collections, and the inventory page spins forever on those.
+        assetLinkable: !!collectionsMap?.[event.apiCollectionId],
         detected: event.timestamp,
         // Raw filterId/host/behaviour kept as explicit fields (not just folded into policyName/user)
         // for the Needs Approval tab's client-side filter and "Approve server" action, which need
@@ -396,6 +443,9 @@ function transformEvent(event, collectionsMap, usernameMap) {
         type: classifyPolicyType(policyName),
         violation: meta.rule_violated || meta.nrule_violated || meta.nruleViolated || event.subCategory || event.filterId || "-",
         severity: (event.severity || "HIGH").toUpperCase(),
+        // Same resolver the old UI and the flyout use, so the column, the flyout and the
+        // compliance report all agree on a row's clauses.
+        complianceMap: resolveComplianceClauseMap(event, true, {}, guardrailComplianceMap || {}),
         evidenceText: primaryValue || normalizeReasonPunctuation(meta.reason) || "-",
         user: userDisplay,
         userHost: rawHost,
@@ -414,7 +464,7 @@ function transformEvent(event, collectionsMap, usernameMap) {
 
 // ─── Dashboard summary section ───────────────────────────────────────────────────
 
-function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, currentTab, latencyData, startTimestamp, endTimestamp }) {
+function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading, onSeverityClick, activeSeverityFilter, onPolicyClick, activePolicyFilter, onClearPolicySelection, onHostClick, activeHostFilter, onClearHostSelection, onAssetClick, activeAssetFilter, onClearAssetSelection, onTypeClick, activeTypeFilter, selectedCard, onOpenCardClick, onOtherCardClick, onOtherBreakdownClick, activeStatusValue, currentTab, latencyData, startTimestamp, endTimestamp }) {
     if (summaryLoading) return <SpinnerCentered />;
     if (!summaryData) return null;
 
@@ -435,8 +485,13 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
         // configEvaluationMode "only") — NOT derived from byType, which excludes /skills/ events
         // entirely and buckets Config by category text (a skill's "Config Mutation" sub-category
         // would otherwise get miscounted as Misconfigured Settings).
-        { label: "Skills Evaluations",     count: skillsEvaluationsCount || 0,     color: TYPE_COLORS.Skill,  key: "SKILLS_EVALUATIONS" },
-        { label: "Misconfigured Settings", count: misconfiguredSettingsCount || 0, color: TYPE_COLORS.Config, key: "MISCONFIGURED_SETTINGS" },
+        // Atlas only - their tabs are gated the same way below, and their counts are never
+        // fetched on Argus (wantsPartitionCounts), so listing them there would show a dead 0
+        // whose click target doesn't exist.
+        ...(isEndpointSecurityCategory() ? [
+            { label: "Skills Evaluations",     count: skillsEvaluationsCount || 0,     color: TYPE_COLORS.Skill,  key: "SKILLS_EVALUATIONS" },
+            { label: "Misconfigured Settings", count: misconfiguredSettingsCount || 0, color: TYPE_COLORS.Config, key: "MISCONFIGURED_SETTINGS" },
+        ] : []),
     ];
 
     const policyRows = topPolicies.map((item, i) => ({
@@ -446,6 +501,39 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
         onClick: () => onPolicyClick?.(item.name),
         renderValue: () => <Text variant="bodyMd">{item.count.toLocaleString("en-US")}</Text>,
     }));
+
+    // Argus: label each host exactly the way the table's Agentic Asset column does
+    // (formatAssetDisplayName), then merge hosts that collapse to the same label - e.g. two
+    // different *.amazonaws.com hosts both render as "Com". Keeps the card and the column in sync
+    // without needing a server-side asset aggregation; the underlying hosts stay on the row so a
+    // click can filter by all of them.
+    const assetGroups = new Map();
+    (topHosts || []).forEach((item) => {
+        const label = formatAssetDisplayName(item.host) || item.name || "-";
+        const entry = assetGroups.get(label) || { label, count: 0, hosts: [] };
+        entry.count += item.count;
+        if (item.host) entry.hosts.push(item.host);
+        assetGroups.set(label, entry);
+    });
+    const assetRows = [...assetGroups.values()]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5)
+        .map((g, i) => ({
+            id: `a${i}`,
+            name: g.label,
+            hosts: g.hosts,
+            // Same tag the table's Agentic Asset cell feeds AssetIcon, so the card shows the
+            // matching product logo/favicon instead of a bare row.
+            assetTagValue: getAssetServiceName(g.hosts[0]) || g.label,
+            count: g.count,
+            onClick: () => onAssetClick?.(g.hosts),
+            renderValue: () => <Text variant="bodyMd">{g.count.toLocaleString("en-US")}</Text>,
+        }));
+
+    // The card highlights by row.name; the filter holds the hosts behind each label.
+    const activeAssetNames = new Set(
+        assetRows.filter(r => r.hosts.some(h => activeAssetFilter?.has(h))).map(r => r.name)
+    );
 
     const hostRows = (topHosts || []).slice(0, 5).map((item, i) => {
         const resolvedUser = getUsernameForCollection({ displayName: item.host }, usernameMap || {});
@@ -537,13 +625,19 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
 
             <HorizontalGrid columns={3} gap="4">
                 <AgenticTopListCard
-                    title="Violations by Top Users"
-                    titleTooltip="Top 5 users by number of violations. Click a user to filter the table below."
-                    columns={[{ label: "User" }, { label: "Violations" }]}
-                    rows={hostRows}
-                    renderIcon={(row) => <OsIcon os={row.os} size={20} />}
-                    activeRows={activeHostFilter}
-                    onClearSelection={onClearHostSelection}
+                    title={isEndpointSecurityCategory() ? "Violations by Top Users" : "Violations by Top Agentic Assets"}
+                    titleTooltip={isEndpointSecurityCategory()
+                        ? "Top 5 users by number of violations. Click a user to filter the table below."
+                        : "Top 5 agentic assets by number of violations. Click an asset to filter the table below."}
+                    columns={[{ label: isEndpointSecurityCategory() ? "User" : "Agentic Asset" }, { label: "Violations" }]}
+                    rows={isEndpointSecurityCategory() ? hostRows : assetRows}
+                    // Atlas rows are devices (OS icon); Argus rows are assets, so use the same
+                    // AssetIcon lookup the table's Agentic Asset column uses.
+                    renderIcon={isEndpointSecurityCategory()
+                        ? (row) => <OsIcon os={row.os} size={20} />
+                        : (row) => <AssetIcon type={null} assetTagValue={row.assetTagValue} size={20} />}
+                    activeRows={isEndpointSecurityCategory() ? activeHostFilter : activeAssetNames}
+                    onClearSelection={isEndpointSecurityCategory() ? onClearHostSelection : onClearAssetSelection}
                 />
                 <AgenticTopListCard
                     title="Top Policies Triggered"
@@ -605,7 +699,11 @@ function Violations() {
     const newLayout = LocalStore((state) => state.guardrailViolationsNewLayout);
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
-    const legacyPath = isEndpointSecurityCategory() ? "/dashboard/protection/threat-activity" : "/dashboard/guardrails/activity";
+    // Atlas and Argus both reach Guardrail Activity via /protection/threat-activity
+    // (see LeftNav); only MCP Security / Gen AI use /guardrails/activity.
+    const legacyPath = (isEndpointSecurityCategory() || isAgenticSecurityCategory())
+        ? "/dashboard/protection/threat-activity"
+        : "/dashboard/guardrails/activity";
 
     useEffect(() => {
         if (!newLayout) {
@@ -654,6 +752,7 @@ function Violations() {
     const gridFilterKey = useRef(`violations-${Date.now()}`);
     const collectionsMap = PersistStore((state) => state.collectionsMap);
     const usernameMapRef = useRef({});
+    const guardrailComplianceMapRef = useRef({});
     const [usernameMap, setUsernameMap] = useState({});
 
     useEffect(() => {
@@ -739,6 +838,8 @@ function Violations() {
     }, []);
 
     const [activeHostFilter, setActiveHostFilter] = useState(new Set());
+    // Argus: the card filters by collection id, not by the (hidden) user column.
+    const [activeAssetFilter, setActiveAssetFilter] = useState(new Set());
 
     const handleHostClick = useCallback((host) => {
         setActiveHostFilter(prev => {
@@ -777,6 +878,23 @@ function Violations() {
     const [tableKey, setTableKey] = useState(0);
     const triggerTableRefresh = useCallback(() => setTableKey(k => k + 1), []);
 
+    const handleAssetClick = useCallback((hosts) => {
+        const list = Array.isArray(hosts) ? hosts : [hosts];
+        setActiveAssetFilter(prev => {
+            const next = new Set(prev);
+            const isActive = list.some(h => next.has(h));
+            list.forEach(h => { if (isActive) next.delete(h); else next.add(h); });
+            return next;
+        });
+        triggerTableRefresh();
+    }, [triggerTableRefresh]);
+
+    const handleClearAssetSelection = useCallback(() => {
+        setActiveAssetFilter(new Set());
+        triggerTableRefresh();
+    }, [triggerTableRefresh]);
+
+
     const handleOpenCardClick = useCallback(() => {
         if (currentTab === "active") return;
         setCurrentTab("active");
@@ -808,6 +926,7 @@ function Violations() {
     // Mirrors SusDataTable.jsx (old UI) exactly — approveRow holds the raw row being approved.
     const guardrailApprovedByPolicy = SessionStore((state) => state.guardrailApprovedByPolicy);
     const setGuardrailApprovedByPolicy = SessionStore((state) => state.setGuardrailApprovedByPolicy);
+    const setGuardrailComplianceMap = SessionStore((state) => state.setGuardrailComplianceMap);
     const [approveRow, setApproveRow] = useState(null);
     const [approveMode, setApproveMode] = useState("ALWAYS"); // ALWAYS | DURATION
     const [approveDays, setApproveDays] = useState("7");
@@ -833,6 +952,27 @@ function Violations() {
     useEffect(() => {
         refreshApprovedByPolicy();
     }, [refreshApprovedByPolicy]);
+
+    // Compliance clauses for the Compliance column. Same two sources the old UI's SusDataTable
+    // uses: per-capability infos, merged with any clauses defined on the policies themselves.
+    useEffect(() => {
+        Promise.all([
+            threatDetectionApi.fetchGuardrailComplianceInfos(),
+            guardrailApi.fetchGuardrailPolicies(),
+        ]).then(([complianceResp, policiesResp]) => {
+            const capabilityMap = {};
+            (complianceResp?.guardrailComplianceInfos || []).forEach((entry) => {
+                const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
+                if (capability) capabilityMap[capability] = entry.mapComplianceToListClauses;
+            });
+            mergePolicyComplianceMap(capabilityMap, policiesResp?.guardrailPolicies);
+            guardrailComplianceMapRef.current = capabilityMap;
+            setGuardrailComplianceMap(capabilityMap);
+            triggerTableRefresh();
+        }).catch((error) => {
+            console.error('Error loading guardrail compliance:', error);
+        });
+    }, [setGuardrailComplianceMap, triggerTableRefresh]);
 
     const submitInlineApprove = useCallback(async () => {
         const policyName = approveRow?.filterId;
@@ -1037,7 +1177,8 @@ function Violations() {
     // AgGridTable's onServerFetch mode handles pagination, sort, and search automatically.
     const onServerFetch = useCallback(({ filters, sortKey, sortOrder, skip, limit, searchString }) => {
         const severityFilter = filters?.severity || [];
-        const hostFilter = filters?.user || [];
+        // Argus has no User column - the asset card's selection is the only host filter there.
+        const hostFilter = [...new Set([...(filters?.user || []), ...activeAssetFilter])];
         // Union the column filter, the "Top Policies" card selection, and the pie's type filter
         // (all map to the backend latestAttack).
         const policyFilter = [...new Set([...(filters?.policyName || []), ...activePolicyFilter, ...activeTypeSubCategories])];
@@ -1086,7 +1227,7 @@ function Violations() {
             configEvaluationMode,
         ).then(result => {
             const events = result?.maliciousEvents || [];
-            let transformed = events.map(e => transformEvent(e, collectionsMap, usernameMapRef.current));
+            let transformed = events.map(e => transformEvent(e, collectionsMap, usernameMapRef.current, guardrailComplianceMapRef.current));
             let total = result?.total || 0;
             // Needs Approval: keep only approval-behaviour rows, and drop rows whose (policy, server)
             // is already approved for that policy — same filter as SusDataTable.jsx.
@@ -1100,7 +1241,7 @@ function Violations() {
             setRows(transformed);
             return { value: transformed, total };
         });
-    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, guardrailApprovedByPolicy]);
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, activeAssetFilter, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, guardrailApprovedByPolicy]);
 
     // Reload the grid when the Top Policies card selection changes (skip the initial mount).
     const policyFilterFirstRun = useRef(true);
@@ -1291,6 +1432,9 @@ function Violations() {
             onHostClick={handleHostClick}
             activeHostFilter={activeHostFilter}
             onClearHostSelection={handleClearHostSelection}
+            onAssetClick={handleAssetClick}
+            activeAssetFilter={activeAssetFilter}
+            onClearAssetSelection={handleClearAssetSelection}
             onTypeClick={handleTypeClick}
             activeTypeFilter={activeTypeFilter}
             selectedCard={selectedCard}

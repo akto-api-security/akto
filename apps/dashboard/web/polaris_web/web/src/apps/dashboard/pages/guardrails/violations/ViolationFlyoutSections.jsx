@@ -18,7 +18,7 @@ import MarkdownViewer from "@/apps/dashboard/components/shared/MarkdownViewer";
 import { HighlightedText } from "@/apps/dashboard/components/shared/MarkdownComponents";
 import ConversationHistory from "@/apps/dashboard/pages/testing/TestRunResultPage/components/ConversationHistory";
 import func from "@/util/func";
-import { getDashboardCategory, categoryToShortName } from "@/apps/main/labelHelper";
+import { getDashboardCategory, categoryToShortName, isEndpointSecurityCategory } from "@/apps/main/labelHelper";
 import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "@/apps/dashboard/pages/guardrails/components/owaspConfig";
 import OwaspTag from "@/apps/dashboard/pages/guardrails/components/OwaspTag";
@@ -29,8 +29,12 @@ import ComplianceTags from "@/apps/dashboard/pages/guardrails/components/Complia
 export function EvidenceBlock({ evidence }) {
     if (!evidence) return null;
     const name = evidence.author || evidence.heading;
+    // Carry the current category, same as the policy link below: a new tab has no PersistStore
+    // session, so without it the page opens under API Security and renders blank.
+    const assetCategoryShort = categoryToShortName[getDashboardCategory()];
     const assetUrl = evidence.apiCollectionId
         ? `/dashboard/observe/inventory/${evidence.apiCollectionId}?agentic_view=skills`
+            + (assetCategoryShort ? `&category=${assetCategoryShort}` : "")
         : null;
     return (
         <Box borderRadius="2">
@@ -177,7 +181,10 @@ export function OverviewSection({ row, detail }) {
 
     const gridItems = [
         { label: "Detected", value: func.epochToDateTime(row.detected) },
-        { label: "Device ID", value: detail?.deviceId || "N/A" },
+        // Atlas only: deviceId is the event's host, which really is a device there
+        // (harshith-s-macbook-pro-...). On Argus the same field is a service hostname, so
+        // labelling it "Device ID" is wrong - the Agentic Asset column already shows it.
+        ...(isEndpointSecurityCategory() ? [{ label: "Device ID", value: detail?.deviceId || "N/A" }] : []),
         { label: "Session ID", value: detail?.sessionId || "N/A" },
     ];
 
