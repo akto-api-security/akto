@@ -466,9 +466,13 @@ public class DbAction extends ActionSupport {
     List<TestingRunIssues> testingRunIssues;
     @Getter @Setter
     List<CustomWebhook> customWebhooks;
+    @Getter @Setter
     int webhookId;
+    @Getter @Setter
     String userEmail;
+    @Getter @Setter
     String message;
+    @Getter @Setter
     List<String> errors;
     List<AccessMatrixTaskInfo> accessMatrixTaskInfos;
     List<SampleData> sampleDatas;
