@@ -34,6 +34,11 @@ public class TestingRun {
     @Setter
     private boolean sendSlackAlert = false;
 
+    public static final String SEND_MS_TEAMS_ALERT = "sendMsTeamsAlert";
+    @Getter
+    @Setter
+    private boolean sendMsTeamsAlert = false;
+
     public static final String SELECTED_SLACK_CHANNEL_ID = "selectedSlackChannelId";
     @Getter
     @Setter
