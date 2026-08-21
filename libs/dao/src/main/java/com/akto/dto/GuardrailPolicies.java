@@ -61,6 +61,8 @@ public class GuardrailPolicies {
     private Map<String, Object> contentFiltering;
 
     private LLMRule llmRule;
+    
+    private List<RedactionRule> redactionRules;
 
     // Step 7: Base Prompt Rule
     private BasePromptRule basePromptRule;
@@ -413,6 +415,21 @@ public class GuardrailPolicies {
         private double confidenceScore;
 
         public LLMRule(boolean enabled, String userPrompt, double confidenceScore) {
+            this.enabled = enabled;
+            this.userPrompt = userPrompt;
+            this.confidenceScore = confidenceScore;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class RedactionRule {
+        private boolean enabled;
+        private String userPrompt;
+        private double confidenceScore;
+
+        public RedactionRule(boolean enabled, String userPrompt, double confidenceScore) {
             this.enabled = enabled;
             this.userPrompt = userPrompt;
             this.confidenceScore = confidenceScore;

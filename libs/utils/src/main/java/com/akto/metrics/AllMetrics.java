@@ -64,6 +64,11 @@ public class AllMetrics {
         deltaCatalogNewCount = new SumMetric("DELTA_CATALOG_NEW_COUNT", 60, accountId, orgId);
         cyborgApiPayloadSize = new SumMetric("CYBORG_API_PAYLOAD_SIZE", 60, accountId, orgId);
         multipleSampleDataFetchLatency = new LatencyMetric("MULTIPLE_SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId);
+        testingTestsExecutedCount = new SumMetric("TESTING_TESTS_EXECUTED_COUNT", 60, accountId, orgId);
+        testingApiHitSuccessCount = new SumMetric("TESTING_API_HIT_SUCCESS_COUNT", 60, accountId, orgId);
+        testingApiHitFailureCount = new SumMetric("TESTING_API_HIT_FAILURE_COUNT", 60, accountId, orgId);
+        testingIssuesCreatedCount = new SumMetric("TESTING_ISSUES_CREATED_COUNT", 60, accountId, orgId);
+        testingKafkaQueuePending = new GaugeMetric("TESTING_KAFKA_QUEUE_PENDING", 60, accountId, orgId);
 
         metrics = Arrays.asList(runtimeKafkaRecordCount, runtimeKafkaRecordSize, runtimeProcessLatency,
                 postgreSampleDataInsertedCount, postgreSampleDataInsertLatency, mergingJobLatency, mergingJobUrlsUpdatedCount,
@@ -71,7 +76,8 @@ public class AllMetrics {
                 cyborgCallCount, cyborgDataSize, testingRunCount, testingRunLatency, totalSampleDataCount, sampleDataFetchLatency,
                 sampleDataFetchCount, pgDataSizeInMb, kafkaOffset, kafkaRecordsLagMax, kafkaRecordsConsumedRate, kafkaFetchAvgLatency,
                 kafkaBytesConsumedRate, cyborgNewApiCount, cyborgTotalApiCount, deltaCatalogNewCount, deltaCatalogTotalCount,
-                cyborgApiPayloadSize, multipleSampleDataFetchLatency);
+                cyborgApiPayloadSize, multipleSampleDataFetchLatency, testingTestsExecutedCount, testingApiHitSuccessCount,
+                testingApiHitFailureCount, testingIssuesCreatedCount, testingKafkaQueuePending);
 
         executorService.scheduleAtFixedRate(() -> {
             try {
@@ -147,6 +153,11 @@ public class AllMetrics {
     private Metric deltaCatalogTotalCount = null;
     private Metric cyborgApiPayloadSize = null;
     private Metric multipleSampleDataFetchLatency = null;
+    private Metric testingTestsExecutedCount = null;
+    private Metric testingApiHitSuccessCount = null;
+    private Metric testingApiHitFailureCount = null;
+    private Metric testingIssuesCreatedCount = null;
+    private Metric testingKafkaQueuePending = null;
 
     private List<Metric> metrics = null;
 
@@ -298,6 +309,31 @@ public class AllMetrics {
     public void setMultipleSampleDataFetchLatency(float val){
         if(multipleSampleDataFetchLatency != null)
             multipleSampleDataFetchLatency.record(val);
+    }
+
+    public void setTestingTestsExecutedCount(float val){
+        if(testingTestsExecutedCount != null)
+            testingTestsExecutedCount.record(val);
+    }
+
+    public void setTestingApiHitSuccessCount(float val){
+        if(testingApiHitSuccessCount != null)
+            testingApiHitSuccessCount.record(val);
+    }
+
+    public void setTestingApiHitFailureCount(float val){
+        if(testingApiHitFailureCount != null)
+            testingApiHitFailureCount.record(val);
+    }
+
+    public void setTestingIssuesCreatedCount(float val){
+        if(testingIssuesCreatedCount != null)
+            testingIssuesCreatedCount.record(val);
+    }
+
+    public void setTestingKafkaQueuePending(float val){
+        if(testingKafkaQueuePending != null)
+            testingKafkaQueuePending.record(val);
     }
 
 
