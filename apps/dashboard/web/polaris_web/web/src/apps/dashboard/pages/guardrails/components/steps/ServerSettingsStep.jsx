@@ -23,7 +23,7 @@ export const ServerSettingsConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTeams, targetRoles }) => {
+    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTags, targetDeviceIds }) => {
         const appSettings = (applyOnRequest || applyOnResponse) ?
             ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
         const behaviourSuffix = policyBehaviour ? `Rule behaviour: ${policyBehaviour}` : '';
@@ -41,8 +41,13 @@ export const ServerSettingsConfig = {
             summary += ' | All users';
         } else {
             const userParts = [];
-            if (targetTeams?.length > 0) userParts.push(`${targetTeams.length} Team${targetTeams.length !== 1 ? 's' : ''}`);
-            if (targetRoles?.length > 0) userParts.push(`${targetRoles.length} Role${targetRoles.length !== 1 ? 's' : ''}`);
+            Object.entries(targetTags || {}).forEach(([key, values]) => {
+                if (values?.length > 0) {
+                    const label = key.charAt(0).toUpperCase() + key.slice(1);
+                    userParts.push(`${values.length} ${label}${values.length !== 1 ? 's' : ''}`);
+                }
+            });
+            if (targetDeviceIds?.length > 0) userParts.push(`${targetDeviceIds.length} User${targetDeviceIds.length !== 1 ? 's' : ''}`);
             if (userParts.length > 0) summary += ` | ${userParts.join(', ')}`;
         }
         summary += `${appSettings} ${behaviourSuffix}`;
@@ -51,6 +56,15 @@ export const ServerSettingsConfig = {
 };
 
 const conditionsReducer = produce((draft, action) => func.conditionsReducer(draft, action));
+
+// deviceId is the agent's device label, "{hostname}-{first8ofMachineID}" — the unique,
+// stable part is the segment after the LAST hyphen (the hostname itself may contain hyphens).
+// Falls back to a plain prefix slice for any value that doesn't follow that format.
+const deviceIdSuffix = (deviceId) => {
+    if (!deviceId) return '';
+    const idx = deviceId.lastIndexOf('-');
+    return idx >= 0 ? deviceId.slice(idx + 1) : deviceId.slice(0, 8);
+};
 
 const CountPopover = ({ count, label, items }) => {
     const [active, setActive] = useState(false);
@@ -101,6 +115,33 @@ const CountPopover = ({ count, label, items }) => {
     );
 };
 
+// Once (per condition list, per mount) after its options have loaded: drop any selected value
+// that no longer matches a live option for its type (a server/device removed from the list, or a
+// tag value no longer on any user). Without this, a condition's stored value count can silently
+// diverge from what's actually visible/checked/enforceable. `enabled` gates this off for Argus —
+// backward-compat values there may not yet have a matching option.
+const usePruneStaleConditionValues = (enabled, ready, conditions, dispatch, valSets) => {
+    const ranRef = useRef(false);
+    useEffect(() => {
+        if (!enabled || ranRef.current || !ready) return;
+        ranRef.current = true;
+        // Descending order: deleting a higher index never shifts the position of one not yet visited.
+        for (let index = conditions.length - 1; index >= 0; index--) {
+            const c = conditions[index];
+            const valSet = valSets[c.type];
+            if (!valSet) {
+                dispatch({ type: 'delete', index });
+                continue;
+            }
+            if (valSet.size === 0) continue;
+            const valid = (c.values || []).filter(v => valSet.has(v));
+            if (valid.length !== (c.values || []).length) {
+                dispatch({ type: 'updateKey', index, key: 'values', obj: valid });
+            }
+        }
+    }, [ready]);
+};
+
 const ServerSettingsStep = ({
     applyToAllServers,
     setApplyToAllServers,
@@ -120,12 +161,13 @@ const ServerSettingsStep = ({
     collectionsLoading,
     policyBehaviour,
     setPolicyBehaviour,
-    targetTeams,
-    setTargetTeams,
-    targetRoles,
-    setTargetRoles,
-    availableTeams,
-    availableRoles,
+    targetTags,
+    setTargetTags,
+    targetDeviceIds,
+    setTargetDeviceIds,
+    availableTagKeyValues = [],
+    availableDevices,
+    matchingDeviceRows = [],
     usersLoading,
     applyToAllUsers,
     setApplyToAllUsers,
@@ -145,9 +187,10 @@ const ServerSettingsStep = ({
     });
 
     const [userConditions, userDispatch] = useReducer(conditionsReducer, null, () => {
-        const conds = [];
-        if ((targetRoles || []).length > 0) conds.push({ type: 'ROLE', values: targetRoles });
-        if ((targetTeams || []).length > 0) conds.push({ type: 'TEAM', values: targetTeams });
+        const conds = Object.entries(targetTags || {})
+            .filter(([, values]) => (values || []).length > 0)
+            .map(([key, values]) => ({ type: key, values }));
+        if ((targetDeviceIds || []).length > 0) conds.push({ type: 'DEVICE', values: targetDeviceIds });
         return conds;
     });
 
@@ -159,8 +202,13 @@ const ServerSettingsStep = ({
 
     useEffect(() => {
         if (isAtlas) {
-            setTargetRoles(userConditions.filter(c => c.type === 'ROLE').flatMap(c => c.values).filter(Boolean));
-            setTargetTeams(userConditions.filter(c => c.type === 'TEAM').flatMap(c => c.values).filter(Boolean));
+            const tagMap = {};
+            userConditions.filter(c => c.type !== 'DEVICE').forEach(c => {
+                const values = (c.values || []).filter(Boolean);
+                if (values.length) tagMap[c.type] = values;
+            });
+            setTargetTags(tagMap);
+            setTargetDeviceIds(userConditions.filter(c => c.type === 'DEVICE').flatMap(c => c.values).filter(Boolean));
         }
     }, [userConditions]);
 
@@ -182,9 +230,11 @@ const ServerSettingsStep = ({
             case 'AGENT': return enrichOptions(agentOptions, 'AI Agent');
             case 'MCP_SERVER': return enrichOptions(mcpOptions, 'MCP Server');
             case 'LLM': return enrichOptions(llmOptions, 'LLM');
-            case 'ROLE': return (availableRoles || []).map(r => ({ label: r, value: r })).sort((a, b) => a.label.localeCompare(b.label));
-            case 'TEAM': return (availableTeams || []).map(t => ({ label: t, value: t })).sort((a, b) => a.label.localeCompare(b.label));
-            default: return [];
+            case 'DEVICE': return (availableDevices || []).slice().sort((a, b) => a.label.localeCompare(b.label));
+            default: {
+                const entry = (availableTagKeyValues || []).find(k => k.key === type);
+                return (entry?.values || []).map(v => ({ label: v, value: v })).sort((a, b) => a.label.localeCompare(b.label));
+            }
         }
     };
 
@@ -227,29 +277,28 @@ const ServerSettingsStep = ({
             selectedBrowserLlms
           );
 
-    // One-time Atlas cleanup: strips stale condition values that don't match a current option.
-    // Skipped for Argus — backward-compat values may not yet have a matching option.
-    const normalizedRef = useRef(false);
-    useEffect(() => {
-        if (!isAtlas) return;
-        if (normalizedRef.current) return;
-        const total = agentOptions.length + mcpOptions.length + llmOptions.length;
-        if (total === 0) return;
-        normalizedRef.current = true;
-        const valSets = {
+    // Agentic Assets: AI Agents / MCP Servers / LLMs.
+    usePruneStaleConditionValues(
+        isAtlas,
+        agentOptions.length + mcpOptions.length + llmOptions.length > 0,
+        agenticConditions, agenticDispatch,
+        {
             AGENT: new Set(agentOptions.map(o => o.value)),
             MCP_SERVER: new Set(mcpOptions.map(o => o.value)),
             LLM: new Set(llmOptions.map(o => o.value)),
-        };
-        agenticConditions.forEach((c, index) => {
-            const valSet = valSets[c.type];
-            if (!valSet || valSet.size === 0) return;
-            const valid = (c.values || []).filter(v => valSet.has(v));
-            if (valid.length !== (c.values || []).length) {
-                agenticDispatch({ type: 'updateKey', index, key: 'values', obj: valid });
-            }
-        });
-    }, [agentOptions.length, mcpOptions.length, llmOptions.length]);
+        }
+    );
+
+    // Device Tags & Users: DEVICE plus any dynamic tag key (team, role, department, ...).
+    usePruneStaleConditionValues(
+        isAtlas,
+        (availableDevices || []).length + (availableTagKeyValues || []).reduce((acc, k) => acc + (k.values || []).length, 0) > 0,
+        userConditions, userDispatch,
+        {
+            DEVICE: new Set((availableDevices || []).map(o => o.value)),
+            ...Object.fromEntries((availableTagKeyValues || []).map(({ key, values }) => [key, new Set(values || [])])),
+        }
+    );
 
     const agenticTypeOptions = [
         { label: `${agentOptions.length > 1 ? 'AI Agents' : 'AI Agent'} [${agentOptions.length}]`, value: 'AGENT', disabled: agentOptions.length === 0 },
@@ -257,11 +306,15 @@ const ServerSettingsStep = ({
         { label: `LLM${llmOptions.length > 1 ? 's' : ''} [${llmOptions.length}]`, value: 'LLM', disabled: llmOptions.length === 0 },
     ];
 
-    const teamCount = (availableTeams || []).length;
-    const roleCount = (availableRoles || []).length;
+    const deviceCount = (availableDevices || []).length;
+    const tagTypeOptions = (availableTagKeyValues || []).map(({ key, values }) => {
+        const label = key.charAt(0).toUpperCase() + key.slice(1);
+        const count = (values || []).length;
+        return { label: `${count > 1 ? `${label}s` : label} [${count}]`, value: key, disabled: count === 0 };
+    });
     const userTypeOptions = [
-        { label: `${teamCount > 1 ? 'Teams' : 'Team'} [${teamCount}]`, value: 'TEAM', disabled: teamCount === 0 },
-        { label: `${roleCount > 1 ? 'Roles' : 'Role'} [${roleCount}]`, value: 'ROLE', disabled: roleCount === 0 },
+        ...tagTypeOptions,
+        { label: `${deviceCount > 1 ? 'Users' : 'User'} [${deviceCount}]`, value: 'DEVICE', disabled: deviceCount === 0 },
     ];
 
     const renderConditionRows = (conditions, typeOptions, dispatch, operator = 'OR', showError = false) => {
@@ -425,7 +478,7 @@ const ServerSettingsStep = ({
                     <Box borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                         <Box padding="4">
                             <VerticalStack gap="4">
-                                <Text variant="headingSm">Teams & Roles</Text>
+                                <Text variant="headingSm">Device Tags & Users</Text>
                                 <VerticalStack gap="2">
                                     <RadioButton
                                         label={
@@ -450,16 +503,38 @@ const ServerSettingsStep = ({
                                         }
                                     />
                                     <RadioButton
-                                        label="Select Teams & Roles"
+                                        label="Select Device Tags & Users"
                                         checked={!applyToAllUsers}
                                         id="select_users_teams"
                                         name="userTargeting"
                                         onChange={() => setApplyToAllUsers(false)}
-                                        disabled={(availableTeams || []).length === 0 && (availableRoles || []).length === 0}
-                                        helpText={(availableTeams || []).length === 0 && (availableRoles || []).length === 0
-                                            ? "No Teams or Roles configured. Set them up in your organization settings before selecting."
-                                            : "Choose specific Teams & Roles."
-                                        }
+                                        disabled={(availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0}
+                                        helpText={(() => {
+                                            const noOptions = (availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0;
+                                            if (noOptions) {
+                                                return "No device tags or users found. Devices must report in before you can target them here.";
+                                            }
+                                            if (userConditions.length === 0) {
+                                                return "Choose specific device tags or Users.";
+                                            }
+                                            if (matchingDeviceRows.length === 0) {
+                                                return "Applies to 0 users with the current selection.";
+                                            }
+                                            return (
+                                                <HorizontalStack gap="1" blockAlign="center" wrap>
+                                                    <Text variant="bodyMd" tone="subdued">Applies to</Text>
+                                                    <CountPopover
+                                                        count={matchingDeviceRows.length}
+                                                        label={`user${matchingDeviceRows.length !== 1 ? 's' : ''}`}
+                                                        items={matchingDeviceRows.map(r => ({
+                                                            value: r.deviceId,
+                                                            label: `${r.username} · ${deviceIdSuffix(r.deviceId)}`,
+                                                        }))}
+                                                    />
+                                                    <Text variant="bodyMd" tone="subdued">with the current selection.</Text>
+                                                </HorizontalStack>
+                                            );
+                                        })()}
                                     />
                                     {!applyToAllUsers && (
                                         <Box paddingInlineStart="6">
@@ -555,19 +630,21 @@ const ServerSettingsStep = ({
 
                         <VerticalStack gap="2">
                             <Checkbox
-                                label="Apply guardrail to responses"
-                                checked={applyOnResponse}
-                                onChange={setApplyOnResponse}
-                                helpText="When enabled, this guardrail will filter and evaluate model responses before they're sent to users."
-                            />
-
-                            <Checkbox
                                 label="Apply guardrail to requests"
                                 checked={applyOnRequest}
                                 onChange={setApplyOnRequest}
                                 helpText="When enabled, this guardrail will filter and evaluate user inputs before they're processed by the model."
                             />
+
+                            <Checkbox
+                                label="Apply guardrail to responses"
+                                checked={applyOnResponse}
+                                onChange={setApplyOnResponse}
+                                helpText="When enabled, this guardrail will filter and evaluate model responses before they're sent to users."
+                            />
                         </VerticalStack>
+
+                        <Banner tone="info">Response Guardrails are not supported for browser LLMs</Banner>
                     </VerticalStack>
                 </Box>
             </FormLayout>

@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text } from "@shopify/polaris"
+import { Box, Button, Popover, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text, Badge } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import ApiGroups from "../../../components/shared/ApiGroups";
@@ -24,6 +24,7 @@ import Dropdown from "../../../components/layouts/Dropdown";
 import ApiIssuesTab from "./ApiIssuesTab";
 import ForbiddenRole from "../../../components/shared/ForbiddenRole";
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
+import { stripMarkdownLinks } from "../../../components/shared/markdownUtils";
 
 import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
@@ -648,9 +649,9 @@ function ApiDetails(props) {
             const bodyStr = parsedMsg?.request?.body || parsedMsg?.requestPayload || '{}'
             const body = JSON.parse(bodyStr)
             if (body.skill_name) {
-                skillMarkdown = `# ${body.skill_name}\n\n` +
-                    (body.skill_description ? `**${body.skill_description}**\n\n` : '') +
-                    (body.skill_content || '')
+                skillMarkdown = `# ${stripMarkdownLinks(body.skill_name)}\n\n` +
+                    (body.skill_description ? `**${stripMarkdownLinks(body.skill_description)}**\n\n` : '') +
+                    stripMarkdownLinks(body.skill_content || '')
             }
         } catch (_) {}
     }
@@ -825,6 +826,14 @@ function ApiDetails(props) {
 
     newData['description'] = (isEditingDescription?<InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription}  placeholder={"Add a brief description"} maxLength={64}/> : description )
 
+
+    const owningPluginName = (() => {
+        if (!apiDetail?.apiCollectionId || !allCollections) return null;
+        const collection = allCollections.find(c => c.id === apiDetail.apiCollectionId);
+        const tag = collection?.envType?.find(t => t.keyName === 'plugin-name');
+        return tag?.value || null;
+    })();
+
     const headingComp = (
         <VerticalStack gap="4" key="heading">
             <HorizontalStack align="space-between" wrap={false}>
@@ -841,6 +850,12 @@ function ApiDetails(props) {
                         collectionIds={apiDetail?.collectionIds}
                         onGroupClick={() => setShowDetails(false)}
                     />
+                    {owningPluginName && (
+                        <HorizontalStack gap="2" blockAlign="center">
+                            <Badge size="small" status="info">{owningPluginName}</Badge>
+                            <Text variant="bodySm" color="subdued">uses this endpoint</Text>
+                        </HorizontalStack>
+                    )}
                 </VerticalStack>
                 <VerticalStack gap="3" align="space-between">
                     <HorizontalStack gap={"1"} wrap={false} >
@@ -898,7 +913,7 @@ function ApiDetails(props) {
         if (!apiDetail?.apiCollectionId || !allCollections) return false;
         const collection = allCollections.find(c => c.id === apiDetail.apiCollectionId);
         if (!collection) return false;
-        
+
         return collection.envType && collection.envType.some(envType =>
             envType.keyName === 'gen-ai'
         );

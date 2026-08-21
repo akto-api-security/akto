@@ -353,14 +353,24 @@ function ApiEndpoints(props) {
     const [savingSystemPrompt, setSavingSystemPrompt] = useState(false)
 
 
-    const isSkillCollection = (apiInfoList || []).some(info => info?.id?.url?.includes('/skills/'))
+
+    const { isSkillCollection, blockedSkillsCount } = useMemo(() => {
+        let hasSkill = false;
+        let blockedCount = 0;
+        (apiInfoList || []).forEach(info => {
+            if (info?.id?.url?.includes('/skills/')) {
+                hasSkill = true;
+                if (info.isSkillBlocked) blockedCount += 1;
+            }
+        });
+        return { isSkillCollection: hasSkill, blockedSkillsCount: blockedCount };
+    }, [apiInfoList]);
 
     // the values used here are defined at the server.
     const baseTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Zombie'] )
     const definedTableTabs = isSkillCollection ? [...baseTableTabs, 'Blocked Skills'] : baseTableTabs
 
     const { tabsInfo } = useTable()
-    const blockedSkillsCount = (apiInfoList || []).filter(info => info?.id?.url?.includes('/skills/') && info.isSkillBlocked).length
     const tableCountObj = { ...func.getTabsCount(definedTableTabs, endpointData), ...(isSkillCollection ? { blocked_skills: blockedSkillsCount } : {}) }
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
@@ -474,12 +484,14 @@ function ApiEndpoints(props) {
         let data = {}
         let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap,apiInfoSeverityMap)
 
-        // Scope to config-only or skills-only endpoints when navigated from the agent tree.
-        // Config and skill endpoints live in the same collection; this keeps the two views distinct.
         if (agenticView === 'config') {
             allEndpoints = allEndpoints.filter(e => e?.endpoint?.includes('/config/'))
         } else if (agenticView === 'skills') {
             allEndpoints = allEndpoints.filter(e => e?.endpoint?.includes('/skills/'))
+        } else if (agenticView === 'plugins') {
+            allEndpoints = allEndpoints.filter(e => e?.endpoint?.includes('/plugin/'))
+        } else if (agenticView === 'mcp') {
+            allEndpoints = allEndpoints.filter(e => !e?.endpoint?.includes('/skills/') && !e?.endpoint?.includes('/plugin/'))
         }
 
         // handle code analysis endpoints
@@ -2063,10 +2075,9 @@ function ApiEndpoints(props) {
                     hasAccessToDiscoveryAgent={hasAccessToDiscoveryAgent}
                 />,
             ] : [
-                dummyAgenticGraph ? <AgentDiscoverGraphWithDummyData key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
-                // (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,
                 // Hide "Test your Endpoints" banner for Endpoint Security
                 (!isEndpointSecurityCategory() && (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null,
+                dummyAgenticGraph ? <AgentDiscoverGraphWithDummyData key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}
                       {/* <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">

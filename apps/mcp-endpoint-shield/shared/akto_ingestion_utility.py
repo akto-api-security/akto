@@ -64,6 +64,7 @@ _CONNECTOR_LOG_DIR: Dict[str, str] = {
     "github":           "~/akto/.github/akto/vscode/logs",
     "opencode":         "~/.config/opencode/akto/logs",
     "kiro_cli":         "~/.kiro/akto/logs",
+    "amp":              "~/.config/amp/akto/logs",
 }
 _default_log_dir = _CONNECTOR_LOG_DIR.get(AKTO_CONNECTOR, f"~/akto/{AKTO_CONNECTOR}-hooks/logs")
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", _default_log_dir))
@@ -210,6 +211,16 @@ _SESSION_FIELD_MAP: Dict[str, Dict[str, Any]] = {
         "conversation_field": None,
         "message_id_field": None,
         "message_id_strategy": "turn_counter",
+        "state_key": "session_id",
+        "extra_fields": ("cwd", "hook_event_name"),
+    },
+    # amp: the plugin forwards the thread id as both session and conversation, and
+    # agent.start carries a real message id, so the prompt hook can pass it through.
+    "amp": {
+        "session_id_field": "session_id",
+        "conversation_field": "conversation_id",
+        "message_id_field": "message_id",
+        "message_id_strategy": "passthrough",
         "state_key": "session_id",
         "extra_fields": ("cwd", "hook_event_name"),
     },

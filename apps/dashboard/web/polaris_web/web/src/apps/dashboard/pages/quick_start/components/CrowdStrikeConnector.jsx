@@ -12,7 +12,7 @@ function CrowdStrikeConnector() {
     const [baseUrl, setBaseUrl] = useState('')
     const [dataIngestionUrl, setDataIngestionUrl] = useState('')
     const [aktoApiToken, setAktoApiToken] = useState('')
-    const [recurringIntervalSeconds, setRecurringIntervalSeconds] = useState('3600')
+    const [recurringIntervalSeconds, setRecurringIntervalSeconds] = useState('21600')
     const [isSaved, setIsSaved] = useState(false)
 
     // Guardrails
@@ -21,18 +21,25 @@ function CrowdStrikeConnector() {
     const [executingGuardrails, setExecutingGuardrails] = useState(false)
     const [envVarValues, setEnvVarValues] = useState({})
 
-    // Device selection
+    // Device selection (guardrails)
     const [devices, setDevices] = useState([])
     const [runOnAllDevices, setRunOnAllDevices] = useState(true)
     const [selectedDeviceIds, setSelectedDeviceIds] = useState([])
     const [searchInput, setSearchInput] = useState('')
 
+    // Device selection (discovery job targeting)
+    const [runDiscoveryOnAllDevices, setRunDiscoveryOnAllDevices] = useState(true)
+    const [selectedDiscoveryDeviceIds, setSelectedDiscoveryDeviceIds] = useState([])
+    const [discoverySearchInput, setDiscoverySearchInput] = useState('')
+    const [schedulingDiscovery, setSchedulingDiscovery] = useState(false)
+
     const allOptions = useMemo(() =>
-        devices.map((d) => ({
-            value: d.id,
-            label: d.hostname || d.id,
-            os: d.platform || 'Unknown OS',
-        })),
+        devices.map((d) => {
+            const os = d.platform || 'Unknown OS'
+            const identifier = d.hostname || d.id
+            const label = d.username ? `${d.username} — ${identifier}` : identifier
+            return { value: d.id, label, os, deviceId: d.id }
+        }),
         [devices]
     )
 
@@ -43,6 +50,13 @@ function CrowdStrikeConnector() {
         [allOptions, searchInput]
     )
 
+    const discoveryFilteredOptions = useMemo(() =>
+        allOptions.filter((opt) =>
+            opt.label.toLowerCase().includes(discoverySearchInput.toLowerCase())
+        ),
+        [allOptions, discoverySearchInput]
+    )
+
     const toggleDevice = useCallback((id) => {
         setSelectedDeviceIds((prev) =>
             prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -51,6 +65,16 @@ function CrowdStrikeConnector() {
 
     const removeDevice = useCallback((id) => {
         setSelectedDeviceIds((prev) => prev.filter((x) => x !== id))
+    }, [])
+
+    const toggleDiscoveryDevice = useCallback((id) => {
+        setSelectedDiscoveryDeviceIds((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+        )
+    }, [])
+
+    const removeDiscoveryDevice = useCallback((id) => {
+        setSelectedDiscoveryDeviceIds((prev) => prev.filter((x) => x !== id))
     }, [])
 
     useEffect(() => {
@@ -64,7 +88,7 @@ function CrowdStrikeConnector() {
                 setClientId(integration.clientId || '')
                 setBaseUrl(integration.baseUrl || '')
                 setDataIngestionUrl(integration.dataIngestionUrl || '')
-                setRecurringIntervalSeconds(String(integration.recurringIntervalSeconds || 3600))
+                setRecurringIntervalSeconds(String(integration.recurringIntervalSeconds || 21600))
                 setIsSaved(true)
 
                 api.fetchCrowdStrikeDevices().then((devRes) => {
@@ -79,7 +103,7 @@ function CrowdStrikeConnector() {
     const handleSave = () => {
         api.addCrowdStrikeIntegration(
             clientId, clientSecret || null, baseUrl || null,
-            dataIngestionUrl, aktoApiToken || null, parseInt(recurringIntervalSeconds) || 3600
+            dataIngestionUrl, aktoApiToken || null, parseInt(recurringIntervalSeconds) || 21600
         ).then(() => {
             setClientSecret('')
             setAktoApiToken('')
@@ -91,7 +115,7 @@ function CrowdStrikeConnector() {
     const handleRemove = () => {
         api.removeCrowdStrikeIntegration().then(() => {
             setClientId(''); setClientSecret(''); setBaseUrl('')
-            setDataIngestionUrl(''); setAktoApiToken(''); setRecurringIntervalSeconds('3600'); setIsSaved(false)
+            setDataIngestionUrl(''); setAktoApiToken(''); setRecurringIntervalSeconds('21600'); setIsSaved(false)
             func.setToast(true, false, 'CrowdStrike integration removed successfully')
         }).catch(() => func.setToast(true, true, 'Failed to remove CrowdStrike integration'))
     }
@@ -123,12 +147,34 @@ function CrowdStrikeConnector() {
             .then((result) => {
                 const execution = result.guardrailExecution || {}
                 const s = execution.successCount || 0
+                const d = execution.dispatchedCount || 0
                 const f = execution.failCount || 0
                 const t = execution.totalCount || 0
-                func.setToast(true, false, `Guardrails executed: ${s}/${t} successful, ${f} failed`)
+                const dispatched = s + d
+                func.setToast(true, f > 0, `Guardrails: ${dispatched}/${t} dispatched${f > 0 ? `, ${f} failed` : ''}`)
             })
             .catch(() => func.setToast(true, true, 'Failed to save and execute guardrails'))
             .finally(() => setExecutingGuardrails(false))
+    }
+
+    // ── Discovery job targeting ──────────────────────────────────────────────
+
+    const handleScheduleDiscovery = () => {
+        if (!runDiscoveryOnAllDevices && selectedDiscoveryDeviceIds.length === 0) {
+            func.setToast(true, true, 'Please select at least one device')
+            return
+        }
+
+        const targetMode = runDiscoveryOnAllDevices ? 'all' : 'select'
+        const deviceIds = runDiscoveryOnAllDevices ? [] : selectedDiscoveryDeviceIds
+
+        setSchedulingDiscovery(true)
+        api.scheduleCrowdStrikeDiscovery(targetMode, deviceIds)
+            .then(() => {
+                func.setToast(true, false, 'CrowdStrike discovery scheduled successfully')
+            })
+            .catch(() => func.setToast(true, true, 'Failed to schedule CrowdStrike discovery'))
+            .finally(() => setSchedulingDiscovery(false))
     }
 
     const isSaveDisabled = !clientId || !dataIngestionUrl || (!clientSecret && !isSaved) || (!aktoApiToken && !isSaved)
@@ -180,6 +226,82 @@ function CrowdStrikeConnector() {
 
             {isSaved && (
                 <VerticalStack gap="4">
+                    <Box paddingBlockStart="1"><Divider /></Box>
+
+                    <VerticalStack gap="4">
+                        <Text variant="headingMd">Discovery Targeting</Text>
+                        <Text variant="bodySm" color="subdued">
+                            Choose which devices the recurring discovery job (AI agent, MCP config, and skills scan) runs against. This is read-only — it does not modify anything on the endpoint.
+                        </Text>
+
+                        <Checkbox
+                            label="Run on all devices"
+                            checked={runDiscoveryOnAllDevices}
+                            onChange={(checked) => setRunDiscoveryOnAllDevices(checked)}
+                            helpText="Run discovery on all CrowdStrike Falcon managed endpoints"
+                        />
+                        {!runDiscoveryOnAllDevices && (
+                            <Box paddingInlineStart="6">
+                                <VerticalStack gap="2">
+                                    <Combobox
+                                        allowMultiple
+                                        activator={
+                                            <Combobox.TextField
+                                                prefix={<Icon source={SearchMinor} />}
+                                                onChange={setDiscoverySearchInput}
+                                                label="Search devices"
+                                                value={discoverySearchInput}
+                                                placeholder="Search by username or hostname..."
+                                                autoComplete="off"
+                                            />
+                                        }
+                                    >
+                                        {discoveryFilteredOptions.length > 0 ? (
+                                            <Listbox onSelect={toggleDiscoveryDevice}>
+                                                {discoveryFilteredOptions.map((opt) => (
+                                                    <Listbox.Option
+                                                        key={opt.value}
+                                                        value={opt.value}
+                                                        selected={selectedDiscoveryDeviceIds.includes(opt.value)}
+                                                        accessibilityLabel={opt.label}
+                                                    >
+                                                        {`${opt.label} (${opt.os}) [${opt.deviceId}]`}
+                                                    </Listbox.Option>
+                                                ))}
+                                            </Listbox>
+                                        ) : null}
+                                    </Combobox>
+                                    {selectedDiscoveryDeviceIds.length > 0 && (
+                                        <HorizontalStack gap="1" wrap>
+                                            {selectedDiscoveryDeviceIds.map((id) => {
+                                                const opt = allOptions.find((o) => o.value === id)
+                                                return (
+                                                    <Tag key={id} onRemove={() => removeDiscoveryDevice(id)}>
+                                                        {opt ? `${opt.label} (${opt.os})` : id}
+                                                    </Tag>
+                                                )
+                                            })}
+                                        </HorizontalStack>
+                                    )}
+                                    <Text variant="bodySm" color="subdued">
+                                        {selectedDiscoveryDeviceIds.length} of {devices.length} device(s) selected
+                                    </Text>
+                                </VerticalStack>
+                            </Box>
+                        )}
+
+                        <HorizontalStack align="end">
+                            <Button
+                                primary
+                                onClick={handleScheduleDiscovery}
+                                loading={schedulingDiscovery}
+                                disabled={schedulingDiscovery || (!runDiscoveryOnAllDevices && selectedDiscoveryDeviceIds.length === 0)}
+                            >
+                                Run Discovery
+                            </Button>
+                        </HorizontalStack>
+                    </VerticalStack>
+
                     <Box paddingBlockStart="1"><Divider /></Box>
 
                     <VerticalStack gap="4">
@@ -247,7 +369,7 @@ function CrowdStrikeConnector() {
                                                                 onChange={setSearchInput}
                                                                 label="Search devices"
                                                                 value={searchInput}
-                                                                placeholder="Search and select devices..."
+                                                                placeholder="Search by username or hostname..."
                                                                 autoComplete="off"
                                                             />
                                                         }
@@ -261,7 +383,7 @@ function CrowdStrikeConnector() {
                                                                         selected={selectedDeviceIds.includes(opt.value)}
                                                                         accessibilityLabel={opt.label}
                                                                     >
-                                                                        {`${opt.label} (${opt.os})`}
+                                                                        {`${opt.label} (${opt.os}) [${opt.deviceId}]`}
                                                                     </Listbox.Option>
                                                                 ))}
                                                             </Listbox>

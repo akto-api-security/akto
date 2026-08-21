@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        AgenticUsers dropped the old fixed teamName/userRole/ssoTeamName/ssoUserRole/teamSource/
+        roleSource fields in favor of the generic deviceTags model. Those fields still exist on
+        documents written before this change and are otherwise invisible to the app going
+        forward, so backfill them into deviceTags here.
+
+        Only touches documents that still carry a legacy field (ssoTeamName/ssoUserRole/
+        teamSource/roleSource exists) rather than ones with empty deviceTags, because deviceTags
+        can already be non-empty from an unrelated source (e.g. Okta group sync) while the legacy
+        team/role fields are still unconverted — filtering on "deviceTags empty" would silently
+        skip those forever since this changeset only ever runs once per account.
+
+        For the same reason this merges into any existing deviceTags instead of overwriting: a
+        legacy value is only appended where its (key, source) pair isn't already present, so a
+        tag already synced live or already set through the new UI before this migration runs is
+        never duplicated or clobbered. Different sources for the same key (e.g. a manual "team"
+        and an Okta "team") simply coexist afterwards — deviceTags has no single "effective" value
+        to resolve to; every source's tags are used directly wherever tags are read.
+
+        Idempotent: a second run recomputes deviceTags to the same values, and the legacy fields
+        are left in place (harmless, no longer read by the app) so nothing here depends on a prior
+        run having stripped them.
+
+        Not reversible — the merge can't tell which entries came from this backfill afterwards.
+    -->
+
+    <changeSet id="014-account-agent-users-migrate-team-role-to-device-tags" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="agent_users"/>
+        </preConditions>
+        <mongodb:runCommand>
+            <mongodb:command>{
+                "update": "agent_users",
+                "updates": [
+                    {
+                        "q": {
+                            "$or": [
+                                { "ssoTeamName": { "$exists": true } },
+                                { "ssoUserRole": { "$exists": true } },
+                                { "teamSource": { "$exists": true } },
+                                { "roleSource": { "$exists": true } }
+                            ]
+                        },
+                        "u": [
+                            {
+                                "$set": {
+                                    "__legacyTags": {
+                                        "$filter": {
+                                            "input": [
+                                                { "$cond": [ { "$and": [ { "$eq": [ { "$type": "$ssoTeamName" }, "string" ] }, { "$gt": [ { "$strLenCP": { "$trim": { "input": "$ssoTeamName" } } }, 0 ] } ] },
+                                                    { "key": "team", "value": { "$toLower": { "$trim": { "input": "$ssoTeamName" } } }, "source": "okta", "lastUpdatedAt": { "$toLong": { "$divide": [ { "$toLong": "$$NOW" }, 1000 ] } }, "lastUpdatedBy": "migration" }, null ] },
+                                                { "$cond": [ { "$and": [ { "$eq": [ { "$type": "$ssoUserRole" }, "string" ] }, { "$gt": [ { "$strLenCP": { "$trim": { "input": "$ssoUserRole" } } }, 0 ] } ] },
+                                                    { "key": "role", "value": { "$toLower": { "$trim": { "input": "$ssoUserRole" } } }, "source": "okta", "lastUpdatedAt": { "$toLong": { "$divide": [ { "$toLong": "$$NOW" }, 1000 ] } }, "lastUpdatedBy": "migration" }, null ] },
+                                                { "$cond": [ { "$and": [ { "$eq": [ "$teamSource", "manual" ] }, { "$eq": [ { "$type": "$teamName" }, "string" ] }, { "$gt": [ { "$strLenCP": { "$trim": { "input": "$teamName" } } }, 0 ] } ] },
+                                                    { "key": "team", "value": { "$toLower": { "$trim": { "input": "$teamName" } } }, "source": "manual", "lastUpdatedAt": { "$toLong": { "$divide": [ { "$toLong": "$$NOW" }, 1000 ] } }, "lastUpdatedBy": "migration" }, null ] },
+                                                { "$cond": [ { "$and": [ { "$eq": [ "$roleSource", "manual" ] }, { "$eq": [ { "$type": "$userRole" }, "string" ] }, { "$gt": [ { "$strLenCP": { "$trim": { "input": "$userRole" } } }, 0 ] } ] },
+                                                    { "key": "role", "value": { "$toLower": { "$trim": { "input": "$userRole" } } }, "source": "manual", "lastUpdatedAt": { "$toLong": { "$divide": [ { "$toLong": "$$NOW" }, 1000 ] } }, "lastUpdatedBy": "migration" }, null ] }
+                                            ],
+                                            "as": "t",
+                                            "cond": { "$ne": [ "$$t", null ] }
+                                        }
+                                    }
+                                }
+                            },
+                            { "$set": { "__existingTags": { "$ifNull": [ "$deviceTags", [] ] } } },
+                            { "$set": { "__existingKeySource": { "$map": { "input": "$__existingTags", "as": "e", "in": { "$concat": [ "$$e.key", "|", "$$e.source" ] } } } } },
+                            {
+                                "$set": {
+                                    "__newLegacyTags": {
+                                        "$filter": {
+                                            "input": "$__legacyTags",
+                                            "as": "lt",
+                                            "cond": { "$not": [ { "$in": [ { "$concat": [ "$$lt.key", "|", "$$lt.source" ] }, "$__existingKeySource" ] } ] }
+                                        }
+                                    }
+                                }
+                            },
+                            { "$set": { "deviceTags": { "$concatArrays": [ "$__existingTags", "$__newLegacyTags" ] } } },
+                            { "$unset": [ "__legacyTags", "__existingTags", "__existingKeySource", "__newLegacyTags" ] }
+                        ],
+                        "multi": true
+                    }
+                ]
+            }</mongodb:command>
+        </mongodb:runCommand>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

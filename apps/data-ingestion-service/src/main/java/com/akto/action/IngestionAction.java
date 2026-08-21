@@ -92,5 +92,5 @@ public class IngestionAction extends ActionSupport {
         success = true;
         return Action.SUCCESS.toUpperCase();
     }
-    
+
 }

@@ -79,19 +79,11 @@ export function countAgentComponentsTab(asset, { inlineComponents = [], configVi
     return mcpCount + toolCount + skills + config;
 }
 
-// LLM traffic on the agent host (/v1/messages) — Cowork, Claude CLI, etc.
-export function isAgentLlmMessagesUrl(url) {
-    const u = String(url || "");
-    return u === "/v1/messages" || u.startsWith("/v1/messages/");
-}
-
-// Observed tools + inline LLM on the agent collection for topology graphs.
-export function buildAgentInlineTopologyComponents(stiEndpoints = [], builtinTools = [], asset = {}) {
+// Observed tools + inline LLM on the agent collection for topology graphs. hasLlm/toolNames come
+// from AgenticObserveAction.fetchAgenticAssetDetail's own server-side summary (scoped to just this
+// asset's collections) — the browser no longer fetches raw STI endpoints itself to derive these.
+export function buildAgentInlineTopologyComponents(hasLlm, toolNames = [], asset = {}) {
     const items = [];
-    const hasLlm = (stiEndpoints || []).some((ep) => {
-        const url = ep?.url || ep?._id?.url;
-        return isAgentLlmMessagesUrl(url);
-    });
     if (hasLlm) {
         const tag = asset?.assetTagValue || asset?.name || "claude";
         const label = tag.toLowerCase().includes("claude")
@@ -99,11 +91,8 @@ export function buildAgentInlineTopologyComponents(stiEndpoints = [], builtinToo
             : formatDisplayName(tag);
         items.push({ id: "inline-llm", cat: "ai-model", type: "LLM", label, edgeColor: "#ec4899" });
     }
-    const seenTools = new Set();
-    (builtinTools || []).forEach((tool, i) => {
-        const name = tool?.name;
-        if (!name || seenTools.has(name)) return;
-        seenTools.add(name);
+    (toolNames || []).forEach((name, i) => {
+        if (!name) return;
         items.push({ id: `inline-tool-${i}`, cat: "mcp", type: "Tool", label: name, edgeColor: "#4cbebb" });
     });
     return items;
@@ -198,7 +187,8 @@ function bucketFromAuditType(type) {
 // Fallback when no audit record matches — mirrors getMethod() in GetPrettifyEndpoint.jsx.
 // MCP protocol endpoints (/mcp/initialize, /mcp/tools/list) are Server-type infrastructure.
 function bucketFromUrl(url) {
-    const u = String(url || "").toLowerCase();
+    // Path only — a query string (e.g. Gemini's "bl=...-server_...") can false-match these keywords.
+    const u = String(url || "").split("?")[0].toLowerCase();
     if (u.includes("skill")) return "Skill";
     if (u.includes("resource")) return "Resource";
     if (u.includes("prompt")) return "Prompt";
@@ -233,7 +223,7 @@ export function buildMcpComponentsFromStis(stiEndpoints = [], apiInfoList = [], 
         const u = info?.id?.url;
         if (!m || !u) return;
         const vCount = Object.values(info.violations || {}).reduce((a, b) => a + (b || 0), 0);
-        infoByKey[`${m} ${u}`] = { riskScore: info.riskScore || 0, violations: vCount };
+        infoByKey[`${m} ${u}`] = { riskScore: info.riskScore || 0, violations: vCount, description: info.description || "" };
     });
 
     // type + risk metadata lookup keyed by resourceName
@@ -272,7 +262,7 @@ export function buildMcpComponentsFromStis(stiEndpoints = [], apiInfoList = [], 
         const hasPrivilegedAccess = privilegedByName[name] || false;
         const riskDescription = riskDescByName[name] || "";
         const riskScore = info.riskScore || 0;
-        const item = { id: id++, name, url, method, apiCollectionId, description: "", riskScore, riskLevel: isMalicious ? "critical" : null, isMalicious, hasPrivilegedAccess, riskDescription, params: [], violations: info.violations || 0 };
+        const item = { id: id++, name, url, method, apiCollectionId, description: info.description || "", riskScore, riskLevel: isMalicious ? "critical" : null, isMalicious, hasPrivilegedAccess, riskDescription, params: [], violations: info.violations || 0 };
         if (type === "Skill") {
             skills.push(item);
         } else if (type === "Resource") {
@@ -296,6 +286,8 @@ export function buildSkillsFlyoutData(collection, apiInfoList = [], stiEndpoints
     const urlBySkill = {};
     const methodBySkill = {};
     const descriptionBySkill = {};
+    const threatScoreBySkill = {};
+    const hasThreatTagBySkill = {};
 
     const skillNameFromUrl = (url) => {
         if (!url) return null;
@@ -316,6 +308,12 @@ export function buildSkillsFlyoutData(collection, apiInfoList = [], stiEndpoints
         riskBySkill[skillName] = Math.max(riskBySkill[skillName] || 0, info.riskScore || 0);
         const vCount = Object.values(info.violations || {}).reduce((a, b) => a + (b || 0), 0);
         if (vCount > 0) violationsBySkill[skillName] = vCount;
+        threatScoreBySkill[skillName] = Math.max(threatScoreBySkill[skillName] || 0, info.threatScore || 0);
+        const hasThreatTag = (info.tagsList || []).some((t) =>
+            (((t.keyName === "skill-tags" || t.key === "skill-tags") && t.value && !/^version=/i.test(t.value)) ||
+             ((t.keyName === "malicious-skill-tag" || t.key === "malicious-skill-tag") && t.value === "true"))
+        );
+        if (hasThreatTag) hasThreatTagBySkill[skillName] = true;
     });
 
     // Also pick up skills present as STI endpoints (SKILL /skills/<name>) that may not yet have apiInfo
@@ -340,25 +338,30 @@ export function buildSkillsFlyoutData(collection, apiInfoList = [], stiEndpoints
         method: methodBySkill[name] || "SKILL",
         apiCollectionId,
         description: descriptionBySkill[name] || "",
+        threatScore: threatScoreBySkill[name] || 0,
+        isThreatEnabled: (threatScoreBySkill[name] || 0) > 0 || !!hasThreatTagBySkill[name],
     }));
 
     return { skills };
 }
 
-function buildModuleDeviceMap(moduleInfos = []) {
+export function buildModuleDeviceMap(moduleInfos = []) {
     const map = {};
     moduleInfos.forEach((module) => {
         if (!module?.name) return;
         const ad = module.additionalData || {};
         map[module.name] = {
             username: ad.username || ad.userName || ad.user || ad.email || "-",
-            team: ad.team || "",
-            role: ad.userRole || "",
             os: ad.os || null,
             browserName: ad.browserName || null,
         };
     });
     return map;
+}
+
+function tagsForUsername(username, userMetadataMap) {
+    if (!username || username === "-") return [];
+    return userMetadataMap[username]?.tags || [];
 }
 
 /**
@@ -500,7 +503,7 @@ export function buildDeviceEndpointsPageData(
     collections,
     trafficMap = {},
     riskScoreMap = {},
-    { moduleInfos = [], usernameMap = {}, violationsByCollectionId = {}, violationRows = [], startTimestamp = 0, endTimestamp = 0 } = {},
+    { moduleInfos = [], usernameMap = {}, userMetadataMap = {}, violationsByCollectionId = {}, violationRows = [], startTimestamp = 0, endTimestamp = 0 } = {},
 ) {
     const agenticCollections = collections.filter((c) => !c.deactivated);
     const deviceModules = buildModuleDeviceMap(moduleInfos);
@@ -531,8 +534,7 @@ export function buildDeviceEndpointsPageData(
                 // Reported directly by the browser extension itself (module_info.additionalData.browserName).
                 browserName: mod.browserName || null,
                 username,
-                team: mod.team || "",
-                role: mod.role || "",
+                tags: tagsForUsername(username, userMetadataMap),
                 maxRisk: 0,
                 maxTraffic: 0,
                 hasPersonalAccount: false,
@@ -590,8 +592,6 @@ export function buildDeviceEndpointsPageData(
             const mod = deviceModules[devId];
             const device = deviceMap[devId];
             if (!device.os) device.os = mod.os || null;
-            if (!device.team) device.team = mod.team || "";
-            if (!device.role) device.role = mod.role || "";
         }
     });
 
@@ -608,8 +608,7 @@ export function buildDeviceEndpointsPageData(
             userCount: 1,
             riskScore: Math.round(device.maxRisk * 10) / 10,
             username: device.username,
-            group: device.team,
-            role: device.role,
+            tags: device.tags,
             violations: { ...device.violations },
             lastTraffic: device.maxTraffic > 0 ? func.prettifyEpoch(device.maxTraffic) : "-",
             lastTrafficEpoch: device.maxTraffic || 0,

@@ -130,6 +130,17 @@ public class BackwardCompatibility {
     public static final String CLEANUP_API_INFO_TAGS = "cleanupApiInfoTags";
     private int cleanupApiInfoTags;
 
+    // One-time conversion of the old fixed teamName/userRole fields (pre-DeviceTag redesign) into
+    // AgenticUsers.deviceTags. See BackwardCompatibilityUtils.
+    public static final String MIGRATE_TEAM_ROLE_TO_DEVICE_TAGS = "migrateTeamRoleToDeviceTags";
+    private int migrateTeamRoleToDeviceTags;
+
+    // One-time conversion of GuardrailPolicies' old fixed targetTeams/targetRoles fields into the
+    // generic targetTags model. Must run after MIGRATE_TEAM_ROLE_TO_DEVICE_TAGS so the "team"/
+    // "role" tag keys line up with what that migration writes onto agent_users.
+    public static final String MIGRATE_GUARDRAIL_TARGET_TEAMS_ROLES_TO_TAGS = "migrateGuardrailTargetTeamsRolesToTags";
+    private int migrateGuardrailTargetTeamsRolesToTags;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,

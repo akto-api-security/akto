@@ -66,9 +66,10 @@ export const HARMFUL_CATEGORY_INFO = {
         ]
     },
     insults: {
-        description: "Controls how aggressively insulting language is caught.",
+        description: "Controls how aggressively insulting or vulgar language is caught.",
         examples: [
-            { label: "Low", text: "You're an idiot and everyone around you knows it." }
+            { label: "Low", text: "You're an idiot and everyone around you knows it." },
+            { label: "High", text: "For fuck's sake just do what I asked already." }
         ]
     },
     sexual: {
@@ -106,10 +107,6 @@ export const LANGUAGE_SAFETY_DESCRIPTIONS = {
     sentimentConfidenceThreshold: {
         description: "Higher values are more permissive (fewer prompts blocked); lower values are stricter.",
         examples: []
-    },
-    profanity: {
-        description: "Automatically redacts common swear words from prompts and responses before they reach the model. Add your own words below to extend the built-in list.",
-        examples: [{ text: "This f***ing thing is broken." }]
     }
 };
 
@@ -178,6 +175,14 @@ export const CUSTOM_GUARDRAILS_DESCRIPTIONS = {
     },
     llmConfidenceThreshold: {
         description: 'A prompt is blocked once the LLM\'s own confidence that it violates your rule exceeds this number. Examples assume the rule "Block requests for competitor pricing."',
+        examples: []
+    },
+    llmRedactionRule: {
+        description: 'Write a plain-language instruction describing what to mask; an LLM finds the matching text and replaces it in place, then lets the request through. Example: "Redact customer full names and home addresses." Use this instead of a block rule when the request should still succeed with the sensitive parts removed.',
+        examples: []
+    },
+    redactionConfidenceThreshold: {
+        description: 'Text is only masked once the LLM\'s confidence that it matches your instruction exceeds this number. Lower it to catch more, raise it to reduce false redactions.',
         examples: []
     },
     externalModel: {

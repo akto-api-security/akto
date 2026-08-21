@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        ApiInfoDao gained getLastTrafficSeenForCollections/getRiskScoreForCollections and
+        SingleTypeInfoDao gained getSensitiveSubtypesDetectedForCollections — Filters.in(collectionIds)
+        siblings of existing unscoped aggregation methods, added so a single-asset-scoped page
+        (AgenticObserveAction.fetchAgenticAssetEndpointsPage) can read a handful of entries without
+        pulling the whole account's traffic/risk/sensitive maps. No-op: read-only aggregations over
+        existing api_info/single_type_info fields, no new/changed/removed field, index, or collection.
+        This changeset exists only to satisfy prod.yml's DAO-migration-required check for the DAO
+        files touched by that change.
+    -->
+
+    <changeSet id="014-account-agentic-scoped-collection-queries" author="akto">
+        <empty/>
+    </changeSet>
+
+</databaseChangeLog>

@@ -502,6 +502,14 @@ const api = {
         })
     },
 
+    scheduleCrowdStrikeDiscovery(discoveryTargetMode, discoveryDeviceIds) {
+        return request({
+            url: '/api/scheduleCrowdStrikeDiscovery',
+            method: 'post',
+            data: { discoveryTargetMode, discoveryDeviceIds }
+        })
+    },
+
     initiateCopilotStudioMultiEnvSetup(tenantId, clientId, clientSecret, dataIngestionUrl) {
         return request({
             url: '/api/copilotStudio/multiEnv/initiate',
@@ -529,6 +537,22 @@ const api = {
     removeCopilotStudioMultiEnvIntegration() {
         return request({
             url: '/api/copilotStudio/multiEnv/remove',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    reconnectCopilotStudioMultiEnvIntegration() {
+        return request({
+            url: '/api/copilotStudio/multiEnv/reconnect',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    enableCopilotStudioMultiEnvAgentGraph() {
+        return request({
+            url: '/api/copilotStudio/multiEnv/enableAgentGraph',
             method: 'post',
             data: {}
         })

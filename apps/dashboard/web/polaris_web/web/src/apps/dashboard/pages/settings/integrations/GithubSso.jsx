@@ -22,7 +22,9 @@ function GithubSso() {
     const location = window.location ;
     const hostname = location.origin;
 
-    const homepageUrl = hostname + "/dashboard/onboarding"
+    // Onboarding flow disabled - point the registered homepage at the dashboard instead.
+    // const homepageUrl = hostname + "/dashboard/onboarding"
+    const homepageUrl = hostname + "/dashboard/observe/inventory"
     const callBackUrl = hostname + "/signup-github"
 
     const integrationSteps = [

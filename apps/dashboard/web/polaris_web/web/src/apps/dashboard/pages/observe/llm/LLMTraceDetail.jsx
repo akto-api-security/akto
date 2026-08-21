@@ -22,9 +22,10 @@ function spanWaterfallLabel(span, index) {
     if (span.responsePayload) {
         try {
             const resp = JSON.parse(span.responsePayload);
-            const toolCalls = resp.choices?.[0]?.message?.tool_calls;
+            // OpenAI nests tool calls under choices[0].message; agent/MCP spans put them at the root.
+            const toolCalls = resp.choices?.[0]?.message?.tool_calls || resp.tool_calls;
             if (toolCalls?.length) {
-                const names = toolCalls.map(tc => tc.function?.name).filter(Boolean);
+                const names = toolCalls.map(tc => tc.function?.name || tc.name).filter(Boolean);
                 if (names.length) return names.join(", ");
             }
         } catch (_) {}

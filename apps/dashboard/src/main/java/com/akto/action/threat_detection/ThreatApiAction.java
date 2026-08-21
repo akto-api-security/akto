@@ -1,6 +1,7 @@
 package com.akto.action.threat_detection;
 
 import com.akto.ProtoMessageUtils;
+import com.akto.action.threat_detection.utils.ThreatsUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
@@ -18,6 +19,8 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse.ActorsCount;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchDashboardTopDataResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchSkillSeverityCountsResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.List;
@@ -30,7 +33,6 @@ import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
 import org.bson.Document;
 import lombok.Getter;
 
@@ -59,6 +61,8 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
 
   @Getter List<TopApiData> topApis;
   @Getter List<TopHostData> topHosts;
+  @Getter List<HostSeverityCount> hostSeverityCounts;
+  @Getter List<SkillSeverityCount> skillSeverityCounts;
 
   @Getter List<DashboardTopActorData> dashboardTopActors;
   @Getter List<DashboardTopApiData> dashboardTopApis;
@@ -129,7 +133,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<ThreatCategoryWiseCountResponse>toProtoMessage(
           ThreatCategoryWiseCountResponse.class, responseBody)
@@ -177,7 +181,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<ThreatSeverityWiseCountResponse>toProtoMessage(
         ThreatSeverityWiseCountResponse.class, responseBody)
@@ -217,7 +221,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<DailyActorsCountResponse>toProtoMessage(
         DailyActorsCountResponse.class, responseBody)
@@ -266,7 +270,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<ThreatActivityTimelineResponse>toProtoMessage(
         ThreatActivityTimelineResponse.class, responseBody)
@@ -318,7 +322,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<ListThreatApiResponse>toProtoMessage(
           ListThreatApiResponse.class, responseBody)
@@ -365,7 +369,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<FetchTopNDataResponse>toProtoMessage(
         FetchTopNDataResponse.class, responseBody)
@@ -385,6 +389,91 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
                         smr.getAttacks()
                     )).collect(Collectors.toList());
               });
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
+  // Per-host severity counts for the whole date range (every host, not top-N) — lets a caller attribute
+  // violation counts to its own asset/device groupings via the host join key without pulling every raw
+  // malicious-event doc (up to the 100k cap, tens of MB) to the browser to run a per-row severity tally.
+  public String fetchHostSeverityCounts() {
+    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_host_severity_counts", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTs);
+        put("end_ts", endTs);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
+
+      ProtoMessageUtils.<FetchHostSeverityCountsResponse>toProtoMessage(
+        FetchHostSeverityCountsResponse.class, responseBody)
+          .ifPresent(
+              m -> this.hostSeverityCounts = m.getHostCountsList().stream()
+                  .map(smr -> new HostSeverityCount(
+                      smr.getHost(),
+                      smr.getCritical(),
+                      smr.getHigh(),
+                      smr.getMedium(),
+                      smr.getLow()
+                  )).collect(Collectors.toList()));
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
+  // Per-skill-name severity counts for the whole date range — the skill-name equivalent of
+  // fetchHostSeverityCounts above. Skill invocations aren't attributable by host/collection (a
+  // skill's declaring collection is shared with the agent/device that invoked it), so this is
+  // keyed by the skill name extracted server-side from the /skills/<name> endpoint instead.
+  public String fetchSkillSeverityCounts() {
+    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_skill_severity_counts", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTs);
+        put("end_ts", endTs);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
+
+      ProtoMessageUtils.<FetchSkillSeverityCountsResponse>toProtoMessage(
+        FetchSkillSeverityCountsResponse.class, responseBody)
+          .ifPresent(
+              m -> this.skillSeverityCounts = m.getSkillCountsList().stream()
+                  .map(smr -> new SkillSeverityCount(
+                      smr.getSkillName(),
+                      smr.getCritical(),
+                      smr.getHigh(),
+                      smr.getMedium(),
+                      smr.getLow()
+                  )).collect(Collectors.toList()));
     } catch (Exception e) {
       e.printStackTrace();
       return ERROR.toUpperCase();
@@ -485,7 +574,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<FetchDashboardTopDataResponse>toProtoMessage(
           FetchDashboardTopDataResponse.class, responseBody)

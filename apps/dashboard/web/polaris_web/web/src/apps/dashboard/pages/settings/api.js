@@ -406,7 +406,10 @@ const settingRequests = {
     },
 
     saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, opts = {}) {
-        const data = { oktaGroupToAktoUserRoleMap }
+        const data = {
+            oktaGroupToAktoUserRoleMap,
+            syncGroupsToUserTags: opts.syncGroupsToUserTags === true,
+        }
         if (Object.prototype.hasOwnProperty.call(opts, 'managementApiToken')) {
             const t = opts.managementApiToken
             // Struts cannot distinguish JSON null from omitted String fields; send "" to mean "clear stored token".
@@ -655,18 +658,18 @@ const settingRequests = {
             data: {}
         })
     },
-    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, allowedFeaturesForUser) {
+    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled) {
         return request({
             url: '/api/createCustomRole',
             method: 'post',
-            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole, allowedFeaturesForUser }
+            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled }
         })
     },
-    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, allowedFeaturesForUser) {
+    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled) {
         return request({
             url: '/api/updateCustomRole',
             method: 'post',
-            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole, allowedFeaturesForUser}
+            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled}
         })
     },
     deleteCustomRole(roleName) {
@@ -874,6 +877,30 @@ const settingRequests = {
             data: { filter }
         })
     },
+    // ATLAS: server-side paginated Endpoint Shield agents (replaces the load-all fetchModuleInfo on that page)
+    async fetchEndpointShieldAgents({ skip = 0, limit = 20, sortKey = "lastHeartbeat", sortOrder = -1, hostnames = [], usernames = [], deviceIds = [], oses = [], queryValue = "", startTimestamp = 0, endTimestamp = 0 } = {}) {
+        return await request({
+            url: '/api/fetchEndpointShieldAgents',
+            method: 'post',
+            data: { skip, limit, sortKey, sortOrder, hostnames, usernames, deviceIds, oses, queryValue, startTimestamp, endTimestamp }
+        })
+    },
+    async fetchEndpointShieldFilterOptions() {
+        return await request({
+            url: '/api/fetchEndpointShieldFilterOptions',
+            method: 'post',
+            data: {}
+        })
+    },
+    // ATLAS: username/team lookup only — projected fields, not every device's full module doc
+    // (replaces fetchModuleInfo(MCP_ENDPOINT_SHIELD) as the source for endpointShieldHelper.js)
+    async fetchEndpointShieldUserMetadata() {
+        return await request({
+            url: '/api/fetchEndpointShieldUserMetadata',
+            method: 'post',
+            data: {}
+        })
+    },
     async deleteModuleInfo(moduleIds) {
         return await request({
             url: '/api/deleteModuleInfo',
@@ -881,18 +908,19 @@ const settingRequests = {
             data: { moduleIds }
         })
     },
-    async updateUserDeviceTag(username, team, userRole) {
+    /** tags: { [key]: string[] } — only the keys present are touched; other tags are left alone. */
+    async updateUserDeviceTag(username, tags) {
         return await request({
             url: '/api/updateUserDeviceTag',
             method: 'post',
-            data: { username, team, userRole }
+            data: { username, tags }
         })
     },
-    async bulkUpdateUserDeviceTag(usernames, team, userRole) {
+    async bulkUpdateUserDeviceTag(usernames, tags) {
         return await request({
             url: '/api/bulkUpdateUserDeviceTag',
             method: 'post',
-            data: { usernames, team, userRole }
+            data: { usernames, tags }
         })
     },
     async fetchAgenticUsers(params = {}) {
@@ -954,13 +982,6 @@ const settingRequests = {
     async resetCollectionAccessTypes() {
         return await request({
             url: '/api/resetCollectionAccessTypes',
-            method: 'post',
-            data: {}
-        })
-    },
-    getAllowedFeaturesForRBAC() {
-        return request({
-            url: '/api/allowedFeaturesForRBAC',
             method: 'post',
             data: {}
         })
@@ -1080,6 +1101,13 @@ const settingRequests = {
             url: '/api/updateFilterLogPolicy',
             method: 'post',
             data: {filterLogPolicy}
+        })
+    },
+    updateRuntimeEnvOverrides(runtimeEnvOverrides) {
+        return request({
+            url: '/api/updateRuntimeEnvOverrides',
+            method: 'post',
+            data: {runtimeEnvOverrides}
         })
     },
     rebootModules(moduleIds, deleteTopicAndReboot = false) {

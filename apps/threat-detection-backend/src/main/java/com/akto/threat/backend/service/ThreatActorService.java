@@ -26,6 +26,8 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchThreatsForActorRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchThreatsForActorResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchSkillSeverityCountsResponse;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.utils.ThreatUtils;
@@ -46,7 +48,9 @@ import com.mongodb.client.model.WriteModel;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import java.util.Map;
 
 import org.bson.Document;
@@ -520,6 +524,7 @@ public class ThreatActorService {
         if (!contextFilter.isEmpty()) {
             match.putAll(contextFilter);
         }
+        match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
         List<Document> pipeline = new ArrayList<>();
         if (!match.isEmpty()) pipeline.add(new Document("$match", match));
@@ -616,6 +621,7 @@ public class ThreatActorService {
     if (!contextFilter.isEmpty()) {
         matchConditions.putAll(contextFilter);
     }
+    matchConditions.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
         pipeline.add(new Document("$match", matchConditions));
     
@@ -817,6 +823,7 @@ public class ThreatActorService {
     if (!contextFilter.isEmpty()) {
       eventsMatch.putAll(contextFilter);
     }
+    eventsMatch.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
     // Daily actor counts from malicious_events (for chart daily breakdown)
     List<DailyActorsCountResponse.ActorsCount> dailyActors = new ArrayList<>();
@@ -933,6 +940,7 @@ public class ThreatActorService {
     if (!contextFilter.isEmpty()) {
         match.putAll(contextFilter);
     }
+    match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
       List<Document> pipeline = Arrays.asList(
         new Document("$match", match),
@@ -1161,6 +1169,7 @@ public class ThreatActorService {
     if (!contextFilter.isEmpty()) {
         match.putAll(contextFilter);
     }
+    match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
   pipeline.add(new Document("$match", match));
 
@@ -1344,6 +1353,7 @@ public class ThreatActorService {
         if (!contextFilter.isEmpty()) {
             match.putAll(contextFilter);
         }
+        match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
         if (!match.isEmpty()) {
             pipeline.add(new Document("$match", match));
@@ -1433,6 +1443,187 @@ public class ThreatActorService {
         .build();
   }
 
+  // Per-host severity counts for the whole date range — every host, not just a top-N. Lets a caller
+  // (e.g. the agentic-assets pages) attribute violation counts to their own asset/device groupings via
+  // the host join key, without pulling every raw event doc (up to the 100k cap, tens of MB) to the
+  // browser just to run a per-row severity tally. Mirrors fetchTopNData's hostPipeline above, but groups
+  // by {host, severity} instead of host alone, and has no result-count limit.
+  public FetchHostSeverityCountsResponse fetchHostSeverityCounts(
+      String accountId, long startTs, long endTs, String contextSource, List<Integer> monthBoundaries) {
+    return fetchHostSeverityCounts(accountId, startTs, endTs, contextSource, monthBoundaries, Collections.emptyList());
+  }
+
+  public FetchHostSeverityCountsResponse fetchHostSeverityCounts(
+      String accountId, long startTs, long endTs, String contextSource, List<Integer> monthBoundaries,
+      List<String> hostFilter) {
+
+    Document match = new Document();
+    if (startTs > 0 || endTs > 0) {
+      Document tsRange = new Document();
+      if (startTs > 0) tsRange.append("$gte", startTs);
+      if (endTs > 0) tsRange.append("$lte", endTs);
+      match.append("detectedAt", tsRange);
+    }
+    if (hostFilter != null && !hostFilter.isEmpty()) {
+      match.append("host", new Document("$in", hostFilter));
+    }
+
+    Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId);
+    if (!contextFilter.isEmpty()) {
+      match.putAll(contextFilter);
+    }
+    match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
+
+    List<Document> pipeline = new ArrayList<>();
+    if (!match.isEmpty()) {
+      pipeline.add(new Document("$match", match));
+    }
+    pipeline.add(new Document("$match", new Document("host", new Document("$nin", Arrays.asList(null, "")))));
+    pipeline.add(new Document("$addFields",
+        new Document("normalizedSeverity",
+            new Document("$ifNull", Arrays.asList(new Document("$toUpper", "$severity"), "UNKNOWN")))));
+    pipeline.add(new Document("$group",
+        new Document("_id", new Document("host", "$host").append("severity", "$normalizedSeverity"))
+            .append("count", new Document("$sum", 1))));
+
+    Map<String, FetchHostSeverityCountsResponse.HostSeverityCount.Builder> byHost = new HashMap<>();
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        Document id = (Document) doc.get("_id");
+        String host = id.getString("host");
+        String severity = id.getString("severity");
+        int count = doc.getInteger("count", 0);
+
+        FetchHostSeverityCountsResponse.HostSeverityCount.Builder b =
+            byHost.computeIfAbsent(host, h -> FetchHostSeverityCountsResponse.HostSeverityCount.newBuilder().setHost(h));
+        switch (severity) {
+          case "CRITICAL": b.setCritical(b.getCritical() + count); break;
+          case "HIGH":     b.setHigh(b.getHigh() + count); break;
+          case "MEDIUM":   b.setMedium(b.getMedium() + count); break;
+          case "LOW":      b.setLow(b.getLow() + count); break;
+          default: break; // UNKNOWN severity isn't surfaced in any of the 4 buckets the UI renders
+        }
+      }
+    }
+
+    FetchHostSeverityCountsResponse.Builder resp = FetchHostSeverityCountsResponse.newBuilder();
+    for (FetchHostSeverityCountsResponse.HostSeverityCount.Builder b : byHost.values()) {
+      resp.addHostCounts(b.build());
+    }
+
+    if (monthBoundaries != null && !monthBoundaries.isEmpty()) {
+      // Boundary value -> index, keyed as long so lookups below aren't tripped up by Integer/Long
+      // autoboxing mismatches against the bucket ids Mongo hands back.
+      Map<Long, Integer> boundaryIndex = new HashMap<>();
+      List<Long> bucketBoundaries = new ArrayList<>();
+      for (int i = 0; i < monthBoundaries.size(); i++) {
+        long boundary = monthBoundaries.get(i).longValue();
+        boundaryIndex.put(boundary, i);
+        bucketBoundaries.add(boundary);
+      }
+      // One extra boundary past the last month-start so $bucket's exclusive upper bound still
+      // captures events landing on endTs itself, keeping this a single cheap aggregation instead of
+      // pulling per-event timestamps to compute the trend client- or dashboard-side.
+      bucketBoundaries.add(Math.max(endTs + 1, bucketBoundaries.get(bucketBoundaries.size() - 1) + 1));
+
+      List<Document> bucketPipeline = new ArrayList<>();
+      if (!match.isEmpty()) {
+        bucketPipeline.add(new Document("$match", match));
+      }
+      bucketPipeline.add(new Document("$bucket",
+          new Document("groupBy", "$detectedAt")
+              .append("boundaries", bucketBoundaries)
+              .append("default", "__out_of_range__")));
+
+      int[] monthlyCounts = new int[monthBoundaries.size()];
+      try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, bucketPipeline).cursor()) {
+        while (cursor.hasNext()) {
+          Document doc = cursor.next();
+          Object bucketId = doc.get("_id");
+          if (!(bucketId instanceof Number)) continue; // "__out_of_range__" default bucket
+          Integer idx = boundaryIndex.get(((Number) bucketId).longValue());
+          if (idx != null) monthlyCounts[idx] = doc.getInteger("count", 0);
+        }
+      }
+      for (int count : monthlyCounts) resp.addMonthlyTotals(count);
+    }
+
+    return resp.build();
+  }
+
+  // Per-skill-name severity counts for the whole date range — the skill-name equivalent of
+  // fetchHostSeverityCounts, but grouped by the skill name extracted from the /skills/<name>
+  // latestApiEndpoint (skill invocations aren't attributable by host: a skill's declaring
+  // collection is shared with the agent/device that invoked it, so host/collection-based
+  // attribution can't give a skill its own count - see excludeSkillEndpointFilter's own comment).
+  // ENDPOINT (Atlas) context only, matching that same existing convention - empty for other
+  // contexts, since skill invocations only exist there.
+  public FetchSkillSeverityCountsResponse fetchSkillSeverityCounts(
+      String accountId, long startTs, long endTs, String contextSource) {
+
+    FetchSkillSeverityCountsResponse.Builder resp = FetchSkillSeverityCountsResponse.newBuilder();
+    if (!ThreatUtils.isAgenticOrEndpointContext(contextSource)) {
+      return resp.build();
+    }
+
+    Document match = new Document();
+    if (startTs > 0 || endTs > 0) {
+      Document tsRange = new Document();
+      if (startTs > 0) tsRange.append("$gte", startTs);
+      if (endTs > 0) tsRange.append("$lte", endTs);
+      match.append("detectedAt", tsRange);
+    }
+    Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId);
+    if (!contextFilter.isEmpty()) {
+      match.putAll(contextFilter);
+    }
+    match.append("latestApiEndpoint", ThreatUtils.SKILLS_ENDPOINT_PATTERN);
+
+    List<Document> pipeline = new ArrayList<>();
+    pipeline.add(new Document("$match", match));
+    pipeline.add(new Document("$addFields",
+        new Document("normalizedSeverity",
+            new Document("$ifNull", Arrays.asList(new Document("$toUpper", "$severity"), "UNKNOWN")))
+            .append("skillName",
+                new Document("$substrCP", Arrays.asList(
+                    "$latestApiEndpoint",
+                    ThreatUtils.SKILLS_ENDPOINT_PREFIX_LENGTH,
+                    new Document("$subtract", Arrays.asList(
+                        new Document("$strLenCP", "$latestApiEndpoint"),
+                        ThreatUtils.SKILLS_ENDPOINT_PREFIX_LENGTH)))))));
+    pipeline.add(new Document("$group",
+        new Document("_id", new Document("skillName", "$skillName").append("severity", "$normalizedSeverity"))
+            .append("count", new Document("$sum", 1))));
+
+    Map<String, FetchSkillSeverityCountsResponse.SkillSeverityCount.Builder> bySkill = new HashMap<>();
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        Document id = (Document) doc.get("_id");
+        String skillName = id.getString("skillName");
+        String severity = id.getString("severity");
+        int count = doc.getInteger("count", 0);
+        if (StringUtils.isBlank(skillName)) continue;
+
+        FetchSkillSeverityCountsResponse.SkillSeverityCount.Builder b =
+            bySkill.computeIfAbsent(skillName, s -> FetchSkillSeverityCountsResponse.SkillSeverityCount.newBuilder().setSkillName(s));
+        switch (severity) {
+          case "CRITICAL": b.setCritical(b.getCritical() + count); break;
+          case "HIGH":     b.setHigh(b.getHigh() + count); break;
+          case "MEDIUM":   b.setMedium(b.getMedium() + count); break;
+          case "LOW":      b.setLow(b.getLow() + count); break;
+          default: break;
+        }
+      }
+    }
+
+    for (FetchSkillSeverityCountsResponse.SkillSeverityCount.Builder b : bySkill.values()) {
+      resp.addSkillCounts(b.build());
+    }
+    return resp.build();
+  }
+
   public FetchDashboardTopDataResponse fetchDashboardTopData(
       String accountId, long startTs, long endTs, int limit, String contextSource) {
 
@@ -1450,6 +1641,7 @@ public class ThreatActorService {
     if (!contextFilter.isEmpty()) {
       match.putAll(contextFilter);
     }
+    match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
     // --- Top Actors (use malicious_events for accurate time-range filtering) ---
     List<FetchDashboardTopDataResponse.TopActorData> topActors = new ArrayList<>();
