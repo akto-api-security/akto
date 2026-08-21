@@ -332,6 +332,8 @@ public class CopilotStudioWebhookAction extends ActionSupport {
         HttpServletRequest request = ServletActionContext.getRequest();
         BufferedReader reader = new BufferedReader(new InputStreamReader(request.getInputStream()));
         String jsonBody = reader.lines().collect(Collectors.joining("\n"));
+        loggerMaker.info("CopilotStudioWebhookAction - incoming request headers: {}, body: {}",
+            JSONUtils.getString(flattenHeaders()), jsonBody);
         if (jsonBody == null || jsonBody.isEmpty()) {
             return new HashMap<>();
         }
