@@ -27,6 +27,7 @@ public class Cluster {
     public static final String DEPENDENCY_FLOW_CRON= "dependency-flow-cron";
     public static final String DELETE_TESTING_RUN_RESULTS = "delete-testing-run-results";
     public static final String ALERTS_CRON = "alerts-cron";
+    public static final String OKTA_USER_SYNC_CRON = "okta-user-sync-cron";
     public static final String COLLECTION_DESCRIPTION_CRON = "collection-description-cron";
     public static final String ENDPOINT_DESCRIPTION_CRON = "endpoint-description-cron";
     public static final String AGENT_BASE_RISK_SCORE_CRON_INFO = "agent-base-risk-score-cron-info";
