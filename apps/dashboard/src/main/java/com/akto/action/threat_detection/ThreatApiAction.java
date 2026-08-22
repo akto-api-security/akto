@@ -14,12 +14,10 @@ import com.akto.dto.type.URLMethods;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActivityTimelineResponse;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse.ActorsCount;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchDashboardTopDataResponse;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchSkillSeverityCountsResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
@@ -112,49 +110,12 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchThreatCategoryCount() {
-    HttpPost post = new HttpPost(
-        String.format("%s/api/dashboard/get_subcategory_wise_count", this.getBackendUrl()));
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
-    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
-
-    Map<String, Object> body = new HashMap<String, Object>() {
-      {
-        put("start_ts", startTs);
-        put("end_ts", endTs);
-        put("latestAttack", latestAttack);
-        if (severityStatusFilter != null && !severityStatusFilter.isEmpty()) {
-          put("status", severityStatusFilter);
-        }
-      }
-    };
-    String msg = objectMapper.valueToTree(body).toString();
-    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-    post.setEntity(requestEntity);
-
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
-
-      ProtoMessageUtils.<ThreatCategoryWiseCountResponse>toProtoMessage(
-          ThreatCategoryWiseCountResponse.class, responseBody)
-          .ifPresent(
-              m -> {
-                Map<String, String> categoryDisplayNames = getCategoryDisplayNames();
-                this.categoryCounts = m.getCategoryWiseCountsList().stream()
-                    .map(
-                        smr -> {
-                          String displayName = categoryDisplayNames.containsKey(smr.getCategory())
-                              ? categoryDisplayNames.get(smr.getCategory())
-                              : smr.getCategory();
-                          return new ThreatCategoryCount(displayName, smr.getSubCategory(), smr.getCount());
-                        })
-                    .collect(Collectors.toList());
-              });
-    } catch (Exception e) {
-      e.printStackTrace();
-      return ERROR.toUpperCase();
-    }
-
+    Map<String, String> categoryDisplayNames = getCategoryDisplayNames();
+    this.categoryCounts = fetchSubcategoryWiseCounts(startTs, endTs, latestAttack, severityStatusFilter).stream()
+        .map(c -> new ThreatCategoryCount(
+            categoryDisplayNames.getOrDefault(c.getCategory(), c.getCategory()),
+            c.getSubCategory(), c.getCount()))
+        .collect(Collectors.toList());
     return SUCCESS.toUpperCase();
   }
 
@@ -401,41 +362,10 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   // violation counts to its own asset/device groupings via the host join key without pulling every raw
   // malicious-event doc (up to the 100k cap, tens of MB) to the browser to run a per-row severity tally.
   public String fetchHostSeverityCounts() {
-    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_host_severity_counts", this.getBackendUrl()));
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
-    post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
-
-    Map<String, Object> body = new HashMap<String, Object>() {
-      {
-        put("start_ts", startTs);
-        put("end_ts", endTs);
-      }
-    };
-    String msg = objectMapper.valueToTree(body).toString();
-
-    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-    post.setEntity(requestEntity);
-
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
-
-      ProtoMessageUtils.<FetchHostSeverityCountsResponse>toProtoMessage(
-        FetchHostSeverityCountsResponse.class, responseBody)
-          .ifPresent(
-              m -> this.hostSeverityCounts = m.getHostCountsList().stream()
-                  .map(smr -> new HostSeverityCount(
-                      smr.getHost(),
-                      smr.getCritical(),
-                      smr.getHigh(),
-                      smr.getMedium(),
-                      smr.getLow()
-                  )).collect(Collectors.toList()));
-    } catch (Exception e) {
-      e.printStackTrace();
-      return ERROR.toUpperCase();
-    }
-
+    // Shared with the insights backend (InsightsThreatBackendAccess) — see
+    // AbstractThreatDetectionAction.fetchHostSeverityCounts, the single place this
+    // request/response shape is built.
+    this.hostSeverityCounts = fetchHostSeverityCounts(startTs, endTs);
     return SUCCESS.toUpperCase();
   }
 
