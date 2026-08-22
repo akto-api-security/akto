@@ -1,0 +1,15 @@
+[AI_AGENT]
+VS Code is an AI-powered development environment that can understand a codebase, reason across files, and take actions through integrated tools, skills, extensions, and MCP servers.
+Cursor is an AI-powered code editor that can understand a codebase, reason across files, and take actions through integrated agents, tools, skills, and MCP servers.
+Claude is an AI-powered development agent that can understand software projects, reason through complex tasks, and take actions through integrated tools, skills, and MCP servers.
+Antigravity is an AI-powered development agent that can understand software projects, reason across the codebase, and take actions through integrated tools, agents, and connected services.
+
+[MCP_SERVER]
+Razorpay MCP is an MCP server that enables AI agents to understand and interact with Razorpay data and capabilities through exposed tools and resources.
+Notion MCP is an MCP server that enables AI agents to understand and interact with Notion workspaces through tools for accessing and managing workspace content.
+Docker MCP is an MCP server that enables AI agents to understand and interact with Docker environments through tools for managing containers, images, and other resources.
+
+[LLM]
+ChatGPT is an LLM-powered AI assistant that can understand user context, reason through conversations, generate content, and interact with tools and connected services.
+Claude.ai is an LLM-powered AI assistant that can understand user context, reason through complex tasks, generate content, and interact with tools and connected services.
+Grok is an LLM-powered AI assistant that can understand user context, reason across information, generate content, and interact with tools and connected services.
