@@ -3,7 +3,6 @@ package com.akto.util;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.mcp.McpRequestResponseUtils;
-import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import org.apache.commons.lang3.StringUtils;
 
@@ -11,7 +10,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -50,19 +48,6 @@ public final class AgenticObserveUtil {
 
     public static String extractServiceName(String hostName) {
         return McpRequestResponseUtils.extractServiceNameFromHost(hostName);
-    }
-
-
-    private static boolean hasEnvTagValue(ApiCollection collection, String keyName, String value) {
-        if (collection == null || collection.getEnvType() == null) {
-            return false;
-        }
-        for (CollectionTags tag : collection.getEnvType()) {
-            if (tag != null && keyName.equals(tag.getKeyName()) && value.equals(tag.getValue())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     public static String toChildPathKey(String serviceName) {

@@ -199,4 +199,98 @@ public class AbstractThreatDetectionAction extends UserAction {
       return new ArrayList<>();
     }
   }
+
+  /**
+   * Per-host critical/high/medium/low violation counts for the window (not bucketed by
+   * month — see fetchViolationsMonthlyTotals for the trend version). Shared by
+   * ThreatApiAction.fetchHostSeverityCounts (Struts-bound, sets an instance field) and
+   * any plain caller that just wants the list back directly.
+   */
+  protected List<com.akto.action.threat_detection.HostSeverityCount> fetchHostSeverityCounts(int startTimestamp, int endTimestamp) {
+    try {
+      String url = String.format("%s/api/dashboard/get_host_severity_counts", this.getBackendUrl());
+      MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+
+      Map<String, Object> body = new HashMap<String, Object>() {
+        {
+          put("start_ts", startTimestamp);
+          put("end_ts", endTimestamp);
+        }
+      };
+      String msg = objectMapper.valueToTree(body).toString();
+      String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+
+      RequestBody requestBody = RequestBody.create(msg, JSON);
+      Request request = new Request.Builder()
+          .url(url)
+          .post(requestBody)
+          .addHeader("Authorization", "Bearer " + this.getApiToken())
+          .addHeader("Content-Type", "application/json")
+          .addHeader("x-context-source", contextSourceValue)
+          .build();
+
+      try (Response resp = httpClient.newCall(request).execute()) {
+        String responseBody = resp.body() != null ? resp.body().string() : "";
+        return ProtoMessageUtils.<com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsResponse>toProtoMessage(
+            com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsResponse.class,
+            responseBody
+        ).map(m -> m.getHostCountsList().stream()
+            .map(smr -> new com.akto.action.threat_detection.HostSeverityCount(
+                smr.getHost(), smr.getCritical(), smr.getHigh(), smr.getMedium(), smr.getLow()))
+            .collect(Collectors.toList()))
+         .orElse(new ArrayList<>());
+      }
+    } catch (Exception e) {
+      return new ArrayList<>();
+    }
+  }
+
+  /**
+   * (category, subCategory) -> count for the window — a single cheap, backend-cached
+   * aggregation (get_subcategory_wise_count). category/subCategory are returned raw
+   * here; ThreatApiAction.fetchThreatCategoryCount layers its own display-name mapping
+   * on top for the UI. latestAttack/statusFilter are optional server-side narrowing
+   * filters (same shape as ThreatApiAction's own fields) — pass null for the
+   * unfiltered account-wide count.
+   */
+  protected List<com.akto.action.threat_detection.ThreatCategoryCount> fetchSubcategoryWiseCounts(
+      int startTimestamp, int endTimestamp, List<String> latestAttack, String statusFilter) {
+    try {
+      String url = String.format("%s/api/dashboard/get_subcategory_wise_count", this.getBackendUrl());
+      MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+
+      Map<String, Object> body = new HashMap<String, Object>() {
+        {
+          put("start_ts", startTimestamp);
+          put("end_ts", endTimestamp);
+          put("latestAttack", latestAttack);
+          if (statusFilter != null && !statusFilter.isEmpty()) put("status", statusFilter);
+        }
+      };
+      String msg = objectMapper.valueToTree(body).toString();
+      String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+
+      RequestBody requestBody = RequestBody.create(msg, JSON);
+      Request request = new Request.Builder()
+          .url(url)
+          .post(requestBody)
+          .addHeader("Authorization", "Bearer " + this.getApiToken())
+          .addHeader("Content-Type", "application/json")
+          .addHeader("x-context-source", contextSourceValue)
+          .build();
+
+      try (Response resp = httpClient.newCall(request).execute()) {
+        String responseBody = resp.body() != null ? resp.body().string() : "";
+        return ProtoMessageUtils.<com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse>toProtoMessage(
+            com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse.class,
+            responseBody
+        ).map(m -> m.getCategoryWiseCountsList().stream()
+            .map(smr -> new com.akto.action.threat_detection.ThreatCategoryCount(smr.getCategory(), smr.getSubCategory(), smr.getCount()))
+            .collect(Collectors.toList()))
+         .orElse(new ArrayList<>());
+      }
+    } catch (Exception e) {
+      return new ArrayList<>();
+    }
+  }
 }
