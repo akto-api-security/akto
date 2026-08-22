@@ -78,12 +78,13 @@ jobs:
           IMAGE_TAG: kafkalatest
           IMAGE_TAG2: latest
           IMAGE_TAG3: ${{ github.event.inputs.release_version }}_local
+          IMAGE_TAG4: ${{ github.event.inputs.release_version }}
 
         run: |
           docker buildx create --use
-          # Build a docker container and push it to DockerHub 
+          # Build a docker container and push it to DockerHub
           cd apps/database-abstractor
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-database-abstractor:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-database-abstractor:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-database-abstractor:$IMAGE_TAG3 . --push
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-database-abstractor:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-database-abstractor:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-database-abstractor:$IMAGE_TAG3 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-database-abstractor:$IMAGE_TAG4 . --push
 
       - name: DockerHub login
         env:
@@ -100,11 +101,12 @@ jobs:
           IMAGE_TAG: kafkalatest
           IMAGE_TAG2: latest
           IMAGE_TAG3: ${{ github.event.inputs.release_version }}_local
+          IMAGE_TAG4: ${{ github.event.inputs.release_version }}
         run: |
           docker buildx create --use
-          # Build a docker container and push it to DockerHub 
+          # Build a docker container and push it to DockerHub
           cd apps/database-abstractor
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG -t $ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG2 -t $ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG3 . --push
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG -t $ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG2 -t $ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG3 -t $ECR_REGISTRY/akto-api-security-database-abstractor:$IMAGE_TAG4 . --push
 
       - name: Send Github release notification to Slack
         id: slack
