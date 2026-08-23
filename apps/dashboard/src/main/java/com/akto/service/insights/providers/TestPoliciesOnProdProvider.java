@@ -1,0 +1,328 @@
+package com.akto.service.insights.providers;
+
+import com.akto.action.threat_detection.AbstractThreatDetectionAction;
+import com.akto.action.threat_detection.DashboardMaliciousEvent;
+import com.akto.action.threat_detection.ThreatCategoryCount;
+import com.akto.dto.GuardrailPolicies;
+import com.akto.service.insights.DataGap;
+import com.akto.service.insights.EvidenceRow;
+import com.akto.service.insights.EvidenceTable;
+import com.akto.service.insights.InsightCta;
+import com.akto.service.insights.InsightContext;
+import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightId;
+import com.akto.service.insights.InsightMetric;
+import com.akto.service.insights.InsightProvider;
+import com.akto.service.insights.InsightResult;
+import com.akto.service.insights.InsightScope;
+import com.akto.service.insights.InsightStatus;
+import com.akto.service.insights.Loaded;
+import com.akto.service.insights.MetricFormat;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * Actionable item #2 — "Test policies running against production users": policies named for
+ * testing/QA/temp work are still live against real traffic. See akto_insights_actionable_items
+ * card 2 for the worked example this mirrors (karan-test, vrt-test, test-guardrail, ...).
+ */
+public class TestPoliciesOnProdProvider implements InsightProvider {
+
+    private static final List<String> TEST_NAME_MARKERS = Arrays.asList("test", "qa", "temp", "delete");
+    private static final int EVIDENCE_ROW_CAP = 20;
+    private static final int EVENT_PAGE_LIMIT = 500;
+
+    @Override
+    public InsightId getInsightId() {
+        return InsightId.TEST_POLICIES_ON_PROD;
+    }
+
+    @Override
+    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, InsightScope scope,
+                                  AbstractThreatDetectionAction threatClient) {
+        Loaded<List<GuardrailPolicies>> policiesLoaded = bundle.getPolicies();
+        if (!policiesLoaded.isOk()) {
+            return failed("Could not load guardrail policies: " + policiesLoaded.getFailureReason());
+        }
+
+        List<GuardrailPolicies> allPolicies = policiesLoaded.getValue();
+        List<GuardrailPolicies> matched = allPolicies.stream()
+                .filter(p -> isTestNamedPolicy(p.getName()))
+                .collect(Collectors.toList());
+
+        InsightMetric policyCountMetric = new InsightMetric(
+                "test_named_policy_count", "Test-named policies",
+                matched.size(), allPolicies.size(), "count",
+                MetricFormat.ofTotal(matched.size(), allPolicies.size()) + " policies", null);
+
+        InsightResult result = base();
+        if (matched.isEmpty()) {
+            // A confident zero — no policy name matched, not a gap.
+            result.setStatus(InsightStatus.READY.name());
+            result.setHeadline("No test, QA, or temp-named policies found.");
+            result.setMetrics(Collections.singletonList(policyCountMetric));
+            result.setMetricsComplete(true);
+            result.setDataGaps(new ArrayList<>());
+            result.setEvidence(new ArrayList<>());
+            result.setCtas(new ArrayList<>());
+            return result;
+        }
+
+        Map<String, GuardrailPolicies> matchedByLowerName = new HashMap<>();
+        for (GuardrailPolicies p : matched) {
+            matchedByLowerName.put(lower(p.getName()), p);
+        }
+
+        Loaded<List<ThreatCategoryCount>> subCatLoaded = bundle.getSubCategoryCounts();
+        if (!subCatLoaded.isOk()) {
+            result.setStatus(InsightStatus.PARTIAL.name());
+            result.setHeadline(matched.size() + " " + (matched.size() == 1 ? "policy is" : "policies are")
+                    + " named for testing; violation counts are unavailable right now.");
+            result.setMetrics(Collections.singletonList(policyCountMetric));
+            result.setMetricsComplete(false);
+            result.setDataGaps(Collections.singletonList(new DataGap(
+                    "THREAT_BACKEND", "REQUEST_FAILED",
+                    "Violation counts unavailable; showing matched policy names only.")));
+            result.setEvidence(Collections.singletonList(namesOnlyEvidence(matched)));
+            result.setCtas(buildCtas(matched));
+            return result;
+        }
+
+        List<ThreatCategoryCount> allCounts = subCatLoaded.getValue();
+        long totalViolations = allCounts.stream().mapToLong(ThreatCategoryCount::getCount).sum();
+        Map<String, Long> violationsByPolicyLower = new HashMap<>();
+        for (ThreatCategoryCount c : allCounts) {
+            String key = lower(c.getCategory());
+            if (matchedByLowerName.containsKey(key)) {
+                violationsByPolicyLower.merge(key, (long) c.getCount(), Long::sum);
+            }
+        }
+        long testViolations = violationsByPolicyLower.values().stream().mapToLong(Long::longValue).sum();
+        double fraction = totalViolations > 0 ? (double) testViolations / totalViolations : 0.0;
+
+        InsightMetric violationCountMetric = new InsightMetric(
+                "test_policy_violation_count", "Violations from test-named policies",
+                testViolations, totalViolations, "count",
+                MetricFormat.ofTotal(testViolations, totalViolations), null);
+        InsightMetric violationPercentMetric = new InsightMetric(
+                "test_policy_violation_percent", "Share of all violations",
+                Math.round(fraction * 100), null, "percent",
+                MetricFormat.percent(fraction), null);
+
+        List<InsightMetric> metrics = new ArrayList<>(Arrays.asList(
+                policyCountMetric, violationCountMetric, violationPercentMetric));
+
+        String headline = String.format(Locale.US,
+                "%s (%s of all violations) come from %d %s named for testing.",
+                MetricFormat.ofTotal(testViolations, totalViolations), MetricFormat.percent(fraction),
+                matched.size(), matched.size() == 1 ? "policy" : "policies");
+
+        String severity = severityFromShare(fraction);
+
+        if (scope == InsightScope.LIST) {
+            result.setStatus(InsightStatus.PARTIAL.name());
+            result.setHeadline(headline);
+            result.setSeverity(severity);
+            result.setMetrics(metrics);
+            result.setMetricsComplete(false);
+            result.setDataGaps(Collections.singletonList(new DataGap(
+                    "PROVIDER", "DEFERRED_TO_DETAIL",
+                    "Real users affected and per-policy blocking behaviour require opening this insight's detail view.")));
+            result.setEvidence(Collections.singletonList(namesOnlyEvidence(matched)));
+            result.setCtas(buildCtas(matched));
+            return result;
+        }
+
+        // DETAIL: page bounded raw events to attribute real users per matched policy.
+        List<String> matchedNames = matched.stream().map(GuardrailPolicies::getName).collect(Collectors.toList());
+        List<DashboardMaliciousEvent> events;
+        try {
+            events = threatClient.fetchAllMaliciousEvents(
+                    ctx.getStartTs(), ctx.getEndTs(), EVENT_PAGE_LIMIT,
+                    Collections.singletonMap("latestAttack", matchedNames));
+        } catch (Exception e) {
+            events = new ArrayList<>();
+        }
+
+        // fetchAllMaliciousEvents swallows its own failures into an empty list, so an empty page
+        // when the free aggregation above already counted testViolations > 0 is a signal the call
+        // failed, not that there are genuinely zero matching events — treat it as a gap rather
+        // than a confident zero (see plan.md's fetchAllMaliciousEvents correctness trap).
+        if (events.isEmpty() && testViolations > 0) {
+            result.setStatus(InsightStatus.PARTIAL.name());
+            result.setHeadline(headline);
+            result.setSeverity(severity);
+            result.setMetrics(metrics);
+            result.setMetricsComplete(false);
+            result.setDataGaps(Collections.singletonList(new DataGap(
+                    "THREAT_BACKEND", "REQUEST_FAILED",
+                    "Could not verify affected users — violation lookup returned no rows despite "
+                            + testViolations + " known violations from the aggregate count.")));
+            result.setEvidence(Collections.singletonList(namesOnlyEvidence(matched)));
+            result.setCtas(buildCtas(matched));
+            return result;
+        }
+
+        Map<String, Set<String>> actorsByPolicyLower = new HashMap<>();
+        Set<String> allActors = new LinkedHashSet<>();
+        for (DashboardMaliciousEvent event : events) {
+            String actor = event.getActor();
+            if (actor == null || actor.trim().isEmpty()) {
+                continue;
+            }
+            allActors.add(actor);
+            String policyKey = lower(event.getFilterId());
+            if (matchedByLowerName.containsKey(policyKey)) {
+                actorsByPolicyLower.computeIfAbsent(policyKey, k -> new LinkedHashSet<>()).add(actor);
+            }
+        }
+
+        InsightMetric realUsersMetric = new InsightMetric(
+                "real_users_affected", "Real users affected",
+                allActors.size(), null, "count",
+                MetricFormat.count(allActors.size(), "user"), null);
+        metrics.add(realUsersMetric);
+
+        boolean anyBlockingWithUsers = matched.stream().anyMatch(p ->
+                "block".equalsIgnoreCase(p.getBehaviour())
+                        && !actorsByPolicyLower.getOrDefault(lower(p.getName()), Collections.emptySet()).isEmpty());
+        String detailSeverity = anyBlockingWithUsers ? "HIGH" : severity;
+
+        result.setStatus(InsightStatus.READY.name());
+        result.setHeadline(headline);
+        result.setSeverity(detailSeverity);
+        result.setMetrics(metrics);
+        result.setMetricsComplete(true);
+        result.setDataGaps(new ArrayList<>());
+        result.setCaveats(Collections.singletonList(
+                "\"Real users affected\" is a lower bound: it only counts the most recent "
+                        + EVENT_PAGE_LIMIT + " matching violations with a resolved actor."));
+        result.setEvidence(Collections.singletonList(
+                fullEvidence(matched, violationsByPolicyLower, actorsByPolicyLower)));
+        result.setCtas(buildCtas(matched));
+        return result;
+    }
+
+    private InsightResult base() {
+        InsightResult r = new InsightResult();
+        r.setInsightId(getInsightId().name());
+        r.setTitle(getInsightId().getDefaultTitle());
+        r.setCategory(getInsightId().getCategory().name());
+        r.setCaveats(new ArrayList<>());
+        return r;
+    }
+
+    private InsightResult failed(String reason) {
+        InsightResult r = InsightResult.noData(getInsightId(), reason);
+        r.setDataGaps(new ArrayList<>(Collections.singletonList(
+                new DataGap("POLICY_STORE", "REQUEST_FAILED", reason))));
+        return r;
+    }
+
+    private static boolean isTestNamedPolicy(String name) {
+        if (name == null) {
+            return false;
+        }
+        String n = lower(name);
+        for (String marker : TEST_NAME_MARKERS) {
+            if (n.contains(marker)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String lower(String s) {
+        return s == null ? "" : s.trim().toLowerCase(Locale.US);
+    }
+
+    private static String severityFromShare(double fraction) {
+        if (fraction >= 0.15) {
+            return "HIGH";
+        }
+        if (fraction >= 0.05) {
+            return "MEDIUM";
+        }
+        return "LOW";
+    }
+
+    private static EvidenceTable namesOnlyEvidence(List<GuardrailPolicies> matched) {
+        List<GuardrailPolicies> capped = matched.stream().limit(EVIDENCE_ROW_CAP).collect(Collectors.toList());
+        List<EvidenceRow> rows = new ArrayList<>();
+        for (GuardrailPolicies p : capped) {
+            Map<String, Object> raw = new HashMap<>();
+            raw.put("policyId", p.getHexId());
+            raw.put("policyName", p.getName());
+            rows.add(new EvidenceRow(
+                    Arrays.asList(p.getName(), defaultStr(p.getBehaviour(), "unknown")), raw));
+        }
+        return new EvidenceTable("test_named_policies", "Policies named for testing",
+                Arrays.asList("Policy", "Mode"), rows, matched.size());
+    }
+
+    private static EvidenceTable fullEvidence(List<GuardrailPolicies> matched,
+                                               Map<String, Long> violationsByPolicyLower,
+                                               Map<String, Set<String>> actorsByPolicyLower) {
+        List<GuardrailPolicies> sorted = matched.stream()
+                .sorted((a, b) -> Long.compare(
+                        violationsByPolicyLower.getOrDefault(lower(b.getName()), 0L),
+                        violationsByPolicyLower.getOrDefault(lower(a.getName()), 0L)))
+                .collect(Collectors.toList());
+        List<GuardrailPolicies> capped = sorted.stream().limit(EVIDENCE_ROW_CAP).collect(Collectors.toList());
+
+        List<EvidenceRow> rows = new ArrayList<>();
+        for (GuardrailPolicies p : capped) {
+            String key = lower(p.getName());
+            long violations = violationsByPolicyLower.getOrDefault(key, 0L);
+            Set<String> actors = actorsByPolicyLower.getOrDefault(key, Collections.emptySet());
+            String sample = actors.stream().limit(3).collect(Collectors.joining(", "));
+
+            Map<String, Object> raw = new HashMap<>();
+            raw.put("policyId", p.getHexId());
+            raw.put("policyName", p.getName());
+            raw.put("violations", violations);
+            raw.put("realUsers", actors.size());
+
+            rows.add(new EvidenceRow(Arrays.asList(
+                    p.getName(),
+                    MetricFormat.count(violations, "violation"),
+                    defaultStr(p.getBehaviour(), "unknown"),
+                    actors.isEmpty() ? "—" : MetricFormat.count(actors.size(), "user"),
+                    sample.isEmpty() ? "—" : sample
+            ), raw));
+        }
+        return new EvidenceTable("test_named_policies", "Policies named for testing",
+                Arrays.asList("Policy", "Violations", "Mode", "Real users affected", "Sample users"),
+                rows, matched.size());
+    }
+
+    private static List<InsightCta> buildCtas(List<GuardrailPolicies> matched) {
+        List<String> policyIds = matched.stream()
+                .map(GuardrailPolicies::getHexId)
+                .filter(id -> id != null)
+                .collect(Collectors.toList());
+        Map<String, Object> params = Collections.singletonMap("policyIds", policyIds);
+
+        List<InsightCta> ctas = new ArrayList<>();
+        ctas.add(new InsightCta("retire_test_policies", "Retire policy", "BULK_ACTION",
+                "/dashboard/guardrails/policies", params, true));
+        ctas.add(new InsightCta("scope_to_test_assets", "Scope to test assets only", "NAVIGATE",
+                "/dashboard/guardrails/policies", params, false));
+        ctas.add(new InsightCta("reassign_owner", "Reassign owner", "NAVIGATE",
+                "/dashboard/guardrails/policies", params, false));
+        return ctas;
+    }
+
+    private static String defaultStr(String value, String fallback) {
+        return value == null || value.trim().isEmpty() ? fallback : value;
+    }
+}

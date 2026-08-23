@@ -1,0 +1,280 @@
+package com.akto.service.insights.providers;
+
+import com.akto.action.threat_detection.AbstractThreatDetectionAction;
+import com.akto.action.threat_detection.DashboardMaliciousEvent;
+import com.akto.action.threat_detection.ThreatCategoryCount;
+import com.akto.dto.GuardrailPolicies;
+import com.akto.service.insights.DataGap;
+import com.akto.service.insights.EvidenceRow;
+import com.akto.service.insights.EvidenceTable;
+import com.akto.service.insights.InsightContext;
+import com.akto.service.insights.InsightCta;
+import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightId;
+import com.akto.service.insights.InsightMetric;
+import com.akto.service.insights.InsightProvider;
+import com.akto.service.insights.InsightResult;
+import com.akto.service.insights.InsightScope;
+import com.akto.service.insights.InsightStatus;
+import com.akto.service.insights.Loaded;
+import com.akto.service.insights.MetricFormat;
+import org.apache.commons.lang3.StringUtils;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * Actionable item #7 — "Policies in alert mode that are catching real things". See
+ * akto_insights_actionable_items card 7 (the "claude_settings_risk fired 82 times in alert mode,
+ * 14 involved credential or PII patterns — none were blocked" worked example): "the counterpart to
+ * card 1 — card 1 says stop blocking what doesn't matter; this says start blocking what does."
+ *
+ * Unlike items #1-6, this one needs no raw-event paging for a complete answer: the "policy mode
+ * (block vs alert) queryable per policy" dependency the doc's own Dependencies table lists as
+ * blocking this card is already satisfied — GuardrailPolicies.behaviour ("block"/"warn"/"alert"/
+ * "approval") was confirmed to exist back when item #1 needed it — and "involving credentials/PII/
+ * injection" is answerable from the exact subCategory literals items #4/#5/#6 already established
+ * ("Secrets", "PII-&lt;type&gt;", "PromptInjection"). Both pieces come straight out of the shared,
+ * free bundle fields (policies + subCategoryCounts) with no per-event lookup at all, so LIST scope
+ * is a complete, non-deferred answer (status READY, no DataGap) — a deliberate contrast with every
+ * prior item in this set. DETAIL scope adds one optional enrichment (which specific users triggered
+ * the dangerous hits on the worst alert-mode policy) via bounded event paging, but a failure there
+ * only drops that one bonus metric — it never degrades the already-complete LIST-scope answer.
+ */
+public class AlertModeRealHitsProvider implements InsightProvider {
+
+    private static final String ALERT_BEHAVIOUR = "alert";
+    private static final String SECRETS_SUBCATEGORY = "Secrets";
+    private static final String PII_PREFIX = "PII-";
+    private static final String PROMPT_INJECTION_SUBCATEGORY = "PromptInjection";
+    private static final int EVENT_PAGE_LIMIT = 500;
+    private static final int EVIDENCE_ROW_CAP = 20;
+
+    @Override
+    public InsightId getInsightId() {
+        return InsightId.ALERT_MODE_REAL_HITS;
+    }
+
+    @Override
+    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, InsightScope scope,
+                                  AbstractThreatDetectionAction threatClient) {
+        Loaded<List<GuardrailPolicies>> policiesLoaded = bundle.getPolicies();
+        if (!policiesLoaded.isOk()) {
+            return failed("Could not load guardrail policies: " + policiesLoaded.getFailureReason());
+        }
+        Loaded<List<ThreatCategoryCount>> subCatLoaded = bundle.getSubCategoryCounts();
+        if (!subCatLoaded.isOk()) {
+            return failed("Could not load violation counts: " + subCatLoaded.getFailureReason());
+        }
+
+        List<GuardrailPolicies> activePolicies = policiesLoaded.getValue().stream()
+                .filter(GuardrailPolicies::isActive)
+                .collect(Collectors.toList());
+        List<GuardrailPolicies> alertModePolicies = activePolicies.stream()
+                .filter(p -> ALERT_BEHAVIOUR.equalsIgnoreCase(p.getBehaviour()))
+                .collect(Collectors.toList());
+
+        InsightResult result = base();
+        InsightMetric policyCountMetric = new InsightMetric(
+                "alert_mode_policy_count", "Active policies in alert mode",
+                alertModePolicies.size(), activePolicies.size(), "count",
+                MetricFormat.ofTotal(alertModePolicies.size(), activePolicies.size()), null);
+
+        if (alertModePolicies.isEmpty()) {
+            result.setStatus(InsightStatus.READY.name());
+            result.setHeadline("No active policies are running in alert mode.");
+            result.setMetrics(Collections.singletonList(policyCountMetric));
+            result.setMetricsComplete(true);
+            result.setDataGaps(new ArrayList<>());
+            result.setEvidence(new ArrayList<>());
+            result.setCtas(new ArrayList<>());
+            return result;
+        }
+
+        Map<String, Long> hitsByPolicyLower = new HashMap<>();
+        Map<String, Long> dangerousHitsByPolicyLower = new HashMap<>();
+        long totalAllViolations = 0;
+        for (ThreatCategoryCount c : subCatLoaded.getValue()) {
+            long count = c.getCount();
+            totalAllViolations += count;
+            String policyKey = lower(c.getCategory());
+            hitsByPolicyLower.merge(policyKey, count, Long::sum);
+            if (isDangerous(c.getSubCategory())) {
+                dangerousHitsByPolicyLower.merge(policyKey, count, Long::sum);
+            }
+        }
+
+        long alertModeTotalHits = 0;
+        long alertModeDangerousHits = 0;
+        for (GuardrailPolicies p : alertModePolicies) {
+            String key = lower(p.getName());
+            alertModeTotalHits += hitsByPolicyLower.getOrDefault(key, 0L);
+            alertModeDangerousHits += dangerousHitsByPolicyLower.getOrDefault(key, 0L);
+        }
+        double alertModeShare = totalAllViolations > 0 ? (double) alertModeTotalHits / totalAllViolations : 0.0;
+
+        List<InsightMetric> metrics = new ArrayList<>();
+        metrics.add(policyCountMetric);
+        metrics.add(new InsightMetric(
+                "alert_mode_violation_share", "Violation volume covered by alert-mode policies",
+                Math.round(alertModeShare * 100), null, "percent", MetricFormat.percent(alertModeShare), null));
+        metrics.add(new InsightMetric(
+                "credential_pii_injection_hits_in_alert_mode", "Credential/PII/injection hits never blocked",
+                alertModeDangerousHits, alertModeTotalHits, "count",
+                MetricFormat.ofTotal(alertModeDangerousHits, alertModeTotalHits), null));
+
+        String severity = alertModeDangerousHits > 0 ? "HIGH" : (alertModeTotalHits > 0 ? "MEDIUM" : "LOW");
+        String headline = alertModeDangerousHits > 0
+                ? String.format(Locale.US,
+                    "%s of %s alert-mode-policy hits involve credentials, PII, or prompt injection — detected, but never blocked.",
+                    MetricFormat.count(alertModeDangerousHits, "hit"), MetricFormat.count(alertModeTotalHits, "hit"))
+                : String.format(Locale.US,
+                    "%s covering %s of all violation volume are in alert mode, but none of their hits involve credentials, PII, or prompt injection.",
+                    MetricFormat.count(alertModePolicies.size(), "policy"), MetricFormat.percent(alertModeShare));
+
+        List<GuardrailPolicies> sortedByDangerous = alertModePolicies.stream()
+                .sorted(Comparator.comparingLong((GuardrailPolicies p) ->
+                        dangerousHitsByPolicyLower.getOrDefault(lower(p.getName()), 0L)).reversed())
+                .collect(Collectors.toList());
+
+        List<String> caveats = new ArrayList<>();
+        caveats.add("\"Credential/PII/injection\" means subCategory Secrets, PII-<type>, or PromptInjection specifically — other alert-mode hits (e.g. denied topics, banned substrings) aren't counted here even though they also went undetected.");
+
+        Set<String> distinctUsers = null;
+        GuardrailPolicies worst = sortedByDangerous.isEmpty() ? null : sortedByDangerous.get(0);
+        long worstDangerousHits = worst != null ? dangerousHitsByPolicyLower.getOrDefault(lower(worst.getName()), 0L) : 0;
+
+        if (scope == InsightScope.DETAIL && worst != null && worstDangerousHits > 0) {
+            distinctUsers = tryResolveDistinctUsers(worst.getName(), subCatLoaded.getValue(), ctx, threatClient);
+            if (distinctUsers == null) {
+                caveats.add("Could not resolve which users triggered the worst policy's undetected hits — the event lookup was unavailable.");
+            }
+        }
+
+        List<EvidenceRow> rows = new ArrayList<>();
+        for (GuardrailPolicies p : sortedByDangerous.stream().limit(EVIDENCE_ROW_CAP).collect(Collectors.toList())) {
+            String key = lower(p.getName());
+            long total = hitsByPolicyLower.getOrDefault(key, 0L);
+            long dangerous = dangerousHitsByPolicyLower.getOrDefault(key, 0L);
+            double sharePct = total > 0 ? (double) dangerous / total : 0.0;
+
+            Map<String, Object> raw = new HashMap<>();
+            raw.put("policyId", p.getHexId());
+            raw.put("policyName", p.getName());
+            raw.put("totalHits", total);
+            raw.put("dangerousHits", dangerous);
+
+            List<String> cells = new ArrayList<>(Arrays.asList(
+                    p.getName(), MetricFormat.count(total, "hit"), MetricFormat.count(dangerous, "hit"),
+                    MetricFormat.percent(sharePct)));
+            if (p == worst && distinctUsers != null) {
+                cells.add(MetricFormat.count(distinctUsers.size(), "user"));
+                raw.put("distinctUsers", distinctUsers.size());
+            } else {
+                cells.add("—");
+            }
+            rows.add(new EvidenceRow(cells, raw));
+        }
+        List<String> columns = Arrays.asList("Policy", "Total hits", "Credential/PII/injection hits", "% dangerous", "Users (worst policy)");
+        List<EvidenceTable> evidence = new ArrayList<>();
+        evidence.add(new EvidenceTable("alert_mode_policies", "Alert-mode policies by risk",
+                columns, rows, alertModePolicies.size()));
+
+        result.setStatus(InsightStatus.READY.name());
+        result.setHeadline(headline);
+        result.setSeverity(severity);
+        result.setMetrics(metrics);
+        result.setMetricsComplete(true);
+        result.setDataGaps(new ArrayList<>());
+        result.setCaveats(caveats);
+        result.setEvidence(evidence);
+        result.setCtas(buildCtas(worst, worstDangerousHits));
+        return result;
+    }
+
+    /** Bonus enrichment only — a failure here doesn't degrade the already-complete LIST-scope
+     *  answer, unlike items #1-6 where DETAIL-scope paging was load-bearing. Returns null on any
+     *  failure so the caller can tell "checked, found nobody" (empty set) apart from "couldn't check". */
+    private Set<String> tryResolveDistinctUsers(String policyName, List<ThreatCategoryCount> subCategoryCounts,
+                                                 InsightContext ctx, AbstractThreatDetectionAction threatClient) {
+        List<String> dangerousSubCategories = subCategoryCounts.stream()
+                .filter(c -> policyName.equalsIgnoreCase(c.getCategory()) && isDangerous(c.getSubCategory()))
+                .map(ThreatCategoryCount::getSubCategory)
+                .distinct()
+                .collect(Collectors.toList());
+        if (dangerousSubCategories.isEmpty()) {
+            return null;
+        }
+        try {
+            Map<String, Object> filters = new HashMap<>();
+            filters.put("latestAttack", Collections.singletonList(policyName));
+            filters.put("subCategory", dangerousSubCategories);
+            List<DashboardMaliciousEvent> events = threatClient.fetchAllMaliciousEvents(
+                    ctx.getStartTs(), ctx.getEndTs(), EVENT_PAGE_LIMIT, filters);
+            if (events.isEmpty()) {
+                return null; // ambiguous per the same fetchAllMaliciousEvents trap as other items — don't claim zero
+            }
+            return events.stream()
+                    .map(e -> StringUtils.defaultIfBlank(e.getActor(), "(unattributed)"))
+                    .collect(Collectors.toCollection(HashSet::new));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static boolean isDangerous(String subCategory) {
+        if (subCategory == null) {
+            return false;
+        }
+        return SECRETS_SUBCATEGORY.equalsIgnoreCase(subCategory)
+                || PROMPT_INJECTION_SUBCATEGORY.equalsIgnoreCase(subCategory)
+                || subCategory.regionMatches(true, 0, PII_PREFIX, 0, PII_PREFIX.length());
+    }
+
+    private static String lower(String s) {
+        return s == null ? "" : s.trim().toLowerCase(Locale.US);
+    }
+
+    private InsightResult base() {
+        InsightResult r = new InsightResult();
+        r.setInsightId(getInsightId().name());
+        r.setTitle(getInsightId().getDefaultTitle());
+        r.setCategory(getInsightId().getCategory().name());
+        r.setCaveats(new ArrayList<>());
+        return r;
+    }
+
+    private InsightResult failed(String reason) {
+        InsightResult r = InsightResult.noData(getInsightId(), reason);
+        r.setDataGaps(new ArrayList<>(Collections.singletonList(
+                new DataGap("POLICY_STORE", "REQUEST_FAILED", reason))));
+        return r;
+    }
+
+    private static List<InsightCta> buildCtas(GuardrailPolicies worst, long worstDangerousHits) {
+        if (worst == null || worstDangerousHits == 0) {
+            return new ArrayList<>();
+        }
+        Map<String, Object> params = new HashMap<>();
+        params.put("policyId", worst.getHexId());
+        params.put("policyName", worst.getName());
+
+        List<InsightCta> ctas = new ArrayList<>();
+        ctas.add(new InsightCta("switch_to_block_mode", "Switch to block mode",
+                "BULK_ACTION", "/dashboard/guardrails/policies", params, true));
+        ctas.add(new InsightCta("simulate_impact_first", "Simulate impact first",
+                "NAVIGATE", "/dashboard/guardrails/policies", params, false));
+        ctas.add(new InsightCta("view_the_hits", "View the hits",
+                "NAVIGATE", "/dashboard/guardrails/violations", params, false));
+        return ctas;
+    }
+}

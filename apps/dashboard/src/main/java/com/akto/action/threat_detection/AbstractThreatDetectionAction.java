@@ -59,18 +59,34 @@ public class AbstractThreatDetectionAction extends UserAction {
    * @param additionalFilters Optional additional filters to add to the request (can be null or empty)
    * @return List of DashboardMaliciousEvent objects
    */
-  protected List<DashboardMaliciousEvent> fetchAllMaliciousEvents(
-      int startTimestamp, 
-      int endTimestamp, 
+  public List<DashboardMaliciousEvent> fetchAllMaliciousEvents(
+      int startTimestamp,
+      int endTimestamp,
       int limit,
       Map<String, Object> additionalFilters) {
+    return fetchAllMaliciousEvents(startTimestamp, endTimestamp, limit, additionalFilters, null);
+  }
+
+  /**
+   * Same as the 4-arg overload, plus the "x-skill-eval-mode" header the backend reads to
+   * partition Skills Evaluations traffic (see MaliciousEventService's listMaliciousRequests):
+   * this is a request header, NOT a filter-body field, so it can't be passed via
+   * additionalFilters. "only" narrows to just /skills/&lt;name&gt; events; "exclude" (or null)
+   * behaves like the header was never sent.
+   */
+  public List<DashboardMaliciousEvent> fetchAllMaliciousEvents(
+      int startTimestamp,
+      int endTimestamp,
+      int limit,
+      Map<String, Object> additionalFilters,
+      String skillEvalMode) {
     final List<DashboardMaliciousEvent> result = new ArrayList<>();
     try {
       String url = String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl());
       MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
       Map<String, Object> filter = new HashMap<>();
-      
+
       // Time range filter
       Map<String, Integer> time_range = new HashMap<>();
       if (startTimestamp > 0) {
@@ -81,7 +97,7 @@ public class AbstractThreatDetectionAction extends UserAction {
       }
       // Always put time_range (even if empty) to match existing pattern
       filter.put("detected_at_time_range", time_range);
-      
+
       // Add any additional filters
       if (additionalFilters != null && !additionalFilters.isEmpty()) {
         filter.putAll(additionalFilters);
@@ -98,15 +114,18 @@ public class AbstractThreatDetectionAction extends UserAction {
 
       String msg = objectMapper.valueToTree(body).toString();
       String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
-      
+
       RequestBody requestBody = RequestBody.create(msg, JSON);
-      Request request = new Request.Builder()
+      Request.Builder requestBuilder = new Request.Builder()
           .url(url)
           .post(requestBody)
           .addHeader("Authorization", "Bearer " + this.getApiToken())
           .addHeader("Content-Type", "application/json")
-          .addHeader("x-context-source", contextSourceValue)
-          .build();
+          .addHeader("x-context-source", contextSourceValue);
+      if (skillEvalMode != null && !skillEvalMode.isEmpty()) {
+        requestBuilder.addHeader("x-skill-eval-mode", skillEvalMode);
+      }
+      Request request = requestBuilder.build();
 
       try (Response resp = httpClient.newCall(request).execute()) {
         String responseBody = resp.body() != null ? resp.body().string() : "";
@@ -197,6 +216,100 @@ public class AbstractThreatDetectionAction extends UserAction {
       }
     } catch (Exception e) {
       return new ArrayList<>();
+    }
+  }
+
+  /**
+   * (category, subCategory) -> count for the window — one cheap aggregation, no event bodies
+   * transferred. For guardrail-written violations, {@code category} is the guardrail policy's
+   * name (get_subcategory_wise_count and fetchAllMaliciousEvents' "latestAttack" filter both key
+   * off the same policy-name join). Unlike fetchAllMaliciousEvents, this deliberately does NOT
+   * swallow failures into an empty list — it throws, so a caller can tell "zero rows" apart from
+   * "the backend call failed" and wrap the difference into a Loaded<T> instead of a confident zero.
+   */
+  public List<ThreatCategoryCount> fetchSubcategoryWiseCounts(
+      int startTimestamp, int endTimestamp, List<String> latestAttack, String statusFilter) throws Exception {
+    String url = String.format("%s/api/dashboard/get_subcategory_wise_count", this.getBackendUrl());
+    MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+
+    Map<String, Object> body = new HashMap<>();
+    body.put("start_ts", startTimestamp);
+    body.put("end_ts", endTimestamp);
+    body.put("latestAttack", latestAttack != null ? latestAttack : new ArrayList<>());
+    if (statusFilter != null && !statusFilter.isEmpty()) {
+      body.put("status", statusFilter);
+    }
+
+    String msg = objectMapper.valueToTree(body).toString();
+    String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+
+    RequestBody requestBody = RequestBody.create(msg, JSON);
+    Request request = new Request.Builder()
+        .url(url)
+        .post(requestBody)
+        .addHeader("Authorization", "Bearer " + this.getApiToken())
+        .addHeader("Content-Type", "application/json")
+        .addHeader("x-context-source", contextSourceValue)
+        .build();
+
+    try (Response resp = httpClient.newCall(request).execute()) {
+      String responseBody = resp.body() != null ? resp.body().string() : "";
+      com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse parsed =
+          ProtoMessageUtils.<com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse>toProtoMessage(
+              com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse.class,
+              responseBody
+          ).orElseThrow(() -> new IllegalStateException("Unparseable get_subcategory_wise_count response"));
+
+      List<ThreatCategoryCount> result = new ArrayList<>();
+      for (com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse.SubCategoryCount row :
+          parsed.getCategoryWiseCountsList()) {
+        result.add(new ThreatCategoryCount(row.getCategory(), row.getSubCategory(), row.getCount()));
+      }
+      return result;
+    }
+  }
+
+  /**
+   * Per-skill-name severity counts for the window (skillName -> critical/high/medium/low), via
+   * the same free-aggregation shape as fetchSubcategoryWiseCounts — no user dimension, so it's
+   * only good for a LIST-scope headline ("N skill evaluations across M skills"); per-user
+   * concentration needs fetchAllMaliciousEvents(..., "only") instead. Throws rather than swallows
+   * failures, same reasoning as fetchSubcategoryWiseCounts.
+   */
+  public List<SkillSeverityCount> fetchSkillSeverityCounts(int startTimestamp, int endTimestamp) throws Exception {
+    String url = String.format("%s/api/dashboard/get_skill_severity_counts", this.getBackendUrl());
+    MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+
+    Map<String, Object> body = new HashMap<>();
+    body.put("start_ts", startTimestamp);
+    body.put("end_ts", endTimestamp);
+
+    String msg = objectMapper.valueToTree(body).toString();
+    String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+
+    RequestBody requestBody = RequestBody.create(msg, JSON);
+    Request request = new Request.Builder()
+        .url(url)
+        .post(requestBody)
+        .addHeader("Authorization", "Bearer " + this.getApiToken())
+        .addHeader("Content-Type", "application/json")
+        .addHeader("x-context-source", contextSourceValue)
+        .build();
+
+    try (Response resp = httpClient.newCall(request).execute()) {
+      String responseBody = resp.body() != null ? resp.body().string() : "";
+      com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchSkillSeverityCountsResponse parsed =
+          ProtoMessageUtils.<com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchSkillSeverityCountsResponse>toProtoMessage(
+              com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchSkillSeverityCountsResponse.class,
+              responseBody
+          ).orElseThrow(() -> new IllegalStateException("Unparseable get_skill_severity_counts response"));
+
+      List<SkillSeverityCount> result = new ArrayList<>();
+      for (com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchSkillSeverityCountsResponse.SkillSeverityCount row :
+          parsed.getSkillCountsList()) {
+        result.add(new SkillSeverityCount(row.getSkillName(), row.getCritical(), row.getHigh(), row.getMedium(), row.getLow()));
+      }
+      return result;
     }
   }
 }
