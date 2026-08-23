@@ -4,19 +4,11 @@ import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.action.threat_detection.ThreatCategoryCount;
 import com.akto.dto.GuardrailPolicies;
-import com.akto.service.insights.DataGap;
-import com.akto.service.insights.EvidenceRow;
-import com.akto.service.insights.EvidenceTable;
 import com.akto.service.insights.InsightContext;
-import com.akto.service.insights.InsightCta;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightId;
-import com.akto.service.insights.InsightMetric;
 import com.akto.service.insights.InsightProvider;
 import com.akto.service.insights.InsightResult;
-import com.akto.service.insights.InsightScope;
-import com.akto.service.insights.InsightStatus;
-import com.akto.service.insights.Loaded;
 import com.akto.service.insights.MetricFormat;
 import org.apache.commons.lang3.StringUtils;
 
@@ -60,27 +52,27 @@ public class AlertFatigueProvider implements InsightProvider {
     }
 
     @Override
-    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, InsightScope scope,
+    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope,
                                   AbstractThreatDetectionAction threatClient) {
-        Loaded<List<ThreatCategoryCount>> subCatLoaded = bundle.getSubCategoryCounts();
-        if (!subCatLoaded.isOk()) {
-            return failed("Could not load violation counts: " + subCatLoaded.getFailureReason());
+        List<ThreatCategoryCount> subCategoryCounts = bundle.getSubCategoryCounts();
+        if (subCategoryCounts == null) {
+            return failed("Could not load violation counts");
         }
 
-        long totalViolations = subCatLoaded.getValue().stream().mapToLong(ThreatCategoryCount::getCount).sum();
-        long distinctBuckets = subCatLoaded.getValue().stream()
+        long totalViolations = subCategoryCounts.stream().mapToLong(ThreatCategoryCount::getCount).sum();
+        long distinctBuckets = subCategoryCounts.stream()
                 .map(c -> lower(c.getCategory()) + " " + lower(c.getSubCategory()))
                 .distinct()
                 .count();
 
-        InsightMetric totalMetric = new InsightMetric(
+        InsightResult.Metric totalMetric = new InsightResult.Metric(
                 "total_violations", "Total violations",
                 totalViolations, null, "count", MetricFormat.count(totalViolations, "violation"), null);
 
         InsightResult result = base();
 
         if (totalViolations == 0) {
-            result.setStatus(InsightStatus.READY.name());
+            result.setStatus(InsightResult.Status.READY.name());
             result.setHeadline("No violations in this window.");
             result.setMetrics(Collections.singletonList(totalMetric));
             result.setMetricsComplete(true);
@@ -90,19 +82,19 @@ public class AlertFatigueProvider implements InsightProvider {
             return result;
         }
 
-        InsightMetric bucketMetric = new InsightMetric(
+        InsightResult.Metric bucketMetric = new InsightResult.Metric(
                 "policy_evidence_type_combinations", "Distinct policy + evidence-type combinations",
                 distinctBuckets, null, "count", MetricFormat.count(distinctBuckets, "combination"), null);
-        List<InsightMetric> baseMetrics = new ArrayList<>(Arrays.asList(totalMetric, bucketMetric));
+        List<InsightResult.Metric> baseMetrics = new ArrayList<>(Arrays.asList(totalMetric, bucketMetric));
 
-        if (scope == InsightScope.LIST) {
-            result.setStatus(InsightStatus.PARTIAL.name());
+        if (scope == Scope.LIST) {
+            result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(MetricFormat.count(totalViolations, "violation") + " across "
                     + MetricFormat.count(distinctBuckets, "combination")
                     + "; collapsing into per-user incidents requires the detail view.");
             result.setMetrics(baseMetrics);
             result.setMetricsComplete(false);
-            result.setDataGaps(Collections.singletonList(new DataGap(
+            result.setDataGaps(Collections.singletonList(new InsightResult.Gap(
                     "PROVIDER", "DEFERRED_TO_DETAIL",
                     "Incident collapsing (user x policy x evidence type) requires paging raw events, done only in the detail view.")));
             result.setEvidence(new ArrayList<>());
@@ -119,12 +111,12 @@ public class AlertFatigueProvider implements InsightProvider {
         }
 
         if (events.isEmpty()) {
-            result.setStatus(InsightStatus.PARTIAL.name());
+            result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(MetricFormat.count(totalViolations, "violation") + " across "
                     + MetricFormat.count(distinctBuckets, "combination") + ".");
             result.setMetrics(baseMetrics);
             result.setMetricsComplete(false);
-            result.setDataGaps(Collections.singletonList(new DataGap(
+            result.setDataGaps(Collections.singletonList(new InsightResult.Gap(
                     "THREAT_BACKEND", "NO_ROWS",
                     "Could not collapse into incidents — the violation lookup returned no rows.")));
             result.setEvidence(new ArrayList<>());
@@ -133,16 +125,16 @@ public class AlertFatigueProvider implements InsightProvider {
         }
 
         Map<String, GuardrailPolicies> policyByLowerName = new HashMap<>();
-        Loaded<List<GuardrailPolicies>> policiesLoaded = bundle.getPolicies();
-        if (policiesLoaded.isOk()) {
-            for (GuardrailPolicies p : policiesLoaded.getValue()) {
+        List<GuardrailPolicies> policies = bundle.getPolicies();
+        if (policies != null) {
+            for (GuardrailPolicies p : policies) {
                 if (p.getName() != null) {
                     policyByLowerName.put(lower(p.getName()), p);
                 }
             }
         }
-        Map<String, String> deviceIdToUsername = bundle.getDeviceIdToUsername().hasValue()
-                ? bundle.getDeviceIdToUsername().getValue() : Collections.emptyMap();
+        Map<String, String> deviceIdToUsername = bundle.getDeviceIdToUsername() != null
+                ? bundle.getDeviceIdToUsername() : Collections.emptyMap();
 
         Map<String, Incident> incidents = new HashMap<>();
         for (DashboardMaliciousEvent event : events) {
@@ -169,16 +161,16 @@ public class AlertFatigueProvider implements InsightProvider {
         long observedTotal = events.size();
         long totalIncidents = incidents.size();
 
-        List<InsightMetric> metrics = new ArrayList<>(baseMetrics);
-        metrics.add(new InsightMetric(
+        List<InsightResult.Metric> metrics = new ArrayList<>(baseMetrics);
+        metrics.add(new InsightResult.Metric(
                 "total_incidents", "Distinct (user, policy, evidence type) incidents",
                 totalIncidents, null, "count", MetricFormat.count(totalIncidents, "incident"), null));
-        metrics.add(new InsightMetric(
+        metrics.add(new InsightResult.Metric(
                 "flagged_incidents", "High-repeat incidents (more than " + REPEAT_THRESHOLD + " in 24h)",
                 flaggedCount, totalIncidents, "count",
                 MetricFormat.ofTotal(flaggedCount, totalIncidents), null));
         if (flaggedCount > 0) {
-            metrics.add(new InsightMetric(
+            metrics.add(new InsightResult.Metric(
                     "violations_in_flagged_incidents", "Violations from high-repeat incidents",
                     violationsInFlagged, observedTotal, "count",
                     MetricFormat.ofTotal(violationsInFlagged, observedTotal), null));
@@ -214,7 +206,7 @@ public class AlertFatigueProvider implements InsightProvider {
                 .limit(EVIDENCE_ROW_CAP)
                 .collect(Collectors.toList());
 
-        List<EvidenceRow> rows = new ArrayList<>();
+        List<InsightResult.Evidence.Row> rows = new ArrayList<>();
         for (Incident incident : topIncidents) {
             String displayActor = deviceIdToUsername.getOrDefault(incident.actor, incident.actor);
             GuardrailPolicies policy = policyByLowerName.get(lower(incident.policy));
@@ -230,18 +222,18 @@ public class AlertFatigueProvider implements InsightProvider {
             raw.put("maxInWindow", incident.maxInWindow);
             raw.put("flagged", incident.flagged);
 
-            rows.add(new EvidenceRow(Arrays.asList(
+            rows.add(new InsightResult.Evidence.Row(Arrays.asList(
                     displayActor, incident.policy, incident.evidenceType,
                     MetricFormat.count(incident.timestamps.size(), "violation"),
                     String.valueOf(incident.maxInWindow), mode
             ), raw));
         }
-        List<EvidenceTable> evidence = new ArrayList<>();
-        evidence.add(new EvidenceTable("alert_fatigue_incidents", "Top incidents by repeat count",
+        List<InsightResult.Evidence> evidence = new ArrayList<>();
+        evidence.add(new InsightResult.Evidence("alert_fatigue_incidents", "Top incidents by repeat count",
                 Arrays.asList("User", "Policy", "Evidence type", "Total", "Max in 24h", "Mode"),
                 rows, incidents.size()));
 
-        result.setStatus(InsightStatus.READY.name());
+        result.setStatus(InsightResult.Status.READY.name());
         result.setHeadline(headline);
         result.setSeverity(severity);
         result.setMetrics(metrics);
@@ -301,11 +293,11 @@ public class AlertFatigueProvider implements InsightProvider {
     private InsightResult failed(String reason) {
         InsightResult r = InsightResult.noData(getInsightId(), reason);
         r.setDataGaps(new ArrayList<>(Collections.singletonList(
-                new DataGap("THREAT_BACKEND", "REQUEST_FAILED", reason))));
+                new InsightResult.Gap("THREAT_BACKEND", "REQUEST_FAILED", reason))));
         return r;
     }
 
-    private static List<InsightCta> buildCtas(List<Incident> topIncidents, Map<String, GuardrailPolicies> policyByLowerName) {
+    private static List<InsightResult.Cta> buildCtas(List<Incident> topIncidents, Map<String, GuardrailPolicies> policyByLowerName) {
         Incident worst = topIncidents.stream().filter(i -> i.flagged).findFirst().orElse(null);
         if (worst == null) {
             return new ArrayList<>();
@@ -316,12 +308,12 @@ public class AlertFatigueProvider implements InsightProvider {
         params.put("policyId", policy != null ? policy.getHexId() : null);
         params.put("policyName", worst.policy);
 
-        List<InsightCta> ctas = new ArrayList<>();
-        ctas.add(new InsightCta("remove_user_from_scope", "Remove user from policy scope",
+        List<InsightResult.Cta> ctas = new ArrayList<>();
+        ctas.add(new InsightResult.Cta("remove_user_from_scope", "Remove user from policy scope",
                 "BULK_ACTION", "/dashboard/guardrails/policies", params, true));
-        ctas.add(new InsightCta("add_exception", "Add exception",
+        ctas.add(new InsightResult.Cta("add_exception", "Add exception",
                 "NAVIGATE", "/dashboard/guardrails/policies", params, false));
-        ctas.add(new InsightCta("switch_to_incident_view", "Switch to incident view",
+        ctas.add(new InsightResult.Cta("switch_to_incident_view", "Switch to incident view",
                 "NAVIGATE", "/dashboard/guardrails/violations", Collections.emptyMap(), false));
         return ctas;
     }

@@ -4,20 +4,12 @@ import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.action.threat_detection.ThreatCategoryCount;
 import com.akto.service.insights.CredentialPatterns;
-import com.akto.service.insights.DataGap;
-import com.akto.service.insights.EvidenceRow;
-import com.akto.service.insights.EvidenceTable;
 import com.akto.service.insights.EvidenceText;
 import com.akto.service.insights.InsightContext;
-import com.akto.service.insights.InsightCta;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightId;
-import com.akto.service.insights.InsightMetric;
 import com.akto.service.insights.InsightProvider;
 import com.akto.service.insights.InsightResult;
-import com.akto.service.insights.InsightScope;
-import com.akto.service.insights.InsightStatus;
-import com.akto.service.insights.Loaded;
 import com.akto.service.insights.MetricFormat;
 import com.akto.util.AgenticObserveUtil;
 import org.apache.commons.lang3.StringUtils;
@@ -65,32 +57,32 @@ public class CredentialExposureProvider implements InsightProvider {
     }
 
     @Override
-    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, InsightScope scope,
+    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope,
                                   AbstractThreatDetectionAction threatClient) {
-        Loaded<List<ThreatCategoryCount>> subCatLoaded = bundle.getSubCategoryCounts();
-        if (!subCatLoaded.isOk()) {
-            return failed("Could not load violation counts: " + subCatLoaded.getFailureReason());
+        List<ThreatCategoryCount> subCategoryCounts = bundle.getSubCategoryCounts();
+        if (subCategoryCounts == null) {
+            return failed("Could not load violation counts");
         }
 
-        long labeledSecretsCount = subCatLoaded.getValue().stream()
+        long labeledSecretsCount = subCategoryCounts.stream()
                 .filter(c -> SECRETS_SUBCATEGORY.equalsIgnoreCase(c.getSubCategory()))
                 .mapToLong(ThreatCategoryCount::getCount)
                 .sum();
 
-        InsightMetric labeledMetric = new InsightMetric(
+        InsightResult.Metric labeledMetric = new InsightResult.Metric(
                 "secrets_labeled_count", "Violations already labeled \"Secrets\"",
                 labeledSecretsCount, null, "count",
                 MetricFormat.count(labeledSecretsCount, "violation"), null);
 
         InsightResult result = base();
 
-        if (scope == InsightScope.LIST) {
-            result.setStatus(InsightStatus.PARTIAL.name());
+        if (scope == Scope.LIST) {
+            result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(MetricFormat.count(labeledSecretsCount, "violation")
                     + " already labeled Secrets; checking other buckets for mislabeled credentials requires the detail view.");
             result.setMetrics(Collections.singletonList(labeledMetric));
             result.setMetricsComplete(false);
-            result.setDataGaps(Collections.singletonList(new DataGap(
+            result.setDataGaps(Collections.singletonList(new InsightResult.Gap(
                     "PROVIDER", "DEFERRED_TO_DETAIL",
                     "Credentials mislabeled under a different category (e.g. PII) require paging raw evidence, done only in the detail view.")));
             result.setEvidence(new ArrayList<>());
@@ -108,11 +100,11 @@ public class CredentialExposureProvider implements InsightProvider {
         }
 
         if (events.isEmpty()) {
-            result.setStatus(InsightStatus.PARTIAL.name());
+            result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(MetricFormat.count(labeledSecretsCount, "violation") + " already labeled Secrets.");
             result.setMetrics(Collections.singletonList(labeledMetric));
             result.setMetricsComplete(false);
-            result.setDataGaps(Collections.singletonList(new DataGap(
+            result.setDataGaps(Collections.singletonList(new InsightResult.Gap(
                     "THREAT_BACKEND", "NO_ROWS",
                     "Could not scan for mislabeled credentials — the violation lookup returned no rows.")));
             result.setEvidence(new ArrayList<>());
@@ -145,27 +137,27 @@ public class CredentialExposureProvider implements InsightProvider {
                 .map(m -> StringUtils.defaultIfBlank(m.event.getHost(), "(unknown)"))
                 .collect(Collectors.toCollection(HashSet::new));
 
-        List<InsightMetric> metrics = new ArrayList<>();
+        List<InsightResult.Metric> metrics = new ArrayList<>();
         metrics.add(labeledMetric);
-        metrics.add(new InsightMetric(
+        metrics.add(new InsightResult.Metric(
                 "credential_pattern_matches", "Credential-shaped violations found",
                 totalMatches, (long) events.size(), "count",
                 MetricFormat.ofTotal(totalMatches, events.size()), null));
-        metrics.add(new InsightMetric(
+        metrics.add(new InsightResult.Metric(
                 "mislabeled_count", "Mislabeled as something other than Secrets",
                 mislabeledCount, totalMatches, "count",
                 MetricFormat.ofTotal(mislabeledCount, totalMatches), null));
         if (totalMatches > 0) {
-            metrics.add(new InsightMetric(
+            metrics.add(new InsightResult.Metric(
                     "mislabeled_percent", "Percent mislabeled",
                     Math.round(mislabeledFraction * 100), null, "percent",
                     MetricFormat.percent(mislabeledFraction), null));
         }
-        metrics.add(new InsightMetric(
+        metrics.add(new InsightResult.Metric(
                 "distinct_users_affected", "Users affected",
                 distinctUsers.size(), null, "count",
                 MetricFormat.count(distinctUsers.size(), "user"), null));
-        metrics.add(new InsightMetric(
+        metrics.add(new InsightResult.Metric(
                 "distinct_destinations_affected", "Destinations affected",
                 distinctDestinations.size(), null, "count",
                 MetricFormat.count(distinctDestinations.size(), "destination"), null));
@@ -194,7 +186,7 @@ public class CredentialExposureProvider implements InsightProvider {
             caveats.add("Violations examined are capped at " + EVENT_PAGE_LIMIT + "; more may exist beyond this page.");
         }
 
-        List<EvidenceTable> evidence = new ArrayList<>();
+        List<InsightResult.Evidence> evidence = new ArrayList<>();
         if (!matches.isEmpty()) {
             List<Match> sorted = matches.stream()
                     // Mislabeled first — that's the actionable surprise; correctly-labeled ones still
@@ -202,7 +194,7 @@ public class CredentialExposureProvider implements InsightProvider {
                     .sorted((a, b) -> Boolean.compare(a.labeledSecrets, b.labeledSecrets))
                     .limit(EVIDENCE_ROW_CAP)
                     .collect(Collectors.toList());
-            List<EvidenceRow> rows = new ArrayList<>();
+            List<InsightResult.Evidence.Row> rows = new ArrayList<>();
             for (Match m : sorted) {
                 String actor = StringUtils.defaultIfBlank(m.event.getActor(), "(unattributed)");
                 String host = StringUtils.defaultIfBlank(m.event.getHost(), "(unknown)");
@@ -218,15 +210,15 @@ public class CredentialExposureProvider implements InsightProvider {
                 raw.put("labeledAs", labeledAs);
                 raw.put("mislabeled", !m.labeledSecrets);
 
-                rows.add(new EvidenceRow(Arrays.asList(
+                rows.add(new InsightResult.Evidence.Row(Arrays.asList(
                         actor, StringUtils.defaultString(device), host, m.patternLabel, labeledAs), raw));
             }
-            evidence.add(new EvidenceTable("credential_exposure_matches", "Credential-shaped violations",
+            evidence.add(new InsightResult.Evidence("credential_exposure_matches", "Credential-shaped violations",
                     Arrays.asList("User", "Device", "Destination", "Pattern type", "Currently labeled as"),
                     rows, matches.size()));
         }
 
-        result.setStatus(InsightStatus.READY.name());
+        result.setStatus(InsightResult.Status.READY.name());
         result.setHeadline(headline);
         result.setSeverity(severity);
         result.setMetrics(metrics);
@@ -262,11 +254,11 @@ public class CredentialExposureProvider implements InsightProvider {
     private InsightResult failed(String reason) {
         InsightResult r = InsightResult.noData(getInsightId(), reason);
         r.setDataGaps(new ArrayList<>(Collections.singletonList(
-                new DataGap("THREAT_BACKEND", "REQUEST_FAILED", reason))));
+                new InsightResult.Gap("THREAT_BACKEND", "REQUEST_FAILED", reason))));
         return r;
     }
 
-    private static List<InsightCta> buildCtas(List<Match> matches) {
+    private static List<InsightResult.Cta> buildCtas(List<Match> matches) {
         if (matches.isEmpty()) {
             return new ArrayList<>();
         }
@@ -276,12 +268,12 @@ public class CredentialExposureProvider implements InsightProvider {
         Map<String, Object> params = new HashMap<>();
         params.put("actors", new ArrayList<>(actors));
 
-        List<InsightCta> ctas = new ArrayList<>();
-        ctas.add(new InsightCta("rotate_exposed_credential", "Rotate exposed credential",
+        List<InsightResult.Cta> ctas = new ArrayList<>();
+        ctas.add(new InsightResult.Cta("rotate_exposed_credential", "Rotate exposed credential",
                 "NAVIGATE", "/dashboard/guardrails/violations", params, true));
-        ctas.add(new InsightCta("force_sync_block_credentials", "Force sync/block on this class",
+        ctas.add(new InsightResult.Cta("force_sync_block_credentials", "Force sync/block on this class",
                 "BULK_ACTION", "/dashboard/guardrails/policies", params, false));
-        ctas.add(new InsightCta("notify_user_security_lead", "Notify user + security lead",
+        ctas.add(new InsightResult.Cta("notify_user_security_lead", "Notify user + security lead",
                 "NAVIGATE", "/dashboard/guardrails/violations", params, false));
         return ctas;
     }

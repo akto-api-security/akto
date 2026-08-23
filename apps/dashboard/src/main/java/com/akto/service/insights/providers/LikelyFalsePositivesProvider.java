@@ -5,20 +5,12 @@ import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.action.threat_detection.ThreatCategoryCount;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.service.insights.CredentialPatterns;
-import com.akto.service.insights.DataGap;
-import com.akto.service.insights.EvidenceRow;
-import com.akto.service.insights.EvidenceTable;
 import com.akto.service.insights.EvidenceText;
 import com.akto.service.insights.InsightContext;
-import com.akto.service.insights.InsightCta;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightId;
-import com.akto.service.insights.InsightMetric;
 import com.akto.service.insights.InsightProvider;
 import com.akto.service.insights.InsightResult;
-import com.akto.service.insights.InsightScope;
-import com.akto.service.insights.InsightStatus;
-import com.akto.service.insights.Loaded;
 import com.akto.service.insights.MetricFormat;
 import com.akto.service.insights.PiiPatterns;
 import org.apache.commons.lang3.StringUtils;
@@ -76,27 +68,27 @@ public class LikelyFalsePositivesProvider implements InsightProvider {
     }
 
     @Override
-    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, InsightScope scope,
+    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope,
                                   AbstractThreatDetectionAction threatClient) {
-        Loaded<List<ThreatCategoryCount>> subCatLoaded = bundle.getSubCategoryCounts();
-        if (!subCatLoaded.isOk()) {
-            return failed("Could not load violation counts: " + subCatLoaded.getFailureReason());
+        List<ThreatCategoryCount> subCategoryCounts = bundle.getSubCategoryCounts();
+        if (subCategoryCounts == null) {
+            return failed("Could not load violation counts");
         }
 
-        List<ThreatCategoryCount> piiRows = subCatLoaded.getValue().stream()
+        List<ThreatCategoryCount> piiRows = subCategoryCounts.stream()
                 .filter(c -> c.getSubCategory() != null && c.getSubCategory().regionMatches(true, 0, PII_PREFIX, 0, PII_PREFIX.length()))
                 .collect(Collectors.toList());
         long totalPiiViolations = piiRows.stream().mapToLong(ThreatCategoryCount::getCount).sum();
         Set<String> policiesWithPii = piiRows.stream().map(ThreatCategoryCount::getCategory).collect(Collectors.toCollection(HashSet::new));
 
-        InsightMetric totalMetric = new InsightMetric(
+        InsightResult.Metric totalMetric = new InsightResult.Metric(
                 "total_pii_violations", "PII-labeled violations",
                 totalPiiViolations, null, "count", MetricFormat.count(totalPiiViolations, "violation"), null);
 
         InsightResult result = base();
 
         if (totalPiiViolations == 0) {
-            result.setStatus(InsightStatus.READY.name());
+            result.setStatus(InsightResult.Status.READY.name());
             result.setHeadline("No PII-labeled violations in this window.");
             result.setMetrics(Collections.singletonList(totalMetric));
             result.setMetricsComplete(true);
@@ -106,19 +98,19 @@ public class LikelyFalsePositivesProvider implements InsightProvider {
             return result;
         }
 
-        InsightMetric policyCountMetric = new InsightMetric(
+        InsightResult.Metric policyCountMetric = new InsightResult.Metric(
                 "policies_with_pii_rules", "Policies with PII-labeled violations",
                 policiesWithPii.size(), null, "count", MetricFormat.count(policiesWithPii.size(), "policy"), null);
-        List<InsightMetric> baseMetrics = new ArrayList<>(Arrays.asList(totalMetric, policyCountMetric));
+        List<InsightResult.Metric> baseMetrics = new ArrayList<>(Arrays.asList(totalMetric, policyCountMetric));
 
-        if (scope == InsightScope.LIST) {
-            result.setStatus(InsightStatus.PARTIAL.name());
+        if (scope == Scope.LIST) {
+            result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(MetricFormat.count(totalPiiViolations, "violation") + " labeled PII across "
                     + MetricFormat.count(policiesWithPii.size(), "policy")
                     + "; a precision estimate requires the detail view.");
             result.setMetrics(baseMetrics);
             result.setMetricsComplete(false);
-            result.setDataGaps(Collections.singletonList(new DataGap(
+            result.setDataGaps(Collections.singletonList(new InsightResult.Gap(
                     "PROVIDER", "DEFERRED_TO_DETAIL",
                     "Precision per policy requires checking evidence text against the declared PII pattern, done only in the detail view.")));
             result.setEvidence(new ArrayList<>());
@@ -139,12 +131,12 @@ public class LikelyFalsePositivesProvider implements InsightProvider {
         }
 
         if (events.isEmpty()) {
-            result.setStatus(InsightStatus.PARTIAL.name());
+            result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(MetricFormat.count(totalPiiViolations, "violation") + " labeled PII across "
                     + MetricFormat.count(policiesWithPii.size(), "policy") + ".");
             result.setMetrics(baseMetrics);
             result.setMetricsComplete(false);
-            result.setDataGaps(Collections.singletonList(new DataGap(
+            result.setDataGaps(Collections.singletonList(new InsightResult.Gap(
                     "THREAT_BACKEND", "NO_ROWS",
                     "Could not estimate precision — the violation lookup returned no rows despite "
                             + totalPiiViolations + " known PII violations from the aggregate count.")));
@@ -195,32 +187,32 @@ public class LikelyFalsePositivesProvider implements InsightProvider {
         long totalFalsePositive = byPolicy.values().stream().mapToLong(s -> s.falsePositive).sum();
         long totalInconclusive = byPolicy.values().stream().mapToLong(s -> s.inconclusive).sum();
 
-        List<InsightMetric> metrics = new ArrayList<>(baseMetrics);
+        List<InsightResult.Metric> metrics = new ArrayList<>(baseMetrics);
         if (totalChecked > 0) {
-            metrics.add(new InsightMetric(
+            metrics.add(new InsightResult.Metric(
                     "likely_false_positive_count", "Likely false positives",
                     totalFalsePositive, totalChecked, "count",
                     MetricFormat.ofTotal(totalFalsePositive, totalChecked), null));
             double overallPrecision = totalChecked > 0 ? (double) totalTruePositive / totalChecked : 0.0;
-            metrics.add(new InsightMetric(
+            metrics.add(new InsightResult.Metric(
                     "overall_precision_percent", "Overall precision (checkable violations)",
                     Math.round(overallPrecision * 100), null, "percent", MetricFormat.percent(overallPrecision), null));
         }
         if (totalInconclusive > 0) {
-            metrics.add(new InsightMetric(
+            metrics.add(new InsightResult.Metric(
                     "inconclusive_count", "Inconclusive (evidence appears redacted)",
                     totalInconclusive, events.size(), "count", MetricFormat.ofTotal(totalInconclusive, events.size()), null));
         }
         if (notCheckableCount > 0) {
-            metrics.add(new InsightMetric(
+            metrics.add(new InsightResult.Metric(
                     "not_independently_checkable_count", "PII type not independently checkable",
                     notCheckableCount, events.size(), "count", MetricFormat.ofTotal(notCheckableCount, events.size()), null));
         }
 
         Map<String, GuardrailPolicies> policyByLowerName = new HashMap<>();
-        Loaded<List<GuardrailPolicies>> policiesLoaded = bundle.getPolicies();
-        if (policiesLoaded.isOk()) {
-            for (GuardrailPolicies p : policiesLoaded.getValue()) {
+        List<GuardrailPolicies> policies = bundle.getPolicies();
+        if (policies != null) {
+            for (GuardrailPolicies p : policies) {
                 if (p.getName() != null) {
                     policyByLowerName.put(lower(p.getName()), p);
                 }
@@ -258,7 +250,7 @@ public class LikelyFalsePositivesProvider implements InsightProvider {
         }
 
         List<PolicyStats> topRows = withSample.stream().limit(EVIDENCE_ROW_CAP).collect(Collectors.toList());
-        List<EvidenceRow> rows = new ArrayList<>();
+        List<InsightResult.Evidence.Row> rows = new ArrayList<>();
         for (PolicyStats s : topRows) {
             GuardrailPolicies policy = policyByLowerName.get(lower(s.policyName));
             Map<String, Object> raw = new HashMap<>();
@@ -268,18 +260,18 @@ public class LikelyFalsePositivesProvider implements InsightProvider {
             raw.put("falsePositive", s.falsePositive);
             raw.put("looksLikeCredential", s.falsePositiveLooksLikeCredential > 0);
 
-            rows.add(new EvidenceRow(Arrays.asList(
+            rows.add(new InsightResult.Evidence.Row(Arrays.asList(
                     s.policyName, MetricFormat.count(s.checkedTotal(), "hit"),
                     MetricFormat.count(s.truePositive, "hit"), MetricFormat.count(s.falsePositive, "hit"),
                     MetricFormat.percent(s.precision()), sampleDisplay(s.sampleFalsePositive)
             ), raw));
         }
-        List<EvidenceTable> evidence = new ArrayList<>();
-        evidence.add(new EvidenceTable("false_positive_precision_by_policy", "Estimated precision by policy",
+        List<InsightResult.Evidence> evidence = new ArrayList<>();
+        evidence.add(new InsightResult.Evidence("false_positive_precision_by_policy", "Estimated precision by policy",
                 Arrays.asList("Policy", "Checked", "Likely true positive", "Likely false positive", "Precision", "Sample false positive"),
                 rows, withSample.size()));
 
-        result.setStatus(InsightStatus.READY.name());
+        result.setStatus(InsightResult.Status.READY.name());
         result.setHeadline(headline);
         result.setSeverity(severity);
         result.setMetrics(metrics);
@@ -359,11 +351,11 @@ public class LikelyFalsePositivesProvider implements InsightProvider {
     private InsightResult failed(String reason) {
         InsightResult r = InsightResult.noData(getInsightId(), reason);
         r.setDataGaps(new ArrayList<>(Collections.singletonList(
-                new DataGap("THREAT_BACKEND", "REQUEST_FAILED", reason))));
+                new InsightResult.Gap("THREAT_BACKEND", "REQUEST_FAILED", reason))));
         return r;
     }
 
-    private static List<InsightCta> buildCtas(PolicyStats worst, Map<String, GuardrailPolicies> policyByLowerName) {
+    private static List<InsightResult.Cta> buildCtas(PolicyStats worst, Map<String, GuardrailPolicies> policyByLowerName) {
         if (worst == null) {
             return new ArrayList<>();
         }
@@ -372,14 +364,14 @@ public class LikelyFalsePositivesProvider implements InsightProvider {
         params.put("policyId", policy != null ? policy.getHexId() : null);
         params.put("policyName", worst.policyName);
 
-        List<InsightCta> ctas = new ArrayList<>();
-        ctas.add(new InsightCta("add_policy_conditions", "Add policy conditions",
+        List<InsightResult.Cta> ctas = new ArrayList<>();
+        ctas.add(new InsightResult.Cta("add_policy_conditions", "Add policy conditions",
                 "BULK_ACTION", "/dashboard/guardrails/policies", params, true));
         if (worst.falsePositiveLooksLikeCredential > 0) {
-            ctas.add(new InsightCta("reclassify_as_credential", "Reclassify as credential detection",
+            ctas.add(new InsightResult.Cta("reclassify_as_credential", "Reclassify as credential detection",
                     "NAVIGATE", "/dashboard/guardrails/policies", params, false));
         }
-        ctas.add(new InsightCta("mark_false_positive", "Mark false positive",
+        ctas.add(new InsightResult.Cta("mark_false_positive", "Mark false positive",
                 "NAVIGATE", "/dashboard/guardrails/violations", params, false));
         return ctas;
     }

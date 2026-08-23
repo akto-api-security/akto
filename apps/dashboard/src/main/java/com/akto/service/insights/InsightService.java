@@ -15,14 +15,14 @@ public class InsightService {
         InsightDataBundle bundle = InsightDataLoader.load(ctx, threatClient);
         List<InsightResult> results = new ArrayList<>();
         for (InsightId id : InsightId.values()) {
-            results.add(computeSafely(id, bundle, ctx, InsightScope.LIST, threatClient));
+            results.add(computeSafely(id, bundle, ctx, InsightProvider.Scope.LIST, threatClient));
         }
         return results;
     }
 
     public InsightResult fetchDetail(InsightId id, InsightContext ctx, AbstractThreatDetectionAction threatClient) {
         InsightDataBundle bundle = InsightDataLoader.load(ctx, threatClient);
-        InsightResult result = computeSafely(id, bundle, ctx, InsightScope.DETAIL, threatClient);
+        InsightResult result = computeSafely(id, bundle, ctx, InsightProvider.Scope.DETAIL, threatClient);
         // Narrative generation (LLM markdown + InsightNarrativeCache) is a later step; until it
         // lands every detail response is metrics/evidence/ctas only, which is a complete and
         // honest response on its own.
@@ -31,7 +31,7 @@ public class InsightService {
         return result;
     }
 
-    private InsightResult computeSafely(InsightId id, InsightDataBundle bundle, InsightContext ctx, InsightScope scope,
+    private InsightResult computeSafely(InsightId id, InsightDataBundle bundle, InsightContext ctx, InsightProvider.Scope scope,
                                          AbstractThreatDetectionAction threatClient) {
         InsightProvider provider = InsightProviderRegistry.get(id);
         if (provider == null) {

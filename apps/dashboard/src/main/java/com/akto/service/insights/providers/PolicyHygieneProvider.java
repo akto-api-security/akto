@@ -5,19 +5,11 @@ import com.akto.action.threat_detection.ThreatCategoryCount;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.GuardrailPolicies;
-import com.akto.service.insights.DataGap;
-import com.akto.service.insights.EvidenceRow;
-import com.akto.service.insights.EvidenceTable;
 import com.akto.service.insights.InsightContext;
-import com.akto.service.insights.InsightCta;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightId;
-import com.akto.service.insights.InsightMetric;
 import com.akto.service.insights.InsightProvider;
 import com.akto.service.insights.InsightResult;
-import com.akto.service.insights.InsightScope;
-import com.akto.service.insights.InsightStatus;
-import com.akto.service.insights.Loaded;
 import com.akto.service.insights.MetricFormat;
 import org.apache.commons.lang3.StringUtils;
 
@@ -67,24 +59,24 @@ public class PolicyHygieneProvider implements InsightProvider {
     }
 
     @Override
-    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, InsightScope scope,
+    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope,
                                   AbstractThreatDetectionAction threatClient) {
-        Loaded<List<GuardrailPolicies>> policiesLoaded = bundle.getPolicies();
-        if (!policiesLoaded.isOk()) {
-            return failed("Could not load guardrail policies: " + policiesLoaded.getFailureReason());
+        List<GuardrailPolicies> policies = bundle.getPolicies();
+        if (policies == null) {
+            return failed("Could not load guardrail policies");
         }
-        Loaded<List<ThreatCategoryCount>> subCatLoaded = bundle.getSubCategoryCounts();
-        if (!subCatLoaded.isOk()) {
-            return failed("Could not load violation counts: " + subCatLoaded.getFailureReason());
+        List<ThreatCategoryCount> subCategoryCounts = bundle.getSubCategoryCounts();
+        if (subCategoryCounts == null) {
+            return failed("Could not load violation counts");
         }
 
-        List<GuardrailPolicies> activePolicies = policiesLoaded.getValue().stream()
+        List<GuardrailPolicies> activePolicies = policies.stream()
                 .filter(GuardrailPolicies::isActive)
                 .collect(Collectors.toList());
 
         Map<String, Long> hitsByPolicyLower = new HashMap<>();
         long totalViolations = 0;
-        for (ThreatCategoryCount c : subCatLoaded.getValue()) {
+        for (ThreatCategoryCount c : subCategoryCounts) {
             totalViolations += c.getCount();
             hitsByPolicyLower.merge(lower(c.getCategory()), (long) c.getCount(), Long::sum);
         }
@@ -100,28 +92,28 @@ public class PolicyHygieneProvider implements InsightProvider {
         double topPolicyShare = totalViolations > 0 ? (double) topPolicyHits / totalViolations : 0.0;
 
         InsightResult result = base();
-        List<InsightMetric> metrics = new ArrayList<>();
-        metrics.add(new InsightMetric(
+        List<InsightResult.Metric> metrics = new ArrayList<>();
+        metrics.add(new InsightResult.Metric(
                 "dead_policy_count", "Active policies with zero hits this window",
                 deadPolicies.size(), activePolicies.size(), "count",
                 MetricFormat.ofTotal(deadPolicies.size(), activePolicies.size()), null));
         if (topPolicy != null && totalViolations > 0) {
-            metrics.add(new InsightMetric(
+            metrics.add(new InsightResult.Metric(
                     "top_policy_violation_share", "Share of all violations from the single busiest policy",
                     Math.round(topPolicyShare * 100), null, "percent", MetricFormat.percent(topPolicyShare), null));
         }
 
         // Uncovered assets — see class doc for why this can't come from violation data.
-        Loaded<List<ApiCollection>> collectionsLoaded = bundle.getActiveCollections();
-        Loaded<Map<Integer, Integer>> lastSeenLoaded = bundle.getCollectionLastTrafficSeen();
+        List<ApiCollection> activeCollections = bundle.getActiveCollections();
+        Map<Integer, Integer> collectionLastTrafficSeen = bundle.getCollectionLastTrafficSeen();
         List<String> caveats = new ArrayList<>();
         caveats.add("Coverage checks a policy's configured server scope (applyToAllServers / selectedMcpServersV2 / selectedAgentServersV2) case-insensitively by exact hostname match, mirroring the real enforcement matcher exactly — it does not distinguish YAML/CI-CD-sourced policies, which the real matcher always treats as applying everywhere.");
 
         List<ApiCollection> uncoveredAssets = new ArrayList<>();
         long activelyUsedCount = 0;
-        if (collectionsLoaded.isOk()) {
-            Map<Integer, Integer> lastSeen = lastSeenLoaded.hasValue() ? lastSeenLoaded.getValue() : new HashMap<>();
-            if (!lastSeenLoaded.isOk()) {
+        if (activeCollections != null) {
+            Map<Integer, Integer> lastSeen = collectionLastTrafficSeen != null ? collectionLastTrafficSeen : new HashMap<>();
+            if (collectionLastTrafficSeen == null) {
                 caveats.add("Traffic recency data was unavailable; falling back to each asset's creation time to decide whether it's actively used.");
             }
 
@@ -140,7 +132,7 @@ public class PolicyHygieneProvider implements InsightProvider {
                 }
             }
 
-            for (ApiCollection c : collectionsLoaded.getValue()) {
+            for (ApiCollection c : activeCollections) {
                 if (StringUtils.isBlank(c.getHostName())) {
                     continue;
                 }
@@ -156,12 +148,11 @@ public class PolicyHygieneProvider implements InsightProvider {
                 }
             }
         } else {
-            caveats.add("Could not load the asset inventory (" + collectionsLoaded.getFailureReason()
-                    + ") — the uncovered-assets half of this insight is unavailable; dead-policy results above are unaffected.");
+            caveats.add("Could not load the asset inventory — the uncovered-assets half of this insight is unavailable; dead-policy results above are unaffected.");
         }
 
-        if (collectionsLoaded.isOk()) {
-            metrics.add(new InsightMetric(
+        if (activeCollections != null) {
+            metrics.add(new InsightResult.Metric(
                     "uncovered_asset_count", "Actively-used surfaces with no guardrail in scope",
                     uncoveredAssets.size(), activelyUsedCount, "count",
                     MetricFormat.ofTotal(uncoveredAssets.size(), activelyUsedCount), null));
@@ -186,33 +177,33 @@ public class PolicyHygieneProvider implements InsightProvider {
             headline = "No dead policies and no uncovered actively-used surfaces found.";
         }
 
-        List<EvidenceTable> evidence = new ArrayList<>();
+        List<InsightResult.Evidence> evidence = new ArrayList<>();
         if (!deadPolicies.isEmpty()) {
-            List<EvidenceRow> rows = new ArrayList<>();
+            List<InsightResult.Evidence.Row> rows = new ArrayList<>();
             for (GuardrailPolicies p : deadPolicies.stream().limit(EVIDENCE_ROW_CAP).collect(Collectors.toList())) {
                 Map<String, Object> raw = new HashMap<>();
                 raw.put("policyId", p.getHexId());
                 raw.put("policyName", p.getName());
-                rows.add(new EvidenceRow(Arrays.asList(
+                rows.add(new InsightResult.Evidence.Row(Arrays.asList(
                         p.getName(), StringUtils.defaultIfBlank(p.getBehaviour(), "unknown"),
                         ageDescription(p.getCreatedTimestamp())), raw));
             }
-            evidence.add(new EvidenceTable("dead_policies", "Policies with zero hits",
+            evidence.add(new InsightResult.Evidence("dead_policies", "Policies with zero hits",
                     Arrays.asList("Policy", "Mode", "Created"), rows, deadPolicies.size()));
         }
         if (!uncoveredAssets.isEmpty()) {
-            List<EvidenceRow> rows = new ArrayList<>();
+            List<InsightResult.Evidence.Row> rows = new ArrayList<>();
             for (ApiCollection c : uncoveredAssets.stream().limit(EVIDENCE_ROW_CAP).collect(Collectors.toList())) {
                 Map<String, Object> raw = new HashMap<>();
                 raw.put("apiCollectionId", c.getId());
                 raw.put("hostName", c.getHostName());
-                rows.add(new EvidenceRow(Arrays.asList(c.getHostName(), ageDescription(c.getStartTs())), raw));
+                rows.add(new InsightResult.Evidence.Row(Arrays.asList(c.getHostName(), ageDescription(c.getStartTs())), raw));
             }
-            evidence.add(new EvidenceTable("uncovered_assets", "Actively-used surfaces with no guardrail",
+            evidence.add(new InsightResult.Evidence("uncovered_assets", "Actively-used surfaces with no guardrail",
                     Arrays.asList("Asset", "First seen"), rows, uncoveredAssets.size()));
         }
 
-        result.setStatus(InsightStatus.READY.name());
+        result.setStatus(InsightResult.Status.READY.name());
         result.setHeadline(headline);
         result.setSeverity(severity);
         result.setMetrics(metrics);
@@ -268,25 +259,25 @@ public class PolicyHygieneProvider implements InsightProvider {
     private InsightResult failed(String reason) {
         InsightResult r = InsightResult.noData(getInsightId(), reason);
         r.setDataGaps(new ArrayList<>(java.util.Collections.singletonList(
-                new DataGap("POLICY_STORE", "REQUEST_FAILED", reason))));
+                new InsightResult.Gap("POLICY_STORE", "REQUEST_FAILED", reason))));
         return r;
     }
 
-    private static List<InsightCta> buildCtas(List<GuardrailPolicies> deadPolicies, List<ApiCollection> uncoveredAssets) {
-        List<InsightCta> ctas = new ArrayList<>();
+    private static List<InsightResult.Cta> buildCtas(List<GuardrailPolicies> deadPolicies, List<ApiCollection> uncoveredAssets) {
+        List<InsightResult.Cta> ctas = new ArrayList<>();
         if (!deadPolicies.isEmpty()) {
             Map<String, Object> params = new HashMap<>();
             params.put("policyIds", deadPolicies.stream().map(GuardrailPolicies::getHexId).collect(Collectors.toList()));
-            ctas.add(new InsightCta("retire_dead_policies", "Retire dead policies",
+            ctas.add(new InsightResult.Cta("retire_dead_policies", "Retire dead policies",
                     "BULK_ACTION", "/dashboard/guardrails/policies", params, true));
         }
         if (!uncoveredAssets.isEmpty()) {
             Map<String, Object> params = new HashMap<>();
             params.put("hostNames", uncoveredAssets.stream().map(ApiCollection::getHostName).collect(Collectors.toList()));
-            ctas.add(new InsightCta("apply_baseline_policy", "Apply baseline policy to uncovered assets",
+            ctas.add(new InsightResult.Cta("apply_baseline_policy", "Apply baseline policy to uncovered assets",
                     "BULK_ACTION", "/dashboard/guardrails/policies", params, deadPolicies.isEmpty()));
         }
-        ctas.add(new InsightCta("review_scope", "Review scope",
+        ctas.add(new InsightResult.Cta("review_scope", "Review scope",
                 "NAVIGATE", "/dashboard/guardrails/policies", java.util.Collections.emptyMap(), false));
         return ctas;
     }

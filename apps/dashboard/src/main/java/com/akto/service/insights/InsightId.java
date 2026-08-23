@@ -9,39 +9,39 @@ public enum InsightId {
 
     ALERT_FATIGUE(
             "Alert fatigue — same user, same policy, over and over",
-            InsightCategory.ACTIONABLE),
+            Category.ACTIONABLE),
     TEST_POLICIES_ON_PROD(
             "Test policies running against production users",
-            InsightCategory.ACTIONABLE),
+            Category.ACTIONABLE),
     SKILL_EVALUATION_CONCENTRATION(
             "One user, one class, flooding the queue",
-            InsightCategory.ACTIONABLE),
+            Category.ACTIONABLE),
     CREDENTIAL_EXPOSURE(
             "Credentials and secrets — separated from PII",
-            InsightCategory.ACTIONABLE),
+            Category.ACTIONABLE),
     PROMPT_INJECTION_REPEATS(
             "Prompt injection attempts, grouped by source",
-            InsightCategory.ACTIONABLE),
+            Category.ACTIONABLE),
     LIKELY_FALSE_POSITIVES(
             "Likely false positives — flag as min risk, don't hide",
-            InsightCategory.ACTIONABLE),
+            Category.ACTIONABLE),
     ALERT_MODE_REAL_HITS(
             "Policies in alert mode that are catching real things",
-            InsightCategory.ACTIONABLE),
+            Category.ACTIONABLE),
     POLICY_HYGIENE(
             "Policy hygiene — dead policies and uncovered assets",
-            InsightCategory.ACTIONABLE),
+            Category.ACTIONABLE),
     SIGNAL_QUALITY(
             "Signal quality",
-            InsightCategory.READ_ONLY),
+            Category.READ_ONLY),
     POLICY_ACTIVITY_THIS_WEEK(
             "What changed this week",
-            InsightCategory.READ_ONLY);
+            Category.READ_ONLY);
 
     private final String defaultTitle;
-    private final InsightCategory category;
+    private final Category category;
 
-    InsightId(String defaultTitle, InsightCategory category) {
+    InsightId(String defaultTitle, Category category) {
         this.defaultTitle = defaultTitle;
         this.category = category;
     }
@@ -50,7 +50,13 @@ public enum InsightId {
         return defaultTitle;
     }
 
-    public InsightCategory getCategory() {
+    public Category getCategory() {
         return category;
+    }
+
+    /** How an insight is presented: ACTIONABLE cards carry CTAs, READ_ONLY cards are context only. */
+    public enum Category {
+        ACTIONABLE,
+        READ_ONLY
     }
 }

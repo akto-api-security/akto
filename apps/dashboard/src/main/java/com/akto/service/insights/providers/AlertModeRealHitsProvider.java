@@ -4,19 +4,11 @@ import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.action.threat_detection.ThreatCategoryCount;
 import com.akto.dto.GuardrailPolicies;
-import com.akto.service.insights.DataGap;
-import com.akto.service.insights.EvidenceRow;
-import com.akto.service.insights.EvidenceTable;
 import com.akto.service.insights.InsightContext;
-import com.akto.service.insights.InsightCta;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightId;
-import com.akto.service.insights.InsightMetric;
 import com.akto.service.insights.InsightProvider;
 import com.akto.service.insights.InsightResult;
-import com.akto.service.insights.InsightScope;
-import com.akto.service.insights.InsightStatus;
-import com.akto.service.insights.Loaded;
 import com.akto.service.insights.MetricFormat;
 import org.apache.commons.lang3.StringUtils;
 
@@ -45,7 +37,7 @@ import java.util.stream.Collectors;
  * injection" is answerable from the exact subCategory literals items #4/#5/#6 already established
  * ("Secrets", "PII-&lt;type&gt;", "PromptInjection"). Both pieces come straight out of the shared,
  * free bundle fields (policies + subCategoryCounts) with no per-event lookup at all, so LIST scope
- * is a complete, non-deferred answer (status READY, no DataGap) — a deliberate contrast with every
+ * is a complete, non-deferred answer (status READY, no data gap) — a deliberate contrast with every
  * prior item in this set. DETAIL scope adds one optional enrichment (which specific users triggered
  * the dangerous hits on the worst alert-mode policy) via bounded event paging, but a failure there
  * only drops that one bonus metric — it never degrades the already-complete LIST-scope answer.
@@ -65,18 +57,18 @@ public class AlertModeRealHitsProvider implements InsightProvider {
     }
 
     @Override
-    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, InsightScope scope,
+    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope,
                                   AbstractThreatDetectionAction threatClient) {
-        Loaded<List<GuardrailPolicies>> policiesLoaded = bundle.getPolicies();
-        if (!policiesLoaded.isOk()) {
-            return failed("Could not load guardrail policies: " + policiesLoaded.getFailureReason());
+        List<GuardrailPolicies> policies = bundle.getPolicies();
+        if (policies == null) {
+            return failed("Could not load guardrail policies");
         }
-        Loaded<List<ThreatCategoryCount>> subCatLoaded = bundle.getSubCategoryCounts();
-        if (!subCatLoaded.isOk()) {
-            return failed("Could not load violation counts: " + subCatLoaded.getFailureReason());
+        List<ThreatCategoryCount> subCategoryCounts = bundle.getSubCategoryCounts();
+        if (subCategoryCounts == null) {
+            return failed("Could not load violation counts");
         }
 
-        List<GuardrailPolicies> activePolicies = policiesLoaded.getValue().stream()
+        List<GuardrailPolicies> activePolicies = policies.stream()
                 .filter(GuardrailPolicies::isActive)
                 .collect(Collectors.toList());
         List<GuardrailPolicies> alertModePolicies = activePolicies.stream()
@@ -84,13 +76,13 @@ public class AlertModeRealHitsProvider implements InsightProvider {
                 .collect(Collectors.toList());
 
         InsightResult result = base();
-        InsightMetric policyCountMetric = new InsightMetric(
+        InsightResult.Metric policyCountMetric = new InsightResult.Metric(
                 "alert_mode_policy_count", "Active policies in alert mode",
                 alertModePolicies.size(), activePolicies.size(), "count",
                 MetricFormat.ofTotal(alertModePolicies.size(), activePolicies.size()), null);
 
         if (alertModePolicies.isEmpty()) {
-            result.setStatus(InsightStatus.READY.name());
+            result.setStatus(InsightResult.Status.READY.name());
             result.setHeadline("No active policies are running in alert mode.");
             result.setMetrics(Collections.singletonList(policyCountMetric));
             result.setMetricsComplete(true);
@@ -103,7 +95,7 @@ public class AlertModeRealHitsProvider implements InsightProvider {
         Map<String, Long> hitsByPolicyLower = new HashMap<>();
         Map<String, Long> dangerousHitsByPolicyLower = new HashMap<>();
         long totalAllViolations = 0;
-        for (ThreatCategoryCount c : subCatLoaded.getValue()) {
+        for (ThreatCategoryCount c : subCategoryCounts) {
             long count = c.getCount();
             totalAllViolations += count;
             String policyKey = lower(c.getCategory());
@@ -122,12 +114,12 @@ public class AlertModeRealHitsProvider implements InsightProvider {
         }
         double alertModeShare = totalAllViolations > 0 ? (double) alertModeTotalHits / totalAllViolations : 0.0;
 
-        List<InsightMetric> metrics = new ArrayList<>();
+        List<InsightResult.Metric> metrics = new ArrayList<>();
         metrics.add(policyCountMetric);
-        metrics.add(new InsightMetric(
+        metrics.add(new InsightResult.Metric(
                 "alert_mode_violation_share", "Violation volume covered by alert-mode policies",
                 Math.round(alertModeShare * 100), null, "percent", MetricFormat.percent(alertModeShare), null));
-        metrics.add(new InsightMetric(
+        metrics.add(new InsightResult.Metric(
                 "credential_pii_injection_hits_in_alert_mode", "Credential/PII/injection hits never blocked",
                 alertModeDangerousHits, alertModeTotalHits, "count",
                 MetricFormat.ofTotal(alertModeDangerousHits, alertModeTotalHits), null));
@@ -153,14 +145,14 @@ public class AlertModeRealHitsProvider implements InsightProvider {
         GuardrailPolicies worst = sortedByDangerous.isEmpty() ? null : sortedByDangerous.get(0);
         long worstDangerousHits = worst != null ? dangerousHitsByPolicyLower.getOrDefault(lower(worst.getName()), 0L) : 0;
 
-        if (scope == InsightScope.DETAIL && worst != null && worstDangerousHits > 0) {
-            distinctUsers = tryResolveDistinctUsers(worst.getName(), subCatLoaded.getValue(), ctx, threatClient);
+        if (scope == Scope.DETAIL && worst != null && worstDangerousHits > 0) {
+            distinctUsers = tryResolveDistinctUsers(worst.getName(), subCategoryCounts, ctx, threatClient);
             if (distinctUsers == null) {
                 caveats.add("Could not resolve which users triggered the worst policy's undetected hits — the event lookup was unavailable.");
             }
         }
 
-        List<EvidenceRow> rows = new ArrayList<>();
+        List<InsightResult.Evidence.Row> rows = new ArrayList<>();
         for (GuardrailPolicies p : sortedByDangerous.stream().limit(EVIDENCE_ROW_CAP).collect(Collectors.toList())) {
             String key = lower(p.getName());
             long total = hitsByPolicyLower.getOrDefault(key, 0L);
@@ -182,14 +174,14 @@ public class AlertModeRealHitsProvider implements InsightProvider {
             } else {
                 cells.add("—");
             }
-            rows.add(new EvidenceRow(cells, raw));
+            rows.add(new InsightResult.Evidence.Row(cells, raw));
         }
         List<String> columns = Arrays.asList("Policy", "Total hits", "Credential/PII/injection hits", "% dangerous", "Users (worst policy)");
-        List<EvidenceTable> evidence = new ArrayList<>();
-        evidence.add(new EvidenceTable("alert_mode_policies", "Alert-mode policies by risk",
+        List<InsightResult.Evidence> evidence = new ArrayList<>();
+        evidence.add(new InsightResult.Evidence("alert_mode_policies", "Alert-mode policies by risk",
                 columns, rows, alertModePolicies.size()));
 
-        result.setStatus(InsightStatus.READY.name());
+        result.setStatus(InsightResult.Status.READY.name());
         result.setHeadline(headline);
         result.setSeverity(severity);
         result.setMetrics(metrics);
@@ -256,11 +248,11 @@ public class AlertModeRealHitsProvider implements InsightProvider {
     private InsightResult failed(String reason) {
         InsightResult r = InsightResult.noData(getInsightId(), reason);
         r.setDataGaps(new ArrayList<>(Collections.singletonList(
-                new DataGap("POLICY_STORE", "REQUEST_FAILED", reason))));
+                new InsightResult.Gap("POLICY_STORE", "REQUEST_FAILED", reason))));
         return r;
     }
 
-    private static List<InsightCta> buildCtas(GuardrailPolicies worst, long worstDangerousHits) {
+    private static List<InsightResult.Cta> buildCtas(GuardrailPolicies worst, long worstDangerousHits) {
         if (worst == null || worstDangerousHits == 0) {
             return new ArrayList<>();
         }
@@ -268,12 +260,12 @@ public class AlertModeRealHitsProvider implements InsightProvider {
         params.put("policyId", worst.getHexId());
         params.put("policyName", worst.getName());
 
-        List<InsightCta> ctas = new ArrayList<>();
-        ctas.add(new InsightCta("switch_to_block_mode", "Switch to block mode",
+        List<InsightResult.Cta> ctas = new ArrayList<>();
+        ctas.add(new InsightResult.Cta("switch_to_block_mode", "Switch to block mode",
                 "BULK_ACTION", "/dashboard/guardrails/policies", params, true));
-        ctas.add(new InsightCta("simulate_impact_first", "Simulate impact first",
+        ctas.add(new InsightResult.Cta("simulate_impact_first", "Simulate impact first",
                 "NAVIGATE", "/dashboard/guardrails/policies", params, false));
-        ctas.add(new InsightCta("view_the_hits", "View the hits",
+        ctas.add(new InsightResult.Cta("view_the_hits", "View the hits",
                 "NAVIGATE", "/dashboard/guardrails/violations", params, false));
         return ctas;
     }

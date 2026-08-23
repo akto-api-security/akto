@@ -46,14 +46,14 @@ public class InsightDataLoader {
                 .build();
     }
 
-    private static Loaded<List<GuardrailPolicies>> loadPolicies() {
+    private static List<GuardrailPolicies> loadPolicies() {
         try {
             List<GuardrailPolicies> policies = GuardrailPoliciesDao.instance.findAll(
                     com.mongodb.client.model.Filters.empty());
-            return Loaded.of(policies != null ? policies : new ArrayList<>());
+            return policies != null ? policies : new ArrayList<>();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "InsightDataLoader: failed to load guardrail policies");
-            return Loaded.failed("Guardrail policy store unavailable");
+            return null;
         }
     }
 
@@ -64,30 +64,30 @@ public class InsightDataLoader {
     // despite N known violations" an unreliable failure signal.
     private static final String ACTIVE_STATUS_FILTER = "ACTIVE";
 
-    private static Loaded<List<ThreatCategoryCount>> loadSubCategoryCounts(
+    private static List<ThreatCategoryCount> loadSubCategoryCounts(
             InsightContext ctx, AbstractThreatDetectionAction threatClient) {
         try {
             List<ThreatCategoryCount> counts = threatClient.fetchSubcategoryWiseCounts(
                     ctx.getStartTs(), ctx.getEndTs(), Collections.emptyList(), ACTIVE_STATUS_FILTER);
-            return Loaded.of(counts != null ? counts : new ArrayList<>());
+            return counts != null ? counts : new ArrayList<>();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "InsightDataLoader: failed to load subcategory-wise violation counts");
-            return Loaded.failed("Threat-detection backend unavailable");
+            return null;
         }
     }
 
-    private static Loaded<List<SkillSeverityCount>> loadSkillSeverityCounts(
+    private static List<SkillSeverityCount> loadSkillSeverityCounts(
             InsightContext ctx, AbstractThreatDetectionAction threatClient) {
         try {
             List<SkillSeverityCount> counts = threatClient.fetchSkillSeverityCounts(ctx.getStartTs(), ctx.getEndTs());
-            return Loaded.of(counts != null ? counts : new ArrayList<>());
+            return counts != null ? counts : new ArrayList<>();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "InsightDataLoader: failed to load skill severity counts");
-            return Loaded.failed("Threat-detection backend unavailable");
+            return null;
         }
     }
 
-    private static Loaded<List<ApiCollection>> loadActiveCollections() {
+    private static List<ApiCollection> loadActiveCollections() {
         try {
             // Mirrors ApiCollectionsDao.fetchAllActiveHosts()'s own filter (hostName exists, not
             // deactivated) rather than inventing a different one — widened only to add startTs,
@@ -96,24 +96,24 @@ public class InsightDataLoader {
             Bson filter = Filters.and(Filters.exists(ApiCollection.HOST_NAME, true), Filters.ne(ApiCollection._DEACTIVATED, true));
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     filter, Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.START_TS));
-            return Loaded.of(collections != null ? collections : new ArrayList<>());
+            return collections != null ? collections : new ArrayList<>();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "InsightDataLoader: failed to load active collections");
-            return Loaded.failed("Collection store unavailable");
+            return null;
         }
     }
 
-    private static Loaded<Map<Integer, Integer>> loadCollectionLastTrafficSeen() {
+    private static Map<Integer, Integer> loadCollectionLastTrafficSeen() {
         try {
             Map<Integer, Integer> lastSeen = ApiInfoDao.instance.getLastTrafficSeen();
-            return Loaded.of(lastSeen != null ? lastSeen : new HashMap<>());
+            return lastSeen != null ? lastSeen : new HashMap<>();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "InsightDataLoader: failed to load collection last-traffic-seen map");
-            return Loaded.failed("Traffic recency data unavailable");
+            return null;
         }
     }
 
-    private static Loaded<Map<String, String>> loadDeviceIdToUsername() {
+    private static Map<String, String> loadDeviceIdToUsername() {
         try {
             Map<String, Set<String>> usernameToDevices = ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield();
             Map<String, String> inverse = new HashMap<>();
@@ -122,10 +122,10 @@ public class InsightDataLoader {
                     inverse.putIfAbsent(deviceId, e.getKey());
                 }
             }
-            return Loaded.of(inverse);
+            return inverse;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "InsightDataLoader: failed to load device-to-username map");
-            return Loaded.failed("Device identity resolution unavailable");
+            return null;
         }
     }
 }

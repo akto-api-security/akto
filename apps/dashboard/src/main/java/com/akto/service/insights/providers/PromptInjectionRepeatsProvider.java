@@ -4,20 +4,12 @@ import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.action.threat_detection.ThreatCategoryCount;
 import com.akto.dto.GuardrailPolicies;
-import com.akto.service.insights.DataGap;
-import com.akto.service.insights.EvidenceRow;
-import com.akto.service.insights.EvidenceTable;
 import com.akto.service.insights.EvidenceText;
 import com.akto.service.insights.InsightContext;
-import com.akto.service.insights.InsightCta;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightId;
-import com.akto.service.insights.InsightMetric;
 import com.akto.service.insights.InsightProvider;
 import com.akto.service.insights.InsightResult;
-import com.akto.service.insights.InsightScope;
-import com.akto.service.insights.InsightStatus;
-import com.akto.service.insights.Loaded;
 import com.akto.service.insights.MetricFormat;
 import com.akto.util.AgenticObserveUtil;
 import org.apache.commons.lang3.StringUtils;
@@ -70,26 +62,26 @@ public class PromptInjectionRepeatsProvider implements InsightProvider {
     }
 
     @Override
-    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, InsightScope scope,
+    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope,
                                   AbstractThreatDetectionAction threatClient) {
-        Loaded<List<ThreatCategoryCount>> subCatLoaded = bundle.getSubCategoryCounts();
-        if (!subCatLoaded.isOk()) {
-            return failed("Could not load violation counts: " + subCatLoaded.getFailureReason());
+        List<ThreatCategoryCount> subCategoryCounts = bundle.getSubCategoryCounts();
+        if (subCategoryCounts == null) {
+            return failed("Could not load violation counts");
         }
 
-        long totalAttempts = subCatLoaded.getValue().stream()
+        long totalAttempts = subCategoryCounts.stream()
                 .filter(c -> INJECTION_SUBCATEGORY.equalsIgnoreCase(c.getSubCategory()))
                 .mapToLong(ThreatCategoryCount::getCount)
                 .sum();
 
-        InsightMetric totalMetric = new InsightMetric(
+        InsightResult.Metric totalMetric = new InsightResult.Metric(
                 "total_injection_attempts", "Prompt injection attempts",
                 totalAttempts, null, "count", MetricFormat.count(totalAttempts, "attempt"), null);
 
         InsightResult result = base();
 
         if (totalAttempts == 0) {
-            result.setStatus(InsightStatus.READY.name());
+            result.setStatus(InsightResult.Status.READY.name());
             result.setHeadline("No prompt injection attempts detected in this window.");
             result.setMetrics(Collections.singletonList(totalMetric));
             result.setMetricsComplete(true);
@@ -99,13 +91,13 @@ public class PromptInjectionRepeatsProvider implements InsightProvider {
             return result;
         }
 
-        if (scope == InsightScope.LIST) {
-            result.setStatus(InsightStatus.PARTIAL.name());
+        if (scope == Scope.LIST) {
+            result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(MetricFormat.count(totalAttempts, "attempt")
                     + "; grouping by source and finding repeats requires the detail view.");
             result.setMetrics(Collections.singletonList(totalMetric));
             result.setMetricsComplete(false);
-            result.setDataGaps(Collections.singletonList(new DataGap(
+            result.setDataGaps(Collections.singletonList(new InsightResult.Gap(
                     "PROVIDER", "DEFERRED_TO_DETAIL",
                     "Repeat detection (same source, asset, and phrasing) requires paging raw events, done only in the detail view.")));
             result.setEvidence(new ArrayList<>());
@@ -124,11 +116,11 @@ public class PromptInjectionRepeatsProvider implements InsightProvider {
         }
 
         if (events.isEmpty()) {
-            result.setStatus(InsightStatus.PARTIAL.name());
+            result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(MetricFormat.count(totalAttempts, "attempt") + ".");
             result.setMetrics(Collections.singletonList(totalMetric));
             result.setMetricsComplete(false);
-            result.setDataGaps(Collections.singletonList(new DataGap(
+            result.setDataGaps(Collections.singletonList(new InsightResult.Gap(
                     "THREAT_BACKEND", "NO_ROWS",
                     "Could not group by source — the violation lookup returned no rows despite "
                             + totalAttempts + " known attempts from the aggregate count.")));
@@ -138,16 +130,16 @@ public class PromptInjectionRepeatsProvider implements InsightProvider {
         }
 
         Map<String, GuardrailPolicies> policyByLowerName = new HashMap<>();
-        Loaded<List<GuardrailPolicies>> policiesLoaded = bundle.getPolicies();
-        if (policiesLoaded.isOk()) {
-            for (GuardrailPolicies p : policiesLoaded.getValue()) {
+        List<GuardrailPolicies> policies = bundle.getPolicies();
+        if (policies != null) {
+            for (GuardrailPolicies p : policies) {
                 if (p.getName() != null) {
                     policyByLowerName.put(lower(p.getName()), p);
                 }
             }
         }
-        Map<String, String> deviceIdToUsername = bundle.getDeviceIdToUsername().hasValue()
-                ? bundle.getDeviceIdToUsername().getValue() : Collections.emptyMap();
+        Map<String, String> deviceIdToUsername = bundle.getDeviceIdToUsername() != null
+                ? bundle.getDeviceIdToUsername() : Collections.emptyMap();
 
         Map<String, Attempt> groups = new HashMap<>();
         for (DashboardMaliciousEvent event : events) {
@@ -173,20 +165,20 @@ public class PromptInjectionRepeatsProvider implements InsightProvider {
         long attemptsInRepeats = repeatGroups.stream().mapToLong(a -> a.count).sum();
         long observedTotal = events.size();
 
-        List<InsightMetric> metrics = new ArrayList<>();
+        List<InsightResult.Metric> metrics = new ArrayList<>();
         metrics.add(totalMetric);
-        metrics.add(new InsightMetric(
+        metrics.add(new InsightResult.Metric(
                 "distinct_sources", "Distinct sources",
                 distinctSources.size(), null, "count", MetricFormat.count(distinctSources.size(), "source"), null));
-        metrics.add(new InsightMetric(
+        metrics.add(new InsightResult.Metric(
                 "distinct_assets", "Distinct assets targeted",
                 distinctAssets.size(), null, "count", MetricFormat.count(distinctAssets.size(), "asset"), null));
-        metrics.add(new InsightMetric(
+        metrics.add(new InsightResult.Metric(
                 "repeat_group_count", "Repeating attempts (same source, asset, phrasing)",
                 repeatGroups.size(), groups.size(), "count",
                 MetricFormat.ofTotal(repeatGroups.size(), groups.size()), null));
         if (!repeatGroups.isEmpty()) {
-            metrics.add(new InsightMetric(
+            metrics.add(new InsightResult.Metric(
                     "attempts_in_repeat_groups", "Attempts belonging to a repeat",
                     attemptsInRepeats, observedTotal, "count",
                     MetricFormat.ofTotal(attemptsInRepeats, observedTotal), null));
@@ -223,7 +215,7 @@ public class PromptInjectionRepeatsProvider implements InsightProvider {
                 .limit(EVIDENCE_ROW_CAP)
                 .collect(Collectors.toList());
 
-        List<EvidenceRow> rows = new ArrayList<>();
+        List<InsightResult.Evidence.Row> rows = new ArrayList<>();
         for (Attempt attempt : topRepeats) {
             String displaySource = deviceIdToUsername.getOrDefault(attempt.actor, attempt.actor);
             Map<String, Object> raw = new HashMap<>();
@@ -235,16 +227,16 @@ public class PromptInjectionRepeatsProvider implements InsightProvider {
             GuardrailPolicies policy = policyByLowerName.get(lower(attempt.policyName));
             raw.put("policyId", policy != null ? policy.getHexId() : null);
 
-            rows.add(new EvidenceRow(Arrays.asList(
+            rows.add(new InsightResult.Evidence.Row(Arrays.asList(
                     displaySource, attempt.asset, truncateForDisplay(attempt.sampleText),
                     MetricFormat.count(attempt.count, "attempt"), formatSpan(attempt.lastSeen - attempt.firstSeen)
             ), raw));
         }
-        List<EvidenceTable> evidence = new ArrayList<>();
-        evidence.add(new EvidenceTable("prompt_injection_repeats", "Repeating injection attempts",
+        List<InsightResult.Evidence> evidence = new ArrayList<>();
+        evidence.add(new InsightResult.Evidence("prompt_injection_repeats", "Repeating injection attempts",
                 Arrays.asList("Source", "Asset", "Sample phrase", "Count", "Span"), rows, repeatGroups.size()));
 
-        result.setStatus(InsightStatus.READY.name());
+        result.setStatus(InsightResult.Status.READY.name());
         result.setHeadline(headline);
         result.setSeverity(severity);
         result.setMetrics(metrics);
@@ -310,11 +302,11 @@ public class PromptInjectionRepeatsProvider implements InsightProvider {
     private InsightResult failed(String reason) {
         InsightResult r = InsightResult.noData(getInsightId(), reason);
         r.setDataGaps(new ArrayList<>(Collections.singletonList(
-                new DataGap("THREAT_BACKEND", "REQUEST_FAILED", reason))));
+                new InsightResult.Gap("THREAT_BACKEND", "REQUEST_FAILED", reason))));
         return r;
     }
 
-    private static List<InsightCta> buildCtas(List<Attempt> topRepeats, Map<String, GuardrailPolicies> policyByLowerName) {
+    private static List<InsightResult.Cta> buildCtas(List<Attempt> topRepeats, Map<String, GuardrailPolicies> policyByLowerName) {
         if (topRepeats.isEmpty()) {
             return new ArrayList<>();
         }
@@ -326,12 +318,12 @@ public class PromptInjectionRepeatsProvider implements InsightProvider {
         params.put("policyId", policy != null ? policy.getHexId() : null);
         params.put("policyName", worst.policyName);
 
-        List<InsightCta> ctas = new ArrayList<>();
-        ctas.add(new InsightCta("view_source_sessions", "View source sessions",
+        List<InsightResult.Cta> ctas = new ArrayList<>();
+        ctas.add(new InsightResult.Cta("view_source_sessions", "View source sessions",
                 "NAVIGATE", "/dashboard/guardrails/violations", params, true));
-        ctas.add(new InsightCta("escalate_to_block_mode", "Escalate to block mode",
+        ctas.add(new InsightResult.Cta("escalate_to_block_mode", "Escalate to block mode",
                 "BULK_ACTION", "/dashboard/guardrails/policies", params, false));
-        ctas.add(new InsightCta("investigate_user", "Investigate user",
+        ctas.add(new InsightResult.Cta("investigate_user", "Investigate user",
                 "NAVIGATE", "/dashboard/observe/users-and-devices",
                 Collections.singletonMap("username", worst.actor), false));
         return ctas;

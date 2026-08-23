@@ -225,7 +225,7 @@ public class AbstractThreatDetectionAction extends UserAction {
    * name (get_subcategory_wise_count and fetchAllMaliciousEvents' "latestAttack" filter both key
    * off the same policy-name join). Unlike fetchAllMaliciousEvents, this deliberately does NOT
    * swallow failures into an empty list — it throws, so a caller can tell "zero rows" apart from
-   * "the backend call failed" and wrap the difference into a Loaded<T> instead of a confident zero.
+   * "the backend call failed" rather than treating a failure as a confident zero.
    */
   public List<ThreatCategoryCount> fetchSubcategoryWiseCounts(
       int startTimestamp, int endTimestamp, List<String> latestAttack, String statusFilter) throws Exception {
