@@ -1,15 +1,9 @@
 package com.akto.service.insights.providers;
 
-import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.action.threat_detection.ThreatCategoryCount;
 import com.akto.dto.GuardrailPolicies;
-import com.akto.service.insights.InsightContext;
-import com.akto.service.insights.InsightDataBundle;
-import com.akto.service.insights.InsightId;
-import com.akto.service.insights.InsightProvider;
-import com.akto.service.insights.InsightResult;
-import com.akto.service.insights.MetricFormat;
+import com.akto.service.insights.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,23 +21,19 @@ import java.util.stream.Collectors;
  * testing/QA/temp work are still live against real traffic. See akto_insights_actionable_items
  * card 2 for the worked example this mirrors (karan-test, vrt-test, test-guardrail, ...).
  */
-public class TestPoliciesOnProdProvider implements InsightProvider {
+public class TestPoliciesOnProdProvider extends AbstractInsightProvider {
 
     private static final List<String> TEST_NAME_MARKERS = Arrays.asList("test", "qa", "temp", "delete");
     private static final int EVIDENCE_ROW_CAP = 20;
     private static final int EVENT_PAGE_LIMIT = 500;
 
-    @Override
-    public InsightId getInsightId() {
-        return InsightId.TEST_POLICIES_ON_PROD;
-    }
+    public TestPoliciesOnProdProvider() { super(InsightId.TEST_POLICIES_ON_PROD, 1); }
 
     @Override
-    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope,
-                                  AbstractThreatDetectionAction threatClient) {
-        List<GuardrailPolicies> policies = bundle.getPolicies();
+    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope) {
+        List<GuardrailPolicies> policies = bundle.policies;
         if (policies == null) {
-            return failed("Could not load guardrail policies");
+            return failed("POLICY_STORE", "Could not load guardrail policies");
         }
 
         List<GuardrailPolicies> allPolicies = policies;
@@ -54,9 +44,9 @@ public class TestPoliciesOnProdProvider implements InsightProvider {
         InsightResult.Metric policyCountMetric = new InsightResult.Metric(
                 "test_named_policy_count", "Test-named policies",
                 matched.size(), allPolicies.size(), "count",
-                MetricFormat.ofTotal(matched.size(), allPolicies.size()) + " policies", null);
+                InsightUtil.ofTotal(matched.size(), allPolicies.size(), "policies"), null);
 
-        InsightResult result = base();
+        InsightResult result = skeleton();
         if (matched.isEmpty()) {
             // A confident zero — no policy name matched, not a gap.
             result.setStatus(InsightResult.Status.READY.name());
@@ -74,7 +64,7 @@ public class TestPoliciesOnProdProvider implements InsightProvider {
             matchedByLowerName.put(lower(p.getName()), p);
         }
 
-        List<ThreatCategoryCount> subCategoryCounts = bundle.getSubCategoryCounts();
+        List<ThreatCategoryCount> subCategoryCounts = bundle.subCategoryCounts;
         if (subCategoryCounts == null) {
             result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(matched.size() + " " + (matched.size() == 1 ? "policy is" : "policies are")
@@ -104,18 +94,18 @@ public class TestPoliciesOnProdProvider implements InsightProvider {
         InsightResult.Metric violationCountMetric = new InsightResult.Metric(
                 "test_policy_violation_count", "Violations from test-named policies",
                 testViolations, totalViolations, "count",
-                MetricFormat.ofTotal(testViolations, totalViolations), null);
+                InsightUtil.ofTotal(testViolations, totalViolations, "violations"), null);
         InsightResult.Metric violationPercentMetric = new InsightResult.Metric(
                 "test_policy_violation_percent", "Share of all violations",
                 Math.round(fraction * 100), null, "percent",
-                MetricFormat.percent(fraction), null);
+                InsightUtil.percent(fraction), null);
 
         List<InsightResult.Metric> metrics = new ArrayList<>(Arrays.asList(
                 policyCountMetric, violationCountMetric, violationPercentMetric));
 
         String headline = String.format(Locale.US,
                 "%s (%s of all violations) come from %d %s named for testing.",
-                MetricFormat.ofTotal(testViolations, totalViolations), MetricFormat.percent(fraction),
+                InsightUtil.ofTotal(testViolations, totalViolations, "violations"), InsightUtil.percent(fraction),
                 matched.size(), matched.size() == 1 ? "policy" : "policies");
 
         String severity = severityFromShare(fraction);
@@ -136,14 +126,9 @@ public class TestPoliciesOnProdProvider implements InsightProvider {
 
         // DETAIL: page bounded raw events to attribute real users per matched policy.
         List<String> matchedNames = matched.stream().map(GuardrailPolicies::getName).collect(Collectors.toList());
-        List<DashboardMaliciousEvent> events;
-        try {
-            events = threatClient.fetchAllMaliciousEvents(
-                    ctx.getStartTs(), ctx.getEndTs(), EVENT_PAGE_LIMIT,
-                    Collections.singletonMap("latestAttack", matchedNames));
-        } catch (Exception e) {
-            events = new ArrayList<>();
-        }
+        List<DashboardMaliciousEvent> events = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT,
+                Collections.singletonMap("latestAttack", matchedNames), null);
+        if (events == null) events = new ArrayList<>();
 
         // fetchAllMaliciousEvents swallows its own failures into an empty list, so an empty page
         // when the free aggregation above already counted testViolations > 0 is a signal the call
@@ -181,7 +166,7 @@ public class TestPoliciesOnProdProvider implements InsightProvider {
         InsightResult.Metric realUsersMetric = new InsightResult.Metric(
                 "real_users_affected", "Real users affected",
                 allActors.size(), null, "count",
-                MetricFormat.count(allActors.size(), "user"), null);
+                InsightUtil.count(allActors.size(), "users"), null);
         metrics.add(realUsersMetric);
 
         boolean anyBlockingWithUsers = matched.stream().anyMatch(p ->
@@ -202,22 +187,6 @@ public class TestPoliciesOnProdProvider implements InsightProvider {
                 fullEvidence(matched, violationsByPolicyLower, actorsByPolicyLower)));
         result.setCtas(buildCtas(matched));
         return result;
-    }
-
-    private InsightResult base() {
-        InsightResult r = new InsightResult();
-        r.setInsightId(getInsightId().name());
-        r.setTitle(getInsightId().getDefaultTitle());
-        r.setCategory(getInsightId().getCategory().name());
-        r.setCaveats(new ArrayList<>());
-        return r;
-    }
-
-    private InsightResult failed(String reason) {
-        InsightResult r = InsightResult.noData(getInsightId(), reason);
-        r.setDataGaps(new ArrayList<>(Collections.singletonList(
-                new InsightResult.Gap("POLICY_STORE", "REQUEST_FAILED", reason))));
-        return r;
     }
 
     private static boolean isTestNamedPolicy(String name) {
@@ -249,13 +218,12 @@ public class TestPoliciesOnProdProvider implements InsightProvider {
 
     private static InsightResult.Evidence namesOnlyEvidence(List<GuardrailPolicies> matched) {
         List<GuardrailPolicies> capped = matched.stream().limit(EVIDENCE_ROW_CAP).collect(Collectors.toList());
-        List<InsightResult.Evidence.Row> rows = new ArrayList<>();
+        List<Map<String, Object>> rows = new ArrayList<>();
         for (GuardrailPolicies p : capped) {
-            Map<String, Object> raw = new HashMap<>();
-            raw.put("policyId", p.getHexId());
-            raw.put("policyName", p.getName());
-            rows.add(new InsightResult.Evidence.Row(
-                    Arrays.asList(p.getName(), defaultStr(p.getBehaviour(), "unknown")), raw));
+            Map<String, Object> row = new HashMap<>();
+            row.put("Policy", p.getName());
+            row.put("Mode", defaultStr(p.getBehaviour(), "unknown"));
+            rows.add(row);
         }
         return new InsightResult.Evidence("test_named_policies", "Policies named for testing",
                 Arrays.asList("Policy", "Mode"), rows, matched.size());
@@ -271,26 +239,20 @@ public class TestPoliciesOnProdProvider implements InsightProvider {
                 .collect(Collectors.toList());
         List<GuardrailPolicies> capped = sorted.stream().limit(EVIDENCE_ROW_CAP).collect(Collectors.toList());
 
-        List<InsightResult.Evidence.Row> rows = new ArrayList<>();
+        List<Map<String, Object>> rows = new ArrayList<>();
         for (GuardrailPolicies p : capped) {
             String key = lower(p.getName());
             long violations = violationsByPolicyLower.getOrDefault(key, 0L);
             Set<String> actors = actorsByPolicyLower.getOrDefault(key, Collections.emptySet());
             String sample = actors.stream().limit(3).collect(Collectors.joining(", "));
 
-            Map<String, Object> raw = new HashMap<>();
-            raw.put("policyId", p.getHexId());
-            raw.put("policyName", p.getName());
-            raw.put("violations", violations);
-            raw.put("realUsers", actors.size());
-
-            rows.add(new InsightResult.Evidence.Row(Arrays.asList(
-                    p.getName(),
-                    MetricFormat.count(violations, "violation"),
-                    defaultStr(p.getBehaviour(), "unknown"),
-                    actors.isEmpty() ? "—" : MetricFormat.count(actors.size(), "user"),
-                    sample.isEmpty() ? "—" : sample
-            ), raw));
+            Map<String, Object> row = new HashMap<>();
+            row.put("Policy", p.getName());
+            row.put("Violations", InsightUtil.count(violations, "violations"));
+            row.put("Mode", defaultStr(p.getBehaviour(), "unknown"));
+            row.put("Real users affected", actors.isEmpty() ? "—" : InsightUtil.count(actors.size(), "users"));
+            row.put("Sample users", sample.isEmpty() ? "—" : sample);
+            rows.add(row);
         }
         return new InsightResult.Evidence("test_named_policies", "Policies named for testing",
                 Arrays.asList("Policy", "Violations", "Mode", "Real users affected", "Sample users"),

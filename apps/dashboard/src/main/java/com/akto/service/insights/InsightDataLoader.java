@@ -1,9 +1,11 @@
 package com.akto.service.insights;
 
 import com.akto.action.threat_detection.HostSeverityCount;
+import com.akto.action.threat_detection.SkillSeverityCount;
 import com.akto.action.threat_detection.ThreatCategoryCount;
 import com.akto.dao.AgentUsersDao;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.GuardrailPoliciesDao;
 import com.akto.dao.McpAllowlistDao;
 import com.akto.dao.McpAuditInfoDao;
@@ -80,6 +82,8 @@ public class InsightDataLoader {
                 () -> threatAccess.hostSeverityCounts(ctx.getStartTs(), ctx.getEndTs())));
         Future<List<ThreatCategoryCount>> subCategoryFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
                 () -> threatAccess.subcategoryWiseCounts(ctx.getStartTs(), ctx.getEndTs())));
+        Future<List<SkillSeverityCount>> skillSeverityFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                () -> threatAccess.skillSeverityCounts(ctx.getStartTs(), ctx.getEndTs())));
 
         List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                 Filters.empty(),
@@ -96,10 +100,13 @@ public class InsightDataLoader {
         Map<Integer, List<String>> sensitiveByCollection = loadSensitiveByCollection(collections);
         List<UserAnalysisData> userAnalysis = loadUserAnalysis();
         List<NhiIdentity> nhiIdentities = loadNhiIdentities();
+        List<ApiCollection> activeCollections = loadActiveCollections();
+        Map<Integer, Integer> collectionLastTrafficSeen = loadCollectionLastTrafficSeen(activeCollections);
 
         boolean threatBackendAvailable = true;
         List<HostSeverityCount> hostSeverityCounts;
         List<ThreatCategoryCount> subCategoryCounts;
+        List<SkillSeverityCount> skillSeverityCounts;
         try {
             hostSeverityCounts = hostSeverityFuture.get(EXTERNAL_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (Exception e) {
@@ -114,10 +121,18 @@ public class InsightDataLoader {
             subCategoryCounts = Collections.emptyList();
             threatBackendAvailable = false;
         }
+        try {
+            skillSeverityCounts = skillSeverityFuture.get(EXTERNAL_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            logger.error("InsightDataLoader: skill severity counts call failed/timed out: " + e.getMessage());
+            skillSeverityCounts = Collections.emptyList();
+            threatBackendAvailable = false;
+        }
 
         return new InsightDataBundle(ctx, collections, collectionsByServiceName, deviceIdToUsername, userTags,
                 auditRows, policies, allowlistNamesLower, sensitiveByCollection, userAnalysis, nhiIdentities,
-                hostSeverityCounts, subCategoryCounts, threatBackendAvailable, threatAccess);
+                hostSeverityCounts, subCategoryCounts, skillSeverityCounts, threatBackendAvailable,
+                activeCollections, collectionLastTrafficSeen, threatAccess);
     }
 
     private <T> Callable<T> withContext(int accountId, Integer userId, CONTEXT_SOURCE contextSource, Callable<T> body) {
@@ -251,6 +266,36 @@ public class InsightDataLoader {
         } catch (Exception e) {
             logger.error("InsightDataLoader: loadNhiIdentities failed: " + e.getMessage());
             return Collections.emptyList();
+        }
+    }
+
+    /**
+     * A narrower projection than `collections` above (id/hostName/startTs only) — policy-coverage
+     * checking (PolicyHygieneProvider) needs no traffic/risk/tag data, and mirrors
+     * ApiCollectionsDao.fetchAllActiveHosts()'s own filter (hostName exists, not deactivated)
+     * rather than inventing a different one.
+     */
+    private List<ApiCollection> loadActiveCollections() {
+        try {
+            Bson filter = Filters.and(Filters.exists(ApiCollection.HOST_NAME, true), Filters.ne(ApiCollection._DEACTIVATED, true));
+            return ApiCollectionsDao.instance.findAll(filter,
+                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.START_TS));
+        } catch (Exception e) {
+            logger.error("InsightDataLoader: loadActiveCollections failed: " + e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    /** Scoped to just the collections already loaded above, rather than ApiInfoDao's unscoped
+     *  getLastTrafficSeen() (whole account) — cheaper, and this is all PolicyHygieneProvider needs. */
+    private Map<Integer, Integer> loadCollectionLastTrafficSeen(List<ApiCollection> activeCollections) {
+        try {
+            List<Integer> ids = new ArrayList<>();
+            for (ApiCollection c : activeCollections) ids.add(c.getId());
+            return ApiInfoDao.instance.getLastTrafficSeenForCollections(ids);
+        } catch (Exception e) {
+            logger.error("InsightDataLoader: loadCollectionLastTrafficSeen failed: " + e.getMessage());
+            return Collections.emptyMap();
         }
     }
 }

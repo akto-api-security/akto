@@ -1,16 +1,8 @@
 package com.akto.service.insights.providers;
 
-import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.action.threat_detection.ThreatCategoryCount;
-import com.akto.service.insights.CredentialPatterns;
-import com.akto.service.insights.EvidenceText;
-import com.akto.service.insights.InsightContext;
-import com.akto.service.insights.InsightDataBundle;
-import com.akto.service.insights.InsightId;
-import com.akto.service.insights.InsightProvider;
-import com.akto.service.insights.InsightResult;
-import com.akto.service.insights.MetricFormat;
+import com.akto.service.insights.*;
 import com.akto.util.AgenticObserveUtil;
 import org.apache.commons.lang3.StringUtils;
 
@@ -45,23 +37,19 @@ import java.util.stream.Collectors;
  * Security note: matched credential VALUES are never included in the response — only the pattern
  * type (e.g. "Bearer token") and where/who. This provider must not become a secrets-leak vector.
  */
-public class CredentialExposureProvider implements InsightProvider {
+public class CredentialExposureProvider extends AbstractInsightProvider {
 
     private static final String SECRETS_SUBCATEGORY = "Secrets";
     private static final int EVENT_PAGE_LIMIT = 1000;
     private static final int EVIDENCE_ROW_CAP = 20;
 
-    @Override
-    public InsightId getInsightId() {
-        return InsightId.CREDENTIAL_EXPOSURE;
-    }
+    public CredentialExposureProvider() { super(InsightId.CREDENTIAL_EXPOSURE, 1); }
 
     @Override
-    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope,
-                                  AbstractThreatDetectionAction threatClient) {
-        List<ThreatCategoryCount> subCategoryCounts = bundle.getSubCategoryCounts();
+    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope) {
+        List<ThreatCategoryCount> subCategoryCounts = bundle.subCategoryCounts;
         if (subCategoryCounts == null) {
-            return failed("Could not load violation counts");
+            return failed("THREAT_BACKEND", "Could not load violation counts");
         }
 
         long labeledSecretsCount = subCategoryCounts.stream()
@@ -72,13 +60,13 @@ public class CredentialExposureProvider implements InsightProvider {
         InsightResult.Metric labeledMetric = new InsightResult.Metric(
                 "secrets_labeled_count", "Violations already labeled \"Secrets\"",
                 labeledSecretsCount, null, "count",
-                MetricFormat.count(labeledSecretsCount, "violation"), null);
+                InsightUtil.count(labeledSecretsCount, "violations"), null);
 
-        InsightResult result = base();
+        InsightResult result = skeleton();
 
         if (scope == Scope.LIST) {
             result.setStatus(InsightResult.Status.PARTIAL.name());
-            result.setHeadline(MetricFormat.count(labeledSecretsCount, "violation")
+            result.setHeadline(InsightUtil.count(labeledSecretsCount, "violations")
                     + " already labeled Secrets; checking other buckets for mislabeled credentials requires the detail view.");
             result.setMetrics(Collections.singletonList(labeledMetric));
             result.setMetricsComplete(false);
@@ -92,16 +80,12 @@ public class CredentialExposureProvider implements InsightProvider {
 
         // DETAIL: page the most recent violations account-wide (no subCategory narrowing — the
         // whole point is to find credential-shaped evidence wherever it landed) and pattern-match.
-        List<DashboardMaliciousEvent> events;
-        try {
-            events = threatClient.fetchAllMaliciousEvents(ctx.getStartTs(), ctx.getEndTs(), EVENT_PAGE_LIMIT, null);
-        } catch (Exception e) {
-            events = new ArrayList<>();
-        }
+        List<DashboardMaliciousEvent> events = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT, null, null);
+        if (events == null) events = new ArrayList<>();
 
         if (events.isEmpty()) {
             result.setStatus(InsightResult.Status.PARTIAL.name());
-            result.setHeadline(MetricFormat.count(labeledSecretsCount, "violation") + " already labeled Secrets.");
+            result.setHeadline(InsightUtil.count(labeledSecretsCount, "violations") + " already labeled Secrets.");
             result.setMetrics(Collections.singletonList(labeledMetric));
             result.setMetricsComplete(false);
             result.setDataGaps(Collections.singletonList(new InsightResult.Gap(
@@ -142,25 +126,25 @@ public class CredentialExposureProvider implements InsightProvider {
         metrics.add(new InsightResult.Metric(
                 "credential_pattern_matches", "Credential-shaped violations found",
                 totalMatches, (long) events.size(), "count",
-                MetricFormat.ofTotal(totalMatches, events.size()), null));
+                InsightUtil.ofTotal(totalMatches, events.size(), "violations"), null));
         metrics.add(new InsightResult.Metric(
                 "mislabeled_count", "Mislabeled as something other than Secrets",
                 mislabeledCount, totalMatches, "count",
-                MetricFormat.ofTotal(mislabeledCount, totalMatches), null));
+                InsightUtil.ofTotal(mislabeledCount, totalMatches, "violations"), null));
         if (totalMatches > 0) {
             metrics.add(new InsightResult.Metric(
                     "mislabeled_percent", "Percent mislabeled",
                     Math.round(mislabeledFraction * 100), null, "percent",
-                    MetricFormat.percent(mislabeledFraction), null));
+                    InsightUtil.percent(mislabeledFraction), null));
         }
         metrics.add(new InsightResult.Metric(
                 "distinct_users_affected", "Users affected",
                 distinctUsers.size(), null, "count",
-                MetricFormat.count(distinctUsers.size(), "user"), null));
+                InsightUtil.count(distinctUsers.size(), "users"), null));
         metrics.add(new InsightResult.Metric(
                 "distinct_destinations_affected", "Destinations affected",
                 distinctDestinations.size(), null, "count",
-                MetricFormat.count(distinctDestinations.size(), "destination"), null));
+                InsightUtil.count(distinctDestinations.size(), "destinations"), null));
 
         String severity;
         String headline;
@@ -168,14 +152,14 @@ public class CredentialExposureProvider implements InsightProvider {
             severity = "HIGH";
             headline = String.format(Locale.US,
                     "%s look like live credentials but %s labeled as something other than Secrets — same bucket, same severity as PII.",
-                    MetricFormat.count(totalMatches, "violation"), MetricFormat.ofTotal(mislabeledCount, totalMatches));
+                    InsightUtil.count(totalMatches, "violations"), InsightUtil.ofTotal(mislabeledCount, totalMatches, "violations"));
         } else if (totalMatches > 0) {
             severity = "MEDIUM";
-            headline = MetricFormat.count(totalMatches, "violation")
+            headline = InsightUtil.count(totalMatches, "violations")
                     + " look like live credentials, all already correctly labeled Secrets.";
         } else {
             severity = "LOW";
-            headline = "No credential-shaped evidence found among the " + MetricFormat.count(events.size(), "violation") + " examined.";
+            headline = "No credential-shaped evidence found among the " + InsightUtil.count(events.size(), "violations") + " examined.";
         }
 
         List<String> caveats = new ArrayList<>();
@@ -194,7 +178,7 @@ public class CredentialExposureProvider implements InsightProvider {
                     .sorted((a, b) -> Boolean.compare(a.labeledSecrets, b.labeledSecrets))
                     .limit(EVIDENCE_ROW_CAP)
                     .collect(Collectors.toList());
-            List<InsightResult.Evidence.Row> rows = new ArrayList<>();
+            List<Map<String, Object>> rows = new ArrayList<>();
             for (Match m : sorted) {
                 String actor = StringUtils.defaultIfBlank(m.event.getActor(), "(unattributed)");
                 String host = StringUtils.defaultIfBlank(m.event.getHost(), "(unknown)");
@@ -202,16 +186,13 @@ public class CredentialExposureProvider implements InsightProvider {
                 String labeledAs = m.labeledSecrets ? "Secrets (correct)"
                         : StringUtils.defaultIfBlank(m.event.getSubCategory(), "(no subCategory)");
 
-                Map<String, Object> raw = new LinkedHashMap<>();
-                raw.put("actor", actor);
-                raw.put("device", device);
-                raw.put("destination", host);
-                raw.put("patternType", m.patternLabel);
-                raw.put("labeledAs", labeledAs);
-                raw.put("mislabeled", !m.labeledSecrets);
-
-                rows.add(new InsightResult.Evidence.Row(Arrays.asList(
-                        actor, StringUtils.defaultString(device), host, m.patternLabel, labeledAs), raw));
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("User", actor);
+                row.put("Device", StringUtils.defaultString(device));
+                row.put("Destination", host);
+                row.put("Pattern type", m.patternLabel);
+                row.put("Currently labeled as", labeledAs);
+                rows.add(row);
             }
             evidence.add(new InsightResult.Evidence("credential_exposure_matches", "Credential-shaped violations",
                     Arrays.asList("User", "Device", "Destination", "Pattern type", "Currently labeled as"),
@@ -242,21 +223,6 @@ public class CredentialExposureProvider implements InsightProvider {
         }
     }
 
-    private InsightResult base() {
-        InsightResult r = new InsightResult();
-        r.setInsightId(getInsightId().name());
-        r.setTitle(getInsightId().getDefaultTitle());
-        r.setCategory(getInsightId().getCategory().name());
-        r.setCaveats(new ArrayList<>());
-        return r;
-    }
-
-    private InsightResult failed(String reason) {
-        InsightResult r = InsightResult.noData(getInsightId(), reason);
-        r.setDataGaps(new ArrayList<>(Collections.singletonList(
-                new InsightResult.Gap("THREAT_BACKEND", "REQUEST_FAILED", reason))));
-        return r;
-    }
 
     private static List<InsightResult.Cta> buildCtas(List<Match> matches) {
         if (matches.isEmpty()) {

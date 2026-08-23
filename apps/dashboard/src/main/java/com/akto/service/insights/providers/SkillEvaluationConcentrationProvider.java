@@ -1,14 +1,8 @@
 package com.akto.service.insights.providers;
 
-import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.action.threat_detection.SkillSeverityCount;
-import com.akto.service.insights.InsightContext;
-import com.akto.service.insights.InsightDataBundle;
-import com.akto.service.insights.InsightId;
-import com.akto.service.insights.InsightProvider;
-import com.akto.service.insights.InsightResult;
-import com.akto.service.insights.MetricFormat;
+import com.akto.service.insights.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,26 +27,24 @@ import java.util.stream.Collectors;
  * (a strictly narrower, stronger signal, since a user's total is always >= any one of their
  * skills' counts).
  */
-public class SkillEvaluationConcentrationProvider implements InsightProvider {
+public class SkillEvaluationConcentrationProvider extends AbstractInsightProvider {
 
     private static final String SKILLS_PREFIX = "/skills/";
     private static final int EVENT_PAGE_LIMIT = 2000;
     private static final int EVIDENCE_ROW_CAP = 20;
 
-    @Override
-    public InsightId getInsightId() {
-        return InsightId.SKILL_EVALUATION_CONCENTRATION;
-    }
+    public SkillEvaluationConcentrationProvider() { super(InsightId.SKILL_EVALUATION_CONCENTRATION, 1); }
 
     @Override
-    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope,
-                                  AbstractThreatDetectionAction threatClient) {
-        List<SkillSeverityCount> skillSeverityCounts = bundle.getSkillSeverityCounts();
-        if (skillSeverityCounts == null) {
-            return failed("Could not load skill evaluation counts");
+    public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope) {
+        // skillSeverityCounts is a threat-backend aggregate (like hostSeverityCounts/subCategoryCounts)
+        // and the bundle never returns null for it — a failed call is signalled by
+        // threatBackendAvailable instead, so an empty list here can't be told apart from a real zero
+        // unless that flag is also checked.
+        if (!bundle.threatBackendAvailable) {
+            return failed("THREAT_BACKEND", "Could not load skill evaluation counts");
         }
-
-        List<SkillSeverityCount> perSkill = skillSeverityCounts;
+        List<SkillSeverityCount> perSkill = bundle.skillSeverityCounts;
         long total = 0;
         long totalCritical = 0;
         for (SkillSeverityCount s : perSkill) {
@@ -60,10 +52,10 @@ public class SkillEvaluationConcentrationProvider implements InsightProvider {
             totalCritical += s.getCritical();
         }
 
-        InsightResult result = base();
+        InsightResult result = skeleton();
         InsightResult.Metric totalMetric = new InsightResult.Metric(
                 "total_skill_evaluations", "Skill evaluations",
-                total, null, "count", MetricFormat.count(total, "evaluation"), null);
+                total, null, "count", InsightUtil.count(total, "evaluations"), null);
 
         if (total == 0) {
             // Confident zero — the aggregate genuinely has no rows, not an absent signal.
@@ -80,13 +72,13 @@ public class SkillEvaluationConcentrationProvider implements InsightProvider {
         InsightResult.Metric skillCountMetric = new InsightResult.Metric(
                 "distinct_skill_count", "Distinct skills evaluated",
                 perSkill.size(), null, "count",
-                MetricFormat.count(perSkill.size(), "skill"), null);
+                InsightUtil.count(perSkill.size(), "skills"), null);
         List<InsightResult.Metric> baseMetrics = new ArrayList<>(Arrays.asList(totalMetric, skillCountMetric));
 
         if (scope == Scope.LIST) {
             result.setStatus(InsightResult.Status.PARTIAL.name());
-            result.setHeadline(MetricFormat.count(total, "evaluation") + " across "
-                    + MetricFormat.count(perSkill.size(), "skill")
+            result.setHeadline(InsightUtil.count(total, "evaluations") + " across "
+                    + InsightUtil.count(perSkill.size(), "skills")
                     + "; per-user concentration requires the detail view.");
             result.setMetrics(baseMetrics);
             result.setMetricsComplete(false);
@@ -99,13 +91,8 @@ public class SkillEvaluationConcentrationProvider implements InsightProvider {
         }
 
         // DETAIL: page raw skill-evaluation events (x-skill-eval-mode: only) to attribute by actor.
-        List<DashboardMaliciousEvent> events;
-        try {
-            events = threatClient.fetchAllMaliciousEvents(
-                    ctx.getStartTs(), ctx.getEndTs(), EVENT_PAGE_LIMIT, null, "only");
-        } catch (Exception e) {
-            events = new ArrayList<>();
-        }
+        List<DashboardMaliciousEvent> events = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT, null, "only");
+        if (events == null) events = new ArrayList<>();
 
         // get_skill_severity_counts (this insight's LIST-scope aggregate) has no status filter and
         // counts every status; list_malicious_requests defaults to ACTIVE-only. So a small gap
@@ -113,8 +100,8 @@ public class SkillEvaluationConcentrationProvider implements InsightProvider {
         // against a known-nonzero aggregate is treated as suspicious here.
         if (events.isEmpty()) {
             result.setStatus(InsightResult.Status.PARTIAL.name());
-            result.setHeadline(MetricFormat.count(total, "evaluation") + " across "
-                    + MetricFormat.count(perSkill.size(), "skill") + ".");
+            result.setHeadline(InsightUtil.count(total, "evaluations") + " across "
+                    + InsightUtil.count(perSkill.size(), "skills") + ".");
             result.setMetrics(baseMetrics);
             result.setMetricsComplete(false);
             result.setDataGaps(Collections.singletonList(new InsightResult.Gap(
@@ -170,11 +157,11 @@ public class SkillEvaluationConcentrationProvider implements InsightProvider {
         InsightResult.Metric topUserShare = new InsightResult.Metric(
                 "top_user_share", "Top user's share of evaluations seen",
                 topActorCount, observedTotal, "count",
-                MetricFormat.ofTotal(topActorCount, observedTotal), null);
+                InsightUtil.ofTotal(topActorCount, observedTotal, "evaluations"), null);
         InsightResult.Metric topUserPercent = new InsightResult.Metric(
                 "top_user_percent", "Top user's percent of evaluations seen",
                 Math.round(topActorFraction * 100), null, "percent",
-                MetricFormat.percent(topActorFraction), null);
+                InsightUtil.percent(topActorFraction), null);
         List<InsightResult.Metric> metrics = new ArrayList<>(baseMetrics);
         metrics.add(topUserShare);
         metrics.add(topUserPercent);
@@ -183,7 +170,7 @@ public class SkillEvaluationConcentrationProvider implements InsightProvider {
             metrics.add(new InsightResult.Metric(
                     "top_user_critical_share", "Top user's share of Critical-severity evaluations",
                     topActorCriticalCount, totalCritical, "count",
-                    MetricFormat.ofTotal(topActorCriticalCount, totalCritical), null));
+                    InsightUtil.ofTotal(topActorCriticalCount, totalCritical, "evaluations"), null));
         }
 
         boolean userFlagged = topActorFraction > 0.5;
@@ -200,8 +187,8 @@ public class SkillEvaluationConcentrationProvider implements InsightProvider {
 
         StringBuilder headline = new StringBuilder();
         if (userFlagged) {
-            headline.append(MetricFormat.ofTotal(topActorCount, observedTotal))
-                    .append(" (").append(MetricFormat.percent(topActorFraction))
+            headline.append(InsightUtil.ofTotal(topActorCount, observedTotal, "evaluations"))
+                    .append(" (").append(InsightUtil.percent(topActorFraction))
                     .append(") of skill evaluations seen come from a single user");
             if (topActor != null && !"(unattributed)".equals(topActor)) {
                 headline.append(" (").append(topActor).append(")");
@@ -212,7 +199,7 @@ public class SkillEvaluationConcentrationProvider implements InsightProvider {
             }
         } else {
             headline.append("No single user accounts for more than half of ")
-                    .append(MetricFormat.count(observedTotal, "skill evaluation")).append(" seen.");
+                    .append(InsightUtil.count(observedTotal, "skill evaluations")).append(" seen.");
         }
 
         List<String> caveats = new ArrayList<>();
@@ -229,14 +216,13 @@ public class SkillEvaluationConcentrationProvider implements InsightProvider {
                     .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
                     .limit(EVIDENCE_ROW_CAP)
                     .collect(Collectors.toList());
-            List<InsightResult.Evidence.Row> rows = new ArrayList<>();
+            List<Map<String, Object>> rows = new ArrayList<>();
             for (Map.Entry<String, Long> e : sortedSkills) {
-                Map<String, Object> raw = new HashMap<>();
-                raw.put("actor", topActor);
-                raw.put("skillName", e.getKey());
-                raw.put("count", e.getValue());
-                rows.add(new InsightResult.Evidence.Row(
-                        Arrays.asList(topActor, e.getKey(), MetricFormat.count(e.getValue(), "evaluation")), raw));
+                Map<String, Object> row = new HashMap<>();
+                row.put("User", topActor);
+                row.put("Skill", e.getKey());
+                row.put("Evaluations", InsightUtil.count(e.getValue(), "evaluations"));
+                rows.add(row);
             }
             evidence.add(new InsightResult.Evidence("top_user_skill_breakdown", "Top user's skill breakdown",
                     Arrays.asList("User", "Skill", "Evaluations"), rows, topActorSkills.size()));
@@ -264,21 +250,6 @@ public class SkillEvaluationConcentrationProvider implements InsightProvider {
         return rest.isEmpty() ? null : rest;
     }
 
-    private InsightResult base() {
-        InsightResult r = new InsightResult();
-        r.setInsightId(getInsightId().name());
-        r.setTitle(getInsightId().getDefaultTitle());
-        r.setCategory(getInsightId().getCategory().name());
-        r.setCaveats(new ArrayList<>());
-        return r;
-    }
-
-    private InsightResult failed(String reason) {
-        InsightResult r = InsightResult.noData(getInsightId(), reason);
-        r.setDataGaps(new ArrayList<>(Collections.singletonList(
-                new InsightResult.Gap("THREAT_BACKEND", "REQUEST_FAILED", reason))));
-        return r;
-    }
 
     private static List<InsightResult.Cta> buildCtas(String actor, Set<String> skillNames) {
         if (actor == null) {

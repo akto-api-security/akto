@@ -29,4 +29,14 @@ public abstract class AbstractInsightProvider implements InsightProvider {
         r.setStatus(InsightResult.Status.NO_DATA.name());
         return r;
     }
+
+    /** A skeleton with a specific, reportable reason a required read failed — more useful to a
+     *  reader than the generic "This insight could not be computed." InsightService falls back to
+     *  on an uncaught exception. */
+    protected InsightResult failed(String source, String reason) {
+        InsightResult r = skeleton();
+        r.addDataGap(new InsightResult.Gap(source, "REQUEST_FAILED", reason));
+        r.setHeadline(reason);
+        return r;
+    }
 }
