@@ -80,6 +80,14 @@
             <version>12.25.1</version>
         </dependency>
 
+        <!-- Prometheus metrics. Version pinned to match apps/dashboard so the import package stays
+             io.micrometer.prometheus.* (Micrometer >=1.13 renamed it to io.micrometer.prometheusmetrics.*). -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+            <version>1.8.1</version>
+        </dependency>
+
     </dependencies>
     <build>
         <sourceDirectory>src/main/java</sourceDirectory>

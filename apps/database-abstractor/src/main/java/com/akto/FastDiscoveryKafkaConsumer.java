@@ -1,8 +1,10 @@
 package com.akto;
 
+import com.akto.listener.InfraMetricsListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.KafkaUtils;
+import io.micrometer.core.instrument.binder.kafka.KafkaClientMetrics;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -52,6 +54,13 @@ public class FastDiscoveryKafkaConsumer implements Runnable {
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");  // Start from latest for new consumer
 
         this.consumer = new KafkaConsumer<>(props);
+
+        // Bind Kafka consumer metrics (lag, consume-rate, offsets) to the Prometheus registry.
+        try {
+            new KafkaClientMetrics(this.consumer).bindTo(InfraMetricsListener.registry);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error binding fast-discovery Kafka metrics", LogDb.DB_ABS);
+        }
 
         loggerMaker.infoAndAddToDb("FastDiscoveryKafkaConsumer initialized: topic=" + topicName +
             ", group=" + groupId + ", broker=" + brokerUrl, LogDb.DB_ABS);

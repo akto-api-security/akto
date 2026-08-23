@@ -35,6 +35,31 @@
         <url-pattern>/tools/*</url-pattern>
     </filter-mapping>
 
+    <!-- Records per-request Prometheus metrics (no-op when PROMETHEUS_METRICS_ENABLED != true). -->
+    <filter>
+        <filter-name>InfraMetricsFilter</filter-name>
+        <filter-class>com.akto.filter.InfraMetricsFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>InfraMetricsFilter</filter-name>
+        <url-pattern>/api/*</url-pattern>
+    </filter-mapping>
+
+    <!-- Guards the /metrics scrape endpoint. Fails closed: 404 when disabled, 401 when token unset. -->
+    <filter>
+        <filter-name>MetricsAuthFilter</filter-name>
+        <filter-class>com.akto.filter.MetricsAuthFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>MetricsAuthFilter</filter-name>
+        <url-pattern>/metrics</url-pattern>
+        <!-- Struts also serves the action at /metrics.action; guard that variant here too. The
+             action itself is the authoritative guard for any other route (see InfraMetricsAction). -->
+        <url-pattern>/metrics.action</url-pattern>
+    </filter-mapping>
+
     <filter>
         <filter-name>struts2</filter-name>
         <filter-class>org.apache.struts2.dispatcher.filter.StrutsPrepareAndExecuteFilter</filter-class>
@@ -47,6 +72,12 @@
 
     <!-- GzipFilter (org.eclipse.jetty.servlets.GzipFilter) was removed in Jetty 12.
          Response compression is handled server-side by the Jetty `gzip` module (Dockerfile). -->
+
+    <!-- First: loads the Prometheus registry class and sets common tags before any meter is
+         registered (JVM binders here, the Kafka binder started by InitializerListener). -->
+    <listener>
+        <listener-class>com.akto.listener.InfraMetricsListener</listener-class>
+    </listener>
 
     <listener>
         <listener-class>com.akto.listener.InitializerListener</listener-class>
