@@ -2,6 +2,7 @@ package com.akto.service.insights;
 
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.action.threat_detection.HostSeverityCount;
+import com.akto.action.threat_detection.SkillSeverityCount;
 import com.akto.action.threat_detection.ThreatCategoryCount;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.DeviceTag;
@@ -38,7 +39,14 @@ public class InsightDataBundle {
     public final List<NhiIdentity> nhiIdentities;
     public final List<HostSeverityCount> hostSeverityCounts;
     public final List<ThreatCategoryCount> subCategoryCounts;
+    public final List<SkillSeverityCount> skillSeverityCounts;
     public final boolean threatBackendAvailable;
+
+    // Guardrail-insights-specific — a narrower asset projection than `collections` above (id/
+    // hostName/startTs only, non-deactivated + hostName-exists), because policy-coverage checking
+    // needs no traffic/risk/tag data and every extra field would be dead weight on every request.
+    public final List<ApiCollection> activeCollections;
+    public final Map<Integer, Integer> collectionLastTrafficSeen;
 
     private final InsightsThreatBackendAccess threatAccess;
 
@@ -55,7 +63,10 @@ public class InsightDataBundle {
                               List<NhiIdentity> nhiIdentities,
                               List<HostSeverityCount> hostSeverityCounts,
                               List<ThreatCategoryCount> subCategoryCounts,
+                              List<SkillSeverityCount> skillSeverityCounts,
                               boolean threatBackendAvailable,
+                              List<ApiCollection> activeCollections,
+                              Map<Integer, Integer> collectionLastTrafficSeen,
                               InsightsThreatBackendAccess threatAccess) {
         this.ctx = ctx;
         this.collections = collections;
@@ -70,7 +81,10 @@ public class InsightDataBundle {
         this.nhiIdentities = nhiIdentities;
         this.hostSeverityCounts = hostSeverityCounts;
         this.subCategoryCounts = subCategoryCounts;
+        this.skillSeverityCounts = skillSeverityCounts;
         this.threatBackendAvailable = threatBackendAvailable;
+        this.activeCollections = activeCollections;
+        this.collectionLastTrafficSeen = collectionLastTrafficSeen;
         this.threatAccess = threatAccess;
     }
 
@@ -102,6 +116,22 @@ public class InsightDataBundle {
         if (scope != InsightProvider.Scope.DETAIL) return null;
         try {
             return threatAccess.piiEvents(ctx.getStartTs(), ctx.getEndTs(), subCategories, Math.min(limit, 2000));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * DETAIL scope only, general-purpose — for a provider whose event filters don't fit
+     * fetchPiiEvents' hardcoded subCategory shape (an unfiltered sweep, a latestAttack/policy-name
+     * filter, or the skill-eval-mode header). Same null-under-LIST-or-failure / possibly-empty-
+     * list-on-success contract as fetchPiiEvents.
+     */
+    public List<DashboardMaliciousEvent> fetchViolationEvents(InsightProvider.Scope scope, int limit,
+                                                               Map<String, Object> filters, String skillEvalMode) {
+        if (scope != InsightProvider.Scope.DETAIL) return null;
+        try {
+            return threatAccess.violationEvents(ctx.getStartTs(), ctx.getEndTs(), Math.min(limit, 3000), filters, skillEvalMode);
         } catch (Exception e) {
             return null;
         }
