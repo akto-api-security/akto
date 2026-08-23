@@ -13822,10 +13822,18 @@
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">DASHBOARD_INSIGHTS</param>
+            </interceptor-ref>
             <result name="SUCCESS" type="json">
                 <param name="root">insights</param>
             </result>
             <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
@@ -13844,10 +13852,18 @@
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">DASHBOARD_INSIGHTS</param>
+            </interceptor-ref>
             <result name="SUCCESS" type="json">
                 <param name="root">insight</param>
             </result>
             <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
@@ -13866,10 +13882,18 @@
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">DASHBOARD_INSIGHTS</param>
+            </interceptor-ref>
             <result name="SUCCESS" type="json">
                 <param name="root">insight</param>
             </result>
             <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>

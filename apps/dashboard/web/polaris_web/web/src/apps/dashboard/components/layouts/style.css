@@ -321,3 +321,12 @@
     display: flex;
     align-items: center;
 }
+
+/* Atlas Insights list row — hover feedback for a Box acting as a click target
+   (same click-target pattern as .agentic-list-cell-click, but this Box is the row itself). */
+.insight-row {
+    cursor: pointer;
+}
+.insight-row:hover {
+    background-color: var(--p-color-bg-hover, #f6f6f7);
+}
