@@ -27,6 +27,7 @@ import java.text.SimpleDateFormat;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.TimeZone;
 import okhttp3.Credentials;
 import okhttp3.Request;
@@ -185,9 +186,6 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                 logAndCollect(Level.DEBUG, "Found {} jira statuses mapped with akto status {}. Using the first one", jiraStatuses.size(),
                     aktoStatus);
 
-                // Use the first mapped status as the target
-                String targetJiraStatus = jiraStatuses.get(0);
-
                 // Extract issue keys for this status group
                 List<String> issueKeys = statusIssues.stream()
                     .map(TestingRunIssues::getTicketId)
@@ -201,12 +199,12 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
 
                 // Get transitions for these issues to reach the target status
                 try {
-                    Map<Integer, List<String>> transitionsMap = JiraApiClient.getTransitions(jira, issueKeys, targetJiraStatus);
+                    Map<Integer, List<String>> transitionsMap = JiraApiClient.getTransitions(jira, issueKeys, jiraStatuses);
 
                     updateJobHeartbeat(job);
                     if (transitionsMap.isEmpty()) {
                         logAndCollect(Level.INFO, "No transitions found for issues with Akto status: {} to Jira status: {}",
-                            aktoStatus, targetJiraStatus);
+                                    aktoStatus, jiraStatuses);
                         continue;
                     }
 
@@ -241,7 +239,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
 
                     if (success) {
                         logAndCollect(Level.DEBUG, "Successfully transitioned {} Jira tickets to status: {}. ticketIds: {}",
-                            issueKeys.size(), targetJiraStatus, issueKeys);
+                            issueKeys.size(), jiraStatuses, issueKeys);
                         // Update last updated timestamp in Akto
                         List<WriteModel<TestingRunIssues>> writeModels = new ArrayList<>();
                         for (TestingRunIssues issue : statusIssues) {
@@ -256,12 +254,11 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                             TestingRunIssuesDao.instance.getMCollection().bulkWrite(writeModels);
                         }
                     } else {
-                        logAndCollect(Level.ERROR, "Failed to transition Jira tickets to status: {}. ticketIds: {}", targetJiraStatus,
-                            issueKeys);
+                        logger.error("Failed to transition Jira tickets. ticketIds: {}", issueKeys);
                     }
                 } catch (Exception e) {
                     logAndCollect(Level.ERROR, "Error getting transitions or performing bulk transition for Akto status: {} to Jira status: {}",
-                        aktoStatus, targetJiraStatus, e);
+                                aktoStatus, jiraStatuses, e);
                 }
             }
         } catch (Exception e) {
