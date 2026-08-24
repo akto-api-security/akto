@@ -8,13 +8,21 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.upload.SwaggerUploadLog;
 import com.akto.open_api.parser.Parser;
 import com.akto.open_api.parser.ParserResult;
+import com.akto.testing.HostDNSLookup;
+import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 import io.swagger.parser.OpenAPIParser;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.parser.core.models.ParseOptions;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
+import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,12 +30,23 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
 public class WizApiEndpointsImporter {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final LoggerMaker loggerMaker = new LoggerMaker(WizApiEndpointsImporter.class, LogDb.DASHBOARD);
+
+    private static final ExecutorService dnsCheckPool = Executors.newFixedThreadPool(5);
+
+    private static final OkHttpClient reachabilityClient = CoreHTTPClient.client.newBuilder()
+        .connectTimeout(2, TimeUnit.SECONDS)
+        .readTimeout(2, TimeUnit.SECONDS)
+        .build();
 
     public static boolean checkApiEndpointsScope() {
         try {
@@ -56,6 +75,23 @@ public class WizApiEndpointsImporter {
             loggerMaker.errorAndAddToDb("Failed to check Wiz api_endpoints scope: " + e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * Builds the Wiz tags JSON string for an Akto message. Always includes source=wiz,
+     * plus whatever additional tags the caller has already resolved for this message.
+     */
+    private static String buildWizTagsJson(Map<String, String> extraTags) {
+        BasicDBObject tagsMap = new BasicDBObject();
+        tagsMap.put("source", "wiz");
+        if (extraTags != null) {
+            for (Map.Entry<String, String> entry : extraTags.entrySet()) {
+                if (entry.getValue() != null) {
+                    tagsMap.put(entry.getKey(), entry.getValue());
+                }
+            }
+        }
+        return tagsMap.toJson();
     }
 
     public static int importWizApiEndpoints(WizIntegration wizIntegration, BiConsumer<ParserResult, WizImportJobPageContext> processor, Runnable heartbeat) {
@@ -87,6 +123,8 @@ public class WizApiEndpointsImporter {
             int deltaTs = wizIntegration.getWizImportApiEndpointsJobDeltaTs();
             Instant cutoff = Instant.ofEpochSecond(deltaTs);
             Set<String> updatedEndpointIds = new HashSet<>();
+            Map<String, Boolean> hostToPubliclyAccessible = new HashMap<>();
+
             for (BasicDBObject meta : allEndpointMeta) {
                 String updatedAt = meta.getString("updatedAt");
                 if (updatedAt == null) continue;
@@ -94,12 +132,75 @@ public class WizApiEndpointsImporter {
                     String id = meta.getString("id");
                     if (id != null && Instant.parse(updatedAt).isAfter(cutoff)) {
                         updatedEndpointIds.add(id);
+
+                        // Strip the port from the host if present, to ensure we only check the hostname for public accessibility
+                        String host = meta.getString("host");
+                        if (host != null) {
+                            try {
+                                String parsedHost = new URI("//" + host).getHost();
+                                if (parsedHost != null) {
+                                    hostToPubliclyAccessible.putIfAbsent(parsedHost, null);
+                                }
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(String.format(
+                                    "Failed to parse host '%s' for endpoint %s", host, id));
+                            }
+                        }
                     }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(String.format(
                         "Failed to parse updatedAt '%s' for endpoint %s", updatedAt, meta.getString("id")));
                 }
             }
+
+            loggerMaker.infoAndAddToDb(String.format("Starting reachability check for %d unique hosts", hostToPubliclyAccessible.size()));
+            
+            Map<String, Future<Boolean>> hostResolutions = new HashMap<>();
+            for (String host : hostToPubliclyAccessible.keySet()) {
+                hostResolutions.put(host, dnsCheckPool.submit(() -> {
+                    try {
+                        if (!HostDNSLookup.isRequestValid(host)) {
+                            loggerMaker.infoAndAddToDb(String.format("%s: invalid host. Address resolves to private IP or localhost", host));
+                            return false;
+                        }
+                        Request request = new Request.Builder().url("https://" + host + "/").get().build();
+                        try (Response response = reachabilityClient.newCall(request).execute()) {
+                            return true;
+                        }
+                    } catch (SSLPeerUnverifiedException | SSLHandshakeException e) {
+                        return true;
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(String.format("%s: unreachable (%s)", host, e.getClass().getSimpleName()));
+                        return false;
+                    }
+                }));
+            }
+
+            int publicHostCount = 0;
+            int unresolvedHostCount = 0;
+
+            for (Map.Entry<String, Future<Boolean>> entry : hostResolutions.entrySet()) {
+                String host = entry.getKey();
+                boolean accessible = false;
+                try {
+                    accessible = entry.getValue().get(2, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } catch (Exception e) {
+                    // timed out, or the check itself failed; treated as unresolved
+                }
+
+                hostToPubliclyAccessible.put(host, accessible);
+                if (accessible) {
+                    publicHostCount++;
+                } else {
+                    unresolvedHostCount++;
+                }
+            }
+
+            loggerMaker.infoAndAddToDb(String.format(
+                "DNS check pool completed: %d public, %d unresolved (of %d hosts checked)",
+                publicHostCount, unresolvedHostCount, hostResolutions.size()));
 
             Map<String, String> canonicalKeyToQaHost = WizApiGatewayFilter.buildCanonicalKeyToQaHost(allEndpointMeta);
 
@@ -179,7 +280,35 @@ public class WizApiEndpointsImporter {
                                     if (aktoFormat != null) {
                                         BasicDBObject msg = BasicDBObject.parse(aktoFormat);
                                         msg.put("source", HttpResponseParams.Source.WIZ.name());
-                                        msg.put("tags", WizApiGatewayFilter.buildWizTagsJson(msg.getString("requestHeaders"), hostToGatewayName));
+
+                                        Map<String, String> tags = new HashMap<>();
+                                        
+                                        String requestHeadersStr = msg.getString("requestHeaders");
+                                        String host = null;
+                                        if (requestHeadersStr != null) {
+                                            try {
+                                                BasicDBObject requestHeaders = BasicDBObject.parse(requestHeadersStr);
+                                                for (String key : requestHeaders.keySet()) {
+                                                    if ("host".equalsIgnoreCase(key)) {
+                                                        host = requestHeaders.getString(key);
+                                                        break;
+                                                    }
+                                                }
+                                            } catch (Exception ignored) {
+                                            }
+                                        }
+
+                                        Boolean publiclyAccessible = hostToPubliclyAccessible.getOrDefault(host, false);
+                                        if (publiclyAccessible) {
+                                            tags.put("public", "true");
+                                        }
+
+                                        String gatewayName = hostToGatewayName.get(host);
+                                        if (gatewayName != null) {
+                                            tags.put("api-gateway", gatewayName);
+                                        }
+                                        msg.put("tags", buildWizTagsJson(tags));
+
                                         log.setAktoFormat(msg.toJson());
                                     }
                                 }
@@ -196,7 +325,6 @@ public class WizApiEndpointsImporter {
                     heartbeat.run();
                 }
             }
-
             loggerMaker.infoAndAddToDb(String.format(
                 "Wiz import completed. Total endpoints dispatched: %d, errors: %d", totalFetched, totalErrors));
 
