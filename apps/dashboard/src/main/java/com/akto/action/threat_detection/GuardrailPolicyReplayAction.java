@@ -440,7 +440,7 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
     private List<ReplaySample> fetchTraceSamples(int endTimestamp) {
         long endMs = endTimestamp * 1000L;
         List<Map<String, Object>> rows = SearchClientFactory.instance().fetchMessages(
-            traceAccountId(), endMs - TRACE_LOOKBACK_MS, endMs,
+            Context.accountId.get(), endMs - TRACE_LOOKBACK_MS, endMs,
             null,   // no filters: not scoped to a session, user or service
             null);  // atlasTrafficFilter unset: include both
 
@@ -479,30 +479,6 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
             .append("requestPayload", requestPayload)
             .append("responsePayload", responsePayload == null ? "" : responsePayload)
             .toJson();
-    }
-
-    /**
-     * Account whose traffic the trace search reads.
-     *
-     * <p>Normally the caller's own account. {@code GUARDRAILS_TRACE_ACCOUNT_ID} overrides it, which
-     * exists only so a local dashboard — whose account has no ingested traffic — can be pointed at
-     * an account that does, to verify the comparison end to end. It makes the numbers meaningless
-     * (the policy comes from one account, the traffic from another), so it must not be set outside
-     * that check.
-     */
-    private static int traceAccountId() {
-        String override = System.getenv("GUARDRAILS_TRACE_ACCOUNT_ID");
-        if (StringUtils.isNotBlank(override)) {
-            try {
-                int parsed = Integer.parseInt(override.trim());
-                loggerMaker.warn("GUARDRAILS_TRACE_ACCOUNT_ID is set: reading traces from account "
-                    + parsed + " instead of " + Context.accountId.get() + " — counts are not meaningful");
-                return parsed;
-            } catch (NumberFormatException e) {
-                loggerMaker.error("GUARDRAILS_TRACE_ACCOUNT_ID is not a number: " + override);
-            }
-        }
-        return Context.accountId.get();
     }
 
     private static String asText(Object value) {
