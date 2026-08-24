@@ -7,6 +7,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -34,7 +35,8 @@ public class CopilotStudioIntegrationAction extends ActionSupport {
     /** Lists every connected tenant for this account — for CopilotStudioAgentUsersCron (akto/libs/utils), which needs to sync agent_users per tenant, not just look up one integration by id. */
     public String fetchAllCopilotStudioIntegrations() {
         try {
-            this.copilotStudioIntegrations = CopilotStudioIntegrationDao.instance.findAll(new BasicDBObject());
+            this.copilotStudioIntegrations = CopilotStudioIntegrationDao.instance.findAll(new BasicDBObject(),
+                    Projections.exclude(CopilotStudioIntegration.ENVIRONMENTS));
         } catch (Exception e) {
             loggerMaker.error("Error in fetchAllCopilotStudioIntegrations", e);
             return Action.ERROR.toUpperCase();
