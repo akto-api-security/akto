@@ -33,7 +33,7 @@ import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.testing.ApiExecutor;
+import com.akto.test_editor.execution.TestPhaseTimer;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
 import com.akto.testing.kafka_utils.TestRunMetrics.Stage;
@@ -147,13 +147,17 @@ public class ConsumerUtil {
                 String sample = messagesList.get(messagesList.size() - 1);
                 loggerMaker.infoAndAddToDb("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
 
-                // RUN_TEST: full test execution wall + CPU; TARGET_HTTP = the slice blocked on the API under test.
-                ApiExecutor.resetHttpTiming();
+                // RUN_TEST: full test execution wall + CPU; sub-phases (resolveExpr/sendReq/validate)
+                // are accumulated on this worker thread via TestPhaseTimer and read back after.
+                TestPhaseTimer.reset();
                 long runCpuStart = CPU_TIME_SUPPORTED ? THREAD_MX.getCurrentThreadCpuTime() : -1L;
                 long runWallStart = System.nanoTime();
                 TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
                 metrics.recordStage(Stage.RUN_TEST, System.nanoTime() - runWallStart);
-                metrics.recordStage(Stage.TARGET_HTTP, ApiExecutor.targetHttpNanos());
+                metrics.recordStage(Stage.RESOLVE_EXPR, TestPhaseTimer.resolveExprNanos());
+                metrics.recordStage(Stage.SEND_REQUEST, TestPhaseTimer.sendReqNanos());
+                metrics.recordStage(Stage.VALIDATE, TestPhaseTimer.validateNanos());
+                metrics.recordRequests(TestPhaseTimer.sendReqCount());
                 if (runCpuStart >= 0) metrics.recordRunTestCpu(THREAD_MX.getCurrentThreadCpuTime() - runCpuStart);
 
                 long persistStart = System.nanoTime();
