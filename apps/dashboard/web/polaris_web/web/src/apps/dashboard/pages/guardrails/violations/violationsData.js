@@ -1,4 +1,6 @@
-import { isEndpointSecurityCategory } from "@/apps/main/labelHelper";
+import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
+import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/constants/guardrailRuleDefinitions";
+import { GUARDRAIL_REMEDIATION_MARKDOWN } from "@/apps/dashboard/pages/threat_detection/constants/guardrailDescriptions";
 // ─── Flyout detail helpers ───────────────────────────────────────────────────────
 
 function _parseAktoOuter(payloadStr) {
@@ -301,6 +303,13 @@ export function buildFallbackDetail(row) {
         fileHighlights: fileHighlights || undefined,
         skillName: skillName || undefined,
         overview: row.type === "Config" ? (metaOverview || undefined) : undefined,
-        remediation: metaRemediation || undefined,
+        // Mirror the old UI's precedence (SampleDetails.jsx's remediationTab): per-event
+        // metadata wins; otherwise Argus/Atlas fall back to the frontend rule catalogue, then
+        // the generic template. Skill events keep the tab hidden - the generic copy adds no
+        // context there, same as the old UI.
+        remediation: metaRemediation
+            || ((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && row.type !== "Skill"
+                ? (getGuardrailRuleInfo(row.violation, policyName)?.remediation || GUARDRAIL_REMEDIATION_MARKDOWN)
+                : undefined),
     };
 }
