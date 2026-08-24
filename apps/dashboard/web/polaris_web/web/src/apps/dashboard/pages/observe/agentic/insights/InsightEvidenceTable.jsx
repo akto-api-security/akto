@@ -8,8 +8,14 @@ import { buildEvidenceColumnDefs } from "./insightsHelpers";
 // One bounded InsightResult.Evidence table (see EVIDENCE_ROW_CAP in InsightService) rendered
 // via the shared AgGridTable, not a hand-rolled <table> — columns are derived from whatever
 // keys the backend actually sent, so this works for every insight's evidence shape unchanged.
-// Rows that carry a `host` are navigable to that asset's inventory page — hostNameMap
-// (PersistStore) is collectionId -> hostName, so it's inverted here to resolve the other way.
+// A row is navigable when it carries one of the same identifying fields the insight's own CTAs
+// deep-link on (see InsightUtil.usersAndDevicesFilterParams/guardrailPolicyParams):
+//   - host   -> that asset's inventory page (hostNameMap, PersistStore, is collectionId ->
+//               hostName, so it's inverted here to resolve the other way)
+//   - user   -> Users and Devices, filtered to that user (same `?filters=groupName__` param
+//               the view_users CTAs use)
+//   - Policy -> Guardrail Policies, opened to that policy (same `?policy=` param the
+//               switch_to_block_mode/view_the_hits CTAs use)
 export default function InsightEvidenceTable({ evidence }) {
     const navigate = useNavigate();
     const hostNameMap = PersistStore((state) => state.hostNameMap);
@@ -25,19 +31,28 @@ export default function InsightEvidenceTable({ evidence }) {
         return reverse;
     }, [hostNameMap]);
 
-    const resolveCollectionId = useCallback(
-        (row) => (row?.host ? collectionIdByHost[row.host] : undefined),
-        [collectionIdByHost]
-    );
+    const resolveRowTarget = useCallback((row) => {
+        if (!row) return undefined;
+        if (row.host && collectionIdByHost[row.host]) {
+            return `/dashboard/observe/inventory/${collectionIdByHost[row.host]}`;
+        }
+        if (row.user) {
+            return `/dashboard/observe/users-and-devices?filters=${encodeURIComponent(`groupName__${row.user}`)}`;
+        }
+        if (row.Policy) {
+            return `/dashboard/guardrails/policies?policy=${encodeURIComponent(row.Policy)}`;
+        }
+        return undefined;
+    }, [collectionIdByHost]);
 
     const handleRowClicked = useCallback(({ data }) => {
-        const collectionId = resolveCollectionId(data);
-        if (collectionId) navigate(`/dashboard/observe/inventory/${collectionId}`);
-    }, [navigate, resolveCollectionId]);
+        const target = resolveRowTarget(data);
+        if (target) navigate(target);
+    }, [navigate, resolveRowTarget]);
 
     const getRowStyle = useCallback(
-        ({ data }) => (resolveCollectionId(data) ? { cursor: "pointer" } : undefined),
-        [resolveCollectionId]
+        ({ data }) => (resolveRowTarget(data) ? { cursor: "pointer" } : undefined),
+        [resolveRowTarget]
     );
 
     return (
