@@ -52,16 +52,17 @@ public class GuardrailCoverageGapProvider extends AbstractInsightProvider {
             else if (!blockingCovered) coveredNonBlockingOnly.add(c);
         }
 
-        int nonBlockingWithHits = 0;
+        List<ApiCollection> nonBlockingWithHitsSurfaces = new ArrayList<>();
         if (bundle.threatBackendAvailable) {
             Set<String> hostsWithHits = new HashSet<>();
             for (HostSeverityCount h : bundle.hostSeverityCounts) {
                 if (h.getCritical() + h.getHigh() + h.getMedium() + h.getLow() > 0) hostsWithHits.add(h.getHost());
             }
             for (ApiCollection c : coveredNonBlockingOnly) {
-                if (hostsWithHits.contains(c.getHostName())) nonBlockingWithHits++;
+                if (hostsWithHits.contains(c.getHostName())) nonBlockingWithHitsSurfaces.add(c);
             }
         }
+        int nonBlockingWithHits = nonBlockingWithHitsSurfaces.size();
 
         // Uncovered surfaces with real harmful-topic activity (user-analysis, matched via
         // serviceId/deviceId both being substrings of the collection's hostName) — the
@@ -103,6 +104,18 @@ public class GuardrailCoverageGapProvider extends AbstractInsightProvider {
             rows.add(row);
         }
         r.addEvidence(new InsightResult.Evidence("uncovered", "Uncovered surfaces", Arrays.asList("host", "type", "harmfulTopicActivity"), rows, uncovered.size()));
+
+        if (!nonBlockingWithHitsSurfaces.isEmpty()) {
+            List<Map<String, Object>> nonBlockingRows = new ArrayList<>();
+            for (ApiCollection c : nonBlockingWithHitsSurfaces.subList(0, Math.min(20, nonBlockingWithHitsSurfaces.size()))) {
+                Map<String, Object> row = new HashMap<>();
+                row.put("host", c.getHostName());
+                row.put("type", AgenticObserveUtil.getTypeFromCollection(c));
+                nonBlockingRows.add(row);
+            }
+            r.addEvidence(new InsightResult.Evidence("non_blocking_with_hits", "Non-blocking policies with real hits",
+                    Arrays.asList("host", "type"), nonBlockingRows, nonBlockingWithHitsSurfaces.size()));
+        }
 
         r.addCta(buildCreatePolicyCta(scope, harmfulSummariesByUncovered));
         r.addCta(new InsightResult.Cta("view_misconfigurations", "View misconfigurations", "NAVIGATE", InsightRoutes.GUARDRAIL_MISCONFIGURATIONS, new HashMap<>(), false));

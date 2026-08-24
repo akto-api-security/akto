@@ -8,8 +8,10 @@ import com.akto.util.Constants;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Static helpers shared across insight providers — number formatting, agent-description
@@ -133,6 +135,32 @@ public final class InsightUtil {
         } catch (Exception e) {
             return String.valueOf(input.hashCode());
         }
+    }
+
+    // ── CTA deep-link params — only these two mechanisms actually work on the frontend today ──
+    // (verified against the live pages, not assumed): Users and Devices reads a single `filters`
+    // query param shaped `key__v1,v2,...` (GithubServerTable's convention; `groupName` is the only
+    // filterKey that page declares — a bare `?username=`/`?host=` param is silently ignored).
+    // Guardrail Policies has no filtered-list deep link, only a single-policy one: `?policy=<exact
+    // name>` opens that policy's edit drawer (GuardrailPolicies.jsx's own `?policy=` handling) —
+    // `policyId`/`policyName`/`policyIds` keys are not read by that page and do nothing.
+
+    /** Empty map (falls back to an unfiltered NAVIGATE) if usernames has no non-blank entries. */
+    public static Map<String, Object> usersAndDevicesFilterParams(List<String> usernames) {
+        List<String> clean = new ArrayList<>();
+        if (usernames != null) {
+            for (String u : usernames) if (u != null && !u.isEmpty()) clean.add(u);
+        }
+        Map<String, Object> params = new HashMap<>();
+        if (!clean.isEmpty()) params.put("filters", "groupName__" + String.join(",", clean));
+        return params;
+    }
+
+    /** Empty map (falls back to an unfiltered NAVIGATE) if policyName is blank. */
+    public static Map<String, Object> guardrailPolicyParams(String policyName) {
+        Map<String, Object> params = new HashMap<>();
+        if (policyName != null && !policyName.isEmpty()) params.put("policy", policyName);
+        return params;
     }
 
     // ── Collection tag helpers (moved from the former AgenticAssetIndex) ───────────────

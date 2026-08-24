@@ -77,6 +77,7 @@ public class ExposureConcentrationProvider extends AbstractInsightProvider {
         long cumulativeTokens = 0;
         long topCohortTokens = 0;
         int topCohortHarmfulHits = 0;
+        List<String> topCohortUsers = new ArrayList<>();
         List<Map<String, Object>> rows = new ArrayList<>();
         for (int i = 0; i < ranked.size(); i++) {
             Map.Entry<String, Long> e = ranked.get(i);
@@ -86,6 +87,7 @@ public class ExposureConcentrationProvider extends AbstractInsightProvider {
             if (i < topCohortSize) {
                 topCohortTokens += e.getValue();
                 topCohortHarmfulHits += harmfulHits;
+                topCohortUsers.add(user);
             }
             if (rows.size() < 10) {
                 Map<String, Object> row = new HashMap<>();
@@ -125,7 +127,8 @@ public class ExposureConcentrationProvider extends AbstractInsightProvider {
         r.addEvidence(new InsightResult.Evidence("top_users", "Top users by token volume and harmful-topic activity",
                 Arrays.asList("user", "tokens", "cumulativePercent", "harmfulHits", "topHarmfulTopic", "topHarmfulReason"), rows, ranked.size()));
 
-        r.addCta(new InsightResult.Cta("view_users", "View users and devices", "NAVIGATE", InsightRoutes.USERS_AND_DEVICES, new HashMap<>(), true));
+        r.addCta(new InsightResult.Cta("view_users", "View users and devices", "NAVIGATE", InsightRoutes.USERS_AND_DEVICES,
+                InsightUtil.usersAndDevicesFilterParams(topCohortUsers), true));
         r.addCta(new InsightResult.Cta("view_llm", "View LLM observability", "NAVIGATE", InsightRoutes.LLM_OBSERVABILITY, new HashMap<>(), false));
         return r;
     }

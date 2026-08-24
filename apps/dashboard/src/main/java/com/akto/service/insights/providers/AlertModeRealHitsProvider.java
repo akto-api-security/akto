@@ -217,17 +217,18 @@ public class AlertModeRealHitsProvider extends AbstractInsightProvider {
         if (worst == null || worstDangerousHits == 0) {
             return new ArrayList<>();
         }
-        Map<String, Object> params = new HashMap<>();
-        params.put("policyId", worst.getHexId());
-        params.put("policyName", worst.getName());
+        // "?policy=<name>" is the one deep-link GuardrailPolicies.jsx actually reads (opens that
+        // policy's edit drawer) — policyId/policyName keys are ignored by the page. Guardrail
+        // Violations has no URL-filter support at all yet, so this same param is inert there today.
+        Map<String, Object> policyParams = InsightUtil.guardrailPolicyParams(worst.getName());
 
         List<InsightResult.Cta> ctas = new ArrayList<>();
         ctas.add(new InsightResult.Cta("switch_to_block_mode", "Switch to block mode",
-                "BULK_ACTION", "/dashboard/guardrails/policies", params, true));
+                "BULK_ACTION", "/dashboard/guardrails/policies", policyParams, true));
         ctas.add(new InsightResult.Cta("simulate_impact_first", "Simulate impact first",
-                "NAVIGATE", "/dashboard/guardrails/policies", params, false));
+                "NAVIGATE", "/dashboard/guardrails/policies", policyParams, false));
         ctas.add(new InsightResult.Cta("view_the_hits", "View the hits",
-                "NAVIGATE", "/dashboard/guardrails/violations", params, false));
+                "NAVIGATE", "/dashboard/guardrails/violations", policyParams, false));
         return ctas;
     }
 }

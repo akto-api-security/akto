@@ -79,6 +79,7 @@ public class OffDomainTokenBurnProvider extends AbstractInsightProvider {
                 : "Team median is " + InsightUtil.count(teamMedian, "tokens") + "; top user is " + InsightUtil.count(ranked.get(0).getValue(), "tokens"));
 
         List<Map<String, Object>> rows = new ArrayList<>();
+        List<String> topUsers = new ArrayList<>();
         for (Map.Entry<String, Long> e : ranked.subList(0, Math.min(10, ranked.size()))) {
             Map<String, Object> row = new HashMap<>();
             row.put("user", e.getKey());
@@ -86,12 +87,14 @@ public class OffDomainTokenBurnProvider extends AbstractInsightProvider {
             row.put("offDomainTokens", offDomainTokensByUser.getOrDefault(e.getKey(), null));
             row.put("team", bundle.teamForUser(e.getKey()));
             rows.add(row);
+            topUsers.add(e.getKey());
         }
         r.addEvidence(new InsightResult.Evidence("top_users", "Top users by token volume",
                 Arrays.asList("user", "totalTokens", "offDomainTokens", "team"), rows, ranked.size()));
 
         r.addCta(new InsightResult.Cta("view_llm", "View LLM observability", "NAVIGATE", InsightRoutes.LLM_OBSERVABILITY, new HashMap<>(), true));
-        r.addCta(new InsightResult.Cta("view_users", "View users and devices", "NAVIGATE", InsightRoutes.USERS_AND_DEVICES, new HashMap<>(), false));
+        r.addCta(new InsightResult.Cta("view_users", "View users and devices", "NAVIGATE", InsightRoutes.USERS_AND_DEVICES,
+                InsightUtil.usersAndDevicesFilterParams(topUsers), false));
         return r;
     }
 

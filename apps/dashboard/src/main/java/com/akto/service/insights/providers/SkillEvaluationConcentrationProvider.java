@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,6 +31,7 @@ public class SkillEvaluationConcentrationProvider extends AbstractInsightProvide
     private static final String SKILLS_PREFIX = "/skills/";
     private static final int EVENT_PAGE_LIMIT = 2000;
     private static final int EVIDENCE_ROW_CAP = 20;
+    private static final int CTA_SKILL_NAMES_CAP = 20;
 
     public SkillEvaluationConcentrationProvider() { super(InsightId.SKILL_EVALUATION_CONCENTRATION, 1); }
 
@@ -255,16 +255,19 @@ public class SkillEvaluationConcentrationProvider extends AbstractInsightProvide
         if (actor == null) {
             return new ArrayList<>();
         }
+        // Capped — this account alone had 242 distinct skills for one actor; dumping the whole set
+        // into a query-string param would blow past any browser's practical URL length limit.
+        List<String> boundedSkillNames = skillNames.stream().distinct().limit(CTA_SKILL_NAMES_CAP).collect(Collectors.toList());
         Map<String, Object> params = new HashMap<>();
         params.put("actor", actor);
-        params.put("skillNames", new ArrayList<>(new HashSet<>(skillNames)));
+        params.put("skillNames", boundedSkillNames);
 
         List<InsightResult.Cta> ctas = new ArrayList<>();
         ctas.add(new InsightResult.Cta("create_exception_for_user_skill", "Create exception for user + skill category",
                 "BULK_ACTION", "/dashboard/guardrails/policies", params, true));
         ctas.add(new InsightResult.Cta("confirm_role_with_manager", "Confirm role with manager",
                 "NAVIGATE", "/dashboard/observe/users-and-devices",
-                Collections.singletonMap("username", actor), false));
+                InsightUtil.usersAndDevicesFilterParams(Collections.singletonList(actor)), false));
         ctas.add(new InsightResult.Cta("view_skills", "View skills",
                 "NAVIGATE", "/dashboard/observe/audit", params, false));
         return ctas;

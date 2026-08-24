@@ -220,7 +220,7 @@ public class AlertFatigueProvider extends AbstractInsightProvider {
         result.setDataGaps(new ArrayList<>());
         result.setCaveats(caveats);
         result.setEvidence(evidence);
-        result.setCtas(buildCtas(topIncidents, policyByLowerName));
+        result.setCtas(buildCtas(topIncidents));
         return result;
     }
 
@@ -260,22 +260,21 @@ public class AlertFatigueProvider extends AbstractInsightProvider {
         return s == null ? "" : s.trim().toLowerCase(Locale.US);
     }
 
-    private static List<InsightResult.Cta> buildCtas(List<Incident> topIncidents, Map<String, GuardrailPolicies> policyByLowerName) {
+    private static List<InsightResult.Cta> buildCtas(List<Incident> topIncidents) {
         Incident worst = topIncidents.stream().filter(i -> i.flagged).findFirst().orElse(null);
         if (worst == null) {
             return new ArrayList<>();
         }
-        GuardrailPolicies policy = policyByLowerName.get(lower(worst.policy));
-        Map<String, Object> params = new HashMap<>();
-        params.put("actor", worst.actor);
-        params.put("policyId", policy != null ? policy.getHexId() : null);
-        params.put("policyName", worst.policy);
+        // "?policy=<name>" is the one deep-link GuardrailPolicies.jsx actually reads (opens that
+        // policy's edit drawer) — policyId/policyName keys are ignored by the page. Guardrail
+        // Violations has no URL-filter support at all yet, so `actor` is inert there today.
+        Map<String, Object> policyParams = InsightUtil.guardrailPolicyParams(worst.policy);
 
         List<InsightResult.Cta> ctas = new ArrayList<>();
         ctas.add(new InsightResult.Cta("remove_user_from_scope", "Remove user from policy scope",
-                "BULK_ACTION", "/dashboard/guardrails/policies", params, true));
+                "BULK_ACTION", "/dashboard/guardrails/policies", policyParams, true));
         ctas.add(new InsightResult.Cta("add_exception", "Add exception",
-                "NAVIGATE", "/dashboard/guardrails/policies", params, false));
+                "NAVIGATE", "/dashboard/guardrails/policies", policyParams, false));
         ctas.add(new InsightResult.Cta("switch_to_incident_view", "Switch to incident view",
                 "NAVIGATE", "/dashboard/guardrails/violations", Collections.emptyMap(), false));
         return ctas;

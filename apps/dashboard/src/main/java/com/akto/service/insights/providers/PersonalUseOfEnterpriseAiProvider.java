@@ -79,6 +79,7 @@ public class PersonalUseOfEnterpriseAiProvider extends AbstractInsightProvider {
                 : InsightUtil.percent(offDomainShare) + " of interactions are off-domain for their agent");
 
         List<Map<String, Object>> rows = new ArrayList<>();
+        List<String> topOffDomainUsers = new ArrayList<>();
         List<Map.Entry<String, Long>> ranked = new ArrayList<>(offDomainByUser.entrySet());
         ranked.sort((a, b) -> b.getValue().compareTo(a.getValue()));
         for (Map.Entry<String, Long> e : ranked.subList(0, Math.min(10, ranked.size()))) {
@@ -86,12 +87,14 @@ public class PersonalUseOfEnterpriseAiProvider extends AbstractInsightProvider {
             row.put("user", e.getKey());
             row.put("offDomainInteractions", e.getValue());
             rows.add(row);
+            topOffDomainUsers.add(e.getKey());
         }
         r.addEvidence(new InsightResult.Evidence("top_off_domain_users", "Top users by off-domain interactions",
                 Arrays.asList("user", "offDomainInteractions"), rows, ranked.size()));
 
         r.addCta(new InsightResult.Cta("view_llm", "View LLM observability", "NAVIGATE", InsightRoutes.LLM_OBSERVABILITY, new HashMap<>(), true));
-        r.addCta(new InsightResult.Cta("view_users", "View users and devices", "NAVIGATE", InsightRoutes.USERS_AND_DEVICES, new HashMap<>(), false));
+        r.addCta(new InsightResult.Cta("view_users", "View users and devices", "NAVIGATE", InsightRoutes.USERS_AND_DEVICES,
+                InsightUtil.usersAndDevicesFilterParams(topOffDomainUsers), false));
         return r;
     }
 }

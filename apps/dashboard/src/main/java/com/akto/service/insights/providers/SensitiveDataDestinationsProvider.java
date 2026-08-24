@@ -24,11 +24,21 @@ public class SensitiveDataDestinationsProvider extends AbstractInsightProvider {
             return r;
         }
 
-        Set<String> configuredPiiTypes = new HashSet<>();
+        // subCategory on a violation event is the firing policy's own name (confirmed against
+        // real malicious_events documents: category/subCategory both equal metadata.policy_name,
+        // e.g. "pii-policy" — NOT a "PII-<type>" coded string; that finer-grained type only shows
+        // up buried in metadata's free-text rule_violated line, which this insight doesn't parse).
+        // So "is this a sensitive-data policy" has to be decided from the policy itself: either it
+        // has explicit PII types configured, or it uses an LLM rule (real accounts write custom
+        // LLM DLP prompts for things like "Employee PII"/"Confidential Business Information"
+        // instead of, or in addition to, the fixed piiTypes list — those must count here too).
+        Set<String> sensitiveDataPolicyNamesLower = new HashSet<>();
         for (GuardrailPolicies p : bundle.policies) {
-            if (p.getPiiTypes() == null) continue;
-            for (GuardrailPolicies.PiiType pt : p.getPiiTypes()) {
-                if (pt.getType() != null) configuredPiiTypes.add(pt.getType().toLowerCase(Locale.ROOT));
+            if (p.getName() == null) continue;
+            boolean hasPiiTypes = p.getPiiTypes() != null && !p.getPiiTypes().isEmpty();
+            boolean hasLlmRule = p.getLlmRule() != null && p.getLlmRule().isEnabled();
+            if (hasPiiTypes || hasLlmRule) {
+                sensitiveDataPolicyNamesLower.add(p.getName().toLowerCase(Locale.ROOT));
             }
         }
 
@@ -37,8 +47,7 @@ public class SensitiveDataDestinationsProvider extends AbstractInsightProvider {
         for (ThreatCategoryCount c : bundle.subCategoryCounts) {
             String sub = c.getSubCategory();
             if (sub == null) continue;
-            String lower = sub.toLowerCase(Locale.ROOT);
-            if (lower.startsWith("pii-") && configuredPiiTypes.contains(lower.substring("pii-".length()))) {
+            if (sensitiveDataPolicyNamesLower.contains(sub.toLowerCase(Locale.ROOT))) {
                 piiTotal += c.getCount();
                 piiSubCategories.add(sub);
             }
