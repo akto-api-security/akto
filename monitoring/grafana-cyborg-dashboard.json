@@ -99,63 +99,6 @@
   "panels": [
     {
       "type": "timeseries",
-      "title": "CPU usage",
-      "description": "Process and system CPU.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 0
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
-          }
-        }
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": []
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "process_cpu_usage{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}",
-          "legendFormat": "process",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "system_cpu_usage{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}",
-          "legendFormat": "system",
-          "refId": "B"
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
       "title": "JVM memory used",
       "description": "Heap / non-heap used, plus committed heap.",
       "datasource": {
@@ -164,8 +107,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
+        "w": 24,
+        "x": 0,
         "y": 0
       },
       "fieldConfig": {
