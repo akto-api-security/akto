@@ -106,7 +106,10 @@
         <action name="threat-detection/validate" class="com.akto.action.CopilotStudioWebhookAction" method="checkReady">
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">^isSuccessful,^status</param>
+                <!-- isSuccessful()'s JavaBean-derived property name is "successful" (the leading "is"
+                     is stripped as a boolean-getter prefix, not part of the name) — @JSON(name="isSuccessful")
+                     on the getter renames the output key; this filter must still match the real property. -->
+                <param name="includeProperties">^successful,^status</param>
             </result>
         </action>
 

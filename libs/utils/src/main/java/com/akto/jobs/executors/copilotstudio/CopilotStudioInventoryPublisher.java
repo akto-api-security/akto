@@ -174,7 +174,7 @@ public class CopilotStudioInventoryPublisher {
     }
 
     /** Port of extractor.go's sanitizeBotName + its callers' strings.ToLower(...); must stay identical or one agent yields two collections. */
-    static String sanitizeBotName(String name) {
+    public static String sanitizeBotName(String name) {
         if (name == null || name.isEmpty()) {
             return "";
         }

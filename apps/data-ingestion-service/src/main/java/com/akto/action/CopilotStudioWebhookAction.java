@@ -5,26 +5,23 @@ import com.akto.dto.AgenticUsers;
 import com.akto.gateway.Gateway;
 import com.akto.jobs.executors.AIAgentConnectorConstants;
 import com.akto.jobs.executors.copilotstudio.CopilotStudioAgentUsersCron;
+import com.akto.jobs.executors.copilotstudio.CopilotStudioInventoryPublisher;
 import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
+import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 import org.apache.struts2.ServletActionContext;
+import org.apache.struts2.json.annotations.JSON;
 
 import javax.servlet.http.HttpServletRequest;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ExecutorCompletionService;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @lombok.Getter
@@ -38,8 +35,6 @@ public class CopilotStudioWebhookAction extends ActionSupport {
         gateway.setDataPublisher(new KafkaDataPublisher());
     }
 
-    private static final Pattern BOT_NAME_JUNK = Pattern.compile("[^\\p{L}\\p{N}-]+");
-    private static final Pattern BOT_NAME_HYPHENS = Pattern.compile("-+");
     private static final String MCP_TOOL_TYPE = "DynamicServerToolDefinition";
 
     private boolean isSuccessful;
@@ -53,6 +48,18 @@ public class CopilotStudioWebhookAction extends ActionSupport {
         isSuccessful = true;
         status = "OK";
         return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Explicit getter (Lombok would otherwise generate this) forced to serialize as "isSuccessful"
+     * via @JSON(name=...): the JavaBean convention strips a leading "is" off a boolean getter to
+     * derive its property name, so a plain isSuccessful() getter serializes as "successful" — which
+     * never matches struts.xml's includeProperties pattern and silently drops the field. Microsoft's
+     * ValidationResponse contract requires the literal key "isSuccessful".
+     */
+    @JSON(name = "isSuccessful")
+    public boolean isSuccessful() {
+        return isSuccessful;
     }
 
     @SuppressWarnings("unchecked")
@@ -70,60 +77,22 @@ public class CopilotStudioWebhookAction extends ActionSupport {
             String conversationId = stringOrEmpty(conversationMetadata.get("conversationId"));
             String hostUserId = resolveHostUserId(stringOrEmpty(userContext.get("id")));
 
-            Map<String, Object> userMsgCall = buildUserMessageRequestData(plannerContext, agent, hostUserId, conversationId);
-            Map<String, Object> toolCall = buildToolInvocationRequestData(toolDefinition, inputValues, agent, hostUserId, conversationId);
+            Map<String, Object> requestData = buildEvaluationRequestData(
+                plannerContext, toolDefinition, inputValues, agent, hostUserId, conversationId);
 
-            ExecutorService executor = Executors.newFixedThreadPool(2);
-            try {
-                ExecutorCompletionService<LabeledResult> completionService = new ExecutorCompletionService<>(executor);
-                completionService.submit(() -> callLabeled("userMessage", userMsgCall));
-                completionService.submit(() -> callLabeled("toolInvocation", toolCall));
-
-                for (int i = 0; i < 2; i++) {
-                    Future<LabeledResult> future = completionService.take();
-                    LabeledResult result = future.get();
-                    if (result.error != null) {
-                        loggerMaker.errorAndAddToDb("CopilotStudioWebhookAction - " + result.label
-                            + " guardrails call failed, failing open: " + result.error.getMessage());
-                        blockAction = false;
-                        return Action.SUCCESS.toUpperCase();
-                    }
-                    if (blockedFrom(result.guardrailsResult)) {
-                        blockAction = true;
-                        reason = result.label + ": " + reasonFrom(result.guardrailsResult);
-                        return Action.SUCCESS.toUpperCase();
-                    }
-                }
+            Map<String, Object> guardrailsResult = callGuardrails(requestData);
+            if (blockedFrom(guardrailsResult)) {
+                blockAction = true;
+                reason = reasonFrom(guardrailsResult);
+            } else {
                 blockAction = false;
-                return Action.SUCCESS.toUpperCase();
-            } finally {
-                executor.shutdownNow();
             }
+            return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("CopilotStudioWebhookAction - failing open: " + e.getMessage());
             blockAction = false;
             return Action.SUCCESS.toUpperCase();
-        }
-    }
-
-    private static final class LabeledResult {
-        final String label;
-        final Map<String, Object> guardrailsResult;
-        final Exception error;
-
-        LabeledResult(String label, Map<String, Object> guardrailsResult, Exception error) {
-            this.label = label;
-            this.guardrailsResult = guardrailsResult;
-            this.error = error;
-        }
-    }
-
-    private LabeledResult callLabeled(String label, Map<String, Object> requestData) {
-        try {
-            return new LabeledResult(label, callGuardrails(requestData), null);
-        } catch (Exception e) {
-            return new LabeledResult(label, null, e);
         }
     }
 
@@ -152,41 +121,33 @@ public class CopilotStudioWebhookAction extends ActionSupport {
         return r != null ? r.toString() : "";
     }
 
-    private Map<String, Object> buildUserMessageRequestData(Map<String, Object> plannerContext, Map<String, Object> agent, String hostUserId, String conversationId) {
-        String userMessage = stringOrEmpty(plannerContext.get("userMessage"));
-        String agentName = agentDisplayName(agent);
-
-        Map<String, Object> requestData = newBaseRequestData(agent, agentName, hostUserId, conversationId);
-        requestData.put("path", "/copilot/conversation/messages/" + conversationId);
-        requestData.put("requestPayload", JSONUtils.getString(Collections.singletonMap("prompt", userMessage)));
-        requestData.put("tag", JSONUtils.getString(buildCopilotStudioTag(agentName, stringOrEmpty(agent.get("environmentId")), false)));
-        return requestData;
-    }
-
-    private Map<String, Object> buildToolInvocationRequestData(Map<String, Object> toolDefinition, Map<String, Object> inputValues, Map<String, Object> agent, String hostUserId, String conversationId) {
+    /**
+     * One evaluation call covering both the user's message and the tool/MCP call in a single
+     * request — Microsoft's webhook already hands us both in one call to analyzeToolExecution,
+     * so there's no need for two separate guardrails+ingestion round trips (and two separate
+     * traffic samples/paths) to cover them.
+     */
+    private Map<String, Object> buildEvaluationRequestData(Map<String, Object> plannerContext, Map<String, Object> toolDefinition,
+            Map<String, Object> inputValues, Map<String, Object> agent, String hostUserId, String conversationId) {
         boolean isMcp = MCP_TOOL_TYPE.equals(stringOrEmpty(toolDefinition.get("type")));
-        String toolName = stringOrEmpty(toolDefinition.get("name"));
         String toolId = stringOrEmpty(toolDefinition.get("id"));
+        String rawToolName = stringOrEmpty(toolDefinition.get("name"));
+        String toolName = isMcp ? mcpOperationName(toolId, rawToolName) : rawToolName;
         String agentName = agentDisplayName(agent);
 
         Map<String, Object> requestData = newBaseRequestData(agent, agentName, hostUserId, conversationId);
-        if (isMcp) {
-            requestData.put("path", "/copilot/mcp");
-            String operationName = mcpOperationName(toolId, toolName);
-            Map<String, Object> params = new LinkedHashMap<>();
-            params.put("name", operationName);
-            params.put("arguments", inputValues);
-            Map<String, Object> rpc = new LinkedHashMap<>();
-            rpc.put("jsonrpc", "2.0");
-            rpc.put("id", 1);
-            rpc.put("method", "tools/call");
-            rpc.put("params", params);
-            requestData.put("requestPayload", JSONUtils.getString(rpc));
-        } else {
-            requestData.put("path", "/copilot/tool/" + toolName.toLowerCase());
-            requestData.put("requestPayload", JSONUtils.getString(inputValues));
-        }
-        requestData.put("tag", JSONUtils.getString(buildCopilotStudioTag(agentName, stringOrEmpty(agent.get("environmentId")), isMcp)));
+        String path = !toolName.isEmpty()
+            ? "/copilot/conversation/tool/" + toolName.toLowerCase()
+            : "/copilot/conversation/messages/" + conversationId;
+        requestData.put("path", path);
+
+        Map<String, Object> evaluationPayload = new LinkedHashMap<>();
+        evaluationPayload.put("userMessage", stringOrEmpty(plannerContext.get("userMessage")));
+        evaluationPayload.put("toolName", toolName);
+        evaluationPayload.put("toolInput", inputValues != null ? inputValues : new HashMap<>());
+        requestData.put("requestPayload", JSONUtils.getString(evaluationPayload));
+
+        requestData.put("tag", JSONUtils.getString(buildCopilotStudioTag(agentName, stringOrEmpty(agent.get("environmentId")))));
         return requestData;
     }
 
@@ -230,18 +191,10 @@ public class CopilotStudioWebhookAction extends ActionSupport {
         return toolId.substring(idx + 1);
     }
 
-    private static String sanitizeBotName(String name) {
-        if (name == null || name.isEmpty()) return "";
-        String sanitized = BOT_NAME_JUNK.matcher(name).replaceAll("-");
-        sanitized = BOT_NAME_HYPHENS.matcher(sanitized).replaceAll("-");
-        sanitized = sanitized.replaceAll("^-+|-+$", "");
-        return sanitized.toLowerCase();
-    }
-
     private static String agentDisplayName(Map<String, Object> agent) {
-        String name = sanitizeBotName(stringOrEmpty(agent.get("name")));
+        String name = CopilotStudioInventoryPublisher.sanitizeBotName(stringOrEmpty(agent.get("name")));
         if (!name.isEmpty()) return name;
-        return sanitizeBotName(stringOrEmpty(agent.get("id")));
+        return CopilotStudioInventoryPublisher.sanitizeBotName(stringOrEmpty(agent.get("id")));
     }
 
     /** {hostUserId}.ai-agent.{agentName} — same shape CopilotStudioInventoryPublisher already uses, so transcript and inventory data for the same (user, agent) pair land in the same collection. */
@@ -284,19 +237,13 @@ public class CopilotStudioWebhookAction extends ActionSupport {
         return ip;
     }
 
-    private static Map<String, Object> buildCopilotStudioTag(String agentName, String environmentId, boolean isMcp) {
+    private static Map<String, Object> buildCopilotStudioTag(String agentName, String environmentId) {
         Map<String, Object> tags = new LinkedHashMap<>();
-        tags.put("source", "ENDPOINT");
+        tags.put(Constants.AKTO_ENDPOINT_SOURCE_TAG, "ENDPOINT");
         tags.put("bot-environment-id", environmentId);
-        // tags.put("bot-name", agentName);
-        tags.put("ai-agent", "copilot-studio");
-        if (isMcp) {
-            tags.put("mcp-server", "MCP Server");
-            tags.put("mcp-client", "copilot-studio");
-        } else {
-            tags.put("gen-ai", "Gen AI");
-            tags.put("ai-agent", "copilot-studio");
-        }
+        tags.put(Constants.AKTO_GEN_AI_TAG, AIAgentConnectorConstants.DATA_TAG_GEN_AI);
+        tags.put(Constants.AKTO_AI_AGENT_TAG, agentName);
+        tags.put(Constants.AKTO_SAAS_AGENT_TAG, Constants.COPILOT_STUDIO_AI_AGENT_NAME);
         return tags;
     }
 
