@@ -197,7 +197,10 @@ public class WizApiEndpointsImporter {
                     unresolvedHostCount++;
                 }
 
-                heartbeat.run();
+                // Log heartbeat every 20 hosts checked to ensure job is not marked as stalled by the scheduler (300 seconds default)
+                if ((publicHostCount + unresolvedHostCount) % 20 == 0) {
+                    heartbeat.run();
+                }
             }
 
             loggerMaker.infoAndAddToDb(String.format(
