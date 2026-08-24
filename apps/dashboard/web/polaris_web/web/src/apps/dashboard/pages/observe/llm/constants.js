@@ -22,6 +22,11 @@ function extractContentText(content) {
         return content.map(c => {
             if (typeof c === "string") return c;
             if (typeof c.text === "string") return c.text;
+            // Tool-result blocks — carry the produced output, not the call arguments
+            if (c.type === "tool_result" || c.output !== undefined) {
+                const out = c.output ?? c.content;
+                return `[${c.name || "tool_result"}] ${typeof out === "string" ? out : JSON.stringify(out)}`;
+            }
             // Tool-call / tool_use blocks
             const name = c.name || c.function?.name;
             const args = c.input ?? c.function?.arguments ?? c.arguments ?? {};
@@ -33,6 +38,19 @@ function extractContentText(content) {
     }
     if (content !== null && typeof content === "object") return JSON.stringify(content);
     return String(content ?? "");
+}
+
+// Agent-turn payload shape emitted by agent/MCP spans:
+//   { role, text, tool_calls: [{ name, input }], tool_results: [{ name, output }] }
+// `text` is "" on tool-only turns, so fall back to the tool blocks — otherwise the row
+// renders blank even though the turn carried a tool call or its result.
+function parseAgentTurnText(obj) {
+    if (typeof obj.text === "string" && obj.text.trim()) return obj.text;
+    const blocks = [
+        ...(Array.isArray(obj.tool_calls)   ? obj.tool_calls   : []),
+        ...(Array.isArray(obj.tool_results) ? obj.tool_results : []),
+    ];
+    return blocks.length ? extractContentText(blocks) : "";
 }
 
 // Returns the first array-valued messages field found across common provider keys.
@@ -67,7 +85,8 @@ export function parsePromptText(queryPayload) {
         // Plain scalar fields — string-typed only to avoid returning objects
         if (typeof obj.prompt  === "string") return obj.prompt;
         if (typeof obj.message === "string") return obj.message;
-        if (typeof obj.text    === "string") return obj.text;
+        const turnText = parseAgentTurnText(obj);
+        if (turnText) return turnText;
         if (typeof obj.body    === "string") return obj.body;
         // Final fallback — always a string
         return JSON.stringify(obj, null, 2);
@@ -125,7 +144,8 @@ export function parseResponseText(responsePayload) {
         if (typeof obj.body === "string") return obj.body;
         if (obj.body && typeof obj.body === "object") return JSON.stringify(obj.body);
         // Plain scalar fields — string-typed only
-        if (typeof obj.text    === "string") return obj.text;
+        const turnText = parseAgentTurnText(obj);
+        if (turnText) return turnText;
         if (typeof obj.message === "string") return obj.message;
         // Final fallback — always a string
         return JSON.stringify(obj, null, 2);

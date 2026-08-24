@@ -8,7 +8,6 @@ import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.utils.search.SearchClient;
 import com.akto.utils.search.SearchClientFactory;
-import com.opensymphony.xwork2.Action;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -69,6 +68,7 @@ public class LLMObservabilityAction extends UserAction {
     @Getter private long                       aggInputTokens     = 0;
     @Getter private long                       aggOutputTokens    = 0;
     @Getter private List<Map<String, Object>>  aggTopUsers        = new ArrayList<>();
+    @Getter private List<Map<String, Object>>  aggTopModels       = new ArrayList<>();
     @Getter private List<Map<String, Object>>  aggUserBreakdown   = new ArrayList<>();
     @Getter private List<Long>                 aggSessionSpark      = new ArrayList<>();
     @Getter private List<Long>                 aggSessionSparkTs    = new ArrayList<>();
@@ -91,7 +91,7 @@ public class LLMObservabilityAction extends UserAction {
     public String fetchSessions() {
         try {
             SearchClient client = SearchClientFactory.instance();
-            if (!client.isConfigured()) return Action.SUCCESS.toUpperCase();
+            if (!client.isConfigured()) return SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
             SearchClient.SessionsResult result = client.fetchSessions(
@@ -106,13 +106,13 @@ public class LLMObservabilityAction extends UserAction {
             logger.error("fetchSessions error: " + e.getMessage());
             sessions = new ArrayList<>();
         }
-        return Action.SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
     }
 
     public String fetchMessages() {
         try {
             SearchClient client = SearchClientFactory.instance();
-            if (!client.isConfigured()) return Action.SUCCESS.toUpperCase();
+            if (!client.isConfigured()) return SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
             messages = client.fetchMessages(accountId, startMs(), endMs(),
@@ -121,7 +121,7 @@ public class LLMObservabilityAction extends UserAction {
             logger.error("fetchMessages error: " + e.getMessage());
             messages = new ArrayList<>();
         }
-        return Action.SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
     }
 
     // ── Session-level aggregated stats (accurate cardinality + token sums) ──────
@@ -129,7 +129,7 @@ public class LLMObservabilityAction extends UserAction {
     public String fetchSessionAggStats() {
         try {
             SearchClient client = SearchClientFactory.instance();
-            if (!client.isConfigured()) return Action.SUCCESS.toUpperCase();
+            if (!client.isConfigured()) return SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
             // Sessions view always reports Atlas (endpoint) traffic, independent of the
@@ -141,6 +141,7 @@ public class LLMObservabilityAction extends UserAction {
             aggInputTokens       = stats.inputTokens;
             aggOutputTokens      = stats.outputTokens;
             aggTopUsers          = stats.topUsers;
+            aggTopModels         = stats.topModels;
             aggUserBreakdown     = stats.userBreakdown;
             aggSessionSpark      = stats.sessionSpark;
             aggSessionSparkTs    = stats.sessionSparkTs;
@@ -148,7 +149,7 @@ public class LLMObservabilityAction extends UserAction {
         } catch (Exception e) {
             logger.error("fetchSessionAggStats error: " + e.getMessage());
         }
-        return Action.SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
     }
 
     // ── Argus aggregated stats (total spans + token sums + top apps/traces + sparklines) ──
@@ -156,7 +157,7 @@ public class LLMObservabilityAction extends UserAction {
     public String fetchArgusStats() {
         try {
             SearchClient client = SearchClientFactory.instance();
-            if (!client.isConfigured()) return Action.SUCCESS.toUpperCase();
+            if (!client.isConfigured()) return SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
             // Argus view always reports non-Atlas (agent) traffic so the total here matches
@@ -176,7 +177,7 @@ public class LLMObservabilityAction extends UserAction {
         } catch (Exception e) {
             logger.error("fetchArgusStats error: " + e.getMessage());
         }
-        return Action.SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
     }
 
     // ── Spans for a single message/trace ──────────────────────────────────────
@@ -185,7 +186,7 @@ public class LLMObservabilityAction extends UserAction {
         try {
             SearchClient client = SearchClientFactory.instance();
             if (!client.isConfigured() || traceId == null || traceId.trim().isEmpty())
-                return Action.SUCCESS.toUpperCase();
+                return SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
             Boolean atlasFilter = CONTEXT_SOURCE.ENDPOINT.equals(Context.contextSource.get()) ? Boolean.TRUE : null;
@@ -193,7 +194,7 @@ public class LLMObservabilityAction extends UserAction {
         } catch (Exception e) {
             spans = new ArrayList<>();
         }
-        return Action.SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
     }
 
     // ── Filter choices (distinct values for column filters) ───────────────────
@@ -201,14 +202,14 @@ public class LLMObservabilityAction extends UserAction {
     public String fetchPromptFilters() {
         try {
             SearchClient client = SearchClientFactory.instance();
-            if (!client.isConfigured()) return Action.SUCCESS.toUpperCase();
+            if (!client.isConfigured()) return SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
             filterChoices = client.fetchPromptFilters(accountId, startMs(), endMs());
         } catch (Exception e) {
             filterChoices = new HashMap<>();
         }
-        return Action.SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
     }
 
     // ── Paginated flat prompt search ───────────────────────────────────────────
@@ -216,7 +217,7 @@ public class LLMObservabilityAction extends UserAction {
     public String searchPrompts() {
         try {
             SearchClient client = SearchClientFactory.instance();
-            if (!client.isConfigured()) return Action.SUCCESS.toUpperCase();
+            if (!client.isConfigured()) return SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
             SearchClient.SearchResult result = client.searchPrompts(
@@ -230,7 +231,7 @@ public class LLMObservabilityAction extends UserAction {
             prompts = new ArrayList<>();
             total   = 0;
         }
-        return Action.SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
     }
 
     // ── Shared helpers ────────────────────────────────────────────────────────

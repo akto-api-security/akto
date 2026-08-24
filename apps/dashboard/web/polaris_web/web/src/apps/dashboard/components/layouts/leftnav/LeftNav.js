@@ -273,7 +273,8 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_llm_observability",
                     }] : []),
-                    ...(!(func.isDemoAccount() && (dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security")) ? [
+                    // Hidden entirely in Endpoint Security (Atlas); still hidden for demo Agentic accounts.
+                    ...(dashboardCategory !== CATEGORY_ENDPOINT_SECURITY && !(func.isDemoAccount() && dashboardCategory === "Agentic Security") ? [
                     {
                         label: "Recent Changes",
                         onClick: () => {

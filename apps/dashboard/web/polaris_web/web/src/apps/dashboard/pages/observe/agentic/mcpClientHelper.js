@@ -3,7 +3,8 @@ const ASSET_TAG_KEYS = { MCP_CLIENT: 'mcp-client', AI_AGENT: 'ai-agent', BROWSER
 const SKILL_TAG_KEY = 'skill';
 
 const NOT_ATTACHED_VALUE = 'not-attached';
-const CLIENT_TYPES = { LLM: 'LLM', AI_AGENT: 'AI Agent', MCP_SERVER: 'MCP Server', SKILL: 'Skill', PLUGIN: 'Plugin' };
+const CLIENT_TYPES = { LLM: 'LLM', AI_AGENT: 'AI Agent', MCP_SERVER: 'MCP Server', SKILL: 'Skill', PLUGIN: 'Plugin', SAAS_AGENT: 'SaaS Agent' };
+const SAAS_AGENT_TAG_KEY = 'saas-agent';
 const ROW_TYPES = { AGENT: 'agent', SERVICE: 'service', SKILL: 'skill', PLUGIN: 'plugin' };
 const TYPE_TAG_TO_DISPLAY = {
     [TYPE_TAG_KEYS.MCP_SERVER]: CLIENT_TYPES.MCP_SERVER,
@@ -174,6 +175,7 @@ const getPluginNameForCollection = (collection) => {
 const getTypeFromTags = (envType) => {
     const tags = normalizeEnvType(envType);
     if (tags.length === 0) return CLIENT_TYPES.MCP_SERVER;
+    if (tags.some(tag => tag.keyName === SAAS_AGENT_TAG_KEY)) return CLIENT_TYPES.SAAS_AGENT;
     const hasSkill = tags.some(tag => tag.keyName === SKILL_TAG_KEY);
     const hasAiAgent = tags.some(tag => tag.keyName === ASSET_TAG_KEYS.AI_AGENT && tag.value !== NOT_ATTACHED_VALUE);
     const hasMcpServer = tags.some(tag => tag.keyName === TYPE_TAG_KEYS.MCP_SERVER);

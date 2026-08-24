@@ -3,6 +3,7 @@ package com.akto.action;
 import com.akto.action.guardrail.ParsedRequest;
 import com.akto.action.guardrail.ProviderAdapter;
 import com.akto.action.guardrail.ProviderRegistry;
+import com.akto.dao.AgentUsersDao;
 import com.akto.dao.context.Context;
 import com.akto.gateway.Gateway;
 import com.akto.log.LoggerMaker;
@@ -99,6 +100,7 @@ public class ProviderGuardrailAction extends ActionSupport {
      */
     private Map<String, Object> buildEnvelope(ParsedRequest frame) {
         String host = buildAgentHost(frame);
+        registerConnectorIdentity(frame);
 
         Map<String, Object> requestHeaders = new HashMap<>();
         requestHeaders.put("host", host);
@@ -210,6 +212,20 @@ public class ProviderGuardrailAction extends ActionSupport {
         }
         int at = email.indexOf('@');
         return at > 0 ? email.substring(0, at) : email;
+    }
+
+    // Self-registers this actor's email-slug into agent_users on first contact, so it becomes
+    // pickable in the existing device dropdown; fail-open, never affects the guardrails verdict.
+    private static void registerConnectorIdentity(ParsedRequest frame) {
+        try {
+            String email = extractEmail(frame.actor);
+            String slug = slugify(emailLocalPart(email));
+            if (!slug.isEmpty()) {
+                AgentUsersDao.instance.ensureConnectorIdentity(email, slug, "inference-hooks");
+            }
+        } catch (Exception e) {
+            loggerMaker.error("Provider guardrail: failed to register connector identity", e);
+        }
     }
 
     private static String extractEmail(Map<String, Object> actor) {

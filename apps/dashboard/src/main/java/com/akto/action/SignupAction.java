@@ -1334,8 +1334,11 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.info("[createUserAndRedirect] Signup record created, logging in user");
             LoginAction.loginUser(signupUserInfo.getUser(), servletResponse, false, servletRequest);
             servletRequest.setAttribute("username", userEmail);
-            logger.infoAndAddToDb("[createUserAndRedirect] Redirecting to /dashboard/onboarding");
-            servletResponse.sendRedirect("/dashboard/onboarding");
+            // Onboarding flow disabled - land new users on the dashboard directly.
+            // logger.infoAndAddToDb("[createUserAndRedirect] Redirecting to /dashboard/onboarding");
+            // servletResponse.sendRedirect("/dashboard/onboarding");
+            logger.infoAndAddToDb("[createUserAndRedirect] Redirecting to /dashboard/observe/inventory");
+            servletResponse.sendRedirect("/dashboard/observe/inventory");
         } else {
             logger.infoAndAddToDb("[createUserAndRedirect] Path: " + (user == null ? "NEW USER" : "EXISTING USER") + " with shouldLogin=true or existing user");
             logger.info("[createUserAndRedirect] invitationToAccount: " + invitationToAccount);
@@ -1568,8 +1571,11 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.info("[createUserAndRedirect] Logging in new user");
             LoginAction.loginUser(user, servletResponse, true, servletRequest);
             servletRequest.setAttribute("username", userEmail);
-            logger.infoAndAddToDb("[createUserAndRedirect] Redirecting new user to /dashboard/onboarding");
-            servletResponse.sendRedirect("/dashboard/onboarding");
+            // Onboarding flow disabled - land new users on the dashboard directly.
+            // logger.infoAndAddToDb("[createUserAndRedirect] Redirecting new user to /dashboard/onboarding");
+            // servletResponse.sendRedirect("/dashboard/onboarding");
+            logger.infoAndAddToDb("[createUserAndRedirect] Redirecting new user to /dashboard/observe/inventory");
+            servletResponse.sendRedirect("/dashboard/observe/inventory");
 
             String dashboardMode = DashboardMode.getActualDashboardMode().toString();
             String distinct_id = userEmail + "_" + dashboardMode;
