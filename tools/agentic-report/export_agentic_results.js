@@ -48,9 +48,15 @@ function emit(base, resultType, extra) {
 }
 
 // ---- Issue rows: full all-time registry ----
+// Track every (apiCollectionId,url,method,testSubType) key that's ever been flagged, so
+// the Non-Issue query below can exclude them -- an issue that happens to be passing in
+// the latest run (e.g. an Ignored one that's since been fixed) must NOT also show up as
+// a separate Non-Issue row for the same test.
+const issueKeys = new Set();
 db.testing_run_issues.find({}).toArray().forEach(issue => {
   const key = issue._id.apiInfoKey;
   const subType = issue._id.testSubCategory;
+  issueKeys.add(key.apiCollectionId + "|" + key.url + "|" + key.method + "|" + subType);
 
   let vresult = db.vulnerable_testing_run_results.findOne({
     "apiInfoKey.apiCollectionId": key.apiCollectionId,
@@ -101,6 +107,9 @@ db.testing_run_result.find({
   testRunResultSummaryId: { $in: summaryIds },
   vulnerable: false
 }).forEach(doc => {
+  const k = doc.apiInfoKey.apiCollectionId + "|" + doc.apiInfoKey.url + "|" + doc.apiInfoKey.method + "|" + doc.testSubType;
+  if (issueKeys.has(k)) return; // already emitted as an Issue row above -- don't duplicate
+
   const info = templateInfo(doc.testSubType);
   const conversationId = doc.testResults && doc.testResults[0] ? doc.testResults[0].conversationId : null;
   const hasError = doc.testResults && doc.testResults.some(t => t.errors && t.errors.length > 0);
