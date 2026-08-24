@@ -12,6 +12,7 @@ import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.data_types.*;
@@ -46,6 +47,7 @@ import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -2011,8 +2013,14 @@ public class ClientActor extends DataActor {
             BasicDBObject payloadObj;
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBObject testingRunResultsummaryMap = (BasicDBObject) payloadObj.get("testingRunResultsummaryMap");
-                return objectMapper.readValue(testingRunResultsummaryMap.toJson(), Map.class);
+                BasicDBObject testingRunResultSummaryMap = (BasicDBObject) payloadObj.get("testingRunResultSummaryMap");
+                Map<String, TestingRunResultSummary> rawMap = objectMapper.readValue(testingRunResultSummaryMap.toJson(),
+                        new TypeReference<Map<String, TestingRunResultSummary>>() {});
+                Map<ObjectId, TestingRunResultSummary> summaryMap = new HashMap<>();
+                for (Map.Entry<String, TestingRunResultSummary> entry : rawMap.entrySet()) {
+                    summaryMap.put(new ObjectId(entry.getKey()), entry.getValue());
+                }
+                return summaryMap;
             } catch(Exception e) {
                 return null;
             }
@@ -2172,6 +2180,58 @@ public class ClientActor extends DataActor {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in updateTestingRunAndMarkCompleted " + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
+
+    public List<CustomWebhook> fetchTeamsWebhooksForTestResults() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<CustomWebhook> webhookList = new ArrayList<>();
+        BasicDBObject obj = new BasicDBObject();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchTeamsWebhooksForTestResults", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchTeamsWebhooksForTestResults", LoggerMaker.LogDb.RUNTIME);
+                return webhookList;
+            }
+            try {
+                BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList webhooks = (BasicDBList) payloadObj.get("customWebhooks");
+                if (webhooks != null) {
+                    for (Object w : webhooks) {
+                        BasicDBObject obj2 = (BasicDBObject) w;
+                        webhookList.add(objectMapper.readValue(obj2.toJson(), CustomWebhook.class));
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchTeamsWebhooksForTestResults" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchTeamsWebhooksForTestResults" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return webhookList;
+    }
+
+    public void recordWebhookSendResult(int webhookId, String userEmail, int timestamp, String message, List<String> errors) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("webhookId", webhookId);
+        obj.put("userEmail", userEmail);
+        obj.put("timestamp", timestamp);
+        obj.put("message", message);
+        obj.put("errors", errors);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/recordWebhookSendResult", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in recordWebhookSendResult", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in recordWebhookSendResult " + e, LoggerMaker.LogDb.RUNTIME);
             return;
         }
     }
@@ -2516,13 +2576,17 @@ public class ClientActor extends DataActor {
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingRunResults", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response == null) {
+                loggerMaker.errorAndAddToDb("null response (all retries failed) in insertTestingRunResults", LoggerMaker.LogDb.TESTING);
+                return;
+            }
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in insertTestingRunResults", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in insertTestingRunResults: status=" + response.getStatusCode() + " body=" + responsePayload, LoggerMaker.LogDb.TESTING);
                 return;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in insertTestingRunResults" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in insertTestingRunResults" + e, LoggerMaker.LogDb.TESTING);
             return;
         }
     }
