@@ -34,8 +34,6 @@ public class CopilotStudioInventoryPublisher {
         .build();
 
     private static final MediaType JSON = MediaType.parse("application/json");
-    /** Must match extractor.go's host construction exactly, or inventory and transcript data for the same agent land in different collections. */
-    private static final String AI_AGENT_HOST_INFIX = ".ai-agent.";
     /** Informational only — carried for traceability back to the inventory row, nothing reads it. */
     private static final String BOT_ID_TAG = "bot-id";
     private static final String TAG_VALUE_TRUE = "true";
@@ -83,7 +81,7 @@ public class CopilotStudioInventoryPublisher {
             }
 
             for (String userId : userIds) {
-                samples.add(buildSample(agent, agentId, userId + AI_AGENT_HOST_INFIX + botName, environmentId, accountId, botName));
+                samples.add(buildSample(agent, agentId, userId + AIAgentConnectorConstants.AI_AGENT_HOST_INFIX + botName, environmentId, accountId, botName));
             }
         }
 

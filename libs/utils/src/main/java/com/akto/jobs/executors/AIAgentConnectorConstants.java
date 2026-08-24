@@ -110,6 +110,13 @@ public final class AIAgentConnectorConstants {
     // it via CyborgApiClient (new endpoints to be added server-side in database-abstractor).
     public static final String CONFIG_COPILOT_STUDIO_MULTI_ENV_INTEGRATION_ID = "COPILOT_STUDIO_MULTI_ENV_INTEGRATION_ID";
 
+    // Copilot Studio agent_users sync (CopilotStudioAgentUsersCron)
+    public static final int COPILOT_STUDIO_AGENT_USERS_SYNC_INTERVAL_HOURS = 3;
+    // Shared with CopilotStudioInventoryPublisher — both build the same {userId}.ai-agent.{name} host shape.
+    public static final String AI_AGENT_HOST_INFIX = ".ai-agent.";
+    // Host-segment sentinel for CopilotStudioWebhookAction when the conversation's AAD user id can't be resolved.
+    public static final String UNRESOLVED_AGENT_USER_ID = "orphan";
+
     // Configuration Keys - Salesforce
     public static final String CONFIG_SALESFORCE_URL = "SALESFORCE_URL";
     public static final String CONFIG_SALESFORCE_CONSUMER_KEY = "SALESFORCE_CONSUMER_KEY";
