@@ -25,13 +25,19 @@ public class InsightsAction extends UserAction {
     @Setter private int startTimestamp;
     @Setter private int endTimestamp;
     @Setter private String insightId;
+    @Setter private String group;
 
     @Getter private List<InsightResult> insights;
     @Getter private InsightResult insight;
 
     public String fetchInsightsList() {
         try {
-            insights = insightService.listInsights(buildContext());
+            // Atlas Discovery and the guardrail/violations set (InsightId.Group) never mix in the
+            // same list — callers that don't send `group` yet (today's three Atlas entry points)
+            // default to Atlas, so this is backward-compatible with no frontend change required.
+            InsightId.Group insightGroup = (group == null || group.isEmpty())
+                    ? InsightId.Group.ATLAS_DISCOVERY : InsightId.Group.valueOf(group);
+            insights = insightService.listInsights(buildContext(), insightGroup);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching insights list: " + e.getMessage());

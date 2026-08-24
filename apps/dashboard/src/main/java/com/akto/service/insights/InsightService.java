@@ -56,13 +56,16 @@ public class InsightService {
         return cached.bundle;
     }
 
-    public List<InsightResult> listInsights(InsightContext ctx) {
+    public List<InsightResult> listInsights(InsightContext ctx, InsightId.Group group) {
         InsightDataBundle bundle = getOrLoadBundle(ctx);
         final int accountId = ctx.getAccountId();
         final Integer userId = ctx.getUserId();
         final CONTEXT_SOURCE contextSource = ctx.getContextSource();
 
-        List<InsightProvider> providers = new ArrayList<>(InsightProviderRegistry.all().values());
+        List<InsightProvider> providers = new ArrayList<>();
+        for (InsightProvider provider : InsightProviderRegistry.all().values()) {
+            if (provider.id().getGroup() == group) providers.add(provider);
+        }
         List<Future<InsightResult>> futures = new ArrayList<>(providers.size());
         for (InsightProvider provider : providers) {
             futures.add(PROVIDER_EXECUTOR.submit(withContext(accountId, userId, contextSource,
@@ -135,6 +138,7 @@ public class InsightService {
         r.setInsightId(provider.id().name());
         r.setTitle(provider.id().getTitle());
         r.setCategory(provider.id().getCategory().name());
+        r.setGroup(provider.id().getGroup().name());
         r.setStatus(InsightResult.Status.NO_DATA.name());
         r.setHeadline("This insight could not be computed.");
         return r;

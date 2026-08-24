@@ -23,6 +23,7 @@ public class InsightResult {
     private String insightId;
     private String title;
     private String category;
+    private String group;               // InsightId.Group — ATLAS_DISCOVERY | GUARDRAIL_VIOLATIONS
     private String status;              // Status
     private String severity;
     private String headline;            // Java-built one-liner. NEVER from the LLM.
