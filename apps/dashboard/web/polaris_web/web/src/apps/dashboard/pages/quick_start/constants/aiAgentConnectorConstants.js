@@ -120,8 +120,8 @@ export const DESCRIPTION_DATABRICKS = 'Import Databricks agents seamlessly into 
 export const DESCRIPTION_SNOWFLAKE = 'Connect to your Snowflake account to discover agents using Cortex and automatically fetch data for all Snowflake agents.';
 export const DESCRIPTION_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'Connect to your GCP BigQuery to import Vertex AI Custom Deployed Model prediction logs into AKTO.';
 export const DESCRIPTION_SALESFORCE = 'Connect to your Salesforce instance to import agents and AI capabilities seamlessly into AKTO.';
-export const DESCRIPTION_ANTHROPIC = 'Use our Anthropic feature to capture traffic from Anthropic and instantly send it to your dashboard for real-time insights.';
-export const DESCRIPTION_OPENAI = 'Use our OpenAI feature to capture traffic from OpenAI and instantly send it to your dashboard for real-time insights.';
+export const DESCRIPTION_ANTHROPIC = "Pull conversation and usage data from Anthropic's Compliance API to bring employee Claude activity under Akto guardrails.";
+export const DESCRIPTION_OPENAI = "Pull conversation and usage data from OpenAI's Compliance API to bring employee ChatGPT activity under Akto guardrails.";
 
 // N8N Field Configuration
 export const N8N_FIELDS = [

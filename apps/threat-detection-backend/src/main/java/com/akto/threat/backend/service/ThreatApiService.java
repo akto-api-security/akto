@@ -172,14 +172,31 @@ public class ThreatApiService {
 
     pipeline.add(new Document("$match", match));
 
-    // 3. Group by category and subCategory
+    // 3. Collapse misconfiguration re-detections (same host+actor+setting) to one before counting
+    if ("ENDPOINT".equalsIgnoreCase(contextSource)) {
+      Document isConfigEvent = new Document("$regexMatch",
+          new Document("input", new Document("$ifNull", Arrays.asList("$latestApiEndpoint", "")))
+              .append("regex", "/config/"));
+
+      Document dedupeKey = new Document("$cond", Arrays.asList(
+          isConfigEvent,
+          new Document("host", "$host").append("actor", "$actor").append("latestApiEndpoint", "$latestApiEndpoint"),
+          new Document("uniqueId", "$_id")));
+
+      pipeline.add(new Document("$group",
+          new Document("_id", dedupeKey)
+              .append("category", new Document("$first", "$category"))
+              .append("subCategory", new Document("$first", "$subCategory"))));
+    }
+
+    // 4. Group by category and subCategory
     pipeline.add(new Document("$group",
         new Document("_id",
             new Document("category", "$category")
             .append("subCategory", "$subCategory"))
             .append("count", new Document("$sum", 1))));
 
-    // 4. Sort by count descending
+    // 5. Sort by count descending
     pipeline.add(new Document("$sort", new Document("count", -1)));
 
     List<ThreatCategoryWiseCountResponse.SubCategoryCount> categoryWiseCounts = new ArrayList<>();

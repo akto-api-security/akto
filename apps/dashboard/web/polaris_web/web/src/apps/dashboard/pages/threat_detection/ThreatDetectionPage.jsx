@@ -325,7 +325,8 @@ function ThreatDetectionPage() {
             }
         }
         const specialAccounts = [1776384040, 1776625569, 1776626846];
-        return specialAccounts.includes(Number(window.ACTIVE_ACCOUNT)) ? values.ranges[4] : values.ranges[2];
+        if (specialAccounts.includes(Number(window.ACTIVE_ACCOUNT))) return values.ranges[4];
+        return func.getLast30DaysRange();
     }, [location.state, searchParams]);
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
 
@@ -354,7 +355,7 @@ function ThreatDetectionPage() {
     const [pendingRowContext, setPendingRowContext] = useState(null);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
-    const showNewLayoutToggle = (func.isDemoAccount() || [1000000, 1726615470, 1779231193, 1776886416].includes(window.ACTIVE_ACCOUNT)) && isEndpointSecurityCategory();
+    const showNewLayoutToggle = isEndpointSecurityCategory();
     const newLayout = LocalStore((state) => state.guardrailViolationsNewLayout);
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 

@@ -266,6 +266,7 @@ class ModelMapScanner:
         "safety",
         "categories",
         "matchedTopic",
+        "matchedCategory",
         "prob_distribution",
         "confidence_source",
         "decision_confidence",

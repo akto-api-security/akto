@@ -607,10 +607,42 @@ public class MaliciousEventService {
         + "|" + DashboardFilterCache.bucketDay(startTs)
         + "|" + DashboardFilterCache.bucketDay(endTs);
 
-    long total = maliciousEventDao.countDocuments(accountId, query);
+    // Misconfigured Settings tab: config-scanner findings get re-reported on every fsnotify/login
+    // event for as long as the misconfiguration is unmitigated, producing many identical rows
+    // (same host, same actor, same setting). Collapse to one row per {host, actor,
+    // latestApiEndpoint} — latestApiEndpoint already identifies the specific misconfigured
+    // setting (e.g. "/claude/config/skipDangerousModePermissionPrompt"), so it stands in for
+    // "agentic component + rule violated" — keeping only the latest occurrence. A different actor
+    // (username) on the same host/setting still gets its own row.
+    boolean dedupeLatestPerHostActorEndpoint = "only".equalsIgnoreCase(configEvalMode)
+        && "ENDPOINT".equalsIgnoreCase(contextSource);
 
+    Document dedupeGroupKey = new Document("host", "$host")
+        .append("actor", "$actor")
+        .append("latestApiEndpoint", "$latestApiEndpoint");
+
+    long total;
     MongoCursor<MaliciousEventDto> cursor;
-    if (sortBySeverity) {
+    if (dedupeLatestPerHostActorEndpoint) {
+      MongoCursor<Document> countCursor = maliciousEventDao.aggregateRaw(accountId, Arrays.asList(
+          new Document("$match", query),
+          new Document("$group", new Document("_id", dedupeGroupKey)),
+          new Document("$count", "total")
+      )).cursor();
+      total = countCursor.hasNext() ? ((Number) countCursor.next().get("total")).longValue() : 0;
+      countCursor.close();
+
+      cursor = maliciousEventDao.getCollection(accountId).aggregate(Arrays.asList(
+          new Document("$match", query),
+          new Document("$sort", new Document("detectedAt", -1)),
+          new Document("$group", new Document("_id", dedupeGroupKey).append("doc", new Document("$first", "$$ROOT"))),
+          new Document("$replaceRoot", new Document("newRoot", "$doc")),
+          new Document("$sort", new Document("detectedAt", sort.getOrDefault("detectedAt", -1))),
+          new Document("$skip", skip),
+          new Document("$limit", limit)
+      )).cursor();
+    } else if (sortBySeverity) {
+      total = maliciousEventDao.countDocuments(accountId, query);
       // Use aggregation pipeline for custom severity sorting
       cursor = maliciousEventDao.getCollection(accountId)
           .aggregate(Arrays.asList(
@@ -632,6 +664,7 @@ public class MaliciousEventService {
           ))
           .cursor();
     } else {
+      total = maliciousEventDao.countDocuments(accountId, query);
       cursor = maliciousEventDao.getCollection(accountId)
           .find(query)
           .sort(new Document("detectedAt", sort.getOrDefault("detectedAt", -1)))

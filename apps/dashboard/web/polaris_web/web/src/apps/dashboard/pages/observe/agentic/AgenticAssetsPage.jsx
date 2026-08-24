@@ -76,10 +76,10 @@ const COL_DEFS = [
     width: 140,
     // Fixed, small enum (AgenticObserveUtil.CLIENT_TYPE_*) — no need to derive values from data.
     filter: "agSetColumnFilter",
-    filterParams: { values: ["AI Agent", "MCP Server", "LLM", "Skill", "Plugin"] },
+    filterParams: { values: ["AI Agent", "SaaS Agent", "MCP Server", "LLM", "Skill", "Plugin"] },
     sortable: false,
     cellRenderer: TypeBadgeCellRenderer,
-    cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL", "Plugin": "agentic-type-PLUGIN" })[p.value] || "agentic-type-DEFAULT",
+    cellClass: (p) => ({ "AI Agent": "agentic-type-AGENT", "SaaS Agent": "agentic-type-SAAS_AGENT", "MCP Server": "agentic-type-MCP", "LLM": "agentic-type-LLM", "Skill": "agentic-type-SKILL", "Plugin": "agentic-type-PLUGIN" })[p.value] || "agentic-type-DEFAULT",
     cellStyle: { display: "flex", alignItems: "center" },
   },
   {
@@ -557,7 +557,7 @@ export default function AgenticAssetsPage() {
 
   const pageTitle = (
     <TitleWithInfo
-      tooltipContent="All agentic assets observed across your environment — AI Agents, MCP Servers, LLMs, and Skills."
+      tooltipContent="All agentic assets observed across your environment — AI Agents, SaaS Agents, MCP Servers, LLMs, and Skills."
       titleText="Agentic assets"
     />
   );
@@ -566,6 +566,7 @@ export default function AgenticAssetsPage() {
 
   const assetTypeBreakdown = useMemo(() => [
     { label: "Agents",      count: stats.countsByType["AI Agent"] || 0,   color: "#9642FC",  key: "AI Agent" },
+    { label: "SaaS Agents", count: stats.countsByType["SaaS Agent"] || 0, color: "#DB2777",  key: "SaaS Agent" },
     { label: "MCP Servers", count: stats.countsByType["MCP Server"] || 0, color: "#4cbebb",  key: "MCP Server" },
     { label: "LLMs",        count: stats.countsByType["LLM"] || 0,        color: "#EAB308",  key: "LLM" },
     { label: "Skills",      count: stats.countsByType["Skill"] || 0,      color: "#D1D5DB",  key: "Skill" },

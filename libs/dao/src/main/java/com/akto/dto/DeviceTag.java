@@ -12,6 +12,7 @@ import lombok.Setter;
 public class DeviceTag {
 
     public static final String SOURCE_MANUAL = "manual";
+    public static final String SOURCE_INFERENCE_HOOKS = "inference-hooks";
 
     public static final String KEY = "key";
     public static final String VALUE = "value";

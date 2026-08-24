@@ -187,7 +187,8 @@ function bucketFromAuditType(type) {
 // Fallback when no audit record matches — mirrors getMethod() in GetPrettifyEndpoint.jsx.
 // MCP protocol endpoints (/mcp/initialize, /mcp/tools/list) are Server-type infrastructure.
 function bucketFromUrl(url) {
-    const u = String(url || "").toLowerCase();
+    // Path only — a query string (e.g. Gemini's "bl=...-server_...") can false-match these keywords.
+    const u = String(url || "").split("?")[0].toLowerCase();
     if (u.includes("skill")) return "Skill";
     if (u.includes("resource")) return "Resource";
     if (u.includes("prompt")) return "Prompt";
