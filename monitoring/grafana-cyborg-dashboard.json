@@ -83,6 +83,27 @@
         "refresh": 2,
         "sort": 1,
         "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(http_requests_total{service=\"cyborg\"}, account_id)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Account",
+        "multi": true,
+        "name": "account_id",
+        "options": [],
+        "query": {
+          "query": "label_values(http_requests_total{service=\"cyborg\"}, account_id)",
+          "refId": "account_id"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "type": "query"
       }
     ]
   },
@@ -329,7 +350,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(rate(http_requests_total{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}[1m]))"
+          "expr": "sum(rate(http_requests_total{service=\"cyborg\", account_id=~\"$account_id\", role=~\"$role\", instance=~\"$instance\"}[1m]))"
         }
       ]
     },
@@ -380,7 +401,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(rate(http_requests_total{service=\"cyborg\", status!~\"2..\", role=~\"$role\", instance=~\"$instance\"}[5m]))"
+          "expr": "sum(rate(http_requests_total{service=\"cyborg\", account_id=~\"$account_id\", status!~\"2..\", role=~\"$role\", instance=~\"$instance\"}[5m]))"
         }
       ]
     },
@@ -429,7 +450,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (status) (rate(http_requests_total{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}[1m]))",
+          "expr": "sum by (status) (rate(http_requests_total{service=\"cyborg\", account_id=~\"$account_id\", role=~\"$role\", instance=~\"$instance\"}[1m]))",
           "legendFormat": "{{status}}"
         }
       ]
@@ -669,7 +690,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (uri) (rate(http_requests_total{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval]))",
+          "expr": "sum by (uri) (rate(http_requests_total{service=\"cyborg\", account_id=~\"$account_id\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval]))",
           "legendFormat": "{{uri}}"
         }
       ]
@@ -721,7 +742,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "histogram_quantile(0.90, sum by (le, uri) (rate(http_request_duration_seconds_bucket{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.90, sum by (le, uri) (rate(http_request_duration_seconds_bucket{service=\"cyborg\", account_id=~\"$account_id\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval])))",
           "legendFormat": "{{uri}}"
         }
       ]
@@ -773,7 +794,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (uri) (rate(http_request_size_bytes_sum{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval])) / sum by (uri) (rate(http_request_size_bytes_count{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval]))",
+          "expr": "sum by (uri) (rate(http_request_size_bytes_sum{service=\"cyborg\", account_id=~\"$account_id\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval])) / sum by (uri) (rate(http_request_size_bytes_count{service=\"cyborg\", account_id=~\"$account_id\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval]))",
           "legendFormat": "{{uri}}"
         }
       ]
@@ -825,8 +846,60 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (uri) (rate(http_request_size_bytes_sum{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval]))",
+          "expr": "sum by (uri) (rate(http_request_size_bytes_sum{service=\"cyborg\", account_id=~\"$account_id\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval]))",
           "legendFormat": "{{uri}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Request rate by account (top 10)",
+      "description": "Top accounts by request rate.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 67
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "lineWidth": 1
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "topk(10, sum by (account_id) (rate(http_requests_total{service=\"cyborg\", account_id=~\"$account_id\", role=~\"$role\", instance=~\"$instance\"}[$__rate_interval])))",
+          "legendFormat": "{{account_id}}"
         }
       ]
     }
