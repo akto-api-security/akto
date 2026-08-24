@@ -61,6 +61,17 @@ export default function LLMObservability() {
     const [sessionStats, setSessionStats] = useState(null);
     const [loading, setLoading] = useState(true);
 
+    // Read traceId once on mount — deep-links a real-invocation trace (e.g. an insight CTA)
+    // straight into the Argus trace flyout. ArgusTraceFlyout only renders in the isArgus branch,
+    // so opening one from anywhere else must force the category over, same technique urlFilters
+    // above uses for the Atlas/username-topic-subTopic case, just pointed the other way.
+    const [initialTraceId] = useState(() => new URLSearchParams(window.location.search).get("traceId"));
+    useEffect(() => {
+        if (!initialTraceId) return;
+        setDashboardCategory(CATEGORY_AGENTIC_SECURITY);
+        setSelectedTrace({ traceId: initialTraceId });
+    }, [initialTraceId, setDashboardCategory]);
+
     useEffect(() => {
         fetchGuardrailPolicyNamesCached();
     }, []);

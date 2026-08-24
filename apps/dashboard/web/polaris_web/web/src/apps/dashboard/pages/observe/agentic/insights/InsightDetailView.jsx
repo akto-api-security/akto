@@ -13,8 +13,8 @@ import "../../../../components/layouts/style.css";
 // this component never reformats a number itself.
 const MetricCard = React.memo(function MetricCard({ metric }) {
     return (
-        <Box style={{ flex: 1, minWidth: 0 }} borderWidth="1" borderColor="border-subdued" borderRadius="2" padding="3">
-            <VerticalStack gap="1">
+        <Box style={{ flex: 1, minWidth: 0 }} borderWidth="1" borderColor="border-subdued" borderRadius="2" padding="4">
+            <VerticalStack gap="2">
                 <Text variant="bodySm" color="subdued">{metric.label}</Text>
                 <Text variant="headingLg" as="p">{metric.formatted}</Text>
             </VerticalStack>
@@ -53,8 +53,13 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
             .finally(() => { if (!unmountedRef.current) setRegenerating(false); });
     }, [insightId, startTimestamp, endTimestamp]);
 
-    const handleCtaClick = useCallback((href) => {
-        if (href) navigate(href);
+    const handleCtaClick = useCallback((cta) => {
+        if (!cta?.route) return;
+        if (cta.kind === "GUARDRAIL_TEMPLATE") {
+            navigate(cta.route, { state: { topicGuardrailPrefill: cta.params || {} } });
+        } else if (cta.href) {
+            navigate(cta.href);
+        }
     }, [navigate]);
 
     const ctas = useMemo(
@@ -79,10 +84,10 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
     const hasNarrative = detail.narrativeStatus === "OK" && !!detail.markdown;
 
     return (
-        <Box style={{ flex: 1, minHeight: 0, overflowY: "auto" }} padding="4">
+        <Box style={{ flex: 1, minHeight: 0, overflowY: "auto" }} padding="5">
             <VerticalStack gap="5">
                 {detail.metrics?.length > 0 && (
-                    <HorizontalStack gap="3" wrap>
+                    <HorizontalStack gap="4" wrap>
                         {detail.metrics.map((metric) => (
                             <MetricCard key={metric.key} metric={metric} />
                         ))}
@@ -149,7 +154,7 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
                                 key={cta.id}
                                 primary={cta.primary}
                                 icon={ExternalMinor}
-                                onClick={() => handleCtaClick(cta.href)}
+                                onClick={() => handleCtaClick(cta)}
                             >
                                 {cta.label}
                             </Button>

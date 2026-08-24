@@ -10,7 +10,7 @@ import { STATUS_BADGE_STATUS, statusLabel, categoryLabel } from "./insightsHelpe
 
 // Atlas Insights — the "Insights" button's flyout. One AgenticFlyoutShell instance whose body
 // switches between the list and a selected insight's detail; the header switches with it.
-export default function InsightsFlyout({ show, onClose, startTimestamp, endTimestamp }) {
+export default function InsightsFlyout({ show, onClose, startTimestamp, endTimestamp, initialInsightId = null }) {
     const [insights, setInsights] = useState([]);
     const [listLoading, setListLoading] = useState(false);
     const [listError, setListError] = useState(false);
@@ -27,9 +27,9 @@ export default function InsightsFlyout({ show, onClose, startTimestamp, endTimes
 
     useEffect(() => {
         if (!show) return;
-        setSelectedInsightId(null);
+        setSelectedInsightId(initialInsightId);
         loadList();
-    }, [show, loadList]);
+    }, [show, initialInsightId, loadList]);
 
     const handleSelectInsight = useCallback((insightId) => setSelectedInsightId(insightId), []);
     const handleBackToList = useCallback(() => setSelectedInsightId(null), []);
@@ -40,7 +40,7 @@ export default function InsightsFlyout({ show, onClose, startTimestamp, endTimes
     );
 
     const header = useMemo(() => (
-        <Box padding="4" borderBlockEndWidth="1" borderColor="border-subdued">
+        <Box padding="5" borderBlockEndWidth="1" borderColor="border-subdued">
             <VerticalStack gap="3">
                 <HorizontalStack align="space-between" blockAlign="start" wrap={false}>
                     {selectedInsight ? (

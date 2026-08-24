@@ -2,23 +2,28 @@ import React, { useState, useMemo, useCallback } from "react";
 import { Box, VerticalStack, HorizontalStack, Text, Badge, Tabs, Icon, Banner } from "@shopify/polaris";
 import { ChevronRightMinor } from "@shopify/polaris-icons";
 import { SeverityBadge } from "../AgenticCellRenderers";
-import { STATUS_BADGE_STATUS, statusLabel, categoryLabel } from "./insightsHelpers";
+import { categoryLabel } from "./insightsHelpers";
+import "../../../../components/layouts/style.css";
 
 const InsightRow = React.memo(function InsightRow({ insight, onSelect }) {
     const handleClick = useCallback(() => onSelect(insight.insightId), [insight.insightId, onSelect]);
     const headline = insight.headline || (insight.metrics && insight.metrics[0]?.formatted) || "";
+    const severity = String(insight.severity || "").toUpperCase();
 
     return (
         <Box
             className="insight-row"
-            padding="4"
+            paddingBlock="4"
+            paddingInlineStart="5"
+            paddingInlineEnd="6"
             borderBlockEndWidth="1"
             borderColor="border-subdued"
             onClick={handleClick}
         >
-            <HorizontalStack align="space-between" blockAlign="center" gap="4" wrap={false}>
-                <Box minWidth="0">
-                    <VerticalStack gap="1">
+            <HorizontalStack gap="4" wrap={false}>
+                <div className={`insight-severity-bar insight-severity-bar-${severity || "DEFAULT"}`} />
+                <Box minWidth="0" style={{ flex: 1 }}>
+                    <VerticalStack gap="2">
                         <HorizontalStack gap="2" blockAlign="center" wrap>
                             <Text variant="bodyMd" fontWeight="semibold">{insight.title}</Text>
                             <Badge>{categoryLabel(insight.category)}</Badge>
@@ -29,10 +34,7 @@ const InsightRow = React.memo(function InsightRow({ insight, onSelect }) {
                         ) : null}
                     </VerticalStack>
                 </Box>
-                <HorizontalStack gap="3" blockAlign="center" wrap={false}>
-                    <Badge status={STATUS_BADGE_STATUS[insight.status]}>{statusLabel(insight.status)}</Badge>
-                    <Icon source={ChevronRightMinor} color="subdued" />
-                </HorizontalStack>
+                <Icon source={ChevronRightMinor} color="subdued" />
             </HorizontalStack>
         </Box>
     );
@@ -70,12 +72,12 @@ export default function InsightsListView({ insights, error, onSelect }) {
 
     return (
         <Box style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <Box paddingInlineStart="4" paddingInlineEnd="4">
+            <Box padding="4">
                 <Tabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange} />
             </Box>
             <Box style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
                 {visibleInsights.length === 0 ? (
-                    <Box padding="8">
+                    <Box padding="10">
                         <Text variant="bodyMd" color="subdued" alignment="center">No insights in this category.</Text>
                     </Box>
                 ) : (

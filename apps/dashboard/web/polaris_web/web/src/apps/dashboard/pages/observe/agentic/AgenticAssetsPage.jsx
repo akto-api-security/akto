@@ -328,6 +328,7 @@ export default function AgenticAssetsPage() {
   const [insightsOpen, setInsightsOpen] = useState(false);
   const handleOpenInsights = useCallback(() => setInsightsOpen(true), []);
   const handleCloseInsights = useCallback(() => setInsightsOpen(false), []);
+  const dashboardInsightsGranted = func.checkForFeatureSaas("DASHBOARD_INSIGHTS");
   const [loading, setLoading] = useState(true);
   const [hostSeverityCounts, setHostSeverityCounts] = useState({});
   const [stats, setStats] = useState({ totalAssets: 0, countsByType: {} });
@@ -557,7 +558,9 @@ export default function AgenticAssetsPage() {
           })
         }
       />
-      <Button icon={MagicMinor} onClick={handleOpenInsights}>Atlas Insights</Button>
+      {dashboardInsightsGranted && (
+        <Button icon={MagicMinor} onClick={handleOpenInsights}>Atlas Insights</Button>
+      )}
     </HorizontalStack>
   );
 
@@ -700,12 +703,14 @@ export default function AgenticAssetsPage() {
           />,
         ]}
       />
-      <InsightsFlyout
-        show={insightsOpen}
-        onClose={handleCloseInsights}
-        startTimestamp={startTimestamp}
-        endTimestamp={endTimestamp}
-      />
+      {dashboardInsightsGranted && (
+        <InsightsFlyout
+          show={insightsOpen}
+          onClose={handleCloseInsights}
+          startTimestamp={startTimestamp}
+          endTimestamp={endTimestamp}
+        />
+      )}
     </>
   );
 }
