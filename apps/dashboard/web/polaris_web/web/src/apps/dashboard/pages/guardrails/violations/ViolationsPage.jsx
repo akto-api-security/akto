@@ -35,7 +35,7 @@ import SessionStore from "@/apps/main/SessionStore";
 import LocalStore from "@/apps/main/LocalStorageStore";
 import guardrailApi from "@/apps/dashboard/pages/guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "@/apps/dashboard/pages/guardrails/utils";
-import { resolveComplianceClauseMap, mergePolicyComplianceMap } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
+import { resolveComplianceClauseMap, loadGuardrailComplianceMap } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
 import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
 
@@ -926,7 +926,6 @@ function Violations() {
     // Mirrors SusDataTable.jsx (old UI) exactly — approveRow holds the raw row being approved.
     const guardrailApprovedByPolicy = SessionStore((state) => state.guardrailApprovedByPolicy);
     const setGuardrailApprovedByPolicy = SessionStore((state) => state.setGuardrailApprovedByPolicy);
-    const setGuardrailComplianceMap = SessionStore((state) => state.setGuardrailComplianceMap);
     const [approveRow, setApproveRow] = useState(null);
     const [approveMode, setApproveMode] = useState("ALWAYS"); // ALWAYS | DURATION
     const [approveDays, setApproveDays] = useState("7");
@@ -953,26 +952,15 @@ function Violations() {
         refreshApprovedByPolicy();
     }, [refreshApprovedByPolicy]);
 
-    // Compliance clauses for the Compliance column. Same two sources the old UI's SusDataTable
-    // uses: per-capability infos, merged with any clauses defined on the policies themselves.
+    // Compliance clauses for the Compliance column. Shared loader (formatUtils.js) - was
+    // copy-pasted here from SusDataTable.jsx/ThreatCompliancePage.jsx; centralised so there's
+    // one fetch, and skipped entirely if a prior page already populated the SessionStore map.
     useEffect(() => {
-        Promise.all([
-            threatDetectionApi.fetchGuardrailComplianceInfos(),
-            guardrailApi.fetchGuardrailPolicies(),
-        ]).then(([complianceResp, policiesResp]) => {
-            const capabilityMap = {};
-            (complianceResp?.guardrailComplianceInfos || []).forEach((entry) => {
-                const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
-                if (capability) capabilityMap[capability] = entry.mapComplianceToListClauses;
-            });
-            mergePolicyComplianceMap(capabilityMap, policiesResp?.guardrailPolicies);
+        loadGuardrailComplianceMap().then((capabilityMap) => {
             guardrailComplianceMapRef.current = capabilityMap;
-            setGuardrailComplianceMap(capabilityMap);
             triggerTableRefresh();
-        }).catch((error) => {
-            console.error('Error loading guardrail compliance:', error);
         });
-    }, [setGuardrailComplianceMap, triggerTableRefresh]);
+    }, [triggerTableRefresh]);
 
     const submitInlineApprove = useCallback(async () => {
         const policyName = approveRow?.filterId;
