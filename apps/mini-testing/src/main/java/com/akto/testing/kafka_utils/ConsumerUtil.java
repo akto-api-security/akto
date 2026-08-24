@@ -149,16 +149,23 @@ public class ConsumerUtil {
 
                 // RUN_TEST: full test execution wall + CPU; sub-phases (resolveExpr/sendReq/validate)
                 // are accumulated on this worker thread via TestPhaseTimer and read back after.
+                // The recording is in a finally so a test that TIMES OUT / is interrupted / throws
+                // (e.g. stuck grinding in resolveWordListVar) still gets its partial phase timings
+                // counted once it unwinds — otherwise the COST line only ever sees fast completers.
                 TestPhaseTimer.reset();
                 long runCpuStart = CPU_TIME_SUPPORTED ? THREAD_MX.getCurrentThreadCpuTime() : -1L;
                 long runWallStart = System.nanoTime();
-                TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
-                metrics.recordStage(Stage.RUN_TEST, System.nanoTime() - runWallStart);
-                metrics.recordStage(Stage.RESOLVE_EXPR, TestPhaseTimer.resolveExprNanos());
-                metrics.recordStage(Stage.SEND_REQUEST, TestPhaseTimer.sendReqNanos());
-                metrics.recordStage(Stage.VALIDATE, TestPhaseTimer.validateNanos());
-                metrics.recordRequests(TestPhaseTimer.sendReqCount());
-                if (runCpuStart >= 0) metrics.recordRunTestCpu(THREAD_MX.getCurrentThreadCpuTime() - runCpuStart);
+                TestingRunResult runResult;
+                try {
+                    runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
+                } finally {
+                    metrics.recordStage(Stage.RUN_TEST, System.nanoTime() - runWallStart);
+                    metrics.recordStage(Stage.RESOLVE_EXPR, TestPhaseTimer.resolveExprNanos());
+                    metrics.recordStage(Stage.SEND_REQUEST, TestPhaseTimer.sendReqNanos());
+                    metrics.recordStage(Stage.VALIDATE, TestPhaseTimer.validateNanos());
+                    metrics.recordRequests(TestPhaseTimer.sendReqCount());
+                    if (runCpuStart >= 0) metrics.recordRunTestCpu(THREAD_MX.getCurrentThreadCpuTime() - runCpuStart);
+                }
 
                 long persistStart = System.nanoTime();
                 executor.persistTestLogsToDb(runResult != null ? runResult.getTestLogs() : null);
@@ -350,9 +357,12 @@ public class ConsumerUtil {
                     String recordId = record.getSingleConsumerRecord().topic() + "-p" + record.getSingleConsumerRecord().partition() + "-o" + record.offset();
                     metrics.onPolled();
                     String label;
+                    String subcategory = "unknown", api = "unknown";
                     try {
                         SingleTestPayload p = parseTestMessage(message);
-                        label = p.getSubcategory() + " " + p.getApiInfoKey();
+                        subcategory = p.getSubcategory();
+                        api = p.getApiInfoKey().toString();
+                        label = subcategory + " " + api;
                     } catch (Exception ex) {
                         label = recordId;
                     }
@@ -360,7 +370,7 @@ public class ConsumerUtil {
                     debugLogToDb(accountId, "picked up recordId=" + recordId + " polled=" + metrics.polled());
                     try {
                         if(!executor.isShutdown()){
-                            metrics.onSubmit(recordId, label, threadName);
+                            metrics.onSubmit(recordId, subcategory, api, threadName);
                             Future<?> future = executor.submit(() -> runTestFromMessage(message));
                             firstRecordRead.set(true);
                             try {
