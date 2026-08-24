@@ -2,7 +2,9 @@ package com.akto.testing.kafka_utils;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -69,10 +71,14 @@ public class TestRunMetrics {
 
     private static final class InflightTask {
         final String label;      // "subcategory apiInfoKey"
+        final String subcategory;
+        final String api;
         final long startMs;
         final String threadName;
-        InflightTask(String label, long startMs, String threadName) {
-            this.label = label;
+        InflightTask(String subcategory, String api, long startMs, String threadName) {
+            this.subcategory = subcategory;
+            this.api = api;
+            this.label = subcategory + " " + api;
             this.startMs = startMs;
             this.threadName = threadName;
         }
@@ -144,8 +150,8 @@ public class TestRunMetrics {
     }
 
     /** A task was submitted to the executor; start tracking it as in-flight. */
-    public void onSubmit(String recordId, String label, String threadName) {
-        inflightTasks.put(recordId, new InflightTask(label, System.currentTimeMillis(), threadName));
+    public void onSubmit(String recordId, String subcategory, String api, String threadName) {
+        inflightTasks.put(recordId, new InflightTask(subcategory, api, System.currentTimeMillis(), threadName));
     }
 
     /** A task finished (any outcome); stop tracking it and fold its wall-clock into the timing aggregates. */
@@ -403,5 +409,34 @@ public class TestRunMetrics {
         if (tasks.size() > limit) sb.append(" (+").append(tasks.size() - limit).append(" more)");
 
         loggerMaker.warnAndAddToDb(sb.toString());
+
+        // Reuse the in-flight registry to show WHICH subcategories / APIs are occupying the stuck slots
+        // right now. Watched across successive STALL prints (every ~30s), a subcategory/API that keeps
+        // dominating is one that "always gets stuck"; a shifting mix means it's load-dependent.
+        int stuckNow = 0;
+        for (InflightTask t : tasks) if (nowMs - t.startMs >= STUCK_AGE_MS) stuckNow++;
+        loggerMaker.warnAndAddToDb("TESTRUN STALL-BY-SUBCAT summaryId=" + summaryId
+                + " stuckSlots=" + stuckNow + " bySubcat=[" + topStuck(tasks, nowMs, true) + "]");
+        loggerMaker.warnAndAddToDb("TESTRUN STALL-BY-API summaryId=" + summaryId
+                + " stuckSlots=" + stuckNow + " byApi=[" + topStuck(tasks, nowMs, false) + "]");
+    }
+
+    /** Count the currently-stuck (age >= STUCK_AGE_MS) in-flight tasks by subcategory or api, top-15 by count. */
+    private String topStuck(List<InflightTask> tasks, long nowMs, boolean bySubcat) {
+        Map<String, Integer> counts = new HashMap<>();
+        for (InflightTask t : tasks) {
+            if (nowMs - t.startMs < STUCK_AGE_MS) continue;
+            counts.merge(bySubcat ? t.subcategory : t.api, 1, Integer::sum);
+        }
+        List<Map.Entry<String, Integer>> list = new ArrayList<>(counts.entrySet());
+        list.sort((a, b) -> Integer.compare(b.getValue(), a.getValue())); // highest count first
+        StringBuilder sb = new StringBuilder();
+        int n = Math.min(15, list.size());
+        for (int i = 0; i < n; i++) {
+            sb.append(list.get(i).getKey()).append("=").append(list.get(i).getValue());
+            if (i < n - 1) sb.append(", ");
+        }
+        if (list.size() > n) sb.append(" (+").append(list.size() - n).append(" more)");
+        return sb.toString();
     }
 }
