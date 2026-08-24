@@ -1,18 +1,27 @@
 package com.akto.service.insights.providers;
 
+import com.akto.dao.ApiInfoDao;
+import com.akto.dao.SampleDataDao;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.GuardrailPolicies;
-import com.akto.dto.McpAuditInfo;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.service.insights.*;
+import com.mongodb.client.model.Filters;
 
 import java.util.*;
 
 /**
- * Users reachable through MCP tools carrying a dangerous capability, and how many of
- * those tools have no blocking guardrail. Built-in agent tools (Bash, Read, ...) are
- * NOT included — that inventory needs an account-wide ApiInfo /tool/* scan this pass
- * deliberately left out; reported as a data gap rather than silently omitted.
+ * Users reachable through MCP tools whose sample traffic shows a dangerous intent, and how
+ * many of those tools have no blocking guardrail. Scoped to ApiCollections tagged as MCP
+ * servers (ApiCollection.isMcpCollection()) — built-in agent tools (Bash, Read, ...) are
+ * NOT included, since they don't live in any ApiCollection; reported as a data gap rather
+ * than silently omitted. Classification is deferred to DETAIL scope only, since it costs one
+ * LLM call per unclassified tool (InsightClassificationHelper.classifyToolDanger).
  */
 public class DangerousCapabilityExposureProvider extends AbstractInsightProvider {
+
+    private static final int MAX_TOOLS_CLASSIFIED = 50;
 
     public DangerousCapabilityExposureProvider() { super(InsightId.DANGEROUS_CAPABILITY_EXPOSURE, 1); }
 
@@ -20,47 +29,58 @@ public class DangerousCapabilityExposureProvider extends AbstractInsightProvider
     public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope) {
         InsightResult r = skeleton();
 
-        List<McpAuditInfo> tools = new ArrayList<>();
-        for (McpAuditInfo a : bundle.auditRows) {
-            if ("mcp-tool".equals(a.getType()) && a.getResourceName() != null) tools.add(a);
+        Map<Integer, ApiCollection> mcpCollectionById = new HashMap<>();
+        for (ApiCollection c : bundle.collections) {
+            if (c.isMcpCollection()) mcpCollectionById.put(c.getId(), c);
         }
 
-        int classified = 0, unclassified = 0, dangerous = 0, ungated = 0;
+        List<ApiInfo> tools = mcpCollectionById.isEmpty() ? Collections.emptyList() :
+                ApiInfoDao.instance.findAll(Filters.in(SingleTypeInfo._COLLECTION_IDS, mcpCollectionById.keySet()));
+
+        int unclassified = 0, dangerous = 0, ungated = 0, classified = 0;
         Set<String> usersReachable = new HashSet<>();
         List<Map<String, Object>> rows = new ArrayList<>();
         List<GuardrailPolicies> policies = bundle.policies;
 
-        for (McpAuditInfo tool : tools) {
-            String capability = InsightUtil.builtinToolCapability(tool.getResourceName());
-            if (capability == null) {
-                if (scope == Scope.DETAIL) {
-                    capability = InsightClassificationHelper.classifyToolCapability(tool.getResourceName(), null);
-                } else {
-                    unclassified++;
-                    continue;
-                }
+        for (ApiInfo tool : tools) {
+            ApiInfo.ApiInfoKey key = tool.getId();
+            if (key == null || key.getUrl() == null || key.getMethod() == null) continue;
+            ApiCollection collection = mcpCollectionById.get(key.getApiCollectionId());
+            if (collection == null) continue;
+
+            if (scope != Scope.DETAIL || classified >= MAX_TOOLS_CLASSIFIED) {
+                unclassified++;
+                continue;
             }
             classified++;
-            if (!InsightUtil.isDangerousCapability(capability)) continue;
+
+            String sampleData = SampleDataDao.getLatestSampleData(key.getApiCollectionId(), key.getUrl(), key.getMethod().name());
+            if (sampleData == null) {
+                unclassified++;
+                continue;
+            }
+
+            String toolName = InsightUtil.toolDisplayName(key.getUrl());
+            InsightClassificationHelper.ToolDangerVerdict verdict = InsightClassificationHelper.classifyToolDanger(toolName, sampleData);
+            if (!verdict.dangerous) continue;
             dangerous++;
 
+            String hostName = collection.getHostName();
             boolean gated = false;
             for (GuardrailPolicies p : policies) {
-                if (InsightUtil.isBlockingPolicy(p) && InsightUtil.policyCoversHost(p, tool.getMcpHost())) { gated = true; break; }
+                if (InsightUtil.isBlockingPolicy(p) && InsightUtil.policyCoversHost(p, hostName)) { gated = true; break; }
             }
             if (!gated) ungated++;
 
-            for (com.akto.dto.ApiCollection c : bundle.collectionsForServiceName(tool.getMcpHost())) {
-                String deviceId = InsightUtil.deviceIdOf(c);
-                String username = bundle.usernameForDevice(deviceId);
-                if (username != null) usersReachable.add(username);
-            }
+            String deviceId = InsightUtil.deviceIdOf(collection);
+            String username = bundle.usernameForDevice(deviceId);
+            if (username != null) usersReachable.add(username);
 
             if (rows.size() < 20) {
                 Map<String, Object> row = new HashMap<>();
-                row.put("tool", tool.getResourceName());
-                row.put("capability", capability);
-                row.put("mcpHost", tool.getMcpHost());
+                row.put("tool", toolName);
+                row.put("capability", verdict.capability);
+                row.put("mcpHost", hostName);
                 row.put("ungated", !gated);
                 rows.add(row);
             }

@@ -2,6 +2,7 @@ package com.akto.service.insights.providers;
 
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.action.threat_detection.ThreatCategoryCount;
+import com.akto.dto.GuardrailPolicies;
 import com.akto.service.insights.*;
 import org.json.JSONObject;
 
@@ -23,12 +24,23 @@ public class SensitiveDataDestinationsProvider extends AbstractInsightProvider {
             return r;
         }
 
+        Set<String> configuredPiiTypes = new HashSet<>();
+        for (GuardrailPolicies p : bundle.policies) {
+            if (p.getPiiTypes() == null) continue;
+            for (GuardrailPolicies.PiiType pt : p.getPiiTypes()) {
+                if (pt.getType() != null) configuredPiiTypes.add(pt.getType().toLowerCase(Locale.ROOT));
+            }
+        }
+
         long piiTotal = 0;
         List<String> piiSubCategories = new ArrayList<>();
         for (ThreatCategoryCount c : bundle.subCategoryCounts) {
-            if (c.getSubCategory() != null && c.getSubCategory().startsWith("PII-")) {
+            String sub = c.getSubCategory();
+            if (sub == null) continue;
+            String lower = sub.toLowerCase(Locale.ROOT);
+            if (lower.startsWith("pii-") && configuredPiiTypes.contains(lower.substring("pii-".length()))) {
                 piiTotal += c.getCount();
-                piiSubCategories.add(c.getSubCategory());
+                piiSubCategories.add(sub);
             }
         }
 

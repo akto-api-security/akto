@@ -602,6 +602,38 @@ public class AzureDataExplorerClient extends SearchClient {
         return spans;
     }
 
+    // ── Real-invocation check for known-malicious tool/skill names ─────────────────
+
+    @Override
+    public List<Map<String, Object>> searchMaliciousComponentInvocations(
+            int accountId, List<String> maliciousTermNames, long startMs, long endMs, int limitPerTerm) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        if (!isConfigured() || maliciousTermNames == null || maliciousTermNames.isEmpty()) return results;
+
+        String baseWhere = buildWhereConditions(accountId, startMs, endMs, null, null);
+        for (String term : maliciousTermNames) {
+            if (term == null || term.trim().isEmpty()) continue;
+            try {
+                String t = esc(term.trim());
+                String kql = ADX_TABLE + " | where " + baseWhere
+                    + " and (" + AgentQueryRecord.F_QUERY_PAYLOAD + " contains '" + t + "' or "
+                    + AgentQueryRecord.F_RESPONSE_PAYLOAD + " contains '" + t + "')"
+                    + " | order by " + AgentQueryRecord.F_TIMESTAMP + " desc | take " + limitPerTerm
+                    + " | project " + AgentQueryRecord.F_TRACE_ID + ", " + AgentQueryRecord.F_TIMESTAMP;
+                for (Map<String, Object> row : queryRows(kql)) {
+                    Map<String, Object> out = new HashMap<>();
+                    out.put(KEY_TERM, term);
+                    out.put(KEY_TRACE_ID, row.get(AgentQueryRecord.F_TRACE_ID));
+                    out.put(KEY_TIMESTAMP, row.get(AgentQueryRecord.F_TIMESTAMP));
+                    results.add(out);
+                }
+            } catch (Exception e) {
+                logger.error("searchMaliciousComponentInvocations error for accountId=" + accountId + ", term=" + term + ": " + e.getMessage());
+            }
+        }
+        return results;
+    }
+
     // ── Filter choices (distinct values for column filters) ───────────────────────
 
     @Override

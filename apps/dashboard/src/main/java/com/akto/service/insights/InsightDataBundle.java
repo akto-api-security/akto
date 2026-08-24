@@ -136,4 +136,27 @@ public class InsightDataBundle {
             return null;
         }
     }
+
+    private static final long MALICIOUS_INVOCATION_WINDOW_MS = 15L * 24 * 3600 * 1000;
+    private static final int MALICIOUS_INVOCATION_LIMIT_PER_TERM = 3;
+
+    /**
+     * DETAIL scope only — proves whether a component already known to be malicious for this
+     * account was actually invoked, by text-searching queryPayload/responsePayload for its
+     * name/skill-name over the last 15 days. Fixed recency window, independent of ctx's own
+     * date range: "was this really called recently" is a standing risk question, not something
+     * that should shrink to whatever range the dashboard happens to be filtered to. Row shape:
+     * {term, traceId, timestamp}. Null under LIST scope, blank input, or failure.
+     */
+    public List<Map<String, Object>> fetchMaliciousComponentInvocations(InsightProvider.Scope scope, List<String> maliciousTermNames) {
+        if (scope != InsightProvider.Scope.DETAIL || maliciousTermNames == null || maliciousTermNames.isEmpty()) return null;
+        try {
+            long endMs = ctx.getEndTs() * 1000L;
+            long startMs = endMs - MALICIOUS_INVOCATION_WINDOW_MS;
+            return com.akto.utils.search.SearchClientFactory.instance()
+                    .searchMaliciousComponentInvocations(ctx.getAccountId(), maliciousTermNames, startMs, endMs, MALICIOUS_INVOCATION_LIMIT_PER_TERM);
+        } catch (Exception e) {
+            return null;
+        }
+    }
 }

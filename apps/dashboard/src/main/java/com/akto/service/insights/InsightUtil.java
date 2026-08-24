@@ -8,12 +8,8 @@ import com.akto.util.Constants;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Static helpers shared across insight providers — number formatting, agent-description
@@ -61,41 +57,8 @@ public final class InsightUtil {
     }
 
     // ── Tool capability classification (insight 8) ──────────────────────────────────────
-
-    public static final String SHELL_EXEC = "SHELL_EXEC";
-    public static final String FILE_WRITE = "FILE_WRITE";
-    public static final String FILE_READ = "FILE_READ";
-    public static final String NETWORK_EGRESS = "NETWORK_EGRESS";
-    public static final String UNCLASSIFIED = "UNCLASSIFIED";
-
-    private static final Map<String, String> BUILTIN_TOOL_CAPABILITY = new HashMap<>();
-    static {
-        BUILTIN_TOOL_CAPABILITY.put("bash", SHELL_EXEC);
-        BUILTIN_TOOL_CAPABILITY.put("write", FILE_WRITE);
-        BUILTIN_TOOL_CAPABILITY.put("edit", FILE_WRITE);
-        BUILTIN_TOOL_CAPABILITY.put("notebookedit", FILE_WRITE);
-        BUILTIN_TOOL_CAPABILITY.put("read", FILE_READ);
-        BUILTIN_TOOL_CAPABILITY.put("glob", FILE_READ);
-        BUILTIN_TOOL_CAPABILITY.put("grep", FILE_READ);
-        BUILTIN_TOOL_CAPABILITY.put("webfetch", NETWORK_EGRESS);
-        BUILTIN_TOOL_CAPABILITY.put("websearch", NETWORK_EGRESS);
-    }
-
-    private static final Set<String> DANGEROUS_CAPABILITIES = new HashSet<>();
-    static {
-        DANGEROUS_CAPABILITIES.add(SHELL_EXEC);
-        DANGEROUS_CAPABILITIES.add(FILE_WRITE);
-        DANGEROUS_CAPABILITIES.add(NETWORK_EGRESS);
-    }
-
-    /** Known-builtin lookup only; unknown (mostly MCP) tool names should fall through to a classifier. */
-    public static String builtinToolCapability(String toolNameOrSlug) {
-        return toolNameOrSlug == null ? null : BUILTIN_TOOL_CAPABILITY.get(toolNameOrSlug.toLowerCase(Locale.ROOT));
-    }
-
-    public static boolean isDangerousCapability(String capability) {
-        return DANGEROUS_CAPABILITIES.contains(capability);
-    }
+    // Classification itself is delegated to InsightClassificationHelper.classifyToolDanger
+    // (sample-data-driven, no static name/slug table) — see DangerousCapabilityExposureProvider.
 
     /** Mirrors AgenticObserveAction's private isAgentBuiltinToolUrl. */
     public static boolean isAgentBuiltinToolUrl(String url) {

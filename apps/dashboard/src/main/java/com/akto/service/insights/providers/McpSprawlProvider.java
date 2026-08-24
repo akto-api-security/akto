@@ -2,7 +2,6 @@ package com.akto.service.insights.providers;
 
 import com.akto.dto.ApiCollection;
 import com.akto.dto.McpAuditInfo;
-import com.akto.dto.nhi_governance.NhiIdentity;
 import com.akto.service.insights.*;
 
 import java.util.ArrayList;
@@ -13,7 +12,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-/** Unapproved & local MCP sprawl, by team, plus dormant assets still holding live credentials. */
+// TODO: NHI identity cross-reference (dormant servers still holding a live credential) was
+// removed here for now — bundle.nhiIdentities/hasLiveCredential and the
+// dormantWithLiveCredsCount metric need to come back once that data source is ready again.
+/** Unapproved & local MCP sprawl, by team, plus dormant assets. */
 public class McpSprawlProvider extends AbstractInsightProvider {
 
     private static final long DORMANT_THRESHOLD_SECONDS = 90L * 24 * 3600;
@@ -45,10 +47,7 @@ public class McpSprawlProvider extends AbstractInsightProvider {
         Map<String, Integer> byTeam = new HashMap<>();
         int untagged = 0;
         int dormant = 0;
-        int dormantWithLiveCreds = 0;
         List<Map<String, Object>> rows = new ArrayList<>();
-
-        List<NhiIdentity> identities = bundle.nhiIdentities;
 
         for (ApiCollection c : flagged) {
             String deviceId = InsightUtil.deviceIdOf(c);
@@ -60,10 +59,7 @@ public class McpSprawlProvider extends AbstractInsightProvider {
             // signal — never guess dormancy from absence of data.
             McpAuditInfo matchingAudit = findAuditRowForHost(bundle, c);
             boolean isDormant = matchingAudit != null && (now - matchingAudit.getLastDetected()) > DORMANT_THRESHOLD_SECONDS;
-            if (isDormant) {
-                dormant++;
-                if (hasLiveCredential(identities, deviceId, InsightUtil.serviceNameOf(c), now)) dormantWithLiveCreds++;
-            }
+            if (isDormant) dormant++;
 
             if (rows.size() < 20) {
                 Map<String, Object> row = new HashMap<>();
@@ -79,8 +75,6 @@ public class McpSprawlProvider extends AbstractInsightProvider {
                 InsightUtil.count(flagged.size(), "servers")));
         r.addMetric(new InsightResult.Metric("dormantCount", "Dormant (90d+) with known last activity", dormant, "count",
                 InsightUtil.count(dormant, "servers")));
-        r.addMetric(new InsightResult.Metric("dormantWithLiveCredsCount", "Dormant servers still holding live credentials", dormantWithLiveCreds, "count",
-                InsightUtil.count(dormantWithLiveCreds, "servers")));
 
         r.setStatus((flagged.isEmpty() ? InsightResult.Status.NO_DATA : InsightResult.Status.READY).name());
         if (untagged > 0 && byTeam.isEmpty()) {
@@ -105,17 +99,5 @@ public class McpSprawlProvider extends AbstractInsightProvider {
             if (serviceName.equalsIgnoreCase(a.getMcpHost())) return a;
         }
         return null;
-    }
-
-    private boolean hasLiveCredential(List<NhiIdentity> identities, String deviceId, String serviceName, long now) {
-        for (NhiIdentity ni : identities) {
-            boolean deviceMatch = deviceId != null && deviceId.equalsIgnoreCase(ni.getDeviceLabel());
-            boolean agentMatch = serviceName != null && serviceName.equalsIgnoreCase(ni.getAgentName());
-            if (!deviceMatch && !agentMatch) continue;
-            boolean active = "ACTIVE".equalsIgnoreCase(ni.getStatus());
-            boolean notExpired = ni.getExpiryDate() == 0 || ni.getExpiryDate() > now;
-            if (active && notExpired) return true;
-        }
-        return false;
     }
 }

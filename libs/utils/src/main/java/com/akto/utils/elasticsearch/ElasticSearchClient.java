@@ -560,6 +560,53 @@ public class ElasticSearchClient extends SearchClient {
         return spans;
     }
 
+    // ── Real-invocation check for known-malicious tool/skill names ─────────────
+
+    @Override
+    public List<Map<String, Object>> searchMaliciousComponentInvocations(
+            int accountId, List<String> maliciousTermNames, long startMs, long endMs, int limitPerTerm) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        if (!isConfigured() || maliciousTermNames == null || maliciousTermNames.isEmpty()) return results;
+
+        for (String term : maliciousTermNames) {
+            if (term == null || term.trim().isEmpty()) continue;
+            try {
+                JSONObject query = buildQuery(accountId, startMs, endMs, null, null, null);
+                JSONArray should = new JSONArray()
+                    .put(new JSONObject().put("match_phrase", new JSONObject().put(AgentQueryRecord.F_QUERY_PAYLOAD, term)))
+                    .put(new JSONObject().put("match_phrase", new JSONObject().put(AgentQueryRecord.F_RESPONSE_PAYLOAD, term)));
+                query.getJSONObject("bool").getJSONArray("must")
+                    .put(new JSONObject().put("bool", new JSONObject().put("should", should).put("minimum_should_match", 1)));
+
+                JSONObject body = new JSONObject()
+                    .put("query", query)
+                    .put("size", limitPerTerm)
+                    .put("sort", new JSONArray().put(new JSONObject().put(AgentQueryRecord.F_TIMESTAMP, new JSONObject().put("order", "desc"))))
+                    .put("_source", new JSONArray().put(AgentQueryRecord.F_TRACE_ID).put(AgentQueryRecord.F_TIMESTAMP));
+
+                JSONObject response = httpPost(trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_search", body.toString());
+                if (response == null) continue;
+
+                JSONArray hits = extractHits(response);
+                if (hits == null) continue;
+                for (int i = 0; i < hits.length(); i++) {
+                    JSONObject hit = hits.optJSONObject(i);
+                    if (hit == null) continue;
+                    JSONObject source = hit.optJSONObject("_source");
+                    if (source == null) continue;
+                    Map<String, Object> row = new HashMap<>();
+                    row.put(KEY_TERM, term);
+                    row.put(KEY_TRACE_ID, source.optString(AgentQueryRecord.F_TRACE_ID, ""));
+                    row.put(KEY_TIMESTAMP, source.optLong(AgentQueryRecord.F_TIMESTAMP, 0L));
+                    results.add(row);
+                }
+            } catch (Exception e) {
+                logger.error("searchMaliciousComponentInvocations error for accountId=" + accountId + ", term=" + term + ": " + e.getMessage());
+            }
+        }
+        return results;
+    }
+
     // ── Filter choices (distinct values for column filters) ───────────────────
 
     @Override
