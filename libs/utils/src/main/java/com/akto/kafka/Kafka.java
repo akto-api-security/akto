@@ -25,10 +25,14 @@ public class Kafka {
         }
     }
 
-    public void send(String message,String topic) {
+    public void send(String message, String topic) {
+        send(null, message, topic);
+    }
+
+    public void send(String key, String message, String topic) {
         if (!this.producerReady) return;
 
-        ProducerRecord<String, String> record = new ProducerRecord<>(topic,message);
+        ProducerRecord<String, String> record = new ProducerRecord<>(topic, key, message);
         producer.send(record, new DemoProducerCallback());
     }
 

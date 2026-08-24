@@ -9,6 +9,7 @@ import javax.servlet.ServletContextListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.akto.AgentRiskKafkaConsumer;
 import com.akto.DaoInit;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.TestingRunWebhookDao;
@@ -17,6 +18,7 @@ import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.merging.Cron;
 import com.akto.metrics.AllMetrics;
 import com.akto.util.filter.DictionaryFilter;
+import com.akto.kafka.AgentRiskKafkaProducer;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.EndpointRemoteCommandCleanupCron;
 import com.akto.utils.TagMismatchCron;
@@ -97,6 +99,12 @@ public class InitializerListener implements ServletContextListener {
         if (kafkaUtils.isFastDiscoveryEnabled()) {
             logger.info("Starting fast-discovery consumer in background thread");
             kafkaUtils.startFastDiscoveryConsumer();
+        }
+
+        // Independent of traffic Kafka flags so the worker can idle before any producer is on.
+        if (AgentRiskKafkaProducer.isRiskConsumerEnabled()) {
+            logger.info("Starting agent-risk consumer");
+            AgentRiskKafkaConsumer.startFromEnv();
         }
     }
 

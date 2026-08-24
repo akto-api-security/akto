@@ -1,5 +1,6 @@
 package com.akto.utils.elasticsearch;
 
+import com.akto.agent_risk.AgentRiskScore;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -15,7 +16,9 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -30,6 +33,7 @@ public class ElasticSearchClient {
     private static final String ES_HOST = System.getenv("ES_HOST");
     private static final String ES_API_KEY = System.getenv("ES_API_KEY");
     private static final String ES_INDEX = System.getenv("ES_INDEX_AGENT_QUERY");
+    private static final String ES_INDEX_RISK = envOrDefault("ES_INDEX_AGENT_RISK", "agent-risk-scores");
 
     private static final int MAX_QUERY_RESULTS = 500;
     private static final MediaType JSON_MEDIA = MediaType.parse("application/json");
@@ -51,6 +55,11 @@ public class ElasticSearchClient {
     public boolean isConfigured() {
         return ES_HOST != null && !ES_HOST.isEmpty()
             && ES_INDEX != null && !ES_INDEX.isEmpty();
+    }
+
+    public boolean isRiskIndexConfigured() {
+        return ES_HOST != null && !ES_HOST.isEmpty()
+            && ES_INDEX_RISK != null && !ES_INDEX_RISK.isEmpty();
     }
 
     /**
@@ -86,6 +95,9 @@ public class ElasticSearchClient {
                     .put("traceId",           r.getTraceId())
                     .put("spanId",            r.getSpanId())
                     .put("topicProcessed",    false);
+                if (r.getApiCollectionId() != 0) {
+                    doc.put("apiCollectionId", r.getApiCollectionId());
+                }
 
                 // Guardrail result: whether a policy was hit, which policy and rule, what was done
                 // about it, and why. Saved on the trace so an investigation does not have to look up
@@ -134,6 +146,187 @@ public class ElasticSearchClient {
             }
         } catch (Exception e) {
             logger.error("ES bulk index error for " + url + ": " + e, e);
+        }
+    }
+
+    /**
+     * Persist scored agent traces. Mapping can be created out of band.
+     * Errors are logged; callers must not fail the Kafka consume on persist miss.
+     */
+    public void bulkIndexAgentRiskScores(List<AgentRiskScore> scores) {
+        if (!isRiskIndexConfigured() || scores == null || scores.isEmpty()) {
+            return;
+        }
+        StringBuilder ndjson = new StringBuilder();
+        for (AgentRiskScore s : scores) {
+            if (s == null) {
+                continue;
+            }
+            ndjson.append("{\"index\":{}}\n");
+            try {
+                JSONObject doc = new JSONObject()
+                    .put("accountId", s.getAccountId())
+                    .put("hash", emptyIfNull(s.getHash()))
+                    .put("neighborId", emptyIfNull(s.getNeighborId()))
+                    .put("source", s.getSource() == null ? "" : s.getSource().name())
+                    .put("composite", s.getComposite())
+                    .put("dataRisk", s.getDataRisk())
+                    .put("toolRisk", s.getToolRisk())
+                    .put("dataClassMax", s.getDataClassMax())
+                    .put("agentKey", emptyIfNull(s.getAgentKey()))
+                    .put("toolFingerprint", emptyIfNull(s.getToolFingerprint()))
+                    .put("privilegeClass", emptyIfNull(s.getPrivilegeClass()))
+                    .put("hardConstraintsMatched", s.isHardConstraintsMatched())
+                    .put("traceId", emptyIfNull(s.getTraceId()))
+                    .put("spanId", emptyIfNull(s.getSpanId()))
+                    .put("timestamp", s.getTimestamp());
+                if (s.getApiCollectionId() != null && s.getApiCollectionId() != 0) {
+                    doc.put("apiCollectionId", s.getApiCollectionId());
+                }
+                if (s.getEmbedding() != null && !s.getEmbedding().isEmpty()) {
+                    JSONArray vec = new JSONArray();
+                    for (Double d : s.getEmbedding()) {
+                        vec.put(d);
+                    }
+                    doc.put("dense_vector", vec);
+                }
+                ndjson.append(doc).append("\n");
+            } catch (JSONException e) {
+                logger.error("Failed to serialize AgentRiskScore: " + e.getMessage());
+            }
+        }
+        if (ndjson.length() == 0) {
+            return;
+        }
+
+        String url = trimTrailingSlash(ES_HOST) + "/" + ES_INDEX_RISK + "/_bulk";
+        Request.Builder rb = new Request.Builder()
+            .url(url)
+            .method("POST", RequestBody.create(ndjson.toString(), NDJSON_MEDIA))
+            .addHeader("Content-Type", "application/x-ndjson");
+        addAuthHeader(rb);
+
+        try (Response resp = http.newCall(rb.build()).execute()) {
+            ResponseBody respBody = resp.body();
+            String bodyText = respBody != null ? respBody.string() : "";
+            if (!resp.isSuccessful()) {
+                logger.error("ES agent-risk bulk index failed (" + resp.code() + ") for " + url + ": " + bodyText);
+                return;
+            }
+            try {
+                JSONObject bulkResponse = new JSONObject(bodyText);
+                if (bulkResponse.optBoolean("errors", false)) {
+                    logger.error("ES agent-risk bulk index had per-item errors for " + url);
+                }
+            } catch (JSONException ignored) {
+                // body already consumed; do not fail the consumer
+            }
+        } catch (Exception e) {
+            logger.error("ES agent-risk bulk index error for " + url + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Cheap batch update: mark original traces processed. Composite lives on the
+     * risk index; this only flips topicProcessed so we do one query per account.
+     */
+    public void markAgentQueryTopicProcessed(List<AgentRiskScore> scores) {
+        if (!isConfigured() || scores == null || scores.isEmpty()) {
+            return;
+        }
+        Map<Integer, JSONArray> tracesByAccount = new HashMap<>();
+        for (AgentRiskScore s : scores) {
+            if (s == null || s.getTraceId() == null || s.getTraceId().isEmpty()) {
+                continue;
+            }
+            tracesByAccount.computeIfAbsent(s.getAccountId(), k -> new JSONArray()).put(s.getTraceId());
+        }
+        for (Map.Entry<Integer, JSONArray> e : tracesByAccount.entrySet()) {
+            try {
+                JSONObject query = new JSONObject().put("bool", new JSONObject().put("must", new JSONArray()
+                    .put(new JSONObject().put("term", new JSONObject().put("accountId", e.getKey())))
+                    .put(new JSONObject().put("terms", new JSONObject().put("traceId.keyword", e.getValue())))));
+                JSONObject body = new JSONObject()
+                    .put("query", query)
+                    .put("script", new JSONObject()
+                        .put("source", "ctx._source.topicProcessed = true;")
+                        .put("lang", "painless"));
+                String url = trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_update_by_query?conflicts=proceed";
+                httpPost(url, body.toString());
+            } catch (Exception ex) {
+                logger.error("ES topicProcessed update failed for accountId " + e.getKey() + ": " + ex.getMessage());
+            }
+        }
+    }
+
+    /**
+     * kNN on agent-risk-scores.dense_vector. Fail-open: null on any error or miss.
+     * Distance is 1 - _score, matching guardcache cosine distance.
+     */
+    public KnnHit knnSearchAgentRiskScores(List<Double> vector, int accountId, String agentKey) {
+        if (!isRiskIndexConfigured() || vector == null || vector.isEmpty()) {
+            return null;
+        }
+        try {
+            JSONArray queryVector = new JSONArray();
+            for (Double d : vector) {
+                queryVector.put(d);
+            }
+            JSONArray must = new JSONArray()
+                .put(new JSONObject().put("term", new JSONObject().put("accountId", accountId)));
+            if (agentKey != null && !agentKey.isEmpty()) {
+                must.put(new JSONObject().put("term", new JSONObject().put("agentKey.keyword", agentKey)));
+            }
+            JSONObject knn = new JSONObject()
+                .put("field", "dense_vector")
+                .put("query_vector", queryVector)
+                .put("k", 1)
+                .put("num_candidates", 20)
+                .put("filter", new JSONObject().put("bool", new JSONObject().put("must", must)));
+            JSONObject body = new JSONObject().put("knn", knn).put("size", 1);
+            String url = trimTrailingSlash(ES_HOST) + "/" + ES_INDEX_RISK + "/_search";
+            JSONObject response = httpPost(url, body.toString());
+            if (response == null) {
+                return null;
+            }
+            JSONArray hits = extractHits(response);
+            if (hits == null || hits.length() == 0) {
+                return null;
+            }
+            JSONObject hit = hits.getJSONObject(0);
+            JSONObject source = hit.optJSONObject("_source");
+            if (source == null) {
+                return null;
+            }
+            AgentRiskScore neighbor = new AgentRiskScore();
+            neighbor.setHash(source.optString("hash", ""));
+            neighbor.setNeighborId(neighbor.getHash());
+            neighbor.setAccountId(source.optInt("accountId", 0));
+            neighbor.setAgentKey(source.optString("agentKey", ""));
+            neighbor.setToolFingerprint(source.optString("toolFingerprint", ""));
+            neighbor.setPrivilegeClass(source.optString("privilegeClass", ""));
+            neighbor.setComposite(source.optInt("composite", 0));
+            neighbor.setDataRisk(source.optInt("dataRisk", 0));
+            neighbor.setToolRisk(source.optInt("toolRisk", 0));
+            neighbor.setDataClassMax(source.optInt("dataClassMax", 0));
+            neighbor.setSource(AgentRiskScore.Source.REUSED);
+            double similarity = hit.optDouble("_score", 0d);
+            double distance = Math.max(0d, 1.0d - similarity);
+            neighbor.setKnnDistance(distance);
+            return new KnnHit(neighbor, distance);
+        } catch (Exception e) {
+            logger.error("ES knn search failed: " + e.getMessage());
+            return null;
+        }
+    }
+
+    public static final class KnnHit {
+        public final AgentRiskScore neighbor;
+        public final double distance;
+
+        public KnnHit(AgentRiskScore neighbor, double distance) {
+            this.neighbor = neighbor;
+            this.distance = distance;
         }
     }
 
@@ -188,29 +381,34 @@ public class ElasticSearchClient {
         String queryPayload = source.optString("queryPayload", "");
         if (queryPayload.isEmpty()) return null;
 
-        return new AgentQueryRecord(
-            hit.optString("_id", ""),
-            source.optInt("accountId", 0),
-            source.optString("serviceId", ""),
-            source.optString("deviceId", ""),
-            source.optString("userName", ""),
-            source.optString("sessionIdentifier", ""),
-            queryPayload,
-            source.optString("responsePayload", ""),
-            source.optLong("timestamp", 0L),
-            source.optInt("inputTokens", 0),
-            source.optInt("outputTokens", 0),
-            source.optString("traceId", ""),
-            source.optString("spanId", ""),
-            source.optBoolean("isAtlasTraffic", false),
-            source.optBoolean("topicProcessed", false),
-            source.has("guardrailViolated") ? source.optBoolean("guardrailViolated") : null,
-            source.optString("guardrailAction", ""),
-            source.optString("guardrailPolicy", ""),
-            source.optString("guardrailRule", ""),
-            source.optString("guardrailReason", ""),
-            source.optString("guardrailSeverity", "")
-        );
+        AgentQueryRecord rec = new AgentQueryRecord();
+        rec.setDocId(hit.optString("_id", ""));
+        rec.setAccountId(source.optInt("accountId", 0));
+        rec.setServiceId(source.optString("serviceId", ""));
+        rec.setDeviceId(source.optString("deviceId", ""));
+        rec.setUserName(source.optString("userName", ""));
+        rec.setSessionIdentifier(source.optString("sessionIdentifier", ""));
+        rec.setQueryPayload(queryPayload);
+        rec.setResponsePayload(source.optString("responsePayload", ""));
+        rec.setTimeStampMs(source.optLong("timestamp", 0L));
+        rec.setInputTokens(source.optInt("inputTokens", 0));
+        rec.setOutputTokens(source.optInt("outputTokens", 0));
+        rec.setTraceId(source.optString("traceId", ""));
+        rec.setSpanId(source.optString("spanId", ""));
+        rec.setIsAtlasTraffic(source.optBoolean("isAtlasTraffic", false));
+        rec.setTopicProcessed(source.optBoolean("topicProcessed", false));
+        if (source.has("guardrailViolated")) {
+            rec.setGuardrailViolated(source.optBoolean("guardrailViolated"));
+        }
+        rec.setGuardrailAction(source.optString("guardrailAction", ""));
+        rec.setGuardrailPolicy(source.optString("guardrailPolicy", ""));
+        rec.setGuardrailRule(source.optString("guardrailRule", ""));
+        rec.setGuardrailReason(source.optString("guardrailReason", ""));
+        rec.setGuardrailSeverity(source.optString("guardrailSeverity", ""));
+        if (source.has("apiCollectionId")) {
+            rec.setApiCollectionId(source.optInt("apiCollectionId"));
+        }
+        return rec;
     }
 
     private JSONObject httpPost(String url, String body) {
@@ -243,6 +441,11 @@ public class ElasticSearchClient {
     private static String trimTrailingSlash(String s) {
         if (s == null) return "";
         return s.endsWith("/") ? s.substring(0, s.length() - 1) : s;
+    }
+
+    private static String envOrDefault(String key, String defaultValue) {
+        String v = System.getenv(key);
+        return (v == null || v.isEmpty()) ? defaultValue : v;
     }
 
     // org.json throws on a null value, so missing guardrail fields have to be saved as "".

@@ -1,6 +1,5 @@
 package com.akto.utils.elasticsearch;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -8,7 +7,6 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
 public class AgentQueryRecord {
 
     private String docId;
@@ -24,6 +22,7 @@ public class AgentQueryRecord {
     private int outputTokens;
     private String traceId;
     private String spanId;
+    private int apiCollectionId;
     private boolean isAtlasTraffic;
     private boolean topicProcessed;
 

@@ -72,6 +72,20 @@ public class ApiCollection {
     @Setter
     private String description;
 
+    // Agent-trace composite (0–100). Distinct from ApiInfo.riskScore.
+    public static final String AGENT_RISK_SCORE = "agentRiskScore";
+    @Getter
+    @Setter
+    private int agentRiskScore;
+    public static final String AGENT_RISK_LAST_CALCULATED_TIME = "agentRiskLastCalculatedTime";
+    @Getter
+    @Setter
+    private int agentRiskLastCalculatedTime;
+    public static final String AGENT_RISK_HASH = "agentRiskHash";
+    @Getter
+    @Setter
+    private String agentRiskHash;
+
     public static final String IS_OUT_OF_TESTING_SCOPE = "isOutOfTestingScope";
     private boolean isOutOfTestingScope;
 

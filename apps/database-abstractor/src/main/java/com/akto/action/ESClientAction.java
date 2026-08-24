@@ -3,6 +3,7 @@ package com.akto.action;
 import java.util.List;
 
 import com.akto.dao.context.Context;
+import com.akto.kafka.AgentRiskKafkaProducer;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.utils.elasticsearch.ElasticSearchClient;
@@ -29,6 +30,12 @@ public class ESClientAction {
             } catch (Exception e) {
                 return Action.ERROR.toUpperCase();
             }
+        }
+        // Scoring is fire-and-forget. A produce miss must not fail the trace write.
+        try {
+            AgentRiskKafkaProducer.produce(agentQueryRecords, accId);
+        } catch (Exception ignored) {
+            // keep storeAgentQueryData successful
         }
         return Action.SUCCESS.toUpperCase();
     }
