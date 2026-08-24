@@ -10,7 +10,10 @@ Usage: python3 build_xlsx.py <output.xlsx>
 import sys
 import json
 import openpyxl
-from openpyxl.styles import Font
+from openpyxl.styles import Font, PatternFill
+from openpyxl.styles.differential import DifferentialStyle
+from openpyxl.formatting.rule import Rule
+from openpyxl.utils import get_column_letter
 
 HEADER = [
     "Issue Name", "Category", "Severity", "API Endpoint", "Testing Run",
@@ -20,9 +23,19 @@ HEADER = [
     "Prompt 4", "Response 4",
     "Validation Message", "Result Type", "Issue Status",
 ]
+SEVERITY_COL = "C"  # keep in sync with HEADER above
 
 SEVERITY_ORDER = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
 RESULT_TYPE_ORDER = {"Issue": 0, "Non-Issue": 1}
+
+# Same severity row-highlight colors as the "Akamai Prompts Red Teaming.xlsx" reference sheet.
+SEVERITY_FILL = {
+    "CRITICAL": "FFF8CBCB",
+    "HIGH": "FFFDE2C7",
+    "MEDIUM": "FFFFF2B2",
+    "LOW": "FFD6EFD8",
+}
+HEADER_FILL = "FF4A4A4A"
 
 
 def clean(value):
@@ -85,7 +98,8 @@ def main():
     ws.title = "Agentic Issues"
     ws.append(HEADER)
     for cell in ws[1]:
-        cell.font = Font(bold=True)
+        cell.font = Font(bold=True, color="FFFFFFFF")
+        cell.fill = PatternFill(patternType="solid", fgColor=HEADER_FILL)
 
     for record in records:
         ws.append(build_row(record))
@@ -94,6 +108,16 @@ def main():
     widths = [45, 22, 12, 55, 32, 45, 45, 45, 45, 45, 45, 45, 45, 55, 12, 12]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+
+    last_col = get_column_letter(len(HEADER))
+    last_row = max(ws.max_row, 2)
+    full_range = f"A2:{last_col}{last_row}"
+    ws.auto_filter.ref = f"A1:{last_col}{last_row}"
+
+    for severity, color in SEVERITY_FILL.items():
+        dxf = DifferentialStyle(fill=PatternFill(patternType="solid", fgColor=color, bgColor=color))
+        rule = Rule(type="expression", dxf=dxf, formula=[f'${SEVERITY_COL}2="{severity}"'])
+        ws.conditional_formatting.add(full_range, rule)
 
     wb.save(out_path)
     counts = {}
