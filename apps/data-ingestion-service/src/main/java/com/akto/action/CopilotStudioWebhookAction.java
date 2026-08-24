@@ -162,10 +162,14 @@ public class CopilotStudioWebhookAction extends ActionSupport {
         requestData.put("ingest_data", "true");
         requestData.put("method", "POST");
         requestData.put("contextSource", "ENDPOINT");
-        requestData.put("source", "copilot-studio");
+        requestData.put("source", "MIRRORING");
         requestData.put("akto_account_id", resolveAccountId());
+        requestData.put("akto_vxlan_id", String.valueOf(""));
         requestData.put("ip", clientIpFromHeaders());
-        requestData.put("responsePayload", "{}");
+        requestData.put("statusCode", 200);
+        requestData.put("status", "200 OK");
+        requestData.put("is_pending", "false");
+        requestData.put("responsePayload", "{\"response\": \"\"}");
         requestData.put("responseHeaders", "{}");
         requestData.put("requestHeaders", buildRequestHeaders(aiAgentHost(hostUserId, agentName), conversationId));
         return requestData;
