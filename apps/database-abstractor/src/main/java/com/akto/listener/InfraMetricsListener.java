@@ -2,10 +2,12 @@ package com.akto.listener;
 
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import io.micrometer.core.instrument.binder.jvm.ClassLoaderMetrics;
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics;
+import io.micrometer.core.instrument.binder.jvm.JvmHeapPressureMetrics;
 import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics;
 import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics;
-import io.micrometer.core.instrument.binder.system.DiskSpaceMetrics;
+import io.micrometer.core.instrument.binder.system.FileDescriptorMetrics;
 import io.micrometer.core.instrument.binder.system.ProcessorMetrics;
 import io.micrometer.core.instrument.binder.system.UptimeMetrics;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
@@ -15,7 +17,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
-import java.io.File;
 
 /**
  * Prometheus setup for the database-abstractor (cyborg) service. Kept independent of the existing
@@ -69,12 +70,16 @@ public class InfraMetricsListener implements ServletContextListener {
     public void contextInitialized(ServletContextEvent sce) {
         try {
             logger.info("Infra metrics initializing.......");
-            new JvmThreadMetrics().bindTo(registry);
-            new JvmGcMetrics().bindTo(registry);
-            new JvmMemoryMetrics().bindTo(registry);
-            new DiskSpaceMetrics(new File("/")).bindTo(registry);
-            new ProcessorMetrics().bindTo(registry); // CPU stats
-            new UptimeMetrics().bindTo(registry);
+            // JVM health
+            new JvmMemoryMetrics().bindTo(registry);          // heap/non-heap used, committed, max
+            new JvmGcMetrics().bindTo(registry);              // gc pause times, allocations
+            new JvmHeapPressureMetrics().bindTo(registry);    // gc overhead + memory-after-gc (leak signal)
+            new JvmThreadMetrics().bindTo(registry);          // live/daemon/blocked threads
+            new ClassLoaderMetrics().bindTo(registry);        // classes loaded/unloaded (classloader leaks)
+            // Process / OS
+            new ProcessorMetrics().bindTo(registry);          // process + system CPU
+            new FileDescriptorMetrics().bindTo(registry);     // open vs max fds (socket/connection leaks)
+            new UptimeMetrics().bindTo(registry);             // uptime, start time
             logger.info("Infra metrics initialized!!!!");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "ERROR while setting up InfraMetricsListener", LogDb.DB_ABS);
