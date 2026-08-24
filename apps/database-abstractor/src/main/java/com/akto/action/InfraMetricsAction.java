@@ -22,8 +22,11 @@ public class InfraMetricsAction extends ActionSupport {
      */
     @Override
     public String execute() throws Exception {
-        ServletActionContext.getResponse().setContentType("text/plain; version=0.0.4; charset=utf-8");
-        InfraMetricsListener.registry.scrape(ServletActionContext.getResponse().getWriter());
+        // Micrometer >=1.13 (Prometheus client 1.x) dropped scrape(Writer); use scrape(contentType)
+        // which returns the exposition text for the requested format.
+        String contentType = "text/plain; version=0.0.4; charset=utf-8";
+        ServletActionContext.getResponse().setContentType(contentType);
+        ServletActionContext.getResponse().getWriter().write(InfraMetricsListener.registry.scrape(contentType));
         return null;
     }
 
