@@ -166,7 +166,7 @@ public class CopilotStudioWebhookAction extends ActionSupport {
         requestData.put("akto_account_id", resolveAccountId());
         requestData.put("akto_vxlan_id", String.valueOf(""));
         requestData.put("ip", clientIpFromHeaders());
-        requestData.put("statusCode", 200);
+        requestData.put("statusCode", "200");
         requestData.put("status", "200 OK");
         requestData.put("is_pending", "false");
         requestData.put("responsePayload", "{\"response\": \"\"}");
