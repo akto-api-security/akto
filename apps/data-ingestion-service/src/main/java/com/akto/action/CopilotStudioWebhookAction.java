@@ -51,11 +51,13 @@ public class CopilotStudioWebhookAction extends ActionSupport {
     }
 
     /**
-     * Explicit getter (Lombok would otherwise generate this) forced to serialize as "isSuccessful"
-     * via @JSON(name=...): the JavaBean convention strips a leading "is" off a boolean getter to
-     * derive its property name, so a plain isSuccessful() getter serializes as "successful" — which
-     * never matches struts.xml's includeProperties pattern and silently drops the field. Microsoft's
-     * ValidationResponse contract requires the literal key "isSuccessful".
+     * Explicit getter (Lombok would otherwise generate this): the JavaBean convention strips a
+     * leading "is" off a boolean getter to derive its property name, so a plain isSuccessful()
+     * getter's underlying property is actually "successful", not "isSuccessful". @JSON(name=...)
+     * renames it back to "isSuccessful" for the JSON key — and struts.xml's includeProperties must
+     * match that renamed value too, since DefaultJSONWriter.bean() applies the @JSON rename before
+     * building the expression checked against includeProperties. Microsoft's ValidationResponse
+     * contract requires the literal key "isSuccessful".
      */
     @JSON(name = "isSuccessful")
     public boolean isSuccessful() {
