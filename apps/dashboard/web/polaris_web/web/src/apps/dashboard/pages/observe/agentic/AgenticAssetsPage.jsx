@@ -8,13 +8,14 @@ import React, {
 } from "react";
 import { produce } from "immer";
 import { useNavigate } from "react-router-dom";
-import { Box, Button, Card, Divider, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
-import { MagicMinor } from "@shopify/polaris-icons";
+import { Box, Card, Divider, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import AgenticAssetFlyout from "./AgenticAssetFlyout";
 import InsightsFlyout from "./insights/InsightsFlyout";
+import InsightsEntryButton from "./insights/InsightsEntryButton";
+import useInsightsEntryPoint from "./insights/useInsightsEntryPoint";
 import {
   AssetNameCellRenderer,
   TypeBadgeCellRenderer,
@@ -325,10 +326,7 @@ function TableSection({
 export default function AgenticAssetsPage() {
   const navigate = useNavigate();
   const [flyout, setFlyout] = useState(null);
-  const [insightsOpen, setInsightsOpen] = useState(false);
-  const handleOpenInsights = useCallback(() => setInsightsOpen(true), []);
-  const handleCloseInsights = useCallback(() => setInsightsOpen(false), []);
-  const dashboardInsightsGranted = func.checkForFeatureSaas("DASHBOARD_INSIGHTS");
+  const insights = useInsightsEntryPoint();
   const [loading, setLoading] = useState(true);
   const [hostSeverityCounts, setHostSeverityCounts] = useState({});
   const [stats, setStats] = useState({ totalAssets: 0, countsByType: {} });
@@ -558,9 +556,7 @@ export default function AgenticAssetsPage() {
           })
         }
       />
-      {dashboardInsightsGranted && (
-        <Button icon={MagicMinor} onClick={handleOpenInsights}>Atlas Insights</Button>
-      )}
+      <InsightsEntryButton granted={insights.granted} onClick={insights.handleOpen} label="Atlas Insights" />
     </HorizontalStack>
   );
 
@@ -703,12 +699,13 @@ export default function AgenticAssetsPage() {
           />,
         ]}
       />
-      {dashboardInsightsGranted && (
+      {insights.granted && (
         <InsightsFlyout
-          show={insightsOpen}
-          onClose={handleCloseInsights}
+          show={insights.open}
+          onClose={insights.handleClose}
           startTimestamp={startTimestamp}
           endTimestamp={endTimestamp}
+          initialInsightId={insights.initialInsightId}
         />
       )}
     </>

@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Box, VerticalStack, HorizontalStack, Text, Badge, Button, Spinner } from "@shopify/polaris";
+import { Box, VerticalStack, HorizontalStack, Text, Button, Spinner } from "@shopify/polaris";
 import { ChevronLeftMinor, RefreshMinor, CancelMajor } from "@shopify/polaris-icons";
 import AgenticFlyoutShell from "../AgenticFlyoutShell";
-import { SeverityBadge } from "../AgenticCellRenderers";
 import insightsApi from "./insightsApi";
 import InsightsListView from "./InsightsListView";
 import InsightDetailView from "./InsightDetailView";
-import { STATUS_BADGE_STATUS, statusLabel, categoryLabel } from "./insightsHelpers";
+import { INSIGHT_GROUP } from "./insightsHelpers";
 
 // Atlas Insights — the "Insights" button's flyout. One AgenticFlyoutShell instance whose body
 // switches between the list and a selected insight's detail; the header switches with it.
-export default function InsightsFlyout({ show, onClose, startTimestamp, endTimestamp, initialInsightId = null }) {
+// `group` picks which InsightId.Group this instance shows — Atlas Discovery and the
+// guardrail/violations set never mix in one list (see InsightService.listInsights).
+export default function InsightsFlyout({ show, onClose, startTimestamp, endTimestamp, initialInsightId = null, group = INSIGHT_GROUP.ATLAS_DISCOVERY }) {
     const [insights, setInsights] = useState([]);
     const [listLoading, setListLoading] = useState(false);
     const [listError, setListError] = useState(false);
@@ -19,11 +20,11 @@ export default function InsightsFlyout({ show, onClose, startTimestamp, endTimes
     const loadList = useCallback(() => {
         setListLoading(true);
         setListError(false);
-        insightsApi.fetchInsightsList({ startTimestamp, endTimestamp })
+        insightsApi.fetchInsightsList({ startTimestamp, endTimestamp, group })
             .then((data) => setInsights(data))
             .catch(() => setListError(true))
             .finally(() => setListLoading(false));
-    }, [startTimestamp, endTimestamp]);
+    }, [startTimestamp, endTimestamp, group]);
 
     useEffect(() => {
         if (!show) return;
@@ -39,6 +40,12 @@ export default function InsightsFlyout({ show, onClose, startTimestamp, endTimes
         [insights, selectedInsightId]
     );
 
+    const isViolationsGroup = group === INSIGHT_GROUP.GUARDRAIL_VIOLATIONS;
+    const flyoutTitle = isViolationsGroup ? "Guardrail Insights" : "Atlas Insights";
+    const flyoutSubtitle = isViolationsGroup
+        ? `governance signal${insights.length === 1 ? "" : "s"} across your guardrail policies`
+        : `governance signal${insights.length === 1 ? "" : "s"} across your agentic AI surface`;
+
     const header = useMemo(() => (
         <Box padding="5" borderBlockEndWidth="1" borderColor="border-subdued">
             <VerticalStack gap="3">
@@ -47,9 +54,9 @@ export default function InsightsFlyout({ show, onClose, startTimestamp, endTimes
                         <Button plain icon={ChevronLeftMinor} onClick={handleBackToList}>Back to Insights</Button>
                     ) : (
                         <VerticalStack gap="1">
-                            <Text variant="headingMd" as="h2">Atlas Insights</Text>
+                            <Text variant="headingMd" as="h2">{flyoutTitle}</Text>
                             <Text variant="bodySm" color="subdued">
-                                {insights.length} governance signal{insights.length === 1 ? "" : "s"} across your agentic AI surface
+                                {insights.length} {flyoutSubtitle}
                             </Text>
                         </VerticalStack>
                     )}
@@ -63,14 +70,11 @@ export default function InsightsFlyout({ show, onClose, startTimestamp, endTimes
                 {selectedInsight && (
                     <HorizontalStack gap="2" blockAlign="center" wrap>
                         <Text variant="headingMd" as="h2">{selectedInsight.title}</Text>
-                        <Badge status={STATUS_BADGE_STATUS[selectedInsight.status]}>{statusLabel(selectedInsight.status)}</Badge>
-                        {selectedInsight.severity ? <SeverityBadge severity={selectedInsight.severity} /> : null}
-                        <Badge>{categoryLabel(selectedInsight.category)}</Badge>
                     </HorizontalStack>
                 )}
             </VerticalStack>
         </Box>
-    ), [selectedInsight, insights.length, handleBackToList, loadList, onClose]);
+    ), [selectedInsight, insights.length, handleBackToList, loadList, onClose, flyoutTitle, flyoutSubtitle]);
 
     return (
         <AgenticFlyoutShell show={show} width={800} header={header}>

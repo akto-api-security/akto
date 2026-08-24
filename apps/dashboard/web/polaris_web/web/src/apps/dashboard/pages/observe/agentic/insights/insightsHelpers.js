@@ -1,6 +1,7 @@
 // Shared display mappings + CTA/evidence helpers for Atlas Insights (InsightResult contract —
 // see apps/dashboard/src/main/java/com/akto/service/insights/InsightResult.java). Nothing here
 // computes a number; every value rendered comes straight from the API response.
+import func from "@/util/func";
 
 export const STATUS_LABEL = {
     READY: "Ready",
@@ -19,6 +20,28 @@ export const CATEGORY_LABEL = {
     ACTIONABLE: "Actionable",
     READ_ONLY: "Read-only",
 };
+
+// InsightId.Group (backend) — the two insight surfaces, which never mix in one list. Each
+// carries the page whose own InsightsFlyout instance actually owns that group, so a pinned
+// entry point elsewhere (e.g. the header popover) can send the reader to the right place.
+export const INSIGHT_GROUP = {
+    ATLAS_DISCOVERY: "ATLAS_DISCOVERY",
+    GUARDRAIL_VIOLATIONS: "GUARDRAIL_VIOLATIONS",
+};
+
+export const INSIGHT_GROUP_LABEL = {
+    [INSIGHT_GROUP.ATLAS_DISCOVERY]: "Observe",
+    [INSIGHT_GROUP.GUARDRAIL_VIOLATIONS]: "Guardrails",
+};
+
+export const INSIGHT_GROUP_ROUTE = {
+    [INSIGHT_GROUP.ATLAS_DISCOVERY]: "/dashboard/observe/agentic-assets",
+    [INSIGHT_GROUP.GUARDRAIL_VIOLATIONS]: "/dashboard/guardrails/violations",
+};
+
+// Query param the target page reads on mount to auto-open its InsightsFlyout — see
+// AgenticAssetsPage.jsx / ViolationsPage.jsx. Empty string opens straight to the list.
+export const INSIGHT_DEEP_LINK_PARAM = "insight";
 
 export function statusLabel(status) {
     return STATUS_LABEL[status] || status || "";
@@ -44,12 +67,28 @@ function humanizeColumnKey(key) {
     return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
 }
 
+// Evidence columns carrying a Unix-epoch-seconds value (InsightUtil doesn't format these
+// server-side since evidence rows are raw data, not a `formatted` metric string) — render as a
+// relative date via func.prettifyEpoch instead of the generic numeric formatter below.
+const EPOCH_SECONDS_COLUMNS = new Set(["firstSeen"]);
+
 // Builds AgGridTable columnDefs from an Evidence.columns list, right-aligning any column whose
 // values are numbers across the (already-bounded, <= EVIDENCE_ROW_CAP) row set.
 export function buildEvidenceColumnDefs(evidence) {
     const columns = evidence?.columns || [];
     const rows = evidence?.rows || [];
     return columns.map((col) => {
+        if (EPOCH_SECONDS_COLUMNS.has(col)) {
+            return {
+                field: col,
+                headerName: humanizeColumnKey(col),
+                flex: 1,
+                minWidth: 110,
+                filter: false,
+                sortable: false,
+                valueFormatter: (p) => (typeof p.value === "number" ? func.prettifyEpoch(p.value) : p.value ?? ""),
+            };
+        }
         const isNumeric = rows.some((row) => typeof row?.[col] === "number");
         return {
             field: col,

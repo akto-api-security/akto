@@ -5,11 +5,11 @@ import request from "@/util/request";
 // "insight" (a single object), per struts.xml — so `request()` already resolves to the
 // exact shape, no unwrapping needed.
 export default {
-    async fetchInsightsList({ startTimestamp, endTimestamp } = {}) {
+    async fetchInsightsList({ startTimestamp, endTimestamp, group } = {}) {
         const insights = await request({
             url: '/api/fetchInsightsList',
             method: 'post',
-            data: { startTimestamp, endTimestamp },
+            data: { startTimestamp, endTimestamp, group },
         });
         return Array.isArray(insights) ? insights : [];
     },

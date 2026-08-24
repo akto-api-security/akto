@@ -1,26 +1,30 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, VerticalStack, HorizontalStack, Text, Button, Banner, Spinner, Icon } from "@shopify/polaris";
-import { RefreshMinor, ExternalMinor, MagicMinor } from "@shopify/polaris-icons";
+import { Box, VerticalStack, HorizontalStack, Text, Button, Banner, Spinner } from "@shopify/polaris";
+import { RefreshMinor, ExternalMinor } from "@shopify/polaris-icons";
 import MarkdownViewer from "@/apps/dashboard/components/shared/MarkdownViewer";
+import GridRows from "@/apps/dashboard/components/shared/GridRows";
+import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import insightsApi from "./insightsApi";
 import InsightEvidenceTable from "./InsightEvidenceTable";
 import { buildCtaHref } from "./insightsHelpers";
 import "../../../../components/layouts/style.css";
 
-// Fixed metric stat card — value/label always come straight from InsightResult.metrics;
+// Metric stat card — same title/value card shape GridRows' other callers use (see
+// TestRunResultFlyout's RowComp). value/label always come straight from InsightResult.metrics;
 // `formatted` is the string the backend built and the narrative is validated against, so
 // this component never reformats a number itself.
-const MetricCard = React.memo(function MetricCard({ metric }) {
-    return (
-        <Box style={{ flex: 1, minWidth: 0 }} borderWidth="1" borderColor="border-subdued" borderRadius="2" padding="4">
+function MetricCardComp({ cardObj }) {
+    const { title, value } = cardObj;
+    return value ? (
+        <Box width="224px">
             <VerticalStack gap="2">
-                <Text variant="bodySm" color="subdued">{metric.label}</Text>
-                <Text variant="headingLg" as="p">{metric.formatted}</Text>
+                <TitleWithInfo textProps={{ variant: "bodySm", color: "subdued" }} titleText={title} />
+                {value}
             </VerticalStack>
         </Box>
-    );
-});
+    ) : null;
+}
 
 export default function InsightDetailView({ insightId, startTimestamp, endTimestamp }) {
     const navigate = useNavigate();
@@ -67,6 +71,14 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
         [detail?.ctas]
     );
 
+    const metricItems = useMemo(
+        () => (detail?.metrics || []).map((metric) => ({
+            title: metric.label,
+            value: <Text variant="headingLg" as="p">{metric.formatted}</Text>,
+        })),
+        [detail?.metrics]
+    );
+
     if (loading) {
         return <Box padding="8"><Spinner accessibilityLabel="Loading insight" size="large" /></Box>;
     }
@@ -84,23 +96,13 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
     const hasNarrative = detail.narrativeStatus === "OK" && !!detail.markdown;
 
     return (
-        <Box style={{ flex: 1, minHeight: 0, overflowY: "auto" }} padding="5">
+        <Box overflowY="scroll" padding="5">
             <VerticalStack gap="5">
-                {detail.metrics?.length > 0 && (
-                    <HorizontalStack gap="4" wrap>
-                        {detail.metrics.map((metric) => (
-                            <MetricCard key={metric.key} metric={metric} />
-                        ))}
-                    </HorizontalStack>
+                {metricItems.length > 0 && (
+                    <GridRows columns={4} items={metricItems} CardComponent={MetricCardComp} />
                 )}
 
                 <div className="chat-message-row">
-                    <div className="chat-message-icon-wrap">
-                        <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#ECEBFF", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <Icon source={MagicMinor} color="base" />
-                        </div>
-                    </div>
-                    <div className="chat-message-divider" />
                     <Box style={{ flex: 1, minWidth: 0 }}>
                         <HorizontalStack align="space-between" blockAlign="center">
                             <Text variant="bodyMd" fontWeight="semibold" color="subdued">Akto AI Agent</Text>
