@@ -5,12 +5,15 @@ import com.akto.dao.context.Context;
 import com.akto.dto.CopilotStudioIntegration;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+
+import java.util.List;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -25,6 +28,19 @@ public class CopilotStudioIntegrationAction extends ActionSupport {
     private CopilotStudioIntegration copilotStudioIntegration;
     private String integrationId;
     private String refreshToken;
+    // Output only, for fetchAllCopilotStudioIntegrations — every connected tenant for this account.
+    private List<CopilotStudioIntegration> copilotStudioIntegrations;
+
+    /** Lists every connected tenant for this account — for CopilotStudioAgentUsersCron (akto/libs/utils), which needs to sync agent_users per tenant, not just look up one integration by id. */
+    public String fetchAllCopilotStudioIntegrations() {
+        try {
+            this.copilotStudioIntegrations = CopilotStudioIntegrationDao.instance.findAll(new BasicDBObject());
+        } catch (Exception e) {
+            loggerMaker.error("Error in fetchAllCopilotStudioIntegrations", e);
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
 
     /**
      * Fetch a specific CopilotStudioIntegration by ID.
