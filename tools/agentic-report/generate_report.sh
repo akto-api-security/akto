@@ -8,7 +8,9 @@
 set -euo pipefail
 
 ACCOUNT_ID="${1:?Usage: generate_report.sh <account_id> [output.xlsx] [mongo_container_name]}"
-OUTPUT="${2:-$HOME/Downloads/Agentic Prompts Report - ${ACCOUNT_ID}.xlsx}"
+# Defaults to the directory this is RUN from (not where the script lives) -- pass an
+# absolute/relative path as $2 to override.
+OUTPUT="${2:-Agentic Prompts Report - ${ACCOUNT_ID}.xlsx}"
 MONGO_CONTAINER="${3:-mongo}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

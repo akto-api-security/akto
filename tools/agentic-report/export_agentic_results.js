@@ -6,9 +6,11 @@
 // doc (falling back to the most recent vulnerable doc for that key if the exact summary
 // link doesn't resolve).
 //
-// "Non-Issue"/"Skipped-Error" rows = testing_run_result scoped to only the LATEST
+// "Non-Issue" rows = testing_run_result scoped to only the LATEST
 // testing_run_result_summaries doc per testingRunId (same dedup the dashboard's
-// Scan Results page uses) -- older reruns are excluded.
+// Scan Results page uses) -- older reruns are excluded. A handful of these also had
+// an execution error (timeout/API failure); those are kept as Non-Issue rows (matching
+// the dashboard's "Passed" count exactly) but flagged via Issue Status = "Execution Error".
 //
 // Every row is joined against yaml_templates (category/name/severity) and testing_run
 // (which job it came from), and agent_conversation_results (the actual prompts/responses).
@@ -90,18 +92,21 @@ const latestSummaries = db.testing_run_result_summaries.aggregate([
 ]).toArray();
 const summaryIds = latestSummaries.map(d => d.data._id);
 
-function exportScoped(matchExtra, resultType) {
-  const match = Object.assign({ testRunResultSummaryId: { $in: summaryIds }, "testResults.resultTypeAgentic": true }, matchExtra);
-  db.testing_run_result.find(match).forEach(doc => {
-    const info = templateInfo(doc.testSubType);
-    const conversationId = doc.testResults && doc.testResults[0] ? doc.testResults[0].conversationId : null;
-    emit(
-      { testSubType: doc.testSubType, method: doc.apiInfoKey.method, url: doc.apiInfoKey.url, name: info.name, severity: info.severity, category: info.category },
-      resultType,
-      { issueStatus: "", testingRun: runName(doc.testRunResultSummaryId), turns: turnsFor(conversationId) }
-    );
-  });
-}
-
-exportScoped({ vulnerable: false }, "Non-Issue");
-exportScoped({ "testResults.errors.0": { $exists: true } }, "Skipped/Error");
+// NOTE: do NOT additionally filter on "testResults.resultTypeAgentic": true here --
+// ~10 genuinely-agentic docs (testSuperType in AGENT_GOAL_HIJACK, MEMORY_AND_CONTEXT_POISONING,
+// etc.) have that flag missing/false on every testResults[] entry despite being real agentic
+// results. The dashboard's own "Passed" count (2,182) only relies on `vulnerable: false`
+// scoped to the latest-per-run set -- verified to match exactly without the extra filter.
+db.testing_run_result.find({
+  testRunResultSummaryId: { $in: summaryIds },
+  vulnerable: false
+}).forEach(doc => {
+  const info = templateInfo(doc.testSubType);
+  const conversationId = doc.testResults && doc.testResults[0] ? doc.testResults[0].conversationId : null;
+  const hasError = doc.testResults && doc.testResults.some(t => t.errors && t.errors.length > 0);
+  emit(
+    { testSubType: doc.testSubType, method: doc.apiInfoKey.method, url: doc.apiInfoKey.url, name: info.name, severity: info.severity, category: info.category },
+    "Non-Issue",
+    { issueStatus: hasError ? "Execution Error" : "", testingRun: runName(doc.testRunResultSummaryId), turns: turnsFor(conversationId) }
+  );
+});

@@ -22,7 +22,7 @@ HEADER = [
 ]
 
 SEVERITY_ORDER = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
-RESULT_TYPE_ORDER = {"Issue": 0, "Non-Issue": 1, "Skipped/Error": 2}
+RESULT_TYPE_ORDER = {"Issue": 0, "Non-Issue": 1}
 
 
 def clean(value):
