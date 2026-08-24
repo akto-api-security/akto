@@ -11,13 +11,9 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.concurrent.ConcurrentHashMap;
-import java.lang.management.ManagementFactory;
-import java.lang.management.ThreadMXBean;
 
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.HttpRequestParams;
@@ -42,12 +38,6 @@ public class VariableResolver {
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
     private static final ConcurrentHashMap<ApiInfoKey, SampleData> sampleDataCache = new ConcurrentHashMap<>();
     private static final int MAX_CACHE_SIZE = 1000;
-
-    // --- instrumentation: per-call CPU + string sizes in word-list resolution (no behavior change) ---
-    private static final LoggerMaker loggerMaker = new LoggerMaker(VariableResolver.class, LogDb.TESTING);
-    private static final ThreadMXBean THREAD_MX = ManagementFactory.getThreadMXBean();
-    /** Log a WORDLIST-CPU line when a single resolveWordListVar call burns at least this many CPU ms. */
-    private static final long WORDLIST_CPU_LOG_THRESHOLD_MS = 50L;
 
     public static Object getValue(Map<String, Object> varMap, String key) {
         if (!varMap.containsKey(key)) {
@@ -535,13 +525,6 @@ public class VariableResolver {
         List<String> wordList = new ArrayList<>();
         String wordListKey = null;
 
-        // instrumentation (no behavior change): measure CPU + string sizes this call burns
-        // long instrWallStart = System.currentTimeMillis();
-        // long instrCpuStart = THREAD_MX.isCurrentThreadCpuTimeSupported() ? THREAD_MX.getCurrentThreadCpuTime() : -1L;
-        // int startExprLen = expression.length();
-        // int k = 0;
-        // StringBuilder varInfo = new StringBuilder();
-
         Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
         Matcher matcher = pattern.matcher(expression);
         List<String> result = new ArrayList<>();
@@ -559,16 +542,10 @@ public class VariableResolver {
                     wordList = (List<String>) varMap.get("wordList_" + match);
                     wordListKey = originalKey;
 
-        //             // record this var's size + biggest value length (measurement only)
-        //             // k++;
-        //             // int n = (wordList == null) ? 0 : wordList.size();
-        //             // int maxValLen = 0;
-        //             // if (wordList != null) {
-        //             //     for (Object w : wordList) {
-        //             //         if (w != null) maxValLen = Math.max(maxValLen, w.toString().length());
-        //             //     }
-        //             // }
-        //             // varInfo.append(match).append(":N=").append(n).append(",maxLen=").append(maxValLen).append("; ");
+                    // the token stays in expression and matcher re-finds it every pass → infinite loop
+                    if (wordList == null || wordList.isEmpty()) {
+                        return new ArrayList<>();
+                    }
 
                     List<String> tempResult = new ArrayList<>();
                     for (String temp : result) {
@@ -590,20 +567,6 @@ public class VariableResolver {
                 e.printStackTrace();
             }
         }
-        // long instrCpuMs = (instrCpuStart >= 0) ? (THREAD_MX.getCurrentThreadCpuTime() - instrCpuStart) / 1_000_000L : -1L;
-        // long instrWallMs = System.currentTimeMillis() - instrWallStart;
-        // if (instrCpuMs >= WORDLIST_CPU_LOG_THRESHOLD_MS || (instrCpuMs < 0 && instrWallMs >= WORDLIST_CPU_LOG_THRESHOLD_MS)) {
-        //     int maxResultLen = 0;
-        //     for (String s : result) {
-        //         if (s != null) maxResultLen = Math.max(maxResultLen, s.length());
-        //     }
-        //     loggerMaker.warnAndAddToDb("WORDLIST-CPU subcategory=" + varMap.get("testSubType")
-        //             + " api=" + varMap.get("apiInfoKey")
-        //             + " cpuMs=" + instrCpuMs + " wallMs=" + instrWallMs
-        //             + " startExprLen=" + startExprLen
-        //             + " finalResults=" + result.size()
-        //             + " maxResultLen=" + maxResultLen);
-        // }
         return result;
     }
 

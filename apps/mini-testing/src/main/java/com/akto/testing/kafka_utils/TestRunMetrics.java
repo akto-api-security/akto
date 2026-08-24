@@ -2,9 +2,7 @@ package com.akto.testing.kafka_utils;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -50,14 +48,13 @@ public class TestRunMetrics {
 
     /**
      * Pipeline stages timed per test, so a whole run can be billed by where wall time goes.
-     * RUN_TEST is the full {@code runTestNew} wall; TARGET_HTTP is the slice of it spent blocked on the
-     * API under test (from {@link com.akto.testing.ApiExecutor}); RUN_TEST minus TARGET_HTTP is compute.
+     * RUN_TEST is the full {@code runTestNew} wall; LOOKUP is config/sample resolution;
      * PERSIST_LOGS + INSERT_RESULTS are the ultron persistence round-trips ("run away from ultron" cost).
      */
-    public enum Stage { LOOKUP, RUN_TEST, RESOLVE_EXPR, SEND_REQUEST, VALIDATE, PERSIST_LOGS, INSERT_RESULTS }
+    public enum Stage { LOOKUP, RUN_TEST, PERSIST_LOGS, INSERT_RESULTS }
 
-    /** WARN-level progress heartbeat cadence (M*N run-wide progress). */
-    private static final long HEARTBEAT_INTERVAL_MS = 30_000L;
+    /** WARN-level progress + cost heartbeat cadence. */
+    private static final long HEARTBEAT_INTERVAL_MS = 60_000L;
     /** No increase in processed records for this long (while work is still in-flight) => log a stall dump. */
     private static final long STALL_THRESHOLD_MS = 60_000L;
     /** Don't spam stall dumps more often than this. */
@@ -70,15 +67,11 @@ public class TestRunMetrics {
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestRunMetrics.class, LogDb.TESTING);
 
     private static final class InflightTask {
-        final String label;      // "subcategory apiInfoKey"
-        final String subcategory;
-        final String api;
+        final String label;      // recordId (topic-partition-offset)
         final long startMs;
         final String threadName;
-        InflightTask(String subcategory, String api, long startMs, String threadName) {
-            this.subcategory = subcategory;
-            this.api = api;
-            this.label = subcategory + " " + api;
+        InflightTask(String label, long startMs, String threadName) {
+            this.label = label;
             this.startMs = startMs;
             this.threadName = threadName;
         }
@@ -111,8 +104,6 @@ public class TestRunMetrics {
     private final EnumMap<Stage, AtomicLong> stageMaxNanos = newStageMax();
     /** CPU time (not wall) attributed to RUN_TEST, to separate compute from I/O wait. */
     private final LongAdder runTestCpuNanos = new LongAdder();
-    /** Total HTTP requests sent across all tests (sum of N per test), to derive requests/test. */
-    private final LongAdder requestCount = new LongAdder();
 
     private static EnumMap<Stage, LongAdder> newStageAdders() {
         EnumMap<Stage, LongAdder> m = new EnumMap<>(Stage.class);
@@ -150,8 +141,8 @@ public class TestRunMetrics {
     }
 
     /** A task was submitted to the executor; start tracking it as in-flight. */
-    public void onSubmit(String recordId, String subcategory, String api, String threadName) {
-        inflightTasks.put(recordId, new InflightTask(subcategory, api, System.currentTimeMillis(), threadName));
+    public void onSubmit(String recordId, String threadName) {
+        inflightTasks.put(recordId, new InflightTask(recordId, System.currentTimeMillis(), threadName));
     }
 
     /** A task finished (any outcome); stop tracking it and fold its wall-clock into the timing aggregates. */
@@ -194,11 +185,6 @@ public class TestRunMetrics {
     /** Fold the CPU time (nanos) a single {@code runTestNew} burned, to split compute from I/O wait. */
     public void recordRunTestCpu(long nanos) {
         if (nanos > 0) runTestCpuNanos.add(nanos);
-    }
-
-    /** Fold the number of HTTP requests one test fanned out (N), to derive requests/test. */
-    public void recordRequests(long count) {
-        if (count > 0) requestCount.add(count);
     }
 
     // ----- lifecycle banners -----
@@ -339,9 +325,9 @@ public class TestRunMetrics {
     }
 
     /**
-     * WARN-level cost breakdown: of all per-test wall time measured so far, how much went to each stage.
-     * Percentages are of the summed stage wall time (not run wall time — stages overlap across threads).
-     * The single line that answers "what is taking so long": target-HTTP vs ultron vs compute.
+     * WARN-level per-test wall-time breakdown, plus per-test CPU (the one non-wall field) so compute can
+     * be told apart from I/O wait. Stage wall times are summed across worker threads and divided by n, so
+     * these are per-test averages, not run wall-clock (tests overlap across threads).
      */
     private void logCostBreakdown() {
         long n = stageCount.get(Stage.RUN_TEST).sum();
@@ -349,16 +335,9 @@ public class TestRunMetrics {
 
         long lookup   = stageNanos.get(Stage.LOOKUP).sum();
         long runTest  = stageNanos.get(Stage.RUN_TEST).sum();
-        long resolve  = stageNanos.get(Stage.RESOLVE_EXPR).sum();
-        long sendReq  = stageNanos.get(Stage.SEND_REQUEST).sum();
-        long validate = stageNanos.get(Stage.VALIDATE).sum();
         long persist  = stageNanos.get(Stage.PERSIST_LOGS).sum();
         long insertRt = stageNanos.get(Stage.INSERT_RESULTS).sum();
         long runCpu   = runTestCpuNanos.sum();
-        long reqs     = requestCount.sum();
-        // The three sub-phases are disjoint subsets of RUN_TEST (resolve builds requests, then the
-        // send-loop runs, then validate per response); the remainder is setup/overhead.
-        long other    = Math.max(0, runTest - resolve - sendReq - validate);
         long ultron   = persist + insertRt;                  // persistence round-trips
         long billed   = lookup + runTest + ultron;
 
@@ -366,13 +345,8 @@ public class TestRunMetrics {
         loggerMaker.warnAndAddToDb("TESTRUN COST summaryId=" + summaryId
                 + " n=" + n
                 + " avgPerTestMs=" + avgWallMs
-                + " requestsPerTest=" + per(reqs, n)
                 + " cpuPerTestMs=" + msPer(runCpu, n)
                 + " | RUN_TEST=" + msPer(runTest, n) + "ms (" + pctOf(runTest, billed) + " of billed)"
-                + " [RESOLVE_EXPR=" + msPer(resolve, n) + "ms/" + pctOf(resolve, runTest) + " of RUN_TEST"
-                + " | SEND_REQUEST=" + msPer(sendReq, n) + "ms/" + pctOf(sendReq, runTest) + " (N=" + per(reqs, n) + "/test)"
-                + " | VALIDATE=" + msPer(validate, n) + "ms/" + pctOf(validate, runTest)
-                + " | OTHER=" + msPer(other, n) + "ms/" + pctOf(other, runTest) + "]"
                 + " LOOKUP=" + msPer(lookup, n) + "ms"
                 + " PERSIST_LOGS=" + msPer(persist, n) + "ms"
                 + " INSERT_RESULTS=" + msPer(insertRt, n) + "ms"
@@ -381,7 +355,6 @@ public class TestRunMetrics {
 
     private static long ms(long nanos) { return nanos / 1_000_000L; }
     private static long msPer(long nanos, long n) { return n > 0 ? (nanos / n) / 1_000_000L : 0; }
-    private static String per(long v, long n) { return n > 0 ? String.format("%.1f", v / (double) n) : "0"; }
     private static String pctOf(long part, long whole) {
         return whole > 0 ? (part * 100L / whole) + "%" : "0%";
     }
@@ -409,34 +382,5 @@ public class TestRunMetrics {
         if (tasks.size() > limit) sb.append(" (+").append(tasks.size() - limit).append(" more)");
 
         loggerMaker.warnAndAddToDb(sb.toString());
-
-        // Reuse the in-flight registry to show WHICH subcategories / APIs are occupying the stuck slots
-        // right now. Watched across successive STALL prints (every ~30s), a subcategory/API that keeps
-        // dominating is one that "always gets stuck"; a shifting mix means it's load-dependent.
-        int stuckNow = 0;
-        for (InflightTask t : tasks) if (nowMs - t.startMs >= STUCK_AGE_MS) stuckNow++;
-        loggerMaker.warnAndAddToDb("TESTRUN STALL-BY-SUBCAT summaryId=" + summaryId
-                + " stuckSlots=" + stuckNow + " bySubcat=[" + topStuck(tasks, nowMs, true) + "]");
-        loggerMaker.warnAndAddToDb("TESTRUN STALL-BY-API summaryId=" + summaryId
-                + " stuckSlots=" + stuckNow + " byApi=[" + topStuck(tasks, nowMs, false) + "]");
-    }
-
-    /** Count the currently-stuck (age >= STUCK_AGE_MS) in-flight tasks by subcategory or api, top-15 by count. */
-    private String topStuck(List<InflightTask> tasks, long nowMs, boolean bySubcat) {
-        Map<String, Integer> counts = new HashMap<>();
-        for (InflightTask t : tasks) {
-            if (nowMs - t.startMs < STUCK_AGE_MS) continue;
-            counts.merge(bySubcat ? t.subcategory : t.api, 1, Integer::sum);
-        }
-        List<Map.Entry<String, Integer>> list = new ArrayList<>(counts.entrySet());
-        list.sort((a, b) -> Integer.compare(b.getValue(), a.getValue())); // highest count first
-        StringBuilder sb = new StringBuilder();
-        int n = Math.min(15, list.size());
-        for (int i = 0; i < n; i++) {
-            sb.append(list.get(i).getKey()).append("=").append(list.get(i).getValue());
-            if (i < n - 1) sb.append(", ");
-        }
-        if (list.size() > n) sb.append(" (+").append(list.size() - n).append(" more)");
-        return sb.toString();
     }
 }

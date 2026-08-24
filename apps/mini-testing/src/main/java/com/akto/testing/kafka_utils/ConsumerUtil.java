@@ -10,7 +10,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -33,7 +32,6 @@ import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.test_editor.execution.TestPhaseTimer;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
 import com.akto.testing.kafka_utils.TestRunMetrics.Stage;
@@ -67,35 +65,8 @@ public class ConsumerUtil {
     }
     private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null;
 
-    // ---- perf tunables (env-overridable so we can sweep without recompiling) ----
-    private static int envInt(String name, int def) {
-        try { String v = System.getenv(name); return (v != null && !v.trim().isEmpty()) ? Integer.parseInt(v.trim()) : def; }
-        catch (Exception e) { return def; }
-    }
-    /**
-     * Per-test execution timeout. Was hard-coded 300s; a CPU-starved test that can't finish should be
-     * cut fast (300s slots waste ~60% of capacity). Override with MINI_TESTING_TASK_TIMEOUT_SECONDS.
-     */
-    private static final int maxRunTimeForTests = envInt("MINI_TESTING_TASK_TIMEOUT_SECONDS", 5 * 60);
-    /** Hard cap on worker concurrency (executor pool + parallel-consumer). 0 = use the run's configured value. */
-    private static final int MAX_CONCURRENCY_CAP = envInt("MINI_TESTING_MAX_CONCURRENCY", 0);
-
-    /** Apply the optional concurrency cap to the run's configured maxConcurrentRequest. */
-    private static int effectiveConcurrency(int configured) {
-        return (MAX_CONCURRENCY_CAP > 0) ? Math.min(configured, MAX_CONCURRENCY_CAP) : configured;
-    }
-
-    /** Named daemon threads so jstack/flamegraphs are readable and pools are attributable. */
-    private static ThreadFactory namedThreadFactory(String prefix) {
-        AtomicInteger seq = new AtomicInteger(1);
-        return r -> {
-            Thread t = new Thread(r, prefix + "-" + seq.getAndIncrement());
-            t.setDaemon(true);
-            return t;
-        };
-    }
-
-    public static ExecutorService executor = Executors.newFixedThreadPool(150, namedThreadFactory("mini-test-worker"));
+    public static ExecutorService executor = Executors.newFixedThreadPool(150);
+    private static final int maxRunTimeForTests = 5 * 60;
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     private static final ConcurrentHashMap<ApiInfoKey, Integer> testedApisMap = new ConcurrentHashMap<>();
@@ -103,7 +74,7 @@ public class ConsumerUtil {
     /** All observability for the current run. Recreated per init(); set before any task is submitted. */
     private TestRunMetrics metrics;
 
-    /** For per-test CPU accounting (compute vs I/O). Null/unsupported -> CPU is reported as 0. */
+    /** For per-test CPU accounting (compute vs I/O). Unsupported -> CPU reported as 0. */
     private static final ThreadMXBean THREAD_MX = ManagementFactory.getThreadMXBean();
     private static final boolean CPU_TIME_SUPPORTED = THREAD_MX.isThreadCpuTimeSupported();
 
@@ -147,12 +118,8 @@ public class ConsumerUtil {
                 String sample = messagesList.get(messagesList.size() - 1);
                 loggerMaker.infoAndAddToDb("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
 
-                // RUN_TEST: full test execution wall + CPU; sub-phases (resolveExpr/sendReq/validate)
-                // are accumulated on this worker thread via TestPhaseTimer and read back after.
-                // The recording is in a finally so a test that TIMES OUT / is interrupted / throws
-                // (e.g. stuck grinding in resolveWordListVar) still gets its partial phase timings
-                // counted once it unwinds — otherwise the COST line only ever sees fast completers.
-                TestPhaseTimer.reset();
+                // RUN_TEST wall + CPU. Recorded in a finally so a test that times out / throws still
+                // gets its timing counted once it unwinds (else COST only ever sees fast completers).
                 long runCpuStart = CPU_TIME_SUPPORTED ? THREAD_MX.getCurrentThreadCpuTime() : -1L;
                 long runWallStart = System.nanoTime();
                 TestingRunResult runResult;
@@ -160,10 +127,6 @@ public class ConsumerUtil {
                     runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
                 } finally {
                     metrics.recordStage(Stage.RUN_TEST, System.nanoTime() - runWallStart);
-                    metrics.recordStage(Stage.RESOLVE_EXPR, TestPhaseTimer.resolveExprNanos());
-                    metrics.recordStage(Stage.SEND_REQUEST, TestPhaseTimer.sendReqNanos());
-                    metrics.recordStage(Stage.VALIDATE, TestPhaseTimer.validateNanos());
-                    metrics.recordRequests(TestPhaseTimer.sendReqCount());
                     if (runCpuStart >= 0) metrics.recordRunTestCpu(THREAD_MX.getCurrentThreadCpuTime() - runCpuStart);
                 }
 
@@ -269,9 +232,9 @@ public class ConsumerUtil {
         }
 
         TestingConfigurations instance = TestingConfigurations.getInstance();
-        int concurrency = effectiveConcurrency(instance.getMaxConcurrentRequest());
+        int concurrency = instance.getMaxConcurrentRequest();
         shutdownExecutorQuietly(5, true);
-        executor = Executors.newFixedThreadPool(concurrency, namedThreadFactory("mini-test-worker"));
+        executor = Executors.newFixedThreadPool(concurrency);
 
         final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
         int startTime = Context.now();
@@ -356,21 +319,11 @@ public class ConsumerUtil {
                     String message = record.value();
                     String recordId = record.getSingleConsumerRecord().topic() + "-p" + record.getSingleConsumerRecord().partition() + "-o" + record.offset();
                     metrics.onPolled();
-                    String label;
-                    String subcategory = "unknown", api = "unknown";
-                    try {
-                        SingleTestPayload p = parseTestMessage(message);
-                        subcategory = p.getSubcategory();
-                        api = p.getApiInfoKey().toString();
-                        label = subcategory + " " + api;
-                    } catch (Exception ex) {
-                        label = recordId;
-                    }
                     loggerMaker.infoAndAddToDb("Thread [" + threadName + "] picked up record recordId=" + recordId + " " + message);
                     debugLogToDb(accountId, "picked up recordId=" + recordId + " polled=" + metrics.polled());
                     try {
                         if(!executor.isShutdown()){
-                            metrics.onSubmit(recordId, subcategory, api, threadName);
+                            metrics.onSubmit(recordId, threadName);
                             Future<?> future = executor.submit(() -> runTestFromMessage(message));
                             firstRecordRead.set(true);
                             try {
@@ -413,7 +366,7 @@ public class ConsumerUtil {
                     } finally {
                         metrics.onComplete(recordId);
                         processedRecords.incrementAndGet();
-                        loggerMaker.infoAndAddToDb("Thread [" + threadName + "] finished processing record recordId=" + recordId + " (" + label + ")");
+                        loggerMaker.infoAndAddToDb("Thread [" + threadName + "] finished processing record recordId=" + recordId + ")");
                         debugLogToDb(accountId, "finished recordId=" + recordId + " executed=" + processedRecords.get());
                     }
                 });
