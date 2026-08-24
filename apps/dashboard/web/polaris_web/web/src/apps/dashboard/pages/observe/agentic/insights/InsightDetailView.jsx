@@ -17,7 +17,7 @@ import "../../../../components/layouts/style.css";
 function MetricCardComp({ cardObj }) {
     const { title, value } = cardObj;
     return value ? (
-        <Box width="224px">
+        <Box>
             <VerticalStack gap="2">
                 <TitleWithInfo textProps={{ variant: "bodySm", color: "subdued" }} titleText={title} />
                 {value}
@@ -99,7 +99,7 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
         <Box overflowY="scroll" padding="5">
             <VerticalStack gap="5">
                 {metricItems.length > 0 && (
-                    <GridRows columns={4} items={metricItems} CardComponent={MetricCardComp} />
+                    <GridRows columns={metricItems.size} items={metricItems} CardComponent={MetricCardComp} />
                 )}
 
                 <div className="chat-message-row">
