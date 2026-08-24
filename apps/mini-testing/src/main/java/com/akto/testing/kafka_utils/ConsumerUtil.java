@@ -14,6 +14,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
 
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -35,9 +37,6 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
 import com.akto.testing.kafka_utils.TestRunMetrics.Stage;
-
-import java.lang.management.ManagementFactory;
-import java.lang.management.ThreadMXBean;
 import com.akto.util.Constants;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
@@ -130,13 +129,8 @@ public class ConsumerUtil {
                     if (runCpuStart >= 0) metrics.recordRunTestCpu(THREAD_MX.getCurrentThreadCpuTime() - runCpuStart);
                 }
 
-                long persistStart = System.nanoTime();
                 executor.persistTestLogsToDb(runResult != null ? runResult.getTestLogs() : null);
-                metrics.recordStage(Stage.PERSIST_LOGS, System.nanoTime() - persistStart);
-
-                long insertStart = System.nanoTime();
                 executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
-                metrics.recordStage(Stage.INSERT_RESULTS, System.nanoTime() - insertStart);
 
                 if (runResult != null && runResult.isVulnerable()) {
                     metrics.markVulnerable();
@@ -366,7 +360,7 @@ public class ConsumerUtil {
                     } finally {
                         metrics.onComplete(recordId);
                         processedRecords.incrementAndGet();
-                        loggerMaker.infoAndAddToDb("Thread [" + threadName + "] finished processing record recordId=" + recordId + ")");
+                        loggerMaker.infoAndAddToDb("Thread [" + threadName + "] finished processing record recordId=" + recordId);
                         debugLogToDb(accountId, "finished recordId=" + recordId + " executed=" + processedRecords.get());
                     }
                 });

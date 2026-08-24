@@ -47,11 +47,10 @@ public class TestRunMetrics {
     }
 
     /**
-     * Pipeline stages timed per test, so a whole run can be billed by where wall time goes.
-     * RUN_TEST is the full {@code runTestNew} wall; LOOKUP is config/sample resolution;
-     * PERSIST_LOGS + INSERT_RESULTS are the ultron persistence round-trips ("run away from ultron" cost).
+     * Pipeline stages timed per test. LOOKUP is config/sample resolution; RUN_TEST is the full
+     * {@code runTestNew} wall (the bulk of a test's cost).
      */
-    public enum Stage { LOOKUP, RUN_TEST, PERSIST_LOGS, INSERT_RESULTS }
+    public enum Stage { LOOKUP, RUN_TEST }
 
     /** WARN-level progress + cost heartbeat cadence. */
     private static final long HEARTBEAT_INTERVAL_MS = 60_000L;
@@ -335,22 +334,16 @@ public class TestRunMetrics {
 
         long lookup   = stageNanos.get(Stage.LOOKUP).sum();
         long runTest  = stageNanos.get(Stage.RUN_TEST).sum();
-        long persist  = stageNanos.get(Stage.PERSIST_LOGS).sum();
-        long insertRt = stageNanos.get(Stage.INSERT_RESULTS).sum();
         long runCpu   = runTestCpuNanos.sum();
-        long ultron   = persist + insertRt;                  // persistence round-trips
-        long billed   = lookup + runTest + ultron;
+        long billed   = lookup + runTest;
 
-        long avgWallMs = ms(runTest + lookup + ultron) / n;
+        long avgWallMs = ms(runTest + lookup) / n;
         loggerMaker.warnAndAddToDb("TESTRUN COST summaryId=" + summaryId
                 + " n=" + n
                 + " avgPerTestMs=" + avgWallMs
                 + " cpuPerTestMs=" + msPer(runCpu, n)
                 + " | RUN_TEST=" + msPer(runTest, n) + "ms (" + pctOf(runTest, billed) + " of billed)"
-                + " LOOKUP=" + msPer(lookup, n) + "ms"
-                + " PERSIST_LOGS=" + msPer(persist, n) + "ms"
-                + " INSERT_RESULTS=" + msPer(insertRt, n) + "ms"
-                + " ULTRON_TOTAL=" + msPer(ultron, n) + "ms/" + pctOf(ultron, billed));
+                + " LOOKUP=" + msPer(lookup, n) + "ms");
     }
 
     private static long ms(long nanos) { return nanos / 1_000_000L; }
