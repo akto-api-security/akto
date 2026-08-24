@@ -99,7 +99,7 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
         <Box overflowY="scroll" padding="5">
             <VerticalStack gap="5">
                 {metricItems.length > 0 && (
-                    <GridRows columns={metricItems.size} items={metricItems} CardComponent={MetricCardComp} />
+                    <GridRows columns={metricItems.length} items={metricItems} CardComponent={MetricCardComp} />
                 )}
 
                 <div className="chat-message-row">
