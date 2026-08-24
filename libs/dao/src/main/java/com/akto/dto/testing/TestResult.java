@@ -9,6 +9,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+
+// Cancels the custom @JsonDeserialize inherited from GenericTestResult - without this, deserializing
+// this concrete class re-enters GenericTestResultDeserializer and recurses infinitely.
+@JsonDeserialize(using = JsonDeserializer.None.class)
 public class TestResult extends GenericTestResult {
 
     public static final String _MESSAGE = "message";
