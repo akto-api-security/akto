@@ -91,14 +91,20 @@ public class DangerousCapabilityExposureProvider extends AbstractInsightProvider
         r.addMetric(new InsightResult.Metric("usersReachable", "Users reachable via dangerous tools", usersReachable.size(), "count",
                 InsightUtil.count(usersReachable.size(), "users")));
 
+        boolean fullyClassified = unclassified == 0;
         r.setMetricsComplete(scope == Scope.DETAIL);
-        r.setStatus((dangerous == 0 ? InsightResult.Status.NO_DATA : InsightResult.Status.PARTIAL).name());
+        r.setStatus((dangerous > 0 || !fullyClassified ? InsightResult.Status.PARTIAL : InsightResult.Status.NO_DATA).name());
         r.addDataGap(new InsightResult.Gap("TOOL_INVENTORY", "NOT_CONFIGURED",
                 "Built-in agent tools (Bash, Read, Write, ...) are not included — only MCP server tools are classified."));
         if (unclassified > 0) {
             r.addDataGap(new InsightResult.Gap("TOOL_INVENTORY", "DEFERRED_TO_DETAIL", unclassified + " tools are classified only when this insight is opened."));
         }
-        r.setHeadline(dangerous == 0 ? "No dangerous-capability MCP tools detected"
+        // Never claim "none detected" while tools are still unclassified — LIST scope never
+        // classifies anything (see the scope check above), so dangerous==0 there means
+        // "not checked yet", not "confirmed safe".
+        r.setHeadline(!fullyClassified
+                ? InsightUtil.count(unclassified, "MCP tools") + " pending classification"
+                : dangerous == 0 ? "No dangerous-capability MCP tools detected"
                 : InsightUtil.count(dangerous, "dangerous tools") + ", " + ungated + " with no blocking guardrail");
 
         r.addEvidence(new InsightResult.Evidence("dangerous_tools", "Dangerous-capability tools",

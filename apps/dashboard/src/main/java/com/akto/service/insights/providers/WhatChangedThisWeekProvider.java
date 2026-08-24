@@ -21,7 +21,11 @@ public class WhatChangedThisWeekProvider extends AbstractInsightProvider {
     @Override
     public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope) {
         InsightResult r = skeleton();
-        long now = ctx.getEndTs() > 0 ? ctx.getEndTs() : System.currentTimeMillis() / 1000;
+        // "This week" is always relative to real wall-clock time, never to ctx's endTs — that's
+        // a date-range filter bound the caller controls (e.g. AgenticAssetsPage's "All time"
+        // preset sends a far-future sentinel), not "now", and using it here silently zeroed out
+        // every real recent asset/component/tag.
+        long now = System.currentTimeMillis() / 1000;
         long since = now - WINDOW_SECONDS;
 
         List<ApiCollection> newAssets = new ArrayList<>();

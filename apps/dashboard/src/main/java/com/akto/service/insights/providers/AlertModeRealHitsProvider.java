@@ -117,8 +117,8 @@ public class AlertModeRealHitsProvider extends AbstractInsightProvider {
         String severity = alertModeDangerousHits > 0 ? "HIGH" : (alertModeTotalHits > 0 ? "MEDIUM" : "LOW");
         String headline = alertModeDangerousHits > 0
                 ? String.format(Locale.US,
-                    "%s of %s alert-mode-policy hits involve credentials, PII, or prompt injection — detected, but never blocked.",
-                    InsightUtil.count(alertModeDangerousHits, "hits"), InsightUtil.count(alertModeTotalHits, "hits"))
+                    "%s involve credentials, PII, or prompt injection — detected, but never blocked.",
+                    InsightUtil.ofTotal(alertModeDangerousHits, alertModeTotalHits, "alert-mode-policy hits"))
                 : String.format(Locale.US,
                     "%s covering %s of all violation volume are in alert mode, but none of their hits involve credentials, PII, or prompt injection.",
                     InsightUtil.count(alertModePolicies.size(), "policies"), InsightUtil.percent(alertModeShare));

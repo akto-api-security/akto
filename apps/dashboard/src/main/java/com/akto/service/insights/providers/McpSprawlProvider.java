@@ -25,7 +25,11 @@ public class McpSprawlProvider extends AbstractInsightProvider {
     @Override
     public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope) {
         InsightResult r = skeleton();
-        long now = ctx.getEndTs() > 0 ? ctx.getEndTs() : System.currentTimeMillis() / 1000;
+        // Dormancy is relative to real wall-clock time, not ctx's endTs (a date-range filter
+        // bound the caller controls — e.g. AgenticAssetsPage's "All time" preset sends a
+        // far-future sentinel). Using that as "now" inflated the elapsed-time gap for every
+        // server and wrongly flagged most of them dormant.
+        long now = System.currentTimeMillis() / 1000;
 
         // Approved service names: allowlist, or an mcp-server audit row with remarks=Approved.
         Set<String> approvedApprovedLower = new HashSet<>(bundle.allowlistNamesLower);

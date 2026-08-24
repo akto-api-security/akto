@@ -29,6 +29,7 @@ public final class InsightUtil {
     }
 
     private static String singular(String noun) {
+        if (noun.endsWith("ies")) return noun.substring(0, noun.length() - 3) + "y";
         return noun.endsWith("s") ? noun.substring(0, noun.length() - 1) : noun;
     }
 
