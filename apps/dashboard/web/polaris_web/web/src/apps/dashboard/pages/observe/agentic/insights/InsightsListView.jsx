@@ -1,8 +1,7 @@
 import React, { useState, useMemo, useCallback } from "react";
-import { Box, VerticalStack, HorizontalStack, Text, Badge, Tabs, Icon, Banner } from "@shopify/polaris";
+import { Box, VerticalStack, HorizontalStack, Text, Tabs, Icon, Banner } from "@shopify/polaris";
 import { ChevronRightMinor } from "@shopify/polaris-icons";
 import { SeverityBadge } from "../AgenticCellRenderers";
-import { categoryLabel } from "./insightsHelpers";
 import "../../../../components/layouts/style.css";
 
 const InsightRow = React.memo(function InsightRow({ insight, onSelect }) {
@@ -13,11 +12,7 @@ const InsightRow = React.memo(function InsightRow({ insight, onSelect }) {
     return (
         <Box
             className="insight-row"
-            paddingBlock="4"
-            paddingInlineStart="5"
-            paddingInlineEnd="6"
-            borderBlockEndWidth="1"
-            borderColor="border-subdued"
+            padding={"3"}
             onClick={handleClick}
         >
             <HorizontalStack gap="4" wrap={false}>
@@ -26,7 +21,6 @@ const InsightRow = React.memo(function InsightRow({ insight, onSelect }) {
                     <VerticalStack gap="2">
                         <HorizontalStack gap="2" blockAlign="center" wrap>
                             <Text variant="bodyMd" fontWeight="semibold">{insight.title}</Text>
-                            <Badge>{categoryLabel(insight.category)}</Badge>
                             {insight.severity ? <SeverityBadge severity={insight.severity} /> : null}
                         </HorizontalStack>
                         {headline ? (
@@ -72,7 +66,7 @@ export default function InsightsListView({ insights, error, onSelect }) {
 
     return (
         <Box style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <Box padding="4">
+            <Box padding="3">
                 <Tabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange} />
             </Box>
             <Box style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
@@ -81,9 +75,11 @@ export default function InsightsListView({ insights, error, onSelect }) {
                         <Text variant="bodyMd" color="subdued" alignment="center">No insights in this category.</Text>
                     </Box>
                 ) : (
-                    visibleInsights.map((insight) => (
-                        <InsightRow key={insight.insightId} insight={insight} onSelect={onSelect} />
-                    ))
+                    <VerticalStack gap={"3"}>
+                        {visibleInsights.map((insight) => (
+                            <InsightRow key={insight.insightId} insight={insight} onSelect={onSelect} />
+                        ))}
+                    </VerticalStack>
                 )}
             </Box>
         </Box>

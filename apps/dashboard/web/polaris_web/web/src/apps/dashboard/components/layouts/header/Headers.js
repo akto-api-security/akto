@@ -17,7 +17,10 @@ import Dropdown from '../Dropdown';
 import Wrapped2025 from './Wrapped2025';
 import { shortNameToCategory } from '../../../../main/labelHelper';
 import insightsApi from '@/apps/dashboard/pages/observe/agentic/insights/insightsApi';
-import InsightsFlyout from '@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout';
+import { INSIGHT_GROUP, INSIGHT_GROUP_LABEL, INSIGHT_GROUP_ROUTE, INSIGHT_DEEP_LINK_PARAM } from '@/apps/dashboard/pages/observe/agentic/insights/insightsHelpers';
+
+const INSIGHT_POPOVER_GROUPS = [INSIGHT_GROUP.ATLAS_DISCOVERY, INSIGHT_GROUP.GUARDRAIL_VIOLATIONS];
+const INSIGHT_POPOVER_TOP_N = 2;
 
 function ContentWithIcon({ icon, text, isAvatar = false }) {
     return (
@@ -93,17 +96,16 @@ export default function Header() {
         }
     }, []);
 
-    /* Pinned Atlas Insights entry point — a small popover with the top few insights, "Show
-       more" opens the full InsightsFlyout (there's no dedicated insights page/route; the flyout
-       IS the insights browsing surface everywhere else in the app, so this reuses it instead of
-       inventing a new one). */
+    /* Pinned insights entry point — a small popover previewing the top actionable insights from
+       both surfaces (Atlas Discovery + guardrail/violations), which never mix in one list (see
+       InsightId.Group). There's no dedicated insights page here — clicking an insight or "Show
+       more" navigates to whichever page actually owns that group's InsightsFlyout
+       (AgenticAssetsPage / ViolationsPage), which auto-opens it via the `?insight=` deep link. */
     const [insightsPopoverActive, setInsightsPopoverActive] = useState(false);
-    const [topInsights, setTopInsights] = useState([]);
+    const [topInsightsByGroup, setTopInsightsByGroup] = useState({});
     const [topInsightsLoaded, setTopInsightsLoaded] = useState(false);
     const [topInsightsLoading, setTopInsightsLoading] = useState(false);
     const [topInsightsError, setTopInsightsError] = useState(false);
-    const [insightsFlyoutOpen, setInsightsFlyoutOpen] = useState(false);
-    const [insightsFlyoutInitialId, setInsightsFlyoutInitialId] = useState(null);
 
     const { insightsStartTimestamp, insightsEndTimestamp } = useMemo(() => {
         const end = Math.floor(Date.now() / 1000);
@@ -116,8 +118,17 @@ export default function Header() {
             if (next && !topInsightsLoaded) {
                 setTopInsightsLoading(true);
                 setTopInsightsError(false);
-                insightsApi.fetchInsightsList({ startTimestamp: insightsStartTimestamp, endTimestamp: insightsEndTimestamp })
-                    .then((data) => { setTopInsights(data); setTopInsightsLoaded(true); })
+                Promise.all(INSIGHT_POPOVER_GROUPS.map((group) =>
+                    insightsApi.fetchInsightsList({ startTimestamp: insightsStartTimestamp, endTimestamp: insightsEndTimestamp, group })
+                ))
+                    .then((resultsByGroup) => {
+                        const byGroup = {};
+                        INSIGHT_POPOVER_GROUPS.forEach((group, i) => {
+                            byGroup[group] = resultsByGroup[i].filter((insight) => insight.category === "ACTIONABLE");
+                        });
+                        setTopInsightsByGroup(byGroup);
+                        setTopInsightsLoaded(true);
+                    })
                     .catch(() => setTopInsightsError(true))
                     .finally(() => setTopInsightsLoading(false));
             }
@@ -127,25 +138,19 @@ export default function Header() {
 
     const handleCloseInsightsPopover = useCallback(() => setInsightsPopoverActive(false), []);
 
-    const handleSelectTopInsight = useCallback((insightId) => {
+    // Empty insightId opens straight to the list (used by "Show more").
+    const goToInsight = useCallback((group, insightId) => {
         setInsightsPopoverActive(false);
-        setInsightsFlyoutInitialId(insightId);
-        setInsightsFlyoutOpen(true);
-    }, []);
+        const query = new URLSearchParams({ [INSIGHT_DEEP_LINK_PARAM]: insightId || "" });
+        navigate(`${INSIGHT_GROUP_ROUTE[group]}?${query.toString()}`);
+    }, [navigate]);
 
-    const handleShowMoreInsights = useCallback(() => {
-        setInsightsPopoverActive(false);
-        setInsightsFlyoutInitialId(null);
-        setInsightsFlyoutOpen(true);
-    }, []);
-
-    const handleCloseInsightsFlyout = useCallback(() => setInsightsFlyoutOpen(false), []);
-
+    const hasAnyTopInsights = INSIGHT_POPOVER_GROUPS.some((group) => (topInsightsByGroup[group] || []).length > 0);
 
     const topInsightsMarkup = (
         <Box width="360px">
             <Box padding="4" borderBlockEndWidth="1" borderColor="border-subdued">
-                <Text variant="headingSm" as="h3">Atlas Insights</Text>
+                <Text variant="headingSm" as="h3">Insights</Text>
             </Box>
             {topInsightsLoading ? (
                 <Box padding="5">
@@ -153,32 +158,46 @@ export default function Header() {
                 </Box>
             ) : topInsightsError ? (
                 <Box padding="5"><Text color="subdued" variant="bodySm">Couldn't load insights.</Text></Box>
-            ) : topInsights.length === 0 ? (
-                <Box padding="5"><Text color="subdued" variant="bodySm">No insights available.</Text></Box>
+            ) : !hasAnyTopInsights ? (
+                <Box padding="5"><Text color="subdued" variant="bodySm">No actionable insights available.</Text></Box>
             ) : (
-                <Scrollable style={{ maxHeight: '320px' }}>
-                    {topInsights.slice(0, 4).map((insight) => (
-                        <Box
-                            key={insight.insightId}
-                            padding="4"
-                            borderBlockEndWidth="1"
-                            borderColor="border-subdued"
-                            onClick={() => handleSelectTopInsight(insight.insightId)}
-                            style={{ cursor: 'pointer' }}
-                        >
-                            <VerticalStack gap="2">
-                                <Text variant="bodyMd" fontWeight="semibold">{insight.title}</Text>
-                                {(insight.headline || insight.metrics?.[0]?.formatted) ? (
-                                    <Text variant="bodySm" color="subdued">{insight.headline || insight.metrics[0].formatted}</Text>
-                                ) : null}
-                            </VerticalStack>
-                        </Box>
-                    ))}
+                <Scrollable style={{ maxHeight: '480px' }}>
+                    {INSIGHT_POPOVER_GROUPS.map((group) => {
+                        const groupInsights = (topInsightsByGroup[group] || []).slice(0, INSIGHT_POPOVER_TOP_N);
+                        if (groupInsights.length === 0) return null;
+                        return (
+                            <Box key={group} padding="3">
+                                <VerticalStack gap={"2"}>
+                                    <Text variant="headingSm" color="subdued">{INSIGHT_GROUP_LABEL[group]}</Text>
+                                    {groupInsights.map((insight) => (
+                                        <Box
+                                            key={insight.insightId}
+                                            padding="3"
+                                            borderBlockEndWidth="1"
+                                            borderColor="border-subdued"
+                                            onClick={() => goToInsight(group, insight.insightId)}
+                                            style={{ cursor: 'pointer' }}
+                                        >
+                                            <VerticalStack gap="2">
+                                                <Text variant="bodyMd" fontWeight="semibold">{insight.title}</Text>
+                                                {(insight.headline || insight.metrics?.[0]?.formatted) ? (
+                                                    <Text variant="bodySm" color="subdued">{insight.headline || insight.metrics[0].formatted}</Text>
+                                                ) : null}
+                                            </VerticalStack>
+                                            
+                                        </Box>
+                                    ))}
+                                </VerticalStack>
+                                <Box padding="2">
+                                    <Button plain fullWidth onClick={() => goToInsight(group, null)}>
+                                        {`Show more in ${INSIGHT_GROUP_LABEL[group]}`}
+                                    </Button>
+                                </Box>
+                            </Box>
+                        );
+                    })}
                 </Scrollable>
             )}
-            <Box padding="3">
-                <Button plain fullWidth onClick={handleShowMoreInsights}>Show more</Button>
-            </Box>
         </Box>
     );
 
@@ -452,7 +471,7 @@ export default function Header() {
                     onClose={handleCloseInsightsPopover}
                     preferredAlignment="right"
                     activator={
-                        <Button id="insights-btn" plain monochrome onClick={handleToggleInsightsPopover} accessibilityLabel="Atlas Insights">
+                        <Button id="insights-btn" plain monochrome onClick={handleToggleInsightsPopover} accessibilityLabel="Insights">
                             <Icon source={MagicMinor} />
                         </Button>
                     }
@@ -558,15 +577,6 @@ export default function Header() {
 
                 </Modal.Section>
             </Modal>
-            {dashboardInsightsGranted && (
-                <InsightsFlyout
-                    show={insightsFlyoutOpen}
-                    onClose={handleCloseInsightsFlyout}
-                    startTimestamp={insightsStartTimestamp}
-                    endTimestamp={insightsEndTimestamp}
-                    initialInsightId={insightsFlyoutInitialId}
-                />
-            )}
         </div>
     );
 

@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList, Scrollable, Avatar, Box } from '@shopify/polaris';
-import { CancelMinor, ViewMinor, ChecklistMajor, MagicMinor } from '@shopify/polaris-icons';
+import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
 import InsightsFlyout from "@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout";
+import InsightsEntryButton from "@/apps/dashboard/pages/observe/agentic/insights/InsightsEntryButton";
+import useInsightsEntryPoint from "@/apps/dashboard/pages/observe/agentic/insights/useInsightsEntryPoint";
+import { INSIGHT_GROUP } from "@/apps/dashboard/pages/observe/agentic/insights/insightsHelpers";
 import SpinnerCentered from "../../components/progress/SpinnerCentered";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func";
@@ -167,9 +170,7 @@ function GuardrailPolicies() {
     const [presetsPopoverActive, setPresetsPopoverActive] = useState(false);
     const [pendingPolicyName, setPendingPolicyName] = useState(null);
     const [openedViaDeepLink, setOpenedViaDeepLink] = useState(false);
-    const [insightsOpen, setInsightsOpen] = useState(false);
-    const handleOpenInsights = useCallback(() => setInsightsOpen(true), []);
-    const handleCloseInsights = useCallback(() => setInsightsOpen(false), []);
+    const insights = useInsightsEntryPoint();
     // No date-range filter on this page today — insights default to the last 30 days,
     // same window AgenticAssetsPage's own DateRangeFilter opens on.
     const { insightsStartTimestamp, insightsEndTimestamp } = useMemo(() => {
@@ -778,7 +779,7 @@ function GuardrailPolicies() {
                 />
             }
             isFirstPage={true}
-            secondaryActions={<Button icon={MagicMinor} onClick={handleOpenInsights}>Atlas Insights</Button>}
+            secondaryActions={<InsightsEntryButton granted={insights.granted} onClick={insights.handleOpen} label="Atlas Insights" />}
             primaryAction={
                 <HorizontalStack gap="2">
                     <Popover
@@ -816,12 +817,16 @@ function GuardrailPolicies() {
             }
             components={components}
         />
-        <InsightsFlyout
-            show={insightsOpen}
-            onClose={handleCloseInsights}
-            startTimestamp={insightsStartTimestamp}
-            endTimestamp={insightsEndTimestamp}
-        />
+        {insights.granted && (
+            <InsightsFlyout
+                show={insights.open}
+                onClose={insights.handleClose}
+                startTimestamp={insightsStartTimestamp}
+                endTimestamp={insightsEndTimestamp}
+                initialInsightId={insights.initialInsightId}
+                group={INSIGHT_GROUP.ATLAS_DISCOVERY}
+            />
+        )}
     </>
 }
 

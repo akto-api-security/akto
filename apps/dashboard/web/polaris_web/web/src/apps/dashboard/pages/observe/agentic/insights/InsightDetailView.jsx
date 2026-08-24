@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, VerticalStack, HorizontalStack, Text, Button, Banner, Spinner, Icon } from "@shopify/polaris";
-import { RefreshMinor, ExternalMinor, MagicMinor } from "@shopify/polaris-icons";
+import { Box, VerticalStack, HorizontalStack, Text, Button, Banner, Spinner } from "@shopify/polaris";
+import { RefreshMinor, ExternalMinor } from "@shopify/polaris-icons";
 import MarkdownViewer from "@/apps/dashboard/components/shared/MarkdownViewer";
 import insightsApi from "./insightsApi";
 import InsightEvidenceTable from "./InsightEvidenceTable";
@@ -84,7 +84,7 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
     const hasNarrative = detail.narrativeStatus === "OK" && !!detail.markdown;
 
     return (
-        <Box style={{ flex: 1, minHeight: 0, overflowY: "auto" }} padding="5">
+        <Box overflowY="scroll" padding="5">
             <VerticalStack gap="5">
                 {detail.metrics?.length > 0 && (
                     <HorizontalStack gap="4" wrap>
@@ -95,12 +95,6 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
                 )}
 
                 <div className="chat-message-row">
-                    <div className="chat-message-icon-wrap">
-                        <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#ECEBFF", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <Icon source={MagicMinor} color="base" />
-                        </div>
-                    </div>
-                    <div className="chat-message-divider" />
                     <Box style={{ flex: 1, minWidth: 0 }}>
                         <HorizontalStack align="space-between" blockAlign="center">
                             <Text variant="bodyMd" fontWeight="semibold" color="subdued">Akto AI Agent</Text>

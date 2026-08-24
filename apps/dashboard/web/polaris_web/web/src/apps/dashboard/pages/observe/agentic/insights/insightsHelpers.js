@@ -20,6 +20,28 @@ export const CATEGORY_LABEL = {
     READ_ONLY: "Read-only",
 };
 
+// InsightId.Group (backend) — the two insight surfaces, which never mix in one list. Each
+// carries the page whose own InsightsFlyout instance actually owns that group, so a pinned
+// entry point elsewhere (e.g. the header popover) can send the reader to the right place.
+export const INSIGHT_GROUP = {
+    ATLAS_DISCOVERY: "ATLAS_DISCOVERY",
+    GUARDRAIL_VIOLATIONS: "GUARDRAIL_VIOLATIONS",
+};
+
+export const INSIGHT_GROUP_LABEL = {
+    [INSIGHT_GROUP.ATLAS_DISCOVERY]: "Observe",
+    [INSIGHT_GROUP.GUARDRAIL_VIOLATIONS]: "Guardrails",
+};
+
+export const INSIGHT_GROUP_ROUTE = {
+    [INSIGHT_GROUP.ATLAS_DISCOVERY]: "/dashboard/observe/agentic-assets",
+    [INSIGHT_GROUP.GUARDRAIL_VIOLATIONS]: "/dashboard/guardrails/violations",
+};
+
+// Query param the target page reads on mount to auto-open its InsightsFlyout — see
+// AgenticAssetsPage.jsx / ViolationsPage.jsx. Empty string opens straight to the list.
+export const INSIGHT_DEEP_LINK_PARAM = "insight";
+
 export function statusLabel(status) {
     return STATUS_LABEL[status] || status || "";
 }
