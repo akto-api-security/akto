@@ -52,7 +52,7 @@ public class TestRunMetrics {
      * API under test (from {@link com.akto.testing.ApiExecutor}); RUN_TEST minus TARGET_HTTP is compute.
      * PERSIST_LOGS + INSERT_RESULTS are the ultron persistence round-trips ("run away from ultron" cost).
      */
-    public enum Stage { LOOKUP, RUN_TEST, TARGET_HTTP, PERSIST_LOGS, INSERT_RESULTS }
+    public enum Stage { LOOKUP, RUN_TEST, RESOLVE_EXPR, SEND_REQUEST, VALIDATE, PERSIST_LOGS, INSERT_RESULTS }
 
     /** WARN-level progress heartbeat cadence (M*N run-wide progress). */
     private static final long HEARTBEAT_INTERVAL_MS = 30_000L;
@@ -105,6 +105,8 @@ public class TestRunMetrics {
     private final EnumMap<Stage, AtomicLong> stageMaxNanos = newStageMax();
     /** CPU time (not wall) attributed to RUN_TEST, to separate compute from I/O wait. */
     private final LongAdder runTestCpuNanos = new LongAdder();
+    /** Total HTTP requests sent across all tests (sum of N per test), to derive requests/test. */
+    private final LongAdder requestCount = new LongAdder();
 
     private static EnumMap<Stage, LongAdder> newStageAdders() {
         EnumMap<Stage, LongAdder> m = new EnumMap<>(Stage.class);
@@ -186,6 +188,11 @@ public class TestRunMetrics {
     /** Fold the CPU time (nanos) a single {@code runTestNew} burned, to split compute from I/O wait. */
     public void recordRunTestCpu(long nanos) {
         if (nanos > 0) runTestCpuNanos.add(nanos);
+    }
+
+    /** Fold the number of HTTP requests one test fanned out (N), to derive requests/test. */
+    public void recordRequests(long count) {
+        if (count > 0) requestCount.add(count);
     }
 
     // ----- lifecycle banners -----
@@ -336,25 +343,34 @@ public class TestRunMetrics {
 
         long lookup   = stageNanos.get(Stage.LOOKUP).sum();
         long runTest  = stageNanos.get(Stage.RUN_TEST).sum();
-        long target   = stageNanos.get(Stage.TARGET_HTTP).sum();
+        long resolve  = stageNanos.get(Stage.RESOLVE_EXPR).sum();
+        long sendReq  = stageNanos.get(Stage.SEND_REQUEST).sum();
+        long validate = stageNanos.get(Stage.VALIDATE).sum();
         long persist  = stageNanos.get(Stage.PERSIST_LOGS).sum();
         long insertRt = stageNanos.get(Stage.INSERT_RESULTS).sum();
         long runCpu   = runTestCpuNanos.sum();
-        long compute  = Math.max(0, runTest - target);      // runTestNew wall not spent blocked on the target API
+        long reqs     = requestCount.sum();
+        // The three sub-phases are disjoint subsets of RUN_TEST (resolve builds requests, then the
+        // send-loop runs, then validate per response); the remainder is setup/overhead.
+        long other    = Math.max(0, runTest - resolve - sendReq - validate);
         long ultron   = persist + insertRt;                  // persistence round-trips
-        long billed   = lookup + runTest + ultron;           // total measured wall (RUN_TEST already includes target)
+        long billed   = lookup + runTest + ultron;
 
         long avgWallMs = ms(runTest + lookup + ultron) / n;
         loggerMaker.warnAndAddToDb("TESTRUN COST summaryId=" + summaryId
                 + " n=" + n
                 + " avgPerTestMs=" + avgWallMs
-                + " | LOOKUP=" + pctOf(lookup, billed) + "(" + msPer(lookup, n) + "ms)"
-                + " RUN_TEST=" + pctOf(runTest, billed) + "(" + msPer(runTest, n) + "ms)"
-                + " [TARGET_HTTP=" + pctOf(target, billed) + "(" + msPer(target, n) + "ms, calls/test=" + per(stageCount.get(Stage.TARGET_HTTP).sum(), n) + ")"
-                + " COMPUTE=" + pctOf(compute, billed) + "(" + msPer(compute, n) + "ms, cpu/test=" + msPer(runCpu, n) + "ms)]"
-                + " PERSIST_LOGS=" + pctOf(persist, billed) + "(" + msPer(persist, n) + "ms)"
-                + " INSERT_RESULTS=" + pctOf(insertRt, billed) + "(" + msPer(insertRt, n) + "ms)"
-                + " ULTRON_TOTAL=" + pctOf(ultron, billed) + "(" + msPer(ultron, n) + "ms)");
+                + " requestsPerTest=" + per(reqs, n)
+                + " cpuPerTestMs=" + msPer(runCpu, n)
+                + " | RUN_TEST=" + msPer(runTest, n) + "ms (" + pctOf(runTest, billed) + " of billed)"
+                + " [RESOLVE_EXPR=" + msPer(resolve, n) + "ms/" + pctOf(resolve, runTest) + " of RUN_TEST"
+                + " | SEND_REQUEST=" + msPer(sendReq, n) + "ms/" + pctOf(sendReq, runTest) + " (N=" + per(reqs, n) + "/test)"
+                + " | VALIDATE=" + msPer(validate, n) + "ms/" + pctOf(validate, runTest)
+                + " | OTHER=" + msPer(other, n) + "ms/" + pctOf(other, runTest) + "]"
+                + " LOOKUP=" + msPer(lookup, n) + "ms"
+                + " PERSIST_LOGS=" + msPer(persist, n) + "ms"
+                + " INSERT_RESULTS=" + msPer(insertRt, n) + "ms"
+                + " ULTRON_TOTAL=" + msPer(ultron, n) + "ms/" + pctOf(ultron, billed));
     }
 
     private static long ms(long nanos) { return nanos / 1_000_000L; }

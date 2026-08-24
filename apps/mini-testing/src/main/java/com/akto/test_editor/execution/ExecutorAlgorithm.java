@@ -72,10 +72,14 @@ public class ExecutorAlgorithm {
             valueOp = null;
         }
 
+        long resolveStart = System.nanoTime();
         List<Object> keyList = VariableResolver.resolveExpression(varMap, keyOp);
+        TestPhaseTimer.addResolveExpr(System.nanoTime() - resolveStart);
         List<Object> valList = new ArrayList<>();
         if (valueOp != null) {
+            resolveStart = System.nanoTime();
             valList = VariableResolver.resolveExpression(varMap, valueOp);
+            TestPhaseTimer.addResolveExpr(System.nanoTime() - resolveStart);
         }
 
         int rawApiIndex = 0;

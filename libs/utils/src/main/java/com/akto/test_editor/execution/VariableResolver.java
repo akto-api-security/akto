@@ -534,7 +534,6 @@ public class VariableResolver {
 
         List<String> wordList = new ArrayList<>();
         String wordListKey = null;
-        return wordList;
 
         // instrumentation (no behavior change): measure CPU + string sizes this call burns
         // long instrWallStart = System.currentTimeMillis();
@@ -543,22 +542,22 @@ public class VariableResolver {
         // int k = 0;
         // StringBuilder varInfo = new StringBuilder();
 
-        // Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
-        // Matcher matcher = pattern.matcher(expression);
-        // List<String> result = new ArrayList<>();
-        // result.add(expression);
-        // while (matcher.find()) {
-        //     throwIfInterrupted();
-        //     try {
-        //         String match = matcher.group(0);
-        //         String originalKey = match;
-        //         match = match.substring(2, match.length());
-        //         match = match.substring(0, match.length() - 1);
+        Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
+        Matcher matcher = pattern.matcher(expression);
+        List<String> result = new ArrayList<>();
+        result.add(expression);
+        while (matcher.find()) {
+            throwIfInterrupted();
+            try {
+                String match = matcher.group(0);
+                String originalKey = match;
+                match = match.substring(2, match.length());
+                match = match.substring(0, match.length() - 1);
 
-        //         Boolean isWordListVar = varMap.containsKey("wordList_" + match);
-        //         if (isWordListVar) {
-        //             wordList = (List<String>) varMap.get("wordList_" + match);
-        //             wordListKey = originalKey;
+                Boolean isWordListVar = varMap.containsKey("wordList_" + match);
+                if (isWordListVar) {
+                    wordList = (List<String>) varMap.get("wordList_" + match);
+                    wordListKey = originalKey;
 
         //             // record this var's size + biggest value length (measurement only)
         //             // k++;
@@ -571,26 +570,26 @@ public class VariableResolver {
         //             // }
         //             // varInfo.append(match).append(":N=").append(n).append(",maxLen=").append(maxValLen).append("; ");
 
-        //             List<String> tempResult = new ArrayList<>();
-        //             for (String temp : result) {
-        //                 throwIfInterrupted();
-        //                 for (Object word : wordList) {
-        //                     throwIfInterrupted();
-        //                     // TODO: handle case to use numbers as well.
-        //                     String tempWord = temp.replace(wordListKey, word.toString());
-        //                     expression = tempWord;
-        //                     tempResult.add(tempWord);
-        //                 }
-        //             }
-        //             result = tempResult;
-        //             matcher = pattern.matcher(expression);
-        //         }
-        //     } catch (RuntimeException e) {
-        //         throw e;
-        //     } catch (Exception e) {
-        //         e.printStackTrace();
-        //     }
-        // }
+                    List<String> tempResult = new ArrayList<>();
+                    for (String temp : result) {
+                        throwIfInterrupted();
+                        for (Object word : wordList) {
+                            throwIfInterrupted();
+                            // TODO: handle case to use numbers as well.
+                            String tempWord = temp.replace(wordListKey, word.toString());
+                            expression = tempWord;
+                            tempResult.add(tempWord);
+                        }
+                    }
+                    result = tempResult;
+                    matcher = pattern.matcher(expression);
+                }
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
         // long instrCpuMs = (instrCpuStart >= 0) ? (THREAD_MX.getCurrentThreadCpuTime() - instrCpuStart) / 1_000_000L : -1L;
         // long instrWallMs = System.currentTimeMillis() - instrWallStart;
         // if (instrCpuMs >= WORDLIST_CPU_LOG_THRESHOLD_MS || (instrCpuMs < 0 && instrWallMs >= WORDLIST_CPU_LOG_THRESHOLD_MS)) {
@@ -605,7 +604,7 @@ public class VariableResolver {
         //             + " finalResults=" + result.size()
         //             + " maxResultLen=" + maxResultLen);
         // }
-        // return result;
+        return result;
     }
 
     private static void throwIfInterrupted() {
