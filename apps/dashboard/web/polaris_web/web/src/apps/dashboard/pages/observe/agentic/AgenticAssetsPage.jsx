@@ -8,11 +8,13 @@ import React, {
 } from "react";
 import { produce } from "immer";
 import { useNavigate } from "react-router-dom";
-import { Box, Card, Divider, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
+import { Box, Button, Card, Divider, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
+import { MagicMinor } from "@shopify/polaris-icons";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import AgenticAssetFlyout from "./AgenticAssetFlyout";
+import InsightsFlyout from "./insights/InsightsFlyout";
 import {
   AssetNameCellRenderer,
   TypeBadgeCellRenderer,
@@ -323,6 +325,10 @@ function TableSection({
 export default function AgenticAssetsPage() {
   const navigate = useNavigate();
   const [flyout, setFlyout] = useState(null);
+  const [insightsOpen, setInsightsOpen] = useState(false);
+  const handleOpenInsights = useCallback(() => setInsightsOpen(true), []);
+  const handleCloseInsights = useCallback(() => setInsightsOpen(false), []);
+  const dashboardInsightsGranted = func.checkForFeatureSaas("DASHBOARD_INSIGHTS");
   const [loading, setLoading] = useState(true);
   const [hostSeverityCounts, setHostSeverityCounts] = useState({});
   const [stats, setStats] = useState({ totalAssets: 0, countsByType: {} });
@@ -552,6 +558,9 @@ export default function AgenticAssetsPage() {
           })
         }
       />
+      {dashboardInsightsGranted && (
+        <Button icon={MagicMinor} onClick={handleOpenInsights}>Atlas Insights</Button>
+      )}
     </HorizontalStack>
   );
 
@@ -673,36 +682,35 @@ export default function AgenticAssetsPage() {
     </HorizontalGrid>
   ), [totalAssets, assetTypeBreakdown, violationTotals, violBreakdown, stats, topAppsRows, topViolRows, handleAssetTypeClick, activeTypeFilter, handleSeverityClick, activeSeverityFilter]);
 
-  if (loading) {
-    return (
+  return (
+    <>
       <PageWithMultipleCards
         title={pageTitle}
         isFirstPage={true}
         secondaryActions={headerActions}
-        components={[<SpinnerCentered key="loading" />]}
+        components={loading ? [<SpinnerCentered key="loading" />] : [
+          topCards,
+          <TableSection
+            key="table"
+            onServerFetch={onServerFetch}
+            flyout={flyout}
+            setFlyout={setFlyout}
+            startTimestamp={startTimestamp}
+            endTimestamp={endTimestamp}
+            refreshKey={refreshKey}
+            enrichMaps={enrichRef.current}
+            gridRef={gridRef}
+          />,
+        ]}
       />
-    );
-  }
-
-  return (
-    <PageWithMultipleCards
-      title={pageTitle}
-      isFirstPage={true}
-      secondaryActions={headerActions}
-      components={[
-        topCards,
-        <TableSection
-          key="table"
-          onServerFetch={onServerFetch}
-          flyout={flyout}
-          setFlyout={setFlyout}
+      {dashboardInsightsGranted && (
+        <InsightsFlyout
+          show={insightsOpen}
+          onClose={handleCloseInsights}
           startTimestamp={startTimestamp}
           endTimestamp={endTimestamp}
-          refreshKey={refreshKey}
-          enrichMaps={enrichRef.current}
-          gridRef={gridRef}
-        />,
-      ]}
-    />
+        />
+      )}
+    </>
   );
 }

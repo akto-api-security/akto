@@ -1,5 +1,5 @@
-import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
-import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PhoneMajor, ChatMajor, SettingsMajor } from '@shopify/polaris-icons';
+import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable, Popover, Spinner } from '@shopify/polaris';
+import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PhoneMajor, ChatMajor, SettingsMajor, MagicMinor } from '@shopify/polaris-icons';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
@@ -16,6 +16,8 @@ import IssuesStore from '../../../pages/issues/issuesStore';
 import Dropdown from '../Dropdown';
 import Wrapped2025 from './Wrapped2025';
 import { shortNameToCategory } from '../../../../main/labelHelper';
+import insightsApi from '@/apps/dashboard/pages/observe/agentic/insights/insightsApi';
+import InsightsFlyout from '@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout';
 
 function ContentWithIcon({ icon, text, isAvatar = false }) {
     return (
@@ -91,9 +93,99 @@ export default function Header() {
         }
     }, []);
 
+    /* Pinned Atlas Insights entry point — a small popover with the top few insights, "Show
+       more" opens the full InsightsFlyout (there's no dedicated insights page/route; the flyout
+       IS the insights browsing surface everywhere else in the app, so this reuses it instead of
+       inventing a new one). */
+    const [insightsPopoverActive, setInsightsPopoverActive] = useState(false);
+    const [topInsights, setTopInsights] = useState([]);
+    const [topInsightsLoaded, setTopInsightsLoaded] = useState(false);
+    const [topInsightsLoading, setTopInsightsLoading] = useState(false);
+    const [topInsightsError, setTopInsightsError] = useState(false);
+    const [insightsFlyoutOpen, setInsightsFlyoutOpen] = useState(false);
+    const [insightsFlyoutInitialId, setInsightsFlyoutInitialId] = useState(null);
+
+    const { insightsStartTimestamp, insightsEndTimestamp } = useMemo(() => {
+        const end = Math.floor(Date.now() / 1000);
+        return { insightsStartTimestamp: end - 30 * 24 * 60 * 60, insightsEndTimestamp: end };
+    }, []);
+
+    const handleToggleInsightsPopover = useCallback(() => {
+        setInsightsPopoverActive((active) => {
+            const next = !active;
+            if (next && !topInsightsLoaded) {
+                setTopInsightsLoading(true);
+                setTopInsightsError(false);
+                insightsApi.fetchInsightsList({ startTimestamp: insightsStartTimestamp, endTimestamp: insightsEndTimestamp })
+                    .then((data) => { setTopInsights(data); setTopInsightsLoaded(true); })
+                    .catch(() => setTopInsightsError(true))
+                    .finally(() => setTopInsightsLoading(false));
+            }
+            return next;
+        });
+    }, [topInsightsLoaded, insightsStartTimestamp, insightsEndTimestamp]);
+
+    const handleCloseInsightsPopover = useCallback(() => setInsightsPopoverActive(false), []);
+
+    const handleSelectTopInsight = useCallback((insightId) => {
+        setInsightsPopoverActive(false);
+        setInsightsFlyoutInitialId(insightId);
+        setInsightsFlyoutOpen(true);
+    }, []);
+
+    const handleShowMoreInsights = useCallback(() => {
+        setInsightsPopoverActive(false);
+        setInsightsFlyoutInitialId(null);
+        setInsightsFlyoutOpen(true);
+    }, []);
+
+    const handleCloseInsightsFlyout = useCallback(() => setInsightsFlyoutOpen(false), []);
+
+
+    const topInsightsMarkup = (
+        <Box width="360px">
+            <Box padding="4" borderBlockEndWidth="1" borderColor="border-subdued">
+                <Text variant="headingSm" as="h3">Atlas Insights</Text>
+            </Box>
+            {topInsightsLoading ? (
+                <Box padding="5">
+                    <HorizontalStack align="center"><Spinner size="small" accessibilityLabel="Loading insights" /></HorizontalStack>
+                </Box>
+            ) : topInsightsError ? (
+                <Box padding="5"><Text color="subdued" variant="bodySm">Couldn't load insights.</Text></Box>
+            ) : topInsights.length === 0 ? (
+                <Box padding="5"><Text color="subdued" variant="bodySm">No insights available.</Text></Box>
+            ) : (
+                <Scrollable style={{ maxHeight: '320px' }}>
+                    {topInsights.slice(0, 4).map((insight) => (
+                        <Box
+                            key={insight.insightId}
+                            padding="4"
+                            borderBlockEndWidth="1"
+                            borderColor="border-subdued"
+                            onClick={() => handleSelectTopInsight(insight.insightId)}
+                            style={{ cursor: 'pointer' }}
+                        >
+                            <VerticalStack gap="2">
+                                <Text variant="bodyMd" fontWeight="semibold">{insight.title}</Text>
+                                {(insight.headline || insight.metrics?.[0]?.formatted) ? (
+                                    <Text variant="bodySm" color="subdued">{insight.headline || insight.metrics[0].formatted}</Text>
+                                ) : null}
+                            </VerticalStack>
+                        </Box>
+                    ))}
+                </Scrollable>
+            )}
+            <Box padding="3">
+                <Button plain fullWidth onClick={handleShowMoreInsights}>Show more</Button>
+            </Box>
+        </Box>
+    );
+
 
     const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
     const { agenticSecurityGranted, endpointSecurityGranted, dastGranted, mcpSecurityGranted } = func.getStiggFeatureGrants();
+    const dashboardInsightsGranted = func.checkForFeatureSaas("DASHBOARD_INSIGHTS");
 
     const disabledDashboardCategories = useMemo(() => {
         const disabled = [];
@@ -354,6 +446,21 @@ export default function Header() {
                 </div>
             </div> */}
 
+            {dashboardInsightsGranted && (
+                <Popover
+                    active={insightsPopoverActive}
+                    onClose={handleCloseInsightsPopover}
+                    preferredAlignment="right"
+                    activator={
+                        <Button id="insights-btn" plain monochrome onClick={handleToggleInsightsPopover} accessibilityLabel="Atlas Insights">
+                            <Icon source={MagicMinor} />
+                        </Button>
+                    }
+                >
+                    {topInsightsMarkup}
+                </Popover>
+            )}
+
             <Button id="beamer-btn" plain monochrome onClick={handleBeamerClick}>
                 <span className={getColorForIcon()}>
                     <Icon source={NotificationMajor} />
@@ -451,6 +558,15 @@ export default function Header() {
 
                 </Modal.Section>
             </Modal>
+            {dashboardInsightsGranted && (
+                <InsightsFlyout
+                    show={insightsFlyoutOpen}
+                    onClose={handleCloseInsightsFlyout}
+                    startTimestamp={insightsStartTimestamp}
+                    endTimestamp={insightsEndTimestamp}
+                    initialInsightId={insightsFlyoutInitialId}
+                />
+            )}
         </div>
     );
 
