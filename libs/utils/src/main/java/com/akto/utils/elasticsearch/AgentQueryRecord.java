@@ -5,6 +5,7 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.billing.Organization;
 import com.akto.usage.OrgUtils;
 import com.akto.util.Constants;
+import com.akto.util.JSONUtils;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -208,7 +209,11 @@ public class AgentQueryRecord {
                 : "span_" + UUID.randomUUID().toString();
 
         String requestPayload  = p.getRequestParams().getPayload();
-        String responsePayload = p.getPayload() != null ? p.getPayload() : "";
+        // awsMetadata duplicates what's already captured as structured Trace/Span data by
+        // BedrockAgentTraceParser — it can embed full tool-call outputs (file listings, page
+        // dumps, etc.), so keeping a second raw copy here needlessly bloats the batch sent
+        // to the agent-query-logs service.
+        String responsePayload = JSONUtils.removeKey(p.getPayload() != null ? p.getPayload() : "", "awsMetadata");
         int inputTokens  = resolveTokenCount(responsePayload, requestPayload, true);
         int outputTokens = resolveTokenCount(responsePayload, responsePayload, false);
 
