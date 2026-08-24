@@ -1,6 +1,9 @@
 import React from 'react';
 import { Text } from "@shopify/polaris";
 import { getGuardrailCapabilityForRule } from '../constants/guardrailRuleDefinitions';
+import SessionStore from '@/apps/main/SessionStore';
+import threatDetectionApi from '../api';
+import guardrailApi from '../../guardrails/api';
 
 // Regular expression to validate IP address (IPv4 and IPv6)
 const IPV4_REGEX = /^(\d{1,3}\.){3}\d{1,3}$/;
@@ -56,6 +59,37 @@ export const getDbComplianceCapability = (ruleViolated) => {
 };
 
 export const dbComplianceKey = (policyName, capability) => `${policyName}::${capability}`;
+
+// Populates SessionStore's guardrailComplianceMap: per-capability infos, merged with any
+// clauses defined on the guardrail policies themselves. Was previously copy-pasted into
+// ThreatCompliancePage.jsx, SusDataTable.jsx and ViolationsPage.jsx (new UI) independently -
+// centralised here so there's one fetch implementation. Skips the network calls entirely when
+// the store is already populated (e.g. a prior visit to Threat/Guardrail Activity already
+// loaded it in this session).
+export const loadGuardrailComplianceMap = async (force = false) => {
+  const existing = SessionStore.getState().guardrailComplianceMap;
+  if (!force && existing && Object.keys(existing).length > 0) {
+    return existing;
+  }
+  try {
+    const [complianceResp, policiesResp] = await Promise.all([
+      threatDetectionApi.fetchGuardrailComplianceInfos(),
+      guardrailApi.fetchGuardrailPolicies(),
+    ]);
+    const capabilityMap = {};
+    (complianceResp?.guardrailComplianceInfos || []).forEach((entry) => {
+      const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
+      if (capability) capabilityMap[capability] = entry.mapComplianceToListClauses;
+    });
+    mergePolicyComplianceMap(capabilityMap, policiesResp?.guardrailPolicies);
+    SessionStore.getState().setGuardrailComplianceMap(capabilityMap);
+    return capabilityMap;
+  } catch (e) {
+    console.error(`Failed to load guardrail compliance map: ${e?.message}`);
+    return existing || {};
+  }
+};
+
 
 export const mergePolicyComplianceMap = (capabilityMap, guardrailPolicies = []) => {
   const addCompliance = (key, compliance) => {

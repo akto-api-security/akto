@@ -13,8 +13,7 @@ import values from "@/util/values";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import threatDetectionApi from "../../threat_detection/api.js"
 import SessionStore from "../../../../main/SessionStore"
-import { resolveComplianceClauseMap, mergePolicyComplianceMap, extractRuleViolated } from "../../threat_detection/utils/formatUtils"
-import guardrailApi from "../../guardrails/api"
+import { resolveComplianceClauseMap, loadGuardrailComplianceMap, extractRuleViolated } from "../../threat_detection/utils/formatUtils"
 import ShowListInBadge from "../../../components/shared/ShowListInBadge";
 import { CellType } from "../../../components/tables/rows/GithubRow.js";
 import SampleDetails from "../../threat_detection/components/SampleDetails";
@@ -68,7 +67,6 @@ function ThreatCompliancePage() {
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
     const setThreatFiltersMap = SessionStore((state) => state.setThreatFiltersMap);
     const guardrailComplianceMap = SessionStore((state) => state.guardrailComplianceMap);
-    const setGuardrailComplianceMap = SessionStore((state) => state.setGuardrailComplianceMap);
     const needsGuardrailCompliance = isAgenticSecurityCategory() || isEndpointSecurityCategory();
 
     const { tabsInfo, selectItems } = useTable();
@@ -113,21 +111,11 @@ function ThreatCompliancePage() {
                     });
                 }
 
-                // Agentic/Endpoint Security: guardrails/{capability}.conf
+                // Agentic/Endpoint Security: guardrails/{capability}.conf. Shared loader
+                // (formatUtils.js) - skips the network calls if another page already
+                // populated SessionStore's guardrailComplianceMap this session.
                 if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
-                    const capabilityKeyedMap = {};
-                    const guardrailComplianceResp = await threatDetectionApi.fetchGuardrailComplianceInfos();
-                    (guardrailComplianceResp?.guardrailComplianceInfos || []).forEach((entry) => {
-                        const capability = (entry._id || '').replace('guardrails/', '').replace('.conf', '');
-                        if (capability) capabilityKeyedMap[capability] = entry.mapComplianceToListClauses;
-                    });
-                    try {
-                        const policiesResp = await guardrailApi.fetchGuardrailPolicies();
-                        mergePolicyComplianceMap(capabilityKeyedMap, policiesResp?.guardrailPolicies);
-                    } catch (e) {
-                        console.error("Failed to load guardrail policies for compliance:", e);
-                    }
-                    setGuardrailComplianceMap(capabilityKeyedMap);
+                    await loadGuardrailComplianceMap();
                 }
 
                 setThreatFiltersMap(updatedThreatFiltersMap);
@@ -139,7 +127,7 @@ function ThreatCompliancePage() {
         };
 
         fetchThreatFiltersData();
-    }, [setThreatFiltersMap, setGuardrailComplianceMap]);
+    }, [setThreatFiltersMap]);
 
     const resetResourcesSelected = () => {
         TableStore.getState().setSelectedItems([])

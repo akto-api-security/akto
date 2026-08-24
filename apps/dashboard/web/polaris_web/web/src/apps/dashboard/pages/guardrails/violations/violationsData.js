@@ -1,3 +1,6 @@
+import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
+import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/constants/guardrailRuleDefinitions";
+import { GUARDRAIL_REMEDIATION_MARKDOWN } from "@/apps/dashboard/pages/threat_detection/constants/guardrailDescriptions";
 // ─── Flyout detail helpers ───────────────────────────────────────────────────────
 
 function _parseAktoOuter(payloadStr) {
@@ -278,9 +281,12 @@ export function buildFallbackDetail(row) {
             text: evidenceText,
             highlights: undefined,
             mono: evidenceIsMono,
-            author: row.type === "Prompt" ? (row.user || undefined) : undefined,
+            // Atlas only: row.user is a real device user there. On Argus it's a host fragment
+            // (e.g. "slash2-api" from slash2-api.concierge.razorpay.com), which reads as a
+            // person's name next to an avatar - misleading, and the asset is already shown.
+            author: (isEndpointSecurityCategory() && row.type === "Prompt") ? (row.user || undefined) : undefined,
             assetName: row.type === "Skill" ? (row.agenticAsset || undefined) : undefined,
-            apiCollectionId: row.type === "Skill" ? (row.apiCollectionId || undefined) : undefined,
+            apiCollectionId: (row.type === "Skill" && row.assetLinkable) ? (row.apiCollectionId || undefined) : undefined,
         },
         triggerReason,
         policyName,
@@ -297,6 +303,13 @@ export function buildFallbackDetail(row) {
         fileHighlights: fileHighlights || undefined,
         skillName: skillName || undefined,
         overview: row.type === "Config" ? (metaOverview || undefined) : undefined,
-        remediation: metaRemediation || undefined,
+        // Mirror the old UI's precedence (SampleDetails.jsx's remediationTab): per-event
+        // metadata wins; otherwise Argus/Atlas fall back to the frontend rule catalogue, then
+        // the generic template. Skill events keep the tab hidden - the generic copy adds no
+        // context there, same as the old UI.
+        remediation: metaRemediation
+            || ((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && row.type !== "Skill"
+                ? (getGuardrailRuleInfo(row.violation, policyName)?.remediation || GUARDRAIL_REMEDIATION_MARKDOWN)
+                : undefined),
     };
 }
