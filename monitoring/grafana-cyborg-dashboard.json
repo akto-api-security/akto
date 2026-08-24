@@ -749,8 +749,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Avg request size by endpoint",
-      "description": "Average request body size per URL.",
+      "title": "Max request size by endpoint",
+      "description": "Largest request body seen per URL (peak payload). Averages hide big outliers.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -794,7 +794,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (uri) (rate(http_request_size_bytes_sum{service=\"cyborg\", account_id=~\"$account_id\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval])) / sum by (uri) (rate(http_request_size_bytes_count{service=\"cyborg\", account_id=~\"$account_id\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval]))",
+          "expr": "max by (uri) (http_request_size_bytes_max{service=\"cyborg\", account_id=~\"$account_id\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"})",
           "legendFormat": "{{uri}}"
         }
       ]
