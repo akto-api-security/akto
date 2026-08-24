@@ -10,7 +10,7 @@ Usage: python3 build_xlsx.py <output.xlsx>
 import sys
 import json
 import openpyxl
-from openpyxl.styles import Font, PatternFill
+from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.styles.differential import DifferentialStyle
 from openpyxl.formatting.rule import Rule
 from openpyxl.utils import get_column_letter
@@ -23,7 +23,8 @@ HEADER = [
     "Prompt 4", "Response 4",
     "Validation Message", "Result Type", "Issue Status",
 ]
-SEVERITY_COL = "C"  # keep in sync with HEADER above
+SEVERITY_COL = "C"     # keep in sync with HEADER above
+RESULT_TYPE_COL = "O"  # keep in sync with HEADER above
 
 SEVERITY_ORDER = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
 RESULT_TYPE_ORDER = {"Issue": 0, "Non-Issue": 1}
@@ -100,9 +101,13 @@ def main():
     for cell in ws[1]:
         cell.font = Font(bold=True, color="FFFFFFFF")
         cell.fill = PatternFill(patternType="solid", fgColor=HEADER_FILL)
+        cell.alignment = Alignment(wrap_text=True, vertical="top")
 
+    wrap_top = Alignment(wrap_text=True, vertical="top")
     for record in records:
         ws.append(build_row(record))
+        for cell in ws[ws.max_row]:
+            cell.alignment = wrap_top
 
     ws.freeze_panes = "A2"
     widths = [45, 22, 12, 55, 32, 45, 45, 45, 45, 45, 45, 45, 45, 55, 12, 12]
@@ -114,9 +119,16 @@ def main():
     full_range = f"A2:{last_col}{last_row}"
     ws.auto_filter.ref = f"A1:{last_col}{last_row}"
 
+    # Only color rows that are actual Issues -- a Non-Issue row still carries the probe's
+    # inherent severity (every template has one, issue or not), so gating on severity alone
+    # colored passing tests the same as failing ones. Gate on Result Type too.
     for severity, color in SEVERITY_FILL.items():
         dxf = DifferentialStyle(fill=PatternFill(patternType="solid", fgColor=color, bgColor=color))
-        rule = Rule(type="expression", dxf=dxf, formula=[f'${SEVERITY_COL}2="{severity}"'])
+        rule = Rule(
+            type="expression",
+            dxf=dxf,
+            formula=[f'AND(${SEVERITY_COL}2="{severity}",${RESULT_TYPE_COL}2="Issue")'],
+        )
         ws.conditional_formatting.add(full_range, rule)
 
     wb.save(out_path)
