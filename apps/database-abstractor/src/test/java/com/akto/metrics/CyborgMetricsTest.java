@@ -8,7 +8,7 @@ import static org.junit.Assert.*;
 public class CyborgMetricsTest {
 
     @Test
-    public void recordHttpRequest_emitsAllSeriesWithAccountIdTag() {
+    public void recordHttpRequest_emitsAllSeriesWithAccountIdOnCounterOnly() {
         CyborgMetrics.recordHttpRequest("/api/fetchApiInfo", "POST", "200", "1000000", 12L, 345);
 
         String out = InfraMetricsListener.registry.scrape("text/plain; version=0.0.4; charset=utf-8");
@@ -16,8 +16,11 @@ public class CyborgMetricsTest {
         assertTrue("counter present", out.contains("http_requests_total"));
         assertTrue("latency present", out.contains("http_request_duration_seconds"));
         assertTrue("request size present", out.contains("http_request_size_bytes"));
-        assertTrue("account_id tag present", out.contains("account_id=\"1000000\""));
         assertTrue("uri tag present", out.contains("uri=\"/api/fetchApiInfo\""));
+        // account_id lives ONLY on the counter, not on the latency histogram/size (cardinality).
+        assertTrue("account_id on counter", lineExists(out, "http_requests_total", "account_id=\"1000000\""));
+        assertFalse("account_id NOT on latency", lineExists(out, "http_request_duration_seconds", "account_id="));
+        assertFalse("account_id NOT on size", lineExists(out, "http_request_size_bytes", "account_id="));
     }
 
     @Test
