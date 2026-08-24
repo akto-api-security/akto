@@ -1,0 +1,27 @@
+# Prometheus scrape job for the cyborg (database-abstractor) /metrics endpoint.
+#
+# Paste this job under `scrape_configs:` in your local prometheus.yml, then reload Prometheus
+# (docker: `docker compose restart prometheus`, or POST /-/reload if lifecycle API is enabled).
+#
+# Target host:
+#   - Prometheus in Docker, cyborg on the host (start-cyborg.sh, port 8085) -> host.docker.internal:8085
+#   - Prometheus on the host too                                            -> localhost:8085
+#
+# Auth: the endpoint requires the bearer token (METRICS_AUTH_TOKEN). Keep this in sync with the
+# value exported by start-cyborg.sh. The service/role labels come from the metrics themselves
+# (common tags service=cyborg, role=$METRICS_SERVICE_ROLE), so we do not set them here.
+
+scrape_configs:
+  - job_name: cyborg
+    metrics_path: /metrics
+    scheme: http
+    scrape_interval: 15s
+    authorization:
+      type: Bearer
+      credentials: local-dev-metrics-token
+    static_configs:
+      # One target per running deployment. Locally there's usually just the api instance.
+      - targets:
+          - host.docker.internal:8085   # api  (change to localhost:8085 if Prometheus runs on host)
+        # - host.docker.internal:8086   # consumer
+        # - host.docker.internal:8087   # fast-consumer

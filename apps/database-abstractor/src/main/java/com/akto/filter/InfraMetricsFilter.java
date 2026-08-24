@@ -25,9 +25,9 @@ import java.util.concurrent.TimeUnit;
 /**
  * Records per-request Prometheus metrics for /api/* traffic.
  *
- * Cardinality is deliberately bounded to method x status-code. Unlike the dashboard's filter we do
- * NOT tag by request URI (Struts action names would blow up the series count and could leak ids),
- * and we use a single Timer publishing multiple percentiles instead of one Timer per percentile.
+ * Tagged by uri x method x status-code. The uri is safe to tag here: db-abstractor routes are a
+ * bounded set of literal /api/<action> Struts action names (no path params / ids), so cardinality
+ * stays finite. A single Timer publishes multiple percentiles instead of one Timer per percentile.
  *
  * The Servlet 2.5 API on this service's classpath has no HttpServletResponse.getStatus(), so the
  * status code is captured via a response wrapper (the standard pre-3.0 pattern).
@@ -105,8 +105,10 @@ public class InfraMetricsFilter implements Filter {
 
                 String method = httpServletRequest.getMethod();
                 String status = String.valueOf(wrapped.getCapturedStatus()); // actual HTTP status code
+                String uri = httpServletRequest.getRequestURI();             // bounded /api/<action> set
 
                 ArrayList<Tag> tags = new ArrayList<>(Arrays.asList(
+                        Tag.of("uri", uri),
                         Tag.of("method", method),
                         Tag.of("status", status)
                 ));

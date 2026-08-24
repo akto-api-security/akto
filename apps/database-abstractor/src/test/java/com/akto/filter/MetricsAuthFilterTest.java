@@ -27,6 +27,7 @@ public class MetricsAuthFilterTest {
     @After
     public void reset() {
         MetricsAuthFilter.setExpectedTokenForTest(null);
+        MetricsAuthFilter.setAuthEnabledForTest(true);
         InfraMetricsListener.setEnabledForTest(false);
     }
 
@@ -101,7 +102,35 @@ public class MetricsAuthFilterTest {
     }
 
     @Test
+    public void authDisabled_servesWithoutToken() throws Exception {
+        InfraMetricsListener.setEnabledForTest(true);
+        MetricsAuthFilter.setAuthEnabledForTest(false); // opt-out
+        MetricsAuthFilter.setExpectedTokenForTest(null);
+        ResponseHandler resp = new ResponseHandler();
+        ChainHandler chain = new ChainHandler();
+
+        new MetricsAuthFilter().doFilter(request(null), response(resp), chain(chain));
+
+        assertNull(resp.sentError);
+        assertTrue(chain.called);
+    }
+
+    @Test
+    public void authDisabledButFeatureOff_stillReturns404() throws Exception {
+        InfraMetricsListener.setEnabledForTest(false);
+        MetricsAuthFilter.setAuthEnabledForTest(false);
+        ResponseHandler resp = new ResponseHandler();
+        ChainHandler chain = new ChainHandler();
+
+        new MetricsAuthFilter().doFilter(request(null), response(resp), chain(chain));
+
+        assertEquals(Integer.valueOf(HttpServletResponse.SC_NOT_FOUND), resp.sentError);
+        assertFalse(chain.called);
+    }
+
+    @Test
     public void enabledButTokenUnset_failsClosedWith401() throws Exception {
+        MetricsAuthFilter.setAuthEnabledForTest(true);
         InfraMetricsListener.setEnabledForTest(true);
         MetricsAuthFilter.setExpectedTokenForTest(null);
         ResponseHandler resp = new ResponseHandler();

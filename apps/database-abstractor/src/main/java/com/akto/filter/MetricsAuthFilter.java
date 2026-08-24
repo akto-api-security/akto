@@ -15,13 +15,16 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
 /**
- * Guards the Prometheus scrape endpoint. Serves data only when enabled AND authorized:
- *   - feature not enabled         -> 404 (endpoint not exposed; collection still runs)
- *   - METRICS_AUTH_TOKEN not set  -> 401 (never open the endpoint)
- *   - token mismatch / missing    -> 401
+ * Guards the Prometheus scrape endpoint. Behaviour, checked in order:
+ *   - feature not enabled            -> 404 (endpoint not exposed; collection still runs)
+ *   - auth disabled (opt-out)        -> served without a token (METRICS_AUTH_ENABLED=false)
+ *   - auth on, METRICS_AUTH_TOKEN unset -> 401 (fail closed; never open the endpoint)
+ *   - auth on, token mismatch/missing   -> 401
+ *   - auth on, token matches            -> served
  *
- * This service is public-facing, so unlike ToolsAuthFilter (which fails OPEN when unconfigured) the
- * authorization FAILS CLOSED.
+ * Auth is ON by default (secure default for a public-facing service) and FAILS CLOSED — unlike
+ * ToolsAuthFilter, which fails open. A client on a fully trusted/private network that does not want
+ * to manage a token can opt out with METRICS_AUTH_ENABLED=false.
  *
  * The token is a static shared secret; a Prometheus scraper sends it as "Authorization: Bearer
  * <token>" (a bare token without the Bearer prefix is also accepted).
@@ -32,12 +35,18 @@ public class MetricsAuthFilter implements Filter {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
 
-    // Read once at class load. volatile + a test seam only; production never mutates this after load.
+    // Read once at class load. volatile + a test seam only; production never mutates these after load.
     private static volatile String expectedToken = System.getenv("METRICS_AUTH_TOKEN");
+    // Auth is ON unless explicitly opted out with METRICS_AUTH_ENABLED=false.
+    private static volatile boolean authEnabled = !"false".equalsIgnoreCase(System.getenv("METRICS_AUTH_ENABLED"));
 
-    // Package-private test seam (env-based statics can't be driven from a unit test otherwise).
+    // Package-private test seams (env-based statics can't be driven from a unit test otherwise).
     static void setExpectedTokenForTest(String token) {
         expectedToken = token;
+    }
+
+    static void setAuthEnabledForTest(boolean enabled) {
+        authEnabled = enabled;
     }
 
     /** True only if a token is configured AND the header carries a matching token. Fails closed. */
@@ -78,6 +87,12 @@ public class MetricsAuthFilter implements Filter {
         // Endpoint is not exposed unless the feature is enabled (collection still runs regardless).
         if (!InfraMetricsListener.isEnabled()) {
             httpResponse.sendError(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+
+        // Opt-out: client explicitly disabled auth (trusted/private network).
+        if (!authEnabled) {
+            chain.doFilter(servletRequest, servletResponse);
             return;
         }
 
