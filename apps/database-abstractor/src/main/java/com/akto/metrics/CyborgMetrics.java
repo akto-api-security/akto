@@ -29,7 +29,7 @@ public class CyborgMetrics {
     // Explicit, meaningful latency buckets (5ms..5s). Replaces publishPercentileHistogram()'s
     // ~69 auto buckets. Grafana computes p50/p90/p99 via histogram_quantile() over these.
     private static final Duration[] LATENCY_SLOS = new Duration[] {
-            Duration.ofMillis(5), Duration.ofMillis(100), Duration.ofMillis(250),
+            Duration.ofMillis(25), Duration.ofMillis(100), Duration.ofMillis(250),
             Duration.ofMillis(500), Duration.ofSeconds(1), Duration.ofMillis(2500),
             Duration.ofSeconds(5)
     };
@@ -70,7 +70,7 @@ public class CyborgMetrics {
                 .description("HTTP request duration")
                 .tags(baseTags)
                 .serviceLevelObjectives(LATENCY_SLOS)
-                .minimumExpectedValue(Duration.ofMillis(5))
+                .minimumExpectedValue(Duration.ofMillis(25))
                 .maximumExpectedValue(Duration.ofSeconds(5))
                 .register(InfraMetricsListener.registry)
                 .record(durationMs, TimeUnit.MILLISECONDS);
