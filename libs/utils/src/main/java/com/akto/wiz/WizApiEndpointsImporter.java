@@ -183,7 +183,7 @@ public class WizApiEndpointsImporter {
                 String host = entry.getKey();
                 boolean accessible = false;
                 try {
-                    accessible = entry.getValue().get(2, TimeUnit.SECONDS);
+                    accessible = entry.getValue().get(5, TimeUnit.SECONDS);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                 } catch (Exception e) {
@@ -196,6 +196,8 @@ public class WizApiEndpointsImporter {
                 } else {
                     unresolvedHostCount++;
                 }
+
+                heartbeat.run();
             }
 
             loggerMaker.infoAndAddToDb(String.format(
