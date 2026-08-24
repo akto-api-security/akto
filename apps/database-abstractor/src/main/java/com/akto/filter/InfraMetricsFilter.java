@@ -1,13 +1,9 @@
 package com.akto.filter;
 
-import com.akto.listener.InfraMetricsListener;
+import com.akto.dao.context.Context;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.DistributionSummary;
-import io.micrometer.core.instrument.Tag;
-import io.micrometer.core.instrument.Timer;
+import com.akto.metrics.CyborgMetrics;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -19,16 +15,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpServletResponseWrapper;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.concurrent.TimeUnit;
 
 /**
- * Records per-request Prometheus metrics for /api/* traffic.
- *
- * Tagged by uri x method x status-code. The uri is safe to tag here: db-abstractor routes are a
- * bounded set of literal /api/<action> Struts action names (no path params / ids), so cardinality
- * stays finite. A single Timer publishes multiple percentiles instead of one Timer per percentile.
+ * Records per-request Prometheus metrics for /api/* traffic. Gathers the tag values (uri, method,
+ * status, account_id) and the measurements (duration, request size) and hands them to
+ * {@link CyborgMetrics} — all metric definitions live there.
  *
  * The Servlet 2.5 API on this service's classpath has no HttpServletResponse.getStatus(), so the
  * status code is captured via a response wrapper (the standard pre-3.0 pattern).
@@ -104,41 +95,14 @@ public class InfraMetricsFilter implements Filter {
             try {
                 HttpServletRequest httpServletRequest = (HttpServletRequest) request;
 
+                String uri = httpServletRequest.getRequestURI();             // bounded /api/<action> set
                 String method = httpServletRequest.getMethod();
                 String status = String.valueOf(wrapped.getCapturedStatus()); // actual HTTP status code
-                String uri = httpServletRequest.getRequestURI();             // bounded /api/<action> set
+                Integer acc = Context.accountId.get();                       // set by AuthFilter upstream
+                String accountId = acc != null ? String.valueOf(acc) : CyborgMetrics.UNKNOWN;
+                int requestBytes = httpServletRequest.getContentLength();    // -1 when unknown
 
-                ArrayList<Tag> tags = new ArrayList<>(Arrays.asList(
-                        Tag.of("uri", uri),
-                        Tag.of("method", method),
-                        Tag.of("status", status)
-                ));
-
-                Counter.builder("http_requests_total")
-                        .description("Total HTTP requests")
-                        .tags(tags)
-                        .register(InfraMetricsListener.registry)
-                        .increment();
-
-                Timer.builder("http_request_duration")
-                        .description("HTTP request duration")
-                        .tags(tags)
-                        .publishPercentileHistogram()
-                        .publishPercentiles(0.5, 0.9, 0.99)
-                        .register(InfraMetricsListener.registry)
-                        .record(duration, TimeUnit.MILLISECONDS);
-
-                // Request body size, from Content-Length. Skipped when unknown (chunked / no body -> -1).
-                // Emits http_request_size_bytes_{count,sum,max}: avg = sum/count, total = sum.
-                int contentLength = httpServletRequest.getContentLength();
-                if (contentLength >= 0) {
-                    DistributionSummary.builder("http_request_size_bytes")
-                            .description("HTTP request body size in bytes")
-                            .baseUnit("bytes")
-                            .tags(tags)
-                            .register(InfraMetricsListener.registry)
-                            .record(contentLength);
-                }
+                CyborgMetrics.recordHttpRequest(uri, method, status, accountId, duration, requestBytes);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, String.format("InfraMetricsFilter error: %s", e.toString()), LogDb.DB_ABS);
             }
