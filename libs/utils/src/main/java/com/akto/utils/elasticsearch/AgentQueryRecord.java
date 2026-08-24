@@ -30,6 +30,7 @@ public class AgentQueryRecord {
     private final String traceId;
     private final String spanId;
     private final boolean isAtlasTraffic;
+    private int apiCollectionId;
 
     // Guardrail result for this prompt, recorded on the traffic by the ingestion gateway
     // (Gateway.recordGuardrailVerdict). Not final: set once by setGuardrailVerdict right after the
@@ -60,7 +61,7 @@ public class AgentQueryRecord {
                             String userName, String sessionIdentifier,
                             String queryPayload, String responsePayload,
                             long timeStampMs, int inputTokens, int outputTokens,
-                            String traceId, String spanId, boolean isAtlasTraffic) {
+                            String traceId, String spanId, int apiCollectionId, boolean isAtlasTraffic) {
         this.docId = docId;
         this.accountId = accountId;
         this.serviceId = serviceId;
@@ -74,6 +75,7 @@ public class AgentQueryRecord {
         this.outputTokens = outputTokens;
         this.traceId = traceId;
         this.spanId = spanId;
+        this.apiCollectionId = apiCollectionId;
         this.isAtlasTraffic = isAtlasTraffic;
     }
 
@@ -90,6 +92,7 @@ public class AgentQueryRecord {
     public int getOutputTokens()         { return outputTokens; }
     public String getTraceId()           { return traceId; }
     public String getSpanId()            { return spanId; }
+    public int getApiCollectionId()      { return apiCollectionId; }
     public boolean getIsAtlasTraffic()   { return isAtlasTraffic; }
 
     public Boolean getGuardrailViolated() { return guardrailViolated; }
@@ -209,6 +212,7 @@ public class AgentQueryRecord {
 
         String requestPayload  = p.getRequestParams().getPayload();
         String responsePayload = p.getPayload() != null ? p.getPayload() : "";
+        int apiCollectionId = p.getRequestParams().getApiCollectionId();
         int inputTokens  = resolveTokenCount(responsePayload, requestPayload, true);
         int outputTokens = resolveTokenCount(responsePayload, responsePayload, false);
 
@@ -226,6 +230,7 @@ public class AgentQueryRecord {
                 outputTokens,
                 traceId,
                 spanId,
+                apiCollectionId,
                 // Browser collections are registered source=ENDPOINT, so their traffic reports as Atlas too.
                 isAtlasTraffic || isBrowserExtensionTraffic
         );
