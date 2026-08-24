@@ -1,6 +1,7 @@
 // Shared display mappings + CTA/evidence helpers for Atlas Insights (InsightResult contract —
 // see apps/dashboard/src/main/java/com/akto/service/insights/InsightResult.java). Nothing here
 // computes a number; every value rendered comes straight from the API response.
+import func from "@/util/func";
 
 export const STATUS_LABEL = {
     READY: "Ready",
@@ -66,12 +67,28 @@ function humanizeColumnKey(key) {
     return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
 }
 
+// Evidence columns carrying a Unix-epoch-seconds value (InsightUtil doesn't format these
+// server-side since evidence rows are raw data, not a `formatted` metric string) — render as a
+// relative date via func.prettifyEpoch instead of the generic numeric formatter below.
+const EPOCH_SECONDS_COLUMNS = new Set(["firstSeen"]);
+
 // Builds AgGridTable columnDefs from an Evidence.columns list, right-aligning any column whose
 // values are numbers across the (already-bounded, <= EVIDENCE_ROW_CAP) row set.
 export function buildEvidenceColumnDefs(evidence) {
     const columns = evidence?.columns || [];
     const rows = evidence?.rows || [];
     return columns.map((col) => {
+        if (EPOCH_SECONDS_COLUMNS.has(col)) {
+            return {
+                field: col,
+                headerName: humanizeColumnKey(col),
+                flex: 1,
+                minWidth: 110,
+                filter: false,
+                sortable: false,
+                valueFormatter: (p) => (typeof p.value === "number" ? func.prettifyEpoch(p.value) : p.value ?? ""),
+            };
+        }
         const isNumeric = rows.some((row) => typeof row?.[col] === "number");
         return {
             field: col,

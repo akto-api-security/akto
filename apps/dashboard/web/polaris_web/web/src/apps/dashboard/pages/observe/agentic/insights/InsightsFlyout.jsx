@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Box, VerticalStack, HorizontalStack, Text, Badge, Button, Spinner } from "@shopify/polaris";
+import { Box, VerticalStack, HorizontalStack, Text, Button, Spinner } from "@shopify/polaris";
 import { ChevronLeftMinor, RefreshMinor, CancelMajor } from "@shopify/polaris-icons";
 import AgenticFlyoutShell from "../AgenticFlyoutShell";
-import { SeverityBadge } from "../AgenticCellRenderers";
 import insightsApi from "./insightsApi";
 import InsightsListView from "./InsightsListView";
 import InsightDetailView from "./InsightDetailView";
-import { STATUS_BADGE_STATUS, statusLabel, categoryLabel, INSIGHT_GROUP } from "./insightsHelpers";
+import { INSIGHT_GROUP } from "./insightsHelpers";
 
 // Atlas Insights — the "Insights" button's flyout. One AgenticFlyoutShell instance whose body
 // switches between the list and a selected insight's detail; the header switches with it.
@@ -71,9 +70,6 @@ export default function InsightsFlyout({ show, onClose, startTimestamp, endTimes
                 {selectedInsight && (
                     <HorizontalStack gap="2" blockAlign="center" wrap>
                         <Text variant="headingMd" as="h2">{selectedInsight.title}</Text>
-                        <Badge status={STATUS_BADGE_STATUS[selectedInsight.status]}>{statusLabel(selectedInsight.status)}</Badge>
-                        {selectedInsight.severity ? <SeverityBadge severity={selectedInsight.severity} /> : null}
-                        <Badge>{categoryLabel(selectedInsight.category)}</Badge>
                     </HorizontalStack>
                 )}
             </VerticalStack>
