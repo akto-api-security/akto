@@ -800,9 +800,9 @@
       ]
     },
     {
-      "type": "timeseries",
-      "title": "Ingress throughput by endpoint",
-      "description": "Request bytes/sec per URL.",
+      "type": "table",
+      "title": "Total request bytes by endpoint",
+      "description": "Total request body bytes received per URL over the selected time range.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -815,29 +815,20 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "Bps",
+          "unit": "bytes",
           "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "lineWidth": 1
+            "align": "auto"
           }
         }
       },
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "calcs": [
-            "mean",
-            "max",
-            "lastNotNull"
-          ]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Total bytes",
+            "desc": true
+          }
+        ]
       },
       "targets": [
         {
@@ -846,8 +837,23 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (uri) (rate(http_request_size_bytes_sum{service=\"cyborg\", account_id=~\"$account_id\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval]))",
-          "legendFormat": "{{uri}}"
+          "expr": "sum by (uri) (increase(http_request_size_bytes_sum{service=\"cyborg\", account_id=~\"$account_id\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"}[$__range]))",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "uri": "Endpoint",
+              "Value": "Total bytes"
+            },
+            "excludeByName": {
+              "Time": true
+            }
+          }
         }
       ]
     },
