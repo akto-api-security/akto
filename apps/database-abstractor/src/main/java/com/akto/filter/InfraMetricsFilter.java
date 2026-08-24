@@ -5,6 +5,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Timer;
 
@@ -126,6 +127,18 @@ public class InfraMetricsFilter implements Filter {
                         .publishPercentiles(0.5, 0.9, 0.99)
                         .register(InfraMetricsListener.registry)
                         .record(duration, TimeUnit.MILLISECONDS);
+
+                // Request body size, from Content-Length. Skipped when unknown (chunked / no body -> -1).
+                // Emits http_request_size_bytes_{count,sum,max}: avg = sum/count, total = sum.
+                int contentLength = httpServletRequest.getContentLength();
+                if (contentLength >= 0) {
+                    DistributionSummary.builder("http_request_size_bytes")
+                            .description("HTTP request body size in bytes")
+                            .baseUnit("bytes")
+                            .tags(tags)
+                            .register(InfraMetricsListener.registry)
+                            .record(contentLength);
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, String.format("InfraMetricsFilter error: %s", e.toString()), LogDb.DB_ABS);
             }
