@@ -103,14 +103,14 @@
             </result>
         </action>
 
-        <action name="threat-detection/validate" class="com.akto.action.CopilotStudioWebhookAction" method="checkReady">
+        <action name="copilot/threat-detection/validate" class="com.akto.action.CopilotStudioWebhookAction" method="checkReady">
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <param name="includeProperties">^isSuccessful,^status</param>
             </result>
         </action>
 
-        <action name="threat-detection/analyze-tool-execution" class="com.akto.action.CopilotStudioWebhookAction" method="analyzeToolExecution">
+        <action name="copilot/threat-detection/analyze-tool-execution" class="com.akto.action.CopilotStudioWebhookAction" method="analyzeToolExecution">
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <param name="includeProperties">^blockAction,^reason,^diagnostics</param>
