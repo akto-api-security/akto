@@ -24,5 +24,3 @@ https:
 model.onnx
 run-mini-runtime.sh
 run-datadog-traffic-forward.sh
-# local dev script that held a secret — never commit
-apps/mini-testing/run-mini-testing-local.sh
