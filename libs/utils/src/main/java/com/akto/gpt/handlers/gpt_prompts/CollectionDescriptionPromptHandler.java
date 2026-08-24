@@ -1,5 +1,8 @@
 package com.akto.gpt.handlers.gpt_prompts;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -9,6 +12,12 @@ import javax.validation.ValidationException;
 
 import com.mongodb.BasicDBObject;
 
+/**
+ * Call 2 of the two-call description pipeline: the TYPE 2 (unrecognized-platform) fallback. Only
+ * reached when PlatformOnlyDescriptionPromptHandler either wasn't attempted (no platform resolved
+ * at all) or came back UNKNOWN_PLATFORM. Grounded in the collection's actual endpoint/skill/tool
+ * names and HTTP methods - never sample request/response traffic.
+ */
 public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler {
 
     public static final String COLLECTION_NAME = "collectionName";
@@ -16,6 +25,11 @@ public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler
     public static final String ACCESS_TYPE = "accessType";
     public static final String COLLECTION_TYPE = "collectionType";
     public static final String SKILL_NAME = "skillName";
+    // Prettified ai-agent/mcp-client platform name (e.g. "VS Code", "Cursor"), looked up via
+    // KnownAiPlatforms. Independent of SKILL_NAME/ITEM_LIBRARY_SIZE - a collection can have both a
+    // skill tag and a known platform at once, and the platform should never be dropped just because
+    // a skill was also found.
+    public static final String PLATFORM_DISPLAY_NAME = "platformDisplayName";
     // Set (>1) when the collection has many distinct items (skills, MCP tools, or plain endpoints) -
     // "Endpoints" then holds only a sample, not the full set, and the model needs to know the true count
     // to avoid describing the whole collection as if it were only about the few shown.
@@ -25,7 +39,6 @@ public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler
     public static final String ITEM_WORD = "itemWord";
     public static final String TAGS = "tags";
     public static final String ENDPOINTS = "endpoints";
-    public static final String SAMPLE_SNIPPETS = "sampleSnippets";
     public static final String MAX_CHARS = "maxChars";
 
     // The one sanctioned "I can't confidently decide" answer - same text the UI already shows as its
@@ -54,6 +67,29 @@ public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler
         "unknown"
     ));
 
+    // The prompt's static structure/instructions live in this file, not in Java string
+    // concatenation, so wording tweaks don't need a recompile. Only the parts that genuinely vary
+    // per call (collection info, endpoints, conditional bullets) are computed in Java and
+    // substituted in.
+    private static final String PROMPT_TEMPLATE = loadTemplate("/prompts/collection_description.txt");
+
+    // Few-shot examples for this TYPE 2 (unrecognized-platform, endpoint-grounded) case - kept out of
+    // Java for the same reason as PlatformOnlyDescriptionPromptHandler's TYPE 1 examples: editing or
+    // adding examples should never need a recompile. Flat file, no categories yet (unlike the TYPE 1
+    // examples, which are split by platform nature) - add more examples to the same file as they come.
+    private static final String EXAMPLES_TEXT = loadTemplate("/prompts/collection_description_examples.txt");
+
+    private static String loadTemplate(String resourcePath) {
+        try (InputStream in = CollectionDescriptionPromptHandler.class.getResourceAsStream(resourcePath)) {
+            if (in == null) {
+                throw new IllegalStateException("Missing prompt template resource: " + resourcePath);
+            }
+            return org.apache.commons.io.IOUtils.toString(in, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load prompt template: " + resourcePath, e);
+        }
+    }
+
     @Override
     protected void validate(BasicDBObject queryData) throws ValidationException {
         if (isBlank(queryData.getString(COLLECTION_NAME)) && isBlank(queryData.getString(HOST_NAME))) {
@@ -77,11 +113,11 @@ public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler
         String accessType = queryData.getString(ACCESS_TYPE);
         String collectionType = queryData.getString(COLLECTION_TYPE);
         String skillName = queryData.getString(SKILL_NAME);
+        String platformDisplayName = queryData.getString(PLATFORM_DISPLAY_NAME);
         int itemLibrarySize = queryData.getInt(ITEM_LIBRARY_SIZE, 0);
         String itemWord = queryData.getString(ITEM_WORD);
         List<String> tags = (List<String>) queryData.getOrDefault(TAGS, null);
         List<String> endpoints = (List<String>) queryData.get(ENDPOINTS);
-        List<String> sampleSnippets = (List<String>) queryData.getOrDefault(SAMPLE_SNIPPETS, null);
         int maxChars = queryData.getInt(MAX_CHARS, 300);
 
         StringBuilder infoBlock = new StringBuilder();
@@ -94,6 +130,9 @@ public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler
         if (!isBlank(collectionType)) {
             infoBlock.append("Collection type: ").append(collectionType).append("\n");
         }
+        if (!isBlank(platformDisplayName)) {
+            infoBlock.append("Platform: ").append(platformDisplayName).append("\n");
+        }
         if (!isBlank(skillName)) {
             infoBlock.append("Skill name: ").append(skillName).append("\n");
         }
@@ -105,76 +144,46 @@ public class CollectionDescriptionPromptHandler extends AzureOpenAIPromptHandler
         }
 
         boolean hasEndpoints = endpoints != null && !endpoints.isEmpty();
-        StringBuilder endpointsBlock = new StringBuilder();
+        String endpointsSection = "";
         if (hasEndpoints) {
+            StringBuilder endpointsBlock = new StringBuilder("ENDPOINTS:\n");
             for (String endpoint : endpoints) {
                 endpointsBlock.append("- ").append(endpoint).append("\n");
             }
+            endpointsSection = endpointsBlock.toString();
         }
 
-        StringBuilder samplesBlock = new StringBuilder();
-        if (sampleSnippets != null && !sampleSnippets.isEmpty()) {
-            for (String snippet : sampleSnippets) {
-                if (snippet == null || snippet.trim().isEmpty()) {
-                    continue;
-                }
-                samplesBlock.append("---\n").append(snippet).append("\n");
-            }
-        }
+        String platformBullet = !isBlank(platformDisplayName)
+            ? "- \"Platform\" (" + platformDisplayName + ") is the subject - lead with it, never a "
+                + "trailing mention. Use it only as a label here; base what it does on the endpoints "
+                + "below, not assumed brand knowledge (you may not know it well).\n"
+            : "";
 
-        return
-            "You are an API security analyst. Based on the identifying info below"
-                + (hasEndpoints ? ", its endpoints, and (if provided) sample request/response traffic, "
-                    : " (no traffic observed for this collection yet, so no endpoints or samples), ")
-                + "write a concise, factual description of what this is used for.\n\n"
-                + "COLLECTION INFO:\n" + infoBlock
-                + (hasEndpoints ? "\nENDPOINTS:\n" + endpointsBlock : "")
-                + (samplesBlock.length() > 0 ? "\nSAMPLE REQUEST/RESPONSE TRAFFIC:\n" + samplesBlock : "")
-                + "\nINSTRUCTIONS:\n"
-                + (!hasEndpoints
-                    ? "- No endpoints have been observed yet - infer purpose from \"Collection type\", the "
-                        + "platform/tool named in Tags/Access type/Host, and your own general knowledge of "
-                        + "that platform. Keep it general and plausible, not falsely specific about "
-                        + "capabilities you have no evidence for.\n"
-                    : "")
-                + "- Infer the purpose from all the info above. If \"Collection type\" identifies this as a "
-                + "Skill, AI agent, MCP server, or LLM, describe it in those specific terms (name the "
-                + "platform/tool from Tags/Access type if known) rather than a generic web API description.\n"
-                + "- If \"Collection type\" is set, do not use the word \"API\" anywhere in the description, "
-                + "not even in passing. It's a skill, agent, MCP server, or LLM, never an API or API "
-                + "collection. Reserve \"API\" for collections with no Collection type set.\n"
-                + "- If \"Skill name\" is set, that name is the point of the description: say what that "
-                + "specific skill actually does (use your own knowledge of what a skill with that name would "
-                + "do if the endpoints/samples don't spell it out - e.g. \"mongodb-mcp-setup\" sets up an MCP "
-                + "connection to MongoDB). Do not describe generic skill-management mechanics (listing, "
-                + "creating, or reading skill definition files) instead of the skill's actual purpose.\n"
-                + (itemLibrarySize > 1
-                    ? "- This collection has " + itemLibrarySize + " distinct " + itemWord + "s - "
-                        + "\"Endpoints\" below only samples some of them. Describe it as a library/toolkit "
-                        + "spanning that many " + itemWord + "s (optionally naming 2-3 as examples), never "
-                        + "as if it were only about the few shown.\n"
-                    : "")
-                + "- Do not invent details that aren't supported by the endpoints or samples.\n"
-                + "- Plain text only, no markdown formatting.\n"
-                + "- Write like a developer jotting a one-line note for a teammate, not like generated "
-                + "marketing copy. Be direct and concrete.\n"
-                + "- Do not begin every description with the same boilerplate opening like \"This API "
-                + "collection...\" or \"This is a...\" - vary it, or just start with the subject/verb.\n"
-                + "- Pick the 1-2 most defining things it does. Do not try to enumerate every endpoint or "
-                + "capability you see - a partial list read as exhaustive is worse than a tight summary.\n"
-                + "- Avoid hedging filler like \"indicating\", \"suggesting\", \"appears to\", \"likely\", "
-                + "\"designed to\", \"focus on\" - state what it does, not what the evidence implies.\n"
-                + "- Avoid generic filler verbs like \"facilitates\", \"enables\", \"leverages\", \"utilizes\" - "
-                + "use the concrete action instead (e.g. \"manages orders\" or \"reads and writes files\", "
-                + "not \"facilitates order management\" or \"facilitates file operations\").\n"
-                + "- Maximum " + maxChars + " characters.\n"
-                + "- If, and only if, you cannot confidently determine what this is used for from "
-                + "the given info, respond with exactly \"" + CANNOT_DECIDE_PLACEHOLDER + "\" as the "
-                + "description instead of guessing.\n\n"
-                + "OUTPUT FORMAT:\n"
-                + "Return a single valid JSON object with the following structure:\n"
-                + "{\"description\": \"<the description text, max " + maxChars + " characters, or \\\""
-                + CANNOT_DECIDE_PLACEHOLDER + "\\\" if you can't decide>\"}";
+        String skillBullet = !isBlank(skillName)
+            ? "- \"Skill name\" (" + skillName + ") is the point of the description: say what that "
+                + "specific skill actually does (read the name itself if the endpoints don't spell it "
+                + "out - e.g. \"mongodb-mcp-setup\" sets up an MCP connection to MongoDB). Do not "
+                + "describe generic skill-management mechanics (listing, creating, or reading skill "
+                + "definition files) instead of the skill's actual purpose.\n"
+            : "";
+
+        String libraryBullet = itemLibrarySize > 1
+            ? "- This collection has " + itemLibrarySize + " distinct " + itemWord + "s - \"Endpoints\" "
+                + "below only samples some of them. Generalize across them into a short functional "
+                + "capability description based on what their names indicate (e.g. \"processes payments "
+                + "and refunds\", \"manages files and git operations\") - do not just list them by name, "
+                + "and don't assume brand knowledge beyond the name itself.\n"
+            : "";
+
+        return PROMPT_TEMPLATE
+            .replace("{{EXAMPLES}}", EXAMPLES_TEXT)
+            .replace("{{INFO_BLOCK}}", infoBlock.toString())
+            .replace("{{ENDPOINTS_SECTION}}", endpointsSection)
+            .replace("{{PLATFORM_BULLET}}", platformBullet)
+            .replace("{{SKILL_BULLET}}", skillBullet)
+            .replace("{{LIBRARY_BULLET}}", libraryBullet)
+            .replace("{{MAX_CHARS}}", String.valueOf(maxChars))
+            .replace("{{CANNOT_DECIDE}}", CANNOT_DECIDE_PLACEHOLDER);
     }
 
     private static boolean isBlank(String s) {

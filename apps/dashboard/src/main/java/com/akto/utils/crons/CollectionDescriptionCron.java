@@ -18,13 +18,12 @@ import org.bson.conversions.Bson;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
-import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.CollectionTags;
-import com.akto.dto.traffic.SampleData;
 import com.akto.gpt.handlers.gpt_prompts.CollectionDescriptionPromptHandler;
+import com.akto.gpt.handlers.gpt_prompts.PlatformOnlyDescriptionPromptHandler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.task.Cluster;
@@ -54,8 +53,6 @@ public class CollectionDescriptionCron {
     private static final int MAX_FAILED_ATTEMPTS = 3;
     private static final int CONCURRENCY = 5;
     private static final int MAX_ENDPOINTS_FOR_CONTEXT = 15;
-    private static final int MAX_SAMPLE_ENDPOINTS = 2;
-    private static final int MAX_SAMPLE_CHARS = 600;
 
     // Explicit allowlist - this cron no longer sweeps every account, only these. Add more IDs here as
     // needed.
@@ -255,6 +252,77 @@ public class CollectionDescriptionCron {
         return tags == null ? null : tagValue(tags, "skill");
     }
 
+    /**
+     * Atlas collection hostnames are constructed as "<device_id>.<client-or-category>.<target...>"
+     * - confirmed across every real example. For ai-agent/skill collections the target is always one
+     * segment, the same value as the ai-agent/mcp-client tag ("...ai-agent.claude" -> "claude"). For
+     * mcp-server collections, segment 2 is the calling *client* (cursor, vscode - same as the
+     * mcp-client tag), and everything after it is the actual *server* identity, which can itself be a
+     * multi-segment domain: "<device>.cursor.api.githubcopilot.com" -> "api.githubcopilot.com",
+     * "<device>.cursor.mcp.razorpay.com" -> "mcp.razorpay.com". The mcp-client/ai-agent tags alone can
+     * never give this - they only ever name the calling client, not the server being called. So: take
+     * everything from segment 2 onward, not just the last dot-token (which for a multi-segment server
+     * domain would just be a meaningless TLD like "com"). Falls back to the ai-agent/mcp-client tag for
+     * non-Atlas collections (real external domains, e.g. mcp.kite.trade) where this splitting doesn't
+     * apply at all.
+     */
+    private static String platformIdentity(ApiCollection collection) {
+        if (isAtlasSourced(collection)) {
+            String target = hostnameTargetIdentity(collection.getHostName());
+            // A locally-hosted model (e.g. Ollama) mirrors as "<device>.ollama-<model>-latest.
+            // localhost:11434" - the real downstream host is a bare loopback/IP address, identical
+            // across every different model served from the same machine, so it carries no identity
+            // at all. The actual identity there is the ai-agent/mcp-client tag value instead
+            // ("r1-network:latest", "nomic-embed-text:latest") - fall back to it rather than
+            // collapsing every locally-hosted model on the same host into one indistinguishable
+            // "platform".
+            if (target != null && !target.isEmpty() && !isGenericHost(target)) {
+                return target;
+            }
+        }
+        return clientTagValue(collection);
+    }
+
+    private static boolean isAtlasSourced(ApiCollection collection) {
+        List<CollectionTags> tags = collection.getTagsList();
+        return tags != null
+            && Constants.AKTO_ENDPOINT_SOURCE_VALUE.equals(tagValue(tags, Constants.AKTO_ENDPOINT_SOURCE_TAG));
+    }
+
+    /** Everything after "<device_id>.<client-or-category>." - see platformIdentity() for why. */
+    private static String hostnameTargetIdentity(String hostName) {
+        if (hostName == null || hostName.trim().isEmpty()) {
+            return null;
+        }
+        String[] parts = hostName.split("\\.");
+        if (parts.length < 3) {
+            return parts.length == 2 ? parts[1] : null;
+        }
+        return String.join(".", java.util.Arrays.copyOfRange(parts, 2, parts.length));
+    }
+
+    private static final java.util.regex.Pattern IPV4_HOST = java.util.regex.Pattern.compile("\\d{1,3}(\\.\\d{1,3}){3}");
+
+    /** "localhost[:port]" or a bare IPv4[:port] - a real destination, but not a distinguishing identity. */
+    private static boolean isGenericHost(String target) {
+        String hostPart = target.contains(":") ? target.substring(0, target.indexOf(':')) : target;
+        return "localhost".equalsIgnoreCase(hostPart) || IPV4_HOST.matcher(hostPart).matches();
+    }
+
+    /**
+     * ai-agent and mcp-client are stamped together by the same hook (confirmed across every
+     * connector in apps/mcp-endpoint-shield/*) - prefer mcp-client since it's the more specific
+     * hook-level identity when both are present, but either alone is enough to identify the client.
+     */
+    private static String clientTagValue(ApiCollection collection) {
+        List<CollectionTags> tags = collection.getTagsList();
+        if (tags == null) {
+            return null;
+        }
+        String mcpClient = tagValue(tags, "mcp-client");
+        return mcpClient != null ? mcpClient : tagValue(tags, "ai-agent");
+    }
+
     private static final class NamedItemLibrary {
         final int distinctCount;
         final List<String> sampleNames;
@@ -333,6 +401,27 @@ public class CollectionDescriptionCron {
         try {
             Context.accountId.set(accountId);
 
+            String collectionType = collectionTypeLabel(collection);
+            // ai-agent/mcp-client identify the platform independently of skill/library detection below -
+            // a collection can carry a "skill" tag and a known platform tag at the same time, and the
+            // platform must never be dropped just because a skill was also found (see collectionTypeLabel
+            // javadoc: it picks one label for prompt phrasing, but that's not exclusive of platform identity).
+            String platformDisplayName = KnownAiPlatforms.displayName(platformIdentity(collection));
+
+            // Call 1: bare platform + type, no endpoint query at all. Most collections resolve to a
+            // known platform (the ai-agent/mcp-client tag space is closed - see KnownAiPlatforms), so
+            // this is the common case and it's essentially free: one small LLM call, zero Mongo reads
+            // beyond the collection doc already in hand.
+            if (!isBlank(platformDisplayName)) {
+                String description = tryPlatformOnlyDescription(platformDisplayName, collectionType);
+                if (description != null) {
+                    storeDescription(collectionId, accountId, description);
+                    return;
+                }
+                // Not confidently recognized (or the call itself failed) - fall through to the
+                // endpoint-grounded call below, which still carries platformDisplayName as a label.
+            }
+
             List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(
                 Filters.eq(ApiInfo.ID_API_COLLECTION_ID, collectionId),
                 0, MAX_ENDPOINTS_FOR_CONTEXT, Sorts.descending(ApiInfo.LAST_SEEN),
@@ -340,15 +429,13 @@ public class CollectionDescriptionCron {
             );
             boolean hasEndpoints = apiInfos != null && !apiInfos.isEmpty();
 
-            String collectionType = collectionTypeLabel(collection);
-
-            if (!hasEndpoints && collectionType == null) {
-                // Genuinely nothing to go on - no traffic yet, and tags don't even say what kind of
-                // collection this is. Not a failure, just not enough info yet - don't count it toward
-                // MAX_FAILED_ATTEMPTS (see markFailed), or a collection that starts like this and later
-                // gets real endpoints/tags would already have burned its retry budget by the time it
-                // actually has something to describe.
-                loggerMaker.debugAndAddToDb("Skipping collection " + collectionId + ": no endpoints and no recognized type yet");
+            if (!hasEndpoints && collectionType == null && isBlank(platformDisplayName)) {
+                // Genuinely nothing to go on - no traffic yet, no recognized type, no platform. Not a
+                // failure, just not enough info yet - don't count it toward MAX_FAILED_ATTEMPTS (see
+                // markFailed), or a collection that starts like this and later gets real endpoints/tags
+                // would already have burned its retry budget by the time it actually has something to
+                // describe.
+                loggerMaker.debugAndAddToDb("Skipping collection " + collectionId + ": no endpoints, type, or platform yet");
                 return;
             }
 
@@ -372,10 +459,24 @@ public class CollectionDescriptionCron {
                     endpointsForPrompt = library.sampleNames;
                 }
             } else if (hasEndpoints && ("AI agent".equals(collectionType) || "LLM".equals(collectionType))) {
-                long totalEndpoints = countEndpoints(collectionId);
-                if (totalEndpoints > apiInfos.size()) {
-                    itemLibrarySize = (int) totalEndpoints;
-                    itemWord = "endpoint";
+                // No skill/mcp-server tag, but some ai-agent collections still route calls through a
+                // /skills/{name} or tools/call/{name} URL convention - try both before falling back to
+                // a bare count. Cheap: same wide, URL-only scan sampleNamedItemLibrary already does for
+                // Skill/MCP-server collections.
+                NamedItemLibrary skillLibrary = sampleNamedItemLibrary(collectionId, SKILL_NAME_PATTERN);
+                NamedItemLibrary toolLibrary = sampleNamedItemLibrary(collectionId, MCP_TOOL_NAME_PATTERN);
+                boolean preferTool = toolLibrary.distinctCount > skillLibrary.distinctCount;
+                NamedItemLibrary bestLibrary = preferTool ? toolLibrary : skillLibrary;
+                if (bestLibrary.distinctCount > 1) {
+                    itemLibrarySize = bestLibrary.distinctCount;
+                    itemWord = preferTool ? "tool" : "skill";
+                    endpointsForPrompt = bestLibrary.sampleNames;
+                } else {
+                    long totalEndpoints = countEndpoints(collectionId);
+                    if (totalEndpoints > apiInfos.size()) {
+                        itemLibrarySize = (int) totalEndpoints;
+                        itemWord = "endpoint";
+                    }
                 }
             }
             boolean isLibrary = itemLibrarySize > 1;
@@ -385,6 +486,7 @@ public class CollectionDescriptionCron {
             queryData.put(CollectionDescriptionPromptHandler.HOST_NAME, collection.getHostName());
             queryData.put(CollectionDescriptionPromptHandler.ACCESS_TYPE, collection.getAccessType());
             queryData.put(CollectionDescriptionPromptHandler.COLLECTION_TYPE, collectionType);
+            queryData.put(CollectionDescriptionPromptHandler.PLATFORM_DISPLAY_NAME, platformDisplayName);
             // A single-skill collection's "skill" tag names the point of the description; a library with
             // many items has no one name that represents the whole thing, so it's left unset there.
             queryData.put(CollectionDescriptionPromptHandler.SKILL_NAME, isLibrary ? null : skillTagValue(collection));
@@ -392,8 +494,6 @@ public class CollectionDescriptionCron {
             queryData.put(CollectionDescriptionPromptHandler.ENDPOINTS, endpointsForPrompt);
             queryData.put(CollectionDescriptionPromptHandler.ITEM_LIBRARY_SIZE, itemLibrarySize);
             queryData.put(CollectionDescriptionPromptHandler.ITEM_WORD, itemWord);
-            queryData.put(CollectionDescriptionPromptHandler.SAMPLE_SNIPPETS,
-                hasEndpoints ? sampleSnippets(collectionId, apiInfos) : null);
             queryData.put(CollectionDescriptionPromptHandler.MAX_CHARS, MAX_DESCRIPTION_CHARS);
 
             BasicDBObject resp = new CollectionDescriptionPromptHandler().handle(queryData);
@@ -404,23 +504,52 @@ public class CollectionDescriptionCron {
                 return;
             }
 
-            if (description.length() > MAX_DESCRIPTION_CHARS) {
-                description = truncateAtWordBoundary(description, MAX_DESCRIPTION_CHARS);
-            }
-
-            ApiCollectionsDao.instance.updateOne(
-                Filters.eq(ApiCollection.ID, collectionId),
-                Updates.set(ApiCollection.DESCRIPTION, description)
-            );
-            failCountCache.remove(collectionId);
-            // Best-effort provenance trail so a bad batch can be found/audited later - this cron never
-            // overwrites a description that was already set, so this only ever fires for new ones.
-            loggerMaker.infoAndAddToDb("Set description for collectionId=" + collectionId
-                + ", accountId=" + accountId + ": " + description);
+            storeDescription(collectionId, accountId, description);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error generating description for collection " + collectionId + ": " + e.getMessage());
             markFailed(collectionId, e.getMessage());
         }
+    }
+
+    /**
+     * Call 1 of the pipeline: bare platform + type, no endpoint data. Returns the description if the
+     * model genuinely recognizes the platform, or null if it flagged UNKNOWN_PLATFORM, the call
+     * errored, or came back empty - any of which means "fall through to the endpoint-grounded call."
+     */
+    private String tryPlatformOnlyDescription(String platformDisplayName, String collectionType) {
+        BasicDBObject queryData = new BasicDBObject();
+        queryData.put(PlatformOnlyDescriptionPromptHandler.PLATFORM_DISPLAY_NAME, platformDisplayName);
+        queryData.put(PlatformOnlyDescriptionPromptHandler.COLLECTION_TYPE, collectionType);
+        queryData.put(PlatformOnlyDescriptionPromptHandler.MAX_CHARS, MAX_DESCRIPTION_CHARS);
+
+        BasicDBObject resp = new PlatformOnlyDescriptionPromptHandler().handle(queryData);
+        String description = resp != null ? resp.getString("description") : null;
+        if (description == null || description.trim().isEmpty()) {
+            return null;
+        }
+        if (PlatformOnlyDescriptionPromptHandler.UNKNOWN_PLATFORM_FLAG.equalsIgnoreCase(description.trim())) {
+            return null;
+        }
+        return description;
+    }
+
+    private void storeDescription(int collectionId, int accountId, String description) {
+        if (description.length() > MAX_DESCRIPTION_CHARS) {
+            description = truncateAtWordBoundary(description, MAX_DESCRIPTION_CHARS);
+        }
+        ApiCollectionsDao.instance.updateOne(
+            Filters.eq(ApiCollection.ID, collectionId),
+            Updates.set(ApiCollection.DESCRIPTION, description)
+        );
+        failCountCache.remove(collectionId);
+        // Best-effort provenance trail so a bad batch can be found/audited later - this cron never
+        // overwrites a description that was already set, so this only ever fires for new ones.
+        loggerMaker.infoAndAddToDb("Set description for collectionId=" + collectionId
+            + ", accountId=" + accountId + ": " + description);
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
     }
 
     /** Hard-cuts at maxChars, then backs off to the last word boundary so it doesn't end mid-word. */
@@ -439,30 +568,6 @@ public class CollectionDescriptionCron {
             endpoints.add(apiInfo.getId().getMethod().name() + " " + apiInfo.getId().getUrl());
         }
         return endpoints;
-    }
-
-    /** Best-effort: grabs one sample per endpoint, for the first MAX_SAMPLE_ENDPOINTS endpoints only. */
-    private List<String> sampleSnippets(int collectionId, List<ApiInfo> apiInfos) {
-        List<String> snippets = new ArrayList<>();
-        for (int i = 0; i < apiInfos.size() && snippets.size() < MAX_SAMPLE_ENDPOINTS; i++) {
-            ApiInfo apiInfo = apiInfos.get(i);
-            try {
-                SampleData sampleData = SampleDataDao.instance.fetchSampleDataForApi(
-                    collectionId, apiInfo.getId().getUrl(), apiInfo.getId().getMethod()
-                );
-                if (sampleData == null || sampleData.getSamples() == null || sampleData.getSamples().isEmpty()) {
-                    continue;
-                }
-                String sample = sampleData.getSamples().get(0);
-                if (sample != null && sample.length() > MAX_SAMPLE_CHARS) {
-                    sample = sample.substring(0, MAX_SAMPLE_CHARS);
-                }
-                snippets.add(sample);
-            } catch (Exception e) {
-                loggerMaker.debugAndAddToDb("Error fetching sample data for collection " + collectionId + ": " + e.getMessage());
-            }
-        }
-        return snippets;
     }
 
     private void markFailed(int collectionId, String reason) {

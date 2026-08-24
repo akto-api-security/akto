@@ -1,0 +1,5 @@
+- Host "...ollama-r1-network-latest.localhost:11434", Collection type "AI agent", Platform "r1-network:latest", Endpoint "GET /api/tags"
+  -> "R1 Network is a locally hosted AI model running through Ollama on localhost:11434, exposing APIs for applications and AI agents to interact with the model."
+
+- Host "...ollama-nomic-embed-text-latest.localhost:11434", Collection type "AI agent", Platform "nomic-embed-text:latest", Endpoint "GET /api/tags"
+  -> "Nomic Embed Text is a locally hosted neural embedding model running through Ollama on localhost:11434, exposing APIs that enable applications and AI agents to generate vector embeddings for text."
