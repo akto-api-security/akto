@@ -312,7 +312,7 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
         Map<String, Object> filters = new HashMap<>();
         filters.put("latestAttack", Collections.singletonList(policyName));
 
-        String cacheKey = baselineCacheKey(saved, endTimestamp);
+        String cacheKey = baselineCacheKey(saved, endTimestamp, useTraces);
         Set<String> cachedBaselineIds = readCachedBaseline(cacheKey);
         run.baselineFromCache = cachedBaselineIds != null;
         loggerMaker.info("Baseline cache " + (cachedBaselineIds == null ? "MISS" : "HIT")
@@ -507,14 +507,18 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
         return saved == null ? null : serializePolicy(saved, policyName);
     }
 
-    private String baselineCacheKey(GuardrailPolicies saved, int endTimestamp) {
+    private String baselineCacheKey(GuardrailPolicies saved, int endTimestamp, boolean useTraces) {
         if (saved == null) {
             return null;
         }
         // endTimestamp is already snapped to a bucket boundary by the caller, so it identifies the
         // window exactly rather than approximately.
+        // The source is part of the key: the two samples carry different id spaces (violation ids
+        // vs traceIds), so sharing an entry would apply one sample's baseline ids to the other's
+        // items, match nothing, and report a regression that never happened.
         return Context.accountId.get() + "|" + policyName + "|" + saved.getUpdatedTimestamp()
-            + "|" + endTimestamp;
+            + "|" + endTimestamp
+            + "|" + (useTraces ? SOURCE_TRACES : SOURCE_VIOLATIONS);
     }
 
     private Set<String> readCachedBaseline(String key) {
