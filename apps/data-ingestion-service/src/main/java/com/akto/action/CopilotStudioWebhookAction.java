@@ -1,7 +1,10 @@
 package com.akto.action;
 
 import com.akto.data_actor.ClientActor;
+import com.akto.dto.AgenticUsers;
 import com.akto.gateway.Gateway;
+import com.akto.jobs.executors.AIAgentConnectorConstants;
+import com.akto.jobs.executors.copilotstudio.CopilotStudioAgentUsersCron;
 import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
 import com.akto.util.JSONUtils;
@@ -37,7 +40,6 @@ public class CopilotStudioWebhookAction extends ActionSupport {
 
     private static final Pattern BOT_NAME_JUNK = Pattern.compile("[^\\p{L}\\p{N}-]+");
     private static final Pattern BOT_NAME_HYPHENS = Pattern.compile("-+");
-    private static final Pattern NON_ALPHANUMERIC = Pattern.compile("[^a-zA-Z0-9]");
     private static final String MCP_TOOL_TYPE = "DynamicServerToolDefinition";
 
     private boolean isSuccessful;
@@ -63,11 +65,13 @@ public class CopilotStudioWebhookAction extends ActionSupport {
             Map<String, Object> inputValues = (Map<String, Object>) body.getOrDefault("inputValues", new HashMap<>());
             Map<String, Object> conversationMetadata = (Map<String, Object>) body.getOrDefault("conversationMetadata", new HashMap<>());
             Map<String, Object> agent = (Map<String, Object>) conversationMetadata.getOrDefault("agent", new HashMap<>());
+            Map<String, Object> userContext = (Map<String, Object>) conversationMetadata.getOrDefault("user", new HashMap<>());
 
             String conversationId = stringOrEmpty(conversationMetadata.get("conversationId"));
+            String hostUserId = resolveHostUserId(stringOrEmpty(userContext.get("id")));
 
-            Map<String, Object> userMsgCall = buildUserMessageRequestData(plannerContext, agent, conversationId);
-            Map<String, Object> toolCall = buildToolInvocationRequestData(toolDefinition, inputValues, agent, conversationId);
+            Map<String, Object> userMsgCall = buildUserMessageRequestData(plannerContext, agent, hostUserId, conversationId);
+            Map<String, Object> toolCall = buildToolInvocationRequestData(toolDefinition, inputValues, agent, hostUserId, conversationId);
 
             ExecutorService executor = Executors.newFixedThreadPool(2);
             try {
@@ -148,24 +152,24 @@ public class CopilotStudioWebhookAction extends ActionSupport {
         return r != null ? r.toString() : "";
     }
 
-    private Map<String, Object> buildUserMessageRequestData(Map<String, Object> plannerContext, Map<String, Object> agent, String conversationId) {
+    private Map<String, Object> buildUserMessageRequestData(Map<String, Object> plannerContext, Map<String, Object> agent, String hostUserId, String conversationId) {
         String userMessage = stringOrEmpty(plannerContext.get("userMessage"));
         String agentName = agentDisplayName(agent);
 
-        Map<String, Object> requestData = newBaseRequestData(agent, agentName, conversationId, false);
+        Map<String, Object> requestData = newBaseRequestData(agent, agentName, hostUserId, conversationId);
         requestData.put("path", "/copilot/conversation/messages/" + conversationId);
         requestData.put("requestPayload", JSONUtils.getString(Collections.singletonMap("prompt", userMessage)));
         requestData.put("tag", JSONUtils.getString(buildCopilotStudioTag(agentName, stringOrEmpty(agent.get("environmentId")), false)));
         return requestData;
     }
 
-    private Map<String, Object> buildToolInvocationRequestData(Map<String, Object> toolDefinition, Map<String, Object> inputValues, Map<String, Object> agent, String conversationId) {
+    private Map<String, Object> buildToolInvocationRequestData(Map<String, Object> toolDefinition, Map<String, Object> inputValues, Map<String, Object> agent, String hostUserId, String conversationId) {
         boolean isMcp = MCP_TOOL_TYPE.equals(stringOrEmpty(toolDefinition.get("type")));
         String toolName = stringOrEmpty(toolDefinition.get("name"));
         String toolId = stringOrEmpty(toolDefinition.get("id"));
         String agentName = agentDisplayName(agent);
 
-        Map<String, Object> requestData = newBaseRequestData(agent, agentName, conversationId, isMcp);
+        Map<String, Object> requestData = newBaseRequestData(agent, agentName, hostUserId, conversationId);
         if (isMcp) {
             requestData.put("path", "/copilot/mcp");
             String operationName = mcpOperationName(toolId, toolName);
@@ -178,9 +182,6 @@ public class CopilotStudioWebhookAction extends ActionSupport {
             rpc.put("method", "tools/call");
             rpc.put("params", params);
             requestData.put("requestPayload", JSONUtils.getString(rpc));
-
-            String mcpHost = copilotStudioMcpHost(agentName, mcpServerName(toolId, toolName));
-            requestData.put("requestHeaders", buildRequestHeaders(mcpHost, conversationId));
         } else {
             requestData.put("path", "/copilot/tool/" + toolName.toLowerCase());
             requestData.put("requestPayload", JSONUtils.getString(inputValues));
@@ -189,7 +190,7 @@ public class CopilotStudioWebhookAction extends ActionSupport {
         return requestData;
     }
 
-    private Map<String, Object> newBaseRequestData(Map<String, Object> agent, String agentName, String conversationId, boolean isMcp) {
+    private Map<String, Object> newBaseRequestData(Map<String, Object> agent, String agentName, String hostUserId, String conversationId) {
         Map<String, Object> requestData = new LinkedHashMap<>();
         requestData.put("guardrails", "true");
         requestData.put("ingest_data", "true");
@@ -200,24 +201,27 @@ public class CopilotStudioWebhookAction extends ActionSupport {
         requestData.put("ip", clientIpFromHeaders());
         requestData.put("responsePayload", "{}");
         requestData.put("responseHeaders", "{}");
-        String host = isMcp ? "" : copilotStudioHost(agentName, stringOrEmpty(agent.get("environmentId")));
-        requestData.put("requestHeaders", buildRequestHeaders(host, conversationId));
+        requestData.put("requestHeaders", buildRequestHeaders(aiAgentHost(hostUserId, agentName), conversationId));
         return requestData;
     }
 
     private static String resolveAccountId() {
-        Integer accountId = ClientActor.getAbstractorAccountIdFromEnvOrNull();
-        return accountId != null ? String.valueOf(accountId) : "1000000";
+        return String.valueOf(ClientActor.getAccountId());
     }
 
-    private static String mcpServerName(String toolId, String toolName) {
-        int idx = toolId.indexOf('~');
-        if (idx < 0) return toolName;
-        String operation = toolId.substring(idx + 1);
-        if (!operation.isEmpty() && toolName.endsWith("-" + operation)) {
-            return toolName.substring(0, toolName.length() - operation.length() - 1);
+    /**
+     * Resolves the Copilot Studio conversation's AAD user id (conversationMetadata.user.id) to
+     * the sanitized host-segment string cached by CopilotStudioAgentUsersCron (see
+     * CopilotStudioUserResolver.buildUserId); falls back to a fixed sentinel when unresolved
+     * (missing from the payload, or no cache hit yet).
+     */
+    private static String resolveHostUserId(String aadUserId) {
+        if (aadUserId == null || aadUserId.isEmpty()) {
+            return AIAgentConnectorConstants.UNRESOLVED_AGENT_USER_ID;
         }
-        return toolName;
+        AgenticUsers cachedUser = CopilotStudioAgentUsersCron.getCachedUser(aadUserId);
+        String userName = cachedUser != null ? cachedUser.getUserName() : null;
+        return (userName != null && !userName.isEmpty()) ? userName : AIAgentConnectorConstants.UNRESOLVED_AGENT_USER_ID;
     }
 
     private static String mcpOperationName(String toolId, String toolName) {
@@ -234,37 +238,16 @@ public class CopilotStudioWebhookAction extends ActionSupport {
         return sanitized.toLowerCase();
     }
 
-    private static String sanitizeEnvironmentId(String environmentId) {
-        if (environmentId == null) return "";
-        String suffix = NON_ALPHANUMERIC.matcher(environmentId).replaceAll("");
-        if (suffix.length() > 10) suffix = suffix.substring(0, 10);
-        return suffix.toLowerCase();
-    }
-
     private static String agentDisplayName(Map<String, Object> agent) {
         String name = sanitizeBotName(stringOrEmpty(agent.get("name")));
         if (!name.isEmpty()) return name;
         return sanitizeBotName(stringOrEmpty(agent.get("id")));
     }
 
-    private static String copilotStudioHost(String agentName, String environmentId) {
+    /** {hostUserId}.ai-agent.{agentName} — same shape CopilotStudioInventoryPublisher already uses, so transcript and inventory data for the same (user, agent) pair land in the same collection. */
+    private static String aiAgentHost(String hostUserId, String agentName) {
         if (agentName == null || agentName.isEmpty()) return "";
-        String host = agentName + ".copilot-studio";
-        String envSuffix = sanitizeEnvironmentId(environmentId);
-        if (!envSuffix.isEmpty()) {
-            host += "-" + envSuffix;
-        }
-        return host + ".microsoft.com";
-    }
-
-    private static String copilotStudioMcpHost(String agentName, String mcpServerName) {
-        if (agentName == null || agentName.isEmpty()) return "";
-        String host = agentName + ".copilot-studio";
-        String serverSuffix = sanitizeBotName(mcpServerName);
-        if (!serverSuffix.isEmpty()) {
-            host += "." + serverSuffix;
-        }
-        return host;
+        return hostUserId + AIAgentConnectorConstants.AI_AGENT_HOST_INFIX + agentName;
     }
 
     private static Map<String, String> flattenHeaders() {
