@@ -2141,10 +2141,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				continue
 			}
 
-			// Same deadline the live single-item endpoints already apply, per batch item.
-			procCtx, cancelProc := s.withValidationDeadline(ctx)
-			processResult, err := s.processor.ProcessRequest(procCtx, reqPayload, valCtx, itemPolicies, auditPolicies, hasAuditRules)
-			cancelProc()
+			processResult, err := s.processor.ProcessRequest(ctx, reqPayload, valCtx, itemPolicies, auditPolicies, hasAuditRules)
 			if err != nil {
 				s.logger.Error("Failed to validate request",
 					zap.Int("index", i),
@@ -2176,9 +2173,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 		// Validate response payload if present
 		if data.ResponsePayload != "" {
 			respPayload := s.extractPayloadForValidation(data.ResponsePayload, data.Method, data.Path, false)
-			procCtx, cancelProc := s.withValidationDeadline(ctx)
-			processResult, err := s.processor.ProcessResponse(procCtx, respPayload, valCtx, itemPolicies)
-			cancelProc()
+			processResult, err := s.processor.ProcessResponse(ctx, respPayload, valCtx, itemPolicies)
 			if err != nil {
 				s.logger.Error("Failed to validate response", zap.Error(err))
 				result.ResponseError = err.Error()
