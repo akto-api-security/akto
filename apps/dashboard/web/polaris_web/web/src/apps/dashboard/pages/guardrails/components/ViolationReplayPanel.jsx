@@ -19,6 +19,9 @@ import Store from '../../../store';
 
 const ENABLED_ACCOUNT_IDS = [];
 
+/** A source's run state before it has ever been run. Each tab keeps its own copy. */
+const EMPTY_RUN = { status: "idle", error: "", result: null, hasCompared: false };
+
 // Fields that cannot move a verdict, so never count as a change.
 const IGNORED_FIELDS = [
     // Step 1: naming and messaging only
@@ -70,15 +73,15 @@ const POLL_TIMEOUT_MS = 10 * 60 * 1000;
 const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, seedVersion = 0,
     isNewPolicy = false }) => {
     const activeAccount = Store(state => state.activeAccount);
-    const [status, setStatus] = useState("idle"); // idle | running | done | error
+    // Run state is kept PER SOURCE so switching tabs shows that tab's own last result instead of
+    // discarding it. Sharing one slot meant flipping to Traffic and back threw away a completed
+    // Violations comparison.
+    const [runs, setRuns] = useState({ VIOLATIONS: EMPTY_RUN, TRACES: EMPTY_RUN });
     // VIOLATIONS = recorded violations. TRACES = recent agent traffic.
     // Violations join to a policy by name, so a new policy has none — only traffic can be replayed.
     const [source, setSource] = useState(isNewPolicy ? "TRACES" : "VIOLATIONS");
-    const [error, setError] = useState("");
     const [detailsOpen, setDetailsOpen] = useState(false);
     // Sticky: switching sample clears the counts but must keep the tabs.
-    const [hasCompared, setHasCompared] = useState(false);
-    const [result, setResult] = useState(null);
 
     const timer = useRef(null);
     const stopped = useRef(false);
@@ -99,6 +102,18 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, see
     const hasDetectionChanges = savedSignature !== null && signature !== savedSignature;
     const hasAnyRule = blankSignature.current !== null && signature !== blankSignature.current;
 
+    // Patch one source's slot, leaving the other untouched. Writes are keyed by the source the run
+    // was started for, so an in-flight poll cannot land on whichever tab happens to be visible.
+    const patchRun = useCallback((src, fields) => {
+        setRuns(prev => ({ ...prev, [src]: { ...(prev[src] || EMPTY_RUN), ...fields } }));
+    }, []);
+
+    const view = runs[source] || EMPTY_RUN;
+    const status = view.status;
+    const error = view.error;
+    const result = view.result;
+    const hasCompared = view.hasCompared;
+
     const clearTimer = useCallback(() => {
         if (timer.current) {
             clearTimeout(timer.current);
@@ -109,7 +124,7 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, see
     // A closed panel must stop hitting the server.
     useEffect(() => () => { stopped.current = true; clearTimer(); }, [clearTimer]);
 
-    const poll = useCallback(async (runId, startedAt) => {
+    const poll = useCallback(async (runId, startedAt, src) => {
         if (stopped.current) return;
         try {
             const resp = await guardrailApi.pollPolicyReplay(runId);
@@ -118,49 +133,41 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, see
             const r = resp?.replayResult;
             if (!r) throw new Error("No response from comparison run");
 
-            setResult(r);
+            patchRun(src, { result: r });
 
-            if (r.status === "DONE") { setStatus("done"); return; }
-            if (r.status === "FAILED") { setError(r.error || "Comparison failed"); setStatus("error"); return; }
-            if (r.status === "EXPIRED") { setError("This comparison expired — run it again"); setStatus("error"); return; }
+            if (r.status === "DONE") { patchRun(src, { status: "done" }); return; }
+            if (r.status === "FAILED") { patchRun(src, { status: "error", error: r.error || "Comparison failed" }); return; }
+            if (r.status === "EXPIRED") { patchRun(src, { status: "error", error: "This comparison expired — run it again" }); return; }
             if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
-                setError("Comparison is taking too long — try again");
-                setStatus("error");
+                patchRun(src, { status: "error", error: "Comparison is taking too long — try again" });
                 return;
             }
-            timer.current = setTimeout(() => poll(runId, startedAt), POLL_INTERVAL_MS);
+            timer.current = setTimeout(() => poll(runId, startedAt, src), POLL_INTERVAL_MS);
         } catch (e) {
             if (stopped.current) return;
-            setError(e?.message || "Could not read comparison progress");
-            setStatus("error");
+            patchRun(src, { status: "error", error: e?.message || "Could not read comparison progress" });
         }
-    }, []);
+    }, [patchRun]);
 
-    // Clear rather than show stale counts under a different tab.
-    const changeSource = (next) => {
-        setSource(next);
-        setStatus("idle");
-        setResult(null);
-    };
+    // Each source keeps its own result, so switching is purely a view change.
+    const changeSource = (next) => setSource(next);
 
     const run = async () => {
-        setHasCompared(true);
+        // Pin the source for the whole run: the user may switch tabs while it is in flight.
+        const src = source;
         stopped.current = false;
         clearTimer();
-        setStatus("running");
-        setError("");
-        setResult(null);
+        patchRun(src, { status: "running", error: "", result: null, hasCompared: true });
 
         try {
             const resp = await guardrailApi.startPolicyReplay({
-                policy: buildPolicy(), policyName, hexId, source
+                policy: buildPolicy(), policyName, hexId, source: src
             });
             const runId = resp?.replayResult?.runId;
             if (!runId) throw new Error("Could not start comparison");
-            poll(runId, Date.now());
+            poll(runId, Date.now(), src);
         } catch (e) {
-            setError(e?.message || "Could not start comparison");
-            setStatus("error");
+            patchRun(src, { status: "error", error: e?.message || "Could not start comparison" });
         }
     };
 
@@ -174,7 +181,10 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, see
     const compared = result?.compared || 0;
     const delta = modified - current;
     const running = status === "running";
-    const idle = status === "idle" && !hasCompared;
+    // Chrome that belongs to the panel as a whole, not to the visible tab: once ANY source has been
+    // run, the tabs and the prompt to run must stay put. Keying these off the current source hid
+    // them the moment you switched to a tab you had not run yet.
+    const hasComparedAny = Object.values(runs).some(r => r.hasCompared);
     // Editing lists lost detections; a new policy has no baseline, so it lists caught ones instead.
     const rows = isNewPolicy
         ? (result?.gainedByDraft || []).map(g => ({ ...g, wasDetected: false, nowDetected: true }))
@@ -218,7 +228,7 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, see
                 </HorizontalStack>
 
                 {/* Tabs only mean something once there are counts, and only traffic applies to a new policy. */}
-                {!idle && !isNewPolicy && (
+                {hasComparedAny && !isNewPolicy && (
                     <ButtonGroup segmented>
                         {REPLAY_SOURCE_TABS.map(tab => (
                             <Button key={tab.id} size="slim" pressed={source === tab.id} disabled={running}
@@ -229,8 +239,8 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, see
                     </ButtonGroup>
                 )}
 
-                {/* Only after a sample switch; the first idle state stays bare. */}
-                {status === "idle" && hasCompared && (
+                {/* Shown on an un-run tab too, so switching never leaves the body blank. */}
+                {status === "idle" && hasComparedAny && (
                     <Text variant="bodySm" color="subdued">
                         {source === "TRACES"
                             ? "Re-run recent agent traffic through both the saved policy and your changes, and compare how many each catches."
