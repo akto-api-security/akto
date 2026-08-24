@@ -286,9 +286,9 @@ const CustomGuardrailsStep = ({
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="4">
                                 <Banner>
-                                    Requires Akto browser extension v1.0.69 or later and is supported
-                                    on browser only for now, on claude.ai and chatgpt.com. Support for
-                                    Endpoint Shield Agent to come soon.
+                                    Requires Akto browser extension v1.0.69 or later. Currently
+                                    supported only via the browser extension. Endpoint Shield
+                                    Agent support is coming soon.
                                 </Banner>
                                 <FormLayout>
                                     <TextField
