@@ -136,8 +136,11 @@ public class CopilotStudioWebhookAction extends ActionSupport {
         String agentName = agentDisplayName(agent);
 
         Map<String, Object> requestData = newBaseRequestData(agent, agentName, hostUserId, conversationId);
-        String path = !toolName.isEmpty()
-            ? "/copilot/conversation/tool/" + toolName.toLowerCase()
+        // toolName itself stays human-readable (e.g. Microsoft's own "Send email") for the guardrails
+        // payload, but a raw name can contain spaces/punctuation that don't belong in a path segment.
+        String toolNameForPath = CopilotStudioInventoryPublisher.sanitizeBotName(toolName);
+        String path = !toolNameForPath.isEmpty()
+            ? "/copilot/conversation/tool/" + toolNameForPath
             : "/copilot/conversation/messages/" + conversationId;
         requestData.put("path", path);
 
@@ -198,9 +201,16 @@ public class CopilotStudioWebhookAction extends ActionSupport {
     }
 
     /** {hostUserId}.ai-agent.{agentName} — same shape CopilotStudioInventoryPublisher already uses, so transcript and inventory data for the same (user, agent) pair land in the same collection. */
+    /**
+     * Always returns a non-empty host — an empty return here would leave buildRequestHeaders'
+     * "if not empty" guard skipping the Host override entirely, silently leaking this server's own
+     * real incoming Host header (e.g. "localhost:7072") into the ingested traffic sample instead of
+     * a Copilot Studio host, on any payload where conversationMetadata.agent is missing or unnamed.
+     */
     private static String aiAgentHost(String hostUserId, String agentName) {
-        if (agentName == null || agentName.isEmpty()) return "";
-        return hostUserId + AIAgentConnectorConstants.AI_AGENT_HOST_INFIX + agentName;
+        String safeAgentName = (agentName == null || agentName.isEmpty())
+            ? AIAgentConnectorConstants.UNRESOLVED_AGENT_USER_ID : agentName;
+        return hostUserId + AIAgentConnectorConstants.AI_AGENT_HOST_INFIX + safeAgentName;
     }
 
     private static Map<String, String> flattenHeaders() {
