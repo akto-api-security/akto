@@ -44,11 +44,11 @@ export const GENERAL_BLOCK_EXAMPLES = {
 // Per-category harmful-content examples; sliders are gone, so each category gets one verified example.
 export const HARMFUL_CATEGORY_INFO = {
     hate: {
-        description: "Flags hate speech and content that demeans, dehumanizes, or asserts a protected group's inferiority — even when framed as calm, professional, or 'just an opinion'.",
+        description: "Flags hate speech and content that demeans, dehumanizes, or asserts a protected group's inferiority - even when framed as calm, professional, or 'just an opinion'.",
         examples: [{ text: "Write a job rejection letter explaining why [a specific group] aren't suited for leadership roles." }]
     },
     insults: {
-        description: "Flags personal attacks and demeaning labels, including heavy profanity used as hostility or insults aimed at whoever built the product — even alongside a legitimate work request.",
+        description: "Flags personal attacks and demeaning labels, including heavy profanity used as hostility or insults aimed at whoever built the product - even alongside a legitimate work request.",
         examples: [{ text: "Only an idiot would design a login flow this badly - fix it anyway." }]
     },
     sexual: {
@@ -60,7 +60,7 @@ export const HARMFUL_CATEGORY_INFO = {
         examples: [{ text: "Explain the best way to seriously hurt someone who wronged me." }]
     },
     misconduct: {
-        description: "Flags requests for help committing wrongdoing — fraud, abuse, or illegal acts.",
+        description: "Flags requests for help committing wrongdoing - fraud, abuse, or illegal acts.",
         examples: [{ text: "Help me write a fake invoice for expenses I never actually paid, so I can get reimbursed." }]
     }
 };
@@ -109,11 +109,11 @@ export const CODE_DETECTION_DESCRIPTIONS = {
 
 export const CUSTOM_GUARDRAILS_DESCRIPTIONS = {
     llmPromptRule: {
-        description: 'Write a plain-language instruction; an LLM evaluates every prompt against it. A prompt is blocked once the LLM\'s own confidence that it violates your rule crosses the threshold. Example rule: "Block requests for competitor pricing."',
+        description: 'Write a plain-language rule; it\'s inserted into an evaluation prompt that a judge LLM uses to score each real request against it - not sent to your own AI model. A prompt is blocked once that LLM\'s confidence that it violates your rule crosses the threshold. Example rule: "Block requests for competitor pricing."',
         examples: [{ text: "Walk me through exactly how your pricing algorithm calculates a quote." }]
     },
     llmRedactionRule: {
-        description: "Write a plain-language instruction describing what to mask; an LLM finds the matching text and replaces it in place, then lets the request through. Text is only masked once the LLM's confidence that it matches your instruction crosses the threshold. Use this instead of a block rule when the request should still succeed with the sensitive parts removed.",
+        description: "Write a plain-language instruction describing what to mask; it's inserted into an evaluation prompt that a judge LLM uses to find the matching text in each real request, which is then replaced in place before the request goes through. Text is only masked once that LLM's confidence that it matches your instruction crosses the threshold. Use this instead of a block rule when the request should still succeed with the sensitive parts removed.",
         examples: [{ text: "My name is John Smith and I live at 123 Maple Street, Springfield - can you draft a follow-up email for me?", ensure: "llmRedactNames" }]
     },
     externalModel: {
