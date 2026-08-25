@@ -52,6 +52,7 @@ const Logs = () => {
         { label: "AWS API Gateway", value: "AWS_API_GATEWAY" },
         { label: "Guardrails Service", value: "GUARDRAILS_SERVICE" },
         {label: "Smart Testing", value: "SMART_TESTING"},
+        { label: "DAST", value: "DAST" },
     ];
   
     const handleSelectLogGroup = (logGroup) => {
