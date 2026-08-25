@@ -338,7 +338,7 @@ function UserAnalysisSection({ username, startTimestamp, endTimestamp }) {
 
 const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 
-function OverviewTab({ device, agents, collections, onTabChange, startTimestamp, endTimestamp }) {
+function OverviewTab({ device, agents, collections, onTabChange, startTimestamp, endTimestamp, violationsTotal }) {
     const [agentTools, setAgentTools] = useState({});
 
     const aiAgents = useMemo(() => agents.filter(a => a.type === "AI Agent"), [agents]);
@@ -395,8 +395,11 @@ function OverviewTab({ device, agents, collections, onTabChange, startTimestamp,
         aiCount:  aiAgents.length,
         mcpCount: agents.filter(a => a.type === "MCP Server").length,
         llmCount: agents.filter(a => a.type === "LLM").length + inlineLlmCount,
-        totalV:   (device.violations?.critical || 0) + (device.violations?.high || 0) + (device.violations?.medium || 0) + (device.violations?.low || 0),
-    }), [agents, aiAgents.length, device.violations, inlineLlmCount]);
+        // device.violations is an exact-hostName join and can undercount vs. the Violations
+        // tab's own query (loose host/Claude-config attribution). Once that tab has actually
+        // loaded (violationsTotal, lifted from DeviceFlyout), prefer its real total.
+        totalV: violationsTotal ?? ((device.violations?.critical || 0) + (device.violations?.high || 0) + (device.violations?.medium || 0) + (device.violations?.low || 0)),
+    }), [agents, aiAgents.length, device.violations, inlineLlmCount, violationsTotal]);
 
     const osLabel = useMemo(() => {
         if (device.os === "mac") return "macOS";
@@ -554,7 +557,7 @@ function AgenticsTab({ deviceId }) {
 // claudeDeviceIds always includes this device's own id (not just hosts already seen ending in
 // ".claude") so an orphan claude-config-scanner event still attributes correctly even if no real
 // Claude collection has been seen for this device yet — matches the original client-side filter.
-function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp }) {
+function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp, onTotalChange }) {
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
         if (!hostNames.length && !deviceId) {
             return Promise.resolve({ value: [], total: 0 });
@@ -582,14 +585,17 @@ function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp 
             sort: sortBySeverity ? { severity: mongoOrder } : { detectedAt: mongoOrder },
             sortBySeverity,
             searchText: searchString || undefined,
-        }).then((res) => ({
-            value: res.violations.map((r) => ({
-                ...r,
-                time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
-            })),
-            total: res.total,
-        }));
-    }, [hostNames, deviceId, startTimestamp, endTimestamp]);
+        }).then((res) => {
+            onTotalChange?.(res.total ?? 0);
+            return {
+                value: res.violations.map((r) => ({
+                    ...r,
+                    time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
+                })),
+                total: res.total,
+            };
+        });
+    }, [hostNames, deviceId, startTimestamp, endTimestamp, onTotalChange]);
 
     const handleViolationClick = useCallback((e) => {
         if (!e.data) return;
@@ -620,6 +626,11 @@ function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp 
 export default function DeviceFlyout({ device, agents, show, onClose, onAgentClick, deviceHostNames = [], collections = [], startTimestamp, endTimestamp }) {
     const [selectedTab, setSelectedTab] = useState(0);
     const deviceId = device?.path?.[0] || device?.deviceId;
+    // See OverviewTab/ViolationsTab below - device.violations undercounts vs. the tab's own
+    // query, so once the Violations tab has actually loaded, its real total wins everywhere
+    // in this flyout. Reset per device so a stale total never carries over to the next one.
+    const [violationsTotal, setViolationsTotal] = useState(null);
+    useEffect(() => { setViolationsTotal(null); }, [deviceId]);
 
     // Minimal identity only — the MCP agent resolves this device's collections and fetches
     // its endpoints/components/violations on demand via akto_agentic_asset_details (deviceId).
@@ -630,13 +641,14 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
 
     const tabs = useMemo(() => {
         if (!device) return [];
-        const totalV = (device.violations?.critical || 0) + (device.violations?.high || 0) + (device.violations?.medium || 0) + (device.violations?.low || 0);
+        const assetTotalV = (device.violations?.critical || 0) + (device.violations?.high || 0) + (device.violations?.medium || 0) + (device.violations?.low || 0);
+        const totalV = violationsTotal ?? assetTotalV;
         return [
             { id: "overview",   content: "Overview" },
             { id: "assets",     content: `Agentic Assets (${(agents || []).length})` },
             { id: "violations", content: `Violations (${totalV})` },
         ];
-    }, [device, agents]);
+    }, [device, agents, violationsTotal]);
 
     if (!device) return null;
 
@@ -666,9 +678,9 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
             }
         >
             <Box padding="2" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-                {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} collections={collections} onTabChange={setSelectedTab} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
+                {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} collections={collections} onTabChange={setSelectedTab} startTimestamp={startTimestamp} endTimestamp={endTimestamp} violationsTotal={violationsTotal} />}
                 {selectedTab === 1 && <AgenticsTab deviceId={deviceId} />}
-                {selectedTab === 2 && <ViolationsTab hostNames={deviceHostNames} deviceId={deviceId} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
+                {selectedTab === 2 && <ViolationsTab hostNames={deviceHostNames} deviceId={deviceId} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onTotalChange={setViolationsTotal} />}
             </Box>
         </AgenticFlyoutShell>
     );

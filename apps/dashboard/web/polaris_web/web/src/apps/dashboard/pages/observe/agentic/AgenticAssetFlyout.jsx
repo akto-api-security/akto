@@ -110,6 +110,10 @@ export default function AgenticAssetFlyout({
     const [selectedTab,    setSelectedTab]    = useState(0);
     const [topNav,         setTopNav]         = useState(null);
     const [topNavPicker,   setTopNavPicker]   = useState(null);
+    // asset.violations (used for the tab badge below) is an exact-hostName join and can undercount
+    // vs. ViolationsTab's own query (loose host/Claude-config attribution - same rows the list
+    // actually shows). Once the user opens the tab and it reports its real total, prefer that.
+    const [violationsTotal, setViolationsTotal] = useState(null);
 
     // hostNames/collectionIds/skillCount/mcpServers/mcpServerCollectionIds/devices no longer come
     // with the grid row (see AgenticObserveAction.GroupSummary.toSummaryResponse()'s and
@@ -160,7 +164,7 @@ export default function AgenticAssetFlyout({
     // own data fetch.
     const detailLoading = !!rawAsset && !assetDetail;
 
-    useEffect(() => { setSelectedTab(0); setTopNav(null); setTopNavPicker(null); }, [asset?.id]);
+    useEffect(() => { setSelectedTab(0); setTopNav(null); setTopNavPicker(null); setViolationsTotal(null); }, [asset?.id]);
 
     // Both computed server-side now (AgenticObserveAction.fetchAgenticAssetDetail, scoped to just
     // this asset's own collections) — no more browser-side STI fetch/derivation. asset.hasInlineLlm/
@@ -206,7 +210,8 @@ export default function AgenticAssetFlyout({
 
     const tabs = useMemo(() => {
         if (!asset) return [];
-        const totalV   = (asset.violations?.critical || 0) + (asset.violations?.high || 0) + (asset.violations?.medium || 0) + (asset.violations?.low || 0);
+        const assetTotalV = (asset.violations?.critical || 0) + (asset.violations?.high || 0) + (asset.violations?.medium || 0) + (asset.violations?.low || 0);
+        const totalV = violationsTotal ?? assetTotalV;
         // endpointsCount is a cheap scalar already present on the grid row (before the lazy detail
         // fetch lands), same number asset.deviceCount would give once loaded — avoids the tab
         // badge flashing 0 while assetDetail is still in flight.
@@ -228,7 +233,7 @@ export default function AgenticAssetFlyout({
             { id: "violations", content: `Violations (${totalV})` },
             { id: "devices",    content: `Devices (${devCount})` },
         ];
-    }, [asset, assetDevices, inlineTopology, mcpComponentCount, configViolations]);
+    }, [asset, assetDevices, inlineTopology, mcpComponentCount, configViolations, violationsTotal]);
 
     if (!asset) return null;
 
@@ -299,7 +304,7 @@ export default function AgenticAssetFlyout({
                                 />
                             </div>
                         )}
-                        {selectedTab === 2 && <ViolationsTab asset={asset} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onViolationClick={asset?.type === "Skill" ? () => handleTabSelect(1) : undefined} />}
+                        {selectedTab === 2 && <ViolationsTab asset={asset} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onViolationClick={asset?.type === "Skill" ? () => handleTabSelect(1) : undefined} onTotalChange={setViolationsTotal} />}
                         {selectedTab === 3 && <DevicesTab asset={asset} enrichMaps={enrichMaps} />}
                     </>
                 )}
