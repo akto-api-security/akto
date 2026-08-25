@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -4071,10 +4072,28 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    // Tracks which accounts' dast_logs capped collection has already been verified/created in
+    // this JVM's lifetime, so the (relatively expensive) existence check in createIndicesIfAbsent()
+    // runs at most once per account per process instead of on every single log insert.
+    private static final Set<Integer> dastLogsCappedCollectionReady = ConcurrentHashMap.newKeySet();
+
     public String insertDastLog() {
         try {
+            int accountId = Context.accountId.get();
+            // Self-healing: guarantees dast_logs is created CAPPED (bounded size/doc count) before
+            // the first write for this account, whether the account is brand new (also covered by
+            // DaoInit.createIndices()) or predates this endpoint — an uncapped collection here would
+            // grow without limit and risk taking down Mongo/cyborg over time.
+            if (dastLogsCappedCollectionReady.add(accountId)) {
+                try {
+                    DastLogsDao.instance.createIndicesIfAbsent();
+                } catch (Exception e) {
+                    dastLogsCappedCollectionReady.remove(accountId);
+                    loggerMaker.errorAndAddToDb(e, "Error ensuring dast_logs capped collection for accountId=" + accountId);
+                }
+            }
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            PupeteerLogsDao.instance.insertOne(dbLog);
+            DastLogsDao.instance.insertOne(dbLog);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertDastLog " + e.toString());
             return Action.ERROR.toUpperCase();
