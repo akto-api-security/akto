@@ -31,8 +31,16 @@ public class Constants {
     public static final String AKTO_SOURCE_RED_TEAMING = "red-teaming";
 
     public static final String LOCAL_KAFKA_BROKER_URL = System.getenv("KAFKA_BROKER_URL") != null ? System.getenv("KAFKA_BROKER_URL") : "localhost:29092"; // run kafka process with name kafka1 in docker
-    public static final String TEST_RESULTS_TOPIC_NAME = "akto.test.messages";
-    public static final String AKTO_KAFKA_GROUP_ID_CONFIG =  "testing-group";
+    // Optional per-instance namespace so multiple mini-testing instances can share one Kafka
+    // broker, each with its own topic + consumer group. Unset/empty => legacy names (backwards compatible).
+    public static final String AKTO_TOPIC_PREFIX = System.getenv("AKTO_TOPIC_PREFIX");
+    private static String withTopicPrefix(String base) {
+        return (AKTO_TOPIC_PREFIX != null && !AKTO_TOPIC_PREFIX.isEmpty())
+                ? AKTO_TOPIC_PREFIX + "." + base
+                : base;
+    }
+    public static final String TEST_RESULTS_TOPIC_NAME = withTopicPrefix("akto.test.messages");
+    public static final String AKTO_KAFKA_GROUP_ID_CONFIG = withTopicPrefix("testing-group");
     public static final int AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG = 1; // read one message at a time
     public static final String TESTING_STATE_FOLDER_PATH = System.getenv("TESTING_STATE_FOLDER_PATH") != null ? System.getenv("TESTING_STATE_FOLDER_PATH") : "testing-info";
     public static final String TESTING_STATE_FILE_NAME = "testing-state.json";

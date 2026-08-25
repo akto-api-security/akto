@@ -4,10 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -94,6 +97,35 @@ public class VariableResolverWordListTest {
         assertFalse(VariableResolver.isWordListVariable("${other}", varMap));
         assertFalse(VariableResolver.isWordListVariable("no placeholders", varMap));
         assertFalse(Thread.currentThread().isInterrupted());
+    }
+
+    /**
+     * Empty word list must return on its own — not spin until something interrupts it.
+     *
+     * BYPASS_ACCOUNT_LINKING_VALIDATION-style templates source their list from sample_data; when the
+     * API payload lacks the fields, the list is empty. Before the fix, resolveWordListVar never removed
+     * the ${...} token (the replace loop never ran), re-scanned the same string, and looped forever — in
+     * prod only ever broken by the 300s task-timeout interrupt.
+     *
+     * Runs on a worker thread and joins WITHOUT interrupting, so this asserts the FIX itself terminates
+     * the call. A regression leaves the worker spinning -> assertFalse(worker.isAlive()) fails cleanly
+     * (daemon thread, so a regressed spin doesn't block JVM exit) instead of hanging the build.
+     */
+    @Test
+    public void emptyWordListReturnsWithoutNeedingInterrupt() throws Exception {
+        Map<String, Object> varMap = new HashMap<>();
+        varMap.put("wordList_color", Arrays.asList("red", "blue"));
+        varMap.put("wordList_animal", new ArrayList<String>()); // empty sticker sheet
+
+        AtomicReference<List<String>> out = new AtomicReference<>();
+        Thread worker = new Thread(() ->
+                out.set(VariableResolver.resolveWordListVar("${color} ${animal}", varMap)));
+        worker.setDaemon(true);
+        worker.start();
+        worker.join(2000); // no interrupt — the fix must make it return by itself
+
+        assertFalse(worker.isAlive(), "empty word list must return, not spin");
+        assertTrue(out.get().isEmpty());
     }
 
     @Test
