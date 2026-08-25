@@ -423,7 +423,7 @@
     },
     {
       "type": "timeseries",
-      "title": "Request rate by endpoint",
+      "title": "Requests",
       "description": "All endpoints.",
       "datasource": {
         "type": "prometheus",
@@ -475,7 +475,7 @@
     },
     {
       "type": "timeseries",
-      "title": "Latency p90 by endpoint",
+      "title": "Latency",
       "description": "All endpoints, p90.",
       "datasource": {
         "type": "prometheus",
