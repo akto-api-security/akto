@@ -595,9 +595,26 @@ export default function AgenticAssetsPage() {
     { label: "Low",      key: "low",      count: violationTotals.low,  color: "#D1D5DB" },
   ], [violationTotals]);
 
+  // These cards' rows come from the stats endpoint's own per-group aggregation (name/type only,
+  // no full row shape) - open the flyout the same way the ?asset= deep link does: a real
+  // server-side lookup by name/type via onServerFetch, not a synthetic partial row.
+  const openAssetByName = useCallback((name, type) => {
+    onServerFetch({
+      skip: 0,
+      limit: 20,
+      searchString: name,
+      filters: type ? { type: [type] } : undefined,
+    }).then((res) => {
+      const rows = res?.value || [];
+      const found = rows.find((r) => (r.name || "").toLowerCase() === (name || "").toLowerCase()) || rows[0];
+      if (found) setFlyout(found);
+    });
+  }, [onServerFetch, setFlyout]);
+
   const topAppsRows = useMemo(() =>
     (stats.topUsedApplications || []).map((row) => ({
       ...row,
+      onClick: (r) => openAssetByName(r.name, r.type),
       renderValue: (r) => (
         <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
           <Box minHeight="28px">
@@ -605,11 +622,12 @@ export default function AgenticAssetsPage() {
           </Box>
         </HorizontalStack>
       ),
-    })), [stats.topUsedApplications]);
+    })), [stats.topUsedApplications, openAssetByName]);
 
   const topViolRows = useMemo(() =>
     (stats.topAssetsWithViolations || []).map((row) => ({
       ...row,
+      onClick: (r) => openAssetByName(r.name, r.type),
       renderValue: (r) => (
         <HorizontalStack align="end" blockAlign="center" gap="3" wrap={false}>
           <Text variant="bodyMd">{func.prettifyShort(r.violations)}</Text>
@@ -623,7 +641,7 @@ export default function AgenticAssetsPage() {
           />
         </HorizontalStack>
       ),
-    })), [stats.topAssetsWithViolations, stats.monthLabels]);
+    })), [stats.topAssetsWithViolations, stats.monthLabels, openAssetByName]);
 
   const topCards = useMemo(() => (
     <HorizontalGrid key="top-row" columns={3} gap="4">
