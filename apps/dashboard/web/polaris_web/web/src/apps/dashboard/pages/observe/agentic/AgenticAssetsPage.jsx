@@ -13,6 +13,9 @@ import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import AgenticAssetFlyout from "./AgenticAssetFlyout";
+import InsightsFlyout from "./insights/InsightsFlyout";
+import InsightsEntryButton from "./insights/InsightsEntryButton";
+import useInsightsEntryPoint from "./insights/useInsightsEntryPoint";
 import {
   AssetNameCellRenderer,
   TypeBadgeCellRenderer,
@@ -323,6 +326,7 @@ function TableSection({
 export default function AgenticAssetsPage() {
   const navigate = useNavigate();
   const [flyout, setFlyout] = useState(null);
+  const insights = useInsightsEntryPoint();
   const [loading, setLoading] = useState(true);
   const [hostSeverityCounts, setHostSeverityCounts] = useState({});
   const [stats, setStats] = useState({ totalAssets: 0, countsByType: {} });
@@ -552,6 +556,7 @@ export default function AgenticAssetsPage() {
           })
         }
       />
+      <InsightsEntryButton granted={insights.granted} onClick={insights.handleOpen} label="Atlas Insights" />
     </HorizontalStack>
   );
 
@@ -673,36 +678,36 @@ export default function AgenticAssetsPage() {
     </HorizontalGrid>
   ), [totalAssets, assetTypeBreakdown, violationTotals, violBreakdown, stats, topAppsRows, topViolRows, handleAssetTypeClick, activeTypeFilter, handleSeverityClick, activeSeverityFilter]);
 
-  if (loading) {
-    return (
+  return (
+    <>
       <PageWithMultipleCards
         title={pageTitle}
         isFirstPage={true}
         secondaryActions={headerActions}
-        components={[<SpinnerCentered key="loading" />]}
+        components={loading ? [<SpinnerCentered key="loading" />] : [
+          topCards,
+          <TableSection
+            key="table"
+            onServerFetch={onServerFetch}
+            flyout={flyout}
+            setFlyout={setFlyout}
+            startTimestamp={startTimestamp}
+            endTimestamp={endTimestamp}
+            refreshKey={refreshKey}
+            enrichMaps={enrichRef.current}
+            gridRef={gridRef}
+          />,
+        ]}
       />
-    );
-  }
-
-  return (
-    <PageWithMultipleCards
-      title={pageTitle}
-      isFirstPage={true}
-      secondaryActions={headerActions}
-      components={[
-        topCards,
-        <TableSection
-          key="table"
-          onServerFetch={onServerFetch}
-          flyout={flyout}
-          setFlyout={setFlyout}
+      {insights.granted && (
+        <InsightsFlyout
+          show={insights.open}
+          onClose={insights.handleClose}
           startTimestamp={startTimestamp}
           endTimestamp={endTimestamp}
-          refreshKey={refreshKey}
-          enrichMaps={enrichRef.current}
-          gridRef={gridRef}
-        />,
-      ]}
-    />
+          initialInsightId={insights.initialInsightId}
+        />
+      )}
+    </>
   );
 }

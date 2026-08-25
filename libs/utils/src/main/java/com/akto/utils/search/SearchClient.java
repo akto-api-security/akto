@@ -31,6 +31,9 @@ public abstract class SearchClient {
     protected static final String KEY_LABEL           = "label";
     protected static final String KEY_COUNT           = "count";
     protected static final String KEY_MODEL           = "model";
+    protected static final String KEY_TERM            = "term";
+    protected static final String KEY_TRACE_ID        = "traceId";
+    protected static final String KEY_TIMESTAMP       = "timestamp";
 
     public abstract boolean isConfigured();
 
@@ -69,6 +72,17 @@ public abstract class SearchClient {
     /** Used by UserAnalysisCron to fetch not-yet-topic-classified records. */
     public abstract void scrollQueryData(int accountId, long startTsMs, long endTsMs,
         int pageSize, int maxRecords, Consumer<AgentQueryRecord> handler);
+
+    /**
+     * Real-invocation evidence for a small set of known-malicious tool/skill names — proves
+     * a component was actually called, not just registered/tagged. One bounded, recency-sorted
+     * text search per term against queryPayload/responsePayload, scoped to accountId + the time
+     * window. A hit does not distinguish which of queryPayload/responsePayload matched, or
+     * whether the term appeared as the actual tool name vs. incidental text — it is evidence of
+     * likely invocation, not a guarantee. Row shape: {KEY_TERM, KEY_TRACE_ID, KEY_TIMESTAMP}.
+     */
+    public abstract List<Map<String, Object>> searchMaliciousComponentInvocations(
+        int accountId, List<String> maliciousTermNames, long startMs, long endMs, int limitPerTerm);
 
     /** Used by UserAnalysisCron to write classified topic/subTopic back to the backend. */
     public abstract void bulkUpdateTopics(List<TopicUpdate> updates);

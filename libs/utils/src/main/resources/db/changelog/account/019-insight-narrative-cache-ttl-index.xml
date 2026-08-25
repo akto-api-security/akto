@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Atlas Insights' AI-rendered narrative cache (InsightNarrativeCacheDao). One document
+        per fingerprint (account + insight + provider/prompt version + inputs); expiresAt is a
+        BSON Date so the TTL index actually fires (see InsightNarrativeCacheDao's class doc for
+        why that matters — a long epoch field, as QueryTopicCacheDao used, never expires).
+        Mirrors InsightNarrativeCacheDao.createIndicesIfAbsent exactly so this is a no-op on
+        deployments where that runtime call already built it.
+    -->
+
+    <changeSet id="019-account-create-insight-narrative-cache" author="akto">
+        <mongodb:createCollection collectionName="insight_narrative_cache"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="insight_narrative_cache"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="019-account-insight-narrative-cache-ttl-index" author="akto">
+        <mongodb:createIndex collectionName="insight_narrative_cache">
+            <mongodb:keys>{ "expiresAt": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "expiresAt_ttl", "expireAfterSeconds": 0 }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="insight_narrative_cache">
+                <mongodb:keys>{ "expiresAt": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

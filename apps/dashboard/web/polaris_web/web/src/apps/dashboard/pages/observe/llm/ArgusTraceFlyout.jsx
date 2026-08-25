@@ -28,10 +28,14 @@ function formatTs(ts) {
 export default function ArgusTraceFlyout({ trace, onClose }) {
     const [conversations, setConversations] = useState([]);
     const [spanRows, setSpanRows] = useState([]);
+    // A trace opened as a bare {traceId} (e.g. an insight's "view real invocation" CTA, before
+    // any row data exists) has none of the meta fields below on `trace` itself — backfilled here
+    // from the first fetched span so Time/Application/Session ID don't just show placeholders.
+    const [firstSpan, setFirstSpan] = useState(null);
 
     useEffect(() => {
         const traceKey = trace?.traceId || trace?.id;
-        if (!traceKey) { setConversations([]); setSpanRows([]); return; }
+        if (!traceKey) { setConversations([]); setSpanRows([]); setFirstSpan(null); return; }
         let cancelled = false;
 
         // Seed from the row's own payloads — works even when traceId is absent
@@ -43,6 +47,7 @@ export default function ArgusTraceFlyout({ trace, onClose }) {
         if (responseText) seed.push({ role: "assistant", message: responseText, customLabel: "AI agent response", creationTimestamp: ts });
         setConversations(seed);
         setSpanRows([]);
+        setFirstSpan(null);
 
         // If a real traceId exists, fetch span-level rows for richer detail
         if (trace.traceId) {
@@ -60,6 +65,7 @@ export default function ArgusTraceFlyout({ trace, onClose }) {
                 });
                 if (msgs.length) setConversations(msgs);
                 setSpanRows(spans);
+                setFirstSpan(spans[0]);
             });
         }
 
@@ -101,25 +107,27 @@ export default function ArgusTraceFlyout({ trace, onClose }) {
         if (!trace) return null;
         return buildAgenticObserveChatMetadata("session", {
             sessionId: trace.traceId,
-            serviceId: trace.serviceId,
-            userName:  trace.userName,
+            serviceId: trace.serviceId || firstSpan?.serviceId,
+            userName:  trace.userName  || firstSpan?.userName,
             model:     trace._model,
         });
-    }, [trace?.traceId]);
+    }, [trace, firstSpan]);
 
     if (!trace) return null;
 
-    const totalTokens = (Number(trace._inputTokens) || 0) + (Number(trace._outputTokens) || 0);
+    const inputTokens  = Number(trace._inputTokens  ?? firstSpan?.inputTokens)  || 0;
+    const outputTokens = Number(trace._outputTokens ?? firstSpan?.outputTokens) || 0;
+    const totalTokens = inputTokens + outputTokens;
 
     const stats = [
-        { label: "Total tokens",  value: formatCompact(totalTokens),                                                                                         tooltip: TOKEN_ESTIMATE_TOOLTIP },
-        { label: "Tokens in/out", value: `${(trace._inputTokens || 0).toLocaleString("en-US")} / ${(trace._outputTokens || 0).toLocaleString("en-US")}`, tooltip: TOKEN_ESTIMATE_TOOLTIP },
+        { label: "Total tokens",  value: formatCompact(totalTokens),                                                     tooltip: TOKEN_ESTIMATE_TOOLTIP },
+        { label: "Tokens in/out", value: `${inputTokens.toLocaleString("en-US")} / ${outputTokens.toLocaleString("en-US")}`, tooltip: TOKEN_ESTIMATE_TOOLTIP },
     ];
 
     const metaItems = [
-        { label: "Time",        value: formatTs(trace.latestTimestamp) },
-        { label: "Application", value: trace.serviceId || "-" },
-        { label: "Session ID",  value: trace.sessionIdentifier || "-" },
+        { label: "Time",        value: formatTs(trace.latestTimestamp || firstSpan?.timestamp) },
+        { label: "Application", value: trace.serviceId || firstSpan?.serviceId || "-" },
+        { label: "Session ID",  value: trace.sessionIdentifier || firstSpan?.sessionIdentifier || "-" },
     ];
 
     return (
