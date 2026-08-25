@@ -273,6 +273,9 @@ public final class AgenticObserveUtil {
         if (hasSkill && !hasAiAgent && !hasMcpServer) {
             return CLIENT_TYPE_SKILL;
         }
+        if(hasMcpServer && !hasAiAgent){
+            return CLIENT_TYPE_MCP_SERVER;
+        }
         for (CollectionTags tag : envType) {
             if (tag == null) {
                 continue;
