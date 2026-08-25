@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Mirrors AgentUsersDao.createIndicesIfAbsent. AgenticUsers gained a userId field (the raw
+        id from whatever external identity source populated the row, e.g. the Microsoft Graph AAD
+        object id for Copilot Studio users), and bulkUpsertExternalIdentities looks rows up by
+        userId. Without an index, that lookup falls back to a full collection scan.
+
+        Index name matches MCollection.generateIndexName so this is a no-op if DaoInit already
+        built it.
+    -->
+
+    <changeSet id="020-account-agent-users-user-id-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="agent_users"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="agent_users">
+            <mongodb:keys>{ "userId": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "userId_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="agent_users">
+                <mongodb:keys>{ "userId": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

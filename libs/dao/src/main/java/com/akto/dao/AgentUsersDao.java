@@ -5,7 +5,10 @@ import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.DeviceTag;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOneModel;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,8 +35,46 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
             new String[]{AgenticUsers.USER_EMAIL}, false);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[]{AgenticUsers.USER_ID}, false);
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[]{AgenticUsers.DEVICE_TAGS + "." + DeviceTag.KEY,
                     AgenticUsers.DEVICE_TAGS + "." + DeviceTag.VALUE}, false);
+    }
+
+    /**
+     * Upserts many rows sourced from an external identity directory (e.g. Microsoft Graph for
+     * Copilot Studio) in one Mongo round trip, each keyed on that source's own user id — a tenant
+     * sync can mean tens of thousands of changed users, so this must never be a per-user call.
+     * Generic and connector-agnostic — any future ai-agent connector with its own external user
+     * id can reuse this the same way ensureConnectorIdentity already serves the inference-hooks
+     * source. Rows with a blank userId/userName are skipped.
+     */
+    public void bulkUpsertExternalIdentities(List<AgenticUsers> updates) {
+        if (updates == null || updates.isEmpty()) return;
+
+        int now = Context.now();
+        List<WriteModel<AgenticUsers>> writes = new ArrayList<>();
+        for (AgenticUsers u : updates) {
+            String userId = u.getUserId();
+            String userName = u.getUserName();
+            if (userId == null || userId.trim().isEmpty() || userName == null || userName.trim().isEmpty()) continue;
+
+            List<Bson> fieldUpdates = new ArrayList<>();
+            fieldUpdates.add(Updates.set(AgenticUsers.USER_ID, userId));
+            fieldUpdates.add(Updates.set(AgenticUsers.USER_NAME, userName));
+            if (u.getUserEmail() != null && !u.getUserEmail().isEmpty()) {
+                fieldUpdates.add(Updates.set(AgenticUsers.USER_EMAIL, u.getUserEmail()));
+            }
+            fieldUpdates.add(Updates.set(AgenticUsers.LAST_UPDATED_AT, now));
+            fieldUpdates.add(Updates.set(AgenticUsers.LAST_UPDATED_BY, u.getLastUpdatedBy()));
+
+            writes.add(new UpdateOneModel<>(Filters.eq(AgenticUsers.USER_ID, userId),
+                Updates.combine(fieldUpdates), new UpdateOptions().upsert(true)));
+        }
+        if (!writes.isEmpty()) {
+            instance.getMCollection().bulkWrite(writes);
+        }
     }
 
     /**

@@ -27,7 +27,9 @@ import com.akto.util.AgenticObserveUtil;
 import com.akto.util.Constants;
 import com.akto.util.McpClientRegistry;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import lombok.Getter;
@@ -1552,7 +1554,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         }).map;
     }
 
-    private ClassificationCacheEntry getOrBuildClassification(Map<String, Integer> traffic,
+    private  ClassificationCacheEntry getOrBuildClassification(Map<String, Integer> traffic,
             Map<String, Double> risk, Map<String, List<String>> sensitive) {
         int accountId = Context.accountId.get();
         long now = System.currentTimeMillis();
@@ -1572,7 +1574,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS,
-                            ApiCollection.BASE_RISK_SCORE, ApiCollection.BASE_RISK_SCORE_REASON)
+                            ApiCollection.BASE_RISK_SCORE, ApiCollection.BASE_RISK_SCORE_REASON, ApiCollection._DEACTIVATED)
             );
             long tFindAll = System.currentTimeMillis();
             Map<String, GroupSummary> groups = classifyAllGroups(collections, traffic, risk, sensitive);
@@ -1938,28 +1940,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         out.put("low", low);
         return out;
     }
-
-    // Skill-name equivalent of sumViolationsForCollections above — skill rows use this instead,
-    // since a skill's declaring collection is shared with the agent/device that invoked it, so
-    // collection-based attribution can't give a skill its own count (see skillViolationsByName's
-    // own field comment). Same "null when zero" contract.
-    private static BasicDBObject violationsForSkillName(String skillName, Map<String, Map<String, Integer>> skillViolationsByName) {
-        if (StringUtils.isBlank(skillName) || skillViolationsByName == null) return null;
-        Map<String, Integer> v = skillViolationsByName.get(skillName);
-        if (v == null) return null;
-        int critical = v.getOrDefault("critical", 0);
-        int high = v.getOrDefault("high", 0);
-        int medium = v.getOrDefault("medium", 0);
-        int low = v.getOrDefault("low", 0);
-        if (critical + high + medium + low == 0) return null;
-        BasicDBObject out = new BasicDBObject();
-        out.put("critical", critical);
-        out.put("high", high);
-        out.put("medium", medium);
-        out.put("low", low);
-        return out;
-    }
-
     // Total violation count for one group, used to make "violations" a real server-side sort key
     // (see fetchAgenticAssetsSummary's sortKey handling) instead of only a per-page display value.
     // Skill rows always sort as 0 here, matching the per-row "violations" field above which no
