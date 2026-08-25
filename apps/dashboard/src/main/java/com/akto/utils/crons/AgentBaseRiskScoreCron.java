@@ -46,7 +46,7 @@ public class AgentBaseRiskScoreCron {
     private static final LoggerMaker loggerMaker = new LoggerMaker(AgentBaseRiskScoreCron.class, LogDb.DASHBOARD);
 
     private static final int PER_ACCOUNT_LIMIT = 400;
-    private static final int RECALC_THRSHOLD_SECONDS = 7 * 24 * 60 * 60;
+    private static final int RECALC_THRSHOLD_SECONDS = 21 * 24 * 60 * 60;
     private static final int CONCURRENCY = 1;
 
     private static final java.util.Set<Integer> ALLOWED_ACCOUNT_IDS = new java.util.HashSet<>(
