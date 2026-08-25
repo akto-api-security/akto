@@ -63,12 +63,12 @@ const Logs = () => {
     const displayedLogData = useMemo(() => {
         const q = logSearchQuery.trim().toLowerCase()
         if (!q) {
-            return logs.logData
+            return [...logs.logData].reverse()
         }
         return logs.logData.filter((entry) => {
             const line = `${func.epochToDateTime(entry.timestamp)} ${entry.log ?? ''}`.toLowerCase()
             return line.includes(q)
-        })
+        }).reverse()
     }, [logs.logData, logSearchQuery])
 
     const fetchLogsFromDb = useCallback(async (startTime, endTime, refresh = false) => {
