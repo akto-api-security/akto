@@ -449,7 +449,7 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "right",
+          "placement": "bottom",
           "calcs": [
             "mean",
             "max",
@@ -501,7 +501,7 @@
       "options": {
         "legend": {
           "displayMode": "table",
-          "placement": "right",
+          "placement": "bottom",
           "calcs": [
             "mean",
             "max",
