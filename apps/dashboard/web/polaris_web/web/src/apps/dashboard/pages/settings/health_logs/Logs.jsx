@@ -52,6 +52,7 @@ const Logs = () => {
         { label: "AWS API Gateway", value: "AWS_API_GATEWAY" },
         { label: "Guardrails Service", value: "GUARDRAILS_SERVICE" },
         {label: "Smart Testing", value: "SMART_TESTING"},
+        { label: "DAST", value: "DAST" },
     ];
   
     const handleSelectLogGroup = (logGroup) => {
@@ -62,12 +63,12 @@ const Logs = () => {
     const displayedLogData = useMemo(() => {
         const q = logSearchQuery.trim().toLowerCase()
         if (!q) {
-            return logs.logData
+            return [...logs.logData].reverse()
         }
         return logs.logData.filter((entry) => {
             const line = `${func.epochToDateTime(entry.timestamp)} ${entry.log ?? ''}`.toLowerCase()
             return line.includes(q)
-        })
+        }).reverse()
     }, [logs.logData, logSearchQuery])
 
     const fetchLogsFromDb = useCallback(async (startTime, endTime, refresh = false) => {
