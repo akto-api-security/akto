@@ -541,6 +541,12 @@ public class VariableResolver {
                 if (isWordListVar) {
                     wordList = (List<String>) varMap.get("wordList_" + match);
                     wordListKey = originalKey;
+
+                    // the token stays in expression and matcher re-finds it every pass → infinite loop
+                    if (wordList == null || wordList.isEmpty()) {
+                        return new ArrayList<>();
+                    }
+
                     List<String> tempResult = new ArrayList<>();
                     for (String temp : result) {
                         throwIfInterrupted();
