@@ -9,13 +9,15 @@ public class CyborgMetricsTest {
 
     @Test
     public void recordHttpRequest_emitsAllSeriesWithAccountIdOnCounterOnly() {
-        CyborgMetrics.recordHttpRequest("/api/fetchApiInfo", "POST", "200", "1000000", 12L, 345);
+        CyborgMetrics.recordHttpRequest("/api/fetchApiInfo", "POST", "200", "1000000", 12L, 345, 999);
 
         String out = InfraMetricsListener.registry.scrape("text/plain; version=0.0.4; charset=utf-8");
 
         assertTrue("counter present", out.contains("http_requests_total"));
         assertTrue("latency present", out.contains("http_request_duration_seconds"));
         assertTrue("request size present", out.contains("http_request_size_bytes"));
+        assertTrue("response size present", out.contains("http_response_size_bytes"));
+        assertTrue("in-flight gauge present", out.contains("http_requests_in_flight"));
         assertTrue("uri tag present", out.contains("uri=\"/api/fetchApiInfo\""));
         // account_id lives ONLY on the counter, not on the latency histogram/size (cardinality).
         assertTrue("account_id on counter", lineExists(out, "http_requests_total", "account_id=\"1000000\""));
@@ -25,7 +27,7 @@ public class CyborgMetricsTest {
 
     @Test
     public void recordHttpRequest_nullAccountId_becomesUnknown() {
-        CyborgMetrics.recordHttpRequest("/api/health", "GET", "200", null, 1L, -1);
+        CyborgMetrics.recordHttpRequest("/api/health", "GET", "200", null, 1L, -1, -1);
 
         String out = InfraMetricsListener.registry.scrape("text/plain; version=0.0.4; charset=utf-8");
 
@@ -34,7 +36,7 @@ public class CyborgMetricsTest {
 
     @Test
     public void recordHttpRequest_negativeSize_skipsSizeMetricButKeepsCount() {
-        CyborgMetrics.recordHttpRequest("/api/noBody", "GET", "204", "42", 3L, -1);
+        CyborgMetrics.recordHttpRequest("/api/noBody", "GET", "204", "42", 3L, -1, -1);
 
         String out = InfraMetricsListener.registry.scrape("text/plain; version=0.0.4; charset=utf-8");
 

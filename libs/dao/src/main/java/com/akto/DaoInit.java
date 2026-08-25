@@ -395,18 +395,43 @@ public class DaoInit {
     }
 
     public static void init(ConnectionString connectionString, ReadPreference readPreference) {
+        init(connectionString, readPreference, null, null);
+    }
+
+    /**
+     * Same as {@link #init(ConnectionString, ReadPreference)} but lets the caller attach Mongo driver
+     * listeners (e.g. Micrometer's MongoMetricsCommandListener / MongoMetricsConnectionPoolListener)
+     * for metrics. Listener types are the Mongo driver interfaces, so libs/dao stays free of any
+     * metrics dependency — the caller (which has Micrometer) constructs them.
+     */
+    public static void init(ConnectionString connectionString, ReadPreference readPreference,
+                            java.util.List<com.mongodb.event.CommandListener> commandListeners,
+                            java.util.List<com.mongodb.event.ConnectionPoolListener> connectionPoolListeners) {
         DbMode.refreshDbType(connectionString.getConnectionString());
 
         CodecRegistry codecRegistry = createCodecRegistry();
 
-        MongoClientSettings clientSettings = MongoClientSettings.builder()
+        MongoClientSettings.Builder builder = MongoClientSettings.builder()
                 .readPreference(readPreference)
                 .applyConnectionString(connectionString)
-                .codecRegistry(codecRegistry)
-                .build();
+                .codecRegistry(codecRegistry);
 
-        clients[0] = MongoClients.create(clientSettings);
+        if (commandListeners != null) {
+            for (com.mongodb.event.CommandListener listener : commandListeners) {
+                builder.addCommandListener(listener);
+            }
+        }
+        if (connectionPoolListeners != null && !connectionPoolListeners.isEmpty()) {
+            builder.applyToConnectionPoolSettings(s -> {
+                for (com.mongodb.event.ConnectionPoolListener listener : connectionPoolListeners) {
+                    s.addConnectionPoolListener(listener);
+                }
+            });
+        }
+
+        clients[0] = MongoClients.create(builder.build());
     }
+
     public static void init(ConnectionString connectionString) {
         init(connectionString, ReadPreference.secondary());
     }

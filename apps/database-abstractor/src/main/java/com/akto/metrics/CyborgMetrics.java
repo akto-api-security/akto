@@ -3,6 +3,7 @@ package com.akto.metrics;
 import com.akto.listener.InfraMetricsListener;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Timer;
 
@@ -10,6 +11,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Central facade for cyborg's Prometheus request metrics. All metric names, tags, and registry
@@ -17,39 +19,52 @@ import java.util.concurrent.TimeUnit;
  *
  * Cardinality discipline:
  *  - account_id is attached ONLY to the request counter (1 series per combo). It is NOT put on the
- *    latency histogram or the size summary — those carry ~10 buckets each and would multiply into
- *    millions of series once tenants are added.
- *  - The latency histogram uses ~10 explicit SLO buckets (not Micrometer's ~69-bucket preset), and
- *    no client-side percentiles (those are per-instance and not aggregatable across pods).
+ *    latency histogram or the size summaries — those carry buckets/series that would multiply into
+ *    millions once tenants are added.
+ *  - The latency histogram uses explicit SLO buckets (25ms..5s), no client-side percentiles.
  */
 public class CyborgMetrics {
 
     public static final String UNKNOWN = "unknown";
 
-    // Explicit, meaningful latency buckets (5ms..5s). Replaces publishPercentileHistogram()'s
-    // ~69 auto buckets. Grafana computes p50/p90/p99 via histogram_quantile() over these.
     private static final Duration[] LATENCY_SLOS = new Duration[] {
             Duration.ofMillis(25), Duration.ofMillis(100), Duration.ofMillis(250),
             Duration.ofMillis(500), Duration.ofSeconds(1), Duration.ofMillis(2500),
             Duration.ofSeconds(5)
     };
 
+    // In-flight (concurrent) requests, exposed as a gauge. Registered once on class load.
+    private static final AtomicInteger IN_FLIGHT = new AtomicInteger(0);
+    static {
+        Gauge.builder("http_requests_in_flight", IN_FLIGHT, AtomicInteger::doubleValue)
+                .description("Number of HTTP requests currently being processed")
+                .register(InfraMetricsListener.registry);
+    }
+
     private CyborgMetrics() {
     }
 
+    public static void incInFlight() {
+        IN_FLIGHT.incrementAndGet();
+    }
+
+    public static void decInFlight() {
+        IN_FLIGHT.decrementAndGet();
+    }
+
     /**
-     * Record one HTTP request: count, latency, and (when known) request body size.
+     * Record one HTTP request: count, latency, and (when known) request/response body sizes.
      *
-     * @param uri          request URI (bounded /api/<action> set)
-     * @param method       HTTP method
-     * @param status       HTTP status code as string
-     * @param accountId    caller account id (use CyborgMetrics.UNKNOWN when absent)
-     * @param durationMs   request duration in milliseconds
-     * @param requestBytes request body size; &lt; 0 means unknown (chunked / no body) and is not recorded
+     * @param uri           request URI (bounded /api/<action> set)
+     * @param method        HTTP method
+     * @param status        HTTP status code as string
+     * @param accountId     caller account id (use CyborgMetrics.UNKNOWN when absent)
+     * @param durationMs    request duration in milliseconds
+     * @param requestBytes  request body size; &lt; 0 means unknown and is not recorded
+     * @param responseBytes response body size; &lt; 0 means unknown and is not recorded
      */
-    public static void recordHttpRequest(String uri, String method, String status,
-                                         String accountId, long durationMs, int requestBytes) {
-        // Low-cardinality base tags shared by every request metric.
+    public static void recordHttpRequest(String uri, String method, String status, String accountId,
+                                         long durationMs, int requestBytes, long responseBytes) {
         List<Tag> baseTags = Arrays.asList(
                 Tag.of("uri", uri),
                 Tag.of("method", method),
@@ -75,7 +90,6 @@ public class CyborgMetrics {
                 .register(InfraMetricsListener.registry)
                 .record(durationMs, TimeUnit.MILLISECONDS);
 
-        // Size summary: count/sum/max only (no buckets), base tags.
         if (requestBytes >= 0) {
             DistributionSummary.builder("http_request_size_bytes")
                     .description("HTTP request body size in bytes")
@@ -83,6 +97,15 @@ public class CyborgMetrics {
                     .tags(baseTags)
                     .register(InfraMetricsListener.registry)
                     .record(requestBytes);
+        }
+
+        if (responseBytes >= 0) {
+            DistributionSummary.builder("http_response_size_bytes")
+                    .description("HTTP response body size in bytes")
+                    .baseUnit("bytes")
+                    .tags(baseTags)
+                    .register(InfraMetricsListener.registry)
+                    .record(responseBytes);
         }
     }
 }

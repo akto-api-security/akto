@@ -44,7 +44,17 @@ public class InitializerListener implements ServletContextListener {
                 do {
                     try {
                         if (!calledOnce) {
-                            DaoInit.init(new ConnectionString(mongoURI));
+                            // Attach Micrometer Mongo connection-pool metrics (in-use / available /
+                            // wait time) to the Prometheus registry. Listener implements the Mongo
+                            // driver interface, so libs/dao stays metrics-agnostic.
+                            // NOTE: the command listener is intentionally NOT attached — Micrometer
+                            // 1.17's MongoMetricsCommandListener calls CommandEvent.getDatabaseName(),
+                            // which this project's older Mongo driver lacks (NoSuchMethodError).
+                            DaoInit.init(new ConnectionString(mongoURI), com.mongodb.ReadPreference.secondary(),
+                                    null,
+                                    java.util.Collections.singletonList(
+                                            new io.micrometer.core.instrument.binder.mongodb.MongoMetricsConnectionPoolListener(
+                                                    com.akto.listener.InfraMetricsListener.registry)));
                             TestingRunWebhookDao.instance.createIndicesIfAbsent();
                             ModuleInfoDao.instance.createIndicesIfAbsent();
                             calledOnce = true;
