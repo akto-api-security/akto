@@ -51,6 +51,8 @@ import com.google.gson.Gson;
 public class ClientActor extends DataActor {
 
     private static final int batchWriteLimit = 8;
+    // A tenant sync can mean tens of thousands of changed users — batch, don't send one giant request.
+    private static final int AGENT_USERS_BULK_BATCH_SIZE = 5000;
     private static final String url = buildDbAbstractorUrl();
     private static final LoggerMaker loggerMaker = new LoggerMaker(ClientActor.class);
     private static final int maxConcurrentBatchWrites = 150;
@@ -1778,6 +1780,92 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb("error in fetchEndpointMcpConfigs " + e, LoggerMaker.LogDb.RUNTIME);
         }
         return configs;
+    }
+
+    @Override
+    public List<CopilotStudioIntegration> fetchCopilotStudioIntegrations() {
+        List<CopilotStudioIntegration> integrations = new ArrayList<>();
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAllCopilotStudioIntegrations", "", "GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchCopilotStudioIntegrations", LoggerMaker.LogDb.RUNTIME);
+                return integrations;
+            }
+            try {
+                BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList list = (BasicDBList) payloadObj.get("copilotStudioIntegrations");
+                if (list == null) {
+                    return integrations;
+                }
+                for (Object item : list) {
+                    BasicDBObject itemObj = (BasicDBObject) item;
+                    integrations.add(objectMapper.readValue(itemObj.toJson(), CopilotStudioIntegration.class));
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchCopilotStudioIntegrations " + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchCopilotStudioIntegrations " + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return integrations;
+    }
+
+    @Override
+    public List<AgenticUsers> fetchAllAgentUsers() {
+        List<AgenticUsers> agentUsers = new ArrayList<>();
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAllAgentUsers", "", "GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchAllAgentUsers", LoggerMaker.LogDb.RUNTIME);
+                return agentUsers;
+            }
+            try {
+                BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList list = (BasicDBList) payloadObj.get("agentUsersList");
+                if (list == null) {
+                    return agentUsers;
+                }
+                for (Object item : list) {
+                    BasicDBObject itemObj = (BasicDBObject) item;
+                    agentUsers.add(objectMapper.readValue(itemObj.toJson(), AgenticUsers.class));
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchAllAgentUsers " + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchAllAgentUsers " + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return agentUsers;
+    }
+
+    @Override
+    public void bulkUpsertAgentUserExternalIdentities(List<AgenticUsers> updates) {
+        if (updates == null || updates.isEmpty()) return;
+        for (int start = 0; start < updates.size(); start += AGENT_USERS_BULK_BATCH_SIZE) {
+            List<AgenticUsers> batch = updates.subList(start, Math.min(start + AGENT_USERS_BULK_BATCH_SIZE, updates.size()));
+            sendAgentUsersBulkUpsertBatch(batch);
+        }
+    }
+
+    private void sendAgentUsersBulkUpsertBatch(List<AgenticUsers> batch) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("agentUsersList", batch);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkUpsertAgentUserExternalIdentities", "", "POST", gson.toJson(obj), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in bulkUpsertAgentUserExternalIdentities", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in bulkUpsertAgentUserExternalIdentities " + e, LoggerMaker.LogDb.RUNTIME);
+        }
     }
 
 }

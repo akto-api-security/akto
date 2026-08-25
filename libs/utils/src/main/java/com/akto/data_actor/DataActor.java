@@ -120,4 +120,9 @@ public abstract class DataActor {
     public abstract List<ApiSequences> fetchApiSequences();
     public abstract List<EndpointMcpConfig> fetchEndpointMcpConfigs(String tempCollectionName, int updatedDate);
 
+    // Copilot Studio agent_users sync (CopilotStudioAgentUsersCron)
+    public abstract List<CopilotStudioIntegration> fetchCopilotStudioIntegrations();
+    public abstract List<AgenticUsers> fetchAllAgentUsers();
+    public abstract void bulkUpsertAgentUserExternalIdentities(List<AgenticUsers> updates);
+
 }
