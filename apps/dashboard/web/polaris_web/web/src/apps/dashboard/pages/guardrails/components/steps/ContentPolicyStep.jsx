@@ -4,12 +4,12 @@ import {
     Text,
     Checkbox,
     Box,
-    HorizontalGrid,
     HorizontalStack,
     Button,
     TextField,
     Tag,
-    Badge
+    Badge,
+    Divider
 } from "@shopify/polaris";
 import { PlusMinor, EditMinor, DeleteMinor, ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons";
 import OwaspTag from "../OwaspTag";
@@ -21,6 +21,7 @@ import { CONTENT_POLICY_DESCRIPTIONS, GENERAL_BLOCK_EXAMPLES, HARMFUL_CATEGORY_I
 import func from "@/util/func";
 import guardrailApi from "../../api";
 import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
+import CheckboxChip from "../../../../components/shared/CheckboxChip";
 
 export const ContentPolicyConfig = {
     number: 2,
@@ -473,6 +474,9 @@ const ContentPolicyStep = ({
         </Box>
     );
 
+    const allCategoriesSelected = Object.entries(harmfulCategoriesSettings)
+        .every(([key, level]) => key === 'useForResponses' || level !== 'none');
+
     return (
         <VerticalStack gap="4">
             <Text variant="bodyMd" tone="subdued">
@@ -624,35 +628,43 @@ const ContentPolicyStep = ({
                     {enableHarmfulCategories && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <Box borderColor="border" borderWidth="1" borderRadius="2" overflowX="hidden">
-                                <Box padding="3" paddingBlockEnd="1">
-                                    <Text variant="bodySm" fontWeight="semibold" tone="subdued">FILTERS FOR PROMPTS</Text>
+                                <Box padding="3" paddingBlockEnd="2">
+                                    <HorizontalStack align="space-between" blockAlign="center">
+                                        <Text variant="headingSm">Filters for prompts</Text>
+                                        <Button
+                                            plain
+                                            onClick={() => {
+                                                const next = { ...harmfulCategoriesSettings };
+                                                Object.keys(next).forEach((key) => {
+                                                    if (key !== 'useForResponses') next[key] = allCategoriesSelected ? 'none' : 'HIGH';
+                                                });
+                                                setHarmfulCategoriesSettings(next);
+                                            }}
+                                        >
+                                            {allCategoriesSelected ? 'Clear all' : 'Select all'}
+                                        </Button>
+                                    </HorizontalStack>
                                 </Box>
-                                <Box padding="2" paddingBlockStart="1">
-                                    <HorizontalGrid gap="1" columns={3}>
+                                <Box padding="3" paddingBlockStart="1">
+                                    <HorizontalStack gap="2" wrap>
                                         {Object.entries(harmfulCategoriesSettings).map(([category, level]) => {
                                             if (category === 'useForResponses') return null;
                                             return (
-                                                <Checkbox
+                                                <CheckboxChip
                                                     key={category}
-                                                    label={
-                                                        <HorizontalStack gap="1" blockAlign="center">
-                                                            <Text as="span" textTransform="capitalize">{category}</Text>
-                                                            {HARMFUL_CATEGORY_INFO[category] && (
-                                                                <ControlInfoIcon
-                                                                    {...HARMFUL_CATEGORY_INFO[category]}
-                                                                    onTryPrompt={onTryPrompt}
-                                                                />
-                                                            )}
-                                                        </HorizontalStack>
-                                                    }
+                                                    label={<Text as="span" textTransform="capitalize">{category}</Text>}
                                                     checked={level !== 'none'}
                                                     onChange={(checked) => setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, [category]: checked ? 'HIGH' : 'none' })}
+                                                    trailing={HARMFUL_CATEGORY_INFO[category] && (
+                                                        <ControlInfoIcon {...HARMFUL_CATEGORY_INFO[category]} onTryPrompt={onTryPrompt} />
+                                                    )}
                                                 />
                                             );
                                         })}
-                                    </HorizontalGrid>
+                                    </HorizontalStack>
                                 </Box>
-                                <Box borderBlockStartWidth="1" borderColor="border" padding="3">
+                                <Divider />
+                                <Box background="bg-surface-secondary" padding="3">
                                     <Checkbox
                                         label="Use the same harmful categories filters for responses"
                                         checked={harmfulCategoriesSettings.useForResponses}
