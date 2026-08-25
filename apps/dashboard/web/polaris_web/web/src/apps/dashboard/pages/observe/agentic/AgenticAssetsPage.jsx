@@ -241,27 +241,30 @@ function TableSection({
 }) {
   const didAutoOpenRef = useRef(false);
 
-  // ?asset= deep link — best-effort: matches against whatever the grid has already fetched (the
-  // first page, at minimum). A row further down the sorted list that hasn't loaded yet won't be
-  // found; this only regressed the corner case (a very old exact link to a low-ranked asset), not
-  // the common one (a link to something high-risk/recent, which sorts near the top by default).
+  // ?asset= deep link — asks the server for this one asset by name (same search box query
+  // shipped by the header, plus the ?type= the linker already sends), instead of scanning
+  // whatever the grid happened to have loaded client-side. That approach silently opened nothing
+  // for any asset not on the first page of the default sort — e.g. a low/zero-risk asset like an
+  // MCP server, which ties with hundreds of others and can land anywhere in the 17-page result.
   useEffect(() => {
     if (didAutoOpenRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const assetName = params.get("asset");
     if (!assetName) return;
-    const api2 = gridRef.current?.api;
-    if (!api2) return;
     didAutoOpenRef.current = true;
     const decoded = decodeURIComponent(assetName.replace(/\+/g, " ")).toLowerCase();
-    let found = null;
-    api2.forEachNode((node) => {
-      if (found || !node.data) return;
-      const n = (node.data.name || "").toLowerCase();
-      if (n === decoded || node.data.id === assetName) found = node.data;
+    const assetType = params.get("type");
+    onServerFetch({
+      skip: 0,
+      limit: 20,
+      searchString: assetName,
+      filters: assetType ? { type: [assetType] } : undefined,
+    }).then((res) => {
+      const rows = res?.value || [];
+      const found = rows.find((r) => (r.name || "").toLowerCase() === decoded || r.id === assetName) || rows[0];
+      if (found) setFlyout(found);
     });
-    if (found) setFlyout(found);
-  }, [setFlyout]);
+  }, [setFlyout, onServerFetch]);
 
   const handleRowClick = useCallback(
     (e) => {
