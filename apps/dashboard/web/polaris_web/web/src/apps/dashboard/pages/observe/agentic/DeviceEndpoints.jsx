@@ -327,7 +327,13 @@ function TableSection({ onServerFetch, fetchDeviceChildren, collections, startTi
         const params = new URLSearchParams(window.location.search);
         const deviceId = params.get("device");
         if (!deviceId) return;
-        openDeviceFlyout({ deviceId, path: [deviceId] });
+        // Deep link (?device=...): fetch the device's own row the same way the grid does -
+        // {deviceId, path:[deviceId]} alone has no username/os/lastSeen/violations, which used
+        // to render the flyout with every field blank. deviceId has its own exact-match column
+        // filter in the grid (buildDeviceColDefs), so it's a real, already-supported filter key.
+        onServerFetch({ skip: 0, limit: 1, filters: { deviceId: [deviceId] } }).then((res) => {
+            openDeviceFlyout(res?.value?.[0] || { deviceId, path: [deviceId] });
+        });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
