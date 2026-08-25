@@ -183,11 +183,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [deniedTopics, setDeniedTopics] = useState([]);
     const [enableHarmfulCategories, setEnableHarmfulCategories] = useState(false);
     const [harmfulCategoriesSettings, setHarmfulCategoriesSettings] = useState({
-        hate: "HIGH",
-        insults: "HIGH",
-        sexual: "HIGH",
-        violence: "HIGH",
-        misconduct: "HIGH",
+        hate: "none",
+        insults: "none",
+        sexual: "none",
+        violence: "none",
+        misconduct: "none",
         useForResponses: false
     });
     const [enableBasePromptRule, setEnableBasePromptRule] = useState(false);
@@ -657,11 +657,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setDeniedTopics([]);
         setEnableHarmfulCategories(false);
         setHarmfulCategoriesSettings({
-            hate: "HIGH",
-            insults: "HIGH",
-            sexual: "HIGH",
-            violence: "HIGH",
-            misconduct: "HIGH",
+            hate: "none",
+            insults: "none",
+            sexual: "none",
+            violence: "none",
+            misconduct: "none",
             useForResponses: false
         });
         setEnableBasePromptRule(false);
