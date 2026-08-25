@@ -584,7 +584,10 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
             <AgenticStatsCard
                 title="Other Violations"
                 titleTooltip="Violations that are under review or ignored. Click a status to filter the table."
-                total={(statusCounts.UNDER_REVIEW || 0) + (statusCounts.IGNORED || 0)}
+                // Sum the same breakdown segments rendered below, so the headline number can never
+                // drift from the bar (it previously hardcoded Under Review + Ignored only, missing
+                // Skills Evaluations / Misconfigured Settings on Atlas).
+                total={otherBreakdown.reduce((sum, seg) => sum + (seg.count || 0), 0)}
                 delta={0}
                 deltaColor="subdued"
                 breakdown={otherBreakdown}
