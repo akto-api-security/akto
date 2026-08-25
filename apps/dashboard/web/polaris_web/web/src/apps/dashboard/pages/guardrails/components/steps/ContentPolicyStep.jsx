@@ -494,6 +494,7 @@ const ContentPolicyStep = ({
                                 <ControlInfoIcon
                                     {...CONTENT_POLICY_DESCRIPTIONS.promptAttacks}
                                     onTryPrompt={onTryPrompt}
+                                    onEnable={() => setEnablePromptAttacks(true)}
                                 />
                             </HorizontalStack>
                         }
@@ -513,6 +514,7 @@ const ContentPolicyStep = ({
                                     <ControlInfoIcon
                                         {...CONTENT_POLICY_DESCRIPTIONS.contextPoisoning}
                                         onTryPrompt={onTryPrompt}
+                                        onEnable={() => setEnableContextPoisoning(true)}
                                     />
                                 </HorizontalStack>
                             }
@@ -582,6 +584,9 @@ const ContentPolicyStep = ({
                                                                         description={block.shortDescription}
                                                                         examples={GENERAL_BLOCK_EXAMPLES[block.key] ? [{ text: GENERAL_BLOCK_EXAMPLES[block.key] }] : []}
                                                                         onTryPrompt={onTryPrompt}
+                                                                        onEnable={() => {
+                                                                            if (!isBlockEnabled(block)) toggleGeneralBlock(block, true);
+                                                                        }}
                                                                     />
                                                                 </HorizontalStack>
                                                             }
@@ -656,7 +661,15 @@ const ContentPolicyStep = ({
                                                     checked={level !== 'none'}
                                                     onChange={(checked) => setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, [category]: checked ? 'HIGH' : 'none' })}
                                                     trailing={HARMFUL_CATEGORY_INFO[category] && (
-                                                        <ControlInfoIcon {...HARMFUL_CATEGORY_INFO[category]} onTryPrompt={onTryPrompt} />
+                                                        <ControlInfoIcon
+                                                            {...HARMFUL_CATEGORY_INFO[category]}
+                                                            onTryPrompt={onTryPrompt}
+                                                            onEnable={() => {
+                                                                if (level === 'none') {
+                                                                    setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, [category]: 'HIGH' });
+                                                                }
+                                                            }}
+                                                        />
                                                     )}
                                                 />
                                             );

@@ -44,6 +44,7 @@ const CodeDetectionStep = ({
                                 <ControlInfoIcon
                                     {...CODE_DETECTION_DESCRIPTIONS.codeFilter}
                                     onTryPrompt={onTryPrompt}
+                                    onEnable={() => setEnableCodeFilter(true)}
                                 />
                             </HorizontalStack>
                         }
@@ -61,6 +62,7 @@ const CodeDetectionStep = ({
                                 <ControlInfoIcon
                                     {...CODE_DETECTION_DESCRIPTIONS.banCode}
                                     onTryPrompt={onTryPrompt}
+                                    onEnable={() => setEnableBanCode(true)}
                                 />
                             </HorizontalStack>
                         }

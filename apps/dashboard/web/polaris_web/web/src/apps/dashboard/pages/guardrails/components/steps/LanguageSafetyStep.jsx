@@ -45,6 +45,7 @@ const LanguageSafetyStep = ({
                                 <ControlInfoIcon
                                     {...LANGUAGE_SAFETY_DESCRIPTIONS.gibberishDetection}
                                     onTryPrompt={onTryPrompt}
+                                    onEnable={() => setEnableGibberishDetection(true)}
                                 />
                             </HorizontalStack>
                         }

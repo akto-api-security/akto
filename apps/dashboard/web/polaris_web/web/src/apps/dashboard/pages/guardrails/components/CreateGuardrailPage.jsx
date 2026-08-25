@@ -1280,12 +1280,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // Helper function to build policy data for playground testing
     const buildPlaygroundPolicyData = () => {
         const b = normalizeBehaviourValue(policyBehaviour);
-        const regexPatternsV2 = regexPatterns
-            .filter(r => r && r.pattern && r.behavior)
-            .map(r => ({
-                pattern: r.pattern,
-                behavior: r.behavior.toLowerCase()
-            }));
+        const regexPatternsV2 = enableRegexPatterns
+            ? regexPatterns
+                .filter(r => r && r.pattern && r.behavior)
+                .map(r => ({
+                    pattern: r.pattern,
+                    behavior: r.behavior.toLowerCase()
+                }))
+            : [];
 
         return {
             name: name || "Playground Test Policy",
@@ -1306,9 +1308,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 : [],
             wordFilters: wordFilters,
             piiFilters: enablePiiTypes ? piiTypes : [],
-            regexPatterns: regexPatterns
-                .filter(r => r && r.pattern)
-                .map(r => r.pattern),
+            regexPatterns: enableRegexPatterns
+                ? regexPatterns
+                    .filter(r => r && r.pattern)
+                    .map(r => r.pattern)
+                : [],
             regexPatternsV2,
             ...(enableLlmPrompt && llmPrompt?.trim() ? {
                 llmRule: {
@@ -1434,7 +1438,51 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
     ];
 
-    const handleSamplePayloadClick = (payload) => {
+    // Auto-configures the rule an example demonstrates so "Try now" reliably triggers it.
+    const EXAMPLE_SETUP = {
+        piiEmail: () => {
+            if (!enablePiiTypes) setEnablePiiTypes(true);
+            setPiiTypes(prev => (prev.some(p => p.type === 'email')
+                ? prev
+                : [...prev, { type: 'email', behavior: 'block', domainCount: 0, minMatchCount: 1 }]));
+        },
+        regexSSN: () => {
+            const pattern = '\\d{3}-\\d{2}-\\d{4}';
+            if (!enableRegexPatterns) setEnableRegexPatterns(true);
+            setRegexPatterns(prev => (prev.some(r => r.pattern === pattern)
+                ? prev
+                : [...prev, { pattern, behavior: 'block' }]));
+        },
+        harmfulCategoriesHate: () => {
+            if (!enableHarmfulCategories) setEnableHarmfulCategories(true);
+            if (harmfulCategoriesSettings.hate !== 'HIGH') {
+                setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, hate: 'HIGH' });
+            }
+        },
+        llmRedactNames: () => {
+            if (!enableLlmRedaction) setEnableLlmRedaction(true);
+            const instruction = "Redact customer full names and home addresses";
+            setRedactionRules(prev => {
+                if (prev.length === 0) {
+                    return [{ enabled: true, userPrompt: instruction, confidenceScore: 0.5 }];
+                }
+                if (!(prev[0].userPrompt || "").trim()) {
+                    const next = [...prev];
+                    next[0] = { ...next[0], enabled: true, userPrompt: instruction };
+                    return next;
+                }
+                return prev;
+            });
+        },
+        tokenLimitLow: () => {
+            // Length is approximated from character count; lower the threshold so the example crosses it.
+            if (!enableTokenLimit) setEnableTokenLimit(true);
+            if (tokenLimitThreshold > 50) setTokenLimitThreshold(50);
+        }
+    };
+
+    const handleSamplePayloadClick = (payload, ensure) => {
+        EXAMPLE_SETUP[ensure]?.();
         setPlaygroundInput(payload);
         // Focus the input field after setting the value
         setTimeout(() => {

@@ -614,15 +614,19 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 deniedTopics,
                 wordFilters,
                 piiFilters: enablePiiTypes ? piiTypes : [],
-                regexPatterns: regexPatterns
-                    .filter(r => r && r.pattern)
-                    .map(r => r.pattern),
-                regexPatternsV2: regexPatterns
-                    .filter(r => r && r.pattern && r.behavior)
-                    .map(r => ({
-                        pattern: r.pattern,
-                        behavior: r.behavior.toLowerCase()
-                    })),
+                regexPatterns: enableRegexPatterns
+                    ? regexPatterns
+                        .filter(r => r && r.pattern)
+                        .map(r => r.pattern)
+                    : [],
+                regexPatternsV2: enableRegexPatterns
+                    ? regexPatterns
+                        .filter(r => r && r.pattern && r.behavior)
+                        .map(r => ({
+                            pattern: r.pattern,
+                            behavior: r.behavior.toLowerCase()
+                        }))
+                    : [],
                 ...(enableLlmPrompt && llmPrompt && llmPrompt.trim() ? {
                     llmRule: {
                         enabled: true,

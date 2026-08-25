@@ -415,6 +415,7 @@ const SensitiveInfoStep = ({
                                 <ControlInfoIcon
                                     {...SENSITIVE_INFO_DESCRIPTIONS.secretsDetection}
                                     onTryPrompt={onTryPrompt}
+                                    onEnable={() => setEnableSecrets(true)}
                                 />
                             </HorizontalStack>
                         }

@@ -210,6 +210,10 @@ const CustomGuardrailsStep = ({
                                 <ControlInfoIcon
                                     {...CUSTOM_GUARDRAILS_DESCRIPTIONS.llmPromptRule}
                                     onTryPrompt={onTryPrompt}
+                                    onEnable={() => {
+                                        setEnableLlmPrompt(true);
+                                        if (!llmRule.trim()) setLlmRule("Block requests for competitor pricing");
+                                    }}
                                 />
                             </HorizontalStack>
                         }
