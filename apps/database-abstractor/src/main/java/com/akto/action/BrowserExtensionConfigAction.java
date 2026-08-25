@@ -29,6 +29,9 @@ public class BrowserExtensionConfigAction extends ActionSupport {
     public String fetchBrowserExtensionConfigs() {
         try {
             this.browserExtensionConfigs = BrowserExtensionConfigDao.instance.findActiveConfigs();
+            // Also surface the v2 merged catalogue so clients pinned to this endpoint can read the
+            // richer per-site configs without switching to api/fetchBrowserExtensionConfigsV2.
+            this.browserExtensionConfigsV2 = BrowserExtensionConfigDao.instance.findActiveConfigsV2();
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching browser extension configs: " + e.getMessage(), LogDb.DB_ABS);
