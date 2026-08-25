@@ -49,6 +49,10 @@ import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
 import { normalizeReasonPunctuation, coerceToText, sanitizeDisplayText } from "./violationsData";
+import InsightsFlyout from "@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout";
+import InsightsEntryButton from "@/apps/dashboard/pages/observe/agentic/insights/InsightsEntryButton";
+import useInsightsEntryPoint from "@/apps/dashboard/pages/observe/agentic/insights/useInsightsEntryPoint";
+import { INSIGHT_GROUP } from "@/apps/dashboard/pages/observe/agentic/insights/insightsHelpers";
 
 // ─── Method → display type mapping ──────────────────────────────────────────────
 
@@ -696,6 +700,8 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
 
 function Violations() {
     const navigate = useNavigate();
+    const insights = useInsightsEntryPoint();
+
     const newLayout = LocalStore((state) => state.guardrailViolationsNewLayout);
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
@@ -1497,6 +1503,17 @@ function Violations() {
                 </VerticalStack>
             </Modal.Section>
         </Modal>,
+        insights.granted ? (
+            <InsightsFlyout
+                key="insights"
+                show={insights.open}
+                onClose={insights.handleClose}
+                startTimestamp={startTimestamp}
+                endTimestamp={endTimestamp}
+                initialInsightId={insights.initialInsightId}
+                group={INSIGHT_GROUP.GUARDRAIL_VIOLATIONS}
+            />
+        ) : null,
     ];
 
     return (
@@ -1508,7 +1525,12 @@ function Violations() {
                 />
             }
             isFirstPage
-            secondaryActions={<NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />}
+            secondaryActions={
+                <HorizontalStack gap="2" blockAlign="center">
+                    <InsightsEntryButton granted={insights.granted} onClick={insights.handleOpen} label="Guardrail Insights" />
+                    <NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />
+                </HorizontalStack>
+            }
             primaryAction={
                 <DateRangeFilter
                     initialDispatch={currDateRange}

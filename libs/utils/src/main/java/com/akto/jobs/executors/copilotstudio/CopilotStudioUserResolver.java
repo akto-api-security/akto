@@ -80,6 +80,11 @@ public class CopilotStudioUserResolver {
         return userIdMap;
     }
 
+    public static List<GraphUser> fetchAllUsersFresh(String tenantId, String clientId, String clientSecret) throws Exception {
+        String token = fetchGraphToken(tenantId, clientId, clientSecret);
+        return fetchAllUsers(token);
+    }
+
     private static File userMapFile(String tenantId) {
         return new File(System.getProperty("java.io.tmpdir"), "copilot-studio-user-map-" + tenantId + ".json");
     }

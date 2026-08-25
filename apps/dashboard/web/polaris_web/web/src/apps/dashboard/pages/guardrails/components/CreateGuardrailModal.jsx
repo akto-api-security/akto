@@ -613,7 +613,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 },
                 deniedTopics,
                 wordFilters,
-                piiFilters: piiTypes,
+                piiFilters: enablePiiTypes ? piiTypes : [],
                 regexPatterns: regexPatterns
                     .filter(r => r && r.pattern)
                     .map(r => r.pattern),

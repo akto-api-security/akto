@@ -19,6 +19,25 @@
     right: 0;
 }
 
+/* Atlas Insights list rows (InsightsListView.jsx) — left accent bar colored by severity. */
+.insight-row {
+    cursor: pointer;
+}
+.insight-row:hover {
+    background: #FBFAFF;
+}
+.insight-severity-bar {
+    width: 3px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    align-self: stretch;
+}
+.insight-severity-bar-CRITICAL { background: #DF2909; }
+.insight-severity-bar-HIGH { background: #E45357; }
+.insight-severity-bar-MEDIUM { background: #EF864C; }
+.insight-severity-bar-LOW { background: #94969C; }
+.insight-severity-bar-DEFAULT { background: #E1E3E5; }
+
 
 /* Asset-type badges — colour a Polaris <Badge> per type (same technique as the
    dashboard-wide .badge-wrapper-<SEVERITY> classes). Keeps TypeBadge a plain Polaris
@@ -320,4 +339,13 @@
     flex-shrink: 0;
     display: flex;
     align-items: center;
+}
+
+/* Atlas Insights list row — hover feedback for a Box acting as a click target
+   (same click-target pattern as .agentic-list-cell-click, but this Box is the row itself). */
+.insight-row {
+    cursor: pointer;
+}
+.insight-row:hover {
+    background-color: var(--p-color-bg-hover, #f6f6f7);
 }
