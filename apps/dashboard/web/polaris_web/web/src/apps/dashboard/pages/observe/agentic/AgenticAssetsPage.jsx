@@ -129,11 +129,7 @@ const COL_DEFS = [
     width: 200,
     // Server-side sort via AgenticObserveAction.violationsTotalForGroup — not a stored field, so
     // it's computed from the already-fetched violationsByCollectionId/skillViolationsByName maps
-    // rather than a real Mongo sort. Default sort (was riskScore, which ties ~770 skills at the
-    // same score and buried every other asset type under them) — violations is a more actionable
-    // "what needs attention first" ordering and doesn't have that tie problem.
-    sort: "desc",
-    sortIndex: 0,
+    // rather than a real Mongo sort.
     filter: false,
     cellRenderer: ViolationsCellRenderer,
     cellStyle: { display: "flex", alignItems: "center" },
@@ -241,11 +237,6 @@ function TableSection({
 }) {
   const didAutoOpenRef = useRef(false);
 
-  // ?asset= deep link — asks the server for this one asset by name (same search box query
-  // shipped by the header, plus the ?type= the linker already sends), instead of scanning
-  // whatever the grid happened to have loaded client-side. That approach silently opened nothing
-  // for any asset not on the first page of the default sort — e.g. a low/zero-risk asset like an
-  // MCP server, which ties with hundreds of others and can land anywhere in the 17-page result.
   useEffect(() => {
     if (didAutoOpenRef.current) return;
     const params = new URLSearchParams(window.location.search);
@@ -253,7 +244,10 @@ function TableSection({
     if (!assetName) return;
     didAutoOpenRef.current = true;
     const decoded = decodeURIComponent(assetName.replace(/\+/g, " ")).toLowerCase();
+    const normalize = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const normDecoded = normalize(decoded);
     const assetType = params.get("type");
+
     onServerFetch({
       skip: 0,
       limit: 20,
@@ -261,7 +255,8 @@ function TableSection({
       filters: assetType ? { type: [assetType] } : undefined,
     }).then((res) => {
       const rows = res?.value || [];
-      const found = rows.find((r) => (r.name || "").toLowerCase() === decoded || r.id === assetName) || rows[0];
+      const found = rows.find((r) =>
+        (r.name || "").toLowerCase() === decoded || r.id === assetName || normalize(r.name) === normDecoded);
       if (found) setFlyout(found);
     });
   }, [setFlyout, onServerFetch]);
@@ -504,7 +499,7 @@ export default function AgenticAssetsPage() {
   // ─── Server-side data fetch for AG Grid ─────────────────────────────────────
   const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString, filters }) => {
     const pageSize = limit || 50;
-    const mappedSortKey = SORT_FIELD_MAP[sortKey] || sortKey || "violations";
+    const mappedSortKey = SORT_FIELD_MAP[sortKey] || sortKey || "riskScore";
     // AG Grid SSRM sends sortOrder: -1 for asc, 1 for desc — opposite of the backend's Mongo
     // convention (1 asc / -1 desc, matching NhiGovernanceViolationsAction's own onServerFetch).
     const mongoSortOrder = sortOrder ? -sortOrder : -1;
@@ -595,9 +590,6 @@ export default function AgenticAssetsPage() {
     { label: "Low",      key: "low",      count: violationTotals.low,  color: "#D1D5DB" },
   ], [violationTotals]);
 
-  // These cards' rows come from the stats endpoint's own per-group aggregation (name/type only,
-  // no full row shape) - open the flyout the same way the ?asset= deep link does: a real
-  // server-side lookup by name/type via onServerFetch, not a synthetic partial row.
   const openAssetByName = useCallback((name, type) => {
     onServerFetch({
       skip: 0,
