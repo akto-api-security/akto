@@ -7,7 +7,6 @@ import {
     TextField,
     HorizontalStack,
     Checkbox,
-    RangeSlider,
     Spinner,
     Tooltip,
     Icon
@@ -109,13 +108,9 @@ const SensitiveInfoStep = ({
     // Secrets detection
     enableSecrets,
     setEnableSecrets,
-    secretsConfidenceScore,
-    setSecretsConfidenceScore,
     // Anonymize
     enableAnonymize,
-    setEnableAnonymize,
-    anonymizeConfidenceScore,
-    setAnonymizeConfidenceScore
+    setEnableAnonymize
 }) => {
     // State for dynamically fetched PII types
     const [availablePiiTypes, setAvailablePiiTypes] = useState([]);
@@ -427,29 +422,6 @@ const SensitiveInfoStep = ({
                         onChange={setEnableSecrets}
                         helpText="Detect and block secrets, API keys, passwords, and other sensitive information in user inputs."
                     />
-                    {enableSecrets && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <HorizontalStack gap="1" blockAlign="center">
-                                    <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
-                                    <ControlInfoIcon
-                                        {...SENSITIVE_INFO_DESCRIPTIONS.secretsConfidenceThreshold}
-                                        onTryPrompt={onTryPrompt}
-                                    />
-                                </HorizontalStack>
-                                <RangeSlider
-                                    label=""
-                                    value={secretsConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setSecretsConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting secrets."
-                                />
-                            </VerticalStack>
-                        </Box>
-                    )}
                 </Box>
 
                 {/* Sensitive Data Anonymization */}
@@ -468,29 +440,6 @@ const SensitiveInfoStep = ({
                         onChange={setEnableAnonymize}
                         helpText="Detect and automatically anonymize sensitive data (emails, credit cards, phone numbers, SSN, etc.) in user inputs by replacing them with placeholders like [REDACTED_EMAIL_1]. Original values are stored securely for later restoration if needed."
                     />
-                    {enableAnonymize && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <HorizontalStack gap="1" blockAlign="center">
-                                    <Text variant="bodyMd" fontWeight="medium">Confidence Threshold</Text>
-                                    <ControlInfoIcon
-                                        {...SENSITIVE_INFO_DESCRIPTIONS.anonymizeConfidenceThreshold}
-                                        onTryPrompt={onTryPrompt}
-                                    />
-                                </HorizontalStack>
-                                <RangeSlider
-                                    label=""
-                                    value={anonymizeConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setAnonymizeConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values are more permissive, lower values are more strict in detecting sensitive data that should be anonymized."
-                                />
-                            </VerticalStack>
-                        </Box>
-                    )}
                 </Box>
             </VerticalStack>
         </VerticalStack>

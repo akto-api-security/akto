@@ -4,12 +4,11 @@ import {
     Text,
     Checkbox,
     Box,
-    RangeSlider,
+    HorizontalGrid,
     HorizontalStack,
     Button,
     TextField,
     Tag,
-    FormLayout,
     Badge
 } from "@shopify/polaris";
 import { PlusMinor, EditMinor, DeleteMinor, ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons";
@@ -50,8 +49,6 @@ const ContentPolicyStep = ({
     // Prompt attacks
     enablePromptAttacks,
     setEnablePromptAttacks,
-    promptAttackLevel,
-    setPromptAttackLevel,
     // Context poisoning (demo only)
     enableContextPoisoning,
     setEnableContextPoisoning,
@@ -70,8 +67,6 @@ const ContentPolicyStep = ({
     // Intent based (Base Prompt)
     enableBasePromptRule,
     setEnableBasePromptRule,
-    basePromptConfidenceScore,
-    setBasePromptConfidenceScore,
     enterpriseLicenseComplianceCategories
 }) => {
     // Denied topics state
@@ -502,31 +497,6 @@ const ContentPolicyStep = ({
                         onChange={setEnablePromptAttacks}
                         helpText="Detect and block user inputs attempting to override system instructions."
                     />
-                    {enablePromptAttacks && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <HorizontalStack gap="1" blockAlign="center">
-                                    <Text variant="bodyMd" fontWeight="medium">Prompt Attack Level</Text>
-                                    <ControlInfoIcon
-                                        {...CONTENT_POLICY_DESCRIPTIONS.promptAttackLevel}
-                                        onTryPrompt={onTryPrompt}
-                                    />
-                                </HorizontalStack>
-                                <RangeSlider
-                                    label=""
-                                    value={promptAttackLevel === 'none' ? 0 : promptAttackLevel === 'low' ? 1 : promptAttackLevel === 'medium' ? 2 : 3}
-                                    min={0}
-                                    max={3}
-                                    step={1}
-                                    output
-                                    onChange={(value) => {
-                                        const levels = ['none', 'low', 'medium', 'high'];
-                                        setPromptAttackLevel(levels[value]);
-                                    }}
-                                />
-                            </VerticalStack>
-                        </Box>
-                    )}
                 </Box>
 
                 {/* Context poisoning (demo only) */}
@@ -653,53 +623,43 @@ const ContentPolicyStep = ({
                     />
                     {enableHarmfulCategories && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <VerticalStack gap="3">
-                                <HorizontalStack align="space-between">
-                                    <Text variant="headingSm">Filters for prompts</Text>
-                                    <Button variant="plain" onClick={() => {
-                                        const resetSettings = { ...harmfulCategoriesSettings };
-                                        Object.keys(resetSettings).forEach(key => {
-                                            if (key !== 'useForResponses') resetSettings[key] = 'none';
-                                        });
-                                        setHarmfulCategoriesSettings(resetSettings);
-                                    }}>Reset all</Button>
-                                </HorizontalStack>
-                                {Object.entries(harmfulCategoriesSettings).map(([category, level]) => {
-                                    if (category === 'useForResponses') return null;
-                                    return (
-                                        <Box key={category}>
-                                            <HorizontalStack gap="1" blockAlign="center">
-                                                <Text variant="bodyMd" fontWeight="medium" textTransform="capitalize">{category}</Text>
-                                                {HARMFUL_CATEGORY_INFO[category] && (
-                                                    <ControlInfoIcon
-                                                        {...HARMFUL_CATEGORY_INFO[category]}
-                                                        onTryPrompt={onTryPrompt}
-                                                    />
-                                                )}
-                                            </HorizontalStack>
-                                            <Box paddingBlockStart="2">
-                                                <RangeSlider
-                                                    label=""
-                                                    value={level === 'none' ? 0 : level === 'low' ? 1 : level === 'medium' ? 2 : 3}
-                                                    min={0}
-                                                    max={3}
-                                                    step={1}
-                                                    output
-                                                    onChange={(value) => {
-                                                        const levels = ['none', 'low', 'medium', 'high'];
-                                                        setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, [category]: levels[value] });
-                                                    }}
+                            <Box borderColor="border" borderWidth="1" borderRadius="2" overflowX="hidden">
+                                <Box padding="3" paddingBlockEnd="1">
+                                    <Text variant="bodySm" fontWeight="semibold" tone="subdued">FILTERS FOR PROMPTS</Text>
+                                </Box>
+                                <Box padding="2" paddingBlockStart="1">
+                                    <HorizontalGrid gap="1" columns={3}>
+                                        {Object.entries(harmfulCategoriesSettings).map(([category, level]) => {
+                                            if (category === 'useForResponses') return null;
+                                            return (
+                                                <Checkbox
+                                                    key={category}
+                                                    label={
+                                                        <HorizontalStack gap="1" blockAlign="center">
+                                                            <Text as="span" textTransform="capitalize">{category}</Text>
+                                                            {HARMFUL_CATEGORY_INFO[category] && (
+                                                                <ControlInfoIcon
+                                                                    {...HARMFUL_CATEGORY_INFO[category]}
+                                                                    onTryPrompt={onTryPrompt}
+                                                                />
+                                                            )}
+                                                        </HorizontalStack>
+                                                    }
+                                                    checked={level !== 'none'}
+                                                    onChange={(checked) => setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, [category]: checked ? 'HIGH' : 'none' })}
                                                 />
-                                            </Box>
-                                        </Box>
-                                    );
-                                })}
-                                <Checkbox
-                                    label="Use the same harmful categories filters for responses"
-                                    checked={harmfulCategoriesSettings.useForResponses}
-                                    onChange={(checked) => setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, useForResponses: checked })}
-                                />
-                            </VerticalStack>
+                                            );
+                                        })}
+                                    </HorizontalGrid>
+                                </Box>
+                                <Box borderBlockStartWidth="1" borderColor="border" padding="3">
+                                    <Checkbox
+                                        label="Use the same harmful categories filters for responses"
+                                        checked={harmfulCategoriesSettings.useForResponses}
+                                        onChange={(checked) => setHarmfulCategoriesSettings({ ...harmfulCategoriesSettings, useForResponses: checked })}
+                                    />
+                                </Box>
+                            </Box>
                         </Box>
                     )}
                 </Box>
@@ -720,30 +680,6 @@ const ContentPolicyStep = ({
                         onChange={setEnableBasePromptRule}
                         helpText="Verify if agent requests match the intent of the base prompt. The base prompt is automatically detected from traffic, and user inputs filling placeholders like {var} or {} are checked against this intent."
                     />
-                    {enableBasePromptRule && (
-                        <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
-                            <FormLayout>
-                                <RangeSlider
-                                    label={
-                                        <HorizontalStack gap="1" blockAlign="center">
-                                            <Text as="span">Confidence Threshold</Text>
-                                            <ControlInfoIcon
-                                                {...CONTENT_POLICY_DESCRIPTIONS.intentConfidenceThreshold}
-                                                onTryPrompt={onTryPrompt}
-                                            />
-                                        </HorizontalStack>
-                                    }
-                                    value={basePromptConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    onChange={setBasePromptConfidenceScore}
-                                    helpText="Set the confidence threshold (0-1). Higher values require more confidence to block content."
-                                />
-                            </FormLayout>
-                        </Box>
-                    )}
                 </Box>
             </VerticalStack>
         </VerticalStack>

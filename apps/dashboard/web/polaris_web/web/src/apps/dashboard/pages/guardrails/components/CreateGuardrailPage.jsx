@@ -1080,8 +1080,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         onTryPrompt={handleSamplePayloadClick}
                         enablePromptAttacks={enablePromptAttacks}
                         setEnablePromptAttacks={setEnablePromptAttacks}
-                        promptAttackLevel={promptAttackLevel}
-                        setPromptAttackLevel={setPromptAttackLevel}
                         enableContextPoisoning={enableContextPoisoning}
                         setEnableContextPoisoning={setEnableContextPoisoning}
                         enableDeniedTopics={enableDeniedTopics}
@@ -1096,8 +1094,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setHarmfulCategoriesSettings={setHarmfulCategoriesSettings}
                         enableBasePromptRule={enableBasePromptRule}
                         setEnableBasePromptRule={setEnableBasePromptRule}
-                        basePromptConfidenceScore={basePromptConfidenceScore}
-                        setBasePromptConfidenceScore={setBasePromptConfidenceScore}
                         enterpriseLicenseComplianceCategories={enterpriseLicenseComplianceCategories}
                     />
                 );
@@ -1107,12 +1103,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         onTryPrompt={handleSamplePayloadClick}
                         enableGibberishDetection={enableGibberishDetection}
                         setEnableGibberishDetection={setEnableGibberishDetection}
-                        gibberishConfidenceScore={gibberishConfidenceScore}
-                        setGibberishConfidenceScore={setGibberishConfidenceScore}
                         enableSentiment={enableSentiment}
                         setEnableSentiment={setEnableSentiment}
-                        sentimentConfidenceScore={sentimentConfidenceScore}
-                        setSentimentConfidenceScore={setSentimentConfidenceScore}
                         wordFilters={wordFilters}
                         setWordFilters={setWordFilters}
                         newCustomWord={newCustomWord}
@@ -1135,12 +1127,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setNewRegexPattern={setNewRegexPattern}
                         enableSecrets={enableSecrets}
                         setEnableSecrets={setEnableSecrets}
-                        secretsConfidenceScore={secretsConfidenceScore}
-                        setSecretsConfidenceScore={setSecretsConfidenceScore}
                         enableAnonymize={enableAnonymize}
                         setEnableAnonymize={setEnableAnonymize}
-                        anonymizeConfidenceScore={anonymizeConfidenceScore}
-                        setAnonymizeConfidenceScore={setAnonymizeConfidenceScore}
                     />
                 );
             case 5:
@@ -1149,12 +1137,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         onTryPrompt={handleSamplePayloadClick}
                         enableCodeFilter={enableCodeFilter}
                         setEnableCodeFilter={setEnableCodeFilter}
-                        codeFilterLevel={codeFilterLevel}
-                        setCodeFilterLevel={setCodeFilterLevel}
                         enableBanCode={enableBanCode}
                         setEnableBanCode={setEnableBanCode}
-                        banCodeConfidenceScore={banCodeConfidenceScore}
-                        setBanCodeConfidenceScore={setBanCodeConfidenceScore}
                     />
                 );
             case 6:
@@ -1165,8 +1149,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableLlmPrompt={setEnableLlmPrompt}
                         llmRule={llmPrompt}
                         setLlmRule={setLlmPrompt}
-                        llmConfidenceScore={llmConfidenceScore}
-                        setLlmConfidenceScore={setLlmConfidenceScore}
                         llmCompliance={llmCompliance}
                         setLlmCompliance={setLlmCompliance}
                         enableLlmRedaction={enableLlmRedaction}
@@ -1177,8 +1159,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableExternalModel={setEnableExternalModel}
                         url={url}
                         setUrl={setUrl}
-                        confidenceScore={confidenceScore}
-                        setConfidenceScore={setConfidenceScore}
                     />
                 );
             case 7:
