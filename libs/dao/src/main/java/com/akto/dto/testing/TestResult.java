@@ -71,7 +71,8 @@ public class TestResult extends GenericTestResult {
         ROLE_NOT_FOUND("config doesn't exist, skipping execution", false),
         TEST_TIMED_OUT("Test took too long for execution, exited out", true),
         TOKEN_RATE_LIMITED("Token rate limit reached, some tests were skipped", true),
-        SKIPPING_COPILOT_INTERNAL_ENDPOINT("Copilot Studio- Skipping test as it is already covered", true);
+        SKIPPING_COPILOT_INTERNAL_ENDPOINT("Copilot Studio- Skipping test as it is already covered", true),
+        NO_RESPECTIVE_DELETE_API("Skipping because no respective DELETE api found for this endpoint", true);
         private final String message;
         private final boolean skipTest;
 
