@@ -2,7 +2,9 @@ package com.akto.listener;
 
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.CyborgMetrics;
 import com.akto.metrics.CyborgMetricsConfig;
+import com.akto.util.http_util.CoreHTTPClient;
 import io.micrometer.core.instrument.binder.jvm.ClassLoaderMetrics;
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics;
 import io.micrometer.core.instrument.binder.jvm.JvmHeapPressureMetrics;
@@ -48,6 +50,9 @@ public class InfraMetricsListener implements ServletContextListener {
         // random /api/<x> paths). Meters without a uri tag (JVM/Mongo/Kafka) are unaffected.
         registry.config().meterFilter(MeterFilter.maximumAllowableTags(
                 "http_", "uri", CyborgMetricsConfig.getMaxUriCardinality(), MeterFilter.deny()));
+        // Same guard for outbound-client metrics on the path tag.
+        registry.config().meterFilter(MeterFilter.maximumAllowableTags(
+                "http_client", "path", CyborgMetricsConfig.getMaxUriCardinality(), MeterFilter.deny()));
     }
 
     @Override
@@ -68,6 +73,9 @@ public class InfraMetricsListener implements ServletContextListener {
             new ProcessorMetrics().bindTo(registry);          // process + system CPU
             new FileDescriptorMetrics().bindTo(registry);     // open vs max fds (socket/connection leaks)
             new UptimeMetrics().bindTo(registry);             // uptime, start time
+            // Outbound HTTP metrics: register the recorder so the shared OkHttp client's interceptor
+            // reports every outbound call cyborg makes (http_client_* tagged by host + path).
+            CoreHTTPClient.setOutboundMetricsRecorder(CyborgMetrics::recordOutboundHttpRequest);
             logger.info("Infra metrics initialized!!!!");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "ERROR while setting up InfraMetricsListener", LogDb.DB_ABS);

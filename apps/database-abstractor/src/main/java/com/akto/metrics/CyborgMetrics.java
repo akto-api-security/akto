@@ -66,4 +66,33 @@ public class CyborgMetrics {
                 .register(InfraMetricsListener.registry)
                 .record(durationMs, TimeUnit.MILLISECONDS);
     }
+
+    /**
+     * Record one OUTBOUND HTTP call cyborg made to another API (count + latency), tagged by target
+     * host + path (never the query string). status is the HTTP code, or 0 when the call failed with
+     * no response (connection error/timeout).
+     */
+    public static void recordOutboundHttpRequest(String host, String path, String method, int status, long durationMs) {
+        List<Tag> tags = Arrays.asList(
+                Tag.of("host", host),
+                Tag.of("path", path),
+                Tag.of("method", method),
+                Tag.of("status", String.valueOf(status))
+        );
+
+        Counter.builder("http_client_requests_total")
+                .description("Total outbound HTTP requests")
+                .tags(tags)
+                .register(InfraMetricsListener.registry)
+                .increment();
+
+        Timer.builder("http_client_request_duration")
+                .description("Outbound HTTP request duration")
+                .tags(tags)
+                .serviceLevelObjectives(LATENCY_SLOS)
+                .minimumExpectedValue(Duration.ofMillis(25))
+                .maximumExpectedValue(Duration.ofSeconds(5))
+                .register(InfraMetricsListener.registry)
+                .record(durationMs, TimeUnit.MILLISECONDS);
+    }
 }

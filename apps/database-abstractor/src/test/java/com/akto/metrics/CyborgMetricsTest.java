@@ -30,6 +30,19 @@ public class CyborgMetricsTest {
         assertTrue("null accountId maps to 'unknown'", out.contains("account_id=\"unknown\""));
     }
 
+    @Test
+    public void recordOutboundHttpRequest_emitsClientMetricsWithHostAndPath() {
+        CyborgMetrics.recordOutboundHttpRequest("tbs.akto.io", "/api/threat_detection/record_malicious_event", "POST", 200, 15L);
+
+        String out = InfraMetricsListener.registry.scrape("text/plain; version=0.0.4; charset=utf-8");
+
+        assertTrue("client counter present", out.contains("http_client_requests_total"));
+        assertTrue("client latency present", out.contains("http_client_request_duration_seconds"));
+        assertTrue("host tag present", out.contains("host=\"tbs.akto.io\""));
+        assertTrue("path tag present", out.contains("path=\"/api/threat_detection/record_malicious_event\""));
+        assertFalse("no query in path", out.contains("?"));
+    }
+
     private static boolean lineExists(String scrape, String metricPrefix, String tag) {
         for (String line : scrape.split("\n")) {
             if (line.startsWith(metricPrefix) && line.contains(tag)) {
