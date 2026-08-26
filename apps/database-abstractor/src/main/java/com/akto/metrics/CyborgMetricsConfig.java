@@ -10,7 +10,7 @@ package com.akto.metrics;
  *
  * Env vars:
  *   PROMETHEUS_METRICS_ENABLED   master switch ("true" to enable; default off)
- *   METRICS_SERVICE_NAME         value of the "service" common tag (default "cyborg")
+ *   OTEL_SERVICE_NAME            overall service name -> "service" common tag (default "cyborg")
  *   METRICS_AUTH_ENABLED         require a token on /metrics (default true; "false" to disable)
  *   METRICS_AUTH_TOKEN           bearer token for /metrics
  *   METRICS_MAX_URI_CARDINALITY  cap on distinct uri tag values on http_* metrics (default 500)
@@ -25,7 +25,8 @@ public final class CyborgMetricsConfig {
     private static volatile boolean authEnabled = !"false".equalsIgnoreCase(env("METRICS_AUTH_ENABLED"));
     private static volatile String authToken = env("METRICS_AUTH_TOKEN");
 
-    private static final String serviceName = firstNonBlank(env("METRICS_SERVICE_NAME"), DEFAULT_SERVICE_NAME);
+    // Overall service name; reuse the standard OTEL_SERVICE_NAME rather than a metrics-specific var.
+    private static final String serviceName = firstNonBlank(env("OTEL_SERVICE_NAME"), DEFAULT_SERVICE_NAME);
     private static final int maxUriCardinality = parseIntOrDefault(env("METRICS_MAX_URI_CARDINALITY"), DEFAULT_MAX_URI_CARDINALITY);
 
     private CyborgMetricsConfig() {
