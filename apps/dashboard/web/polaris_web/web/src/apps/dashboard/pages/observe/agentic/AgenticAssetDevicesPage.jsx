@@ -274,7 +274,10 @@ function shapeEndpointRow(row, { rowType, onOpenBundle }) {
                 <TooltipText tooltip={row.username || "-"} text={row.username || "-"} />
             </Box>
         ),
-        riskScoreComp: <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
+        riskScoreComp: transform.wrapRiskScoreTooltip(
+            <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
+            riskScore, row.baseRiskScore, row.baseRiskScoreReason
+        ),
         sensitiveSubTypes: transform.prettifySubtypes(row.sensitiveInRespTypes || []),
         lastTraffic: func.prettifyEpoch(row.lastSeenEpoch || 0),
         discovered: func.prettifyEpoch(row.startTs || 0),

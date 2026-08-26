@@ -797,6 +797,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         final String deviceId;
         String username = "-";
         double riskScore = 0;
+        Double baseRiskScore = null;
+        String baseRiskScoreReason = null;
         int lastSeenEpoch = 0;
         int startTs = 0; // 0 == "no discovered time seen yet"; matches JS's Infinity->0 fallback
         final Set<String> sensitiveTypes = new LinkedHashSet<>();
@@ -886,7 +888,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             g.children.add(child);
             if (collTraffic > g.lastSeenEpoch) g.lastSeenEpoch = collTraffic;
             if (childStartTs > 0 && (g.startTs == 0 || childStartTs < g.startTs)) g.startTs = childStartTs;
-            if (collRisk > g.riskScore) g.riskScore = collRisk;
+            // Carry the base score/remarks from whichever child owns the current max risk score,
+            // so the device row's tooltip can explain the score it displays (mirrors
+            // AgentEndpointTreeTable.jsx's groupByEndpointId).
+            if (collRisk >= g.riskScore) {
+                g.baseRiskScore = c.getBaseRiskScore();
+                g.baseRiskScoreReason = c.getBaseRiskScoreReason();
+                g.riskScore = collRisk;
+            }
             if (collSensitive != null) g.sensitiveTypes.addAll(collSensitive);
             if (flags[0]) g.hasPersonalAccount = true;
             if (flags[1]) g.hasLocalMcpServer = true;
@@ -963,6 +972,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 row.put("endpointId", g.deviceId);
                 row.put("username", g.username);
                 row.put("riskScore", g.riskScore > 0 ? AgenticObserveUtil.roundRiskScore(g.riskScore) : 0);
+                row.put("baseRiskScore", g.baseRiskScore);
+                row.put("baseRiskScoreReason", g.baseRiskScoreReason);
                 row.put("sensitiveInRespTypes", new ArrayList<>(g.sensitiveTypes));
                 row.put("lastSeenEpoch", g.lastSeenEpoch);
                 row.put("startTs", g.startTs);
