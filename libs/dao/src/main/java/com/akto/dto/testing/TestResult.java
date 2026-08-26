@@ -72,7 +72,7 @@ public class TestResult extends GenericTestResult {
         TEST_TIMED_OUT("Test took too long for execution, exited out", true),
         TOKEN_RATE_LIMITED("Token rate limit reached, some tests were skipped", true),
         SKIPPING_COPILOT_INTERNAL_ENDPOINT("Copilot Studio- Skipping test as it is already covered", true),
-        NO_RESPECTIVE_DELETE_API("Skipping because no respective DELETE api found for this endpoint", true);
+        NO_RESPECTIVE_DELETE_API("Skipping test on this API, because clean up artifact is missing", true);
         private final String message;
         private final boolean skipTest;
 
