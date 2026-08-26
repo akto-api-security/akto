@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from "react";
-import { Box, VerticalStack, HorizontalStack, Text, Tabs, Icon, Banner } from "@shopify/polaris";
+import { Box, VerticalStack, HorizontalStack, Text, Tabs, Icon, Banner, Badge } from "@shopify/polaris";
 import { ChevronRightMinor } from "@shopify/polaris-icons";
 import { SeverityBadge } from "../AgenticCellRenderers";
 import "../../../../components/layouts/style.css";
@@ -21,7 +21,7 @@ const InsightRow = React.memo(function InsightRow({ insight, onSelect }) {
                     <VerticalStack gap="2">
                         <HorizontalStack gap="2" blockAlign="center" wrap>
                             <Text variant="bodyMd" fontWeight="semibold">{insight.title}</Text>
-                            {insight.severity ? <SeverityBadge severity={insight.severity} /> : null}
+                            {insight.severity ? <SeverityBadge severity={insight.severity} /> : <Badge>Coming soon</Badge>}
                         </HorizontalStack>
                         {headline ? (
                             <Text variant="bodySm" color="subdued">{headline}</Text>
