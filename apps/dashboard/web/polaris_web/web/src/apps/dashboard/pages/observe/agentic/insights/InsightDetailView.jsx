@@ -12,11 +12,6 @@ import { buildTopicGuardrailPrefillForTopic } from "../../../guardrails/topicGua
 import LocalStore from "@/apps/main/LocalStorageStore";
 import "../../../../components/layouts/style.css";
 
-// A blank gap where a button would otherwise be reads as broken. Only insights that actually
-// found something worth acting on (severity above LOW) get an explicit "coming soon" instead —
-// a LOW-severity/no-finding result having no CTA is expected, not a gap.
-const NEEDS_ACTION_SEVERITIES = new Set(["CRITICAL", "HIGH", "MEDIUM"]);
-
 // Metric stat card — same title/value card shape GridRows' other callers use (see
 // TestRunResultFlyout's RowComp). value/label always come straight from InsightResult.metrics;
 // `formatted` is the string the backend built and the narrative is validated against, so
@@ -189,7 +184,15 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
                 )}
             </VerticalStack>
 
-            {(ctas.length > 0 || detail.dataGaps?.length > 0) ? (
+            {!detail.severity ? (
+                // No severity computed at all means this result isn't a real, actionable finding
+                // yet (a "confident zero"/all-clear state, or data still deferred) — show it as
+                // not-yet-actionable rather than a real button that would navigate somewhere with
+                // nothing behind it.
+                <Box paddingBlockStart="5">
+                    <Badge>Coming soon</Badge>
+                </Box>
+            ) : (ctas.length > 0 || detail.dataGaps?.length > 0) && (
                 <Box paddingBlockStart="5">
                     <HorizontalStack gap="3">
                         {ctas.map((cta) => (
@@ -209,15 +212,6 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
                         ))}
                     </HorizontalStack>
                 </Box>
-            ) : (
-                // No CTA and no data gap explains why — if there's still something worth acting on
-                // (severity above LOW), say so plainly instead of leaving a blank gap where a
-                // button would otherwise be, which reads as broken rather than not-yet-built.
-                NEEDS_ACTION_SEVERITIES.has(String(detail.severity || "").toUpperCase()) && (
-                    <Box paddingBlockStart="5">
-                        <Badge>Actions coming soon</Badge>
-                    </Box>
-                )
             )}
         </Box>
     );
