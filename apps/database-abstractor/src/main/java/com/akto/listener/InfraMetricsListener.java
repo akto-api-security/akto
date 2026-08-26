@@ -2,6 +2,7 @@ package com.akto.listener;
 
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.CyborgMetricsConfig;
 import io.micrometer.core.instrument.binder.jvm.ClassLoaderMetrics;
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics;
 import io.micrometer.core.instrument.binder.jvm.JvmHeapPressureMetrics;
@@ -10,6 +11,7 @@ import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics;
 import io.micrometer.core.instrument.binder.system.FileDescriptorMetrics;
 import io.micrometer.core.instrument.binder.system.ProcessorMetrics;
 import io.micrometer.core.instrument.binder.system.UptimeMetrics;
+import io.micrometer.core.instrument.config.MeterFilter;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import org.slf4j.Logger;
@@ -19,57 +21,37 @@ import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 
 /**
- * Prometheus setup for the database-abstractor (cyborg) service. Kept independent of the existing
- * push-based metrics (AllMetrics / OpenTelemetry).
+ * Owns the Prometheus registry for the database-abstractor (cyborg) service and binds JVM/process
+ * metrics on startup. Configuration lives in {@link CyborgMetricsConfig}; this class only wires the
+ * registry and the JVM binders.
  *
- * FULLY OPT-IN: everything is gated on PROMETHEUS_METRICS_ENABLED (default false). When off, NOTHING
- * runs — no JVM binders, the request filter is a passthrough, the Kafka/Mongo binders are not
- * attached, and the /metrics endpoint 404s. A deployment that doesn't want metrics pays nothing and
- * carries no extra listeners. When on, collection runs and /metrics serves (auth via MetricsAuthFilter).
+ * FULLY OPT-IN: JVM binders are bound only when {@link CyborgMetricsConfig#isEnabled()} (the request
+ * filter, Kafka/Mongo binders, and the endpoint are gated on the same switch elsewhere). When off,
+ * nothing is registered and the feature is inert.
  *
- * Common tags (service=cyborg, role=$METRICS_SERVICE_ROLE) are applied in a static block so they
- * are set at class load, before any meter is registered.
+ * The registry is configured once (static block, before any meter is created): common service tags
+ * and a cardinality guard that caps distinct {@code uri} values on {@code http_*} metrics.
  */
 public class InfraMetricsListener implements ServletContextListener {
 
     public static final PrometheusMeterRegistry registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
 
-    // Master switch. Off unless PROMETHEUS_METRICS_ENABLED=true. Gates ALL collection AND the
-    // endpoint; when false the whole feature is inert. volatile + a test seam only.
-    private static volatile boolean ENABLED = "true".equalsIgnoreCase(System.getenv("PROMETHEUS_METRICS_ENABLED"));
-
-    // Deployment role (api / consumer / fast-consumer); "unknown" when not set. Resolved once.
-    private static final String ROLE = resolveRole();
-
     private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsListener.class, LogDb.DB_ABS);
     private static final Logger logger = LoggerFactory.getLogger(InfraMetricsListener.class);
 
     static {
-        // service=cyborg is constant; role is set per Docker deployment (api / consumer / fast-consumer).
-        registry.config().commonTags("service", "cyborg", "role", ROLE);
-    }
-
-    /** Master switch: when false the entire metrics feature (collection + endpoint) is inert. */
-    public static boolean isEnabled() {
-        return ENABLED;
-    }
-
-    // Test seam: env-derived static can't be driven from a unit test otherwise. Not for production use.
-    public static void setEnabledForTest(boolean enabled) {
-        ENABLED = enabled;
-    }
-
-    private static String resolveRole() {
-        String role = System.getenv("METRICS_SERVICE_ROLE");
-        if (role == null || role.trim().isEmpty()) {
-            return "unknown";
-        }
-        return role.trim();
+        // service identity on every series (service=cyborg, role=api|consumer|fast-consumer).
+        registry.config().commonTags("service", "cyborg", "role", CyborgMetricsConfig.getRole());
+        // Anti-explosion guard: cap distinct uri values on http_* metrics; beyond the cap new uri
+        // series are dropped rather than growing unbounded (e.g. an authenticated caller spraying
+        // random /api/<x> paths). Meters without a uri tag (e.g. http_requests_in_flight) are unaffected.
+        registry.config().meterFilter(MeterFilter.maximumAllowableTags(
+                "http_", "uri", CyborgMetricsConfig.getMaxUriCardinality(), MeterFilter.deny()));
     }
 
     @Override
     public void contextInitialized(ServletContextEvent sce) {
-        if (!ENABLED) {
+        if (!CyborgMetricsConfig.isEnabled()) {
             logger.info("Prometheus metrics disabled (PROMETHEUS_METRICS_ENABLED != true). Skipping all collection.");
             return;
         }
@@ -79,7 +61,7 @@ public class InfraMetricsListener implements ServletContextListener {
             new JvmMemoryMetrics().bindTo(registry);          // heap/non-heap used, committed, max
             new JvmGcMetrics().bindTo(registry);              // gc pause times, allocations
             new JvmHeapPressureMetrics().bindTo(registry);    // gc overhead + memory-after-gc (leak signal)
-            new JvmThreadMetrics().bindTo(registry);          // live/daemon/blocked threads
+            new JvmThreadMetrics().bindTo(registry);          // live/daemon/peak threads
             new ClassLoaderMetrics().bindTo(registry);        // classes loaded/unloaded (classloader leaks)
             // Process / OS
             new ProcessorMetrics().bindTo(registry);          // process + system CPU

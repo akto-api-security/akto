@@ -16,6 +16,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.merging.Cron;
 import com.akto.metrics.AllMetrics;
+import com.akto.metrics.CyborgMetricsConfig;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.EndpointRemoteCommandCleanupCron;
@@ -55,7 +56,7 @@ public class InitializerListener implements ServletContextListener {
                             // NOTE: the command listener is intentionally NOT attached — Micrometer
                             // 1.17's MongoMetricsCommandListener calls CommandEvent.getDatabaseName(),
                             // which this project's older Mongo driver lacks (NoSuchMethodError).
-                            if (InfraMetricsListener.isEnabled()) {
+                            if (CyborgMetricsConfig.isEnabled()) {
                                 DaoInit.init(new ConnectionString(mongoURI), ReadPreference.secondary(),
                                         null,
                                         Collections.singletonList(

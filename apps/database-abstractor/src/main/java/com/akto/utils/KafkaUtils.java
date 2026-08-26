@@ -26,6 +26,7 @@ import com.akto.action.DbAction;
 import com.akto.action.ESClientAction;
 import com.akto.dao.context.Context;
 import com.akto.listener.InfraMetricsListener;
+import com.akto.metrics.CyborgMetricsConfig;
 import io.micrometer.core.instrument.binder.kafka.KafkaClientMetrics;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.LogsEndpointShield;
@@ -139,7 +140,7 @@ public class KafkaUtils {
         this.consumer = new KafkaConsumer<>(properties);
 
         // Bind Kafka consumer metrics (lag, consume-rate, offsets) — only when metrics are enabled.
-        if (InfraMetricsListener.isEnabled()) {
+        if (CyborgMetricsConfig.isEnabled()) {
             try {
                 new KafkaClientMetrics(this.consumer).bindTo(InfraMetricsListener.registry);
             } catch (Exception e) {

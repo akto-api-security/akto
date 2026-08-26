@@ -3,6 +3,7 @@ package com.akto;
 import com.akto.listener.InfraMetricsListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.CyborgMetricsConfig;
 import com.akto.utils.KafkaUtils;
 import io.micrometer.core.instrument.binder.kafka.KafkaClientMetrics;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -56,7 +57,7 @@ public class FastDiscoveryKafkaConsumer implements Runnable {
         this.consumer = new KafkaConsumer<>(props);
 
         // Bind Kafka consumer metrics (lag, consume-rate, offsets) — only when metrics are enabled.
-        if (InfraMetricsListener.isEnabled()) {
+        if (CyborgMetricsConfig.isEnabled()) {
             try {
                 new KafkaClientMetrics(this.consumer).bindTo(InfraMetricsListener.registry);
             } catch (Exception e) {

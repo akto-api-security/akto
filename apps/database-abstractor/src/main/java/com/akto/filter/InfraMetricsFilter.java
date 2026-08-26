@@ -1,10 +1,10 @@
 package com.akto.filter;
 
 import com.akto.dao.context.Context;
-import com.akto.listener.InfraMetricsListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.CyborgMetrics;
+import com.akto.metrics.CyborgMetricsConfig;
 
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
@@ -101,7 +101,7 @@ public class InfraMetricsFilter implements Filter {
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain filterChain)
             throws IOException, ServletException {
         // Feature off -> zero-overhead passthrough (no wrapping, no recording).
-        if (!InfraMetricsListener.isEnabled() || !(response instanceof HttpServletResponse)) {
+        if (!CyborgMetricsConfig.isEnabled() || !(response instanceof HttpServletResponse)) {
             filterChain.doFilter(request, response);
             return;
         }

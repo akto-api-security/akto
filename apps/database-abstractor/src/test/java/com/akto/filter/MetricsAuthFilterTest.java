@@ -1,6 +1,6 @@
 package com.akto.filter;
 
-import com.akto.listener.InfraMetricsListener;
+import com.akto.metrics.CyborgMetricsConfig;
 import org.junit.After;
 import org.junit.Test;
 
@@ -15,9 +15,8 @@ import java.lang.reflect.Proxy;
 import static org.junit.Assert.*;
 
 /**
- * Verifies MetricsAuthFilter's fail-closed auth. The token is injected via the package-private
- * static test seam so the test does not depend on environment variables. The same static logic
- * (MetricsAuthFilter.isAuthorized) is what InfraMetricsAction relies on via the filter.
+ * Verifies MetricsAuthFilter's fail-closed auth. Enabled/auth/token come from CyborgMetricsConfig,
+ * driven here via its test seams so the test does not depend on environment variables.
  *
  * Servlet types are faked with java.lang.reflect.Proxy (JDK-native) rather than a mocking library:
  * the Mockito version on the classpath (1.x/cglib) cannot initialize on JDK 17.
@@ -26,9 +25,9 @@ public class MetricsAuthFilterTest {
 
     @After
     public void reset() {
-        MetricsAuthFilter.setExpectedTokenForTest(null);
-        MetricsAuthFilter.setAuthEnabledForTest(true);
-        InfraMetricsListener.setEnabledForTest(false);
+        CyborgMetricsConfig.setEnabledForTest(false);
+        CyborgMetricsConfig.setAuthEnabledForTest(true);
+        CyborgMetricsConfig.setAuthTokenForTest(null);
     }
 
     /** Records the status passed to sendError(...); null means the chain was allowed through. */
@@ -86,16 +85,20 @@ public class MetricsAuthFilterTest {
                 getClass().getClassLoader(), new Class<?>[]{FilterChain.class}, handler);
     }
 
+    private void run(String authHeader, ResponseHandler resp, ChainHandler chain) throws Exception {
+        new MetricsAuthFilter().doFilter(request(authHeader), response(resp), chain(chain));
+    }
+
     // ---- filter behavior ----
 
     @Test
     public void notEnabled_returns404_andDoesNotChain() throws Exception {
-        InfraMetricsListener.setEnabledForTest(false);
-        MetricsAuthFilter.setExpectedTokenForTest("secret");
+        CyborgMetricsConfig.setEnabledForTest(false);
+        CyborgMetricsConfig.setAuthTokenForTest("secret");
         ResponseHandler resp = new ResponseHandler();
         ChainHandler chain = new ChainHandler();
 
-        new MetricsAuthFilter().doFilter(request("Bearer secret"), response(resp), chain(chain));
+        run("Bearer secret", resp, chain);
 
         assertEquals(Integer.valueOf(HttpServletResponse.SC_NOT_FOUND), resp.sentError);
         assertFalse(chain.called);
@@ -103,13 +106,13 @@ public class MetricsAuthFilterTest {
 
     @Test
     public void authDisabled_servesWithoutToken() throws Exception {
-        InfraMetricsListener.setEnabledForTest(true);
-        MetricsAuthFilter.setAuthEnabledForTest(false); // opt-out
-        MetricsAuthFilter.setExpectedTokenForTest(null);
+        CyborgMetricsConfig.setEnabledForTest(true);
+        CyborgMetricsConfig.setAuthEnabledForTest(false); // opt-out
+        CyborgMetricsConfig.setAuthTokenForTest(null);
         ResponseHandler resp = new ResponseHandler();
         ChainHandler chain = new ChainHandler();
 
-        new MetricsAuthFilter().doFilter(request(null), response(resp), chain(chain));
+        run(null, resp, chain);
 
         assertNull(resp.sentError);
         assertTrue(chain.called);
@@ -117,12 +120,12 @@ public class MetricsAuthFilterTest {
 
     @Test
     public void authDisabledButFeatureOff_stillReturns404() throws Exception {
-        InfraMetricsListener.setEnabledForTest(false);
-        MetricsAuthFilter.setAuthEnabledForTest(false);
+        CyborgMetricsConfig.setEnabledForTest(false);
+        CyborgMetricsConfig.setAuthEnabledForTest(false);
         ResponseHandler resp = new ResponseHandler();
         ChainHandler chain = new ChainHandler();
 
-        new MetricsAuthFilter().doFilter(request(null), response(resp), chain(chain));
+        run(null, resp, chain);
 
         assertEquals(Integer.valueOf(HttpServletResponse.SC_NOT_FOUND), resp.sentError);
         assertFalse(chain.called);
@@ -130,13 +133,13 @@ public class MetricsAuthFilterTest {
 
     @Test
     public void enabledButTokenUnset_failsClosedWith401() throws Exception {
-        MetricsAuthFilter.setAuthEnabledForTest(true);
-        InfraMetricsListener.setEnabledForTest(true);
-        MetricsAuthFilter.setExpectedTokenForTest(null);
+        CyborgMetricsConfig.setEnabledForTest(true);
+        CyborgMetricsConfig.setAuthEnabledForTest(true);
+        CyborgMetricsConfig.setAuthTokenForTest(null);
         ResponseHandler resp = new ResponseHandler();
         ChainHandler chain = new ChainHandler();
 
-        new MetricsAuthFilter().doFilter(request("Bearer whatever"), response(resp), chain(chain));
+        run("Bearer whatever", resp, chain);
 
         assertEquals(Integer.valueOf(HttpServletResponse.SC_UNAUTHORIZED), resp.sentError);
         assertFalse(chain.called);
@@ -144,12 +147,12 @@ public class MetricsAuthFilterTest {
 
     @Test
     public void enabledWithTokenMismatch_returns401() throws Exception {
-        InfraMetricsListener.setEnabledForTest(true);
-        MetricsAuthFilter.setExpectedTokenForTest("secret");
+        CyborgMetricsConfig.setEnabledForTest(true);
+        CyborgMetricsConfig.setAuthTokenForTest("secret");
         ResponseHandler resp = new ResponseHandler();
         ChainHandler chain = new ChainHandler();
 
-        new MetricsAuthFilter().doFilter(request("Bearer wrong"), response(resp), chain(chain));
+        run("Bearer wrong", resp, chain);
 
         assertEquals(Integer.valueOf(HttpServletResponse.SC_UNAUTHORIZED), resp.sentError);
         assertFalse(chain.called);
@@ -157,12 +160,12 @@ public class MetricsAuthFilterTest {
 
     @Test
     public void enabledWithMissingHeader_returns401() throws Exception {
-        InfraMetricsListener.setEnabledForTest(true);
-        MetricsAuthFilter.setExpectedTokenForTest("secret");
+        CyborgMetricsConfig.setEnabledForTest(true);
+        CyborgMetricsConfig.setAuthTokenForTest("secret");
         ResponseHandler resp = new ResponseHandler();
         ChainHandler chain = new ChainHandler();
 
-        new MetricsAuthFilter().doFilter(request(null), response(resp), chain(chain));
+        run(null, resp, chain);
 
         assertEquals(Integer.valueOf(HttpServletResponse.SC_UNAUTHORIZED), resp.sentError);
         assertFalse(chain.called);
@@ -170,12 +173,12 @@ public class MetricsAuthFilterTest {
 
     @Test
     public void enabledWithMatchingBearerToken_passesThrough() throws Exception {
-        InfraMetricsListener.setEnabledForTest(true);
-        MetricsAuthFilter.setExpectedTokenForTest("secret");
+        CyborgMetricsConfig.setEnabledForTest(true);
+        CyborgMetricsConfig.setAuthTokenForTest("secret");
         ResponseHandler resp = new ResponseHandler();
         ChainHandler chain = new ChainHandler();
 
-        new MetricsAuthFilter().doFilter(request("Bearer secret"), response(resp), chain(chain));
+        run("Bearer secret", resp, chain);
 
         assertNull(resp.sentError);
         assertTrue(chain.called);
@@ -183,12 +186,12 @@ public class MetricsAuthFilterTest {
 
     @Test
     public void enabledWithBareToken_passesThrough() throws Exception {
-        InfraMetricsListener.setEnabledForTest(true);
-        MetricsAuthFilter.setExpectedTokenForTest("secret");
+        CyborgMetricsConfig.setEnabledForTest(true);
+        CyborgMetricsConfig.setAuthTokenForTest("secret");
         ResponseHandler resp = new ResponseHandler();
         ChainHandler chain = new ChainHandler();
 
-        new MetricsAuthFilter().doFilter(request("secret"), response(resp), chain(chain)); // no Bearer prefix
+        run("secret", resp, chain); // no Bearer prefix
 
         assertNull(resp.sentError);
         assertTrue(chain.called);
@@ -198,18 +201,16 @@ public class MetricsAuthFilterTest {
 
     @Test
     public void isAuthorized_failsClosedWhenTokenUnset() {
-        MetricsAuthFilter.setExpectedTokenForTest(null);
+        CyborgMetricsConfig.setAuthTokenForTest(null);
         assertFalse(MetricsAuthFilter.isAuthorized("Bearer anything"));
-        assertFalse(MetricsAuthFilter.isTokenConfigured());
     }
 
     @Test
     public void isAuthorized_matchesBearerAndBareToken() {
-        MetricsAuthFilter.setExpectedTokenForTest("secret");
+        CyborgMetricsConfig.setAuthTokenForTest("secret");
         assertTrue(MetricsAuthFilter.isAuthorized("Bearer secret"));
         assertTrue(MetricsAuthFilter.isAuthorized("secret"));
         assertFalse(MetricsAuthFilter.isAuthorized("Bearer wrong"));
         assertFalse(MetricsAuthFilter.isAuthorized(null));
-        assertTrue(MetricsAuthFilter.isTokenConfigured());
     }
 }
