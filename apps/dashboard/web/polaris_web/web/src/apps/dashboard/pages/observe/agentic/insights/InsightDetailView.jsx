@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, VerticalStack, HorizontalStack, Text, Button, Banner, Spinner, Tooltip, Badge } from "@shopify/polaris";
+import { Box, VerticalStack, HorizontalStack, Text, Button, Banner, Spinner, Tooltip } from "@shopify/polaris";
 import { RefreshMinor, ExternalMinor } from "@shopify/polaris-icons";
 import MarkdownViewer from "@/apps/dashboard/components/shared/MarkdownViewer";
 import GridRows from "@/apps/dashboard/components/shared/GridRows";
@@ -184,15 +184,7 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
                 )}
             </VerticalStack>
 
-            {!detail.severity ? (
-                // No severity computed at all means this result isn't a real, actionable finding
-                // yet (a "confident zero"/all-clear state, or data still deferred) — show it as
-                // not-yet-actionable rather than a real button that would navigate somewhere with
-                // nothing behind it.
-                <Box paddingBlockStart="5">
-                    <Badge>Coming soon</Badge>
-                </Box>
-            ) : (ctas.length > 0 || detail.dataGaps?.length > 0) && (
+            {(ctas.length > 0 || detail.dataGaps?.length > 0) && (
                 <Box paddingBlockStart="5">
                     <HorizontalStack gap="3">
                         {ctas.map((cta) => (
