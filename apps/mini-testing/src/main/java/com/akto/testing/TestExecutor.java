@@ -1277,7 +1277,7 @@ public class TestExecutor {
             List<DependencyNode> deleteDependencyNodes = dataActor.findDependencyNodes(
                     apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), "DELETE");
             if (deleteDependencyNodes == null || deleteDependencyNodes.isEmpty()) {
-                loggerMaker.infoAndAddToDb("Skipping test, no respective DELETE api found for cleanup: " + apiInfoKey);
+                loggerMaker.infoAndAddToDb("Skipping test on this API, because clean up artifact is missing: " + apiInfoKey);
                 return generateFailedRunResultForMessage(testRunId, apiInfoKey, testSuperType, testSubType,
                         testRunResultSummaryId, Collections.singletonList(rawApi.getOriginalMessage()),
                         TestError.NO_RESPECTIVE_DELETE_API.getMessage());
