@@ -3,7 +3,6 @@ package com.akto.utils.jobs;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.MCollection;
-import com.akto.dao.MissingApiInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
@@ -55,8 +54,12 @@ import java.util.regex.Pattern;
  * unauthenticated API.
  *
  * This job finds those endpoints and rebuilds their ApiInfo from sample_data using the same
- * AuthPolicy the runtime uses. Results are staged in missing_api_info for review — nothing here
- * writes to api_info.
+ * AuthPolicy the runtime uses, then inserts them into api_info. Writes are $setOnInsert only, so an
+ * api_info doc that already exists is never modified.
+ *
+ * Endpoints discovered within BACKFILL_MIN_AGE_DAYS are left alone: the runtime may still be in the
+ * middle of writing their api_info, and if it is failing to, that is a live bug worth seeing rather
+ * than papering over.
  *
  * Shape follows InitializerListener.backFillDiscovered: keyset pagination on _id, no skip, one
  * bulkWrite per batch. In steady state every batch short-circuits after two projection-only reads,
@@ -75,6 +78,8 @@ public class ApiInfoBackfillJob {
     private static final int SAMPLE_BATCH_SIZE = 1000;
     // smaller batch only where full sample bodies are pulled, to cap how much payload one query returns
     private static final int SAMPLE_FETCH_BATCH_SIZE = 100;
+    // endpoints discovered more recently than this are left to the runtime
+    private static final int BACKFILL_MIN_AGE_DAYS = 7;
 
     private static final Bson SAMPLE_SORT = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");
 
@@ -130,9 +135,6 @@ public class ApiInfoBackfillJob {
         int accountId = Context.accountId.get();
         int startTime = Context.now();
         loggerMaker.warnAndAddToDb("Starting api info backfill for account " + accountId);
-
-        MissingApiInfoDao.instance.createIndicesIfAbsent();
-        loggerMaker.warn("Api info backfill: missing_api_info indices ensured for account " + accountId);
 
         List<CustomAuthType> customAuthTypes;
         try {
@@ -256,22 +258,22 @@ public class ApiInfoBackfillJob {
             missing.removeAll(keysPresentIn(ApiInfoDao.instance, apiCollectionId, missing));
             int notInApiInfo = missing.size();
 
-            if (!missing.isEmpty()) {
-                missing.removeAll(keysPresentIn(MissingApiInfoDao.instance, apiCollectionId, missing));
-            }
-            int notAlreadyStaged = missing.size();
-
             // an endpoint the inventory does not list is not something the ui can show, so there is
-            // nothing to fix for it — skip rather than stage a record that could never be promoted
+            // nothing to fix for it — skip rather than write a record for an api that is not there
             Map<ApiInfoKey, int[]> timestamps = missing.isEmpty()
                     ? Collections.<ApiInfoKey, int[]>emptyMap()
                     : stiTimestamps(missing, apiCollectionId);
+            int listedInInventory = timestamps.size();
+
+            // leave anything discovered in the last few days to the runtime
+            timestamps = dropRecentlyDiscovered(timestamps);
+            int oldEnough = timestamps.size();
 
             List<ApiInfo> built = timestamps.isEmpty()
                     ? Collections.<ApiInfo>emptyList()
                     : buildFromSamples(timestamps, apiCollectionId, customAuthTypes);
 
-            int written = stage(built);
+            int written = writeToApiInfo(built);
             staged += written;
 
             // the funnel, so a zero at the end says which stage dropped everything rather than
@@ -280,8 +282,8 @@ public class ApiInfoBackfillJob {
             loggerMaker.warn("Api info backfill collection " + apiCollectionId
                     + ": candidates=" + candidates
                     + " notInApiInfo=" + notInApiInfo
-                    + " notAlreadyStaged=" + notAlreadyStaged
-                    + " listedInInventory=" + timestamps.size()
+                    + " listedInInventory=" + listedInInventory
+                    + " oldEnough=" + oldEnough
                     + " builtFromSamples=" + built.size()
                     + " written=" + written);
         }
@@ -369,6 +371,24 @@ public class ApiInfoBackfillJob {
     }
 
     /**
+     * Drops endpoints discovered within BACKFILL_MIN_AGE_DAYS. A freshly discovered endpoint may
+     * simply not have had its api_info written yet, and if the runtime is failing to write it that
+     * is a live bug — better surfaced than hidden behind a backfilled doc.
+     */
+    private static Map<ApiInfoKey, int[]> dropRecentlyDiscovered(Map<ApiInfoKey, int[]> timestamps) {
+        if (timestamps.isEmpty()) return timestamps;
+
+        int cutoff = Context.now() - BACKFILL_MIN_AGE_DAYS * 24 * 60 * 60;
+        Map<ApiInfoKey, int[]> oldEnough = new HashMap<>();
+        for (Map.Entry<ApiInfoKey, int[]> e: timestamps.entrySet()) {
+            int discovered = e.getValue()[0];
+            // discovered == 0 means sti carried no usable timestamp; treat as old, not as new
+            if (discovered == 0 || discovered < cutoff) oldEnough.put(e.getKey(), e.getValue());
+        }
+        return oldEnough;
+    }
+
+    /**
      * Second sample_data pass, this time pulling the samples themselves — only for endpoints that
      * survived every check above, so the large documents are never read for the common case.
      */
@@ -414,13 +434,15 @@ public class ApiInfoBackfillJob {
     }
 
     /**
-     * $setOnInsert only, so a record that appeared since the diff above is left exactly as it is.
+     * $setOnInsert only, so an api_info doc that appeared since the diff above is left exactly as it
+     * is — this can add apis, never alter one.
+     *
      * Note this cannot be a ReplaceOneModel: an upsert carrying a replacement document requires _id
      * to be specified whole, while ApiInfoDao.getFilter matches on _id sub-paths. Update operators
      * are fine with that — mongo seeds the new _id from the query's equality conditions, which is
-     * the same thing ApiInfoBulkUpdate relies on for api_info.
+     * the same thing ApiInfoBulkUpdate relies on.
      */
-    private static int stage(List<ApiInfo> apiInfoList) {
+    private static int writeToApiInfo(List<ApiInfo> apiInfoList) {
         if (apiInfoList.isEmpty()) return 0;
 
         List<WriteModel<ApiInfo>> writes = new ArrayList<>();
@@ -440,7 +462,7 @@ public class ApiInfoBackfillJob {
             ));
         }
 
-        MissingApiInfoDao.instance.getMCollection().bulkWrite(writes);
+        ApiInfoDao.instance.getMCollection().bulkWrite(writes);
         return writes.size();
     }
 
