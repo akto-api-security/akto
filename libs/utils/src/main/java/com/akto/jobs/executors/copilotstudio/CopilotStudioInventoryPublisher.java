@@ -81,14 +81,16 @@ public class CopilotStudioInventoryPublisher {
             }
 
             for (String userId : userIds) {
-                samples.add(buildSample(agent, agentId, userId + AIAgentConnectorConstants.AI_AGENT_HOST_INFIX + botName, environmentId, accountId, botName));
+                // Only the owner's own sample gets the owner tag, not every chatter's.
+                boolean isOwnerSample = userId.equals(resolvedOwnerId);
+                samples.add(buildSample(agent, agentId, userId + AIAgentConnectorConstants.AI_AGENT_HOST_INFIX + botName, environmentId, accountId, botName, isOwnerSample));
             }
         }
 
         return samples;
     }
 
-    private Map<String, Object> buildSample(JsonNode agent, String agentId, String host, String environmentId, int accountId, String botName) {
+    private Map<String, Object> buildSample(JsonNode agent, String agentId, String host, String environmentId, int accountId, String botName, boolean isOwnerSample) {
         Map<String, String> tags = new HashMap<>();
         tags.put(Constants.AKTO_ENDPOINT_SOURCE_TAG, Constants.AKTO_ENDPOINT_SOURCE_VALUE);
         tags.put(Constants.AKTO_GEN_AI_TAG, AIAgentConnectorConstants.DATA_TAG_GEN_AI);
@@ -97,6 +99,9 @@ public class CopilotStudioInventoryPublisher {
         tags.put(Constants.AKTO_COPILOT_BOT_ENVIRONMENT_TAG, environmentId != null ? environmentId : "");
         tags.put(Constants.AKTO_COPILOT_INVENTORY_TAG, TAG_VALUE_TRUE);
         tags.put(Constants.AKTO_SAAS_AGENT_TAG, Constants.COPILOT_STUDIO_AI_AGENT_NAME);
+        if (isOwnerSample) {
+            tags.put(Constants.AKTO_AI_AGENT_OWNER_TAG, TAG_VALUE_TRUE);
+        }
 
         Map<String, String> requestHeaders = new HashMap<>();
         requestHeaders.put(HEADER_HOST, host);

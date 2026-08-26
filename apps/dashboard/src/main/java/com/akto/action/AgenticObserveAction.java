@@ -455,9 +455,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     // Java port of mcpClientHelper.js's hasPersonalAccountTag/hasLocalMcpServerTag/
     // hasMisconfiguredConfigTag — extracted (unlike GroupSummary.accumulateCheap's own inline copy
     // of this same logic) because fetchAgenticAssetEndpointsPage needs it per-child, not just once
-    // per group. {personal, localMcp, misconfigured}.
+    // per group. {personal, localMcp, misconfigured, owner}.
     private static boolean[] computeAgenticTagFlags(List<CollectionTags> envType) {
-        boolean personal = false, localMcp = false, misconfigured = false;
+        boolean personal = false, localMcp = false, misconfigured = false, owner = false;
         if (envType != null) {
             for (CollectionTags tag : envType) {
                 if (tag == null) continue;
@@ -468,9 +468,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 }
                 if ("local-mcp-server".equals(key)) localMcp = true;
                 if ("misconfigured-config".equals(key) && "true".equals(value)) misconfigured = true;
+                if (Constants.AKTO_AI_AGENT_OWNER_TAG.equals(key) && "true".equals(value)) owner = true;
             }
         }
-        return new boolean[]{personal, localMcp, misconfigured};
+        return new boolean[]{personal, localMcp, misconfigured, owner};
     }
 
     // Cheap per-group accumulator, built for EVERY group (agent/service/llm/skill — ~800 at real
@@ -804,6 +805,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         boolean hasLocalMcpServer = false;
         boolean hasMisconfiguredConfig = false;
         boolean hasMaliciousSkill = false;
+        boolean hasOwnerTag = false;
         final List<BasicDBObject> children = new ArrayList<>();
 
         EndpointGroup(String deviceId) { this.deviceId = deviceId; }
@@ -859,6 +861,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             child.put("hasPersonalAccount", flags[0]);
             child.put("hasLocalMcpServer", flags[1]);
             child.put("hasMisconfiguredConfig", flags[2]);
+            child.put("hasOwnerTag", flags[3]);
             child.put("hasMaliciousSkill", childMalicious);
             child.put("skillCount", skillCount);
             child.put("baseRiskScore", c.getBaseRiskScore());
@@ -891,6 +894,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (flags[0]) g.hasPersonalAccount = true;
             if (flags[1]) g.hasLocalMcpServer = true;
             if (flags[2]) g.hasMisconfiguredConfig = true;
+            if (flags[3]) g.hasOwnerTag = true;
             if (childMalicious) g.hasMaliciousSkill = true;
         }
         return groups;
@@ -970,6 +974,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 row.put("hasLocalMcpServer", g.hasLocalMcpServer);
                 row.put("hasMisconfiguredConfig", g.hasMisconfiguredConfig);
                 row.put("hasMaliciousSkill", g.hasMaliciousSkill);
+                row.put("hasOwnerTag", g.hasOwnerTag);
                 row.put("childCount", g.children.size());
                 row.put("children", g.children);
                 rows.add(row);
@@ -1005,6 +1010,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     if (wanted.contains("Local MCP Server") && Boolean.TRUE.equals(r.getBoolean("hasLocalMcpServer", false))) return false;
                     if (wanted.contains("Misconfigured") && Boolean.TRUE.equals(r.getBoolean("hasMisconfiguredConfig", false))) return false;
                     if (wanted.contains("Malicious Skills") && Boolean.TRUE.equals(r.getBoolean("hasMaliciousSkill", false))) return false;
+                    if (wanted.contains("Owner") && Boolean.TRUE.equals(r.getBoolean("hasOwnerTag", false))) return false;
                     return true;
                 });
             }

@@ -76,6 +76,7 @@ const ENDPOINT_TAGS_FILTER_DEF = { key: "endpointTags", label: "Endpoint tags", 
     { label: "Local MCP Server", value: "Local MCP Server" },
     { label: "Misconfigured", value: "Misconfigured" },
     { label: "Malicious Skills", value: "Malicious Skills" },
+    { label: "Owner", value: "Owner" },
 ] };
 
 const resourceName = { singular: "endpoint", plural: "endpoints" };
@@ -248,6 +249,7 @@ function shapeEndpointRow(row, { rowType, onOpenBundle }) {
         ...(row.hasLocalMcpServer ? ["Local MCP Server"] : []),
         ...(row.hasMisconfiguredConfig ? ["Misconfigured"] : []),
         ...(row.hasMaliciousSkill ? ["Malicious Skills"] : []),
+        ...(row.hasOwnerTag ? ["Owner"] : []),
     ];
     const children = row.children || [];
     const misconfiguredChildId = row.hasMisconfiguredConfig
@@ -267,6 +269,7 @@ function shapeEndpointRow(row, { rowType, onOpenBundle }) {
                 {row.hasLocalMcpServer && <Badge size="small" status="critical">Local MCP Server</Badge>}
                 {row.hasMisconfiguredConfig && <MisconfiguredBadge />}
                 {row.hasMaliciousSkill && <Badge size="small" status="critical">Malicious Skills</Badge>}
+                {row.hasOwnerTag && <Badge size="small" status="success">Owner</Badge>}
             </HorizontalStack>
         ),
         usernameComp: (
