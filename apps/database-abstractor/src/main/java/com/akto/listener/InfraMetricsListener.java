@@ -45,7 +45,7 @@ public class InfraMetricsListener implements ServletContextListener {
         registry.config().commonTags("service", CyborgMetricsConfig.getServiceName());
         // Anti-explosion guard: cap distinct uri values on http_* metrics; beyond the cap new uri
         // series are dropped rather than growing unbounded (e.g. an authenticated caller spraying
-        // random /api/<x> paths). Meters without a uri tag (e.g. http_requests_in_flight) are unaffected.
+        // random /api/<x> paths). Meters without a uri tag (JVM/Mongo/Kafka) are unaffected.
         registry.config().meterFilter(MeterFilter.maximumAllowableTags(
                 "http_", "uri", CyborgMetricsConfig.getMaxUriCardinality(), MeterFilter.deny()));
     }

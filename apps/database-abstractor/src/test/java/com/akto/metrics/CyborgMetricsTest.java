@@ -8,14 +8,13 @@ import static org.junit.Assert.*;
 public class CyborgMetricsTest {
 
     @Test
-    public void recordHttpRequest_emitsCounterLatencyInflight_accountIdOnCounterOnly() {
+    public void recordHttpRequest_emitsCounterAndLatency_accountIdOnCounterOnly() {
         CyborgMetrics.recordHttpRequest("/api/fetchApiInfo", "POST", "200", "1000000", 12L);
 
         String out = InfraMetricsListener.registry.scrape("text/plain; version=0.0.4; charset=utf-8");
 
         assertTrue("counter present", out.contains("http_requests_total"));
         assertTrue("latency present", out.contains("http_request_duration_seconds"));
-        assertTrue("in-flight gauge present", out.contains("http_requests_in_flight"));
         assertTrue("uri tag present", out.contains("uri=\"/api/fetchApiInfo\""));
         // account_id lives ONLY on the counter, not on the latency histogram (cardinality).
         assertTrue("account_id on counter", lineExists(out, "http_requests_total", "account_id=\"1000000\""));

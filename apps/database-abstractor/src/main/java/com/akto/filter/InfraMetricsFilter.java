@@ -68,12 +68,10 @@ public class InfraMetricsFilter implements Filter {
         }
 
         StatusCapturingResponse wrapped = new StatusCapturingResponse((HttpServletResponse) response);
-        CyborgMetrics.incInFlight();
         long start = System.currentTimeMillis();
         try {
             filterChain.doFilter(request, wrapped);
         } finally {
-            CyborgMetrics.decInFlight();
             long duration = System.currentTimeMillis() - start;
             try {
                 HttpServletRequest httpServletRequest = (HttpServletRequest) request;

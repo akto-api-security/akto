@@ -2,7 +2,6 @@ package com.akto.metrics;
 
 import com.akto.listener.InfraMetricsListener;
 import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Timer;
 
@@ -10,7 +9,6 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Central facade for cyborg's Prometheus request metrics. All metric names, tags, and registry
@@ -30,23 +28,7 @@ public class CyborgMetrics {
             Duration.ofSeconds(5)
     };
 
-    // In-flight (concurrent) requests, exposed as a gauge. Registered once on class load.
-    private static final AtomicInteger IN_FLIGHT = new AtomicInteger(0);
-    static {
-        Gauge.builder("http_requests_in_flight", IN_FLIGHT, AtomicInteger::doubleValue)
-                .description("Number of HTTP requests currently being processed")
-                .register(InfraMetricsListener.registry);
-    }
-
     private CyborgMetrics() {
-    }
-
-    public static void incInFlight() {
-        IN_FLIGHT.incrementAndGet();
-    }
-
-    public static void decInFlight() {
-        IN_FLIGHT.decrementAndGet();
     }
 
     /**
