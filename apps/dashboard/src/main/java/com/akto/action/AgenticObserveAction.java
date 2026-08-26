@@ -485,6 +485,16 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return new boolean[]{personal, localMcp, misconfigured, owner};
     }
 
+    private static String extractEnvironmentName(List<CollectionTags> envType) {
+        if (envType == null) return null;
+        for (CollectionTags tag : envType) {
+            if (tag != null && Constants.AKTO_COPILOT_BOT_ENVIRONMENT_NAME_TAG.equals(tag.getKeyName())) {
+                return tag.getValue();
+            }
+        }
+        return null;
+    }
+
     // Cheap per-group accumulator, built for EVERY group (agent/service/llm/skill — ~800 at real
     // scale) in one pass over all collections. Deliberately does NOT build a per-device breakdown —
     // that's the expensive part (needs a Map<deviceId, ...> with its own Set<String> per device),
@@ -819,6 +829,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         boolean hasMisconfiguredConfig = false;
         boolean hasMaliciousSkill = false;
         boolean hasOwnerTag = false;
+        String environmentName = null;
         final List<BasicDBObject> children = new ArrayList<>();
 
         EndpointGroup(String deviceId) { this.deviceId = deviceId; }
@@ -846,6 +857,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             double collRisk = r != null ? r : 0.0;
             List<String> collSensitive = sensitive != null ? sensitive.get(idStr) : null;
             boolean[] flags = computeAgenticTagFlags(c.getEnvType());
+            String environmentName = extractEnvironmentName(c.getEnvType());
             int childStartTs = c.getStartTs();
 
             int skillCount = 0;
@@ -875,6 +887,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             child.put("hasLocalMcpServer", flags[1]);
             child.put("hasMisconfiguredConfig", flags[2]);
             child.put("hasOwnerTag", flags[3]);
+            if (StringUtils.isNotBlank(environmentName)) child.put("environmentName", environmentName);
             child.put("hasMaliciousSkill", childMalicious);
             child.put("skillCount", skillCount);
             child.put("baseRiskScore", c.getBaseRiskScore());
@@ -915,6 +928,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (flags[1]) g.hasLocalMcpServer = true;
             if (flags[2]) g.hasMisconfiguredConfig = true;
             if (flags[3]) g.hasOwnerTag = true;
+            // First non-blank wins — every child of one owner-tagged group is the same bot, same environment.
+            if (g.environmentName == null && StringUtils.isNotBlank(environmentName)) g.environmentName = environmentName;
             if (childMalicious) g.hasMaliciousSkill = true;
         }
         return groups;
@@ -997,6 +1012,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 row.put("hasMisconfiguredConfig", g.hasMisconfiguredConfig);
                 row.put("hasMaliciousSkill", g.hasMaliciousSkill);
                 row.put("hasOwnerTag", g.hasOwnerTag);
+                row.put("environmentName", g.environmentName);
                 row.put("childCount", g.children.size());
                 row.put("children", g.children);
                 rows.add(row);
@@ -1032,7 +1048,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     if (wanted.contains("Local MCP Server") && Boolean.TRUE.equals(r.getBoolean("hasLocalMcpServer", false))) return false;
                     if (wanted.contains("Misconfigured") && Boolean.TRUE.equals(r.getBoolean("hasMisconfiguredConfig", false))) return false;
                     if (wanted.contains("Malicious Skills") && Boolean.TRUE.equals(r.getBoolean("hasMaliciousSkill", false))) return false;
-                    if (wanted.contains("Agent Owner") && Boolean.TRUE.equals(r.getBoolean("hasOwnerTag", false))) return false;
+                    if (wanted.contains("Owner") && Boolean.TRUE.equals(r.getBoolean("hasOwnerTag", false))) return false;
                     return true;
                 });
             }

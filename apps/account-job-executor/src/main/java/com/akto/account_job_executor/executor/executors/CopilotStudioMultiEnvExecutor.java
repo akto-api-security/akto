@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -302,11 +303,19 @@ public class CopilotStudioMultiEnvExecutor extends AccountJobExecutor {
                 agentsByEnvironment.computeIfAbsent(environmentId, k -> new ArrayList<>()).add(agent);
             }
 
+            Map<String, String> environmentIdToName = new HashMap<>();
+            for (CopilotStudioIntegration.Environment env : integration.getEnvironments()) {
+                if (env.getEnvironmentId() != null && env.getEnvironmentName() != null) {
+                    environmentIdToName.put(env.getEnvironmentId().toLowerCase(Locale.ROOT), env.getEnvironmentName());
+                }
+            }
+
             String jwtToken = System.getenv(DATABASE_ABSTRACTOR_SERVICE_TOKEN_ENV);
             int published = 0;
             for (Map.Entry<String, List<JsonNode>> entry : agentsByEnvironment.entrySet()) {
                 List<Map<String, Object>> samples = inventoryPublisher.buildSamples(
-                    entry.getValue(), entry.getKey(), null, accountId, ownerIdToUserId, botNameToKnownUserIds);
+                    entry.getValue(), entry.getKey(), null, accountId, ownerIdToUserId, botNameToKnownUserIds,
+                    environmentIdToName);
                 published += inventoryPublisher.publish(ingestionUrl, jwtToken, samples);
             }
 

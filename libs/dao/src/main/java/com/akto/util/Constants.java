@@ -82,6 +82,7 @@ public class Constants {
     public static final String AKTO_COPILOT_BOT_SCHEMA_TAG = "bot-schemaname";
     public static final String AKTO_COPILOT_BOT_NAME_TAG = "bot-name";
     public static final String AKTO_COPILOT_BOT_ENVIRONMENT_TAG = "bot-environment-id";
+    public static final String AKTO_COPILOT_BOT_ENVIRONMENT_NAME_TAG = "bot-environment-name";
     public static final String AKTO_COPILOT_BOT_PUBLISHED_STATE_TAG = "bot-published-state";
     public static final String AKTO_COPILOT_SOURCE_VALUE = "COPILOT_STUDIO";
     public static final String AKTO_COPILOT_CONVERSATION_URL_PREFIX = "/copilot/conversation";
