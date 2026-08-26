@@ -55,11 +55,13 @@ public class FastDiscoveryKafkaConsumer implements Runnable {
 
         this.consumer = new KafkaConsumer<>(props);
 
-        // Bind Kafka consumer metrics (lag, consume-rate, offsets) to the Prometheus registry.
-        try {
-            new KafkaClientMetrics(this.consumer).bindTo(InfraMetricsListener.registry);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error binding fast-discovery Kafka metrics", LogDb.DB_ABS);
+        // Bind Kafka consumer metrics (lag, consume-rate, offsets) — only when metrics are enabled.
+        if (InfraMetricsListener.isEnabled()) {
+            try {
+                new KafkaClientMetrics(this.consumer).bindTo(InfraMetricsListener.registry);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error binding fast-discovery Kafka metrics", LogDb.DB_ABS);
+            }
         }
 
         loggerMaker.infoAndAddToDb("FastDiscoveryKafkaConsumer initialized: topic=" + topicName +

@@ -22,6 +22,10 @@ import com.akto.utils.EndpointRemoteCommandCleanupCron;
 import com.akto.utils.TagMismatchCron;
 import com.akto.utils.TokenBlocklistCron;
 import com.mongodb.ConnectionString;
+import com.mongodb.ReadPreference;
+import io.micrometer.core.instrument.binder.mongodb.MongoMetricsConnectionPoolListener;
+
+import java.util.Collections;
 
 
 public class InitializerListener implements ServletContextListener {
@@ -44,17 +48,21 @@ public class InitializerListener implements ServletContextListener {
                 do {
                     try {
                         if (!calledOnce) {
-                            // Attach Micrometer Mongo connection-pool metrics (in-use / available /
-                            // wait time) to the Prometheus registry. Listener implements the Mongo
-                            // driver interface, so libs/dao stays metrics-agnostic.
+                            // Attach Micrometer Mongo connection-pool metrics ONLY when the metrics
+                            // feature is enabled — a deployment that doesn't want metrics gets a plain
+                            // Mongo client with no extra listeners. Listener implements the Mongo driver
+                            // interface, so libs/dao stays metrics-agnostic.
                             // NOTE: the command listener is intentionally NOT attached — Micrometer
                             // 1.17's MongoMetricsCommandListener calls CommandEvent.getDatabaseName(),
                             // which this project's older Mongo driver lacks (NoSuchMethodError).
-                            DaoInit.init(new ConnectionString(mongoURI), com.mongodb.ReadPreference.secondary(),
-                                    null,
-                                    java.util.Collections.singletonList(
-                                            new io.micrometer.core.instrument.binder.mongodb.MongoMetricsConnectionPoolListener(
-                                                    com.akto.listener.InfraMetricsListener.registry)));
+                            if (InfraMetricsListener.isEnabled()) {
+                                DaoInit.init(new ConnectionString(mongoURI), ReadPreference.secondary(),
+                                        null,
+                                        Collections.singletonList(
+                                                new MongoMetricsConnectionPoolListener(InfraMetricsListener.registry)));
+                            } else {
+                                DaoInit.init(new ConnectionString(mongoURI));
+                            }
                             TestingRunWebhookDao.instance.createIndicesIfAbsent();
                             ModuleInfoDao.instance.createIndicesIfAbsent();
                             calledOnce = true;

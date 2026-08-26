@@ -22,19 +22,20 @@ import javax.servlet.ServletContextListener;
  * Prometheus setup for the database-abstractor (cyborg) service. Kept independent of the existing
  * push-based metrics (AllMetrics / OpenTelemetry).
  *
- * Metrics are always collected; the flag below only gates whether the scrape ENDPOINT serves them.
- * The /metrics endpoint returns data only when enabled AND authorized (see MetricsAuthFilter).
+ * FULLY OPT-IN: everything is gated on PROMETHEUS_METRICS_ENABLED (default false). When off, NOTHING
+ * runs — no JVM binders, the request filter is a passthrough, the Kafka/Mongo binders are not
+ * attached, and the /metrics endpoint 404s. A deployment that doesn't want metrics pays nothing and
+ * carries no extra listeners. When on, collection runs and /metrics serves (auth via MetricsAuthFilter).
  *
  * Common tags (service=cyborg, role=$METRICS_SERVICE_ROLE) are applied in a static block so they
- * are set at class load, before any meter (JVM binders here, the Kafka binder at consumer startup,
- * or HTTP meters on first request) is ever registered.
+ * are set at class load, before any meter is registered.
  */
 public class InfraMetricsListener implements ServletContextListener {
 
     public static final PrometheusMeterRegistry registry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
 
-    // Endpoint gate only. Off unless PROMETHEUS_METRICS_ENABLED=true. Collection is always on;
-    // this just controls whether /metrics serves the data. volatile + a test seam only.
+    // Master switch. Off unless PROMETHEUS_METRICS_ENABLED=true. Gates ALL collection AND the
+    // endpoint; when false the whole feature is inert. volatile + a test seam only.
     private static volatile boolean ENABLED = "true".equalsIgnoreCase(System.getenv("PROMETHEUS_METRICS_ENABLED"));
 
     // Deployment role (api / consumer / fast-consumer); "unknown" when not set. Resolved once.
@@ -48,7 +49,7 @@ public class InfraMetricsListener implements ServletContextListener {
         registry.config().commonTags("service", "cyborg", "role", ROLE);
     }
 
-    /** Endpoint gate: /metrics serves data only when this is true. Collection is unaffected. */
+    /** Master switch: when false the entire metrics feature (collection + endpoint) is inert. */
     public static boolean isEnabled() {
         return ENABLED;
     }
@@ -68,6 +69,10 @@ public class InfraMetricsListener implements ServletContextListener {
 
     @Override
     public void contextInitialized(ServletContextEvent sce) {
+        if (!ENABLED) {
+            logger.info("Prometheus metrics disabled (PROMETHEUS_METRICS_ENABLED != true). Skipping all collection.");
+            return;
+        }
         try {
             logger.info("Infra metrics initializing.......");
             // JVM health

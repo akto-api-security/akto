@@ -138,11 +138,13 @@ public class KafkaUtils {
         Properties properties = configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
         this.consumer = new KafkaConsumer<>(properties);
 
-        // Bind Kafka consumer metrics (lag, consume-rate, offsets) to the Prometheus registry.
-        try {
-            new KafkaClientMetrics(this.consumer).bindTo(InfraMetricsListener.registry);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error binding main Kafka consumer metrics: " + e.toString());
+        // Bind Kafka consumer metrics (lag, consume-rate, offsets) — only when metrics are enabled.
+        if (InfraMetricsListener.isEnabled()) {
+            try {
+                new KafkaClientMetrics(this.consumer).bindTo(InfraMetricsListener.registry);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error binding main Kafka consumer metrics: " + e.toString());
+            }
         }
 
         final Thread mainThread = Thread.currentThread();
