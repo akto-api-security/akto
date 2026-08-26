@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.DaoInit;
 import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.ApiCollectionsDao;
@@ -160,6 +161,16 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             this.misconfiguredCollectionIds = misconfiguredCollectionIds;
             this.builtAt = builtAt;
         }
+    }
+
+    public static void main(String[] args) {
+        Context.accountId.set(1785654409);
+        Context.contextSource.set(CONTEXT_SOURCE.ENDPOINT);
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
+
+        List<ApiCollection> colls = ApiCollectionsDao.instance.findAll(Filters.empty());
+        AgenticObserveAction ac = new AgenticObserveAction();
+        ac.fetchAgenticAssetsSummary();
     }
 
     private SkillDataCacheEntry getOrBuildSkillData() {
@@ -1646,9 +1657,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // "not-attached" hostname (an orphan skill bucket, not a real agent/service/llm) —
             // matches constants.js's groupCollectionsBySkill, which never checks
             // isNotAttachedHostName, unlike its Agent/Service/LLM siblings below.
+            boolean fannedOutSkillFromArray = false;
             if (c.getSkills() != null) {
                 for (String skill : c.getSkills()) {
                     if (StringUtils.isBlank(skill)) continue;
+                    fannedOutSkillFromArray = true;
                     GroupSummary g = groups.computeIfAbsent("skill|" + skill, k -> {
                         GroupSummary gs = new GroupSummary(skill, "skill");
                         gs.name = skill;
@@ -1665,6 +1678,35 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     // its "skill" tag names it, so this collection (c) is never the one contributing it.
                     if (g.owningPluginName == null) g.owningPluginName = AgenticObserveUtil.getOwningPluginName(c);
                     if (g.owningPluginName == null) g.owningPluginName = skillNameToOwningPlugin.get(skill);
+                }
+            }
+            // Standalone skill collections (no owning agent's .skills array lists them — the
+            // collection IS the skill, named by its own "skill" tag(s) rather than a member of some
+            // other collection's .skills array) never fan out above since .skills is empty/null on
+            // them. Without this fallback they fall through to the agent/service classification
+            // below, find no mcp-client/ai-agent/mcp-server/gen-ai/browser-llm tag, and get dropped
+            // by the `if (typeTag == null) continue;` a few lines down — silently excluded from every
+            // group despite being tagged AKTO_SKILL_TAG in the DB. Only applies when the array fan-out
+            // above found nothing, so a collection already counted via .skills isn't double-counted.
+            // A single collection can carry MULTIPLE "skill" tags (one per skill the owning
+            // user/agent has created) — unlike getOwningPluginName's single-value lookup, this must
+            // walk every tag, not just the first, or every skill past the first on that collection
+            // silently disappears from the count.
+            if (!fannedOutSkillFromArray && envType != null) {
+                for (CollectionTags tag : envType) {
+                    if (tag == null || !Constants.AKTO_SKILL_TAG.equals(tag.getKeyName()) || StringUtils.isBlank(tag.getValue())) {
+                        continue;
+                    }
+                    String ownSkillTag = tag.getValue();
+                    GroupSummary g = groups.computeIfAbsent("skill|" + ownSkillTag, k -> {
+                        GroupSummary gs = new GroupSummary(ownSkillTag, "skill");
+                        gs.name = ownSkillTag;
+                        gs.clientType = AgenticObserveUtil.CLIENT_TYPE_SKILL;
+                        return gs;
+                    });
+                    g.accumulateCheap(c, hostName, envType, collRisk, collTraffic, deviceId, sensitive);
+                    if (g.owningPluginName == null) g.owningPluginName = AgenticObserveUtil.getOwningPluginName(c);
+                    if (g.owningPluginName == null) g.owningPluginName = skillNameToOwningPlugin.get(ownSkillTag);
                 }
             }
 
