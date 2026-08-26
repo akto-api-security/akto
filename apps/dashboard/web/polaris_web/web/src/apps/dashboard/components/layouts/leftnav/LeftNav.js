@@ -273,7 +273,8 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_llm_observability",
                     }] : []),
-                    ...(!(func.isDemoAccount() && (dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security")) ? [
+                    // Hidden entirely in Endpoint Security (Atlas); still hidden for demo Agentic accounts.
+                    ...(dashboardCategory !== CATEGORY_ENDPOINT_SECURITY && !(func.isDemoAccount() && dashboardCategory === "Agentic Security") ? [
                     {
                         label: "Recent Changes",
                         onClick: () => {
@@ -428,6 +429,7 @@ export default function LeftNav() {
                         NHI Governance
                     </Text>
                 ),
+                badge: <Badge status="info">Beta</Badge>,
                 icon: SocialAdMajor,
                 onClick: () => {
                     handleSelect("dashboard_nhi_identities");
@@ -467,21 +469,22 @@ export default function LeftNav() {
                     },
                 ],
             }] : []),
-            ...(dashboardCategory === "Agentic Security" && func.isDemoAccount() ? [{
-                label: (
-                    <Text variant="bodyMd" fontWeight="medium">
-                        Prompt Hardening
-                    </Text>
-                ),
-                icon: AutomationFilledMajor,
-                onClick: () => {
-                    handleSelect("dashboard_prompt_hardening");
-                    navigate("/dashboard/prompt-hardening");
-                    setActive("normal");
-                },
-                selected: leftNavSelected === "dashboard_prompt_hardening",
-                key: "prompt_hardening",
-            }] : []),
+            //Prompt Hardening nav item hidden for now
+            // ...(dashboardCategory === "Agentic Security" && func.isDemoAccount() ? [{
+            //     label: (
+            //         <Text variant="bodyMd" fontWeight="medium">
+            //             Prompt Hardening
+            //         </Text>
+            //     ),
+            //     icon: AutomationFilledMajor,
+            //     onClick: () => {
+            //         handleSelect("dashboard_prompt_hardening");
+            //         navigate("/dashboard/prompt-hardening");
+            //         setActive("normal");
+            //     },
+            //     selected: leftNavSelected === "dashboard_prompt_hardening",
+            //     key: "prompt_hardening",
+            // }] : []),
             {
                 url: "#",
                 label: (

@@ -36,7 +36,7 @@
     "is-cidr": "^5.0.3",
     "is-ip": "^5.0.1",
     "leven": "^4.0.0",
-    "lodash": "^4.17.21",
+    "lodash": "^4.18.1",
     "mdast-util-gfm": "^3.1.0",
     "mdast-util-to-markdown": "^2.1.2",
     "micromark-extension-gfm": "^3.0.0",
@@ -64,7 +64,9 @@
     "rmdist": "rimraf web/dist",
     "dev": "npm run rmdist && cross-env NODE_ENV=development webpack serve --config web/webpack.config.dev.js",
     "build": "cross-env NODE_ENV=production VERSION=$RELEASE_VERSION webpack --progress --config web/webpack.config.js",
-    "hot": "cross-env NODE_ENV=development VERSION=$RELEASE_VERSION webpack --watch --progress --config web/webpack.config.js"
+    "hot": "cross-env NODE_ENV=development VERSION=$RELEASE_VERSION webpack --watch --progress --config web/webpack.config.js",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "eslintConfig": {
     "extends": [
@@ -92,6 +94,7 @@
     "@babel/preset-env": "^7.22.5",
     "@babel/preset-react": "^7.22.5",
     "@babel/preset-typescript": "^7.26.0",
+    "@playwright/test": "^1.62.1",
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.15",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",

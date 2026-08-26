@@ -107,16 +107,19 @@ jobs:
           fi
           HEAD=${{ github.sha }}
 
-          DAO_CHANGED=$(git diff --name-only --diff-filter=AM "$BASE"..."$HEAD" \
-            | grep -E "^libs/dao/src/main/java/com/akto/(dao/.*|DaoInit\.java)$" || true)
-          if [ -z "$DAO_CHANGED" ]; then
+          # Only schema-affecting additions count, not any edit to a DAO file.
+          SCHEMA_TOUCHED=$(git diff -U0 "$BASE"..."$HEAD" \
+              -- 'libs/dao/src/main/java/com/akto/dao/*.java' 'libs/dao/src/main/java/com/akto/DaoInit.java' \
+            | grep -E '^\+' \
+            | grep -E 'createIndex|createIndicesIfAbsent|createUniqueIndex|createCollection|dropIndex|dropCollection|renameCollection|convertToCappedCollection|compactCollection' || true)
+          if [ -z "$SCHEMA_TOUCHED" ]; then
             exit 0
           fi
 
           MIGRATION_ADDED=$(git diff --name-only --diff-filter=A "$BASE"..."$HEAD" \
             | grep -E "^libs/utils/src/main/resources/db/changelog/(common|billing|account)/.*\.xml$" || true)
           if [ -z "$MIGRATION_ADDED" ]; then
-            echo "DAO changed since last release ($BASE) but no migration file added under db/changelog/common|billing|account/."
+            echo "This change adds/changes an index or collection since last release ($BASE) but no migration file was added under db/changelog/common|billing|account/. See libs/utils/src/main/resources/db/changelog/README.md."
             exit 1
           fi
 

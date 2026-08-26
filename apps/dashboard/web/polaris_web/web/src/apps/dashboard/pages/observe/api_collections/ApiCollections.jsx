@@ -7,7 +7,7 @@ import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
 import { CollectionIcon } from "../../../components/shared/CollectionIcon"
-import React, { useEffect,useState, useRef } from "react"
+import React, { useEffect, useState, useRef, useMemo } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import { CircleTickMajor } from '@shopify/polaris-icons';
@@ -37,7 +37,7 @@ import ReactFlow, {
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
 import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../../main/labelHelper";
 import useAgenticFilter, { FILTER_TYPES } from "./useAgenticFilter";
-import { AGENTIC_OBSERVE_BACK_PATHS, INVENTORY_FILTER_KEY, fetchAndCacheSkillApiData } from "../agentic/constants";
+import { AGENTIC_OBSERVE_BACK_PATHS, INVENTORY_FILTER_KEY, fetchAndCacheSkillApiData, fetchAndCacheAgenticTrafficRiskBundle, fetchAndCacheAgenticSensitiveInfo } from "../agentic/constants";
 import AgentEndpointTreeTable from "./AgentEndpointTreeTable";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "./endpointShieldHelper";
 import { sendQuery } from "../../agentic/services/agenticService";
@@ -332,6 +332,8 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
             detectedTimestamp: trafficInfoMap[c.id] || 0,
             riskScore: c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] || 0),
+            baseRiskScore: c.baseRiskScore,
+            baseRiskScoreReason: c.baseRiskScoreReason,
             discovered: func.prettifyEpoch(c.startTs || 0),
             descriptionComp: c.description ? (
                 <Tooltip content={c.description} dismissOnMouseOut>
@@ -457,6 +459,8 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         sensitiveInRespCount: sensitiveTypes.length,
         detectedTimestamp: trafficInfoMap[rawCollection.id] || 0,
         riskScore,
+        baseRiskScore: rawCollection.baseRiskScore,
+        baseRiskScoreReason: rawCollection.baseRiskScoreReason,
         detected,
         discovered,
         coverage: calcCoverage,
@@ -521,7 +525,34 @@ function ApiCollections(props) {
     const userRole = window.USER_ROLE
 
     const navigate = useNavigate();
-    
+
+    // /inventory is deprecated for Atlas (its left-nav always targets /agentic-assets directly, so
+    // reaching /inventory here means a stale link/back-button); redirect unless embedded (e.g.
+    // McpSecurityPage's tab). Argus has NO equivalent grouped page — its own left-nav intentionally
+    // sends it to /inventory, and this component's isArgus-conditional rendering below is its real
+    // view, so it must not be redirected away from itself.
+    //
+    // Exception within Atlas itself: UsersAndDevices.jsx's row click stores a device/agent filter
+    // under INVENTORY_FILTER_KEY *before* navigating here, so this page can render that device's
+    // endpoint tree (AgentEndpointTreeTable, see useTreeView below). Redirecting unconditionally
+    // skipped that tree entirely and sent the user straight to the grouped assets page instead,
+    // discarding the filter/context — so redirect only when there's no such filter, i.e. a stale
+    // link/bookmark/back-button, not a drill-down.
+    const inventoryPageFilters = PersistStore(state => state.filtersMap)?.[INVENTORY_FILTER_KEY];
+    // The specific device/agent hostName list from that filter, when present — lets fetchData's
+    // mount effect below take a scoped path (fetchCollectionsBasicForHostNames, a real DB $in
+    // query) instead of api.getAllCollectionsBasic()'s whole-account fetch, which doesn't scale to
+    // accounts with thousands of devices/collections just to filter down to one device's handful
+    // client-side afterward (useAgenticFilter's hostName branch). Only hostName-type filters have
+    // this scoped alternative; envType/tag-based filters still need the full account fetch to
+    // match tag values, so they keep going through fetchData unchanged.
+    const deviceHostNamesFilter = inventoryPageFilters?.filters?.find(f => f.key === 'hostName' && !f.value?.negated)?.value?.values;
+    useEffect(() => {
+        if (!onlyShowCollectionsTable && isEndpointSecurityCategory() && !inventoryPageFilters) {
+            navigate("/dashboard/observe/agentic-assets", { replace: true });
+        }
+    }, [navigate, inventoryPageFilters]);
+
     const getAgenticObserveBackUrl = () => {
         if (!isEndpointSecurityCategory()) return undefined;
         try {
@@ -738,6 +769,7 @@ function ApiCollections(props) {
 
                         // Store in PersistStore asynchronously AFTER the UI has rendered
                         setTimeout(() => {
+                            if (!isMountedRef.current) return;
                             setCollectionsMap(collectionsMapNew);
                             setHostNameMap(hostNameMapNew);
                             setTagCollectionsMap(tagCollectionsMapNew);
@@ -883,7 +915,7 @@ function ApiCollections(props) {
 
         // Process data - OPTIMIZATION: For large datasets (>COLLECTIONS_LAZY_RENDER_THRESHOLD items), store RAW data + transform function
         // Transformation happens on-demand in the table for each page (100 items at a time)
-        const shouldOptimize = finalArr.length > COLLECTIONS_LAZY_RENDER_THRESHOLD && func.isApiCollectionsCachingEnabled();
+        const shouldOptimize = finalArr.length > COLLECTIONS_LAZY_RENDER_THRESHOLD;
 
         let dataObj;
         if (shouldOptimize) {
@@ -983,7 +1015,10 @@ function ApiCollections(props) {
                 .filter(([_, count]) => count > 0)
                 .map(([collectionId, untrackedCount]) => {
                     const collection = collectionMap.get(parseInt(collectionId));
-                    return collection ? {
+                    if (!collection) return null;
+
+                    const apisForCollection = untrackedApiDataMap[collectionId];
+                    const row = {
                         id: collection.id,
                         name: `untracked-${collection.id}`,
                         displayName: collection.displayName,
@@ -992,16 +1027,39 @@ function ApiCollections(props) {
                         rowStatus: 'critical',
                         nextUrl: null,
                         deactivated: false,
-                        collapsibleRow: untrackedApiDataMap[collectionId] ?
-                            transform.getUntrackedApisCollapsibleRow(untrackedApiDataMap[collectionId]) : null,
-                        collapsibleRowText: untrackedApiDataMap[collectionId] ? untrackedApiDataMap[collectionId].map(x => x.url).join(", ") : null,
                         severityInfo: {},
                         sensitiveInRespTypes: [],
                         detectedTimestamp: 0,
                         startTs: collection.startTs || 0,
                         testedEndpoints: 0,
                         riskScore: 0,
-                    } : null;
+                    };
+                    let builtCollapsibleRow;
+                    let builtCollapsibleRowText;
+                    Object.defineProperty(row, 'collapsibleRow', {
+                        enumerable: true,
+                        get() {
+                            if (builtCollapsibleRow === undefined) {
+                                builtCollapsibleRow = apisForCollection
+                                    ? transform.getUntrackedApisCollapsibleRow(apisForCollection)
+                                    : null;
+                            }
+                            return builtCollapsibleRow;
+                        },
+                    });
+                    Object.defineProperty(row, 'collapsibleRowText', {
+                        enumerable: true,
+                        get() {
+                            if (builtCollapsibleRowText === undefined) {
+                                builtCollapsibleRowText = apisForCollection
+                                    ? apisForCollection.map(x => x.url).join(", ")
+                                    : null;
+                            }
+                            return builtCollapsibleRowText;
+                        },
+                    });
+
+                    return row;
                 })
                 .filter(Boolean);
 
@@ -1047,25 +1105,26 @@ function ApiCollections(props) {
                 // Update the store with new sensitive info
                 setLastFetchedSensitiveResp(newSensitiveInfo);
 
-                // Check if sensitive info actually changed to avoid unnecessary updates
-                const sensitiveInfoChanged = JSON.stringify(sensitiveInfoMap) !== JSON.stringify(newSensitiveInfo.sensitiveInfoMap);
+                
+                const sensitiveInfoChanged = !func.sensitiveInfoMapsLookEqual(sensitiveInfoMap, newSensitiveInfo.sensitiveInfoMap);
 
                 if (sensitiveInfoChanged) {
-                    // Only update sensitive fields in existing data instead of recreating everything
-                    const updatedNormalData = dataObj.normal.map(item => ({
-                        ...item,
-                        sensitiveInRespTypes: newSensitiveInfo.sensitiveInfoMap[item.id] || []
-                    }));
+                    const withUpdatedSensitiveInfo = (item) => {
+                        const tags = newSensitiveInfo.sensitiveInfoMap[item.id] || [];
+                        return {
+                            ...item,
+                            sensitiveInRespTypes: tags,
+                            sensitiveSubTypesVal: tags.join(' ') || '-',
+                        };
+                    };
 
+                    const updatedNormalData = dataObj.normal.map(withUpdatedSensitiveInfo);
                     setNormalData(updatedNormalData);
 
-                    // Update prettified data with new sensitive info
-                    const updatedPrettifyData = dataObj.prettify.map(item => ({
-                        ...item,
-                        sensitiveInRespTypes: newSensitiveInfo.sensitiveInfoMap[item.id] || [],
-                        sensitiveSubTypes: transform.prettifySubtypes(newSensitiveInfo.sensitiveInfoMap[item.id] || [], item.deactivated),
-                        sensitiveSubTypesVal: (newSensitiveInfo.sensitiveInfoMap[item.id] || []).join(' ')
-                    }));
+                  
+                    const updatedPrettifyData = dataObj.prettify === dataObj.normal
+                        ? updatedNormalData
+                        : dataObj.prettify.map(withUpdatedSensitiveInfo);
 
                     // Re-categorize with updated data
                     const { categorized: updatedCategorized } = categorizeCollections(updatedPrettifyData);
@@ -1098,9 +1157,10 @@ function ApiCollections(props) {
 
         if (res.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
             setTimeout(() => {
+                if (!isMountedRef.current) return;
                 setSelectedTab("custom");
                 setSelected(3);
-            }, [100]);
+            }, 100);
         }
         setCollectionsMap(func.mapCollectionIdToName(activeCollections))
         setHostNameMap(func.mapCollectionIdToHostName(activeCollections))
@@ -1108,6 +1168,41 @@ function ApiCollections(props) {
         setCollectionsRegistryStatusMap(func.mapCollectionIdToRegistryStatus(activeCollections))
         } catch (error) {
             setLoading(false);
+        }
+    }
+
+    async function fetchTargetedDeviceCollections(deviceHostNames, isMountedRef) {
+        try {
+            setLoading(true);
+            const [collectionsResp, trafficRiskBundle, sensitiveMap, endpointUsernameMap] = await Promise.all([
+                api.fetchCollectionsBasicForHostNames(deviceHostNames),
+                fetchAndCacheAgenticTrafficRiskBundle({ api, PersistStore }),
+                fetchAndCacheAgenticSensitiveInfo({ api, PersistStore }),
+                fetchEndpointShieldUsernameMap(),
+            ]);
+            if (!isMountedRef.current) return;
+
+            const cacheMaps = {
+                trafficInfoMap: trafficRiskBundle?.trafficMap || {},
+                coverageMap: {},
+                riskScoreMap: trafficRiskBundle?.riskScoreMap || {},
+                severityInfoMap: {},
+                sensitiveInfoMap: sensitiveMap || {},
+                usernameMap: endpointUsernameMap || {},
+            };
+
+            const lightweightData = (collectionsResp?.apiCollections || []).map(c => transformRawCollectionData(c, cacheMaps));
+            const { categorized, envTypeObj } = categorizeCollections(lightweightData);
+
+            setData(categorized);
+            setNormalData(lightweightData);
+            setEnvTypeMap(envTypeObj);
+            setUsernameMap(endpointUsernameMap || {});
+            setSummaryData({ totalEndpoints: 0, totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0, totalAllowedForTesting: 0 });
+            setHasUsageEndpoints(true);
+            setLoading(false);
+        } catch (error) {
+            if (isMountedRef.current) setLoading(false);
         }
     }
 
@@ -1126,7 +1221,7 @@ function ApiCollections(props) {
     }
 
     // Use custom hook for Agentic filter detection and summary calculation
-    const { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections, activeFilterPlainTitle } = useAgenticFilter(normalData);
+    const { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections, activeFilterPlainTitle, activeFilterDescription } = useAgenticFilter(normalData);
 
     // Persist tag filters whenever they change (same pattern as existing filters)
     useEffect(() => {
@@ -1151,7 +1246,12 @@ function ApiCollections(props) {
 
     useEffect(() => {
         if (!activeFilterType) return;
-        const collectionIds = normalData.map(c => c.id).filter(Boolean);
+        // Only collections that actually have skills need this lookup; querying every visible
+        // collection fires one request per collection for no benefit on the rest.
+        const collectionIds = normalData
+            .filter(c => Array.isArray(c.skills) && c.skills.length > 0)
+            .map(c => c.id)
+            .filter(Boolean);
         if (!collectionIds.length) return;
         const alreadyCached = !!PersistStore.getState().skillRiskScoreCache?.ts;
         fetchAndCacheSkillApiData(collectionIds, { api, PersistStore })
@@ -1162,7 +1262,11 @@ function ApiCollections(props) {
     useEffect(() => {
         const isMountedRef = { current: true };
 
-        fetchData(isMountedRef, false); // Use cache on mount
+        if (isEndpointSecurityCategory() && deviceHostNamesFilter?.length > 0) {
+            fetchTargetedDeviceCollections(deviceHostNamesFilter, isMountedRef);
+        } else {
+            fetchData(isMountedRef, false); // Use cache on mount
+        }
         resetFunc();
 
         // Cleanup function to prevent state updates after unmount
@@ -1268,6 +1372,12 @@ function ApiCollections(props) {
     }
 
 
+
+    const normalDataById = useMemo(() => {
+        const map = new Map();
+        normalData.forEach(c => map.set(c.id, c));
+        return map;
+    }, [normalData]);
 
     const promotedBulkActions = (selectedResourcesArr) => {
         let selectedResources;
@@ -1462,12 +1572,12 @@ function ApiCollections(props) {
         }
 
         const allOutOfTestScopeFalse = selectedResources.every(id => {
-            const collection = normalData.find(c => c.id === id);
+            const collection = normalDataById.get(id);
             return collection && !collection.isOutOfTestingScope;
         })
 
         const allOutOfTestScopeTrue = selectedResources.every(id => {
-            const collection = normalData.find(c => c.id === id);
+            const collection = normalDataById.get(id);
             return collection && collection.isOutOfTestingScope;
         })
 
@@ -1490,8 +1600,8 @@ function ApiCollections(props) {
             )
         }
 
-        // Add Run Test button for multi-collection testing
-        if (selectedResources.length > 1) {
+        // Add Run Test button for multi-collection testing (hidden for Atlas / Endpoint Security)
+        if (selectedResources.length > 1 && !isEndpointSecurityCategory()) {
             actions.push({
                 content: <Button id="bulk-run-test-button" primary>Run test</Button>,
                 onAction: () => {
@@ -1638,8 +1748,9 @@ function ApiCollections(props) {
               ]
             : []),
     
-        // For agentic filter: show Unique Endpoints and Unique Sources (except for AI Agent/Skill which uses tree view)
+        // For agentic filter: show Unique Endpoints and Unique Sources (except for AI Agent/Skill/Plugin which use tree view)
         ...(activeFilterTitle && activeFilterType !== FILTER_TYPES.AI_AGENT && activeFilterType !== FILTER_TYPES.SKILL
+            && activeFilterType !== FILTER_TYPES.PLUGIN
             ? [
                   {
                       title: "Unique Endpoints",
@@ -1819,11 +1930,6 @@ function ApiCollections(props) {
         return data.filter((x) => (!x?.deactivated && x?.type !== "API_GROUP" && x?.urlsCount > 1));
     }
 
-    // Use titleWithTooltip for Groups tab (selected === 2)
-    // Also conditionally modify headers based on activeFilterType:
-    // - For browser-llm: hide "Total endpoints" column, rename "API collection name" to "LLM source"
-    // - For ai-agent: rename "API collection name" to "Agentic resource name"
-    // - For mcp-server: rename "Total endpoints" to "Total tools", rename "API collection name" to "MCP Server source"
     const getModifiedHeaders = () => {
         let modifiedHeaders = selected === 2 
             ? headers.map(h => h.titleWithTooltip ? {...h, title: h.titleWithTooltip} : h) 
@@ -1858,7 +1964,8 @@ function ApiCollections(props) {
             });
             // Move source column after Endpoint ID
             modifiedHeaders = moveSourceColumnAfterEndpointId(modifiedHeaders);
-        } else if (activeFilterType === FILTER_TYPES.AI_AGENT || activeFilterType === FILTER_TYPES.SKILL) {
+        } else if (activeFilterType === FILTER_TYPES.AI_AGENT || activeFilterType === FILTER_TYPES.SKILL
+                || activeFilterType === FILTER_TYPES.PLUGIN) {
             modifiedHeaders = modifiedHeaders.filter(h => h.value !== 'urlsCount');
             modifiedHeaders = modifiedHeaders.map(h => {
                 if (h.value === 'displayNameComp') {
@@ -1897,7 +2004,8 @@ function ApiCollections(props) {
         if (activeFilterType === FILTER_TYPES.BROWSER_LLM) {
             // Remove endpoints sorting for LLM
             modifiedSortOptions = modifiedSortOptions.filter(opt => opt.sortKey !== 'urlsCount');
-        } else if (activeFilterType === FILTER_TYPES.AI_AGENT || activeFilterType === FILTER_TYPES.SKILL) {
+        } else if (activeFilterType === FILTER_TYPES.AI_AGENT || activeFilterType === FILTER_TYPES.SKILL
+                || activeFilterType === FILTER_TYPES.PLUGIN) {
             modifiedSortOptions = modifiedSortOptions.filter(opt => opt.sortKey !== 'urlsCount');
         } else if (activeFilterType === FILTER_TYPES.MCP_SERVER) {
             // Change "Endpoints" to "Tools" for MCP Servers
@@ -1943,30 +2051,30 @@ function ApiCollections(props) {
     };
     const dynamicSortOptions = getModifiedSortOptions();
 
-    // Extract available tag keys from collections in envTypeMap
-    const availableTagKeys = new Set();
-    const tagKeyValues = {}; // Store unique values for each tag key
+    const { sortedTagKeys, tagKeyValues } = useMemo(() => {
+        const availableTagKeys = new Set();
+        const values = {}; // Store unique values for each tag key
 
-    Object.values(envTypeMap || {}).forEach((envTypeArray) => {
-        if (Array.isArray(envTypeArray)) {
-            envTypeArray.forEach(tagObj => {
-                if (tagObj?.keyName && tagObj.keyName !== 'envType') {
-                    availableTagKeys.add(tagObj.keyName);
+        Object.values(envTypeMap || {}).forEach((envTypeArray) => {
+            if (Array.isArray(envTypeArray)) {
+                envTypeArray.forEach(tagObj => {
+                    if (tagObj?.keyName && tagObj.keyName !== 'envType') {
+                        availableTagKeys.add(tagObj.keyName);
 
-                    // Collect unique values for each tag key
-                    if (!tagKeyValues[tagObj.keyName]) {
-                        tagKeyValues[tagObj.keyName] = new Set();
+                        // Collect unique values for each tag key
+                        if (!values[tagObj.keyName]) {
+                            values[tagObj.keyName] = new Set();
+                        }
+                        if (tagObj.value) {
+                            values[tagObj.keyName].add(tagObj.value);
+                        }
                     }
-                    if (tagObj.value) {
-                        tagKeyValues[tagObj.keyName].add(tagObj.value);
-                    }
-                }
-            });
-        }
-    });
+                });
+            }
+        });
 
-    // Sort tag keys alphabetically
-    const sortedTagKeys = Array.from(availableTagKeys).sort();
+        return { sortedTagKeys: Array.from(availableTagKeys).sort(), tagKeyValues: values };
+    }, [envTypeMap]);
 
     // Create tag filter definitions for the Filters component
     const tagFilterDefinitions = sortedTagKeys.map(tagKeyName => ({
@@ -2027,8 +2135,28 @@ function ApiCollections(props) {
                         activeFilterType === FILTER_TYPES.AI_AGENT || 
                         activeFilterType === FILTER_TYPES.MCP_SERVER || 
                         activeFilterType === FILTER_TYPES.BROWSER_LLM ||
-                        activeFilterType === FILTER_TYPES.SKILL);
+                        activeFilterType === FILTER_TYPES.SKILL ||
+                        activeFilterType === FILTER_TYPES.PLUGIN);
     
+    const filteredDataByTags = useMemo(() => {
+        if (centerView !== CenterViewType.Table) return [];
+        return (data[selectedTab] || []).filter(item => {
+            // Check if item matches ALL applied tag filters
+            return Object.entries(tagFiltersApplied).every(([tagKey, selectedValues]) => {
+                // If no values selected for this filter, show all items
+                if (!selectedValues || selectedValues.length === 0) {
+                    return true;
+                }
+
+                // Check if item's tags contain any of the selected values for this tag key
+                const itemTags = envTypeMap[item.id] || [];
+                return itemTags.some(tag =>
+                    tag.keyName === tagKey && selectedValues.includes(tag.value)
+                );
+            });
+        });
+    }, [centerView, data, selectedTab, tagFiltersApplied, envTypeMap]);
+
     // For agentic filters, use the tree view component grouped by endpoint ID
     const getTableComponent = () => {
         // Tree view for AI Agent, MCP Server, and LLM (grouped by endpoint ID with expandable resources)
@@ -2073,23 +2201,6 @@ function ApiCollections(props) {
             );
         }
         
-        // Filter data based on applied tag filters
-        const filteredDataByTags = (data[selectedTab] || []).filter(item => {
-            // Check if item matches ALL applied tag filters
-            return Object.entries(tagFiltersApplied).every(([tagKey, selectedValues]) => {
-                // If no values selected for this filter, show all items
-                if (!selectedValues || selectedValues.length === 0) {
-                    return true;
-                }
-
-                // Check if item's tags contain any of the selected values for this tag key
-                const itemTags = envTypeMap[item.id] || [];
-                return itemTags.some(tag =>
-                    tag.keyName === tagKey && selectedValues.includes(tag.value)
-                );
-            });
-        });
-
             // Custom filter UI using Polaris Filters component
         const customFilterUI = sortedTagKeys.length > 0 && (
             <div>
@@ -2166,6 +2277,8 @@ function ApiCollections(props) {
                 return `MCP Server - ${activeFilterTitle}`;
             case FILTER_TYPES.SKILL:
                 return `Skill - ${activeFilterTitle}`;
+            case FILTER_TYPES.PLUGIN:
+                return `Plugin - ${activeFilterTitle}`;
             default:
                 return `${activeFilterTitle}`;
         }
@@ -2176,13 +2289,16 @@ function ApiCollections(props) {
         <>
             <PageWithMultipleCards
                 title={
-                    <TitleWithInfo
-                        tooltipContent={activeFilterTitle
-                            ? `Viewing collections filtered by ${activeFilterTitle}`
-                            : "Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
-                        titleText={pageTitle}
-                        docsUrl={"https://docs.akto.io/api-inventory/concepts"}
-                    />
+                    <VerticalStack gap="1">
+                        <TitleWithInfo
+                            tooltipContent={activeFilterTitle
+                                ? `Viewing collections filtered by ${activeFilterTitle}`
+                                : "Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
+                            titleText={pageTitle}
+                            docsUrl={"https://docs.akto.io/api-inventory/concepts"}
+                        />
+                        {activeFilterDescription && <Text variant="bodySm">{activeFilterDescription}</Text>}
+                    </VerticalStack>
                 }
                 primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
                 isFirstPage={!agenticObserveBackUrl}

@@ -10,6 +10,7 @@ import (
 
 	"time"
 
+	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	"github.com/akto-api-security/akto-endpoint-shield/mcp/depstats"
 	"github.com/akto-api-security/akto-endpoint-shield/mcp/guardcache"
 	"github.com/akto-api-security/akto-endpoint-shield/utils"
@@ -61,6 +62,19 @@ func main() {
 	}
 	if cfg.DatabaseAbstractorToken != "" {
 		os.Setenv("AKTO_API_TOKEN", cfg.DatabaseAbstractorToken)
+	}
+
+	if cfg.ThreatKafka.Enabled {
+		producer, err := kafka.NewThreatProducer(cfg, logger)
+		if err != nil {
+			logger.Fatal("Failed to create threat event producer", zap.Error(err))
+		}
+		defer producer.Close()
+
+		mcp.SetThreatSink(producer.Sink())
+		logger.Info("Threat events will be buffered on Kafka",
+			zap.String("topic", cfg.ThreatKafka.Topic),
+			zap.String("broker", cfg.ThreatKafka.BrokerURL))
 	}
 
 	validatorService, err := validator.NewService(cfg, logger)
@@ -244,6 +258,7 @@ func setupRouter(validationHandler *handlers.ValidationHandler, authMiddleware g
 		api.POST("/ingestData", validationHandler.IngestData)
 		api.POST("/validate/request", validationHandler.ValidateRequest)
 		api.POST("/validate/requestWithPolicy", validationHandler.ValidateRequestWithPolicy)
+		api.POST("/validate/replayWithPolicy", validationHandler.ReplayWithPolicy)
 		api.POST("/validate/response", validationHandler.ValidateResponse)
 		api.POST("/validate/file", validationHandler.ValidateFile)
 	}

@@ -52,6 +52,7 @@ public class ElasticSearchClient extends SearchClient {
     private static final String AGG_TOTAL_INPUT_TOKENS  = "totalInputTokens";
     private static final String AGG_TOTAL_OUTPUT_TOKENS = "totalOutputTokens";
     private static final String AGG_TOP_USERS           = "topUsersByTokens";
+    private static final String AGG_TOP_MODELS          = "topModelsBySessions";
     private static final String AGG_USER_BREAKDOWN      = "userBreakdown";
     private static final String AGG_TOTAL_SPANS         = "totalSpans";
     private static final String AGG_TOP_APPS            = "topApps";
@@ -59,6 +60,11 @@ public class ElasticSearchClient extends SearchClient {
     private static final String AGG_TRACE_SPARK         = "traceSpark";
     private static final String AGG_SESSION_SPARK       = "sessionSpark";
     private static final int    USER_BREAKDOWN_SIZE      = 3;
+    // "model" lives inside the responsePayload JSON, not as an indexed field, so it cannot be a
+    // terms agg. We sample the most recent sessions and tally their models application-side —
+    // same cap the sessions-summary path uses.
+    private static final int    MODEL_SESSION_SAMPLE     = 500;
+    private static final int    TOP_N_MODELS             = 5;
     // Nested agg: terms on topic.keyword → sub-agg terms on subTopic.keyword.
     // Preserves domain→subDomain link so the frontend can show the hierarchy correctly.
     private static final String AGG_TOPIC_HIERARCHY     = "topicHierarchyAgg";
@@ -127,6 +133,16 @@ public class ElasticSearchClient extends SearchClient {
                                 .put("must", new JSONArray()
                                     .put(new JSONObject().put("match_phrase", new JSONObject()
                                         .put(AgentQueryRecord.F_QUERY_PAYLOAD, "\"body\""))))
+                                .put("must_not", new JSONArray()
+                                    .put(new JSONObject().put("match_phrase", new JSONObject()
+                                        .put(AgentQueryRecord.F_QUERY_PAYLOAD, "toolName")))
+                                    .put(new JSONObject().put("match_phrase", new JSONObject()
+                                        .put(AgentQueryRecord.F_QUERY_PAYLOAD, "tools/call"))))))
+                            // Catch-all for other payload shapes (e.g. Copilot Studio): any non-tool-call turn with a traceId.
+                            .put(new JSONObject().put("bool", new JSONObject()
+                                .put("must", new JSONArray()
+                                    .put(new JSONObject().put("exists", new JSONObject()
+                                        .put("field", AgentQueryRecord.F_TRACE_ID))))
                                 .put("must_not", new JSONArray()
                                     .put(new JSONObject().put("match_phrase", new JSONObject()
                                         .put(AgentQueryRecord.F_QUERY_PAYLOAD, "toolName")))
@@ -250,13 +266,14 @@ public class ElasticSearchClient extends SearchClient {
                                                  Map<String, List<String>> filters, Boolean atlasTrafficFilter) {
         long aggTotalSessions = 0, aggInputTokens = 0, aggOutputTokens = 0;
         List<Map<String, Object>> aggTopUsers = new ArrayList<>();
+        List<Map<String, Object>> aggTopModels = new ArrayList<>();
         List<Map<String, Object>> aggUserBreakdown = new ArrayList<>();
         List<Long> aggSessionSpark = new ArrayList<>();
         List<Long> aggSessionSparkTs = new ArrayList<>();
         List<Long> aggSessionTokenSpark = new ArrayList<>();
 
         if (!isConfigured()) {
-            return new SessionAggStats(0, 0, 0, aggTopUsers, aggUserBreakdown,
+            return new SessionAggStats(0, 0, 0, aggTopUsers, aggTopModels, aggUserBreakdown,
                 aggSessionSpark, aggSessionSparkTs, aggSessionTokenSpark);
         }
         try {
@@ -295,6 +312,7 @@ public class ElasticSearchClient extends SearchClient {
                 .put(AGG_TOP_USERS, new JSONObject()
                     .put("terms", new JSONObject().put("field", AgentQueryRecord.F_USER_NAME_KW).put("size", 10))
                     .put("aggs", tokenSubAggs()))
+                .put(AGG_TOP_MODELS, sessionModelSampleAgg())
                 .put(AGG_USER_BREAKDOWN, new JSONObject()
                     .put("terms", new JSONObject()
                         .put("field", AgentQueryRecord.F_USER_NAME_KW)
@@ -325,7 +343,7 @@ public class ElasticSearchClient extends SearchClient {
 
             JSONObject aggsResult = aggregate(filteredQuery, aggs);
             if (aggsResult == null) {
-                return new SessionAggStats(0, 0, 0, aggTopUsers, aggUserBreakdown,
+                return new SessionAggStats(0, 0, 0, aggTopUsers, aggTopModels, aggUserBreakdown,
                     aggSessionSpark, aggSessionSparkTs, aggSessionTokenSpark);
             }
 
@@ -339,6 +357,7 @@ public class ElasticSearchClient extends SearchClient {
                 row.put(KEY_TOTAL_TOKENS, in + out);
                 aggTopUsers.add(row);
             }
+            aggTopModels.addAll(parseTopModels(aggsResult));
             aggUserBreakdown.addAll(parseBreakdown(aggsResult, AGG_USER_BREAKDOWN, USER_BREAKDOWN_SIZE, AGG_TOTAL_SESSIONS));
 
             JSONObject sessionSparkAgg = aggsResult.optJSONObject(AGG_SESSION_SPARK);
@@ -365,7 +384,7 @@ public class ElasticSearchClient extends SearchClient {
             logger.error("fetchSessionAggStats error for accountId=" + accountId + ": " + e.getMessage());
         }
         return new SessionAggStats(aggTotalSessions, aggInputTokens, aggOutputTokens,
-            aggTopUsers, aggUserBreakdown, aggSessionSpark, aggSessionSparkTs, aggSessionTokenSpark);
+            aggTopUsers, aggTopModels, aggUserBreakdown, aggSessionSpark, aggSessionSparkTs, aggSessionTokenSpark);
     }
 
     // ── Argus aggregated stats (total spans + token sums + top apps/traces + sparklines) ──
@@ -479,18 +498,11 @@ public class ElasticSearchClient extends SearchClient {
                         row.put(AgentQueryRecord.F_TRACE_ID,      tid);
                         row.put(AgentQueryRecord.F_INPUT_TOKENS,  in);
                         row.put(AgentQueryRecord.F_OUTPUT_TOKENS, out);
-                        JSONObject firstHitAgg = b.optJSONObject(AGG_FIRST_HIT);
-                        if (firstHitAgg != null) {
-                            JSONArray topHits = firstHitAgg.optJSONObject("hits") != null
-                                ? firstHitAgg.getJSONObject("hits").optJSONArray("hits") : null;
-                            if (topHits != null && topHits.length() > 0) {
-                                JSONObject src = topHits.getJSONObject(0).optJSONObject("_source");
-                                if (src != null) {
-                                    row.put(AgentQueryRecord.F_QUERY_PAYLOAD,    src.optString(AgentQueryRecord.F_QUERY_PAYLOAD,    ""));
-                                    row.put(AgentQueryRecord.F_RESPONSE_PAYLOAD, src.optString(AgentQueryRecord.F_RESPONSE_PAYLOAD, ""));
-                                    row.put(AgentQueryRecord.F_SERVICE_ID,       src.optString(AgentQueryRecord.F_SERVICE_ID,       ""));
-                                }
-                            }
+                        JSONObject src = firstHitSource(b);
+                        if (src != null) {
+                            row.put(AgentQueryRecord.F_QUERY_PAYLOAD,    src.optString(AgentQueryRecord.F_QUERY_PAYLOAD,    ""));
+                            row.put(AgentQueryRecord.F_RESPONSE_PAYLOAD, src.optString(AgentQueryRecord.F_RESPONSE_PAYLOAD, ""));
+                            row.put(AgentQueryRecord.F_SERVICE_ID,       src.optString(AgentQueryRecord.F_SERVICE_ID,       ""));
                         }
                         aggTopTraces.add(row);
                     }
@@ -556,6 +568,53 @@ public class ElasticSearchClient extends SearchClient {
             return new ArrayList<>();
         }
         return spans;
+    }
+
+    // ── Real-invocation check for known-malicious tool/skill names ─────────────
+
+    @Override
+    public List<Map<String, Object>> searchMaliciousComponentInvocations(
+            int accountId, List<String> maliciousTermNames, long startMs, long endMs, int limitPerTerm) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        if (!isConfigured() || maliciousTermNames == null || maliciousTermNames.isEmpty()) return results;
+
+        for (String term : maliciousTermNames) {
+            if (term == null || term.trim().isEmpty()) continue;
+            try {
+                JSONObject query = buildQuery(accountId, startMs, endMs, null, null, null);
+                JSONArray should = new JSONArray()
+                    .put(new JSONObject().put("match_phrase", new JSONObject().put(AgentQueryRecord.F_QUERY_PAYLOAD, term)))
+                    .put(new JSONObject().put("match_phrase", new JSONObject().put(AgentQueryRecord.F_RESPONSE_PAYLOAD, term)));
+                query.getJSONObject("bool").getJSONArray("must")
+                    .put(new JSONObject().put("bool", new JSONObject().put("should", should).put("minimum_should_match", 1)));
+
+                JSONObject body = new JSONObject()
+                    .put("query", query)
+                    .put("size", limitPerTerm)
+                    .put("sort", new JSONArray().put(new JSONObject().put(AgentQueryRecord.F_TIMESTAMP, new JSONObject().put("order", "desc"))))
+                    .put("_source", new JSONArray().put(AgentQueryRecord.F_TRACE_ID).put(AgentQueryRecord.F_TIMESTAMP));
+
+                JSONObject response = httpPost(trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_search", body.toString());
+                if (response == null) continue;
+
+                JSONArray hits = extractHits(response);
+                if (hits == null) continue;
+                for (int i = 0; i < hits.length(); i++) {
+                    JSONObject hit = hits.optJSONObject(i);
+                    if (hit == null) continue;
+                    JSONObject source = hit.optJSONObject("_source");
+                    if (source == null) continue;
+                    Map<String, Object> row = new HashMap<>();
+                    row.put(KEY_TERM, term);
+                    row.put(KEY_TRACE_ID, source.optString(AgentQueryRecord.F_TRACE_ID, ""));
+                    row.put(KEY_TIMESTAMP, source.optLong(AgentQueryRecord.F_TIMESTAMP, 0L));
+                    results.add(row);
+                }
+            } catch (Exception e) {
+                logger.error("searchMaliciousComponentInvocations error for accountId=" + accountId + ", term=" + term + ": " + e.getMessage());
+            }
+        }
+        return results;
     }
 
     // ── Filter choices (distinct values for column filters) ───────────────────
@@ -813,6 +872,87 @@ public class ElasticSearchClient extends SearchClient {
     }
 
     /**
+     * Terms agg over the most recent MODEL_SESSION_SAMPLE sessions, each carrying the earliest
+     * document that actually names a model. Only responsePayload is pulled back — the model is
+     * parsed out of it in {@link #parseTopModels}.
+     */
+    private static JSONObject sessionModelSampleAgg() throws JSONException {
+        return new JSONObject()
+            .put("terms", new JSONObject()
+                .put("field", AgentQueryRecord.F_SESSION_IDENTIFIER_KW)
+                .put("size", MODEL_SESSION_SAMPLE)
+                .put("order", new JSONObject().put(KEY_LATEST_TS, "desc")))
+            .put("aggs", new JSONObject()
+                .put(KEY_LATEST_TS, new JSONObject().put("max", new JSONObject().put("field", AgentQueryRecord.F_TIMESTAMP)))
+                .put(AGG_FIRST_HIT, new JSONObject()
+                    .put("filter", new JSONObject().put("match_phrase", new JSONObject()
+                        .put(AgentQueryRecord.F_RESPONSE_PAYLOAD, "model")))
+                    .put("aggs", new JSONObject().put("hit", new JSONObject().put("top_hits", new JSONObject()
+                        .put("size", 1)
+                        .put("sort", new JSONArray().put(new JSONObject().put(AgentQueryRecord.F_TIMESTAMP, new JSONObject().put("order", "asc"))))
+                        .put("_source", new JSONArray().put(AgentQueryRecord.F_RESPONSE_PAYLOAD)))))));
+    }
+
+    /**
+     * Tallies unique sessions per model from {@link #sessionModelSampleAgg()} and returns the
+     * top TOP_N_MODELS as {KEY_MODEL, KEY_COUNT} rows, highest first.
+     */
+    private static List<Map<String, Object>> parseTopModels(JSONObject aggsResult) throws JSONException {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (aggsResult == null) return out;
+        JSONObject agg = aggsResult.optJSONObject(AGG_TOP_MODELS);
+        if (agg == null) return out;
+        JSONArray buckets = agg.optJSONArray("buckets");
+        if (buckets == null) return out;
+
+        Map<String, Long> sessionsByModel = new HashMap<>();
+        for (int i = 0; i < buckets.length(); i++) {
+            JSONObject b = buckets.optJSONObject(i);
+            if (b == null) continue;
+            JSONObject src = firstHitSource(b);
+            if (src == null) continue;
+            String model = extractModel(src.optString(AgentQueryRecord.F_RESPONSE_PAYLOAD, ""));
+            if (model.isEmpty()) continue;
+            sessionsByModel.merge(model, 1L, Long::sum);
+        }
+
+        List<Map.Entry<String, Long>> ranked = new ArrayList<>(sessionsByModel.entrySet());
+        ranked.sort((a, b) -> Long.compare(b.getValue(), a.getValue()));
+        for (int i = 0; i < Math.min(TOP_N_MODELS, ranked.size()); i++) {
+            Map<String, Object> row = new HashMap<>();
+            row.put(KEY_MODEL, ranked.get(i).getKey());
+            row.put(KEY_COUNT, ranked.get(i).getValue());
+            out.add(row);
+        }
+        return out;
+    }
+
+    /** Reads the model name out of a responsePayload JSON string; "" when absent/unparseable. */
+    private static String extractModel(String responsePayload) {
+        if (responsePayload == null || responsePayload.isEmpty()) return "";
+        try {
+            return new JSONObject(responsePayload).optString("model", "");
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /**
+     * Resolves an AGG_FIRST_HIT sub-agg — either a bare top_hits or one wrapped in a filter agg
+     * under "hit" — down to the single top hit's _source. Null when the bucket has no hit.
+     */
+    private static JSONObject firstHitSource(JSONObject bucket) throws JSONException {
+        JSONObject firstHitAgg = bucket.optJSONObject(AGG_FIRST_HIT);
+        if (firstHitAgg == null) return null;
+        JSONObject hitsRoot = firstHitAgg.optJSONObject("hit");
+        if (hitsRoot == null) hitsRoot = firstHitAgg;
+        JSONObject hits = hitsRoot.optJSONObject("hits");
+        JSONArray topHits = hits != null ? hits.optJSONArray("hits") : null;
+        if (topHits == null || topHits.length() == 0) return null;
+        return topHits.getJSONObject(0).optJSONObject("_source");
+    }
+
+    /**
      * Iterates a named terms aggregation and returns one Map per bucket with:
      * keyField, F_INPUT_TOKENS, F_OUTPUT_TOKENS, KEY_COUNT (doc_count).
      * Buckets with an empty key are skipped.
@@ -898,24 +1038,15 @@ public class ElasticSearchClient extends SearchClient {
             row.put(KEY_TOTAL_TOKENS,                inTokens + outTokens);
             row.put(KEY_MSG_COUNT,                   subAggLong(bucket, KEY_MSG_COUNT));
 
-            JSONObject firstHitAgg = bucket.optJSONObject(AGG_FIRST_HIT);
-            if (firstHitAgg != null) {
-                JSONObject hitsRoot = firstHitAgg.optJSONObject("hit");
-                if (hitsRoot == null) hitsRoot = firstHitAgg;
-                JSONArray topHits = hitsRoot.optJSONObject("hits") != null
-                    ? hitsRoot.getJSONObject("hits").optJSONArray("hits") : null;
-                if (topHits != null && topHits.length() > 0) {
-                    JSONObject src = topHits.getJSONObject(0).optJSONObject("_source");
-                    if (src != null) {
-                        row.put(AgentQueryRecord.F_QUERY_PAYLOAD,       src.optString(AgentQueryRecord.F_QUERY_PAYLOAD,       ""));
-                        row.put(AgentQueryRecord.F_RESPONSE_PAYLOAD,    src.optString(AgentQueryRecord.F_RESPONSE_PAYLOAD,    ""));
-                        row.put(AgentQueryRecord.F_SERVICE_ID,          src.optString(AgentQueryRecord.F_SERVICE_ID,          ""));
-                        row.put(AgentQueryRecord.F_USER_NAME,           src.optString(AgentQueryRecord.F_USER_NAME,           ""));
-                        row.put(AgentQueryRecord.F_DEVICE_ID,           src.optString(AgentQueryRecord.F_DEVICE_ID,           ""));
-                        row.put(AgentQueryRecord.F_SESSION_IDENTIFIER,  src.optString(AgentQueryRecord.F_SESSION_IDENTIFIER,  ""));
-                        row.put(AgentQueryRecord.F_TRACE_ID,            src.optString(AgentQueryRecord.F_TRACE_ID,            ""));
-                    }
-                }
+            JSONObject src = firstHitSource(bucket);
+            if (src != null) {
+                row.put(AgentQueryRecord.F_QUERY_PAYLOAD,       src.optString(AgentQueryRecord.F_QUERY_PAYLOAD,       ""));
+                row.put(AgentQueryRecord.F_RESPONSE_PAYLOAD,    src.optString(AgentQueryRecord.F_RESPONSE_PAYLOAD,    ""));
+                row.put(AgentQueryRecord.F_SERVICE_ID,          src.optString(AgentQueryRecord.F_SERVICE_ID,          ""));
+                row.put(AgentQueryRecord.F_USER_NAME,           src.optString(AgentQueryRecord.F_USER_NAME,           ""));
+                row.put(AgentQueryRecord.F_DEVICE_ID,           src.optString(AgentQueryRecord.F_DEVICE_ID,           ""));
+                row.put(AgentQueryRecord.F_SESSION_IDENTIFIER,  src.optString(AgentQueryRecord.F_SESSION_IDENTIFIER,  ""));
+                row.put(AgentQueryRecord.F_TRACE_ID,            src.optString(AgentQueryRecord.F_TRACE_ID,            ""));
             }
 
             // Extract topic hierarchy: domain → [subDomain1, subDomain2, ...].

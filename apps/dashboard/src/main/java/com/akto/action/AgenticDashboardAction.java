@@ -220,6 +220,14 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             // Fetch all malicious events once within the time range
             List<DashboardMaliciousEvent> allThreats = fetchAllMaliciousEvents(startTimestamp, endTimestamp, demoCollections);
 
+            // Skill invocations fire their own /skills/<name> violation events distinct from the
+            // agent/device traffic that triggered them - exclude them here so every number on the
+            // Endpoint Security Dashboard (successful exploits, sensitive data events, guardrail
+            // score, compliance-at-risk) reflects only agent/device-attributable violations.
+            allThreats = allThreats.stream()
+                    .filter(e -> e.getUrl() == null || !e.getUrl().startsWith("/skills/"))
+                    .collect(Collectors.toList());
+
             // Fetch threat compliance data
             Map<String, ThreatComplianceInfo> threatComplianceMap =
                     com.akto.util.GuardrailMetricsProcessor.fetchThreatComplianceMap();

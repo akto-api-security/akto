@@ -3692,44 +3692,137 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    // Per-account "already attempted this JVM lifetime" guard for ensureTeamRoleAndGuardrailTagsMigrated
+    // — without it, an account whose migration keeps failing (or whose BackwardCompatibility doc is
+    // somehow never updated) would re-attempt on every single request that touches
+    // ModuleInfoAction.fetchAgenticUsers, instead of once per process lifetime like the startup path.
+    private static final Set<Integer> attemptedTeamTagsMigrationForAccount = Collections.synchronizedSet(new HashSet<>());
+
+    private static void safeMigrateTeamRoleToDeviceTags(BackwardCompatibility backwardCompatibility){
+        try {
+            if(backwardCompatibility.getMigrateTeamRoleToDeviceTags() == 0){
+                BackwardCompatibilityUtils.migrateTeamRoleToDeviceTags();
+                BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.MIGRATE_TEAM_ROLE_TO_DEVICE_TAGS, Context.now())
+                );
+            }
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "error in migrateTeamRoleToDeviceTags: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
+    private static void safeMigrateGuardrailTargetTeamsRolesToTags(BackwardCompatibility backwardCompatibility){
+        try {
+            if(backwardCompatibility.getMigrateGuardrailTargetTeamsRolesToTags() == 0){
+                BackwardCompatibilityUtils.migrateGuardrailTargetTeamsRolesToTags();
+                BackwardCompatibilityDao.instance.updateOne(
+                    Filters.eq("_id", backwardCompatibility.getId()),
+                    Updates.set(BackwardCompatibility.MIGRATE_GUARDRAIL_TARGET_TEAMS_ROLES_TO_TAGS, Context.now())
+                );
+            }
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "error in migrateGuardrailTargetTeamsRolesToTags: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
+    /**
+     * Lazy, self-healing fallback for the two migrations above — call from a frequently-hit request
+     * path (ModuleInfoAction.fetchAgenticUsers) so they still get a chance to run even if this
+     * account's dashboard process never took the one-time, runJobFunctions-gated startup pass (or
+     * that pass errored on some unrelated hook before reaching these two). Safe to call on every
+     * request: the in-memory guard above makes the real work happen at most once per process lifetime,
+     * and the underlying migrations are themselves idempotent (merge into existing tags, never
+     * overwrite) if somehow triggered twice.
+     */
+    public static void ensureTeamRoleAndGuardrailTagsMigrated(){
+        Integer accountId = Context.accountId.get();
+        if (accountId == null || !attemptedTeamTagsMigrationForAccount.add(accountId)) return;
+        try {
+            BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
+            if (backwardCompatibility == null) return;
+            safeMigrateTeamRoleToDeviceTags(backwardCompatibility);
+            safeMigrateGuardrailTargetTeamsRolesToTags(backwardCompatibility);
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "error in ensureTeamRoleAndGuardrailTagsMigrated: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
+        // Run first and individually guarded — setBackwardCompatibilities has no per-call isolation,
+        // so an unrelated hook throwing further down would otherwise silently prevent every hook
+        // after it (including these two) from ever running, with no migration-specific error.
+        safeMigrateTeamRoleToDeviceTags(backwardCompatibility);
+        safeMigrateGuardrailTargetTeamsRolesToTags(backwardCompatibility);
+
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
             setOrganizationsInBilling(backwardCompatibility);
         }
         setAktoDefaultNewUI(backwardCompatibility);
+        logger.debugAndAddToDb("setAktoDefaultNewUI completed for account: " + Context.accountId.get());
         updateCustomDataTypeOperator(backwardCompatibility);
+        logger.debugAndAddToDb("updateCustomDataTypeOperator completed for account: " + Context.accountId.get());
         markSummariesAsVulnerable(backwardCompatibility);
+        logger.debugAndAddToDb("markSummariesAsVulnerable completed for account: " + Context.accountId.get());
         moveUserDataFromModuleInfoToAgenticUsers(backwardCompatibility);
+        logger.debugAndAddToDb("moveUserDataFromModuleInfoToAgenticUsers completed for account: " + Context.accountId.get());
         cleanupApiInfoTags(backwardCompatibility);
         dropLastCronRunInfoField(backwardCompatibility);
+        logger.debugAndAddToDb("dropLastCronRunInfoField completed for account: " + Context.accountId.get());
         cleanupRbacEntriesForDeveloperRole(backwardCompatibility);
+        logger.debugAndAddToDb("cleanupRbacEntriesForDeveloperRole completed for account: " + Context.accountId.get());
         fetchIntegratedConnections(backwardCompatibility);
+        logger.debugAndAddToDb("fetchIntegratedConnections completed for account: " + Context.accountId.get());
         dropFilterSampleDataCollection(backwardCompatibility);
+        logger.debugAndAddToDb("dropFilterSampleDataCollection completed for account: " + Context.accountId.get());
         dropApiDependencies(backwardCompatibility);
+        logger.debugAndAddToDb("dropApiDependencies completed for account: " + Context.accountId.get());
         resetSingleTypeInfoCount(backwardCompatibility);
+        logger.debugAndAddToDb("resetSingleTypeInfoCount completed for account: " + Context.accountId.get());
         dropWorkflowTestResultCollection(backwardCompatibility);
+        logger.debugAndAddToDb("dropWorkflowTestResultCollection completed for account: " + Context.accountId.get());
         readyForNewTestingFramework(backwardCompatibility);
+        logger.debugAndAddToDb("readyForNewTestingFramework completed for account: " + Context.accountId.get());
         addAktoDataTypes(backwardCompatibility);
+        logger.debugAndAddToDb("addAktoDataTypes completed for account: " + Context.accountId.get());
         updateDeploymentStatus(backwardCompatibility);
+        logger.debugAndAddToDb("updateDeploymentStatus completed for account: " + Context.accountId.get());
         dropAuthMechanismData(backwardCompatibility);
+        logger.debugAndAddToDb("dropAuthMechanismData completed for account: " + Context.accountId.get());
         moveAuthMechanismDataToRole(backwardCompatibility);
+        logger.debugAndAddToDb("moveAuthMechanismDataToRole completed for account: " + Context.accountId.get());
         createLoginSignupGroups(backwardCompatibility);
+        logger.debugAndAddToDb("createLoginSignupGroups completed for account: " + Context.accountId.get());
         createRiskScoreGroups(backwardCompatibility);
+        logger.debugAndAddToDb("createRiskScoreGroups completed for account: " + Context.accountId.get());
         setApiCollectionAutomatedField(backwardCompatibility);
+        logger.debugAndAddToDb("setApiCollectionAutomatedField completed for account: " + Context.accountId.get());
         createAutomatedAPIGroups(backwardCompatibility);
+        logger.debugAndAddToDb("createAutomatedAPIGroups completed for account: " + Context.accountId.get());
         deleteOptionsAPIs(backwardCompatibility);
+        logger.debugAndAddToDb("deleteOptionsAPIs completed for account: " + Context.accountId.get());
         deleteAccessListFromApiToken(backwardCompatibility);
+        logger.debugAndAddToDb("deleteAccessListFromApiToken completed for account: " + Context.accountId.get());
         deleteNullSubCategoryIssues(backwardCompatibility);
+        logger.debugAndAddToDb("deleteNullSubCategoryIssues completed for account: " + Context.accountId.get());
         enableNewMerging(backwardCompatibility);
+        logger.debugAndAddToDb("enableNewMerging completed for account: " + Context.accountId.get());
         setDefaultTelemetrySettings(backwardCompatibility);
+        logger.debugAndAddToDb("setDefaultTelemetrySettings completed for account: " + Context.accountId.get());
         disableAwsSecretPiiType(backwardCompatibility);
+        logger.debugAndAddToDb("disableAwsSecretPiiType completed for account: " + Context.accountId.get());
         makeFirstUserAdmin(backwardCompatibility);
+        logger.debugAndAddToDb("makeFirstUserAdmin completed for account: " + Context.accountId.get());
         dropSpecialCharacterApiCollections(backwardCompatibility);
+        logger.debugAndAddToDb("dropSpecialCharacterApiCollections completed for account: " + Context.accountId.get());
         addDefaultAdvancedFilters(backwardCompatibility);
+        logger.debugAndAddToDb("addDefaultAdvancedFilters completed for account: " + Context.accountId.get());
         moveAzureSamlConfig(backwardCompatibility);
+        logger.debugAndAddToDb("moveAzureSamlConfig completed for account: " + Context.accountId.get());
         moveOktaOidcSSO(backwardCompatibility);
+        logger.debugAndAddToDb("moveOktaOidcSSO completed for account: " + Context.accountId.get());
     }
 
     public static void printMultipleHosts(int apiCollectionId) {

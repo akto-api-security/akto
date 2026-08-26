@@ -101,6 +101,7 @@ const agenticCategoryMapping = {
   "AGENTIC_SAFETY": ASI09,
   "ROGUE_AGENTS": ASI10,
 }
+const stringCollator = new Intl.Collator(undefined, { sensitivity: 'base' });
 
 const func = {
   categoryMapping: categoryMapping,
@@ -618,6 +619,31 @@ prettifyEpoch(epoch) {
     const allowedAccounts = [1736798101, 1718042191];
     return allowedAccounts.includes(window.ACTIVE_ACCOUNT);
   },
+  // Cheap heuristic equality check for two id -> string[] maps (e.g. sensitiveInfoMap), used to
+  // skip redundant re-renders. Avoids a full JSON.stringify of both maps, which on a large account
+  // (100k+ keys) is an O(N) string-allocation pass just to answer a boolean. A false "equal" only
+  // costs a skipped re-render, never stale data being shown as fresh, so sampling is an acceptable
+  // trade — this is not used for anything that needs exact equality.
+  sensitiveInfoMapsLookEqual: (a, b) => {
+    const aObj = a || {};
+    const bObj = b || {};
+    const aKeys = Object.keys(aObj);
+    const bKeys = Object.keys(bObj);
+    if (aKeys.length !== bKeys.length) return false;
+
+    const SAMPLE_SIZE = 200;
+    const step = aKeys.length <= SAMPLE_SIZE ? 1 : Math.ceil(aKeys.length / SAMPLE_SIZE);
+    for (let i = 0; i < aKeys.length; i += step) {
+      const key = aKeys[i];
+      const aVal = aObj[key] || [];
+      const bVal = bObj[key] || [];
+      if (aVal.length !== bVal.length) return false;
+      for (let j = 0; j < aVal.length; j++) {
+        if (aVal[j] !== bVal[j]) return false;
+      }
+    }
+    return true;
+  },
   convertKeysToLowercase: function (obj){
     return Object.keys(obj).reduce((acc, k) => {
       acc[k.toLowerCase()] = obj[k];
@@ -1020,8 +1046,13 @@ prettifyEpoch(epoch) {
   },
   
 sortFunc: (data, sortKey, sortOrder, treeView) => {
+  // Sort a copy, never the input in place: callers pass their own state array directly when no
+  // filter has narrowed it first (tempData === props.data in components/tables/transform.js), so
+  // Array.prototype.sort()'s in-place mutation was silently reordering that state (e.g. a table's
+  // normalData) as a side effect of computing what to render — sorting the table by a column would
+  // reorder the underlying collections list itself, for anything else that reads it.
   if(sortKey === 'displayName'){
-    let finalArr = data.sort((a, b) => {
+    let finalArr = [...data].sort((a, b) => {
         let nameA = ""
         if(a?.displayName?.length > 0){
           nameA = a?.displayName.toLowerCase() ;
@@ -1044,7 +1075,7 @@ sortFunc: (data, sortKey, sortOrder, treeView) => {
         if (!startsWithDigitA && startsWithDigitB) return -1;
     
         // If both names either start with a digit or both don't, compare them directly
-        return nameA.localeCompare(nameB);
+        return stringCollator.compare(nameA, nameB);
     });
     if(sortOrder > 0){
       finalArr.reverse()
@@ -1061,30 +1092,33 @@ sortFunc: (data, sortKey, sortOrder, treeView) => {
       }
     })
     arr1 = arr1.sort((a, b) => {
-      return (sortOrder) * (b['displayName'].localeCompare(a['displayName']))
+      return (sortOrder) * stringCollator.compare(b['displayName'], a['displayName'])
     })
     arr2 = arr2.sort((a, b) => {
-      return (sortOrder) * (b['displayName'].localeCompare(a['displayName']))
+      return (sortOrder) * stringCollator.compare(b['displayName'], a['displayName'])
     })
     return [...arr1, ...arr2]
   }
-  data.sort((a, b) => {
+  const sorted = [...data].sort((a, b) => {
     if(typeof a[sortKey] ==='number')
     return (sortOrder) * (a[sortKey] - b[sortKey]);
     if(typeof a[sortKey] ==='string')
-    return (sortOrder) * (b[sortKey].localeCompare(a[sortKey]));
+    return (sortOrder) * stringCollator.compare(b[sortKey], a[sortKey]);
   })
   if(treeView){
-    func.recursiveSort(data, sortKey, sortOrder)
+    func.recursiveSort(sorted, sortKey, sortOrder)
   }
-  return data
+  return sorted
 },
 recursiveSort(data, sortKey, sortOrder = 1) {
+  // `data` here is always a fresh array already owned by this call (a top-level copy from
+  // sortFunc, or a `.children` array being recursed into) — sorting it in place is correct and
+  // intentional at this level, unlike the top-level sortFunc entry point above.
   data.sort((a, b) => {
       if (typeof a[sortKey] === 'number') {
           return sortOrder * (a[sortKey] - b[sortKey]);
       } else if (typeof a[sortKey] === 'string') {
-          return sortOrder * b[sortKey].localeCompare(a[sortKey]);
+          return sortOrder * stringCollator.compare(b[sortKey], a[sortKey]);
       }
       return 0;
   });
@@ -1399,12 +1433,13 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               description: description,
               descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={description} text={description}/></Box>),
               lastTested: apiInfoMap[key] ? apiInfoMap[key]["lastTested"] : 0,
-              isThreatEnabled: apiInfoMap[key] ? apiInfoMap[key]["threatScore"] > 0 : false,
+              isThreatEnabled: apiInfoMap[key] ? (apiInfoMap[key]["threatScore"] > 0 || (x.url?.includes("/skills/") && (apiInfoMap[key]["tagsList"] || []).some(t => (((t.keyName === "skill-tags" || t.key === "skill-tags") && t.value && !/^version=/i.test(t.value)) || ((t.keyName === "malicious-skill-tag" || t.key === "malicious-skill-tag") && t.value === "true"))))) : false,
+              threatScore: apiInfoMap[key] ? (apiInfoMap[key]["threatScore"] || 0) : 0,
               agentProxyGuardrailEnabled: apiInfoMap[key] ? (apiInfoMap[key]["agentProxyGuardrailEnabled"] || false) : false,
               guardrailSchema: apiInfoMap[key] ? (apiInfoMap[key]["guardrailSchema"] || null) : null,
-              isMalicious: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "malicious-skill" || t.key === "malicious-skill") && t.value === "true") : false,
+              isMalicious: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "malicious-skill-tag" || t.key === "malicious-skill-tag") && t.value === "true") : false,
               isMisconfigured: (apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true") : false) || (x.endpoint?.startsWith("/claude/config/") && (collectionEnvTypeMap[x.apiCollectionId] || []).some(t => (t.keyName === "misconfigured-config" || t.key === "misconfigured-config") && t.value === "true")),
-              skillTags: apiInfoMap[key] ? [...new Set((apiInfoMap[key]["tagsList"] || []).filter(t => (t.keyName === "skill-tags" || t.key === "skill-tags") && t.value).map(t => t.value))] : [],
+              skillTags: apiInfoMap[key] ? [...new Set((apiInfoMap[key]["tagsList"] || []).filter(t => (t.keyName === "skill-tags" || t.key === "skill-tags") && t.value && !/^version=/i.test(t.value)).map(t => t.value))] : [],
               tagsList: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []) : [],
               apiType,
           }
@@ -2472,6 +2507,14 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
         year: 'numeric'
       })} ${timeStr}`;
   },
+  // values.ranges has no 30-day preset (it jumps 7 days -> 2 months) and pages pick their
+  // default by index into that array, so a 30-day default is built here instead.
+  getLast30DaysRange(){
+    const until = new Date(new Date().setHours(23, 59, 59, 999));
+    const since = new Date(new Date(new Date().setDate(until.getDate() - 30)).setHours(0, 0, 0, 0));
+    return { title: "Last 30 days", alias: "last30days", period: { since, until } };
+  },
+
   isDemoAccount(){
      return window.ACTIVE_ACCOUNT === 1669322524
   },

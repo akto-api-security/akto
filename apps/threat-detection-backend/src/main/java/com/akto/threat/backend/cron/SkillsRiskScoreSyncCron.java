@@ -65,7 +65,7 @@ public class SkillsRiskScoreSyncCron {
                             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                             LastCronRunInfo lastRunTimerInfo = accountSettings.getLastUpdatedCronInfo();
                             int deltaEndTime = Context.now();
-                            int deltaStartTime = deltaEndTime - Constants.ONE_DAY_TIMESTAMP;
+                            int deltaStartTime = deltaEndTime - Constants.FOUR_HOURS_TIMESTAMP;
 
                             Bson updateForLastCronRunInfo = Updates.set(
                                 AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_ATLAS_THREAT_SCORE_SYNC,
@@ -73,9 +73,9 @@ public class SkillsRiskScoreSyncCron {
                             );
 
                             if (lastRunTimerInfo != null) {
-                                if (deltaEndTime - lastRunTimerInfo.getLastInfoResetted() <= Constants.ONE_DAY_TIMESTAMP) {
+                                if (deltaEndTime - lastRunTimerInfo.getLastInfoResetted() <= Constants.FOUR_HOURS_TIMESTAMP) {
                                     int last = lastRunTimerInfo.getLastAtlasThreatScoreSync();
-                                    deltaStartTime = (last > 0) ? last : (deltaEndTime - Constants.ONE_DAY_TIMESTAMP);
+                                    deltaStartTime = (last > 0) ? last : (deltaEndTime - Constants.FOUR_HOURS_TIMESTAMP);
                                 } else {
                                     updateForLastCronRunInfo = Updates.combine(
                                         updateForLastCronRunInfo,
@@ -93,8 +93,7 @@ public class SkillsRiskScoreSyncCron {
                                 Filters.gte("detectedAt", deltaStartTime),
                                 Filters.lte("detectedAt", deltaEndTime),
                                 Filters.eq("successfulExploit", true),
-                                Filters.eq("contextSource", "ENDPOINT"),
-                                Filters.eq("category", "malicious_skill_detected")
+                                Filters.eq("contextSource", "ENDPOINT")
                             )));
                             pipeline.add(Aggregates.group(groupedId, Accumulators.addToSet("severities", "$severity")));
 
@@ -144,12 +143,12 @@ public class SkillsRiskScoreSyncCron {
                             loggerMaker.infoAndAddToDb("Skills malicious events count: " + apiInfoKeyToRiskScore.size());
 
                             CollectionTags maliciousTag =
-                                new CollectionTags(Context.now(), "malicious-skill", "true", CollectionTags.TagSource.AKTO);
+                                new CollectionTags(Context.now(), "malicious-skill-tag", "true", CollectionTags.TagSource.AKTO);
 
-                            // only-if-absent guard: matches docs that do NOT already carry the malicious-skill tag
+                            // only-if-absent guard: matches docs that do NOT already carry the malicious-skill-tag
                             Bson tagNotPresent = Filters.not(Filters.elemMatch(ApiInfo.TAGS_LIST,
                                 Filters.and(
-                                    Filters.eq(CollectionTags.KEY_NAME, "malicious-skill"),
+                                    Filters.eq(CollectionTags.KEY_NAME, "malicious-skill-tag"),
                                     Filters.eq(CollectionTags.VALUE, "true")
                                 )));
 
@@ -191,17 +190,18 @@ public class SkillsRiskScoreSyncCron {
     }
 
     private static float computeRiskScore(List<String> severities) {
-        float max = 0f;
-        for (String s : severities) {
-            float score = 0f;
-            switch (s.toUpperCase()) {
-                case "CRITICAL": score = 5f; break;
-                case "HIGH":     score = 4f; break;
-                case "MEDIUM":   score = 3f; break;
-                default:         break;
-            }
-            max = Math.max(max, score);
-        }
-        return max;
+        // float max = 0f;
+        // for (String s : severities) {
+        //     float score = 0f;
+        //     switch (s.toUpperCase()) {
+        //         case "CRITICAL": score = 5f; break;
+        //         case "HIGH":     score = 4f; break;
+        //         case "MEDIUM":   score = 3f; break;
+        //         default:         break;
+        //     }
+        //     max = Math.max(max, score);
+        // }
+        // return max;
+        return 4f;
     }
 }

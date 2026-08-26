@@ -48,6 +48,7 @@ public class TrafficUpdatesTeams {
         if (!alertResult.redAlertHosts.isEmpty()) {
             String payload = generateRedAlertPayload(alertResult.redAlertHosts, alertType, metricsUrl);
             if (payload != null) {
+                body.append(",");
                 body.append(CardTextBlock.createTextBlock(payload, true, "default", "attention"));
             }
         }
@@ -55,7 +56,7 @@ public class TrafficUpdatesTeams {
         if (!alertResult.greenAlertHosts.isEmpty()) {
             String payload = generateGreenAlertPayload(alertResult.greenAlertHosts, alertType, metricsUrl);
             if (payload != null) {
-
+                body.append(",");
                 body.append(CardTextBlock.createTextBlock(payload, true, "default", "good"));
             }
         }

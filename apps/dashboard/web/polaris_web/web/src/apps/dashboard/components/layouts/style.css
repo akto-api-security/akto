@@ -19,14 +19,35 @@
     right: 0;
 }
 
+/* Atlas Insights list rows (InsightsListView.jsx) — left accent bar colored by severity. */
+.insight-row {
+    cursor: pointer;
+}
+.insight-row:hover {
+    background: #FBFAFF;
+}
+.insight-severity-bar {
+    width: 3px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    align-self: stretch;
+}
+.insight-severity-bar-CRITICAL { background: #DF2909; }
+.insight-severity-bar-HIGH { background: #E45357; }
+.insight-severity-bar-MEDIUM { background: #EF864C; }
+.insight-severity-bar-LOW { background: #94969C; }
+.insight-severity-bar-DEFAULT { background: #E1E3E5; }
+
 
 /* Asset-type badges — colour a Polaris <Badge> per type (same technique as the
    dashboard-wide .badge-wrapper-<SEVERITY> classes). Keeps TypeBadge a plain Polaris
    <Badge> instead of an inline-styled span. */
 .agentic-type-AGENT .Polaris-Badge   { background-color: #F3E8FF; color: #9642FC; }
+.agentic-type-SAAS_AGENT .Polaris-Badge { background-color: #FCE7F3; color: #DB2777; }
 .agentic-type-MCP .Polaris-Badge     { background-color: #ECFDF5; color: #0D9488; }
 .agentic-type-LLM .Polaris-Badge     { background-color: #FEFCE8; color: #CA8A04; }
 .agentic-type-SKILL .Polaris-Badge   { background-color: #F9FAFB; color: #6B7280; }
+.agentic-type-PLUGIN .Polaris-Badge  { background-color: #EEF2FF; color: #4F46E5; }
 .agentic-type-PROMPT .Polaris-Badge  { background-color: #E0F7FA; color: #0E7490; }
 .agentic-type-CONFIG .Polaris-Badge  { background-color: #FEFCE8; color: #CA8A04; }
 .agentic-type-TOOL .Polaris-Badge    { background-color: #ECFDF5; color: #0D9488; }
@@ -250,6 +271,7 @@
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    overflow-y: auto;
 }
 
 /* AiChatSection — flex column with a pinned input row. The expand/collapse flex
@@ -309,4 +331,21 @@
 
 .ag-row-group-leaf-indent{
     margin-left: 0px !important;
+}
+
+/* AG Grid row icon: it is a flex item inside HorizontalStack, so without flex-shrink:0
+   it (and the img inside) shrinks as the user narrows the column. */
+.ag-grid-row-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+}
+
+/* Atlas Insights list row — hover feedback for a Box acting as a click target
+   (same click-target pattern as .agentic-list-cell-click, but this Box is the row itself). */
+.insight-row {
+    cursor: pointer;
+}
+.insight-row:hover {
+    background-color: var(--p-color-bg-hover, #f6f6f7);
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import api from "../api";
@@ -7,7 +7,6 @@ import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
 import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, VerticalStack } from "@shopify/polaris";
-import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap } from "../utils/formatUtils";
@@ -120,22 +119,26 @@ const getHeaders = () => {
   return baseHeaders;
 };
 
-const sortOptions = [
-  {
-    label: "Discovered time",
-    value: "detectedAt asc",
-    directionLabel: "Newest",
-    sortKey: "detectedAt",
-    columnIndex: 5,
-  },
-  {
-    label: "Discovered time",
-    value: "detectedAt desc",
-    directionLabel: "Oldest",
-    sortKey: "detectedAt",
-    columnIndex: 5,
-  },
-];
+const getSortOptions = (headers) => {
+  const columnIndex = headers.findIndex((h) => h.value === "discoveredTs") + 1;
+  if (columnIndex === 0) return [];
+  return [
+    {
+      label: "Discovered time",
+      value: "detectedAt asc",
+      directionLabel: "Newest",
+      sortKey: "detectedAt",
+      columnIndex,
+    },
+    {
+      label: "Discovered time",
+      value: "detectedAt desc",
+      directionLabel: "Oldest",
+      sortKey: "detectedAt",
+      columnIndex,
+    },
+  ];
+};
 
 let filters = [];
 
@@ -148,6 +151,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const endTimestamp = getTimeEpoch("until");
 
   const [loading, setLoading] = useState(true);
+  const misconfigRowMetaRef = useRef({});
   const collectionsMap = PersistStore((state) => state.collectionsMap);
   const hostNameMap = PersistStore((state) => state.hostNameMap);
   const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
@@ -156,7 +160,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const guardrailApprovedByPolicy = SessionStore((state) => state.guardrailApprovedByPolicy);
   const setGuardrailApprovedByPolicy = SessionStore((state) => state.setGuardrailApprovedByPolicy);
   const needsGuardrailCompliance = label === LABELS.GUARDRAIL || isAgenticSecurityCategory() || isEndpointSecurityCategory();
-  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, needs_approval: 3, training: 4, skills_evaluations: 4 };
+  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, needs_approval: 3, training: 4, skills_evaluations: 4, misconfigured_settings: 5 };
   const resolvedInitialTab = initialTab || 'active';
   const [currentTab, setCurrentTab] = useState(resolvedInitialTab);
   const [selected, setSelected] = useState(tabIndexMap[resolvedInitialTab] || 0)
@@ -334,7 +338,20 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       index: baseTabs.length + guardrailExtraTabs.length
     });
   }
-  const tableTabs = [...baseTabs, ...guardrailExtraTabs, ...skillsExtraTabs]
+  // "Misconfigured Settings" — events whose latestApiEndpoint contains "/config/" (config-scanner
+  // findings, e.g. "/codex/config/mcp_servers.computer-use.command"), filtered server-side via the
+  // same "only"/"exclude" convention as Skills Evaluations. Endpoint (Atlas) only.
+  const configExtraTabs = [];
+  if (isEndpointSecurityCategory()) {
+    configExtraTabs.push({
+      content: 'Misconfigured Settings',
+      badge: 'Beta',
+      onAction: () => { setCurrentTab('misconfigured_settings'); },
+      id: 'misconfigured_settings',
+      index: baseTabs.length + guardrailExtraTabs.length + skillsExtraTabs.length
+    });
+  }
+  const tableTabs = [...baseTabs, ...guardrailExtraTabs, ...skillsExtraTabs, ...configExtraTabs]
 
   const handleSelectedTab = (selectedIndex) => {
     setLoading(true)
@@ -492,6 +509,29 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   // Simplified handler functions using the generic handlers
   const handleBulkIgnore = (selectedIds) => handleBulkOperation(selectedIds, 'ignore', 'IGNORED');
   const handleBulkDelete = (selectedIds) => handleBulkOperation(selectedIds, 'delete');
+  const handleMisconfigGroupDelete = async (selectedIds) => {
+    const validIds = (selectedIds || []).filter(id => id != null && id !== '');
+    if (validIds.length === 0) {
+      func.setToast(true, true, 'No valid events selected');
+      return;
+    }
+
+    try {
+      for (const id of validIds) {
+        const meta = misconfigRowMetaRef.current[id];
+        if (meta?.host && meta?.actor && meta?.url) {
+          await threatDetectionRequests.deleteMaliciousEvents({ hosts: [meta.host], actors: [meta.actor], urls: [meta.url] });
+        } else {
+          await threatDetectionRequests.deleteMaliciousEvents({ eventIds: [id] });
+        }
+      }
+      if (triggerRefresh) {
+        triggerRefresh();
+      }
+    } catch (error) {
+      func.setToast(true, true, 'Error deleting events');
+    }
+  };
   const handleBulkMarkForReview = (selectedIds) => handleBulkOperation(selectedIds, 'markForReview', 'UNDER_REVIEW');
   const handleBulkRemoveFromReview = (selectedIds) => handleBulkOperation(selectedIds, 'removeFromReview', 'ACTIVE');
   const handleBulkMarkForTraining = async (selectedIds) => {
@@ -571,7 +611,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
               ignore: () => handleBulkIgnore(selectedIds),
               removeFromReview: () => handleBulkRemoveFromReview(selectedIds),
               reactivate: () => handleBulkRemoveFromReview(selectedIds),
-              delete: () => handleBulkDelete(selectedIds),
+              delete: () => (currentTab === 'misconfigured_settings' ? handleMisconfigGroupDelete(selectedIds) : handleBulkDelete(selectedIds)),
               markForTraining: () => handleBulkMarkForTraining(selectedIds)
             };
             func.showConfirmationModal(message, label, handlers[actionType]);
@@ -629,17 +669,23 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     // Fetch active events with a high limit (single page) and filter after mapping.
     const isNeedsApproval = currentTab === 'needs_approval';
     const isSkillsEvaluations = currentTab === 'skills_evaluations';
+    const isMisconfiguredSettings = currentTab === 'misconfigured_settings';
     // Needs Approval is a client-side view (fetch a big page, filter after mapping). Skills
-    // Evaluations is now SERVER-paginated: it shows ACTIVE events narrowed to the skill-evaluation
-    // set by the backend (x-skill-eval-mode header), so totals/pagination are correct.
+    // Evaluations / Misconfigured Settings are SERVER-paginated: each shows ACTIVE events narrowed
+    // to its own partition by the backend (x-skill-eval-mode / x-config-eval-mode headers), so
+    // totals/pagination are correct.
     const isClientSideView = isNeedsApproval;
-    const effectiveStatus = (isNeedsApproval || isSkillsEvaluations) ? 'ACTIVE' : currentTab.toUpperCase();
+    const effectiveStatus = (isNeedsApproval || isSkillsEvaluations || isMisconfiguredSettings) ? 'ACTIVE' : currentTab.toUpperCase();
     const effectiveSkip = isClientSideView ? 0 : skip;
     const effectiveLimit = isClientSideView ? 200 : limit;
-    // Skills Evaluations partition (Atlas only): "only" on the Skills Evaluations tab, "exclude" on
-    // the Active tab. Backend applies it (gated to contextSource=ENDPOINT); undefined elsewhere.
+    // Skills Evaluations / Misconfigured Settings partitions (Atlas only): "only" on their own tab,
+    // "exclude" on the Active tab so neither shows up there. Backend applies each independently
+    // (gated to contextSource=ENDPOINT); undefined elsewhere.
     const skillEvaluationMode = isEndpointSecurityCategory()
       ? (isSkillsEvaluations ? 'only' : (currentTab === 'active' ? 'exclude' : undefined))
+      : undefined;
+    const configEvaluationMode = isEndpointSecurityCategory()
+      ? (isMisconfiguredSettings ? 'only' : (currentTab === 'active' ? 'exclude' : undefined))
       : undefined;
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
@@ -712,14 +758,21 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       undefined,
       undefined,
       severityFilter,
-      skillEvaluationMode
+      skillEvaluationMode,
+      configEvaluationMode
     );
 
     // Store the total count for filtered results
     setTotalFilteredCount(res.total || 0);
 //    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
+    if (isMisconfiguredSettings) {
+      misconfigRowMetaRef.current = {};
+    }
     let ret = (res?.maliciousEvents || []).map((x) => {
+      if (isMisconfiguredSettings) {
+        misconfigRowMetaRef.current[x.id] = { host: x.host, actor: x.actor, url: x.url };
+      }
       const severity = (isAgenticSecurityCategory() || isEndpointSecurityCategory())
         ? (x?.severity || "HIGH")
         : (x?.severity || threatFiltersMap[x?.filterId]?.severity || "HIGH")
@@ -727,7 +780,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       const complianceMapData = resolveComplianceClauseMap(x, needsGuardrailCompliance, threatFiltersMap, guardrailComplianceMap);
       const complianceList = Object.keys(complianceMapData);
 
-      // Determine if this is session-based by checking if sessionId is present and not empty
       const isSessionBased = x?.sessionId && x.sessionId !== '';
 
       let nextUrl = null;
@@ -749,7 +801,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         ...x,
         id: x.id,
         actorComp: isEndpointSecurityCategory()
-          ? getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap)
+          ? getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap, x.actor)
           : formatActorId(x.actor),
         host: x.host || "-",
         endpointComp: String(x?.url || "").includes('/skills/') ? (
@@ -775,7 +827,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           />
         ),
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
-        discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),
+        discoveredTs: func.prettifyEpoch(x.timestamp || 0),
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
         severityComp: (<div className={`badge-wrapper-${severity}`}>
@@ -989,6 +1041,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   if (currentTab === 'needs_approval') {
     headers.push({ text: "Action", value: "approveAction", title: "Action" });
   }
+  const sortOptions = getSortOptions(headers);
   return (
     <>
       <GithubServerTable

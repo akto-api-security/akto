@@ -1,5 +1,5 @@
 import {  HorizontalStack,  Page, VerticalStack } from "@shopify/polaris";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useNavigationType } from "react-router-dom";
 import { learnMoreObject } from "../../../main/onboardingData"
 import { getDashboardCategory } from "../../../main/labelHelper"
 import LearnPopoverComponent from "./LearnPopoverComponent";
@@ -12,6 +12,7 @@ const PageWithMultipleCards = (props) => {
 
     const location = useLocation();
     const navigate = useNavigate()
+    const navigationType = useNavigationType()
     const stack = JSON.parse(sessionStorage.getItem('pathnameStack') || '[]');
     const isNewTab = location.key === 'default' || stack.length <= 1
 
@@ -20,10 +21,27 @@ const PageWithMultipleCards = (props) => {
     // Track pathnames in sessionStorage
     const MAX_STACK_SIZE = 50; // Maximum number of entries in the stack
 
+    // Includes location.search, not just pathname — a page whose identity depends on its query
+    // params (e.g. an asset-detail page keyed by ?groupKey=...&rowType=...) would otherwise have
+    // its own stack entry silently stripped down to the bare route, so navigating back to it from
+    // one page further in (e.g. Inventory's own back button) lands on a query-string-less URL that
+    // page can't actually render (reproduced: "groupKey and rowType are required"). For every page
+    // that doesn't use query params, `search` is always "", so this is a no-op there.
+    //
+    // navigationType === 'REPLACE' updates the top entry in place instead of pushing a new one —
+    // several table components (GithubServerTable) sync their own filter/sort state into the URL
+    // via a replace navigation shortly after mount, which still changes location.search here even
+    // though it isn't a real navigation the back arrow should have to step through. Without this,
+    // that self-correction pushed a near-duplicate entry for "the same page" every time, requiring
+    // the back arrow to be pressed twice to actually leave it (confirmed: pressing back once from
+    // one hop further in landed on this page's own pre-self-correction URL, not the true prior page).
     useEffect(() => {
         let stack = JSON.parse(sessionStorage.getItem('pathnameStack') || '[]');
-        const currentPath = location.pathname;
-        if (stack.length === 0 || stack[stack.length - 1] !== currentPath) {
+        const currentPath = location.pathname + location.search;
+        if (navigationType === 'REPLACE' && stack.length > 0) {
+            stack[stack.length - 1] = currentPath;
+            sessionStorage.setItem('pathnameStack', JSON.stringify(stack));
+        } else if (stack.length === 0 || stack[stack.length - 1] !== currentPath) {
             stack.push(currentPath);
             // Trim the stack to the maximum size
             if (stack.length > MAX_STACK_SIZE) {
@@ -32,12 +50,12 @@ const PageWithMultipleCards = (props) => {
             sessionStorage.setItem('pathnameStack', JSON.stringify(stack));
         }
         prevPathRef.current = currentPath;
-    }, [location.pathname]);
+    }, [location.pathname, location.search, navigationType]);
 
     // Custom navigateBack: skip over same-pathname entries
     const navigateBack = () => {
         let stack = JSON.parse(sessionStorage.getItem('pathnameStack') || '[]');
-        const currentPath = location.pathname;
+        const currentPath = location.pathname + location.search;
         // Remove current path
         while (stack.length > 0 && stack[stack.length - 1] === currentPath) {
             stack.pop();

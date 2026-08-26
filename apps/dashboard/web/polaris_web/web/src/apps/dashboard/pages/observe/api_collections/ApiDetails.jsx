@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text } from "@shopify/polaris"
+import { Box, Button, Popover, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text, Badge, List } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import ApiGroups from "../../../components/shared/ApiGroups";
@@ -656,22 +656,81 @@ function ApiDetails(props) {
         } catch (_) {}
     }
 
+    // Base risk score/remarks live on the owning collection, not the per-endpoint ApiInfo — same
+    // fields AgentEndpointTreeTable.jsx/AgenticAssetDevicesPage.jsx surface via wrapRiskScoreTooltip.
+    const agentRiskAnalysis = (() => {
+        if (!isEndpointSecurityCategory()) return null;
+        if (!apiDetail?.apiCollectionId || !allCollections) return null;
+        const collection = allCollections.find(c => c.id === apiDetail.apiCollectionId);
+        if (!collection?.baseRiskScoreReason || !collection?.baseRiskScore) return null;
+        return { score: collection.baseRiskScore, reason: collection.baseRiskScoreReason };
+    })();
+
+    // Justifies apiDetail.riskScore itself: base (LLM score) + threat (guardrail violations) +
+    // remaining (everything else the real ApiInfoDao.getRiskScore formula folds in — sensitive
+    // data, open-issue severity, public access — that baseRiskScore was never actually summed
+    // with in the backend). "remaining" is computed as a balancing figure, not itemized, so the
+    // three lines always add up to the displayed total instead of drifting from it.
+    const riskScoreFactors = (() => {
+        if (!apiDetail || !agentRiskAnalysis) return [];
+        const factors = [];
+        const isThreat = !!apiDetail.isThreatEnabled;
+        // Real threatScore when present; falls back to 1 for the skill-tag-only threat path
+        // (malicious-skill-tag), which flags isThreatEnabled without ever setting a threatScore.
+        const threatWeight = isThreat ? (apiDetail.threatScore || 1) : 0;
+        if (threatWeight > 0) factors.push({ weight: threatWeight, text: 'Guardrail violations detected' });
+
+        const baseWeight = agentRiskAnalysis?.score || 0;
+        const remaining = (apiDetail.riskScore || 0) - baseWeight - threatWeight;
+        if (remaining > 0) {
+            const sensitiveTags = [...new Set([...(apiDetail.sensitiveTags || []), ...(apiDetail.sensitiveInReq || []), ...(apiDetail.sensitiveInResp || [])])];
+            const remainingReasons = [];
+            if (sensitiveTags.length > 0) remainingReasons.push(`sensitive data detected: ${sensitiveTags.join(', ')}`);
+            if (apiDetail.access_type === 'Public') remainingReasons.push('publicly accessible');
+            factors.push({
+                weight: remaining,
+                text: remainingReasons.length > 0 ? `Other factors — ${remainingReasons.join(', ')}` : 'Other factors',
+            });
+        }
+        return factors;
+    })();
+
     const ValuesTab = {
         id: 'values',
         content: "Values",
         component: isSkillEndpoint && skillMarkdown
             ? <MarkdownViewer markdown={skillMarkdown} />
             : sampleData.length > 0 && <Box paddingBlockStart={"4"}>
-                <SampleDataList
-                    key="Sample values"
-                    sampleData={sampleData}
-                    heading={"Sample values"}
-                    minHeight={"35vh"}
-                    vertical={true}
-                    isAPISampleData={true}
-                    isWebSocket={isWebSocket}
-                    metadata={headersWithData.map(x => x.split(" ")[0])}
-                />
+                <VerticalStack gap="4">
+                    {agentRiskAnalysis && (
+                        <VerticalStack gap="3">
+                            <HorizontalStack gap="2" blockAlign="center">
+                                <Text variant='headingMd'>Agent's Risk Score Breakdown</Text>
+                                <Badge status={transform.getStatus(apiDetail?.riskScore)} size="small">{apiDetail?.riskScore}</Badge>
+                            </HorizontalStack>
+                            <List type="bullet">
+                                <List.Item>
+                                    <Text variant="bodyMd" color="subdued" as="span">{agentRiskAnalysis.score} -&gt; {agentRiskAnalysis.reason}</Text>
+                                </List.Item>
+                                {riskScoreFactors.map((factor, index) => (
+                                    <List.Item key={index}>
+                                        <Text variant="bodyMd" color="subdued" as="span">{factor.weight} -&gt; {factor.text}</Text>
+                                    </List.Item>
+                                ))}
+                            </List>
+                        </VerticalStack>
+                    )}
+                    <SampleDataList
+                        key="Sample values"
+                        sampleData={sampleData}
+                        heading={"Sample values"}
+                        minHeight={"35vh"}
+                        vertical={true}
+                        isAPISampleData={true}
+                        isWebSocket={isWebSocket}
+                        metadata={headersWithData.map(x => x.split(" ")[0])}
+                    />
+                </VerticalStack>
             </Box>,
     }
     const DependencyTab = {
@@ -826,6 +885,14 @@ function ApiDetails(props) {
 
     newData['description'] = (isEditingDescription?<InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription}  placeholder={"Add a brief description"} maxLength={64}/> : description )
 
+
+    const owningPluginName = (() => {
+        if (!apiDetail?.apiCollectionId || !allCollections) return null;
+        const collection = allCollections.find(c => c.id === apiDetail.apiCollectionId);
+        const tag = collection?.envType?.find(t => t.keyName === 'plugin-name');
+        return tag?.value || null;
+    })();
+
     const headingComp = (
         <VerticalStack gap="4" key="heading">
             <HorizontalStack align="space-between" wrap={false}>
@@ -842,6 +909,12 @@ function ApiDetails(props) {
                         collectionIds={apiDetail?.collectionIds}
                         onGroupClick={() => setShowDetails(false)}
                     />
+                    {owningPluginName && (
+                        <HorizontalStack gap="2" blockAlign="center">
+                            <Badge size="small" status="info">{owningPluginName}</Badge>
+                            <Text variant="bodySm" color="subdued">uses this endpoint</Text>
+                        </HorizontalStack>
+                    )}
                 </VerticalStack>
                 <VerticalStack gap="3" align="space-between">
                     <HorizontalStack gap={"1"} wrap={false} >
@@ -899,7 +972,7 @@ function ApiDetails(props) {
         if (!apiDetail?.apiCollectionId || !allCollections) return false;
         const collection = allCollections.find(c => c.id === apiDetail.apiCollectionId);
         if (!collection) return false;
-        
+
         return collection.envType && collection.envType.some(envType =>
             envType.keyName === 'gen-ai'
         );

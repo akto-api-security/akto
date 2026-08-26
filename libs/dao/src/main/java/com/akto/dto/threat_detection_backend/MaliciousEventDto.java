@@ -33,6 +33,7 @@ public class MaliciousEventDto {
   private String contextSource;
   private String sessionId;
   private List<OwaspCategory> owaspCategories;
+  private String remediation;
 
   public enum EventType {
     SINGLE,
@@ -105,6 +106,7 @@ public class MaliciousEventDto {
     this.contextSource = builder.contextSource;
     this.sessionId = builder.sessionId;
     this.owaspCategories = builder.owaspCategories;
+    this.remediation = builder.remediation;
   }
 
   public static class Builder {
@@ -133,6 +135,8 @@ public class MaliciousEventDto {
     private String contextSource;
     private String sessionId;
     private List<OwaspCategory> owaspCategories;
+    private String remediation;
+
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
       return this;
@@ -250,6 +254,11 @@ public class MaliciousEventDto {
 
     public Builder setSessionId(String sessionId) {
       this.sessionId = sessionId;
+      return this;
+    }
+
+    public Builder setRemediation(String remediation) {
+      this.remediation = remediation;
       return this;
     }
 
@@ -465,6 +474,14 @@ public class MaliciousEventDto {
 
   public void setSessionId(String sessionId) {
     this.sessionId = sessionId;
+  }
+
+  public String getRemediation() {
+    return remediation;
+  }
+
+  public void setRemediation(String remediation) {
+    this.remediation = remediation;
   }
 
   public List<OwaspCategory> getOwaspCategories() {

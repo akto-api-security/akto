@@ -57,6 +57,8 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
             String nodeEnv = System.getenv("NODE_ENV");
             servletRequest.setAttribute("nodeEnv", nodeEnv != null ? nodeEnv : "production");
             servletRequest.setAttribute("airgapped", String.valueOf("true".equalsIgnoreCase(System.getenv("AIRGAPPED"))));
+            String agGridLicenseKey = System.getenv("AG_GRID_LICENSE_KEY");
+            servletRequest.setAttribute("AG_GRID_LICENSE_KEY", agGridLicenseKey != null ? agGridLicenseKey : "");
         } catch(Exception e){
         }
 

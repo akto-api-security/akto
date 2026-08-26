@@ -24,15 +24,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
 
 import com.akto.action.threat_detection.utils.ThreatDetectionHelper;
+import com.akto.action.threat_detection.utils.ThreatsUtils;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
@@ -85,8 +84,15 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter List<String> hosts;
   @Getter @Setter String latestApiOrigRegex;
   @Getter @Setter Boolean sortBySeverity;
-  // Skills Evaluations partition mode ("only" | "exclude"), sent to the threat backend as a header.
+  // Skills Evaluations / Misconfigured Settings partition modes ("only" | "exclude"), sent to
+  // the threat backend as headers.
   @Getter @Setter String skillEvaluationMode;
+  @Getter @Setter String configEvaluationMode;
+  // ---- Agentic Assets flyout Violations tab server-side pagination/search ----
+  @Getter @Setter String searchText; // free-text match across filterId/host/actor
+  @Getter @Setter List<String> looseHostKeys; // "<firstSegment> <lastSegment>" — see ViolationsTab.jsx's looseHostSet
+  @Getter @Setter List<String> claudeDeviceIds;
+  @Getter @Setter Boolean matchClaudeConfig;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -115,6 +121,9 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
     if (this.skillEvaluationMode != null && !this.skillEvaluationMode.isEmpty()) {
       post.addHeader("x-skill-eval-mode", this.skillEvaluationMode);
+    }
+    if (this.configEvaluationMode != null && !this.configEvaluationMode.isEmpty()) {
+      post.addHeader("x-config-eval-mode", this.configEvaluationMode);
     }
 
     Map<String, Object> filter = new HashMap<>();
@@ -162,6 +171,22 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       filter.put("latestApiOrigRegex", this.latestApiOrigRegex);
     }
 
+    if (this.searchText != null && !this.searchText.isEmpty()) {
+      filter.put("searchText", this.searchText);
+    }
+
+    if (this.looseHostKeys != null && !this.looseHostKeys.isEmpty()) {
+      filter.put("looseHostKeys", this.looseHostKeys);
+    }
+
+    if (this.claudeDeviceIds != null && !this.claudeDeviceIds.isEmpty()) {
+      filter.put("claudeDeviceIds", this.claudeDeviceIds);
+    }
+
+    if (this.matchClaudeConfig != null) {
+      filter.put("matchClaudeConfig", this.matchClaudeConfig);
+    }
+
     filter.put("latestAttack", latestAttack);
 
     if (this.statusFilter != null) {
@@ -197,7 +222,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
           ListMaliciousRequestsResponse.class, responseBody)
@@ -231,6 +256,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                                 smr.getJiraTicketUrl(),
                                 smr.getSeverity(),
                                 smr.getSessionId() != null && !smr.getSessionId().isEmpty() ? smr.getSessionId() : "");
+                            event.setRemediation(smr.getRemediation());
                             if (!smr.getOwaspCategoriesList().isEmpty()) {
                                 event.setOwaspCategories(smr.getOwaspCategoriesList().stream()
                                     .map(o -> new DashboardMaliciousEvent.OwaspCategory(
@@ -282,7 +308,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       post.setEntity(requestEntity);
 
       try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-        String responseBody = EntityUtils.toString(resp.getEntity());
+        String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
         ProtoMessageUtils.<FetchAlertFiltersResponse>toProtoMessage(
             FetchAlertFiltersResponse.class, responseBody)
@@ -319,7 +345,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
     } catch (Exception e) {
       e.printStackTrace();
       return ERROR.toUpperCase();
@@ -591,7 +617,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       if (resp.getStatusLine().getStatusCode() != 200) {
         this.deleteSuccess = false;

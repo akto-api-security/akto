@@ -67,6 +67,31 @@ export default {
         return resp
     },
 
+    // Kick off one background comparison of this policy's recent violations: the saved policy
+    // versus the edited draft, over the same events. Returns a runId to poll.
+    // policyName must be the name the violations were recorded under (the pre-edit name), since a
+    // guardrail event's filterId *is* the policy name.
+    // source: 'VIOLATIONS' (this policy's recorded violations) or 'TRACES' (recent agent traffic,
+    // blocked or not). Traces cover traffic the policy never matched, so an edit's false positives
+    // show up there; violations can only show detections an edit loses.
+    async startPolicyReplay({ policy, policyName, hexId, source = 'VIOLATIONS' }) {
+        const resp = await request({
+            url: '/api/startPolicyReplay',
+            method: 'post',
+            data: { policy, policyName, hexId, source }
+        })
+        return resp
+    },
+
+    async pollPolicyReplay(runId) {
+        const resp = await request({
+            url: '/api/pollPolicyReplay',
+            method: 'post',
+            data: { runId }
+        })
+        return resp
+    },
+
     async fetchBrowserExtensionConfigs() {
         const resp = await request({
             url: '/api/fetchBrowserExtensionConfigs',

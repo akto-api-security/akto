@@ -146,13 +146,13 @@ const flaggedData = [
     }
 ]
 
-const ChartComponent = ({ subCategoryCount, severityCountMap, onThreatTypeClick, onSeverityClick }) => {
+const ChartComponent = ({ categoryCount, severityCountMap, onThreatTypeClick, onSeverityClick }) => {
     return (
       <VerticalStack gap={4} columns={2}>
         <HorizontalGrid gap={4} columns={2}>
           <TopThreatTypeChart
             key={"top-threat-types"}
-            data={subCategoryCount}
+            data={categoryCount}
             onBarClick={onThreatTypeClick}
           />
           <InfoCard
@@ -325,7 +325,8 @@ function ThreatDetectionPage() {
             }
         }
         const specialAccounts = [1776384040, 1776625569, 1776626846];
-        return specialAccounts.includes(Number(window.ACTIVE_ACCOUNT)) ? values.ranges[4] : values.ranges[2];
+        if (specialAccounts.includes(Number(window.ACTIVE_ACCOUNT))) return values.ranges[4];
+        return func.getLast30DaysRange();
     }, [location.state, searchParams]);
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
 
@@ -343,18 +344,18 @@ function ThreatDetectionPage() {
     const [showDetails, setShowDetails] = useState(false);
     const [sampleData, setSampleData] = useState([])
     const [showNewTab, setShowNewTab] = useState(false)
-    const [subCategoryCount, setSubCategoryCount] = useState([]);
+    const [categoryCount, setCategoryCount] = useState([]);
     const [severityCountMap, setSeverityCountMap] = useState([]);
     const [moreActions, setMoreActions] = useState(false);
     const [webhookIntegrationModalOpen, setWebhookIntegrationModalOpen] = useState(false);
     const [webhookIntegrationData, setWebhookIntegrationData] = useState(null);
-    const [latencyData, setLatencyData] = useState([]);
+    const [latencyData, setLatencyData] = useState(null);
     const [detailsLoading, setDetailsLoading] = useState(false);
     const pollingIntervalRef = useRef(null);
     const [pendingRowContext, setPendingRowContext] = useState(null);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
-    const showNewLayoutToggle = (func.isDemoAccount() || [1726615470, 1779231193, 1776886416].includes(window.ACTIVE_ACCOUNT)) && isEndpointSecurityCategory();
+    const showNewLayoutToggle = isEndpointSecurityCategory() || isAgenticSecurityCategory();
     const newLayout = LocalStore((state) => state.guardrailViolationsNewLayout);
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
@@ -455,7 +456,8 @@ function ThreatDetectionPage() {
             complianceMapData: data.complianceMapData || {},
             metadata: data.metadata || '',
             behaviourRaw: data.behaviourRaw || extractBehaviour(data.metadata) || '',
-            host: data.host || ''
+            host: data.host || '',
+            remediation: data.remediation || ''
         });
 
         setShowDetails(true);
@@ -475,7 +477,8 @@ function ThreatDetectionPage() {
                 complianceMap: data.complianceMapData || {},
                 metadata: data.metadata || '',
                 behaviour: data.behaviourRaw || extractBehaviour(data.metadata) || '',
-                host: data.host || ''
+                host: data.host || '',
+                remediation: data.remediation || ''
             },
             currentEventId: data.id || '',
             currentEventStatus: data.status || '',
@@ -506,7 +509,10 @@ function ThreatDetectionPage() {
         const fetchThreatCategoryCount = async () => {
             const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
             const finalObj = threatDetectionFunc.getGraphsData(res);
-            setSubCategoryCount(finalObj.subCategoryCount);
+            // categoryCountRes groups by policy name (category), not the generic rule-type
+            // subCategory (e.g. "UserDefinedLLMRule" shared by many distinct policies) — same
+            // source ThreatApiPage.jsx already uses for this same chart.
+            setCategoryCount(finalObj.categoryCountRes);
           };
 
           const fetchCountBySeverity = async () => {
@@ -665,6 +671,7 @@ function ThreatDetectionPage() {
               metadata: rowContext?.metadata || '',
               behaviour: rowContext?.behaviourRaw || extractBehaviour(rowContext?.metadata) || '',
               host: rowContext?.host || '',
+              remediation: rowContext?.remediation || '',
               complianceMap: rowContext?.complianceMapData || (() => {
                 if (!queryParams.filterId) return {};
                 const { threatFiltersMap, guardrailComplianceMap } = SessionStore.getState();
@@ -720,7 +727,7 @@ function ThreatDetectionPage() {
     // Normal mode - show table, charts, and sidebar
     const components = [
         <ChartComponent
-            subCategoryCount={subCategoryCount}
+            categoryCount={categoryCount}
             severityCountMap={severityCountMap}
             onThreatTypeClick={handleThreatTypeClick}
             onSeverityClick={handleSeverityClick}

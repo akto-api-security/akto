@@ -526,6 +526,29 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
+// Account type tag keys and their recognised values. The tags are written by the
+// browser extension / ingestion path onto the collection, never by this service.
+const (
+	tagKeyLoginUserEmailType = "login-user-email-type"
+	tagKeyBrowserLLMAccount  = "browser-llm-account-type" // browser extension only
+
+	accountTypePersonal   = "personal"
+	accountTypeEnterprise = "enterprise"
+	accountTypeUnknown    = "unknown"
+)
+
+// accountTypeTagKeys lists the tag keys that carry an account type, in strict
+// precedence order. login-user-email-type is the authoritative signal;
+// browser-llm-account-type covers browser-extension collections that lack it.
+//
+// Deliberately NOT included: ai-agent-account-type. That tag carries the CLI's
+// subscription plan tier (go, plus, pro, team, ...), which describes billing, not
+// account ownership, and must not drive the personal-account guardrail.
+var accountTypeTagKeys = []string{
+	tagKeyLoginUserEmailType,
+	tagKeyBrowserLLMAccount,
+}
+
 // blockPersonalAccountPolicyName returns the name of the first policy that has
 // BlockPersonalAccounts enabled, or ("", false) if none.
 func blockPersonalAccountPolicyName(policies []types.Policy) (string, bool) {
@@ -595,10 +618,11 @@ func (s *Service) refreshCollectionTagsIfNeeded() {
 	s.logger.Info("Collection tag cache refreshed", zap.Int("collectionsCount", len(byHostName)))
 }
 
-// getLoginUserEmailType looks up the host from request headers in the collection tag cache
-// and returns login-user-email-type, falling back to browser-llm-account-type.
-// The account type is resolved ONLY from the collection's tags; if the host is not
-// found in the collection cache, it returns "" (no fallback to the request tag).
+// getLoginUserEmailType looks up the host from request headers in the collection tag
+// cache and resolves the account type from any of accountTypeTagKeys (see
+// resolveAccountType). The account type is resolved ONLY from the collection's tags;
+// if the host is not found in the collection cache, it returns "" (no fallback to the
+// request tag).
 func (s *Service) getLoginUserEmailType(reqHeaders map[string]string) string {
 	host := extractHostHeader(reqHeaders)
 	s.logger.Info("getLoginUserEmailType - host extracted", zap.String("host", host))
@@ -623,64 +647,181 @@ func (s *Service) getLoginUserEmailType(reqHeaders map[string]string) string {
 		return ""
 	}
 
-	if v := tags["login-user-email-type"]; v != "" {
-		s.logger.Info("getLoginUserEmailType - returning login-user-email-type", zap.String("value", v))
-		return v
+	accountType, srcKey := resolveAccountType(tags)
+	s.logger.Info("getLoginUserEmailType - resolved account type",
+		zap.String("value", accountType),
+		zap.String("sourceTagKey", srcKey))
+	return accountType
+}
+
+// resolveAccountType reads the account type from a collection's tags, returning the
+// first non-empty value in accountTypeTagKeys order along with the key it came from
+// (for logging). login-user-email-type is authoritative; browser-llm-account-type is
+// consulted only when it is absent, for browser-extension collections.
+//
+// Strict precedence is deliberate: an authoritative "enterprise" is never overridden
+// by a lower-precedence key, so this cannot block a request that the previous
+// first-non-empty-wins behaviour allowed.
+func resolveAccountType(tags map[string]string) (string, string) {
+	for _, key := range accountTypeTagKeys {
+		if v := normalizeAccountType(tags[key]); v != "" {
+			return v, key
+		}
 	}
-	if v := tags["browser-llm-account-type"]; v != "" {
-		s.logger.Info("getLoginUserEmailType - returning browser-llm-account-type (cache)", zap.String("value", v))
-		return v
+	return "", ""
+}
+
+// normalizeAccountType trims and lower-cases a raw tag value so comparisons against
+// the accountType* constants are exact. Unrecognised values are returned as-is; the
+// caller decides what to do with them (see the explicit match in ValidateRequest).
+func normalizeAccountType(raw string) string {
+	return strings.ToLower(strings.TrimSpace(raw))
+}
+
+// accountTypeFromRequestTag resolves the account type from the request's own tag JSON
+// (a map[string]string, e.g. {"browser-llm-account-type":"enterprise"}). Browser-
+// extension traffic carries the account-type tag on the request itself rather than on a
+// stored collection, so this is consulted for those requests. Returns "" if the tag is
+// absent, unparseable, or carries no recognised account-type key — the same precedence
+// as the collection-based resolveAccountType.
+func accountTypeFromRequestTag(tag string) string {
+	if tag == "" {
+		return ""
+	}
+	var m map[string]string
+	if err := json.Unmarshal([]byte(tag), &m); err != nil {
+		return ""
+	}
+	accountType, _ := resolveAccountType(m)
+	return accountType
+}
+
+// resolvePersonalAccountBlock decides whether a request must be blocked by the
+// personal-account guardrail. It is the single source of truth for that decision,
+// shared by both the single-request path (ValidateRequest) and the batch/ingest
+// path (ValidateBatch) so the two can never drift.
+//
+// It returns the offending policy name and true only when a BlockPersonalAccounts
+// policy applies AND the account type resolves to exactly "personal". Detection
+// precedence: browser-extension requests read the account type from their own tag;
+// everything else falls back to the collection-tag cache. enterprise/unknown/empty
+// and any unrecognised value are allowed, so an unclassified login never blocks.
+func (s *Service) resolvePersonalAccountBlock(policies []types.Policy, tag string, reqHeaders map[string]string, path, sessionID string) (string, bool) {
+	policyName, ok := blockPersonalAccountPolicyName(policies)
+	if !ok {
+		return "", false
 	}
 
-	return ""
+	var accountType, accountTypeSource string
+	// Browser-extension requests carry the account-type tag on the request itself
+	// (the extension host is usually absent from the collection cache), so read it
+	// straight from the request tag when present.
+	if mcp.IsBrowserExtensionRequest(tag) {
+		if at := accountTypeFromRequestTag(tag); at != "" {
+			accountType = at
+			accountTypeSource = "requestTag"
+		}
+	}
+	// Fall back to the collection-tag lookup (existing behaviour) when the request
+	// tag did not supply an account type.
+	if accountType == "" {
+		s.refreshCollectionTagsIfNeeded()
+		accountType = s.getLoginUserEmailType(reqHeaders)
+		accountTypeSource = "collection"
+	}
+	s.logger.Info("resolvePersonalAccountBlock - account type check",
+		zap.String("path", path),
+		zap.String("sessionID", sessionID),
+		zap.String("accountType", accountType),
+		zap.String("accountTypeSource", accountTypeSource),
+		zap.String("policyName", policyName))
+
+	// Match explicitly: only "personal" blocks. "enterprise" is allowed, and any
+	// other value ("unknown", a missing tag, or a value this build does not know)
+	// is treated as not-personal so an unclassified login never blocks traffic.
+	switch accountType {
+	case accountTypePersonal:
+		s.logger.Warn("resolvePersonalAccountBlock - blocking personal account",
+			zap.String("path", path),
+			zap.String("accountType", accountType),
+			zap.String("policyName", policyName),
+			zap.String("sessionID", sessionID))
+		return policyName, true
+	case accountTypeEnterprise, accountTypeUnknown, "":
+		// Explicitly allowed.
+	default:
+		s.logger.Info("resolvePersonalAccountBlock - unrecognised account type, allowing",
+			zap.String("accountType", accountType),
+			zap.String("policyName", policyName),
+			zap.String("sessionID", sessionID))
+	}
+	return "", false
+}
+
+// personalAccountReason returns the user-facing reason for a personal-account guardrail
+// hit, worded to match the policy behaviour so an "alert" outcome is not reported as
+// "Blocked". Any other behaviour falls back to the block wording.
+func personalAccountReason(behaviour string) string {
+	if strings.ToLower(strings.TrimSpace(behaviour)) == "alert" {
+		return "Alert: personal accounts are not permitted by guardrail policy"
+	}
+	return "Blocked: personal accounts are not permitted by guardrail policy"
+}
+
+// reportPersonalAccountThreat asynchronously reports a personal-account block to the
+// dashboard threat feed. Shared by the single-request and batch/ingest paths so both
+// report identically. It is a no-op when skipThreat is set.
+func (s *Service) reportPersonalAccountThreat(payloadToValidate string, reqHeaders map[string]string, ip, path, method, statusCodeStr, contextSource, host, sessionID, policyName, behaviour, blockReason string, skipThreat bool) {
+	if skipThreat {
+		return
+	}
+	statusCode := 0
+	if statusCodeStr != "" {
+		fmt.Sscanf(statusCodeStr, "%d", &statusCode)
+	}
+	go func() {
+		if err := mcp.ReportThreat(
+			context.Background(),
+			payloadToValidate,
+			"",
+			types.ThreatMetadata{
+				PolicyName:   policyName,
+				RuleViolated: "BlockPersonalAccounts",
+				Severity:     "MEDIUM",
+				Reason:       blockReason,
+			},
+			ip,
+			path,
+			method,
+			reqHeaders,
+			nil,
+			statusCode,
+			types.ContextSource(contextSource),
+			host,
+			sessionID,
+			behaviour,
+		); err != nil {
+			s.logger.Warn("Failed to report threat for personal account block", zap.String("policyName", policyName), zap.Error(err))
+		}
+	}()
 }
 
 // TODO: move reportAndBlockPersonalAccount to mcp library so threat reporting
 // and validation live in one place alongside other policy enforcement.
 func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID, policyName, behaviour string) *mcp.ValidationResult {
-	blockReason := "Blocked: personal accounts are not permitted by guardrail policy"
+	blockReason := personalAccountReason(behaviour)
 
 	if s.sessionMgr != nil && sessionID != "" {
 		s.sessionMgr.TrackResponse(sessionID, requestID, blockReason, true)
 		s.sessionMgr.UpdateBlockedReason(sessionID, blockReason)
 	}
 
-	if !params.EffectiveSkipThreat() {
-		reqHeaders := make(map[string]string)
-		if params.RequestHeaders != "" {
-			json.Unmarshal([]byte(params.RequestHeaders), &reqHeaders)
-		}
-		statusCode := 0
-		if params.StatusCode != "" {
-			fmt.Sscanf(params.StatusCode, "%d", &statusCode)
-		}
-		go func() {
-			if err := mcp.ReportThreat(
-				context.Background(),
-				payloadToValidate,
-				"",
-				types.ThreatMetadata{
-					PolicyName:   policyName,
-					RuleViolated: "BlockPersonalAccounts",
-					Severity:     "MEDIUM",
-					Reason:       blockReason,
-				},
-				params.IP,
-				params.Path,
-				params.Method,
-				reqHeaders,
-				nil,
-				statusCode,
-				types.ContextSource(params.ContextSource),
-				extractHostHeader(reqHeaders),
-				sessionID,
-				behaviour,
-				"",
-			); err != nil {
-				s.logger.Warn("Failed to report threat for personal account block", zap.String("policyName", policyName), zap.Error(err))
-			}
-		}()
+	reqHeaders := make(map[string]string)
+	if params.RequestHeaders != "" {
+		json.Unmarshal([]byte(params.RequestHeaders), &reqHeaders)
 	}
+	s.reportPersonalAccountThreat(payloadToValidate, reqHeaders, params.IP, params.Path, params.Method,
+		params.StatusCode, params.ContextSource, extractHostHeader(reqHeaders), sessionID, policyName, behaviour, blockReason, params.EffectiveSkipThreat())
 
 	return &mcp.ValidationResult{
 		Allowed:   false,
@@ -854,16 +995,27 @@ func hostFromRequestHeaders(rawHeaders string) string {
 // anomaly detection enabled. Only fires for agentic tool-call paths.
 // Returns a block result if any policy with behaviour "block" triggers an anomaly.
 func (s *Service) checkToolCallAnomaly(ctx context.Context, params *models.ValidateRequestParams, sessionID string, policies []types.Policy, contextSource string) *mcp.ValidationResult {
-	if contextSource != string(types.ContextSourceAgentic) {
-		return nil
-	}
 	if !isToolCallPath(params.Path) {
+		s.logger.Info("checkToolCallAnomaly skipped - not a tool call path",
+			zap.String("path", params.Path),
+			zap.String("sessionID", sessionID),
+			zap.String("contextSource", contextSource))
 		return nil
 	}
 	s.cache.mu.RLock()
 	anomalyMap := s.cache.anomalyByPolicy
 	s.cache.mu.RUnlock()
+	s.logger.Info("checkToolCallAnomaly entered evaluation",
+		zap.String("path", params.Path),
+		zap.String("sessionID", sessionID),
+		zap.String("contextSource", contextSource),
+		zap.Int("anomalyMapSize", len(anomalyMap)),
+		zap.Int("policiesCount", len(policies)),
+		zap.Strings("policyNames", policyNames(policies)))
 	if len(anomalyMap) == 0 {
+		s.logger.Info("checkToolCallAnomaly skipped - anomaly map empty",
+			zap.String("path", params.Path),
+			zap.String("sessionID", sessionID))
 		return nil
 	}
 	for _, p := range policies {
@@ -876,6 +1028,12 @@ func (s *Service) checkToolCallAnomaly(ctx context.Context, params *models.Valid
 			continue
 		}
 		event, breached := s.anomalyDetector.RecordToolCall(ctx, sessionID, cfg.PolicyName, cfg.ToolCallLimit)
+		s.logger.Info("checkToolCallAnomaly recorded tool call",
+			zap.String("policyName", cfg.PolicyName),
+			zap.String("sessionID", sessionID),
+			zap.Int("toolCallLimit", cfg.ToolCallLimit),
+			zap.Bool("breached", breached),
+			zap.Bool("firstFire", event != nil))
 		if breached {
 			details := fmt.Sprintf("Tool call limit exceeded: %d calls per session (policy: %s)", cfg.ToolCallLimit, cfg.PolicyName)
 			s.logger.Warn("Anomaly detected: tool call limit exceeded",
@@ -909,24 +1067,49 @@ func (s *Service) checkToolCallAnomaly(ctx context.Context, params *models.Valid
 // has anomaly detection enabled. Only fires for agentic tool-call paths with 4xx/5xx.
 // Returns a block result if any policy with behaviour "block" triggers an anomaly.
 func (s *Service) checkErrorAnomaly(ctx context.Context, params *models.ValidateRequestParams, sessionID string, policies []types.Policy, contextSource string) *mcp.ValidationResult {
-	if contextSource != string(types.ContextSourceAgentic) {
-		return nil
-	}
 	if !isToolCallPath(params.Path) || !isErrorStatusCode(params.StatusCode) {
+		s.logger.Info("checkErrorAnomaly skipped - not a tool call path or not an error status",
+			zap.String("path", params.Path),
+			zap.String("statusCode", params.StatusCode),
+			zap.Bool("isToolCallPath", isToolCallPath(params.Path)),
+			zap.Bool("isErrorStatusCode", isErrorStatusCode(params.StatusCode)),
+			zap.String("sessionID", sessionID),
+			zap.String("contextSource", contextSource))
 		return nil
 	}
 	s.cache.mu.RLock()
 	anomalyMap := s.cache.anomalyByPolicy
 	s.cache.mu.RUnlock()
+	s.logger.Info("checkErrorAnomaly entered evaluation",
+		zap.String("path", params.Path),
+		zap.String("statusCode", params.StatusCode),
+		zap.String("sessionID", sessionID),
+		zap.String("contextSource", contextSource),
+		zap.Int("anomalyMapSize", len(anomalyMap)),
+		zap.Int("policiesCount", len(policies)),
+		zap.Strings("policyNames", policyNames(policies)))
 	if len(anomalyMap) == 0 {
+		s.logger.Info("checkErrorAnomaly skipped - anomaly map empty",
+			zap.String("path", params.Path),
+			zap.String("sessionID", sessionID))
 		return nil
 	}
 	for _, p := range policies {
 		cfg, ok := anomalyMap[p.Info.Name]
+		s.logger.Info("checkErrorAnomaly policies loop call - ",
+			zap.String("policyName", p.Info.Name),
+			zap.Bool("isFound", ok))
+
 		if !ok {
 			continue
 		}
 		event, breached := s.anomalyDetector.RecordError(ctx, sessionID, cfg.PolicyName, cfg.ErrorLimit)
+		s.logger.Info("checkErrorAnomaly recorded error",
+			zap.String("policyName", cfg.PolicyName),
+			zap.String("sessionID", sessionID),
+			zap.Int("errorLimit", cfg.ErrorLimit),
+			zap.Bool("breached", breached),
+			zap.Bool("firstFire", event != nil))
 		if breached {
 			details := fmt.Sprintf("Error limit exceeded: %d errors per session (policy: %s)", cfg.ErrorLimit, cfg.PolicyName)
 			s.logger.Warn("Anomaly detected: error limit exceeded",
@@ -1023,7 +1206,10 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 	anomalyMap := make(map[string]*anomalyCfg)
 	for _, gp := range response.GuardrailPolicies {
 		s.logger.Info("checking anomaly config in policy",
-			zap.String("policyName", gp.Name))
+			zap.String("policyName", gp.Name),
+			zap.Bool("active", gp.Active),
+			zap.Bool("hasAnomalyConfig", gp.AnomalyDetection != nil),
+			zap.Bool("anomalyEnabled", gp.AnomalyDetection != nil && gp.AnomalyDetection.Enabled))
 		if gp.Active && gp.AnomalyDetection != nil && gp.AnomalyDetection.Enabled {
 			ad := gp.AnomalyDetection
 			anomalyMap[gp.Name] = &anomalyCfg{
@@ -1032,8 +1218,16 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 				PolicyName:    gp.Name,
 				Behaviour:     gp.Behaviour,
 			}
+			s.logger.Info("anomaly config added to map",
+				zap.String("policyName", gp.Name),
+				zap.String("behaviour", gp.Behaviour),
+				zap.Int("toolCallLimit", ad.ToolCallLimit),
+				zap.Int("errorLimit", ad.ErrorLimit))
 		}
 	}
+	s.logger.Info("anomaly config map built",
+		zap.Int("anomalyMapSize", len(anomalyMap)),
+		zap.Int("totalPoliciesFetched", len(response.GuardrailPolicies)))
 
 	// Compile blocked-host rules from the converted policies (uses policy.BlockedHosts patterns).
 	blockedHostRules := mcp.CompileBlockedHostRules(policies)
@@ -1362,23 +1556,8 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Check account-type guardrail after server filtering so the policy's server
 	// selection is respected (a personal-account policy scoped to server A should
 	// not block requests arriving on server B).
-	if policyName, ok := blockPersonalAccountPolicyName(policies); ok {
-		s.refreshCollectionTagsIfNeeded()
-		accountType := s.getLoginUserEmailType(valCtx.RequestHeaders)
-		s.logger.Info("ValidateRequest - account type check",
-			zap.String("path", params.Path),
-			zap.String("sessionID", sessionID),
-			zap.String("accountType", accountType))
-		if accountType != "" && accountType != "enterprise" {
-			s.logger.Warn("ValidateRequest - blocking non-enterprise account",
-				zap.String("path", params.Path),
-				zap.String("method", params.Method),
-				zap.String("account", params.AktoAccountID),
-				zap.String("accountType", accountType),
-				zap.String("policyName", policyName),
-				zap.String("sessionID", sessionID))
-			return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName)), nil
-		}
+	if policyName, blocked := s.resolvePersonalAccountBlock(policies, valCtx.Tag, valCtx.RequestHeaders, params.Path, sessionID); blocked {
+		return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName)), nil
 	}
 
 	// Host blocklist (block-only). Evaluated after server filtering so only rules from
@@ -1936,6 +2115,33 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				zap.String("payload", data.RequestPayload))
 
 			reqPayload := s.extractPayloadForValidation(data.RequestPayload, data.Method, data.Path, true)
+
+			// Personal-account guardrail — shared with ValidateRequest via
+			// resolvePersonalAccountBlock so the inline and ingest paths enforce it
+			// identically. Blocking here bypasses the normal payload processing below.
+			if policyName, blocked := s.resolvePersonalAccountBlock(itemPolicies, data.Tag, reqHeaders, data.Path, ""); blocked {
+				behaviour := behaviourForPolicy(itemPolicies, policyName)
+				blockReason := personalAccountReason(behaviour)
+				reqResult = &mcp.ValidationResult{
+					Allowed:   false,
+					Reason:    blockReason,
+					Behaviour: behaviour,
+					Metadata: types.ThreatMetadata{
+						PolicyName:   policyName,
+						RuleViolated: "BlockPersonalAccounts",
+						Severity:     "MEDIUM",
+						Reason:       blockReason,
+					},
+				}
+				result.RequestAllowed = false
+				result.RequestReason = blockReason
+				result.RequestBehaviour = behaviour
+				s.reportPersonalAccountThreat(reqPayload, reqHeaders, data.IP, data.Path, data.Method,
+					data.StatusCode, itemContextSource, mcpServerName, "", policyName, behaviour, blockReason, skipThreat)
+				results = append(results, result)
+				continue
+			}
+
 			processResult, err := s.processor.ProcessRequest(ctx, reqPayload, valCtx, itemPolicies, auditPolicies, hasAuditRules)
 			if err != nil {
 				s.logger.Error("Failed to validate request",

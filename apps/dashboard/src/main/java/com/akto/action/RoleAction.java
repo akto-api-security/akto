@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -16,7 +17,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
-import lombok.Getter;
 import lombok.Setter;
 
 public class RoleAction extends UserAction {
@@ -118,10 +118,7 @@ public class RoleAction extends UserAction {
     }
 
     @Setter
-    private List<String> allowedFeaturesForUser;
-
-    @Getter
-    List<String> allowedFeaturesForRBAC;
+    private boolean threatProtectionEnabled;
 
     public String createCustomRole() {
 
@@ -149,12 +146,7 @@ public class RoleAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if(allowedFeaturesForUser != null && !allowedFeaturesForUser.isEmpty()) {
-            allowedFeaturesForUser = allowedFeaturesForUser.stream()
-                .collect(Collectors.toList());
-        }
-
-        CustomRole role = new CustomRole(roleName, baseRole, apiCollectionIds, defaultInviteRole, allowedFeaturesForUser);
+        CustomRole role = new CustomRole(roleName, baseRole, apiCollectionIds, defaultInviteRole, threatProtectionEnabled, new ArrayList<>());
         CustomRoleDao.instance.insertOne(role);
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
         return SUCCESS.toUpperCase();
@@ -182,16 +174,11 @@ public class RoleAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if(allowedFeaturesForUser != null && !allowedFeaturesForUser.isEmpty()) {
-            allowedFeaturesForUser = allowedFeaturesForUser.stream()
-                .collect(Collectors.toList());
-        }
-
         CustomRoleDao.instance.updateOne(Filters.eq(CustomRole._NAME, roleName),Updates.combine(
             Updates.set(CustomRole.BASE_ROLE, baseRole),
             Updates.set(CustomRole.API_COLLECTIONS_ID, apiCollectionIds),
             Updates.set(CustomRole.DEFAULT_INVITE_ROLE, defaultInviteRole),
-            Updates.set(RBAC.ALLOWED_FEATURES_FOR_USER, allowedFeaturesForUser)
+            Updates.set(CustomRole.THREAT_PROTECTION_ENABLED, threatProtectionEnabled)
         ));
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
 

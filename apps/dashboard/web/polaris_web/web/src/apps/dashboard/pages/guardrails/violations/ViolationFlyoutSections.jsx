@@ -18,8 +18,7 @@ import MarkdownViewer from "@/apps/dashboard/components/shared/MarkdownViewer";
 import { HighlightedText } from "@/apps/dashboard/components/shared/MarkdownComponents";
 import ConversationHistory from "@/apps/dashboard/pages/testing/TestRunResultPage/components/ConversationHistory";
 import func from "@/util/func";
-import { getDashboardCategory, categoryToShortName } from "@/apps/main/labelHelper";
-import { GUARDRAIL_SECTIONS } from "@/apps/dashboard/pages/threat_detection/constants/guardrailDescriptions";
+import { getDashboardCategory, categoryToShortName, isEndpointSecurityCategory } from "@/apps/main/labelHelper";
 import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "@/apps/dashboard/pages/guardrails/components/owaspConfig";
 import OwaspTag from "@/apps/dashboard/pages/guardrails/components/OwaspTag";
@@ -30,8 +29,12 @@ import ComplianceTags from "@/apps/dashboard/pages/guardrails/components/Complia
 export function EvidenceBlock({ evidence }) {
     if (!evidence) return null;
     const name = evidence.author || evidence.heading;
+    // Carry the current category, same as the policy link below: a new tab has no PersistStore
+    // session, so without it the page opens under API Security and renders blank.
+    const assetCategoryShort = categoryToShortName[getDashboardCategory()];
     const assetUrl = evidence.apiCollectionId
         ? `/dashboard/observe/inventory/${evidence.apiCollectionId}?agentic_view=skills`
+            + (assetCategoryShort ? `&category=${assetCategoryShort}` : "")
         : null;
     return (
         <Box borderRadius="2">
@@ -159,6 +162,10 @@ export function OverviewSection({ row, detail }) {
         [row.violation, row.policyName],
     );
 
+    // Only render sections when a specific rule matched. On no-match we deliberately show no
+    // sections rather than a generic guardrail catalogue - it's not specific to the event that
+    // fired (e.g. a Skill violation showing "Content Filters / Denied Topics" filler). The rest of
+    // the Overview (evidence, trigger reason, detection grid, topology, OWASP/compliance) still renders.
     const guardrailSections = useMemo(() => {
         if (guardrailRuleInfo) {
             return [{
@@ -167,14 +174,17 @@ export function OverviewSection({ row, detail }) {
                 subSections: guardrailRuleInfo.overview.map(o => ({ subHeading: o.heading, description: o.body })),
             }];
         }
-        return GUARDRAIL_SECTIONS;
+        return [];
     }, [guardrailRuleInfo]);
 
     const owaspThreats = useMemo(() => getOwaspThreatsForRule(row.violation), [row.violation]);
 
     const gridItems = [
         { label: "Detected", value: func.epochToDateTime(row.detected) },
-        { label: "Device ID", value: detail?.deviceId || "N/A" },
+        // Atlas only: deviceId is the event's host, which really is a device there
+        // (harshith-s-macbook-pro-...). On Argus the same field is a service hostname, so
+        // labelling it "Device ID" is wrong - the Agentic Asset column already shows it.
+        ...(isEndpointSecurityCategory() ? [{ label: "Device ID", value: detail?.deviceId || "N/A" }] : []),
         { label: "Session ID", value: detail?.sessionId || "N/A" },
     ];
 
@@ -200,51 +210,62 @@ export function OverviewSection({ row, detail }) {
                 <DetailGrid items={gridItems} columns={3} />
             </Box>
 
-            <Divider />
+            {detail?.overview && (
+                <>
+                    <Divider />
+                    <MarkdownViewer markdown={detail.overview} />
+                </>
+            )}
 
-            {/* 3. Numbered guardrail sections */}
-            <Box padding="4">
-                <VerticalStack gap="5">
-                    {guardrailSections.map((section, sectionIdx) => (
-                        <React.Fragment key={sectionIdx}>
-                            <VerticalStack gap="3">
-                                <Text variant="headingMd" fontWeight="bold">
-                                    {sectionIdx + 1}. {section.heading}
-                                </Text>
-                                {section.description && (
-                                    <Text variant="bodyMd">{section.description}</Text>
-                                )}
-                                {section.subSections && section.subSections.length > 0 && (
-                                    <VerticalStack gap="3" paddingBlockStart="2">
-                                        {section.subSections.map((sub, subIdx) => (
-                                            <VerticalStack key={subIdx} gap="2">
-                                                <Text variant="headingSm" fontWeight="semibold">
-                                                    {sub.subHeading}:
-                                                </Text>
-                                                {sub.description && (
-                                                    <Text variant="bodyMd">{sub.description}</Text>
-                                                )}
-                                                {sub.items && sub.items.length > 0 && (
-                                                    <Box paddingInlineStart="4" paddingBlockStart="1">
-                                                        <VerticalStack gap="2">
-                                                            {sub.items.map((item, itemIdx) => (
-                                                                <Text key={itemIdx} variant="bodyMd">• {item}</Text>
-                                                            ))}
-                                                        </VerticalStack>
-                                                    </Box>
-                                                )}
+            {guardrailSections.length > 0 && !detail?.overview && (
+                <>
+                    <Divider />
+
+                    {/* 3. Numbered guardrail sections */}
+                    <Box padding="4">
+                        <VerticalStack gap="5">
+                            {guardrailSections.map((section, sectionIdx) => (
+                                <React.Fragment key={sectionIdx}>
+                                    <VerticalStack gap="3">
+                                        <Text variant="headingMd" fontWeight="bold">
+                                            {sectionIdx + 1}. {section.heading}
+                                        </Text>
+                                        {section.description && (
+                                            <Text variant="bodyMd">{section.description}</Text>
+                                        )}
+                                        {section.subSections && section.subSections.length > 0 && (
+                                            <VerticalStack gap="3" paddingBlockStart="2">
+                                                {section.subSections.map((sub, subIdx) => (
+                                                    <VerticalStack key={subIdx} gap="2">
+                                                        <Text variant="headingSm" fontWeight="semibold">
+                                                            {sub.subHeading}:
+                                                        </Text>
+                                                        {sub.description && (
+                                                            <Text variant="bodyMd">{sub.description}</Text>
+                                                        )}
+                                                        {sub.items && sub.items.length > 0 && (
+                                                            <Box paddingInlineStart="4" paddingBlockStart="1">
+                                                                <VerticalStack gap="2">
+                                                                    {sub.items.map((item, itemIdx) => (
+                                                                        <Text key={itemIdx} variant="bodyMd">• {item}</Text>
+                                                                    ))}
+                                                                </VerticalStack>
+                                                            </Box>
+                                                        )}
+                                                    </VerticalStack>
+                                                ))}
                                             </VerticalStack>
-                                        ))}
+                                        )}
                                     </VerticalStack>
-                                )}
-                            </VerticalStack>
-                            {sectionIdx < guardrailSections.length - 1 && (
-                                <Box paddingBlockStart="4"><Divider /></Box>
-                            )}
-                        </React.Fragment>
-                    ))}
-                </VerticalStack>
-            </Box>
+                                    {sectionIdx < guardrailSections.length - 1 && (
+                                        <Box paddingBlockStart="4"><Divider /></Box>
+                                    )}
+                                </React.Fragment>
+                            ))}
+                        </VerticalStack>
+                    </Box>
+                </>
+            )}
 
             {topo && (
                 <>
@@ -313,7 +334,11 @@ export function FileSection({ detail }) {
             <SampleData
                 data={{
                     message: detail.fileContent,
-                    vulnerabilitySegments: (detail.fileHighlights || []).map((phrase) => ({ phrase })),
+                    vulnerabilitySegments: (detail.fileHighlights || []).map((highlight) =>
+                        typeof highlight === "string"
+                            ? { phrase: highlight }
+                            : { ...highlight, includeKeyInHighlight: true }
+                    ),
                 }}
                 editorLanguage={detail.fileLanguage || "json"}
                 minHeight="640px"

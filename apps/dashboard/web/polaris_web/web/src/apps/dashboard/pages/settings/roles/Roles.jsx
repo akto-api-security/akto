@@ -7,7 +7,6 @@ import { usersCollectionRenderItem } from "../rbac/utils";
 import PersistStore from "../../../../main/PersistStore";
 import SearchableResourceList from "../../../components/shared/SearchableResourceList";
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
-import Dropdown from "../../../components/layouts/Dropdown";
 
 const rolesOptions = [
     {
@@ -46,7 +45,38 @@ function getRoleDisplayName(role) {
 
 export { rolesOptions, getRoleDisplayName }
 
+/*
+ * Base roles that decide threat access themselves - admin and the threat roles always
+ * have it, guest never does. The backend ignores the toggle for these too, so showing
+ * it would imply a control that does not exist.
+ */
+const FIXED_THREAT_BASE_ROLES = ['ADMIN', 'GUEST', 'THREAT_ENGINEER', 'THREAT_VIEWER']
+
+function showThreatToggle(role) {
+    return !FIXED_THREAT_BASE_ROLES.includes(role?.baseRole)
+}
+
+function threatEnabledFor(role) {
+    return role?.threatProtectionEnabled === true
+}
+
+// never persist a choice for a base role that decides on its own
+function threatValueToSave(role) {
+    return showThreatToggle(role) && threatEnabledFor(role)
+}
+
+// an empty feature map means a self-hosted deployment, where everything is granted
+function isThreatFeatureGranted() {
+    const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED
+    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
+        return true
+    }
+    return stiggFeatures?.THREAT_DETECTION?.isGranted === true
+}
+
 const Roles = () => {
+
+    const threatFeatureGranted = isThreatFeatureGranted()
 
     const userRole = window.USER_ROLE
     const isLocalDeploy = func.checkLocal();
@@ -56,7 +86,6 @@ const Roles = () => {
     const [loading, setLoading] = useState(false)
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const [createNewRoleModalActive, setCreateNewRoleModalActive] = useState(false)
-    const [allowedFeatures, setAllowedFeatures] = useState([])
 
     const toggleInviteUserModal = () => {
         setCreateNewRoleModalActive(!createNewRoleModalActive)
@@ -76,31 +105,27 @@ const Roles = () => {
         }
     };
 
-    const getAllAllowedFeatures = async () => {
-        try {
-            const featuresResponse = await settingRequests.getAllowedFeaturesForRBAC()
-            if (featuresResponse) {
-                setAllowedFeatures(featuresResponse);
-            }
-        } catch (error) {
-        }
-    }
-
     useEffect(() => {
         if (userRole !== 'GUEST') {
             getRoleData();
         }
+
+    }, [])
+
+    // collectionsMap loads asynchronously, so this cannot be a mount-only effect
+    useEffect(() => {
         setAllCollections(Object.entries(collectionsMap).map(([id, collectionName]) => ({
             id: parseInt(id, 10),
             collectionName
         })));
-        getAllAllowedFeatures();
-
-    }, [])
+    }, [collectionsMap])
 
     const getRoleItems = (role, key) => {
         return roles.filter(r => r.name === role)[0][key] || []
     };
+
+    // drop ids for collections that are deleted or deactivated; the picker cannot list them
+    const selectable = (ids) => ids.filter((id) => id in collectionsMap);
 
     const handleSelectedItemsChange = (role, items, key) => {
         setRoles(prevRoles => {
@@ -130,6 +155,20 @@ const Roles = () => {
         })
     }
 
+    const updateThreatProtection = (role, value) => {
+        setRoles(prevRoles => {
+            return prevRoles.map(r => {
+                if (r.name === role) {
+                    return {
+                        ...r,
+                        threatProtectionEnabled: value
+                    }
+                }
+                return r;
+            })
+        })
+    }
+
     const updateDefaultInviteRole = (role, value) => {
         setRoles(prevRoles => {
             return prevRoles.map(r => {
@@ -146,7 +185,7 @@ const Roles = () => {
 
     const handleUpdate = async (role) => {
         const roleData = roles.filter(r => r.name === role)[0]
-        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole, roleData.allowedFeaturesForUser)
+        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole, threatValueToSave(roleData))
         await getRoleData();
     }
 
@@ -208,7 +247,7 @@ const Roles = () => {
                                 content: (
                                     <ResourceListModal
                                         title={`Update ${name} role`}
-                                        activatorPlaceaholder={`${(getRoleItems(name, "apiCollectionsId") || []).length} collections accessible, ${getRoleDisplayName(baseRole)} permissions${defaultInviteRole ? ', Default invite role' : ''}`}
+                                        activatorPlaceaholder={`${selectable(getRoleItems(name, "apiCollectionsId")).length} collections accessible, ${getRoleDisplayName(baseRole)} permissions${defaultInviteRole ? ', Default invite role' : ''}`}
                                         isColoredActivator={true}
                                         component={<VerticalStack gap={4}>
                                             <Box paddingBlockStart={4}>
@@ -226,20 +265,14 @@ const Roles = () => {
                                                         checked={defaultInviteRole}
                                                         onChange={(checked) => { updateDefaultInviteRole(name, checked) }}
                                                     />
-                                                </HorizontalStack>
-                                            </Box>
-                                            <Box paddingBlockStart={4}> 
-                                                <HorizontalStack gap={"4"}  align="center" blockAlign="center">
-                                                    <Text variant="bodyMd" as="h4">
-                                                        Allowed Features
-                                                    </Text>
-                                                    <Dropdown
-                                                        id={`allowed-features-${name}`}
-                                                        menuItems={allowedFeatures.map(feature => ({ label: feature, value: feature }))}
-                                                        selected={(items) =>  handleSelectedItemsChange(name, items, 'allowedFeaturesForUser')}
-                                                        allowMultiple={true}
-                                                        initial={getRoleItems(name, "allowedFeaturesForUser")}
-                                                    />
+                                                    {showThreatToggle(item) ? (
+                                                        <Checkbox
+                                                            label={"Enable threat protection"}
+                                                            checked={threatEnabledFor(item)}
+                                                            disabled={!threatFeatureGranted}
+                                                            onChange={(checked) => { updateThreatProtection(name, checked) }}
+                                                        />
+                                                    ) : null}
                                                 </HorizontalStack>
                                             </Box>
                                             <Box>
@@ -250,7 +283,7 @@ const Roles = () => {
                                                     isFilterControlEnabale={userRole === 'ADMIN'}
                                                     selectable={userRole === 'ADMIN'}
                                                     onSelectedItemsChange={(items) => handleSelectedItemsChange(name, items, 'apiCollectionsId')}
-                                                    alreadySelectedItems={getRoleItems(name, "apiCollectionsId")}
+                                                    alreadySelectedItems={selectable(getRoleItems(name, "apiCollectionsId"))}
                                                 />
                                             </Box>
                                         </VerticalStack>}

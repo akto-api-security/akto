@@ -242,7 +242,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
         const baseData = {
           ...x,
           actor: isEndpointSecurityCategory()
-            ? getUsernameForCollection({ displayName: x.latestApiHost || x.id }, usernameMap)
+            ? getUsernameForCollection({ displayName: x.latestApiHost || x.id }, usernameMap, x.id || x.latestApiIp)
             : formatActorId(x.id),
           latestIp: formatActorId(x.latestApiIp),
           latestHost: x.latestApiHost || "-",

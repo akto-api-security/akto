@@ -8,6 +8,7 @@ import com.akto.dao.AccountsDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.jobs.executors.copilotstudio.CopilotStudioAgentUsersCron;
 import com.akto.log.LoggerMaker;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.utils.HttpTrafficPublisher;
@@ -60,6 +61,9 @@ public class InitializerListener implements ServletContextListener {
 
         // Warm the MCP collection-name cache and start the periodic refresher
         McpCollectionResolver.getInstance().start();
+
+        // Warm the Copilot Studio agent_users cache from DB and start the periodic Graph sync
+        CopilotStudioAgentUsersCron.getInstance().start();
     }
 
     private void initMongoConnection() {
