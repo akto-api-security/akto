@@ -17,7 +17,7 @@ import PolicyDiffModal from './PolicyDiffModal';
 import guardrailApi from '../api';
 import Store from '../../../store';
 
-const ENABLED_ACCOUNT_IDS = ['1726615470'];
+const ENABLED_ACCOUNT_IDS = ['1726615470', '1779231193'];
 
 /** A source's run state before it has ever been run. Each tab keeps its own copy. */
 const EMPTY_RUN = { status: "idle", error: "", result: null, hasCompared: false };
