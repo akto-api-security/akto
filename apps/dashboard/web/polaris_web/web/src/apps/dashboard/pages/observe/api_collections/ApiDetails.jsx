@@ -659,6 +659,7 @@ function ApiDetails(props) {
     // Base risk score/remarks live on the owning collection, not the per-endpoint ApiInfo — same
     // fields AgentEndpointTreeTable.jsx/AgenticAssetDevicesPage.jsx surface via wrapRiskScoreTooltip.
     const agentRiskAnalysis = (() => {
+        if (!isEndpointSecurityCategory()) return null;
         if (!apiDetail?.apiCollectionId || !allCollections) return null;
         const collection = allCollections.find(c => c.id === apiDetail.apiCollectionId);
         if (!collection?.baseRiskScoreReason || !collection?.baseRiskScore) return null;
@@ -686,11 +687,6 @@ function ApiDetails(props) {
             const remainingReasons = [];
             if (sensitiveTags.length > 0) remainingReasons.push(`sensitive data detected: ${sensitiveTags.join(', ')}`);
             if (apiDetail.access_type === 'Public') remainingReasons.push('publicly accessible');
-            const openIssuesText = Object.entries(apiDetail.severityObj || {})
-                .filter(([, count]) => count > 0)
-                .map(([severity, count]) => `${count} ${severity}`)
-                .join(', ');
-            if (openIssuesText) remainingReasons.push(`open security issues: ${openIssuesText}`);
             factors.push({
                 weight: remaining,
                 text: remainingReasons.length > 0 ? `Other factors — ${remainingReasons.join(', ')}` : 'Other factors',
