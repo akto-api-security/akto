@@ -41,6 +41,9 @@ public class CyborgMetricsTest {
         assertTrue("host tag present", out.contains("host=\"tbs.akto.io\""));
         assertTrue("path tag present", out.contains("path=\"/api/threat_detection/record_malicious_event\""));
         assertFalse("no query in path", out.contains("?"));
+        // account_id only on the counter, not the latency histogram.
+        assertTrue("account_id on client counter", lineExists(out, "http_client_requests_total", "account_id="));
+        assertFalse("account_id NOT on client latency", lineExists(out, "http_client_request_duration_seconds", "account_id="));
     }
 
     private static boolean lineExists(String scrape, String metricPrefix, String tag) {
