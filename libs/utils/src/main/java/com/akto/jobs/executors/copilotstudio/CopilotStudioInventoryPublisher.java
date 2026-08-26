@@ -43,12 +43,25 @@ public class CopilotStudioInventoryPublisher {
     /** Kept at "{}" on purpose — over 3 chars triggers an unwanted AgentQueryRecord write downstream. */
     private static final String EMPTY_REQUEST_PAYLOAD = "{}";
 
-    /** Builds one sample per (agent, known user) pair — reaches every user who talks to a bot, not just its owner. Agents with no usable name or no resolved owner/chatter are skipped. */
+    /** Same as the 7-arg overload below, without an environment-name lookup (bot-environment-name tag left unset). */
     public List<Map<String, Object>> buildSamples(List<JsonNode> agents, String environmentId,
                                                    Map<String, String> botIdToDataverseName, int accountId,
                                                    Map<String, String> ownerIdToUserId,
                                                    Map<String, Set<String>> botNameToKnownUserIds) {
+        return buildSamples(agents, environmentId, botIdToDataverseName, accountId, ownerIdToUserId,
+            botNameToKnownUserIds, null);
+    }
+
+    /** Builds one sample per (agent, known user) pair — reaches every user who talks to a bot, not just its owner. Agents with no usable name or no resolved owner/chatter are skipped. */
+    public List<Map<String, Object>> buildSamples(List<JsonNode> agents, String environmentId,
+                                                   Map<String, String> botIdToDataverseName, int accountId,
+                                                   Map<String, String> ownerIdToUserId,
+                                                   Map<String, Set<String>> botNameToKnownUserIds,
+                                                   Map<String, String> environmentIdToName) {
         List<Map<String, Object>> samples = new ArrayList<>();
+
+        String environmentName = (environmentIdToName != null && environmentId != null)
+            ? environmentIdToName.get(environmentId.toLowerCase(Locale.ROOT)) : null;
 
         for (JsonNode agent : agents) {
             JsonNode properties = agent.path("properties");
@@ -83,14 +96,14 @@ public class CopilotStudioInventoryPublisher {
             for (String userId : userIds) {
                 // Only the owner's own sample gets the owner tag, not every chatter's.
                 boolean isOwnerSample = userId.equals(resolvedOwnerId);
-                samples.add(buildSample(agent, agentId, userId + AIAgentConnectorConstants.AI_AGENT_HOST_INFIX + botName, environmentId, accountId, botName, isOwnerSample));
+                samples.add(buildSample(agent, agentId, userId + AIAgentConnectorConstants.AI_AGENT_HOST_INFIX + botName, environmentId, accountId, botName, isOwnerSample, environmentName));
             }
         }
 
         return samples;
     }
 
-    private Map<String, Object> buildSample(JsonNode agent, String agentId, String host, String environmentId, int accountId, String botName, boolean isOwnerSample) {
+    private Map<String, Object> buildSample(JsonNode agent, String agentId, String host, String environmentId, int accountId, String botName, boolean isOwnerSample, String environmentName) {
         Map<String, String> tags = new HashMap<>();
         tags.put(Constants.AKTO_ENDPOINT_SOURCE_TAG, Constants.AKTO_ENDPOINT_SOURCE_VALUE);
         tags.put(Constants.AKTO_GEN_AI_TAG, AIAgentConnectorConstants.DATA_TAG_GEN_AI);
@@ -101,6 +114,9 @@ public class CopilotStudioInventoryPublisher {
         tags.put(Constants.AKTO_SAAS_AGENT_TAG, Constants.COPILOT_STUDIO_AI_AGENT_NAME);
         if (isOwnerSample) {
             tags.put(Constants.AKTO_AI_AGENT_OWNER_TAG, TAG_VALUE_TRUE);
+        }
+        if (environmentName != null && !environmentName.isEmpty()) {
+            tags.put(Constants.AKTO_COPILOT_BOT_ENVIRONMENT_NAME_TAG, environmentName);
         }
 
         Map<String, String> requestHeaders = new HashMap<>();
