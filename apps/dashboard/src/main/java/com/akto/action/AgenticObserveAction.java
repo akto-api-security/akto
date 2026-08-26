@@ -1010,7 +1010,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     if (wanted.contains("Local MCP Server") && Boolean.TRUE.equals(r.getBoolean("hasLocalMcpServer", false))) return false;
                     if (wanted.contains("Misconfigured") && Boolean.TRUE.equals(r.getBoolean("hasMisconfiguredConfig", false))) return false;
                     if (wanted.contains("Malicious Skills") && Boolean.TRUE.equals(r.getBoolean("hasMaliciousSkill", false))) return false;
-                    if (wanted.contains("Owner") && Boolean.TRUE.equals(r.getBoolean("hasOwnerTag", false))) return false;
+                    if (wanted.contains("Agent Owner") && Boolean.TRUE.equals(r.getBoolean("hasOwnerTag", false))) return false;
                     return true;
                 });
             }
