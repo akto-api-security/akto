@@ -73,8 +73,9 @@
     <!-- GzipFilter (org.eclipse.jetty.servlets.GzipFilter) was removed in Jetty 12.
          Response compression is handled server-side by the Jetty `gzip` module (Dockerfile). -->
 
-    <!-- First: loads the Prometheus registry class and sets common tags before any meter is
-         registered (JVM binders here, the Kafka binder started by InitializerListener). -->
+    <!-- Binds JVM/process metrics at startup when metrics are enabled. Common tags + the uri
+         cardinality guard are applied in the registry's static initializer (at class load), so
+         listener order does not matter for those. -->
     <listener>
         <listener-class>com.akto.listener.InfraMetricsListener</listener-class>
     </listener>
