@@ -2,7 +2,6 @@ package com.akto.metrics;
 
 import com.akto.listener.InfraMetricsListener;
 import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Timer;
@@ -17,11 +16,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Central facade for cyborg's Prometheus request metrics. All metric names, tags, and registry
  * wiring live here; callers just pass the tag values and the measurements.
  *
- * Cardinality discipline:
- *  - account_id is attached ONLY to the request counter (1 series per combo). It is NOT put on the
- *    latency histogram or the size summaries — those carry buckets/series that would multiply into
- *    millions once tenants are added.
- *  - The latency histogram uses explicit SLO buckets (25ms..5s), no client-side percentiles.
+ * Cardinality discipline: account_id is attached ONLY to the request counter (1 series per combo);
+ * the latency histogram stays tenant-agnostic and uses explicit SLO buckets (25ms..5s), with no
+ * client-side percentiles (Grafana computes them via histogram_quantile over the buckets).
  */
 public class CyborgMetrics {
 
@@ -53,18 +50,15 @@ public class CyborgMetrics {
     }
 
     /**
-     * Record one HTTP request: count, latency, and (when known) request/response body sizes.
+     * Record one HTTP request: count (by uri/method/status/account_id) and latency (by uri/method/status).
      *
-     * @param uri           request URI (bounded /api/<action> set)
-     * @param method        HTTP method
-     * @param status        HTTP status code as string
-     * @param accountId     caller account id (use CyborgMetrics.UNKNOWN when absent)
-     * @param durationMs    request duration in milliseconds
-     * @param requestBytes  request body size; &lt; 0 means unknown and is not recorded
-     * @param responseBytes response body size; &lt; 0 means unknown and is not recorded
+     * @param uri        request URI (bounded /api/<action> set)
+     * @param method     HTTP method
+     * @param status     HTTP status code as string
+     * @param accountId  caller account id (use CyborgMetrics.UNKNOWN when absent)
+     * @param durationMs request duration in milliseconds
      */
-    public static void recordHttpRequest(String uri, String method, String status, String accountId,
-                                         long durationMs, int requestBytes, long responseBytes) {
+    public static void recordHttpRequest(String uri, String method, String status, String accountId, long durationMs) {
         List<Tag> baseTags = Arrays.asList(
                 Tag.of("uri", uri),
                 Tag.of("method", method),
@@ -89,23 +83,5 @@ public class CyborgMetrics {
                 .maximumExpectedValue(Duration.ofSeconds(5))
                 .register(InfraMetricsListener.registry)
                 .record(durationMs, TimeUnit.MILLISECONDS);
-
-        if (requestBytes >= 0) {
-            DistributionSummary.builder("http_request_size_bytes")
-                    .description("HTTP request body size in bytes")
-                    .baseUnit("bytes")
-                    .tags(baseTags)
-                    .register(InfraMetricsListener.registry)
-                    .record(requestBytes);
-        }
-
-        if (responseBytes >= 0) {
-            DistributionSummary.builder("http_response_size_bytes")
-                    .description("HTTP response body size in bytes")
-                    .baseUnit("bytes")
-                    .tags(baseTags)
-                    .register(InfraMetricsListener.registry)
-                    .record(responseBytes);
-        }
     }
 }
