@@ -1,6 +1,5 @@
 package com.akto.metrics;
 
-import com.akto.dao.context.Context;
 import com.akto.listener.InfraMetricsListener;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Tag;
@@ -74,28 +73,24 @@ public class CyborgMetrics {
      * no response (connection error/timeout).
      */
     public static void recordOutboundHttpRequest(String host, String path, String method, int status, long durationMs) {
-        List<Tag> baseTags = Arrays.asList(
+        // No account_id on outbound: it's a call to an external API, and the accountId on the calling
+        // thread can be stale for background/async paths — a wrong tenant label is worse than none.
+        List<Tag> tags = Arrays.asList(
                 Tag.of("host", host),
                 Tag.of("path", path),
                 Tag.of("method", method),
                 Tag.of("status", String.valueOf(status))
         );
-        // Runs on the calling thread, so Context.accountId (set by AuthFilter for request-driven
-        // calls) attributes the outbound call to the tenant. "unknown" for background-thread calls.
-        Integer acc = Context.accountId.get();
-        String account = acc != null ? String.valueOf(acc) : UNKNOWN;
 
-        // account_id only on the counter (cheap), not on the latency histogram (cardinality).
         Counter.builder("http_client_requests_total")
                 .description("Total outbound HTTP requests")
-                .tags(baseTags)
-                .tag("account_id", account)
+                .tags(tags)
                 .register(InfraMetricsListener.registry)
                 .increment();
 
         Timer.builder("http_client_request_duration")
                 .description("Outbound HTTP request duration")
-                .tags(baseTags)
+                .tags(tags)
                 .serviceLevelObjectives(LATENCY_SLOS)
                 .minimumExpectedValue(Duration.ofMillis(25))
                 .maximumExpectedValue(Duration.ofSeconds(5))
