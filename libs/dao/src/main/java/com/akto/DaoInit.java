@@ -436,6 +436,16 @@ public class DaoInit {
         init(connectionString, ReadPreference.secondary());
     }
 
+    /**
+     * Convenience for callers that want the default ReadPreference (secondary) but still attach
+     * Mongo driver listeners (e.g. Micrometer metrics). Mirrors {@link #init(ConnectionString)}.
+     */
+    public static void init(ConnectionString connectionString,
+                            java.util.List<com.mongodb.event.CommandListener> commandListeners,
+                            java.util.List<com.mongodb.event.ConnectionPoolListener> connectionPoolListeners) {
+        init(connectionString, ReadPreference.secondary(), commandListeners, connectionPoolListeners);
+    }
+
     public static void createIndices() {
         try {
             TestingRunResultDao.instance.convertToCappedCollection();

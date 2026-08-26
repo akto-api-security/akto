@@ -23,7 +23,6 @@ import com.akto.utils.EndpointRemoteCommandCleanupCron;
 import com.akto.utils.TagMismatchCron;
 import com.akto.utils.TokenBlocklistCron;
 import com.mongodb.ConnectionString;
-import com.mongodb.ReadPreference;
 import io.micrometer.core.instrument.binder.mongodb.MongoMetricsConnectionPoolListener;
 
 import java.util.Collections;
@@ -57,7 +56,7 @@ public class InitializerListener implements ServletContextListener {
                             // 1.17's MongoMetricsCommandListener calls CommandEvent.getDatabaseName(),
                             // which this project's older Mongo driver lacks (NoSuchMethodError).
                             if (CyborgMetricsConfig.isEnabled()) {
-                                DaoInit.init(new ConnectionString(mongoURI), ReadPreference.secondary(),
+                                DaoInit.init(new ConnectionString(mongoURI),
                                         null,
                                         Collections.singletonList(
                                                 new MongoMetricsConnectionPoolListener(InfraMetricsListener.registry)));
