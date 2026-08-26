@@ -156,5 +156,11 @@ export const extractOverviewAndRemediation = (metadata) => {
   }
 };
 
+export const storedRemediationMarkdown = (raw) => {
+  if (!raw || typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  return trimmed || null;
+};
+
 export const getBehaviourTone = (behaviour) =>
   behaviour === 'block' ? 'critical' : behaviour === 'warn' ? 'attention' : behaviour === 'alert' ? 'info' : undefined;

@@ -17,3 +17,14 @@ message RecordMaliciousEventRequest {
   threat_detection.message.malicious_event.v1.MaliciousEventMessage malicious_event = 1;
   repeated threat_detection.message.sample_request.v1.SampleMaliciousRequest sample_requests = 2;
 }
+
+message UpdateRemediationRequest {
+  string ref_id = 1;             // UUID refId of the malicious event
+  string remediation = 2;        // Remediation steps from LLM
+}
+
+message UpdateRemediationResponse {
+  bool success = 1;
+  string message = 2;
+  int32 updated_count = 3;  // Should be 1 for single update
+}

@@ -456,7 +456,8 @@ function ThreatDetectionPage() {
             complianceMapData: data.complianceMapData || {},
             metadata: data.metadata || '',
             behaviourRaw: data.behaviourRaw || extractBehaviour(data.metadata) || '',
-            host: data.host || ''
+            host: data.host || '',
+            remediation: data.remediation || ''
         });
 
         setShowDetails(true);
@@ -476,7 +477,8 @@ function ThreatDetectionPage() {
                 complianceMap: data.complianceMapData || {},
                 metadata: data.metadata || '',
                 behaviour: data.behaviourRaw || extractBehaviour(data.metadata) || '',
-                host: data.host || ''
+                host: data.host || '',
+                remediation: data.remediation || ''
             },
             currentEventId: data.id || '',
             currentEventStatus: data.status || '',
@@ -669,6 +671,7 @@ function ThreatDetectionPage() {
               metadata: rowContext?.metadata || '',
               behaviour: rowContext?.behaviourRaw || extractBehaviour(rowContext?.metadata) || '',
               host: rowContext?.host || '',
+              remediation: rowContext?.remediation || '',
               complianceMap: rowContext?.complianceMapData || (() => {
                 if (!queryParams.filterId) return {};
                 const { threatFiltersMap, guardrailComplianceMap } = SessionStore.getState();

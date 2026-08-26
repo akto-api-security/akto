@@ -136,7 +136,9 @@ public class MaliciousEventService {
     // Skip recording for specific policies on specific account.
     // TODO: Remove once policy is fixed.
 
-    String refId = UUID.randomUUID().toString();
+    String refId = (evt.hasRefId() && !evt.getRefId().isEmpty())
+        ? evt.getRefId()
+        : UUID.randomUUID().toString();
     logger.debug("received malicious event " + evt.getLatestApiEndpoint() + " filterId " + evt.getFilterId() + " eventType " + evt.getEventType().toString());
 
     EventType eventType = evt.getEventType();
@@ -206,6 +208,28 @@ public class MaliciousEventService {
         KafkaUtils.generateMsg(
             maliciousEventModel, MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, accountId),
         KafkaTopic.ThreatDetection.INTERNAL_DB_MESSAGES);
+  }
+
+  public int updateRemediation(String accountId, String refId, String remediation) {
+    try {
+      if (refId == null || refId.isEmpty()) {
+        logger.error("refId is required to update remediation");
+        return 0;
+      }
+
+      Bson update = Updates.set("remediation", remediation);
+
+      Bson filters = Filters.eq("refId", refId);
+
+      long modifiedCount = maliciousEventDao.getCollection(accountId)
+          .updateOne(filters, update)
+          .getModifiedCount();
+
+      return (int) modifiedCount;
+    } catch (Exception e) {
+      logger.error("Error updating remediation for refId: " + refId, e);
+      return 0;
+    }
   }
 
   private <T> Set<T> findDistinctFields(
@@ -719,6 +743,7 @@ public class MaliciousEventService {
                 .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
                 .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
                 .setSessionId(resolvedSessionId)
+                .setRemediation(evt.getRemediation() != null ? evt.getRemediation() : "")
                 .addAllOwaspCategories(evt.getOwaspCategories() != null
                     ? evt.getOwaspCategories().stream()
                         .map(o -> OwaspCategory.newBuilder()

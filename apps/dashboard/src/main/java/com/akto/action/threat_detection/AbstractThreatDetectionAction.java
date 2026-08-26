@@ -134,7 +134,8 @@ public class AbstractThreatDetectionAction extends UserAction {
             ListMaliciousRequestsResponse.class, responseBody
         ).ifPresent(m -> {
           result.addAll(m.getMaliciousEventsList().stream()
-              .map(smr -> new DashboardMaliciousEvent(
+              .map(smr -> {
+                DashboardMaliciousEvent event = new DashboardMaliciousEvent(
                   smr.getId(),
                   smr.getActor(),
                   smr.getFilterId(),
@@ -159,7 +160,10 @@ public class AbstractThreatDetectionAction extends UserAction {
                   smr.getJiraTicketUrl(),
                   smr.getSeverity(),
                   smr.getSessionId() != null && !smr.getSessionId().isEmpty() ? smr.getSessionId() : ""
-              ))
+                );
+                event.setRemediation(smr.getRemediation());
+                return event;
+              })
               .collect(Collectors.toList())
           );
         });
