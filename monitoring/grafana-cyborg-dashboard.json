@@ -367,7 +367,7 @@
     {
       "type": "timeseries",
       "title": "Open file descriptors",
-      "description": "Open vs max fds. Rising open = socket/connection leak.",
+      "description": "Actual open file descriptors. Steady climb = socket/connection leak.",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -402,22 +402,13 @@
       },
       "targets": [
         {
+          "refId": "A",
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
           "expr": "process_files_open_files{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}",
-          "legendFormat": "open",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "expr": "process_files_max_files{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}",
-          "legendFormat": "max",
-          "refId": "B"
+          "legendFormat": "open"
         }
       ]
     },
