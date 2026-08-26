@@ -1,6 +1,7 @@
 package com.akto.utils.crons;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -56,7 +57,7 @@ public class CollectionDescriptionCron {
 
     // Explicit allowlist - this cron no longer sweeps every account, only these. Add more IDs here as
     // needed.
-    private static final List<Integer> ALLOWED_ACCOUNT_IDS = Collections.singletonList(1779231193);
+    private static final List<Integer> ALLOWED_ACCOUNT_IDS = Arrays.asList(1779231193, 1783981503);
 
     // Skill/MCP-server collections can have hundreds of distinct skills or tools - sampled wide enough
     // to report the true count, but only a slice of names is ever put in a prompt.

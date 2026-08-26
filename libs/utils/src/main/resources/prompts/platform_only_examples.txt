@@ -3,6 +3,8 @@ VS Code is an AI-powered development environment that can understand a codebase,
 Cursor is an AI-powered code editor that can understand a codebase, reason across files, and take actions through integrated agents, tools, skills, and MCP servers.
 Claude is an AI-powered development agent that can understand software projects, reason through complex tasks, and take actions through integrated tools, skills, and MCP servers.
 Antigravity is an AI-powered development agent that can understand software projects, reason across the codebase, and take actions through integrated tools, agents, and connected services.
+GitHub Copilot is an AI-powered code completion tool that can understand a codebase, reason across files, and take actions through integrated tools, skills, extensions, and MCP servers.
+Codex is an AI-powered code generation tool that can understand programming languages, reason through code, and generate relevant code snippets through integrated tools, skills, extensions, and MCP servers.
 
 [MCP_SERVER]
 Razorpay MCP is an MCP server that enables AI agents to understand and interact with Razorpay data and capabilities through exposed tools and resources.

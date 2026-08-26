@@ -32,6 +32,13 @@ public class PlatformOnlyDescriptionPromptHandler extends AzureOpenAIPromptHandl
     // go on at all," which is what the other placeholder means in the fallback call.
     public static final String UNKNOWN_PLATFORM_FLAG = "UNKNOWN_PLATFORM";
 
+    // Backstop against the model echoing its internal TYPE 1/TYPE 2 classification into the actual
+    // description text (seen in practice despite the prompt telling it not to) - never trust wording
+    // alone for this, catch it in code so a leaked classification can never end up stored as if it
+    // were a real description.
+    private static final java.util.regex.Pattern LEAKED_CLASSIFICATION_PATTERN =
+        java.util.regex.Pattern.compile("\\bTYPE\\s*[12]\\b", java.util.regex.Pattern.CASE_INSENSITIVE);
+
     // The prompt's static structure/instructions live in this file, not in Java string
     // concatenation, so wording tweaks don't need a recompile. Only the parts that genuinely vary
     // per call (platform name, examples, type phrase) are computed in Java and substituted in.
@@ -185,8 +192,19 @@ public class PlatformOnlyDescriptionPromptHandler extends AzureOpenAIPromptHandl
                 return resp;
             }
 
-            resp.put("description", UNKNOWN_PLATFORM_FLAG.equalsIgnoreCase(description)
-                ? UNKNOWN_PLATFORM_FLAG : description);
+            if (UNKNOWN_PLATFORM_FLAG.equalsIgnoreCase(description)) {
+                resp.put("description", UNKNOWN_PLATFORM_FLAG);
+                return resp;
+            }
+
+            if (LEAKED_CLASSIFICATION_PATTERN.matcher(description).find()) {
+                // Never store this - treat it the same as any other failed Call 1 attempt, which
+                // falls through to the endpoint-grounded call instead of leaving bad text behind.
+                resp.put("error", "LLM leaked its TYPE 1/TYPE 2 classification instead of a description: " + description);
+                return resp;
+            }
+
+            resp.put("description", description);
         } catch (Exception e) {
             logger.error("Error parsing platform-only description response: " + processed, e);
             resp.put("error", "Error parsing response: " + e.getMessage());
