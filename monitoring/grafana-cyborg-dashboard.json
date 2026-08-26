@@ -48,27 +48,6 @@
           "type": "prometheus",
           "uid": "${DS_PROMETHEUS}"
         },
-        "definition": "label_values(jvm_memory_used_bytes{service=\"cyborg\"}, role)",
-        "hide": 0,
-        "includeAll": true,
-        "label": "Role",
-        "multi": true,
-        "name": "role",
-        "options": [],
-        "query": {
-          "query": "label_values(jvm_memory_used_bytes{service=\"cyborg\"}, role)",
-          "refId": "role"
-        },
-        "refresh": 2,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "current": {},
-        "datasource": {
-          "type": "prometheus",
-          "uid": "${DS_PROMETHEUS}"
-        },
         "definition": "label_values(up{job=\"cyborg\"}, instance)",
         "hide": 0,
         "includeAll": true,
@@ -139,7 +118,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (area) (jvm_memory_used_bytes{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"})",
+          "expr": "sum by (area) (jvm_memory_used_bytes{service=\"cyborg\", instance=~\"$instance\"})",
           "legendFormat": "used {{area}}",
           "refId": "A"
         },
@@ -148,7 +127,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum(jvm_memory_committed_bytes{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\", area=\"heap\"})",
+          "expr": "sum(jvm_memory_committed_bytes{service=\"cyborg\", instance=~\"$instance\", area=\"heap\"})",
           "legendFormat": "heap committed",
           "refId": "B"
         }
@@ -196,7 +175,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "jvm_threads_live_threads{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}",
+          "expr": "jvm_threads_live_threads{service=\"cyborg\", instance=~\"$instance\"}",
           "legendFormat": "live",
           "refId": "A"
         },
@@ -205,7 +184,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "jvm_threads_daemon_threads{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}",
+          "expr": "jvm_threads_daemon_threads{service=\"cyborg\", instance=~\"$instance\"}",
           "legendFormat": "daemon",
           "refId": "B"
         },
@@ -214,7 +193,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "jvm_threads_peak_threads{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}",
+          "expr": "jvm_threads_peak_threads{service=\"cyborg\", instance=~\"$instance\"}",
           "legendFormat": "peak",
           "refId": "C"
         }
@@ -262,7 +241,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (action) (rate(jvm_gc_pause_seconds_sum{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}[$__rate_interval]))",
+          "expr": "sum by (action) (rate(jvm_gc_pause_seconds_sum{service=\"cyborg\", instance=~\"$instance\"}[$__rate_interval]))",
           "legendFormat": "{{action}}",
           "refId": "A"
         }
@@ -310,7 +289,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "jvm_memory_usage_after_gc{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}",
+          "expr": "jvm_memory_usage_after_gc{service=\"cyborg\", instance=~\"$instance\"}",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -358,7 +337,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "jvm_gc_overhead{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}",
+          "expr": "jvm_gc_overhead{service=\"cyborg\", instance=~\"$instance\"}",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -407,7 +386,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "process_files_open_files{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}",
+          "expr": "process_files_open_files{service=\"cyborg\", instance=~\"$instance\"}",
           "legendFormat": "open"
         }
       ]
@@ -458,7 +437,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "sum by (uri) (rate(http_requests_total{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval]))",
+          "expr": "sum by (uri) (rate(http_requests_total{service=\"cyborg\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval]))",
           "legendFormat": "{{uri}}",
           "refId": "A"
         }
@@ -510,7 +489,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "histogram_quantile(0.90, sum by (le, uri) (rate(http_request_duration_seconds_bucket{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.90, sum by (le, uri) (rate(http_request_duration_seconds_bucket{service=\"cyborg\", instance=~\"$instance\", uri!=\"\"}[$__rate_interval])))",
           "legendFormat": "{{uri}}",
           "refId": "A"
         }
@@ -563,7 +542,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "mongodb_driver_pool_size{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}",
+          "expr": "mongodb_driver_pool_size{service=\"cyborg\", instance=~\"$instance\"}",
           "legendFormat": "size {{server_address}}"
         },
         {
@@ -572,7 +551,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "mongodb_driver_pool_checkedout{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}",
+          "expr": "mongodb_driver_pool_checkedout{service=\"cyborg\", instance=~\"$instance\"}",
           "legendFormat": "in-use {{server_address}}"
         },
         {
@@ -581,7 +560,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "mongodb_driver_pool_waitqueuesize{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}",
+          "expr": "mongodb_driver_pool_waitqueuesize{service=\"cyborg\", instance=~\"$instance\"}",
           "legendFormat": "waiting {{server_address}}"
         }
       ]

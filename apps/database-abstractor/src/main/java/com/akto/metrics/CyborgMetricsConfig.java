@@ -10,14 +10,12 @@ package com.akto.metrics;
  *
  * Env vars:
  *   PROMETHEUS_METRICS_ENABLED   master switch ("true" to enable; default off)
- *   METRICS_SERVICE_ROLE         role tag: api | consumer | fast-consumer (default "unknown")
  *   METRICS_AUTH_ENABLED         require a token on /metrics (default true; "false" to disable)
  *   METRICS_AUTH_TOKEN           bearer token for /metrics
  *   METRICS_MAX_URI_CARDINALITY  cap on distinct uri tag values on http_* metrics (default 500)
  */
 public final class CyborgMetricsConfig {
 
-    public static final String UNKNOWN = "unknown";
     private static final int DEFAULT_MAX_URI_CARDINALITY = 500;
 
     // volatile: read on every request; the setters exist only for tests, never for production use.
@@ -25,7 +23,6 @@ public final class CyborgMetricsConfig {
     private static volatile boolean authEnabled = !"false".equalsIgnoreCase(env("METRICS_AUTH_ENABLED"));
     private static volatile String authToken = env("METRICS_AUTH_TOKEN");
 
-    private static final String role = resolveRole();
     private static final int maxUriCardinality = parseIntOrDefault(env("METRICS_MAX_URI_CARDINALITY"), DEFAULT_MAX_URI_CARDINALITY);
 
     private CyborgMetricsConfig() {
@@ -46,19 +43,9 @@ public final class CyborgMetricsConfig {
         return authToken;
     }
 
-    /** Deployment role tag value (api / consumer / fast-consumer), or "unknown". */
-    public static String getRole() {
-        return role;
-    }
-
     /** Max distinct uri tag values on http_* metrics before new ones are dropped (anti-explosion). */
     public static int getMaxUriCardinality() {
         return maxUriCardinality;
-    }
-
-    private static String resolveRole() {
-        String r = env("METRICS_SERVICE_ROLE");
-        return (r == null || r.trim().isEmpty()) ? UNKNOWN : r.trim();
     }
 
     private static String env(String key) {
