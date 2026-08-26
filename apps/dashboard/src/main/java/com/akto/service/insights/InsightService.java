@@ -10,6 +10,7 @@ import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -81,7 +82,24 @@ public class InsightService {
                 results.add(failureResult(providers.get(i)));
             }
         }
+        // Worst-first: a reader should see CRITICAL/HIGH cards before LOW ones, not the fixed
+        // cheapest-first build order the registry iterates in. List.sort is stable, so insights
+        // tied on severity keep that original registry order as their tiebreak.
+        results.sort(Comparator.comparingInt(r -> severityRank(r.getSeverity())));
         return results;
+    }
+
+    /** CRITICAL first, matching the same rank convention the Violations grid's severity column
+     *  sort already uses. Missing/unrecognized severity sorts last, after LOW. */
+    private static int severityRank(String severity) {
+        if (severity == null) return 5;
+        switch (severity.toUpperCase(java.util.Locale.US)) {
+            case "CRITICAL": return 1;
+            case "HIGH": return 2;
+            case "MEDIUM": return 3;
+            case "LOW": return 4;
+            default: return 5;
+        }
     }
 
     private <T> Callable<T> withContext(int accountId, Integer userId, CONTEXT_SOURCE contextSource, Callable<T> body) {
@@ -115,6 +133,7 @@ public class InsightService {
             if (cached != null) {
                 r.setMarkdown(cached.getNarrativeMarkdown());
                 r.setNarrativeStatus("OK");
+                applyNarrativeSummaryFields(r, cached.getNarrativeConcern(), cached.getNarrativeImpact(), cached.getNarrativeRemediation());
                 return r;
             }
         }
@@ -175,7 +194,18 @@ public class InsightService {
                 .append("metrics", metrics)
                 .append("evidence", evidence)
                 .append("caveats", r.getCaveats())
-                .append("dataGaps", gaps);
+                .append("dataGaps", gaps)
+                .append("draftConcern", r.getConcern() != null ? r.getConcern() : "")
+                .append("draftImpact", r.getImpact() != null ? r.getImpact() : "")
+                .append("draftRemediation", r.getRemediation() != null ? r.getRemediation() : "");
+    }
+
+    /** The provider's own concern/impact/remediation are a guaranteed, deterministic fallback —
+     *  only replace a field when the model actually returned something non-empty for it. */
+    private void applyNarrativeSummaryFields(InsightResult r, String concern, String impact, String remediation) {
+        if (concern != null && !concern.isEmpty()) r.setConcern(concern);
+        if (impact != null && !impact.isEmpty()) r.setImpact(impact);
+        if (remediation != null && !remediation.isEmpty()) r.setRemediation(remediation);
     }
 
     /** Fingerprint over the exact bytes sent to the LLM — a changed metric changes the key, so
@@ -195,12 +225,17 @@ public class InsightService {
             return;
         }
         String markdown = out.getString("markdown");
+        String concern = out.getString("concern");
+        String impact = out.getString("impact");
+        String remediation = out.getString("remediation");
         r.setMarkdown(markdown);
         r.setNarrativeStatus("OK");
+        applyNarrativeSummaryFields(r, concern, impact, remediation);
 
         long now = System.currentTimeMillis() / 1000;
         InsightNarrativeCache cache = new InsightNarrativeCache(fingerprint, r.getInsightId(), providerVersion,
-                InsightNarrativeHandler.PROMPT_VERSION, markdown, now, new Date((now + TimeUnit.DAYS.toSeconds(NARRATIVE_TTL_DAYS)) * 1000L));
+                InsightNarrativeHandler.PROMPT_VERSION, markdown, concern, impact, remediation, now,
+                new Date((now + TimeUnit.DAYS.toSeconds(NARRATIVE_TTL_DAYS)) * 1000L));
         InsightNarrativeCacheDao.instance.put(cache);
     }
 }

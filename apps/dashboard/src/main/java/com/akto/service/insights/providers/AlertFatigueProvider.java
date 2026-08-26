@@ -39,13 +39,21 @@ public class AlertFatigueProvider extends AbstractInsightProvider {
     private static final int EVIDENCE_ROW_CAP = 20;
     private static final long WINDOW_SECONDS = 24L * 60 * 60;
     private static final int REPEAT_THRESHOLD = 5;
+    // A blocking policy still lets this many repeats through before we call it CRITICAL rather
+    // than HIGH — HIGH already covers "any blocking policy involved"; this is for the case where
+    // that policy is being hit at a volume that reads as sustained, ongoing abuse rather than a
+    // handful of retries.
+    private static final int CRITICAL_REPEAT_THRESHOLD = 50;
 
     public AlertFatigueProvider() { super(InsightId.ALERT_FATIGUE, 1); }
 
     @Override
     public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope) {
         List<ThreatCategoryCount> subCategoryCounts = bundle.subCategoryCounts;
-        if (subCategoryCounts == null) {
+        // subCategoryCounts is a threat-backend aggregate and the bundle never returns null
+        // for it — a failed call is signalled by threatBackendAvailable instead, so an empty
+        // list here can't be told apart from a real zero unless that flag is also checked.
+        if (!bundle.threatBackendAvailable) {
             return failed("THREAT_BACKEND", "Could not load violation counts");
         }
 
@@ -93,7 +101,12 @@ public class AlertFatigueProvider extends AbstractInsightProvider {
         }
 
         // DETAIL: page raw events and collapse to (actor, policy, evidence-type) incidents.
-        List<DashboardMaliciousEvent> events = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT, null, null);
+        // "exclude" drops Skills Evaluations traffic (a separate, non-violation activity type) from
+        // the incident grouping — same convention ViolationsPage.jsx uses for its Active tab, and a
+        // no-op on non-ENDPOINT accounts where the concept doesn't exist. The LIST-scope aggregate
+        // above has no equivalent exclusion (the backend's cheap aggregate endpoint doesn't support
+        // it), so its total can run slightly high until this DETAIL view resolves the real count.
+        List<DashboardMaliciousEvent> events = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT, null, "exclude");
         if (events == null) events = new ArrayList<>();
 
         if (events.isEmpty()) {
@@ -126,7 +139,7 @@ public class AlertFatigueProvider extends AbstractInsightProvider {
         for (DashboardMaliciousEvent event : events) {
             String actor = StringUtils.defaultIfBlank(event.getActor(), "(unattributed)");
             String policy = StringUtils.defaultIfBlank(event.getFilterId(), "(unknown policy)");
-            String evidenceType = StringUtils.defaultIfBlank(event.getSubCategory(), "(unknown)");
+            String evidenceType = InsightUtil.humanizeSubCategory(event.getSubCategory());
             String key = lower(actor) + " " + lower(policy) + " " + lower(evidenceType);
             Incident incident = incidents.computeIfAbsent(key, k -> new Incident(actor, policy, evidenceType));
             incident.timestamps.add(event.getTimestamp());
@@ -164,21 +177,28 @@ public class AlertFatigueProvider extends AbstractInsightProvider {
 
         boolean anyFlaggedBlocking = incidents.values().stream()
                 .anyMatch(i -> i.flagged && isBlocking(policyByLowerName.get(lower(i.policy))));
+        boolean anyFlaggedBlockingAtCriticalVolume = incidents.values().stream()
+                .anyMatch(i -> i.flagged && i.maxInWindow >= CRITICAL_REPEAT_THRESHOLD
+                        && isBlocking(policyByLowerName.get(lower(i.policy))));
 
+        String dateRange = InsightUtil.dateRangeDescription(ctx.getStartTs(), ctx.getEndTs());
         String severity;
         String headline;
         if (flaggedCount > 0) {
-            severity = anyFlaggedBlocking ? "HIGH" : "MEDIUM";
+            severity = anyFlaggedBlockingAtCriticalVolume ? "CRITICAL" : (anyFlaggedBlocking ? "HIGH" : "MEDIUM");
             headline = String.format(Locale.US,
-                    "%s collapse to %s; %s repeat more than %d times in 24h%s.",
+                    "%s collapse to %s %s; %s repeat more than %d times in 24h%s.",
                     InsightUtil.count(observedTotal, "violations"), InsightUtil.count(totalIncidents, "incidents"),
+                    dateRange,
                     InsightUtil.count(flaggedCount, "incidents"), REPEAT_THRESHOLD,
-                    anyFlaggedBlocking ? ", including at least one policy in block mode" : "");
+                    anyFlaggedBlockingAtCriticalVolume
+                            ? ", including a blocking policy being hit at sustained high volume"
+                            : (anyFlaggedBlocking ? ", including at least one policy in block mode" : ""));
         } else {
             severity = "LOW";
             headline = InsightUtil.count(observedTotal, "violations") + " collapse to "
-                    + InsightUtil.count(totalIncidents, "incidents") + "; none repeat more than "
-                    + REPEAT_THRESHOLD + " times in 24h.";
+                    + InsightUtil.count(totalIncidents, "incidents") + " " + dateRange
+                    + "; none repeat more than " + REPEAT_THRESHOLD + " times in 24h.";
         }
 
         List<String> caveats = new ArrayList<>();
@@ -192,11 +212,36 @@ public class AlertFatigueProvider extends AbstractInsightProvider {
                 .limit(EVIDENCE_ROW_CAP)
                 .collect(Collectors.toList());
 
+        String concern = null;
+        String impact = null;
+        String remediation = null;
+        Incident worstFlagged = topIncidents.stream().filter(i -> i.flagged).findFirst().orElse(null);
+        if (worstFlagged != null) {
+            String displayActor = deviceIdToUsername.getOrDefault(worstFlagged.actor, worstFlagged.actor);
+            concern = String.format(Locale.US,
+                    "%s repeat more than %d times in 24h — the worst is \"%s\" against policy \"%s\" (%s), repeating %d times.",
+                    InsightUtil.count(flaggedCount, "incidents"), REPEAT_THRESHOLD, displayActor, worstFlagged.policy,
+                    worstFlagged.evidenceType, worstFlagged.maxInWindow);
+            impact = anyFlaggedBlocking
+                    ? "The same user is repeatedly hitting a policy that's supposed to be blocking — either the "
+                            + "policy isn't stopping them, or they keep trying anyway. Either way it's worth a look, "
+                            + "and repeat noise like this makes it easier to miss a genuinely new threat."
+                    : "Not a blocked action, so no harm is being actively prevented — but repeat noise like this "
+                            + "makes it easier to miss a genuinely new incident buried in the same alerts.";
+            remediation = anyFlaggedBlocking
+                    ? String.format(Locale.US, "Investigate why \"%s\" keeps recurring against a blocking policy — "
+                            + "confirm the block is actually taking effect, or add a scoped exception if this is expected.",
+                            displayActor)
+                    : String.format(Locale.US, "Add an exception or suppression rule for \"%s\" on \"%s\" if this "
+                            + "is expected behavior, or investigate why it keeps repeating if it isn't.",
+                            displayActor, worstFlagged.policy);
+        }
+
         List<Map<String, Object>> rows = new ArrayList<>();
         for (Incident incident : topIncidents) {
             String displayActor = deviceIdToUsername.getOrDefault(incident.actor, incident.actor);
             GuardrailPolicies policy = policyByLowerName.get(lower(incident.policy));
-            String mode = policy != null ? StringUtils.defaultIfBlank(policy.getBehaviour(), "unknown") : "unknown";
+            String mode = InsightUtil.humanizePolicyMode(policy != null ? policy.getBehaviour() : null);
 
             Map<String, Object> row = new HashMap<>();
             row.put("User", displayActor);
@@ -219,6 +264,9 @@ public class AlertFatigueProvider extends AbstractInsightProvider {
         result.setMetricsComplete(true);
         result.setDataGaps(new ArrayList<>());
         result.setCaveats(caveats);
+        result.setConcern(concern);
+        result.setImpact(impact);
+        result.setRemediation(remediation);
         result.setEvidence(evidence);
         result.setCtas(buildCtas(topIncidents));
         return result;
@@ -265,10 +313,13 @@ public class AlertFatigueProvider extends AbstractInsightProvider {
         if (worst == null) {
             return new ArrayList<>();
         }
-        // "?policy=<name>" is the one deep-link GuardrailPolicies.jsx actually reads (opens that
-        // policy's edit drawer) — policyId/policyName keys are ignored by the page. Guardrail
-        // Violations has no URL-filter support at all yet, so `actor` is inert there today.
+        // "?policy=<name>" is the one deep-link GuardrailPolicies.jsx reads (opens that policy's
+        // edit drawer). Violations reads "?policy=" and "?user=" too (seeds its existing card-click
+        // filters on arrival) — see ViolationsPage.jsx's deep-link effect.
         Map<String, Object> policyParams = InsightUtil.guardrailPolicyParams(worst.policy);
+        Map<String, Object> incidentParams = new HashMap<>();
+        incidentParams.put("policy", worst.policy);
+        incidentParams.put("user", worst.actor);
 
         List<InsightResult.Cta> ctas = new ArrayList<>();
         ctas.add(new InsightResult.Cta("remove_user_from_scope", "Remove user from policy scope",
@@ -276,7 +327,7 @@ public class AlertFatigueProvider extends AbstractInsightProvider {
         ctas.add(new InsightResult.Cta("add_exception", "Add exception",
                 "NAVIGATE", "/dashboard/guardrails/policies", policyParams, false));
         ctas.add(new InsightResult.Cta("switch_to_incident_view", "Switch to incident view",
-                "NAVIGATE", "/dashboard/guardrails/violations", Collections.emptyMap(), false));
+                "NAVIGATE", "/dashboard/guardrails/violations", incidentParams, false));
         return ctas;
     }
 }

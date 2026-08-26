@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { produce } from "immer";
 import {
     Badge,
@@ -700,6 +700,7 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
 
 function Violations() {
     const navigate = useNavigate();
+    const location = useLocation();
     const insights = useInsightsEntryPoint();
 
     const newLayout = LocalStore((state) => state.guardrailViolationsNewLayout);
@@ -860,6 +861,36 @@ function Violations() {
         setActiveHostFilter(new Set());
         applyGridFilter("user", []);
     }, [applyGridFilter]);
+
+    // Deep link from an Insight CTA (?policy=a,b&user=x,y) — same two filter mechanisms a manual
+    // card click already drives (see handlePolicyClick/handleHostClick above). `policy` goes
+    // straight into React state (that's the reliable path per the comment on activePolicyFilter —
+    // the grid's own policyName set-filter silently drops values outside its known list). `user`
+    // is both seeded into the grid's persisted filter state (for a fresh page load, before
+    // AgGridTable's own onGridReady has run — see AgGridTable.jsx) AND applied live via
+    // applyGridFilter (for when this page is already mounted and the CTA just changed the URL —
+    // ViolationsPage is rendered by the Violations page itself hosting the insight flyout, so a
+    // CTA click often doesn't remount this component at all). Depends on location.search, not []
+    // — a mount-only effect would silently no-op on that already-mounted case.
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const policyNames = (params.get("policy") || "").split(",").map(s => s.trim()).filter(Boolean);
+        const userNames = (params.get("user") || "").split(",").map(s => s.trim()).filter(Boolean);
+        if (policyNames.length > 0) {
+            setActivePolicyFilter(new Set(policyNames));
+        }
+        if (userNames.length > 0) {
+            setActiveHostFilter(new Set(userNames));
+            const key = gridFilterKey.current;
+            const { filtersMap, setFiltersMap } = PersistStore.getState();
+            setFiltersMap({
+                ...filtersMap,
+                [key]: { ...(filtersMap[key] || {}), filters: { ...(filtersMap[key]?.filters || {}), user: userNames } },
+            });
+            applyGridFilter("user", userNames);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.search]);
 
     const handleTypeClick = useCallback((typeName) => {
         const mapping = summaryData?.typeToSubCategories || {};
