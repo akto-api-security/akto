@@ -124,12 +124,25 @@ public class ExposureConcentrationProvider extends AbstractInsightProvider {
                 : InsightUtil.count(topCohortSize, "users") + " (top 20%) hold " + InsightUtil.percent(topCohortTokenShare) + " of AI token volume, "
                         + InsightUtil.count(usersWithHarmfulActivity, "users") + " flagged for harmful-topic activity");
 
+        if (usersWithHarmfulActivity > 0) {
+            r.setSeverity(harmfulShareInTopCohort >= 0.5 ? "HIGH" : "MEDIUM");
+            r.setConcern("AI usage — and the harmful-topic activity that comes with it — is concentrated in a small group of users rather than spread evenly.");
+            r.setImpact("A concentrated cohort is both your biggest single point of failure and your highest-leverage place to focus review: "
+                    + InsightUtil.percent(harmfulShareInTopCohort) + " of all harmful-topic hits trace back to just the top 20% of users by volume.");
+            r.setRemediation("Review the users below individually — check what they're actually using AI for and whether their access needs tighter guardrails.");
+        } else if (topCohortTokenShare >= 0.7) {
+            r.setSeverity("LOW");
+            r.setConcern("Token volume is heavily concentrated in a small group of users, though none are flagged for harmful-topic activity.");
+            r.setImpact("If one of these heavy users' credentials or agent were compromised, the blast radius would be disproportionately large.");
+            r.setRemediation("No action needed today — worth keeping an eye on this cohort as usage grows.");
+        }
+
         r.addEvidence(new InsightResult.Evidence("top_users", "Top users by token volume and harmful-topic activity",
                 Arrays.asList("user", "tokens", "cumulativePercent", "harmfulHits", "topHarmfulTopic", "topHarmfulReason"), rows, ranked.size()));
 
         r.addCta(new InsightResult.Cta("view_users", "View users and devices", "NAVIGATE", InsightRoutes.USERS_AND_DEVICES,
                 InsightUtil.usersAndDevicesFilterParams(topCohortUsers), true));
-        r.addCta(new InsightResult.Cta("view_llm", "View LLM observability", "NAVIGATE", InsightRoutes.LLM_OBSERVABILITY, new HashMap<>(), false));
+        r.addCta(new InsightResult.Cta("view_llm", "View session-level AI usage (LLM Observability)", "NAVIGATE", InsightRoutes.LLM_OBSERVABILITY, new HashMap<>(), false));
         return r;
     }
 

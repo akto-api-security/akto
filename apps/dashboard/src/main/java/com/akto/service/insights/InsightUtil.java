@@ -25,7 +25,7 @@ public final class InsightUtil {
     // ── Metric formatting — the narrative model copies these strings verbatim ──────────
 
     public static String count(long n, String noun) {
-        return n + " " + (n == 1 ? singular(noun) : noun);
+        return grouped(n) + " " + (n == 1 ? singular(noun) : noun);
     }
 
     private static String singular(String noun) {
@@ -34,7 +34,12 @@ public final class InsightUtil {
     }
 
     public static String ofTotal(long n, long total, String noun) {
-        return n + " of " + total + " " + noun;
+        return grouped(n) + " of " + grouped(total) + " " + noun;
+    }
+
+    /** Thousands-grouped, e.g. 18234 -> "18,234" — every formatted count/token number a reader sees goes through this. */
+    public static String grouped(long n) {
+        return String.format(Locale.US, "%,d", n);
     }
 
     public static String percent(double fraction) {

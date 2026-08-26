@@ -41,14 +41,19 @@ public class WhatChangedThisWeekProvider extends AbstractInsightProvider {
         }
 
         int newTagCount = 0;
-        List<String> newTagSamples = new ArrayList<>();
+        List<Map<String, Object>> newTagRows = new ArrayList<>();
         for (ApiCollection c : bundle.collections) {
             if (c.getTagsList() == null) continue;
             for (CollectionTags t : c.getTagsList()) {
                 if (t == null || Constants.AKTO_MALICIOUS_MCP_SERVER_TAG.equals(t.getKeyName())) continue;
                 if (t.getLastUpdatedTs() >= since && t.getLastUpdatedTs() <= now) {
                     newTagCount++;
-                    if (newTagSamples.size() < 20) newTagSamples.add(c.getHostName() + " -> " + t.getKeyName());
+                    if (newTagRows.size() < 20) {
+                        Map<String, Object> tagRow = new HashMap<>();
+                        tagRow.put("host", c.getHostName());
+                        tagRow.put("tag", t.getKeyName() + (t.getValue() != null ? ": " + t.getValue() : ""));
+                        newTagRows.add(tagRow);
+                    }
                 }
             }
         }
@@ -66,15 +71,28 @@ public class WhatChangedThisWeekProvider extends AbstractInsightProvider {
                 ? InsightUtil.count(newAssets.size(), "new assets") + " and " + InsightUtil.count(newComponents.size(), "new components") + " this week"
                 : "No new assets, components or tags in the last 7 days");
 
+        if (!newAssets.isEmpty()) {
+            r.setConcern(InsightUtil.count(newAssets.size(), "assets") + " started appearing in traffic for the first time this week.");
+            r.setImpact("A new asset is unreviewed by definition — until someone looks at it, you don't know if it's expected or something that showed up unexpectedly.");
+            r.setRemediation("For each one: confirm who owns it and what it's for, then mark it Approved in the audit if it checks out.");
+        }
+
         List<Map<String, Object>> rows = new ArrayList<>();
         for (ApiCollection c : newAssets.subList(0, Math.min(20, newAssets.size()))) {
             Map<String, Object> row = new HashMap<>();
             row.put("host", c.getHostName());
             row.put("firstSeen", c.getStartTs());
+            String username = bundle.usernameForDevice(InsightUtil.deviceIdOf(c));
+            row.put("user", username != null ? username : "unknown");
             rows.add(row);
         }
         r.addEvidence(new InsightResult.Evidence("new_assets", "New assets this week",
-                java.util.Arrays.asList("host", "firstSeen"), rows, newAssets.size()));
+                java.util.Arrays.asList("host", "firstSeen", "user"), rows, newAssets.size()));
+
+        if (!newTagRows.isEmpty()) {
+            r.addEvidence(new InsightResult.Evidence("new_tags", "New tag detections this week",
+                    java.util.Arrays.asList("host", "tag"), newTagRows, newTagCount));
+        }
 
         r.addCta(cta("view_agentic_assets", "View agentic assets", InsightRoutes.AGENTIC_ASSETS, true));
         r.addCta(cta("view_audit", "Review audit data", InsightRoutes.AUDIT, false));

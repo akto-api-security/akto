@@ -8,6 +8,7 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import insightsApi from "./insightsApi";
 import InsightEvidenceTable from "./InsightEvidenceTable";
 import { buildCtaHref } from "./insightsHelpers";
+import { buildTopicGuardrailPrefillForTopic } from "../../../guardrails/topicGuardrailUtils";
 import "../../../../components/layouts/style.css";
 
 // Metric stat card — same title/value card shape GridRows' other callers use (see
@@ -60,7 +61,14 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
     const handleCtaClick = useCallback((cta) => {
         if (!cta?.route) return;
         if (cta.kind === "GUARDRAIL_TEMPLATE") {
-            navigate(cta.route, { state: { topicGuardrailPrefill: cta.params || {} } });
+            // `blockTopic` is a bare topic name (see OffDomainTokenBurnProvider) — build the
+            // actual prefill client-side via the same helper the LLM Observability "Create
+            // guardrail" flow uses, rather than the backend duplicating DeniedTopic's shape.
+            // Every other provider already sends a fully-formed GuardrailPolicies-shaped prefill.
+            const prefill = cta.params?.blockTopic
+                ? buildTopicGuardrailPrefillForTopic(cta.params.blockTopic, {})
+                : (cta.params || {});
+            navigate(cta.route, { state: { topicGuardrailPrefill: prefill } });
         } else if (cta.href) {
             navigate(cta.href);
         }
@@ -94,12 +102,38 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
     }
 
     const hasNarrative = detail.narrativeStatus === "OK" && !!detail.markdown;
+    const hasNarrativeSummary = detail.concern || detail.impact || detail.remediation;
 
     return (
         <Box overflowY="scroll" padding="5">
             <VerticalStack gap="5">
                 {metricItems.length > 0 && (
                     <GridRows columns={metricItems.length} items={metricItems} CardComponent={MetricCardComp} />
+                )}
+
+                {hasNarrativeSummary && (
+                    <Box background="bg-surface-secondary" padding="4" borderRadius="2">
+                        <VerticalStack gap="3">
+                            {detail.concern && (
+                                <VerticalStack gap="1">
+                                    <Text variant="bodySm" fontWeight="semibold" color="subdued">Concern</Text>
+                                    <Text variant="bodyMd">{detail.concern}</Text>
+                                </VerticalStack>
+                            )}
+                            {detail.impact && (
+                                <VerticalStack gap="1">
+                                    <Text variant="bodySm" fontWeight="semibold" color="subdued">Impact</Text>
+                                    <Text variant="bodyMd">{detail.impact}</Text>
+                                </VerticalStack>
+                            )}
+                            {detail.remediation && (
+                                <VerticalStack gap="1">
+                                    <Text variant="bodySm" fontWeight="semibold" color="subdued">Remediation</Text>
+                                    <Text variant="bodyMd">{detail.remediation}</Text>
+                                </VerticalStack>
+                            )}
+                        </VerticalStack>
+                    </Box>
                 )}
 
                 <div className="chat-message-row">

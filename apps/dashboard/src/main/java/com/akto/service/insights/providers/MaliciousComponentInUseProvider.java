@@ -102,7 +102,6 @@ public class MaliciousComponentInUseProvider extends AbstractInsightProvider {
                 Map<String, Object> row = new HashMap<>();
                 row.put("server", serviceName);
                 row.put("devices", deviceCount);
-                row.put("confirmedInvoked", confirmedInvoked);
                 rows.add(row);
             }
         }
@@ -145,8 +144,18 @@ public class MaliciousComponentInUseProvider extends AbstractInsightProvider {
         }
         r.setHeadline(InsightUtil.count(maliciousServiceNames.size(), "malicious components") + " reaching " + InsightUtil.count(devices.size(), "devices")
                 + (invocationHits != null ? ", " + InsightUtil.count(confirmedInvokedServices, "confirmed actually invoked") : ""));
+        r.addCaveat("\"Malicious\" here means Akto's own threat-intel tagging or MCP audit risk analysis flagged this component's name/signature — "
+                + "not a live behavioral judgment based on what it actually did on your network.");
 
-        r.addEvidence(new InsightResult.Evidence("malicious", "Malicious components", Arrays.asList("server", "devices", "confirmedInvoked"), rows, maliciousServiceNames.size()));
+        r.setSeverity((confirmedInvokedServices > 0 ? "CRITICAL" : devices.isEmpty() ? "MEDIUM" : "HIGH"));
+        r.setConcern(confirmedInvokedServices > 0
+                ? InsightUtil.count(confirmedInvokedServices, "of these components") + " were actually called in the last 15 days, not just registered."
+                : "These components are present and reachable, but no real invocation has been confirmed yet in the last 15 days.");
+        r.setImpact("A known-malicious tool that's reachable can exfiltrate data, run unapproved actions, or serve as a foothold for further attacks the moment it's invoked."
+                + (users.isEmpty() ? "" : " Right now it's reachable by " + InsightUtil.count(users.size(), "users") + " across " + InsightUtil.count(teams.size(), "teams") + "."));
+        r.setRemediation("Remove or block these components at the source (uninstall, deregister, or revoke access), then apply a blocking guardrail policy on the servers that hosted them so any re-registration is caught automatically.");
+
+        r.addEvidence(new InsightResult.Evidence("malicious", "Malicious components", Arrays.asList("server", "devices"), rows, maliciousServiceNames.size()));
         if (!invocationRows.isEmpty()) {
             r.addEvidence(new InsightResult.Evidence("real_invocations", "Real invocation evidence (last 15 days)",
                     Arrays.asList("term", "traceId", "timestamp"), invocationRows, invocationRows.size()));

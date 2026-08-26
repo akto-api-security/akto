@@ -24,6 +24,9 @@ public class InsightNarrativeCache {
     public static final String PROVIDER_VERSION = "providerVersion";
     public static final String PROMPT_VERSION = "promptVersion";
     public static final String NARRATIVE_MARKDOWN = "narrativeMarkdown";
+    public static final String NARRATIVE_CONCERN = "narrativeConcern";
+    public static final String NARRATIVE_IMPACT = "narrativeImpact";
+    public static final String NARRATIVE_REMEDIATION = "narrativeRemediation";
     public static final String GENERATED_AT = "generatedAt";
     public static final String EXPIRES_AT = "expiresAt";
 
@@ -32,6 +35,9 @@ public class InsightNarrativeCache {
     private int providerVersion;
     private int promptVersion;
     private String narrativeMarkdown;
+    private String narrativeConcern;    // nullable — empty when the model had nothing grounded to add over the provider's own draft
+    private String narrativeImpact;     // nullable
+    private String narrativeRemediation; // nullable
     private long generatedAt;
     private Date expiresAt;
 }
