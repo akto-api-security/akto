@@ -4,6 +4,8 @@ import com.akto.ProtoMessageUtils;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ApiDistributionDataRequestPayload;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchApiDistributionDataRequest;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
+import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.UpdateRemediationRequest;
+import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.UpdateRemediationResponse;
 import com.akto.proto.generated.threat_detection.service.agentic_session_service.v1.BulkUpdateAgenticSessionContextRequest;
 import com.akto.threat.backend.service.ApiDistributionDataService;
 import com.akto.threat.backend.service.MaliciousEventService;
@@ -42,6 +44,37 @@ public class ThreatDetectionRouter implements ARouter {
 
               maliciousEventService.recordMaliciousEvent(ctx.get("accountId"), req);
               ctx.response().setStatusCode(202).end();
+            });
+
+    router
+        .post("/update_remediation")
+        .blockingHandler(
+            ctx -> {
+              RequestBody reqBody = ctx.body();
+              UpdateRemediationRequest req =
+                  ProtoMessageUtils.<UpdateRemediationRequest>toProtoMessage(
+                          UpdateRemediationRequest.class, reqBody.asString())
+                      .orElse(null);
+
+              if (req == null || req.getRefId() == null || req.getRefId().isEmpty()) {
+                ctx.response().setStatusCode(400).end("Invalid request");
+                return;
+              }
+
+              int updatedCount = maliciousEventService.updateRemediation(
+                  ctx.get("accountId"),
+                  req.getRefId(),
+                  req.getRemediation());
+
+              UpdateRemediationResponse response = UpdateRemediationResponse.newBuilder()
+                  .setSuccess(updatedCount > 0)
+                  .setMessage(updatedCount > 0 ? "Remediation updated successfully" : "Event not found")
+                  .setUpdatedCount(updatedCount)
+                  .build();
+
+              int statusCode = updatedCount > 0 ? 200 : 404;
+              ProtoMessageUtils.toString(response)
+                  .ifPresent(s -> ctx.response().setStatusCode(statusCode).end(s));
             });
 
     router

@@ -463,6 +463,7 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         metadata: event.metadata || null,
         sessionId: event.sessionId || null,
         deviceId: rawHost,
+        remediation: event.remediation || null,
     };
 }
 
