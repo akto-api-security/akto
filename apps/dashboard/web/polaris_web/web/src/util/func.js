@@ -1434,6 +1434,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={description} text={description}/></Box>),
               lastTested: apiInfoMap[key] ? apiInfoMap[key]["lastTested"] : 0,
               isThreatEnabled: apiInfoMap[key] ? (apiInfoMap[key]["threatScore"] > 0 || (x.url?.includes("/skills/") && (apiInfoMap[key]["tagsList"] || []).some(t => (((t.keyName === "skill-tags" || t.key === "skill-tags") && t.value && !/^version=/i.test(t.value)) || ((t.keyName === "malicious-skill-tag" || t.key === "malicious-skill-tag") && t.value === "true"))))) : false,
+              threatScore: apiInfoMap[key] ? (apiInfoMap[key]["threatScore"] || 0) : 0,
               agentProxyGuardrailEnabled: apiInfoMap[key] ? (apiInfoMap[key]["agentProxyGuardrailEnabled"] || false) : false,
               guardrailSchema: apiInfoMap[key] ? (apiInfoMap[key]["guardrailSchema"] || null) : null,
               isMalicious: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "malicious-skill-tag" || t.key === "malicious-skill-tag") && t.value === "true") : false,
