@@ -675,6 +675,7 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 				extractHostHeader(reqHeaders),
 				sessionID,
 				behaviour,
+				"",
 			); err != nil {
 				s.logger.Warn("Failed to report threat for personal account block", zap.String("policyName", policyName), zap.Error(err))
 			}
@@ -791,6 +792,7 @@ func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCt
 				extractHostHeader(valCtx.RequestHeaders),
 				sessionID,
 				behaviour,
+				"",
 			); err != nil {
 				s.logger.Warn("Failed to report threat for blocked host", zap.Error(err))
 			}
@@ -1819,10 +1821,10 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 	s.schemaFetcher.RefreshIfNeeded()
 
 	type batchPolicyBundle struct {
-		policies        []types.Policy
-		auditPolicies   map[string]*types.AuditPolicy
-		compiledRules   map[string]*regexp.Regexp
-		hasAuditRules   bool
+		policies      []types.Policy
+		auditPolicies map[string]*types.AuditPolicy
+		compiledRules map[string]*regexp.Regexp
+		hasAuditRules bool
 	}
 	policyByContext := make(map[string]batchPolicyBundle)
 

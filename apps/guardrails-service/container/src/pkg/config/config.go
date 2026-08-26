@@ -54,7 +54,8 @@ type Config struct {
 	// fails open here *before* the caller gives up. <=0 disables the bound.
 	ValidationTimeoutMs int
 
-	File FileConfig
+	GuardrailRemediationGenerate bool
+	File                         FileConfig
 }
 
 type FileConfig struct {
@@ -116,6 +117,7 @@ func LoadConfig() *Config {
 		NhiEnabled:                       getEnvAsBool("NHI_ENABLED", true),
 		NhiScanIntervalMin:               getEnvAsInt("NHI_SCAN_INTERVAL_MIN", 30),
 		ValidationTimeoutMs:              getEnvAsInt("GUARDRAILS_VALIDATION_TIMEOUT_MS", 2500),
+		GuardrailRemediationGenerate:     getEnvAsBool("GUARDRAILS_GENERATE_REMEDIATION", false),
 		File: FileConfig{
 			Enabled:          getEnvAsBool("FILE_VALIDATION_ENABLED", false),
 			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
