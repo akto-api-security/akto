@@ -230,6 +230,7 @@ import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
 import com.akto.utils.crons.UserAnalysisCron;
 import com.akto.utils.crons.AgentBasePromptDetectionCron;
+import com.akto.utils.jobs.ApiInfoBackfillJob;
 import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.jobs.JobUtils;
@@ -2743,7 +2744,7 @@ public class InitializerListener implements ServletContextListener {
                 int now = Context.now();
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
-                    logger.debug("Starting init functions and scheduling jobs at " + now);
+                    logger.warn("Starting init functions and scheduling jobs at " + now);
                     updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
 
                     // API group jobs
@@ -2756,6 +2757,7 @@ public class InitializerListener implements ServletContextListener {
                     syncCronInfo.setUpUpdateCronScheduler();
                     syncCronInfo.setUpMcpMaliciousnessCronScheduler();
                     setUpGuardrailServiceUrlLatencyScheduler();
+                    ApiInfoBackfillJob.apiInfoBackfillScheduler();
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
 //                        crons.insertHistoricalDataJob();
@@ -2774,7 +2776,6 @@ public class InitializerListener implements ServletContextListener {
                         tokenGeneratorCron.tokenGeneratorScheduler();
                         crons.deleteTestRunsScheduler();
                         setUpFillCollectionIdArrayJob();
-
 
                         // CleanInventory.cleanInventoryJobRunner();
 
