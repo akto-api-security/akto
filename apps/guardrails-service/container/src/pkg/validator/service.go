@@ -800,6 +800,7 @@ func (s *Service) reportPersonalAccountThreat(payloadToValidate string, reqHeade
 			host,
 			sessionID,
 			behaviour,
+			"",
 		); err != nil {
 			s.logger.Warn("Failed to report threat for personal account block", zap.String("policyName", policyName), zap.Error(err))
 		}
