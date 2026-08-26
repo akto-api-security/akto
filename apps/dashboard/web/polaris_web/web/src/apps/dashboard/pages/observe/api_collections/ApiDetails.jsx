@@ -656,22 +656,43 @@ function ApiDetails(props) {
         } catch (_) {}
     }
 
+    // Base risk score/remarks live on the owning collection, not the per-endpoint ApiInfo — same
+    // fields AgentEndpointTreeTable.jsx/AgenticAssetDevicesPage.jsx surface via wrapRiskScoreTooltip.
+    const agentRiskAnalysis = (() => {
+        if (!apiDetail?.apiCollectionId || !allCollections) return null;
+        const collection = allCollections.find(c => c.id === apiDetail.apiCollectionId);
+        if (!collection?.baseRiskScoreReason || !collection?.baseRiskScore) return null;
+        return { score: collection.baseRiskScore, reason: collection.baseRiskScoreReason };
+    })();
+
     const ValuesTab = {
         id: 'values',
         content: "Values",
         component: isSkillEndpoint && skillMarkdown
             ? <MarkdownViewer markdown={skillMarkdown} />
             : sampleData.length > 0 && <Box paddingBlockStart={"4"}>
-                <SampleDataList
-                    key="Sample values"
-                    sampleData={sampleData}
-                    heading={"Sample values"}
-                    minHeight={"35vh"}
-                    vertical={true}
-                    isAPISampleData={true}
-                    isWebSocket={isWebSocket}
-                    metadata={headersWithData.map(x => x.split(" ")[0])}
-                />
+                <VerticalStack gap="4">
+                    {agentRiskAnalysis && (
+                        <VerticalStack gap="3">
+                            <Text variant='headingMd'>Agent Risk Analysis</Text>
+                            <VerticalStack gap="1">
+                                <Text variant="bodyMd" color="subdued">
+                                    {agentRiskAnalysis.reason}
+                                </Text>
+                            </VerticalStack>
+                        </VerticalStack>
+                    )}
+                    <SampleDataList
+                        key="Sample values"
+                        sampleData={sampleData}
+                        heading={"Sample values"}
+                        minHeight={"35vh"}
+                        vertical={true}
+                        isAPISampleData={true}
+                        isWebSocket={isWebSocket}
+                        metadata={headersWithData.map(x => x.split(" ")[0])}
+                    />
+                </VerticalStack>
             </Box>,
     }
     const DependencyTab = {
