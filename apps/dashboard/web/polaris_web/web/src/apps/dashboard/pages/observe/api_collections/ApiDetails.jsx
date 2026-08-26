@@ -671,7 +671,7 @@ function ApiDetails(props) {
     // with in the backend). "remaining" is computed as a balancing figure, not itemized, so the
     // three lines always add up to the displayed total instead of drifting from it.
     const riskScoreFactors = (() => {
-        if (!apiDetail) return [];
+        if (!apiDetail || !agentRiskAnalysis) return [];
         const factors = [];
         const isThreat = !!apiDetail.isThreatEnabled;
         // Real threatScore when present; falls back to 1 for the skill-tag-only threat path
