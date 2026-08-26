@@ -78,10 +78,12 @@ public class MaliciousComponentInUseProvider extends AbstractInsightProvider {
         Set<String> teams = new HashSet<>();
         List<Map<String, Object>> rows = new ArrayList<>();
         int confirmedInvokedServices = 0;
+        int totalComponentRows = 0; // rows.size() is capped at 20 mid-loop; this tracks the real total for Evidence.totalRowCount
 
         for (String serviceName : maliciousServiceNames) {
             List<ApiCollection> occurrences = bundle.collectionsForServiceName(serviceName);
             int deviceCount = 0;
+            Set<String> serviceUsers = new LinkedHashSet<>();
             for (ApiCollection c : occurrences) {
                 collectionIds.add(c.getId());
                 String deviceId = InsightUtil.deviceIdOf(c);
@@ -89,20 +91,43 @@ public class MaliciousComponentInUseProvider extends AbstractInsightProvider {
                 String username = bundle.usernameForDevice(deviceId);
                 if (username != null) {
                     users.add(username);
+                    serviceUsers.add(username);
                     String team = bundle.teamForUser(username);
                     if (team != null) teams.add(team);
                 }
             }
 
-            Set<String> serviceTerms = maliciousResourceNamesByService.getOrDefault(serviceName, Collections.singleton(serviceName));
-            boolean confirmedInvoked = serviceTerms.stream().anyMatch(confirmedInvokedTerms::contains);
+            Set<String> resourceNames = maliciousResourceNamesByService.get(serviceName);
+            boolean confirmedInvoked = resourceNames != null && !resourceNames.isEmpty()
+                    ? resourceNames.stream().anyMatch(confirmedInvokedTerms::contains)
+                    : confirmedInvokedTerms.contains(serviceName);
             if (confirmedInvoked) confirmedInvokedServices++;
 
-            if (rows.size() < 20) {
-                Map<String, Object> row = new HashMap<>();
-                row.put("server", serviceName);
-                row.put("devices", deviceCount);
-                rows.add(row);
+            // One row per exact malicious tool/skill name when known (from componentRiskAnalysis) —
+            // a bare service bucket like "claude" or "vscode" isn't an actionable identifier on its
+            // own. Falls back to the service name only when no finer-grained name was ever reported.
+            String usersDisplay = serviceUsers.isEmpty() ? "unknown" : String.join(", ", serviceUsers);
+            if (resourceNames != null && !resourceNames.isEmpty()) {
+                for (String resourceName : resourceNames) {
+                    totalComponentRows++;
+                    if (rows.size() >= 20) continue;
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("component", resourceName);
+                    row.put("server", serviceName);
+                    row.put("devices", deviceCount);
+                    row.put("users", usersDisplay);
+                    rows.add(row);
+                }
+            } else {
+                totalComponentRows++;
+                if (rows.size() < 20) {
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("component", serviceName);
+                    row.put("server", serviceName);
+                    row.put("devices", deviceCount);
+                    row.put("users", usersDisplay);
+                    rows.add(row);
+                }
             }
         }
 
@@ -155,7 +180,8 @@ public class MaliciousComponentInUseProvider extends AbstractInsightProvider {
                 + (users.isEmpty() ? "" : " Right now it's reachable by " + InsightUtil.count(users.size(), "users") + " across " + InsightUtil.count(teams.size(), "teams") + "."));
         r.setRemediation("Remove or block these components at the source (uninstall, deregister, or revoke access), then apply a blocking guardrail policy on the servers that hosted them so any re-registration is caught automatically.");
 
-        r.addEvidence(new InsightResult.Evidence("malicious", "Malicious components", Arrays.asList("server", "devices"), rows, maliciousServiceNames.size()));
+        r.addEvidence(new InsightResult.Evidence("malicious", "Malicious components",
+                Arrays.asList("component", "server", "devices", "users"), rows, totalComponentRows));
         if (!invocationRows.isEmpty()) {
             r.addEvidence(new InsightResult.Evidence("real_invocations", "Real invocation evidence (last 15 days)",
                     Arrays.asList("term", "traceId", "timestamp"), invocationRows, invocationRows.size()));

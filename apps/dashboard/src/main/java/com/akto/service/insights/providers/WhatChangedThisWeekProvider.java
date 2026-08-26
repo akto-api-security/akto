@@ -41,20 +41,11 @@ public class WhatChangedThisWeekProvider extends AbstractInsightProvider {
         }
 
         int newTagCount = 0;
-        List<Map<String, Object>> newTagRows = new ArrayList<>();
         for (ApiCollection c : bundle.collections) {
             if (c.getTagsList() == null) continue;
             for (CollectionTags t : c.getTagsList()) {
                 if (t == null || Constants.AKTO_MALICIOUS_MCP_SERVER_TAG.equals(t.getKeyName())) continue;
-                if (t.getLastUpdatedTs() >= since && t.getLastUpdatedTs() <= now) {
-                    newTagCount++;
-                    if (newTagRows.size() < 20) {
-                        Map<String, Object> tagRow = new HashMap<>();
-                        tagRow.put("host", c.getHostName());
-                        tagRow.put("tag", t.getKeyName() + (t.getValue() != null ? ": " + t.getValue() : ""));
-                        newTagRows.add(tagRow);
-                    }
-                }
+                if (t.getLastUpdatedTs() >= since && t.getLastUpdatedTs() <= now) newTagCount++;
             }
         }
 
@@ -88,11 +79,6 @@ public class WhatChangedThisWeekProvider extends AbstractInsightProvider {
         }
         r.addEvidence(new InsightResult.Evidence("new_assets", "New assets this week",
                 java.util.Arrays.asList("host", "firstSeen", "user"), rows, newAssets.size()));
-
-        if (!newTagRows.isEmpty()) {
-            r.addEvidence(new InsightResult.Evidence("new_tags", "New tag detections this week",
-                    java.util.Arrays.asList("host", "tag"), newTagRows, newTagCount));
-        }
 
         r.addCta(cta("view_agentic_assets", "View agentic assets", InsightRoutes.AGENTIC_ASSETS, true));
         r.addCta(cta("view_audit", "Review audit data", InsightRoutes.AUDIT, false));

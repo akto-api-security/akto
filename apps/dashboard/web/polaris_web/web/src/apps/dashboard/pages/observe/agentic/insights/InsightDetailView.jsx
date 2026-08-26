@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, VerticalStack, HorizontalStack, Text, Button, Banner, Spinner } from "@shopify/polaris";
+import { Box, VerticalStack, HorizontalStack, Text, Button, Banner, Spinner, Tooltip } from "@shopify/polaris";
 import { RefreshMinor, ExternalMinor } from "@shopify/polaris-icons";
 import MarkdownViewer from "@/apps/dashboard/components/shared/MarkdownViewer";
 import GridRows from "@/apps/dashboard/components/shared/GridRows";
@@ -163,16 +163,6 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
                     </Box>
                 </div>
 
-                {detail.dataGaps?.length > 0 && (
-                    <Banner status="warning" title="Some data is incomplete">
-                        <VerticalStack gap="1">
-                            {detail.dataGaps.map((gap, idx) => (
-                                <Text key={idx} variant="bodyMd">{gap.impact}</Text>
-                            ))}
-                        </VerticalStack>
-                    </Banner>
-                )}
-
                 {detail.evidence?.length > 0 && (
                     <VerticalStack gap="4">
                         {detail.evidence.map((evidence) => (
@@ -182,7 +172,7 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
                 )}
             </VerticalStack>
 
-            {ctas.length > 0 && (
+            {(ctas.length > 0 || detail.dataGaps?.length > 0) && (
                 <Box paddingBlockStart="5">
                     <HorizontalStack gap="3">
                         {ctas.map((cta) => (
@@ -194,6 +184,11 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
                             >
                                 {cta.label}
                             </Button>
+                        ))}
+                        {detail.dataGaps?.map((gap, idx) => (
+                            <Tooltip key={idx} content={gap.impact}>
+                                <Button disabled>Coming soon</Button>
+                            </Tooltip>
                         ))}
                     </HorizontalStack>
                 </Box>
