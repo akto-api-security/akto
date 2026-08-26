@@ -1272,6 +1272,18 @@ public class TestExecutor {
                     TestError.OUT_OF_TESTING_SCOPE_COLLECTION.getMessage());
         }
 
+        if (testingRunConfig != null && testingRunConfig.getCleanUp()
+                && (apiInfoKey.getMethod() == Method.POST || apiInfoKey.getMethod() == Method.PUT)) {
+            List<DependencyNode> deleteDependencyNodes = dataActor.findDependencyNodes(
+                    apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), "DELETE");
+            if (deleteDependencyNodes == null || deleteDependencyNodes.isEmpty()) {
+                loggerMaker.infoAndAddToDb("Skipping test on this API, because clean up artifact is missing: " + apiInfoKey);
+                return generateFailedRunResultForMessage(testRunId, apiInfoKey, testSuperType, testSubType,
+                        testRunResultSummaryId, Collections.singletonList(rawApi.getOriginalMessage()),
+                        TestError.NO_RESPECTIVE_DELETE_API.getMessage());
+            }
+        }
+
         if(shouldCallClientLayerForSampleData){
             try {
                 long start = System.currentTimeMillis();
