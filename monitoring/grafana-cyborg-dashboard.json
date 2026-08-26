@@ -515,6 +515,76 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "type": "timeseries",
+      "title": "MongoDB connection pool",
+      "description": "Pool size (total), in-use (checked-out), and wait-queue. Rising in-use/waiting = pool pressure.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "lineWidth": 1
+          }
+        }
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max",
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "mongodb_driver_pool_size{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}",
+          "legendFormat": "size {{server_address}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "mongodb_driver_pool_checkedout{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}",
+          "legendFormat": "in-use {{server_address}}"
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "expr": "mongodb_driver_pool_waitqueuesize{service=\"cyborg\", role=~\"$role\", instance=~\"$instance\"}",
+          "legendFormat": "waiting {{server_address}}"
+        }
+      ]
     }
   ]
 }
