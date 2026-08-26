@@ -31,7 +31,6 @@ public class SkillEvaluationConcentrationProvider extends AbstractInsightProvide
     private static final String SKILLS_PREFIX = "/skills/";
     private static final int EVENT_PAGE_LIMIT = 2000;
     private static final int EVIDENCE_ROW_CAP = 20;
-    private static final int CTA_SKILL_NAMES_CAP = 20;
 
     public SkillEvaluationConcentrationProvider() { super(InsightId.SKILL_EVALUATION_CONCENTRATION, 1); }
 
@@ -175,9 +174,17 @@ public class SkillEvaluationConcentrationProvider extends AbstractInsightProvide
 
         boolean userFlagged = topActorFraction > 0.5;
         boolean pairAlsoFlagged = topPairFraction > 0.5;
+        // Dominating volume and dominating Critical-severity evaluations are different risks — a
+        // user responsible for most of the account's Critical-severity evaluations specifically is
+        // worse than one responsible for a lot of routine ones, even if their raw volume share
+        // doesn't cross the HIGH threshold above.
+        double topActorCriticalFraction = totalCritical > 0 ? (double) topActorCriticalCount / totalCritical : 0.0;
+        boolean userDominatesCritical = totalCritical > 0 && topActorCriticalFraction > 0.5;
 
         String severity;
-        if (userFlagged) {
+        if (userDominatesCritical) {
+            severity = "CRITICAL";
+        } else if (userFlagged) {
             severity = "HIGH";
         } else if (topActorFraction > 0.25) {
             severity = "MEDIUM";
@@ -186,7 +193,7 @@ public class SkillEvaluationConcentrationProvider extends AbstractInsightProvide
         }
 
         StringBuilder headline = new StringBuilder();
-        if (userFlagged) {
+        if (userFlagged || userDominatesCritical) {
             headline.append(InsightUtil.ofTotal(topActorCount, observedTotal, "evaluations"))
                     .append(" (").append(InsightUtil.percent(topActorFraction))
                     .append(") of skill evaluations seen come from a single user");
@@ -196,6 +203,11 @@ public class SkillEvaluationConcentrationProvider extends AbstractInsightProvide
             headline.append(".");
             if (pairAlsoFlagged) {
                 headline.append(" All from a single skill: ").append(topPairSkill).append(".");
+            }
+            if (userDominatesCritical) {
+                headline.append(" That same user accounts for ")
+                        .append(InsightUtil.percent(topActorCriticalFraction))
+                        .append(" of all Critical-severity evaluations.");
             }
         } else {
             headline.append("No single user accounts for more than half of ")
@@ -207,6 +219,25 @@ public class SkillEvaluationConcentrationProvider extends AbstractInsightProvide
         if (observedTotal == EVENT_PAGE_LIMIT) {
             caveats.add("Evaluations examined are capped at " + EVENT_PAGE_LIMIT
                     + " for this call; the true concentration may differ if more exist.");
+        }
+
+        String concern = null;
+        String impact = null;
+        String remediation = null;
+        if (userFlagged || userDominatesCritical) {
+            concern = String.format(java.util.Locale.US,
+                    "\"%s\" accounts for %s of all skill evaluations seen%s.",
+                    topActor, InsightUtil.percent(topActorFraction),
+                    pairAlsoFlagged ? " — all from a single skill, \"" + topPairSkill + "\"" : "");
+            impact = userDominatesCritical
+                    ? "One user or automation dominating Critical-severity evaluations specifically is either a "
+                            + "compromised account, a misconfigured automation, or a role with far more access than "
+                            + "it should need."
+                    : "This much volume from a single source is either a legitimate automation that should be "
+                            + "identified as such, or a single account with more reach than expected.";
+            remediation = "Confirm with this user's manager (or the automation's owner) whether this level of "
+                    + "activity is expected; if it's an automation, tag it as one rather than leaving it looking "
+                    + "like one person's manual activity.";
         }
 
         List<InsightResult.Evidence> evidence = new ArrayList<>();
@@ -235,8 +266,11 @@ public class SkillEvaluationConcentrationProvider extends AbstractInsightProvide
         result.setMetricsComplete(true);
         result.setDataGaps(new ArrayList<>());
         result.setCaveats(caveats);
+        result.setConcern(concern);
+        result.setImpact(impact);
+        result.setRemediation(remediation);
         result.setEvidence(evidence);
-        result.setCtas(buildCtas(topActor, perActorSkill.getOrDefault(topActor, Collections.emptyMap()).keySet()));
+        result.setCtas(buildCtas(topActor));
         return result;
     }
 
@@ -251,25 +285,23 @@ public class SkillEvaluationConcentrationProvider extends AbstractInsightProvide
     }
 
 
-    private static List<InsightResult.Cta> buildCtas(String actor, Set<String> skillNames) {
+    private static List<InsightResult.Cta> buildCtas(String actor) {
         if (actor == null) {
             return new ArrayList<>();
         }
-        // Capped — this account alone had 242 distinct skills for one actor; dumping the whole set
-        // into a query-string param would blow past any browser's practical URL length limit.
-        List<String> boundedSkillNames = skillNames.stream().distinct().limit(CTA_SKILL_NAMES_CAP).collect(Collectors.toList());
-        Map<String, Object> params = new HashMap<>();
-        params.put("actor", actor);
-        params.put("skillNames", boundedSkillNames);
-
+        // Neither Guardrail Policies nor Audit reads a user/skill query param today — there's no
+        // "create an exception for this user+skill" or "filter Audit to this user's skills" action
+        // to deep-link into yet, so these stay plain navigates to the right page rather than
+        // passing skillNames/actor params the destination silently ignores.
         List<InsightResult.Cta> ctas = new ArrayList<>();
         ctas.add(new InsightResult.Cta("create_exception_for_user_skill", "Create exception for user + skill category",
-                "BULK_ACTION", "/dashboard/guardrails/policies", params, true));
+                "NAVIGATE", "/dashboard/guardrails/policies", Collections.emptyMap(), true));
         ctas.add(new InsightResult.Cta("confirm_role_with_manager", "Confirm role with manager",
                 "NAVIGATE", "/dashboard/observe/users-and-devices",
                 InsightUtil.usersAndDevicesFilterParams(Collections.singletonList(actor)), false));
-        ctas.add(new InsightResult.Cta("view_skills", "View skills",
-                "NAVIGATE", "/dashboard/observe/audit", params, false));
+        ctas.add(new InsightResult.Cta("view_skills", "View this user's violations",
+                "NAVIGATE", "/dashboard/guardrails/violations",
+                Collections.singletonMap("user", actor), false));
         return ctas;
     }
 }

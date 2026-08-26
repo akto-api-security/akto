@@ -12,7 +12,6 @@ import com.mongodb.BasicDBObject;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -83,21 +82,24 @@ public class InsightService {
                 results.add(failureResult(providers.get(i)));
             }
         }
+        // Worst-first: a reader should see CRITICAL/HIGH cards before LOW ones, not the fixed
+        // cheapest-first build order the registry iterates in. List.sort is stable, so insights
+        // tied on severity keep that original registry order as their tiebreak.
         results.sort(Comparator.comparingInt(r -> severityRank(r.getSeverity())));
         return results;
     }
 
-    private static final Map<String, Integer> SEVERITY_RANK = new HashMap<>();
-    static {
-        SEVERITY_RANK.put("CRITICAL", 0);
-        SEVERITY_RANK.put("HIGH", 1);
-        SEVERITY_RANK.put("MEDIUM", 2);
-        SEVERITY_RANK.put("LOW", 3);
-    }
-
-    /** Unset severity (nothing actionable found, or not yet computed at LIST scope) always sorts last. */
-    private int severityRank(String severity) {
-        return SEVERITY_RANK.getOrDefault(severity, Integer.MAX_VALUE);
+    /** CRITICAL first, matching the same rank convention the Violations grid's severity column
+     *  sort already uses. Missing/unrecognized severity sorts last, after LOW. */
+    private static int severityRank(String severity) {
+        if (severity == null) return 5;
+        switch (severity.toUpperCase(java.util.Locale.US)) {
+            case "CRITICAL": return 1;
+            case "HIGH": return 2;
+            case "MEDIUM": return 3;
+            case "LOW": return 4;
+            default: return 5;
+        }
     }
 
     private <T> Callable<T> withContext(int accountId, Integer userId, CONTEXT_SOURCE contextSource, Callable<T> body) {

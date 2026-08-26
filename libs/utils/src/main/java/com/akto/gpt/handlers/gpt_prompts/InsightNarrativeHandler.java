@@ -1,7 +1,6 @@
 package com.akto.gpt.handlers.gpt_prompts;
 
 import com.mongodb.BasicDBObject;
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 import javax.validation.ValidationException;
@@ -26,7 +25,7 @@ import java.util.regex.Pattern;
  */
 public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
 
-    public static final int PROMPT_VERSION = 1;
+    public static final int PROMPT_VERSION = 3;
     public static final String NARRATIVE_INPUT = "narrativeInput"; // JSON string
 
     private static final Pattern NUMERIC_LITERAL = Pattern.compile("\\d[\\d,]*(?:\\.\\d+)?%?");
@@ -40,8 +39,17 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
         catch (Exception e) { return null; }
     }
 
+    // Confirmed directly against the real Azure endpoint: at the default reasoning effort, this
+    // prompt burned an entire 4000-token budget on invisible reasoning and returned empty content
+    // (finish_reason "length") without ever writing the answer — raising the budget alone doesn't
+    // fix that, it just burns more tokens/latency reasoning about a job with no real judgment call
+    // in it. "minimal" is the right effort here: this handler is a RENDERER, not an analyst — every
+    // fact is already computed, its only job is copying values into prose/JSON.
     @Override
-    protected int getMaxTokens() { return 1200; }
+    protected String getReasoningEffort() { return "minimal"; }
+
+    @Override
+    protected int getMaxTokens() { return 4000; }
 
     @Override
     protected double getTemperature() { return 0.0; }
@@ -64,15 +72,14 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
             validate(queryData);
             JSONObject input = new JSONObject(queryData.getString(NARRATIVE_INPUT));
             Set<String> allowedLiterals = allowedLiterals(input);
-            Set<String> factKeys = factKeys(input);
 
             String prompt = buildPrompt(input, null);
-            BasicDBObject result = tryOnce(prompt, allowedLiterals, factKeys);
+            BasicDBObject result = tryOnce(prompt, allowedLiterals);
             if (result.containsField("error")) {
                 // One retry, naming the offending literals back to the model.
                 String rejectedNote = result.getString("error");
                 prompt = buildPrompt(input, rejectedNote);
-                result = tryOnce(prompt, allowedLiterals, factKeys);
+                result = tryOnce(prompt, allowedLiterals);
             }
             return result;
         } catch (ValidationException e) {
@@ -87,12 +94,12 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
         }
     }
 
-    private BasicDBObject tryOnce(String prompt, Set<String> allowedLiterals, Set<String> factKeys) throws Exception {
+    private BasicDBObject tryOnce(String prompt, Set<String> allowedLiterals) throws Exception {
         String rawResponse = call(prompt);
-        return validateAndBuild(rawResponse, allowedLiterals, factKeys);
+        return validateAndBuild(rawResponse, allowedLiterals);
     }
 
-    private BasicDBObject validateAndBuild(String rawResponse, Set<String> allowedLiterals, Set<String> factKeys) {
+    private BasicDBObject validateAndBuild(String rawResponse, Set<String> allowedLiterals) {
         BasicDBObject resp = new BasicDBObject();
         if (rawResponse == null || rawResponse.isEmpty() || "NOT_FOUND".equalsIgnoreCase(rawResponse)) {
             resp.put("error", "empty response");
@@ -104,7 +111,6 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
             String concern = json.optString("concern", "");
             String impact = json.optString("impact", "");
             String remediation = json.optString("remediation", "");
-            JSONArray factsUsedArr = json.optJSONArray("factsUsed");
 
             if (narrative.isEmpty()) { resp.put("error", "no narrative"); return resp; }
             if (MARKDOWN_LINK.matcher(narrative).find()) { resp.put("error", "contains a markdown link"); return resp; }
@@ -131,15 +137,6 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
                 return resp;
             }
 
-            if (factsUsedArr != null) {
-                for (int i = 0; i < factsUsedArr.length(); i++) {
-                    if (!factKeys.contains(factsUsedArr.optString(i))) {
-                        resp.put("error", "factsUsed references an unknown key");
-                        return resp;
-                    }
-                }
-            }
-
             resp.put("markdown", narrative);
             resp.put("concern", concern);
             resp.put("impact", impact);
@@ -152,6 +149,10 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
     }
 
     private void collectUnknownLiterals(String text, Set<String> allowedLiterals, Set<String> out) {
+        // allowedLiterals already carries both comma and no-comma forms of every number (see
+        // addLiteralsFrom) — the model sometimes adds/drops thousands-separators when copying a
+        // number (e.g. writes "1,252" for a fact whose formatted string is "1252"), which is the
+        // same number, not a fabrication.
         Matcher m = NUMERIC_LITERAL.matcher(text);
         while (m.find()) {
             String literal = m.group();
@@ -190,16 +191,19 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
           .append("DRAFT_IMPACT: ").append(input.optString("draftImpact", "")).append("\n")
           .append("DRAFT_REMEDIATION: ").append(input.optString("draftRemediation", "")).append("\n\n")
           .append("Write four fields:\n")
-          .append("- narrative: one sentence on what this means, a short \"what we found\" list, then ")
-          .append("\"why it matters\". Under 200 words total, no headings other than plain prose, no emojis.\n")
+          .append("- narrative: the detail behind concern/impact/remediation below, for a reader who wants the ")
+          .append("specifics — not a restatement of them. 2-4 short sentences of flowing prose, each one naming ")
+          .append("a specific fact from FACTS/EVIDENCE (its number and what it's about). Plain sentences only — ")
+          .append("no markdown list syntax (no \"- \" or \"* \" bullets, they don't render as a list here, only ")
+          .append("as a stray dash), no literal section labels like \"What we found\", \"Why it matters\", ")
+          .append("\"Summary\", no markdown heading (#, ##). Under 200 words total, no emojis.\n")
           .append("- concern: one sentence, under 40 words, on what was specifically found — name real ")
           .append("entities from EVIDENCE where possible.\n")
           .append("- impact: one to two sentences, under 40 words, on what happens if this is left ")
           .append("unaddressed.\n")
           .append("- remediation: one to two sentences, under 40 words, the concrete next step to take.\n\n")
           .append("Return exactly: {\"narrative\": \"<markdown>\", \"concern\": \"<text>\", ")
-          .append("\"impact\": \"<text>\", \"remediation\": \"<text>\", \"factsUsed\": [\"<fact key>\", ...]}. ")
-          .append("This is a json response.\n");
+          .append("\"impact\": \"<text>\", \"remediation\": \"<text>\"}. This is a json response.\n");
         if (rejectedNote != null) {
             sb.append("\nYour previous attempt was rejected: ").append(rejectedNote)
               .append(". Return only numbers copied verbatim from FACTS/EVIDENCE, in every field.\n");
@@ -207,53 +211,33 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
         return sb.toString();
     }
 
-    /** Every "formatted" string in FACTS, plus every numeric-looking cell value in EVIDENCE, plus totalRowCount. */
+    /** Every numeric literal anywhere in FACTS/EVIDENCE/CAVEATS/DATA_GAPS/the DRAFT fields — i.e.
+     *  everything actually embedded in the prompt the model sees (see buildPrompt). Deliberately
+     *  scans whole serialized blocks rather than cherry-picking fields like "formatted": a metric's
+     *  "label" ("more than 5 in 24h") or an evidence table's own title can carry a real number too,
+     *  and the model can't tell those apart from a "formatted" value — it just sees text with a
+     *  number in it. Field-by-field extraction only catches up with each new case one bug report at
+     *  a time; scanning everything the prompt actually contains closes the whole class at once. */
     private Set<String> allowedLiterals(JSONObject input) {
         Set<String> out = new HashSet<>();
-        JSONArray metrics = input.optJSONArray("metrics");
-        if (metrics != null) {
-            for (int i = 0; i < metrics.length(); i++) {
-                String formatted = metrics.optJSONObject(i) != null ? metrics.optJSONObject(i).optString("formatted", "") : "";
-                addLiteralsFrom(formatted, out);
-            }
+        for (String field : new String[] { "metrics", "evidence", "caveats", "dataGaps" }) {
+            Object value = input.opt(field);
+            if (value != null) addLiteralsFrom(value.toString(), out);
         }
-        JSONArray evidence = input.optJSONArray("evidence");
-        if (evidence != null) {
-            for (int i = 0; i < evidence.length(); i++) {
-                JSONObject table = evidence.optJSONObject(i);
-                if (table == null) continue;
-                addLiteralsFrom(String.valueOf(table.opt("totalRowCount")), out);
-                JSONArray rows = table.optJSONArray("rows");
-                if (rows == null) continue;
-                for (int j = 0; j < rows.length(); j++) {
-                    JSONObject row = rows.optJSONObject(j);
-                    if (row == null) continue;
-                    for (java.util.Iterator<?> it = row.keys(); it.hasNext(); ) {
-                        String key = String.valueOf(it.next());
-                        addLiteralsFrom(String.valueOf(row.opt(key)), out);
-                    }
-                }
-            }
-        }
+        addLiteralsFrom(input.optString("draftConcern", ""), out);
+        addLiteralsFrom(input.optString("draftImpact", ""), out);
+        addLiteralsFrom(input.optString("draftRemediation", ""), out);
         return out;
     }
 
     private void addLiteralsFrom(String text, Set<String> out) {
         if (text == null) return;
         Matcher m = NUMERIC_LITERAL.matcher(text);
-        while (m.find()) out.add(m.group());
-    }
-
-    private Set<String> factKeys(JSONObject input) {
-        Set<String> out = new HashSet<>();
-        JSONArray metrics = input.optJSONArray("metrics");
-        if (metrics != null) {
-            for (int i = 0; i < metrics.length(); i++) {
-                JSONObject metric = metrics.optJSONObject(i);
-                if (metric != null) out.add(metric.optString("key", ""));
-            }
+        while (m.find()) {
+            String literal = m.group();
+            out.add(literal);
+            out.add(literal.replace(",", "")); // also allow the same number without a thousands separator
         }
-        return out;
     }
 
     @Override
