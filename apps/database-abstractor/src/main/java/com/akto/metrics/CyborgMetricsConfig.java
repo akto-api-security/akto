@@ -10,6 +10,7 @@ package com.akto.metrics;
  *
  * Env vars:
  *   PROMETHEUS_METRICS_ENABLED   master switch ("true" to enable; default off)
+ *   METRICS_SERVICE_NAME         value of the "service" common tag (default "cyborg")
  *   METRICS_AUTH_ENABLED         require a token on /metrics (default true; "false" to disable)
  *   METRICS_AUTH_TOKEN           bearer token for /metrics
  *   METRICS_MAX_URI_CARDINALITY  cap on distinct uri tag values on http_* metrics (default 500)
@@ -17,12 +18,14 @@ package com.akto.metrics;
 public final class CyborgMetricsConfig {
 
     private static final int DEFAULT_MAX_URI_CARDINALITY = 500;
+    private static final String DEFAULT_SERVICE_NAME = "cyborg";
 
     // volatile: read on every request; the setters exist only for tests, never for production use.
     private static volatile boolean enabled = "true".equalsIgnoreCase(env("PROMETHEUS_METRICS_ENABLED"));
     private static volatile boolean authEnabled = !"false".equalsIgnoreCase(env("METRICS_AUTH_ENABLED"));
     private static volatile String authToken = env("METRICS_AUTH_TOKEN");
 
+    private static final String serviceName = firstNonBlank(env("METRICS_SERVICE_NAME"), DEFAULT_SERVICE_NAME);
     private static final int maxUriCardinality = parseIntOrDefault(env("METRICS_MAX_URI_CARDINALITY"), DEFAULT_MAX_URI_CARDINALITY);
 
     private CyborgMetricsConfig() {
@@ -43,6 +46,11 @@ public final class CyborgMetricsConfig {
         return authToken;
     }
 
+    /** Value of the "service" common tag applied to every metric. */
+    public static String getServiceName() {
+        return serviceName;
+    }
+
     /** Max distinct uri tag values on http_* metrics before new ones are dropped (anti-explosion). */
     public static int getMaxUriCardinality() {
         return maxUriCardinality;
@@ -50,6 +58,10 @@ public final class CyborgMetricsConfig {
 
     private static String env(String key) {
         return System.getenv(key);
+    }
+
+    private static String firstNonBlank(String value, String fallback) {
+        return (value == null || value.trim().isEmpty()) ? fallback : value.trim();
     }
 
     private static int parseIntOrDefault(String value, int def) {

@@ -40,9 +40,9 @@ public class InfraMetricsListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InfraMetricsListener.class);
 
     static {
-        // service identity on every series. Deployments are told apart by Prometheus' own
-        // job/instance labels, so no extra role tag is needed.
-        registry.config().commonTags("service", "cyborg");
+        // service identity on every series (value from METRICS_SERVICE_NAME, default "cyborg").
+        // Deployments are told apart by Prometheus' own job/instance labels, so no role tag is needed.
+        registry.config().commonTags("service", CyborgMetricsConfig.getServiceName());
         // Anti-explosion guard: cap distinct uri values on http_* metrics; beyond the cap new uri
         // series are dropped rather than growing unbounded (e.g. an authenticated caller spraying
         // random /api/<x> paths). Meters without a uri tag (e.g. http_requests_in_flight) are unaffected.
