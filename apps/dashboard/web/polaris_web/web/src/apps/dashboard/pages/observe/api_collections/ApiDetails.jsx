@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text, Badge } from "@shopify/polaris"
+import { Box, Button, Popover, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text, Badge, List } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import ApiGroups from "../../../components/shared/ApiGroups";
@@ -665,6 +665,40 @@ function ApiDetails(props) {
         return { score: collection.baseRiskScore, reason: collection.baseRiskScoreReason };
     })();
 
+    // Justifies apiDetail.riskScore itself: base (LLM score) + threat (guardrail violations) +
+    // remaining (everything else the real ApiInfoDao.getRiskScore formula folds in — sensitive
+    // data, open-issue severity, public access — that baseRiskScore was never actually summed
+    // with in the backend). "remaining" is computed as a balancing figure, not itemized, so the
+    // three lines always add up to the displayed total instead of drifting from it.
+    const riskScoreFactors = (() => {
+        if (!apiDetail) return [];
+        const factors = [];
+        const isThreat = !!apiDetail.isThreatEnabled;
+        // Real threatScore when present; falls back to 1 for the skill-tag-only threat path
+        // (malicious-skill-tag), which flags isThreatEnabled without ever setting a threatScore.
+        const threatWeight = isThreat ? (apiDetail.threatScore || 1) : 0;
+        if (threatWeight > 0) factors.push({ weight: threatWeight, text: 'Guardrail violations detected' });
+
+        const baseWeight = agentRiskAnalysis?.score || 0;
+        const remaining = (apiDetail.riskScore || 0) - baseWeight - threatWeight;
+        if (remaining > 0) {
+            const sensitiveTags = [...new Set([...(apiDetail.sensitiveTags || []), ...(apiDetail.sensitiveInReq || []), ...(apiDetail.sensitiveInResp || [])])];
+            const remainingReasons = [];
+            if (sensitiveTags.length > 0) remainingReasons.push(`sensitive data detected: ${sensitiveTags.join(', ')}`);
+            if (apiDetail.access_type === 'Public') remainingReasons.push('publicly accessible');
+            const openIssuesText = Object.entries(apiDetail.severityObj || {})
+                .filter(([, count]) => count > 0)
+                .map(([severity, count]) => `${count} ${severity}`)
+                .join(', ');
+            if (openIssuesText) remainingReasons.push(`open security issues: ${openIssuesText}`);
+            factors.push({
+                weight: remaining,
+                text: remainingReasons.length > 0 ? `Other factors — ${remainingReasons.join(', ')}` : 'Other factors',
+            });
+        }
+        return factors;
+    })();
+
     const ValuesTab = {
         id: 'values',
         content: "Values",
@@ -674,12 +708,20 @@ function ApiDetails(props) {
                 <VerticalStack gap="4">
                     {agentRiskAnalysis && (
                         <VerticalStack gap="3">
-                            <Text variant='headingMd'>Agent Risk Analysis</Text>
-                            <VerticalStack gap="1">
-                                <Text variant="bodyMd" color="subdued">
-                                    {agentRiskAnalysis.reason}
-                                </Text>
-                            </VerticalStack>
+                            <HorizontalStack gap="2" blockAlign="center">
+                                <Text variant='headingMd'>Agent's Risk Score Breakdown</Text>
+                                <Badge status={transform.getStatus(apiDetail?.riskScore)} size="small">{apiDetail?.riskScore}</Badge>
+                            </HorizontalStack>
+                            <List type="bullet">
+                                <List.Item>
+                                    <Text variant="bodyMd" color="subdued" as="span">{agentRiskAnalysis.score} -&gt; {agentRiskAnalysis.reason}</Text>
+                                </List.Item>
+                                {riskScoreFactors.map((factor, index) => (
+                                    <List.Item key={index}>
+                                        <Text variant="bodyMd" color="subdued" as="span">{factor.weight} -&gt; {factor.text}</Text>
+                                    </List.Item>
+                                ))}
+                            </List>
                         </VerticalStack>
                     )}
                     <SampleDataList
