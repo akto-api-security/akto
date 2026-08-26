@@ -13,7 +13,6 @@ import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics;
 import io.micrometer.core.instrument.binder.system.FileDescriptorMetrics;
 import io.micrometer.core.instrument.binder.system.ProcessorMetrics;
 import io.micrometer.core.instrument.binder.system.UptimeMetrics;
-import io.micrometer.core.instrument.config.MeterFilter;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
 import org.slf4j.Logger;
@@ -31,8 +30,8 @@ import javax.servlet.ServletContextListener;
  * filter, Kafka/Mongo binders, and the endpoint are gated on the same switch elsewhere). When off,
  * nothing is registered and the feature is inert.
  *
- * The registry is configured once (static block, before any meter is created): common service tags
- * and a cardinality guard that caps distinct {@code uri} values on {@code http_*} metrics.
+ * The registry is configured once (static block, before any meter is created) with the common
+ * service tag.
  */
 public class InfraMetricsListener implements ServletContextListener {
 
@@ -45,14 +44,6 @@ public class InfraMetricsListener implements ServletContextListener {
         // service identity on every series (value from SERVICE_NAME, default "cyborg").
         // Deployments are told apart by Prometheus' own job/instance labels, so no role tag is needed.
         registry.config().commonTags("service", CyborgMetricsConfig.getServiceName());
-        // Anti-explosion guard: cap distinct uri values on http_* metrics; beyond the cap new uri
-        // series are dropped rather than growing unbounded (e.g. an authenticated caller spraying
-        // random /api/<x> paths). Meters without a uri tag (JVM/Mongo/Kafka) are unaffected.
-        registry.config().meterFilter(MeterFilter.maximumAllowableTags(
-                "http_", "uri", CyborgMetricsConfig.getMaxUriCardinality(), MeterFilter.deny()));
-        // Same guard for outbound-client metrics on the path tag.
-        registry.config().meterFilter(MeterFilter.maximumAllowableTags(
-                "http_client", "path", CyborgMetricsConfig.getMaxUriCardinality(), MeterFilter.deny()));
     }
 
     @Override

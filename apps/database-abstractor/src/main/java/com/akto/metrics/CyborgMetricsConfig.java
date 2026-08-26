@@ -13,11 +13,9 @@ package com.akto.metrics;
  *   SERVICE_NAME                 overall service name -> "service" common tag (default "cyborg")
  *   METRICS_AUTH_ENABLED         require a token on /metrics (default true; "false" to disable)
  *   METRICS_AUTH_TOKEN           bearer token for /metrics
- *   METRICS_MAX_URI_CARDINALITY  cap on distinct uri tag values on http_* metrics (default 500)
  */
 public final class CyborgMetricsConfig {
 
-    private static final int DEFAULT_MAX_URI_CARDINALITY = 500;
     private static final String DEFAULT_SERVICE_NAME = "cyborg";
 
     // volatile: read on every request; the setters exist only for tests, never for production use.
@@ -27,7 +25,6 @@ public final class CyborgMetricsConfig {
 
     // Overall service name (general SERVICE_NAME env, not a metrics-specific var).
     private static final String serviceName = firstNonBlank(env("SERVICE_NAME"), DEFAULT_SERVICE_NAME);
-    private static final int maxUriCardinality = parseIntOrDefault(env("METRICS_MAX_URI_CARDINALITY"), DEFAULT_MAX_URI_CARDINALITY);
 
     private CyborgMetricsConfig() {
     }
@@ -52,28 +49,12 @@ public final class CyborgMetricsConfig {
         return serviceName;
     }
 
-    /** Max distinct uri tag values on http_* metrics before new ones are dropped (anti-explosion). */
-    public static int getMaxUriCardinality() {
-        return maxUriCardinality;
-    }
-
     private static String env(String key) {
         return System.getenv(key);
     }
 
     private static String firstNonBlank(String value, String fallback) {
         return (value == null || value.trim().isEmpty()) ? fallback : value.trim();
-    }
-
-    private static int parseIntOrDefault(String value, int def) {
-        if (value == null || value.trim().isEmpty()) {
-            return def;
-        }
-        try {
-            return Integer.parseInt(value.trim());
-        } catch (NumberFormatException e) {
-            return def;
-        }
     }
 
     // ---- test seams (env-derived statics can't be driven from a unit test otherwise) ----
