@@ -114,9 +114,9 @@ public class CopilotStudioInventoryPublisher {
         tags.put(Constants.AKTO_SAAS_AGENT_TAG, Constants.COPILOT_STUDIO_AI_AGENT_NAME);
         if (isOwnerSample) {
             tags.put(Constants.AKTO_AI_AGENT_OWNER_TAG, TAG_VALUE_TRUE);
-            if (environmentName != null && !environmentName.isEmpty()) {
-                tags.put(Constants.AKTO_COPILOT_BOT_ENVIRONMENT_NAME_TAG, environmentName);
-            }
+        }
+        if (environmentName != null && !environmentName.isEmpty()) {
+            tags.put(Constants.AKTO_COPILOT_BOT_ENVIRONMENT_NAME_TAG, environmentName);
         }
 
         Map<String, String> requestHeaders = new HashMap<>();
