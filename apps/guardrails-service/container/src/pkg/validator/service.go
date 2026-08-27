@@ -237,6 +237,7 @@ func (s *Service) filterPoliciesByContextSource(policies []types.Policy, context
 // policies with an empty server map are skipped (not configured for any server).
 // filterPoliciesByMcpServer filters policies to those applicable to the given MCP server name.
 // YAML policies always pass through. If mcpServerName is empty, all policies are returned unchanged.
+// MCP/Agent/LLM buckets are matched and negated independently; a name excluded by one bucket can't sneak back in via another (see isExplicitlyExcluded).
 func (s *Service) filterPoliciesByMcpServer(policies []types.Policy, mcpServerName string) []types.Policy {
 	if mcpServerName == "" {
 		return policies
@@ -258,39 +259,113 @@ func (s *Service) filterPoliciesByMcpServer(policies []types.Policy, mcpServerNa
 			// 	continue
 			// }
 		}
-		combinedServers := make(map[string]struct{}, len(policy.SelectedMcpServers)+len(policy.SelectedAgentServers))
-		for k, v := range policy.SelectedMcpServers {
-			combinedServers[k] = v
-		}
-		for k, v := range policy.SelectedAgentServers {
-			combinedServers[k] = v
-		}
-		if len(combinedServers) == 0 {
+		agentConfigured := len(policy.SelectedAgentServers) > 0 || policy.NegatedAgentServers
+		mcpConfigured := len(policy.SelectedMcpServers) > 0 || policy.NegatedMcpServers
+		llmConfigured := len(policy.SelectedLlmServers) > 0 || policy.NegatedLlmServers
+		if !agentConfigured && !mcpConfigured && !llmConfigured {
 			continue // not configured for any server
 		}
-		for serverName := range combinedServers {
-			storedLower := strings.ToLower(serverName)
-			// Exact match: full hostname stored (old Argus) or short key equals incoming.
-			if storedLower == mcpServerNameLower {
-				filtered = append(filtered, policy)
-				break
-			}
-			// Suffix match: stored value is a trailing dot-segment — covers service names
-			// ('filesystem'), multi-segment LLM domains ('chatgpt.com'), and old device-stripped
-			// Atlas keys ('cursor.filesystem') since ".cursor.filesystem" is a valid suffix.
-			if strings.HasSuffix(mcpServerNameLower, "."+storedLower) {
-				filtered = append(filtered, policy)
-				break
-			}
-			// Middle-segment match: stored agent platform key sits between device-id and service name.
-			// e.g. stored='cursor' matches 'device.cursor.filesystem'.
-			if strings.Contains(mcpServerNameLower, "."+storedLower+".") {
-				filtered = append(filtered, policy)
-				break
-			}
+		vetoed := isExplicitlyExcluded(mcpServerNameLower, policy)
+		agentMatch := bucketMatches(mcpServerNameLower, policy.SelectedAgentServers, policy.NegatedAgentServers, agentSegmentMatch, true, vetoed)
+		mcpMatch := bucketMatches(mcpServerNameLower, policy.SelectedMcpServers, policy.NegatedMcpServers, hostSegmentMatch, false, vetoed)
+		llmMatch := bucketMatches(mcpServerNameLower, policy.SelectedLlmServers, policy.NegatedLlmServers, hostSegmentMatch, false, vetoed)
+		if agentMatch || mcpMatch || llmMatch {
+			filtered = append(filtered, policy)
 		}
 	}
 	return filtered
+}
+
+// isExplicitlyExcluded is a global veto: true if the name is excluded in ANY negated bucket, so it can't sneak back in via a different bucket's elimination match.
+func isExplicitlyExcluded(mcpServerNameLower string, policy types.Policy) bool {
+	if policy.NegatedAgentServers && rawBucketContains(mcpServerNameLower, policy.SelectedAgentServers, agentSegmentMatch, true) {
+		return true
+	}
+	if policy.NegatedMcpServers && rawBucketContains(mcpServerNameLower, policy.SelectedMcpServers, hostSegmentMatch, false) {
+		return true
+	}
+	if policy.NegatedLlmServers && rawBucketContains(mcpServerNameLower, policy.SelectedLlmServers, hostSegmentMatch, false) {
+		return true
+	}
+	return false
+}
+
+// wildcardAllServers is the Include-mode "select all" sentinel — matches every name, present and
+// future, same as an empty Exclude bucket, but keeps the bucket in Include mode (see frontend DropdownSearch.jsx).
+const wildcardAllServers = "__all__"
+
+// bucketMatches: Include mode grants on a positive list match, or on the wildcard sentinel (still
+// subject to vetoed, like Exclude's elimination grant below). Exclude mode grants unless this name
+// is specifically excluded here, or vetoed by isExplicitlyExcluded (an explicit exclusion elsewhere).
+func bucketMatches(mcpServerNameLower string, servers map[string]struct{}, negated bool, segmentMatch func(name, stored string) bool, allowLegacyFallback bool, vetoed bool) bool {
+	found := rawBucketContains(mcpServerNameLower, servers, segmentMatch, allowLegacyFallback)
+	if !negated {
+		if _, wildcard := servers[wildcardAllServers]; wildcard {
+			return !vetoed
+		}
+		return found
+	}
+	if found {
+		return false
+	}
+	return !vetoed
+}
+
+// rawBucketContains reports whether mcpServerNameLower matches any stored value, ignoring Include/Exclude — allowLegacyFallback should be true only for the Agent bucket.
+func rawBucketContains(mcpServerNameLower string, servers map[string]struct{}, segmentMatch func(name, stored string) bool, allowLegacyFallback bool) bool {
+	for serverName := range servers {
+		storedLower := strings.ToLower(serverName)
+		if allowLegacyFallback && strings.Contains(storedLower, ".") {
+			// Legacy compound key (e.g. "cursor.filesystem") can't be type-attributed, so fall back to loose matching.
+			if looseServerMatch(mcpServerNameLower, storedLower) {
+				return true
+			}
+			continue
+		}
+		if segmentMatch(mcpServerNameLower, storedLower) {
+			return true
+		}
+	}
+	return false
+}
+
+// looseServerMatch is the pre-type-scoping exact/suffix/contains match, kept as a fallback for legacy compound keys.
+func looseServerMatch(nameLower, storedLower string) bool {
+	if storedLower == nameLower {
+		return true
+	}
+	if strings.HasSuffix(nameLower, "."+storedLower) {
+		return true
+	}
+	if strings.Contains(nameLower, "."+storedLower+".") {
+		return true
+	}
+	return false
+}
+
+// agentSegmentMatch checks storedLower against the clientType segment of "{deviceLabel}.{clientType}.{host}".
+func agentSegmentMatch(nameLower, storedLower string) bool {
+	if nameLower == storedLower {
+		return true
+	}
+	if strings.HasPrefix(nameLower, storedLower+".") {
+		return true
+	}
+	if strings.Contains(nameLower, "."+storedLower+".") {
+		return true
+	}
+	return false
+}
+
+// hostSegmentMatch checks storedLower against the trailing host segment of "{deviceLabel}.{clientType}.{host}".
+func hostSegmentMatch(nameLower, storedLower string) bool {
+	if nameLower == storedLower {
+		return true
+	}
+	if strings.HasSuffix(nameLower, "."+storedLower) {
+		return true
+	}
+	return false
 }
 
 // filterPoliciesByDeviceId filters policies by the device label embedded in the MCP server name.

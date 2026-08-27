@@ -75,12 +75,18 @@ public class GuardrailPolicies {
     private List<String> selectedMcpServers;
     private List<String> selectedAgentServers;
     
-    // Step 6: Enhanced Server settings (new format with ID and name)
+    // Step 6: Enhanced Server settings. selectedAgentServersV2 = agents only; LLM entries live in selectedLlmServersV2.
     private List<SelectedServer> selectedMcpServersV2;
     private List<SelectedServer> selectedAgentServersV2;
+    private List<SelectedServer> selectedLlmServersV2;
     private boolean applyOnResponse;
     private boolean applyOnRequest;
     private boolean applyToAllServers;
+
+    // Include/Exclude toggle per server list, independently matched by type; empty+negated matches everything, including future assets.
+    private boolean negatedAgentServers;
+    private boolean negatedMcpServers;
+    private boolean negatedLlmServers;
 
     // Tag/Device targeting — controls which agentic users/devices this policy applies to.
     // targetDeviceIds holds explicitly-picked device IDs (dropdown shows them labeled by username,
@@ -190,6 +196,14 @@ public class GuardrailPolicies {
             return selectedAgentServers.stream()
                     .map(serverId -> new SelectedServer(serverId, serverId)) // ID as name for old data
                     .collect(java.util.stream.Collectors.toList());
+        }
+        return new java.util.ArrayList<>();
+    }
+
+    // No legacy fallback — this list is new, there's no old-format data to fall back to.
+    public List<SelectedServer> getEffectiveSelectedLlmServers() {
+        if (selectedLlmServersV2 != null) {
+            return selectedLlmServersV2;
         }
         return new java.util.ArrayList<>();
     }

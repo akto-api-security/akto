@@ -278,6 +278,9 @@ public class GuardrailPoliciesAction extends UserAction {
         updates.add(Updates.set("applyOnRequest", p.isApplyOnRequest()));
         updates.add(Updates.set("applyToAllServers", p.isApplyToAllServers()));
         updates.add(Updates.set("active", p.isActive()));
+        updates.add(Updates.set("negatedAgentServers", p.isNegatedAgentServers()));
+        updates.add(Updates.set("negatedMcpServers", p.isNegatedMcpServers()));
+        updates.add(Updates.set("negatedLlmServers", p.isNegatedLlmServers()));
 
         if (StringUtils.isNotBlank(p.getDescription())) {
             updates.add(Updates.set("description", p.getDescription()));
@@ -350,6 +353,9 @@ public class GuardrailPoliciesAction extends UserAction {
         }
         if (p.getSelectedAgentServersV2() != null) {
             updates.add(Updates.set("selectedAgentServersV2", p.getSelectedAgentServersV2()));
+        }
+        if (p.getSelectedLlmServersV2() != null) {
+            updates.add(Updates.set("selectedLlmServersV2", p.getSelectedLlmServersV2()));
         }
         if (p.getBlockedHosts() != null) {
             updates.add(Updates.set("blockedHosts", p.getBlockedHosts()));
