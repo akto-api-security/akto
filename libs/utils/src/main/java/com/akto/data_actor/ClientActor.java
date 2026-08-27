@@ -2226,6 +2226,8 @@ public class ClientActor extends DataActor {
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
+            loggerMaker.infoAndAddToDb("recordWebhookSendResult: callback for webhookId=" + webhookId
+                    + " statusCode=" + response.getStatusCode() + " responseBody=" + responsePayload, LoggerMaker.LogDb.RUNTIME);
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in recordWebhookSendResult", LoggerMaker.LogDb.RUNTIME);
                 return;
