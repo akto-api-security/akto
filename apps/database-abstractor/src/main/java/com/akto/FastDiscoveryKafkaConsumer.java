@@ -80,7 +80,7 @@ public class FastDiscoveryKafkaConsumer implements Runnable {
         // A fatal Error that escapes the loop must not leave a silently-dead consumer inside a
         // live JVM — take the process down so the container restarts (restart: always).
         consumerThread.setUncaughtExceptionHandler((t, e) -> {
-            loggerMaker.errorAndAddToDb(e, "fatal error in " + t.getName() + ", exiting JVM for restart", LogDb.DB_ABS);
+            loggerMaker.errorAndAddToDb("fatal error in " + t.getName() + ", exiting JVM for restart: " + e, LogDb.DB_ABS);
             System.exit(1);
         });
         consumerThread.start();
