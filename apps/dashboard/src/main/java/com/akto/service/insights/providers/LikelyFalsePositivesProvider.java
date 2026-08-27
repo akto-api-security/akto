@@ -114,10 +114,14 @@ public class LikelyFalsePositivesProvider extends AbstractInsightProvider {
         List<InsightResult.Metric> baseMetrics = new ArrayList<>(Arrays.asList(totalMetric, policyCountMetric));
 
         if (scope == Scope.LIST) {
+            // Real precision (the false-positive rate) still requires the detail view, but a reader
+            // shouldn't see "Coming soon" for a card with real PII-labeled volume behind it — tier by
+            // volume alone as a floor; DETAIL can move this to CRITICAL once precision is known.
             result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(InsightUtil.count(totalPiiViolations, "violations") + " labeled PII across "
                     + InsightUtil.count(policiesWithPii.size(), "policies")
                     + "; a precision estimate requires the detail view.");
+            result.setSeverity(totalPiiViolations >= 20 ? "MEDIUM" : "LOW");
             result.setMetrics(baseMetrics);
             result.setMetricsComplete(false);
             result.setDataGaps(Collections.singletonList(new InsightResult.Gap(
@@ -132,7 +136,9 @@ public class LikelyFalsePositivesProvider extends AbstractInsightProvider {
         // above (the exact type list is per-account/dynamic — see PiiPatterns' doc — so it can't
         // be known in advance; the free aggregate just told us which ones actually occur here).
         // Only rows that are actually PII-<type>-labeled feed this — a piiOnlyPolicyNamesLower
-        // fallback row's subCategory is the policy's own name, not a real PII type.
+        // fallback row's subCategory is the policy's own name, not a real PII type. "exclude" drops
+        // Skills Evaluations traffic — a skill's own documentation matching a PII pattern isn't a
+        // live false-positive-worthy hit (same convention as AlertFatigueProvider).
         List<String> exactSubCategories = piiRows.stream()
                 .map(ThreatCategoryCount::getSubCategory)
                 .filter(sc -> sc != null && sc.regionMatches(true, 0, PII_PREFIX, 0, PII_PREFIX.length()))
@@ -141,7 +147,7 @@ public class LikelyFalsePositivesProvider extends AbstractInsightProvider {
         boolean anyFetchCapped = false;
         if (!exactSubCategories.isEmpty()) {
             List<DashboardMaliciousEvent> labeled = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT,
-                    Collections.singletonMap("subCategory", exactSubCategories), null);
+                    Collections.singletonMap("subCategory", exactSubCategories), "exclude");
             if (labeled != null) {
                 events.addAll(labeled);
                 anyFetchCapped = anyFetchCapped || labeled.size() == EVENT_PAGE_LIMIT;
@@ -155,7 +161,7 @@ public class LikelyFalsePositivesProvider extends AbstractInsightProvider {
                 .distinct().collect(Collectors.toCollection(LinkedHashSet::new));
         if (!fallbackPolicyNames.isEmpty()) {
             List<DashboardMaliciousEvent> fallbackEvents = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT,
-                    Collections.singletonMap("latestAttack", new ArrayList<>(fallbackPolicyNames)), null);
+                    Collections.singletonMap("latestAttack", new ArrayList<>(fallbackPolicyNames)), "exclude");
             if (fallbackEvents != null) {
                 anyFetchCapped = anyFetchCapped || fallbackEvents.size() == EVENT_PAGE_LIMIT;
                 Set<String> seenIds = events.stream().map(DashboardMaliciousEvent::getId).collect(Collectors.toCollection(HashSet::new));
