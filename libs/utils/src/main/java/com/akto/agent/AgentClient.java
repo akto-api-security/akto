@@ -390,7 +390,7 @@ public class AgentClient {
             }
             // externalApiTokens is 0 for non-agentic conversations (e.g., ask_akto, docs_agent)
             int externalApiTokens = 0;
-            return new GenericAgentConversation(title, conversationId, prompt, responseFromMcpServer, finalSentPrompt, timestamp, timestamp, tokensUsed, externalApiTokens, tokensLimit, conversationType);
+            return new GenericAgentConversation(title, conversationId, prompt, responseFromMcpServer, finalSentPrompt, timestamp, timestamp, tokensUsed, externalApiTokens, tokensLimit, conversationType, contextSource);
         } catch (Exception e) {
             throw new Exception("Failed to get response from MCP server: " + e.getMessage());
         }
