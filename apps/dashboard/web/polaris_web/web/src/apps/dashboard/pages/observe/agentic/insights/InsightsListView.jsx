@@ -28,7 +28,7 @@ const InsightRow = React.memo(function InsightRow({ insight, onSelect }) {
                     <VerticalStack gap="2">
                         <HorizontalStack gap="2" blockAlign="center" wrap>
                             <Text variant="bodyMd" fontWeight="semibold" color={disabled ? "subdued" : undefined}>{insight.title}</Text>
-                            {disabled ? <Badge>Coming soon</Badge> : (insight.severity ? <SeverityBadge severity={insight.severity} /> : null)}
+                            {disabled ? <Badge status="info">Coming soon</Badge> : (insight.severity ? <SeverityBadge severity={insight.severity} /> : null)}
                         </HorizontalStack>
                         {headline ? (
                             <Text variant="bodySm" color="subdued">{headline}</Text>
