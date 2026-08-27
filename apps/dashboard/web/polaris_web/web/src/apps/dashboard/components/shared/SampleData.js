@@ -7,7 +7,8 @@ import editorSetup from './customEditor';
 import yamlEditorSetup from "../../pages/test_editor/components/editor_config/editorSetup"
 import keywords from "../../pages/test_editor/components/editor_config/keywords"
 import authTypesApi from "@/apps/dashboard/pages/settings/auth_types/api";
-import { locateSegment } from "./vulnerabilityEvidence";
+import { locateSegment, locateAllSegmentRanges } from "./vulnerabilityEvidence";
+import { isEndpointSecurityCategory } from "../../../main/labelHelper";
 import { COOKIE_REDACT_PLACEHOLDER } from './customDiffEditor';
 
 function highlightRedactedCookies(ref) {
@@ -172,6 +173,13 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
   const decorations = [];
   let firstStart = Infinity;
 
+  const locateRanges = isEndpointSecurityCategory()
+    ? locateAllSegmentRanges
+    : (segment, segmentText) => {
+      const range = locateSegment(segment, segmentText);
+      return range ? [range] : [];
+    };
+
   vulnerabilitySegments.forEach((segment) => {
     try {
       // Informational evidence (e.g. missing headers) describes something ABSENT,
@@ -181,41 +189,42 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
       }
       // Shared locator (see vulnerabilityEvidence.js) - the SAME contract the
       // Evidence panel uses, so we never highlight what the panel can't show.
-      const range = locateSegment(segment, text);
-      // If we cannot locate the exact phrase, skip rather than highlight the
-      // wrong span using unreliable offsets.
-      if (!range) {
+      const ranges = locateRanges(segment, text);
+      if (ranges.length === 0) {
         return;
       }
-
-      const startPos = model.getPositionAt(range.start);
-      const endPos = model.getPositionAt(range.end);
-
-      if (!startPos || !endPos) {
-        return;
-      }
-
-      firstStart = Math.min(firstStart, range.start);
 
       const reason = typeof segment?.reason === 'string' ? segment.reason.trim() : '';
-      const options = {
-        inlineClassName: "vulnerability-highlight",
-        // Marker in the scrollbar so evidence is easy to find/jump to in large responses.
-        overviewRuler: {
-          color: "rgba(139, 69, 255, 0.8)",
-          position: monaco.editor.OverviewRulerLane.Right
-        }
-      };
-      if (reason) {
-        options.hoverMessage = [
-          { value: "**Evidence**" },
-          { value: reason }
-        ];
-      }
 
-      decorations.push({
-        range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
-        options
+      ranges.forEach((range) => {
+        const startPos = model.getPositionAt(range.start);
+        const endPos = model.getPositionAt(range.end);
+
+        if (!startPos || !endPos) {
+          return;
+        }
+
+        firstStart = Math.min(firstStart, range.start);
+
+        const options = {
+          inlineClassName: "vulnerability-highlight",
+          // Marker in the scrollbar so evidence is easy to find/jump to in large responses.
+          overviewRuler: {
+            color: "rgba(139, 69, 255, 0.8)",
+            position: monaco.editor.OverviewRulerLane.Right
+          }
+        };
+        if (reason) {
+          options.hoverMessage = [
+            { value: "**Evidence**" },
+            { value: reason }
+          ];
+        }
+
+        decorations.push({
+          range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
+          options
+        });
       });
     } catch (error) {
       console.error('Error creating vulnerability highlight:', error, segment);

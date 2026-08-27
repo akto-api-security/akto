@@ -641,6 +641,15 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       ]
     };
 
+    if (isEndpointSecurityCategory()) {
+      const atlasPartitionActions = [
+        { label: 'Mark for Review', type: 'markForReview' },
+        { label: 'Ignore', type: 'ignore', validationType: 'ignore', warning: true }
+      ];
+      tabActions['skills_evaluations'] = atlasPartitionActions;
+      tabActions['misconfigured_settings'] = atlasPartitionActions;
+    }
+
     // Add tab-specific actions
     const currentTabActions = tabActions[currentTab] || [];
     currentTabActions.forEach(({ label, type, validationType, warning }) => {
