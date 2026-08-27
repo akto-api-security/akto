@@ -61,6 +61,7 @@ type Config struct {
 	ValidationTimeoutMs int
 
 	GuardrailRemediationGenerate bool
+	GuardrailAverageSeverity     bool
 	File                         FileConfig
 }
 
@@ -105,7 +106,7 @@ type MediaConfig struct {
 func LoadConfig() *Config {
 	dbAbstractorToken := getEnv("DATABASE_ABSTRACTOR_SERVICE_TOKEN", "")
 	return &Config{
-		ServerPort:                       getEnvAsInt("SERVER_PORT", 8080),
+		ServerPort:                       getEnvAsInt("SERVER_PORT", 9091),
 		DatabaseAbstractorURL:            getEnv("DATABASE_ABSTRACTOR_SERVICE_URL", "https://ultron.akto.io"),
 		DatabaseAbstractorToken:          dbAbstractorToken,
 		AgentGuardEngineURL:              getEnv("AGENT_GUARD_ENGINE_URL", "https://akto-agent-guard-engine.billing-53a.workers.dev"),
@@ -137,6 +138,7 @@ func LoadConfig() *Config {
 		ValidationTimeoutMs:              getEnvAsInt("GUARDRAILS_VALIDATION_TIMEOUT_MS", 2500),
 		ThreatKafka:                      loadThreatKafkaConfig(),
 		GuardrailRemediationGenerate:     getEnvAsBool("GUARDRAILS_GENERATE_REMEDIATION", false),
+		GuardrailAverageSeverity:         getEnvAsBool("GUARDRAILS_AVERAGE_SEVERITY", false),
 		File: FileConfig{
 			Enabled:          getEnvAsBool("FILE_VALIDATION_ENABLED", false),
 			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
