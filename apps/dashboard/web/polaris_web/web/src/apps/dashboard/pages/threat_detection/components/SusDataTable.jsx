@@ -647,6 +647,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       actions.push(createAction(label, type, validationType, warning));
     });
 
+    if (isEndpointSecurityCategory() && (currentTab === 'skills_evaluations' || currentTab === 'misconfigured_settings')) {
+      actions.push(createAction('Mark for Review', 'markForReview'));
+      actions.push(createAction('Ignore', 'ignore', 'ignore', true));
+    }
+
     // Delete button for all tabs
     actions.push(createAction('Delete', 'delete'));
 
