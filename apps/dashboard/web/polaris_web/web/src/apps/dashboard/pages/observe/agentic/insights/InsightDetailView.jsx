@@ -7,10 +7,18 @@ import GridRows from "@/apps/dashboard/components/shared/GridRows";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import insightsApi from "./insightsApi";
 import InsightEvidenceTable from "./InsightEvidenceTable";
-import { buildCtaHref } from "./insightsHelpers";
+import { buildCtaHref, buildInsightChatMetadata } from "./insightsHelpers";
 import { buildTopicGuardrailPrefillForTopic } from "../../../guardrails/topicGuardrailUtils";
 import LocalStore from "@/apps/main/LocalStorageStore";
+import AskAktoSection from "../../../testing/TestRunResultPage/AskAktoSection";
+import { sendQuery } from "../../../agentic/services/agenticService";
 import "../../../../components/layouts/style.css";
+
+// Static intro line for the Ask Akto card — never fetched/AI-generated. AiAnalysisCard (inside
+// AskAktoSection) only shows its "Get AI Overview" button when `summary` is falsy; that flow
+// isn't used here, so a truthy static summary keeps the card in its collapsed/expand-toggle mode
+// straight away, with zero network calls until the user actually sends a message.
+const AI_CHAT_INTRO = "Ask about this insight's metrics, evidence, or what to do next.";
 
 // Metric stat card — same title/value card shape GridRows' other callers use (see
 // TestRunResultFlyout's RowComp). value/label always come straight from InsightResult.metrics;
@@ -35,6 +43,13 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
     const [error, setError] = useState(false);
     const [regenerating, setRegenerating] = useState(false);
 
+    // Ask Akto follow-up chat state. `aiConversationIdRef` is a ref, not state, on purpose — it's
+    // never rendered, only read/written, so setting it after the first response doesn't cost an
+    // extra re-render the way TestRunResultPage's equivalent useState does.
+    const [aiMessages, setAiMessages] = useState([]);
+    const [aiLoading, setAiLoading] = useState(false);
+    const aiConversationIdRef = useRef(null);
+
     // Shared unmount guard — InsightDetailView unmounts entirely when the user hits "Back to
     // Insights", and both the initial fetch and a still-in-flight Regenerate call must not
     // setState after that.
@@ -45,6 +60,11 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
         setLoading(true);
         setError(false);
         setDetail(null);
+        // Wipe Ask Akto chat state too — this insight's identity changed, so any in-progress
+        // conversation belongs to a different insight and must not bleed into the new one.
+        setAiMessages([]);
+        setAiLoading(false);
+        aiConversationIdRef.current = null;
         insightsApi.fetchInsightDetail({ insightId, startTimestamp, endTimestamp })
             .then((data) => { if (!unmountedRef.current) setDetail(data); })
             .catch(() => { if (!unmountedRef.current) setError(true); })
@@ -87,6 +107,27 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
             navigate(cta.href);
         }
     }, [navigate, onClose]);
+
+    const handleSendFollowUp = useCallback((query) => {
+        const trimmed = query?.trim();
+        if (!trimmed || aiLoading) return;
+
+        const userMsg = { _id: "user_" + Date.now(), role: "user", message: trimmed };
+        setAiMessages((prev) => [...prev, userMsg]);
+        setAiLoading(true);
+
+        sendQuery(trimmed, aiConversationIdRef.current, "INSIGHTS", buildInsightChatMetadata(detail))
+            .then((response) => {
+                if (unmountedRef.current) return;
+                if (response?.conversationId) aiConversationIdRef.current = response.conversationId;
+                if (response?.response) {
+                    const aiMsg = { _id: "system_" + Date.now(), role: "system", message: response.response, isComplete: true, isFromHistory: false };
+                    setAiMessages((prev) => [...prev, aiMsg]);
+                }
+            })
+            .catch(() => {})
+            .finally(() => { if (!unmountedRef.current) setAiLoading(false); });
+    }, [aiLoading, detail]);
 
     const ctas = useMemo(
         () => (detail?.ctas || []).map((cta) => ({ ...cta, href: buildCtaHref(cta) })),
@@ -182,6 +223,14 @@ export default function InsightDetailView({ insightId, startTimestamp, endTimest
                         ))}
                     </VerticalStack>
                 )}
+
+                <AskAktoSection
+                    aiSummary={AI_CHAT_INTRO}
+                    aiSummaryLoading={false}
+                    aiMessages={aiMessages}
+                    aiLoading={aiLoading}
+                    onSendFollowUp={handleSendFollowUp}
+                />
             </VerticalStack>
 
             {(ctas.length > 0 || detail.dataGaps?.length > 0) && (

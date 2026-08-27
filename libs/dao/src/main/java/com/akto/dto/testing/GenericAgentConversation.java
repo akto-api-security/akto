@@ -18,7 +18,8 @@ public class GenericAgentConversation {
         ANALYZE_REQUESTS,
         DOCS_AGENT,
         ANALYZE_DASHBOARD_DATA,
-        AGENTIC_OBSERVE
+        AGENTIC_OBSERVE,
+        INSIGHTS
     }
 
     private String title;
