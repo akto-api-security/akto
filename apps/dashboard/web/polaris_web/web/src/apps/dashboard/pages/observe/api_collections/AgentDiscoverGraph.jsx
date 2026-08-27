@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Box, Text, VerticalStack, HorizontalStack, Card, Badge, Icon, Avatar } from '@shopify/polaris';
-import ReactFlow, { Background, Handle, Position, getBezierPath } from 'react-flow-renderer';
+import ReactFlow, { Background, Controls, Handle, Position, getBezierPath, useViewport } from 'react-flow-renderer';
 import TooltipText from '../../../components/shared/TooltipText';
 import ShowListInBadge from '../../../components/shared/ShowListInBadge';
 import api from './api';
@@ -251,6 +251,42 @@ export const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX
         </foreignObject>
       )}
     </g>
+  );
+});
+
+// Dashed boundary boxes for nodes with component.showBoundary = true.
+// These are plain absolutely-positioned divs passed as ReactFlow children, which
+// react-flow-renderer renders *outside* the pannable/zoomable viewport pane. Now that
+// panning and zooming are enabled on the graph, this overlay re-applies the current
+// viewport transform itself so the boxes stay aligned to the nodes they highlight.
+const BoundaryOverlay = memo(function BoundaryOverlay({ nodes }) {
+  const { x, y, zoom } = useViewport();
+  const boundaryNodes = nodes.filter(n => n.data?.component?.showBoundary);
+
+  if (boundaryNodes.length === 0) return null;
+
+  return (
+    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }}>
+      <div style={{ transform: `translate(${x}px, ${y}px) scale(${zoom})`, transformOrigin: '0 0' }}>
+        {boundaryNodes.map(n => (
+          <div
+            key={`boundary-${n.id}`}
+            style={{
+              position: 'absolute',
+              left: `${n.position.x - 20}px`,
+              top: `${Math.max(20, n.position.y - 20)}px`,
+              width: '250px',
+              height: '130px',
+              border: `2px dashed ${n.data.component.boundaryColor || '#7c3aed'}`,
+              borderRadius: '12px',
+              pointerEvents: 'none',
+              opacity: 0.5,
+              backgroundColor: n.data.component.boundaryBg || 'rgba(124, 58, 237, 0.05)'
+            }}
+          />
+        ))}
+      </div>
+    </div>
   );
 });
 
@@ -670,36 +706,20 @@ function AgentDiscoverGraph({ apiCollectionId }) {
                 nodesDraggable={false}
                 nodesConnectable={false}
                 elementsSelectable={false}
-                panOnDrag={false}
-                zoomOnScroll={false}
+                panOnDrag={true}
+                zoomOnScroll={true}
                 panOnScroll={false}
-                zoomOnPinch={false}
+                zoomOnPinch={true}
                 zoomOnDoubleClick={false}
+                minZoom={0.2}
+                maxZoom={2}
                 preventScrolling={true}
                 defaultViewport={{ x: 0, y: 0, zoom: 1 }}
               >
                 <Background color="#e1e5e9" gap={16} />
+                <Controls showInteractive={false} />
 
-                {/* Dashed boundary — rendered for any node with component.showBoundary = true */}
-                {nodes.filter(n => n.data?.component?.showBoundary).map(n => (
-                  <div
-                    key={`boundary-${n.id}`}
-                    style={{
-                      position: 'absolute',
-                      left: `${n.position.x - 20}px`,
-                      top: `${Math.max(20, n.position.y - 20)}px`,
-                      width: '250px',
-                      height: '130px',
-                      border: `2px dashed ${n.data.component.boundaryColor || '#7c3aed'}`,
-                      borderRadius: '12px',
-                      pointerEvents: 'none',
-                      opacity: 0.5,
-                      zIndex: 0,
-                      backgroundColor: n.data.component.boundaryBg || 'rgba(124, 58, 237, 0.05)'
-                    }}
-                  />
-                ))}
-
+                <BoundaryOverlay nodes={nodes} />
               </ReactFlow>
             </div>
           </VerticalStack>
