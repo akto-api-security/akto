@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text } from "@shopify/polaris";
+import { Text, Tooltip } from "@shopify/polaris";
 import { getGuardrailCapabilityForRule } from '../constants/guardrailRuleDefinitions';
 import SessionStore from '@/apps/main/SessionStore';
 import threatDetectionApi from '../api';
@@ -12,16 +12,35 @@ const looksLikeSecret = (value) => {
   return false;
 };
 
-export const formatActorId = (actorId) => {
+const ACTOR_ID_MAX_LENGTH = 25;
+
+export const actorIdFullDisplay = (actorId) => {
+  if (!actorId) return "-";
+  return looksLikeSecret(actorId) ? "Non IP Value" : String(actorId);
+};
+
+export const actorIdDisplayText = (actorId) => {
+  const display = actorIdFullDisplay(actorId);
+  return display.length > ACTOR_ID_MAX_LENGTH
+    ? `${display.slice(0, ACTOR_ID_MAX_LENGTH)}...`
+    : display;
+};
+
+export const formatActorId = (actorId, textProps = { variant: "bodyMd", fontWeight: "medium" }) => {
   if (!actorId) return "-";
 
-  const display = looksLikeSecret(actorId) ? "Non IP Value" : actorId;
+  const display = actorIdFullDisplay(actorId);
+  const truncated = actorIdDisplayText(actorId);
 
-  return (
-    <Text variant="bodyMd" fontWeight="medium">
-      {display}
+  const text = (
+    <Text {...textProps}>
+      {truncated}
     </Text>
   );
+
+  return display.length > ACTOR_ID_MAX_LENGTH
+    ? <Tooltip content={display}>{text}</Tooltip>
+    : text;
 };
 
 export const extractRuleViolated = (metadata) => {

@@ -4,9 +4,6 @@ import TooltipWithLink from "../../../components/shared/TooltipWithLink";
 import api from "../api";
 import func from "../../../../../util/func";
 
-const IPV4_REGEX = /^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
-const IPV6_REGEX = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:)*[0-9a-fA-F]{1,4})?::(([0-9a-fA-F]{1,4}:)*[0-9a-fA-F]{1,4})?)$/;
-
 // Cache to store fetched reputation scores
 const reputationScoreCache = new Map();
 
@@ -18,12 +15,6 @@ const getBadgeTone = (score) => {
   if (score == "MEDIUM") return "MEDIUM"; // Medium reputation
   if (score == "LOW") return "HIGH"; // Low reputation
   if (score == "N/A") return "LOW"; // Not available
-};
-
-// Check if IP address is valid (IPv4 or IPv6)
-const isValidIpAddress = (ip) => {
-  if (!ip || ip === "-") return false;
-  return IPV4_REGEX.test(ip) || IPV6_REGEX.test(ip);
 };
 
 const getLinkForIp = (ip, source) => {
@@ -79,7 +70,7 @@ const IpReputationScore = ({ ipAddress }) => {
 
   // Fetch reputation score
   const fetchReputationScore = async () => {
-    if (!isValidIpAddress(ipAddress)) return;
+    if (!func.isValidIpAddress(ipAddress)) return;
 
     // Check cache first
     if (reputationScoreCache.has(ipAddress)) {
@@ -139,7 +130,7 @@ const IpReputationScore = ({ ipAddress }) => {
     }
   }, [isVisible, reputationData, loading]);
 
-  if (!isValidIpAddress(ipAddress)) {
+  if (!func.isValidIpAddress(ipAddress)) {
     return <Text as="span">-</Text>;
   }
 
