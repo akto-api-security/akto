@@ -34,6 +34,7 @@ import {
     ChatSessionSection,
     FileSection,
     OverviewSection,
+    PromptResponseSection,
     RemediationSection,
 } from "./ViolationFlyoutSections";
 import { buildFallbackDetail, buildViolationChatContext } from "./violationsData";
@@ -399,9 +400,12 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
         }];
     }, [violation]);
 
-    // Tabs: Overview · (type-specific middle tab) · Remediation · Timeline.
+    // Tabs: Overview · Values · (type-specific middle tab) · Remediation · Timeline.
     const tabModel = useMemo(() => {
-        const tabs = [{ id: "overview", content: "Overview" }];
+        const tabs = [
+            { id: "overview", content: "Overview" },
+            { id: "promptResponse", content: "Values" },
+        ];
         let middle = null;
         if (detail?.chatSession?.length) middle = "chat";
         else if (detail?.fileContent && violation?.type !== "Skill") middle = "file";
@@ -420,7 +424,8 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
 
     function renderTabContent(id) {
         switch (id) {
-            case "overview":    return <OverviewSection row={violation} detail={detail} />;
+            case "overview":        return <OverviewSection row={violation} detail={detail} />;
+            case "promptResponse":  return <PromptResponseSection detail={detail} />;
             case "chat":        return <ChatSessionSection messages={detail?.chatSession} highlights={detail?.evidence?.highlights || []} />;
             case "file":
                 if (violation.type === "Tool") {
