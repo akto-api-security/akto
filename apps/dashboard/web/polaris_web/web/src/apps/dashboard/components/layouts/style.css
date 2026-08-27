@@ -122,18 +122,6 @@
     overflow: hidden;
 }
 
-/* Hidden measurement layer for BreakdownLegend (AgenticStatsCard ResizeObserver pattern).
-   position/visibility/pointer-events cannot be expressed via Polaris Box. */
-.breakdown-legend-measure {
-    position: absolute;
-    visibility: hidden;
-    pointer-events: none;
-    display: flex;
-    gap: 4px;
-    top: 0;
-    left: 0;
-}
-
 /* Cursor + hover — DataTable owns all spacing/borders */
 .agentic-list-table table {
     table-layout: fixed;
