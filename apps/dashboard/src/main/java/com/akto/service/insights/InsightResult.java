@@ -26,6 +26,11 @@ public class InsightResult {
     private String group;               // InsightId.Group — ATLAS_DISCOVERY | GUARDRAIL_VIOLATIONS
     private String status;              // Status
     private String severity;
+    // Copied straight from InsightId.disabled (see AbstractInsightProvider.skeleton) — a static,
+    // hand-set "this insight's provider isn't wired up yet" toggle, same for every account. NOT a
+    // signal for "this account has no data right now" — a confirmed-zero or NO_DATA result is
+    // still a real, checked outcome and should render normally with no severity badge.
+    private boolean disabled;
     private String headline;            // Java-built one-liner. NEVER from the LLM.
     // concern/impact/remediation: the provider sets a Java-computed, deterministic draft (or
     // leaves it null when there's nothing to flag) — that's the guaranteed fallback shown

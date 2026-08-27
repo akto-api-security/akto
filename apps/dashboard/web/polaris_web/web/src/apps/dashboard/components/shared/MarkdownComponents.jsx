@@ -36,6 +36,18 @@ export const markdownComponents = {
     a: ({ children, href }) => <a href={href} className="markdown-link" target="_blank" rel="noopener noreferrer">{children}</a>
 }
 
+// Inert variant for untrusted content (e.g. skill markdown): shows the link text AND the raw
+// target (nothing hidden), but never renders a real href, so there is nothing to click/navigate.
+export const inertMarkdownComponents = {
+    ...markdownComponents,
+    a: ({ children, href }) => (
+        <span className="markdown-link markdown-link-inert">{children}{href ? ` (${href})` : ''}</span>
+    ),
+    img: ({ alt, src }) => (
+        <span className="markdown-link markdown-link-inert">{alt || 'image'}{src ? ` (${src})` : ''}</span>
+    ),
+}
+
 // Shared markdown styles
 export const markdownStyles = `
     .markdown-content {
@@ -213,10 +225,11 @@ export const markdownStyles = `
     }
 `
 
-// React component for rendering markdown with shared components
-export const MarkdownRenderer = ({ children }) => {
+// React component for rendering markdown with shared components. inertLinks swaps in the
+// non-navigable variant (see inertMarkdownComponents above) for untrusted content.
+export const MarkdownRenderer = ({ children, inertLinks }) => {
     return (
-        <ReactMarkdown components={markdownComponents}>
+        <ReactMarkdown components={inertLinks ? inertMarkdownComponents : markdownComponents}>
             {children}
         </ReactMarkdown>
     )

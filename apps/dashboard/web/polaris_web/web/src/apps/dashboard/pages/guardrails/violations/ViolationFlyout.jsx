@@ -18,6 +18,7 @@ import { MobileCancelMajor } from "@shopify/polaris-icons";
 
 import AgenticFlyoutShell from "@/apps/dashboard/pages/observe/agentic/AgenticFlyoutShell";
 import AiChatSection from "@/apps/dashboard/pages/observe/agentic/AiChatSection";
+import { buildAgenticObserveChatMetadata } from "@/apps/dashboard/pages/observe/agentic/agenticObserveApi";
 import { SeverityBadge } from "@/apps/dashboard/pages/observe/agentic/AgenticCellRenderers";
 import ActivityTracker from "@/apps/dashboard/pages/dashboard/components/ActivityTracker";
 import JiraTicketCreationModal from "@/apps/dashboard/components/shared/JiraTicketCreationModal";
@@ -33,9 +34,10 @@ import {
     ChatSessionSection,
     FileSection,
     OverviewSection,
+    PromptResponseSection,
     RemediationSection,
 } from "./ViolationFlyoutSections";
-import { buildFallbackDetail } from "./violationsData";
+import { buildFallbackDetail, buildViolationChatContext } from "./violationsData";
 import "../../../components/layouts/style.css";
 
 // ─── Event Actions dropdown ───────────────────────────────────────────────────
@@ -382,6 +384,11 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
         return buildFallbackDetail(violation);
     }, [violation]);
 
+    const chatMetadata = useMemo(() => {
+        if (!violation || !detail) return null;
+        return buildAgenticObserveChatMetadata("violation", buildViolationChatContext(violation, detail));
+    }, [violation, detail]);
+
     // Timeline for the selected violation — shows just this event.
     // Previously iterated allRows (the entire dataset) client-side; now the flyout
     // only has the current page's data so we show a single-entry timeline.
@@ -393,9 +400,12 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
         }];
     }, [violation]);
 
-    // Tabs: Overview · (type-specific middle tab) · Remediation · Timeline.
+    // Tabs: Overview · Values · (type-specific middle tab) · Remediation · Timeline.
     const tabModel = useMemo(() => {
-        const tabs = [{ id: "overview", content: "Overview" }];
+        const tabs = [
+            { id: "overview", content: "Overview" },
+            { id: "promptResponse", content: "Values" },
+        ];
         let middle = null;
         if (detail?.chatSession?.length) middle = "chat";
         else if (detail?.fileContent && violation?.type !== "Skill") middle = "file";
@@ -414,7 +424,8 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
 
     function renderTabContent(id) {
         switch (id) {
-            case "overview":    return <OverviewSection row={violation} detail={detail} />;
+            case "overview":        return <OverviewSection row={violation} detail={detail} />;
+            case "promptResponse":  return <PromptResponseSection detail={detail} />;
             case "chat":        return <ChatSessionSection messages={detail?.chatSession} highlights={detail?.evidence?.highlights || []} />;
             case "file":
                 if (violation.type === "Tool") {
@@ -454,6 +465,7 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
                     placeholder="Ask anything related to your endpoints..."
                     resetKey={violation.id}
                     conversationType="AGENTIC_OBSERVE"
+                    chatMetadata={chatMetadata}
                 />
             }
         >

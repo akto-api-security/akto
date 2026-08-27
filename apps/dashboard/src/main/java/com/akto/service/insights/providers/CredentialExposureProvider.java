@@ -71,9 +71,18 @@ public class CredentialExposureProvider extends AbstractInsightProvider {
         InsightResult result = skeleton();
 
         if (scope == Scope.LIST) {
+            // A real severity when there's already-labeled Secrets volume to show — but this can
+            // only ever be a floor: the mislabeled-credential case this insight exists to catch is,
+            // by definition, NOT counted in labeledSecretsCount, and finding it needs the raw-event
+            // scan below. So unlike most providers here, labeledSecretsCount == 0 does NOT mean
+            // severity stays null out of caution — it stays null because there is genuinely nothing
+            // cheap to show yet, not because it's a confirmed-clean result.
             result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(InsightUtil.count(labeledSecretsCount, "violations")
                     + " already labeled Secrets; checking other buckets for mislabeled credentials requires the detail view.");
+            if (labeledSecretsCount > 0) {
+                result.setSeverity("MEDIUM");
+            }
             result.setMetrics(Collections.singletonList(labeledMetric));
             result.setMetricsComplete(false);
             result.setDataGaps(Collections.singletonList(new InsightResult.Gap(
@@ -86,7 +95,10 @@ public class CredentialExposureProvider extends AbstractInsightProvider {
 
         // DETAIL: page the most recent violations account-wide (no subCategory narrowing — the
         // whole point is to find credential-shaped evidence wherever it landed) and pattern-match.
-        List<DashboardMaliciousEvent> events = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT, null, null);
+        // "exclude" drops Skills Evaluations traffic — a skill's own documentation matching a
+        // credential-shaped pattern isn't a live credential leak (same convention as
+        // AlertFatigueProvider and PromptInjectionRepeatsProvider).
+        List<DashboardMaliciousEvent> events = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT, null, "exclude");
         if (events == null) events = new ArrayList<>();
 
         if (events.isEmpty()) {

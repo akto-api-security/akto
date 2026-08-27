@@ -60,7 +60,9 @@ type Config struct {
 	// fails open here *before* the caller gives up. <=0 disables the bound.
 	ValidationTimeoutMs int
 
-	File FileConfig
+	GuardrailRemediationGenerate bool
+	GuardrailAverageSeverity     bool
+	File                         FileConfig
 }
 
 // ThreatKafkaConfig is the producer half of the malicious-event buffer, read by
@@ -135,6 +137,8 @@ func LoadConfig() *Config {
 		NhiScanIntervalMin:               getEnvAsInt("NHI_SCAN_INTERVAL_MIN", 30),
 		ValidationTimeoutMs:              getEnvAsInt("GUARDRAILS_VALIDATION_TIMEOUT_MS", 2500),
 		ThreatKafka:                      loadThreatKafkaConfig(),
+		GuardrailRemediationGenerate:     getEnvAsBool("GUARDRAILS_GENERATE_REMEDIATION", false),
+		GuardrailAverageSeverity:         getEnvAsBool("GUARDRAILS_AVERAGE_SEVERITY", false),
 		File: FileConfig{
 			Enabled:          getEnvAsBool("FILE_VALIDATION_ENABLED", false),
 			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),

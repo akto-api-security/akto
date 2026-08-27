@@ -35,7 +35,7 @@ import SessionStore from "@/apps/main/SessionStore";
 import LocalStore from "@/apps/main/LocalStorageStore";
 import guardrailApi from "@/apps/dashboard/pages/guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "@/apps/dashboard/pages/guardrails/utils";
-import { resolveComplianceClauseMap, loadGuardrailComplianceMap } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
+import { resolveComplianceClauseMap, loadGuardrailComplianceMap, formatActorId, actorIdDisplayText } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
 import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
 
@@ -130,6 +130,10 @@ function UserCellRenderer({ value, data }) {
             </Box>
         </HorizontalStack>
     );
+}
+
+function ActorCellRenderer({ value }) {
+    return formatActorId(value, { variant: "bodySm" });
 }
 
 function RuleViolatedCellRenderer({ value }) {
@@ -237,8 +241,8 @@ function buildColDefs(filterValues, showApprove, onApprove) {
             // asc here means ascending severityRank, and the backend ranks CRITICAL as 1.
             sort: "asc",
         },
-        // Atlas only: the username map comes from Endpoint Shield metadata, which Argus has no
-        // equivalent of - there the column would just repeat the host shown in Agentic Asset.
+        // Atlas: username from Endpoint Shield metadata. Argus: identity actor (IAM ARN, etc.),
+        // distinct from the Agentic Asset column.
         ...(isEndpointSecurityCategory() ? [{
             field: "user",
             headerName: "User",
@@ -246,6 +250,18 @@ function buildColDefs(filterValues, showApprove, onApprove) {
             filter: "agSetColumnFilter",
             filterParams: { values: filterValues.hosts || [] },
             cellRenderer: UserCellRenderer,
+        }] : []),
+        ...(isAgenticSecurityCategory() ? [{
+            field: "actor",
+            headerName: "Actor",
+            minWidth: 160,
+            sortable: false,
+            filter: "agSetColumnFilter",
+            filterParams: {
+                values: filterValues.actors || [],
+                valueFormatter: (p) => actorIdDisplayText(p.value),
+            },
+            cellRenderer: ActorCellRenderer,
         }] : []),
         {
             field: "agenticAsset",
@@ -451,6 +467,7 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         // compliance report all agree on a row's clauses.
         complianceMap: resolveComplianceClauseMap(event, true, {}, guardrailComplianceMap || {}),
         evidenceText: primaryValue || normalizeReasonPunctuation(meta.reason) || "-",
+        actor: event.actor || "",
         user: userDisplay,
         userHost: rawHost,
         agenticAsset: skillOrToolName || formatAssetDisplayName(rawAsset),
@@ -527,15 +544,12 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
             id: `a${i}`,
             name: g.label,
             hosts: g.hosts,
-            // Same tag the table's Agentic Asset cell feeds AssetIcon, so the card shows the
-            // matching product logo/favicon instead of a bare row.
             assetTagValue: getAssetServiceName(g.hosts[0]) || g.label,
             count: g.count,
             onClick: () => onAssetClick?.(g.hosts),
             renderValue: () => <Text variant="bodyMd">{g.count.toLocaleString("en-US")}</Text>,
         }));
 
-    // The card highlights by row.name; the filter holds the hosts behind each label.
     const activeAssetNames = new Set(
         assetRows.filter(r => r.hosts.some(h => activeAssetFilter?.has(h))).map(r => r.name)
     );
@@ -636,8 +650,6 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
                         : "Top 5 agentic assets by number of violations. Click an asset to filter the table below."}
                     columns={[{ label: isEndpointSecurityCategory() ? "User" : "Agentic Asset" }, { label: "Violations" }]}
                     rows={isEndpointSecurityCategory() ? hostRows : assetRows}
-                    // Atlas rows are devices (OS icon); Argus rows are assets, so use the same
-                    // AssetIcon lookup the table's Agentic Asset column uses.
                     renderIcon={isEndpointSecurityCategory()
                         ? (row) => <OsIcon os={row.os} size={20} />
                         : (row) => <AssetIcon type={null} assetTagValue={row.assetTagValue} size={20} />}
@@ -730,7 +742,7 @@ function Violations() {
     const [selectedViolation, setSelectedViolation] = useState(null);
     const [bulkSelectedCount, setBulkSelectedCount] = useState(0);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-    const [filterValues, setFilterValues] = useState({ hosts: [], subCategory: [] });
+    const [filterValues, setFilterValues] = useState({ hosts: [], subCategory: [], actors: [] });
     const [latencyData, setLatencyData] = useState(null);
     const [activeSeverityFilter, setActiveSeverityFilter] = useState(new Set());
     const [activePolicyFilter, setActivePolicyFilter] = useState(new Set());
@@ -808,6 +820,8 @@ function Violations() {
         threatDetectionApi.fetchFiltersThreatTable(startTimestamp, endTimestamp).then(res => {
             setFilterValues({
                 hosts: (res?.hosts || []).filter(h => h && h.trim() !== '' && h !== '-'),
+                // fetchFilters maps proto actors onto `ips` (legacy name from when actor === IP).
+                actors: (res?.ips || []).filter(a => a && String(a).trim() !== '' && a !== '-'),
                 subCategory: res?.subCategory || [],
             });
         });
@@ -846,7 +860,6 @@ function Violations() {
     }, []);
 
     const [activeHostFilter, setActiveHostFilter] = useState(new Set());
-    // Argus: the card filters by collection id, not by the (hidden) user column.
     const [activeAssetFilter, setActiveAssetFilter] = useState(new Set());
 
     const handleHostClick = useCallback((host) => {
@@ -931,7 +944,6 @@ function Violations() {
         setActiveAssetFilter(new Set());
         triggerTableRefresh();
     }, [triggerTableRefresh]);
-
 
     const handleOpenCardClick = useCallback(() => {
         if (currentTab === "active") return;
@@ -1074,10 +1086,10 @@ function Violations() {
                         ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "ACTIVE", undefined, undefined, undefined, undefined, undefined, false, [], "exclude", "exclude")
                         : Promise.resolve(null),
                     wantsPartitionCounts
-                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "UNDER_REVIEW", undefined, undefined, undefined, undefined, undefined, false, [], "exclude", "exclude")
+                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "UNDER_REVIEW", undefined, undefined, undefined, undefined, undefined, false, [], undefined, undefined)
                         : Promise.resolve(null),
                     wantsPartitionCounts
-                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "IGNORED", undefined, undefined, undefined, undefined, undefined, false, [], "exclude", "exclude")
+                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "IGNORED", undefined, undefined, undefined, undefined, undefined, false, [], undefined, undefined)
                         : Promise.resolve(null),
                 ]);
 
@@ -1203,7 +1215,6 @@ function Violations() {
     // AgGridTable's onServerFetch mode handles pagination, sort, and search automatically.
     const onServerFetch = useCallback(({ filters, sortKey, sortOrder, skip, limit, searchString }) => {
         const severityFilter = filters?.severity || [];
-        // Argus has no User column - the asset card's selection is the only host filter there.
         const hostFilter = [...new Set([...(filters?.user || []), ...activeAssetFilter])];
         // Union the column filter, the "Top Policies" card selection, and the pie's type filter
         // (all map to the backend latestAttack).
@@ -1232,7 +1243,7 @@ function Violations() {
 
         return threatDetectionApi.fetchSuspectSampleData(
             effectiveSkip,
-            [],             // ips
+            filters?.actor || [],
             [],             // apiCollectionIds
             [],             // urls
             [],             // types
