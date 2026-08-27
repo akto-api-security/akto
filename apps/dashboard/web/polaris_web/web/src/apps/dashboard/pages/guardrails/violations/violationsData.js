@@ -2,6 +2,8 @@ import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/ma
 import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/constants/guardrailRuleDefinitions";
 import { GUARDRAIL_REMEDIATION_MARKDOWN } from "@/apps/dashboard/pages/threat_detection/constants/guardrailDescriptions";
 import { storedRemediationMarkdown } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
+import { getOwaspThreatsForRule } from "@/apps/dashboard/pages/guardrails/components/owaspConfig";
+import func from "@/util/func";
 // ─── Flyout detail helpers ───────────────────────────────────────────────────────
 
 function _parseAktoOuter(payloadStr) {
@@ -312,5 +314,41 @@ export function buildFallbackDetail(row) {
             || ((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && row.type !== "Skill"
                 ? (getGuardrailRuleInfo(row.violation, policyName)?.remediation || GUARDRAIL_REMEDIATION_MARKDOWN)
                 : undefined),
+    };
+}
+
+export function buildViolationChatContext(row, detail) {
+    if (!row) return {};
+
+    const guardrailRuleInfo = getGuardrailRuleInfo(row.violation, row.policyName);
+    const owaspThreats = getOwaspThreatsForRule(row.violation);
+    const complianceTags = row.complianceMap
+        ? Object.entries(row.complianceMap).flatMap(([framework, clauses]) =>
+            Array.isArray(clauses) && clauses.length > 0
+                ? clauses.map((clause) => `${framework} - ${clause}`)
+                : [framework])
+        : [];
+    const guardrailRuleExplanation = guardrailRuleInfo
+        ? [guardrailRuleInfo.heading, ...(guardrailRuleInfo.overview || []).flatMap((o) => [`${o.heading}:`, o.body])]
+            .filter(Boolean)
+            .join("\n")
+        : undefined;
+
+    return {
+        violation: row.violation,
+        severity: row.severity,
+        action: row.action,
+        type: row.type,
+        policyName: row.policyName,
+        agenticAsset: row.agenticAsset || undefined,
+        detected: row.detected ? func.epochToDateTime(row.detected) : undefined,
+        deviceId: detail?.deviceId,
+        sessionId: detail?.sessionId,
+        evidenceText: detail?.evidence?.text,
+        triggerReason: detail?.triggerReason,
+        guardrailRuleExplanation,
+        owaspThreats: owaspThreats.length ? owaspThreats.map((t) => `${t.id} - ${t.name}`) : undefined,
+        complianceTags: complianceTags.length ? complianceTags : undefined,
+        remediation: detail?.remediation,
     };
 }
