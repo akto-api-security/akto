@@ -76,11 +76,17 @@ public class GuardrailPolicies {
     private List<String> selectedMcpServers;
     private List<String> selectedAgentServers;
     
-    // Step 6: Enhanced Server settings (new format with ID and name)
+    // Step 6: Enhanced Server settings. selectedAgentServersV2 = agents only; LLM entries live in selectedLlmServersV2 (split for independent matching/negation).
     private List<SelectedServer> selectedMcpServersV2;
     private List<SelectedServer> selectedAgentServersV2;
+    private List<SelectedServer> selectedLlmServersV2;
     private boolean applyOnResponse;
     private boolean applyOnRequest;
+
+    // Include/Exclude toggle per server list, independently matched by type; empty+negated matches everything, including future assets.
+    private boolean negatedAgentServers;
+    private boolean negatedMcpServers;
+    private boolean negatedLlmServers;
     
     // Step 7: URL and Confidence Score
     private String url;
@@ -184,6 +190,10 @@ public class GuardrailPolicies {
         if (selectedAgentServersV2 != null && !selectedAgentServersV2.isEmpty()) {
             return selectedAgentServersV2;
         }
+
+        if (selectedLlmServersV2 != null) {
+            return new ArrayList<>();
+        }
         if (selectedAgentServers != null && !selectedAgentServers.isEmpty()) {
             return selectedAgentServers.stream()
                     .map(serverId -> new SelectedServer(serverId, serverId))
@@ -197,6 +207,14 @@ public class GuardrailPolicies {
         //     return new ArrayList<>();
         // }
         // return fetchApplicableServersByContext(Constants.AKTO_GEN_AI_TAG);
+    }
+
+    // No legacy fallback — this list is new, there's no old-format data to fall back to.
+    public List<SelectedServer> getEffectiveSelectedLlmServers() {
+        if (selectedLlmServersV2 != null) {
+            return selectedLlmServersV2;
+        }
+        return new ArrayList<>();
     }
 
     // filters collections by the policy's contextSource tag (key="source", value=contextSource.name())
