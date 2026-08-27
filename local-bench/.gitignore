@@ -1,0 +1,9 @@
+# Env (contains local/secret config)
+bench.env
+
+# Logs & hang/stall thread-dump captures
+*.log
+hang-*.txt
+
+# Kafka test message dumps
+*.jsonl
