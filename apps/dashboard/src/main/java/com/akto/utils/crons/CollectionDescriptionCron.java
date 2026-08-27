@@ -4,9 +4,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -15,6 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.ApiCollectionsDao;
@@ -23,6 +26,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.gpt.handlers.gpt_prompts.AgentBaseRiskScoreAnalyzer;
 import com.akto.gpt.handlers.gpt_prompts.CollectionDescriptionPromptHandler;
 import com.akto.gpt.handlers.gpt_prompts.PlatformOnlyDescriptionPromptHandler;
 import com.akto.log.LoggerMaker;
@@ -61,7 +65,7 @@ public class CollectionDescriptionCron {
 
     // Skill/MCP-server collections can have hundreds of distinct skills or tools - sampled wide enough
     // to report the true count, but only a slice of names is ever put in a prompt.
-    private static final int MAX_LIBRARY_SAMPLE_QUERY = 1000;
+    private static final int MAX_LIBRARY_SAMPLE_QUERY = 2000;
     private static final int MAX_LIBRARY_NAMES_IN_PROMPT = 40;
     static final Pattern SKILL_NAME_PATTERN = Pattern.compile("/skills/([^/?]+)");
     private static final Pattern MCP_TOOL_NAME_PATTERN = Pattern.compile("tools/call/([^/?]+)");
@@ -72,7 +76,7 @@ public class CollectionDescriptionCron {
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void setUpCollectionDescriptionCronScheduler() {
-        scheduler.scheduleWithFixedDelay(this::run, 0, 1, TimeUnit.HOURS);
+        scheduler.scheduleWithFixedDelay(this::run, 0, 30, TimeUnit.MINUTES);
     }
 
     private void run() {
@@ -179,20 +183,30 @@ public class CollectionDescriptionCron {
         );
     }
 
-    // Argus (agentic: mcp-server/gen-ai tags) or Atlas (endpoint security: source=ENDPOINT tag)
-    // collections only - excludes plain API Security collections for now.
+    // Argus (agentic: mcp-server/gen-ai/ai-agent tags) or Atlas (endpoint security: source=ENDPOINT
+    // tag) collections, or anything with real serviceGraphEdges data regardless of tags (externally
+    // reported by trace-ingestion services like Copilot Studio, which tag collections "ai-agent" but
+    // not always "mcp-server"/"gen-ai"/"source=ENDPOINT" - without this branch those collections were
+    // silently never selected for a description at all, no matter how good the prompt is). Excludes
+    // plain API Security collections with none of these signals.
     static Bson argusOrAtlasTypeFilter() {
-        return Filters.and(
+        Bson tagBasedMatch = Filters.and(
             Filters.exists(ApiCollection.TAGS_STRING),
             Filters.or(
                 Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
                 Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, "ai-agent")),
                 Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
                     Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_ENDPOINT_SOURCE_TAG),
                     Filters.eq(CollectionTags.VALUE, Constants.AKTO_ENDPOINT_SOURCE_VALUE)
                 ))
             )
         );
+        Bson hasServiceGraphData = Filters.and(
+            Filters.exists(ApiCollection.SERVICE_GRAPH_EDGES, true),
+            Filters.ne(ApiCollection.SERVICE_GRAPH_EDGES, new Document())
+        );
+        return Filters.or(tagBasedMatch, hasServiceGraphData);
     }
 
     // Atlas (endpoint security: source=ENDPOINT tag) only - narrower than argusOrAtlasTypeFilter, used
@@ -381,6 +395,12 @@ public class CollectionDescriptionCron {
         return m.find() ? m.group(1) : null;
     }
 
+    // Internal/operational tag keys that say nothing about what the collection actually does -
+    // "mode" (e.g. "observe" vs "block") and "source" (e.g. "ENDPOINT", Akto's own Atlas/Argus
+    // classification) are plumbing, not identity or purpose signals, and only add noise to the
+    // prompt's Tags line.
+    private static final Set<String> TAG_KEYS_EXCLUDED_FROM_PROMPT = new HashSet<>(Arrays.asList("mode", "source"));
+
     private static List<String> tagStrings(ApiCollection collection) {
         List<CollectionTags> tagsList = collection.getTagsList();
         List<String> tags = new ArrayList<>();
@@ -388,7 +408,7 @@ public class CollectionDescriptionCron {
             return tags;
         }
         for (CollectionTags tag : tagsList) {
-            if (tag.getKeyName() == null) {
+            if (tag.getKeyName() == null || TAG_KEYS_EXCLUDED_FROM_PROMPT.contains(tag.getKeyName())) {
                 continue;
             }
             tags.add(tag.getKeyName() + ": " + tag.getValue());
@@ -488,6 +508,15 @@ public class CollectionDescriptionCron {
             queryData.put(CollectionDescriptionPromptHandler.ACCESS_TYPE, collection.getAccessType());
             queryData.put(CollectionDescriptionPromptHandler.COLLECTION_TYPE, collectionType);
             queryData.put(CollectionDescriptionPromptHandler.PLATFORM_DISPLAY_NAME, platformDisplayName);
+            // serviceGraphEdges is populated by an external trace-ingestion service (n8n, Copilot
+            // Studio, etc), not by anything in this pipeline - most collections never have it. When
+            // present it's real, reported tool/MCP/RAG wiring, worth far more than guessing from
+            // endpoint names alone, so surface it whenever it's actually there.
+            Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges = collection.getServiceGraphEdges();
+            if (serviceGraphEdges != null && !serviceGraphEdges.isEmpty()) {
+                queryData.put(CollectionDescriptionPromptHandler.SERVICE_GRAPH_CONTEXT,
+                    AgentBaseRiskScoreAnalyzer.buildAgentContextJson(collection));
+            }
             // A single-skill collection's "skill" tag names the point of the description; a library with
             // many items has no one name that represents the whole thing, so it's left unset there.
             queryData.put(CollectionDescriptionPromptHandler.SKILL_NAME, isLibrary ? null : skillTagValue(collection));
