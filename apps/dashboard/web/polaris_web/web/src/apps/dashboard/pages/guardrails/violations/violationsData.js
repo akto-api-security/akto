@@ -43,6 +43,8 @@ export function coerceToText(value) {
 function _extractPromptBody(req) {
     if (!req) return null;
     if (req.body != null) return req.body;
+    // MCP JSON-RPC tool calls: {method:"tools/call", params:{name, arguments}} - no .body at all.
+    if (req.params?.arguments != null) return req.params.arguments;
     const msgs = req.messages || req?.body?.messages;
     if (Array.isArray(msgs) && msgs.length > 0) {
         const lastUser = [...msgs].reverse().find(m => m.role === "user") || msgs[msgs.length - 1];
