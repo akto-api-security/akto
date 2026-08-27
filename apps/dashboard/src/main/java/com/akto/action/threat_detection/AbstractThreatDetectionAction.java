@@ -308,7 +308,7 @@ public class AbstractThreatDetectionAction extends UserAction {
             com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse.class,
             responseBody
         ).map(m -> m.getCategoryWiseCountsList().stream()
-            .map(smr -> new com.akto.action.threat_detection.ThreatCategoryCount(smr.getCategory(), smr.getSubCategory(), smr.getCount()))
+            .map(smr -> new com.akto.action.threat_detection.ThreatCategoryCount(smr.getCategory(), smr.getSubCategory(), smr.getCount(), smr.getUrl()))
             .collect(Collectors.toList()))
          .orElse(new ArrayList<>());
       }

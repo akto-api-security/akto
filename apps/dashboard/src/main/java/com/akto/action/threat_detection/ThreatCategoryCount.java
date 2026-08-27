@@ -4,11 +4,17 @@ public class ThreatCategoryCount {
   private String category;
   private String subCategory;
   private int count;
+  private String url;
 
   public ThreatCategoryCount(String category, String subCategory, int count) {
+    this(category, subCategory, count, null);
+  }
+
+  public ThreatCategoryCount(String category, String subCategory, int count, String url) {
     this.category = category;
     this.subCategory = subCategory;
     this.count = count;
+    this.url = url;
   }
 
   public String getCategory() {
@@ -33,5 +39,13 @@ public class ThreatCategoryCount {
 
   public void setCount(int count) {
     this.count = count;
+  }
+
+  public String getUrl() {
+    return url;
+  }
+
+  public void setUrl(String url) {
+    this.url = url;
   }
 }

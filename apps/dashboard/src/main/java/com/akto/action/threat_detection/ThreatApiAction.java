@@ -114,7 +114,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     this.categoryCounts = fetchSubcategoryWiseCounts(startTs, endTs, latestAttack, severityStatusFilter).stream()
         .map(c -> new ThreatCategoryCount(
             categoryDisplayNames.getOrDefault(c.getCategory(), c.getCategory()),
-            c.getSubCategory(), c.getCount()))
+            c.getSubCategory(), c.getCount(), c.getUrl()))
         .collect(Collectors.toList());
     return SUCCESS.toUpperCase();
   }
