@@ -108,7 +108,20 @@ public class InitializerListener implements ServletContextListener {
 
         if (kafkaUtils.isReadEnabled()) {
             logger.info("init kafka consumer");
-            kafkaUtils.initKafkaConsumer();
+            // Run the (blocking) poll loop on its own thread so contextInitialized can return and
+            // Jetty finishes starting (serving /metrics, health, /api, etc.) while the consumer
+            // polls in the background. Same pattern startFastDiscoveryConsumer() already uses.
+            // initKafkaConsumer() keeps its own shutdown hook (consumer.wakeup() + join) for a
+            // graceful stop, and calls System.exit() on a fatal Exception.
+            Thread mainConsumerThread = new Thread(kafkaUtils::initKafkaConsumer, "kafka-main-consumer");
+            mainConsumerThread.setDaemon(false);
+            // A fatal Error that escapes the loop must not leave a silently-dead consumer inside a
+            // live JVM — take the process down so the container restarts (restart: always).
+            mainConsumerThread.setUncaughtExceptionHandler((t, e) -> {
+                logger.error("fatal error in {}, exiting JVM for restart", t.getName(), e);
+                System.exit(1);
+            });
+            mainConsumerThread.start();
         }
 
         // Start fast-discovery consumer in background thread (if enabled)
