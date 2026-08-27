@@ -181,6 +181,10 @@ public class TestCompletion {
                         webhook.getMethod().toString(), payload, headers, "");
                 try {
                     response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+                    loggerMaker.infoAndAddToDb("sendTeamsAlertIfNeeded: webhook callback for webhookId=" + webhook.getId()
+                            + " url=" + webhook.getUrl()
+                            + " statusCode=" + (response != null ? response.getStatusCode() : "null")
+                            + " responseBody=" + (response != null ? response.getBody() : "null"), LogDb.TESTING);
                     if (response == null || response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
                         String statusCode = response == null ? "null" : String.valueOf(response.getStatusCode());
                         errors.add("Webhook endpoint returned non-2xx status: " + statusCode);
