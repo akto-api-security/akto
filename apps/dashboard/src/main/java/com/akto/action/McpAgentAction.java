@@ -165,6 +165,79 @@ public class McpAgentAction extends UserAction {
                         }
                         tokensLimit = 20000;
                     }
+                } else if (StringUtils.isNotEmpty(type) && type.equals("insight_result")) {
+                    // Insights detail view's Ask Akto chat. The frontend sends the exact
+                    // InsightResult fields it's already rendering on screen (not just an id to
+                    // re-fetch) so the AI is grounded in precisely what the user is looking at,
+                    // never a possibly-drifted server-side recompute.
+                    Object data = metaData.get("data");
+                    if (data != null && data instanceof Map) {
+                        Map<String, Object> dataMap = (Map<String, Object>) data;
+                        StringBuilder sb = new StringBuilder("Insight Context:\n");
+                        appendIfPresent(sb, "Insight", dataMap.get("title"));
+                        appendIfPresent(sb, "Status", dataMap.get("status"));
+                        appendIfPresent(sb, "Severity", dataMap.get("severity"));
+                        appendIfPresent(sb, "Headline", dataMap.get("headline"));
+
+                        Object metricsObj = dataMap.get("metrics");
+                        if (metricsObj instanceof List && !((List<?>) metricsObj).isEmpty()) {
+                            sb.append("Metrics:\n");
+                            for (Object m : (List<?>) metricsObj) {
+                                if (m instanceof Map) {
+                                    Map<?, ?> metric = (Map<?, ?>) m;
+                                    sb.append("- ").append(metric.get("label")).append(": ").append(metric.get("formatted")).append("\n");
+                                }
+                            }
+                        }
+
+                        appendIfPresent(sb, "Concern", dataMap.get("concern"));
+                        appendIfPresent(sb, "Impact", dataMap.get("impact"));
+                        appendIfPresent(sb, "Remediation", dataMap.get("remediation"));
+                        appendIfPresent(sb, "AI Summary", dataMap.get("markdown"));
+
+                        Object evidenceObj = dataMap.get("evidence");
+                        if (evidenceObj instanceof List && !((List<?>) evidenceObj).isEmpty()) {
+                            sb.append("Evidence:\n");
+                            for (Object e : (List<?>) evidenceObj) {
+                                if (!(e instanceof Map)) continue;
+                                Map<?, ?> table = (Map<?, ?>) e;
+                                Object rowsObj = table.get("rows");
+                                int rowCount = rowsObj instanceof List ? ((List<?>) rowsObj).size() : 0;
+                                sb.append(table.get("title")).append(" (").append(rowCount).append(" of ")
+                                        .append(table.get("totalRowCount")).append(" shown):\n");
+                                if (rowsObj instanceof List) {
+                                    for (Object row : (List<?>) rowsObj) {
+                                        sb.append("  ").append(row).append("\n");
+                                    }
+                                }
+                            }
+                        }
+
+                        Object caveatsObj = dataMap.get("caveats");
+                        if (caveatsObj instanceof List && !((List<?>) caveatsObj).isEmpty()) {
+                            sb.append("Caveats:\n");
+                            for (Object c : (List<?>) caveatsObj) sb.append("- ").append(c).append("\n");
+                        }
+
+                        Object dataGapsObj = dataMap.get("dataGaps");
+                        if (dataGapsObj instanceof List && !((List<?>) dataGapsObj).isEmpty()) {
+                            sb.append("Data gaps:\n");
+                            for (Object g : (List<?>) dataGapsObj) {
+                                if (g instanceof Map) {
+                                    Map<?, ?> gap = (Map<?, ?>) g;
+                                    sb.append("- ").append(gap.get("source")).append("/").append(gap.get("reason"))
+                                            .append(": ").append(gap.get("impact")).append("\n");
+                                }
+                            }
+                        }
+
+                        contextString = sb.toString();
+                        if (contextString.length() > MAX_TEST_RESULT_CONTEXT_CHARS) {
+                            contextString = contextString.substring(0, MAX_TEST_RESULT_CONTEXT_CHARS)
+                                + "\n\n[... truncated server-side ...]";
+                        }
+                        tokensLimit = 40000;
+                    }
                 }
             }
 

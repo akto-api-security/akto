@@ -2,7 +2,18 @@ import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/ma
 import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/constants/guardrailRuleDefinitions";
 import { GUARDRAIL_REMEDIATION_MARKDOWN } from "@/apps/dashboard/pages/threat_detection/constants/guardrailDescriptions";
 import { storedRemediationMarkdown } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
+import { getOwaspThreatsForRule } from "@/apps/dashboard/pages/guardrails/components/owaspConfig";
+import func from "@/util/func";
 // ─── Flyout detail helpers ───────────────────────────────────────────────────────
+
+const VALUE_SECTION_LABELS = {
+    Prompt: "Prompt",
+    Tool: "Tool Call",
+    Skill: "Skill",
+    Config: "Config Value",
+    LLM: "Flagged Content",
+    Other: "Flagged Content",
+};
 
 function _parseAktoOuter(payloadStr) {
     if (!payloadStr) return null;
@@ -29,6 +40,20 @@ export function coerceToText(value) {
     if (value == null) return null;
     if (typeof value === "string") return value;
     try { return JSON.stringify(value); } catch { return String(value); }
+}
+
+function _extractPromptBody(req) {
+    if (!req) return null;
+    if (req.body != null) return req.body;
+    const msgs = req.messages || req?.body?.messages;
+    if (Array.isArray(msgs) && msgs.length > 0) {
+        const lastUser = [...msgs].reverse().find(m => m.role === "user") || msgs[msgs.length - 1];
+        const content = lastUser?.content;
+        if (typeof content === "string") return content;
+        if (Array.isArray(content)) return content.map(c => c.text || "").join("\n");
+        return content;
+    }
+    return null;
 }
 
 // Raw request bodies can be captured terminal output — full of ANSI colour/cursor escape
@@ -260,12 +285,14 @@ export function buildFallbackDetail(row) {
     const policyName = meta.policyName || (row.policyName && row.policyName !== "-" ? row.policyName : null);
     const isPromptOrTool = row.type === "Prompt" || row.type === "Tool";
     const rawPrimaryValue = coerceToText(isPromptOrTool
-        ? (req?.body || null)
+        ? _extractPromptBody(req)
         : row.type === "Skill" ? (resp?.evidence || null) : (req?.evidence || null));
     // If the value is JSON (or JSON nested inside JSON, e.g. a proxied request captured as a
     // string field), unwrap and pretty-print it instead of showing raw escaped quotes.
     const { text: prettyPrimaryValue, isJson } = prettyPrintIfJson(rawPrimaryValue);
     const primaryValue = sanitizeDisplayText(prettyPrimaryValue, 1500);
+    // untruncated, for Values tab
+    const primaryValueFull = sanitizeDisplayText(prettyPrimaryValue, Infinity);
     const evidenceText = primaryValue || row.evidenceText || row.violation;
     const evidenceIsMono = isJson && !!primaryValue && evidenceText === primaryValue;
 
@@ -303,6 +330,18 @@ export function buildFallbackDetail(row) {
         fileTabLabel: fileTabLabel || undefined,
         fileHighlights: fileHighlights || undefined,
         skillName: skillName || undefined,
+        promptResponse: (() => {
+            const promptBody = primaryValueFull || reason || undefined;
+            return {
+                valueLabel: VALUE_SECTION_LABELS[row.type] || VALUE_SECTION_LABELS.Other,
+                promptBody,
+                behaviour: row.behaviourRaw || meta.behaviour || meta.nbehaviour || undefined,
+                blockedAt: resp?.error?.data?.blocked_at || row.detected || undefined,
+                blockedBy: resp?.error?.data?.blocked_by || policyName || undefined,
+                reason: (reason && reason !== promptBody) ? reason : undefined,
+                message: resp?.error?.message || resp?.message || undefined,
+            };
+        })(),
         overview: row.type === "Config" ? (metaOverview || undefined) : undefined,
         // Stored LLM markdown wins; otherwise per-event metadata, then
         // the frontend rule catalogue / generic template. Skill events keep the tab hidden
@@ -312,5 +351,41 @@ export function buildFallbackDetail(row) {
             || ((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && row.type !== "Skill"
                 ? (getGuardrailRuleInfo(row.violation, policyName)?.remediation || GUARDRAIL_REMEDIATION_MARKDOWN)
                 : undefined),
+    };
+}
+
+export function buildViolationChatContext(row, detail) {
+    if (!row) return {};
+
+    const guardrailRuleInfo = getGuardrailRuleInfo(row.violation, row.policyName);
+    const owaspThreats = getOwaspThreatsForRule(row.violation);
+    const complianceTags = row.complianceMap
+        ? Object.entries(row.complianceMap).flatMap(([framework, clauses]) =>
+            Array.isArray(clauses) && clauses.length > 0
+                ? clauses.map((clause) => `${framework} - ${clause}`)
+                : [framework])
+        : [];
+    const guardrailRuleExplanation = guardrailRuleInfo
+        ? [guardrailRuleInfo.heading, ...(guardrailRuleInfo.overview || []).flatMap((o) => [`${o.heading}:`, o.body])]
+            .filter(Boolean)
+            .join("\n")
+        : undefined;
+
+    return {
+        violation: row.violation,
+        severity: row.severity,
+        action: row.action,
+        type: row.type,
+        policyName: row.policyName,
+        agenticAsset: row.agenticAsset || undefined,
+        detected: row.detected ? func.epochToDateTime(row.detected) : undefined,
+        deviceId: detail?.deviceId,
+        sessionId: detail?.sessionId,
+        evidenceText: detail?.evidence?.text,
+        triggerReason: detail?.triggerReason,
+        guardrailRuleExplanation,
+        owaspThreats: owaspThreats.length ? owaspThreats.map((t) => `${t.id} - ${t.name}`) : undefined,
+        complianceTags: complianceTags.length ? complianceTags : undefined,
+        remediation: detail?.remediation,
     };
 }
