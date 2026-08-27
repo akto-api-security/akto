@@ -5,13 +5,20 @@ import { SeverityBadge } from "../AgenticCellRenderers";
 import "../../../../components/layouts/style.css";
 
 const InsightRow = React.memo(function InsightRow({ insight, onSelect }) {
-    const handleClick = useCallback(() => onSelect(insight.insightId), [insight.insightId, onSelect]);
+    // Backend-computed, straight from InsightId.disabled — a static "not wired up yet" toggle,
+    // same for every account. NOT set for a confirmed-zero or NO_DATA result (those still render
+    // normally with no severity badge — see InsightResult.disabled's own comment).
+    const disabled = !!insight.disabled;
+    const handleClick = useCallback(() => {
+        if (disabled) return;
+        onSelect(insight.insightId);
+    }, [insight.insightId, onSelect, disabled]);
     const headline = insight.headline || (insight.metrics && insight.metrics[0]?.formatted) || "";
     const severity = String(insight.severity || "").toUpperCase();
 
     return (
         <Box
-            className="insight-row"
+            className={`insight-row${disabled ? " insight-row-disabled" : ""}`}
             padding={"3"}
             onClick={handleClick}
         >
@@ -20,15 +27,15 @@ const InsightRow = React.memo(function InsightRow({ insight, onSelect }) {
                 <Box minWidth="0" style={{ flex: 1 }}>
                     <VerticalStack gap="2">
                         <HorizontalStack gap="2" blockAlign="center" wrap>
-                            <Text variant="bodyMd" fontWeight="semibold">{insight.title}</Text>
-                            {insight.severity ? <SeverityBadge severity={insight.severity} /> : <Badge>Coming soon</Badge>}
+                            <Text variant="bodyMd" fontWeight="semibold" color={disabled ? "subdued" : undefined}>{insight.title}</Text>
+                            {disabled ? <Badge>Coming soon</Badge> : (insight.severity ? <SeverityBadge severity={insight.severity} /> : null)}
                         </HorizontalStack>
                         {headline ? (
                             <Text variant="bodySm" color="subdued">{headline}</Text>
                         ) : null}
                     </VerticalStack>
                 </Box>
-                <Icon source={ChevronRightMinor} color="subdued" />
+                {!disabled && <Icon source={ChevronRightMinor} color="subdued" />}
             </HorizontalStack>
         </Box>
     );

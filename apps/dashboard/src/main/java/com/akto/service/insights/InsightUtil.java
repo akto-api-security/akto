@@ -227,13 +227,14 @@ public final class InsightUtil {
         }
     }
 
-    // ── CTA deep-link params — only these two mechanisms actually work on the frontend today ──
+    // ── CTA deep-link params — only these mechanisms actually work on the frontend today ──
     // (verified against the live pages, not assumed): Users and Devices reads a single `filters`
-    // query param shaped `key__v1,v2,...` (GithubServerTable's convention; `groupName` is the only
-    // filterKey that page declares — a bare `?username=`/`?host=` param is silently ignored).
-    // Guardrail Policies has no filtered-list deep link, only a single-policy one: `?policy=<exact
-    // name>` opens that policy's edit drawer (GuardrailPolicies.jsx's own `?policy=` handling) —
-    // `policyId`/`policyName`/`policyIds` keys are not read by that page and do nothing.
+    // query param shaped `key__v1,v2,...` (GithubServerTable's convention; `username` is the only
+    // filterKey its Users-tab `fetchData` actually consumes — `groupName` parses into a UI chip but
+    // is silently dropped before it reaches the backend query, so it must not be used here).
+    // Guardrail Policies reads `?policy=<exact name>` (opens that policy's edit drawer) and
+    // `?policyIds=id1,id2,...` (pre-selects those rows for a bulk action) — `policyId`/`policyName`
+    // keys are not read by that page and do nothing.
 
     /** Empty map (falls back to an unfiltered NAVIGATE) if usernames has no non-blank entries. */
     public static Map<String, Object> usersAndDevicesFilterParams(List<String> usernames) {
@@ -242,7 +243,7 @@ public final class InsightUtil {
             for (String u : usernames) if (u != null && !u.isEmpty()) clean.add(u);
         }
         Map<String, Object> params = new HashMap<>();
-        if (!clean.isEmpty()) params.put("filters", "groupName__" + String.join(",", clean));
+        if (!clean.isEmpty()) params.put("filters", "username__" + String.join(",", clean));
         return params;
     }
 

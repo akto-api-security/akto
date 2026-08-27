@@ -83,9 +83,12 @@ public class InsightService {
             }
         }
         // Worst-first: a reader should see CRITICAL/HIGH cards before LOW ones, not the fixed
-        // cheapest-first build order the registry iterates in. List.sort is stable, so insights
-        // tied on severity keep that original registry order as their tiebreak.
-        results.sort(Comparator.comparingInt(r -> severityRank(r.getSeverity())));
+        // cheapest-first build order the registry iterates in. Disabled ("Coming soon") cards sort
+        // last regardless of severity — there's nothing to act on yet. List.sort is stable, so
+        // insights tied on both keep their original registry order as the final tiebreak.
+        results.sort(Comparator
+                .comparing(InsightResult::isDisabled)
+                .thenComparingInt(r -> severityRank(r.getSeverity())));
         return results;
     }
 
@@ -160,6 +163,7 @@ public class InsightService {
         r.setGroup(provider.id().getGroup().name());
         r.setStatus(InsightResult.Status.NO_DATA.name());
         r.setHeadline("This insight could not be computed.");
+        r.setDisabled(provider.id().isDisabled());
         return r;
     }
 

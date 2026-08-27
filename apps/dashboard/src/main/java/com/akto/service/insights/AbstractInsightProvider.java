@@ -28,6 +28,7 @@ public abstract class AbstractInsightProvider implements InsightProvider {
         r.setCategory(id.getCategory().name());
         r.setGroup(id.getGroup().name());
         r.setStatus(InsightResult.Status.NO_DATA.name());
+        r.setDisabled(id.isDisabled());
         return r;
     }
 

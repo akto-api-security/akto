@@ -86,10 +86,16 @@ public class AlertFatigueProvider extends AbstractInsightProvider {
         List<InsightResult.Metric> baseMetrics = new ArrayList<>(Arrays.asList(totalMetric, bucketMetric));
 
         if (scope == Scope.LIST) {
+            // Real repeat-rate still requires collapsing into incidents in the detail view, but a
+            // reader shouldn't see "Coming soon" for a card with real violation volume behind it —
+            // tier by raw volume as a floor; DETAIL can still move this to CRITICAL/HIGH/MEDIUM once
+            // the real per-incident repeat counts are known, same as TestPoliciesOnProdProvider's
+            // LIST-scope severityFromShare vs. its DETAIL CRITICAL override.
             result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(InsightUtil.count(totalViolations, "violations") + " across "
                     + InsightUtil.count(distinctBuckets, "combinations")
                     + "; collapsing into per-user incidents requires the detail view.");
+            result.setSeverity(severityFromVolume(totalViolations));
             result.setMetrics(baseMetrics);
             result.setMetricsComplete(false);
             result.setDataGaps(Collections.singletonList(new InsightResult.Gap(
@@ -306,6 +312,17 @@ public class AlertFatigueProvider extends AbstractInsightProvider {
 
     private static String lower(String s) {
         return s == null ? "" : s.trim().toLowerCase(Locale.US);
+    }
+
+    /** LIST-scope approximation from raw volume alone, before incidents are collapsed. */
+    private static String severityFromVolume(long totalViolations) {
+        if (totalViolations >= 100) {
+            return "HIGH";
+        }
+        if (totalViolations >= 20) {
+            return "MEDIUM";
+        }
+        return "LOW";
     }
 
     private static List<InsightResult.Cta> buildCtas(List<Incident> topIncidents) {
