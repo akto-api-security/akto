@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList, Scrollable, Avatar, Box } from '@shopify/polaris';
+import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList, Scrollable, Avatar, Box, Banner } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
 import InsightsFlyout from "@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout";
@@ -185,13 +185,6 @@ function GuardrailPolicies() {
         [allCollections]
     );
 
-    const tablePolicyData = useMemo(() => (
-        policyData.map(row => ({
-            ...row,
-            agent: getApplicableAgentKeys(row.originalData, allCollections, agentFilterOptions),
-        }))
-    ), [policyData, allCollections, agentFilterOptions]);
-
     const location = useLocation();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -202,6 +195,35 @@ function GuardrailPolicies() {
         : [...headings, agentFilterHeader];
 
     const policyName = searchParams.get("policy");
+    // Deep link from an Insight CTA (e.g. "Retire dead policies") — pre-checks the exact offending
+    // policies for the bulk-action bar below, and scopes the table to just them (see
+    // tablePolicyData). State (not a frozen useMemo) so "View all policies" below can clear it.
+    const [initialSelectedResourceIds, setInitialSelectedResourceIds] = useState(() => {
+        const raw = new URLSearchParams(window.location.search).get("policyIds");
+        if (!raw) return undefined;
+        return raw.split(",").map(s => s.trim()).filter(Boolean);
+    });
+
+    const clearInsightScopedView = useCallback(() => {
+        setInitialSelectedResourceIds(undefined);
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            next.delete("policyIds");
+            return next;
+        }, { replace: true });
+    }, [setSearchParams]);
+
+    const tablePolicyData = useMemo(() => {
+        // Same deep link — show ONLY the offending policies, not the full table with a few rows
+        // checked among everything else.
+        const scoped = initialSelectedResourceIds?.length > 0
+            ? policyData.filter(row => initialSelectedResourceIds.includes(row.id))
+            : policyData;
+        return scoped.map(row => ({
+            ...row,
+            agent: getApplicableAgentKeys(row.originalData, allCollections, agentFilterOptions),
+        }));
+    }, [policyData, allCollections, agentFilterOptions, initialSelectedResourceIds]);
 
     useEffect(() => {
         const prefill = location.state?.topicGuardrailPrefill;
@@ -741,6 +763,16 @@ function GuardrailPolicies() {
     }
 
     const components = [
+        ...(initialSelectedResourceIds?.length > 0 ? [
+            <Banner
+                key="insight-scoped-view-banner"
+                status="info"
+                onDismiss={clearInsightScopedView}
+                action={{ content: "View all policies", onAction: clearInsightScopedView }}
+            >
+                {`Showing ${initialSelectedResourceIds.length} polic${initialSelectedResourceIds.length === 1 ? "y" : "ies"} from an insight.`}
+            </Banner>
+        ] : []),
         <GithubSimpleTable
             key={`policies-table-${tableRefreshKey}-${agentFilterOptions.length}`}
             resourceName={resourceName}
@@ -764,6 +796,7 @@ function GuardrailPolicies() {
             loading={loading || Boolean(pendingPolicyName)}
             loadingText={"Loading guardrail policies..."}
             selectable={true}
+            initialSelectedResourceIds={initialSelectedResourceIds}
             promotedBulkActions={promotedBulkActions}
             {...(func.isDemoAccount() && { customFilters: true, modifyData })}
         />

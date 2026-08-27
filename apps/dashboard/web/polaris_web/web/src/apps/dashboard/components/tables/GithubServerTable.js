@@ -550,6 +550,10 @@ function GithubServerTable(props) {
   const {selectedResources: rawSelectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(fullDataIds!== undefined ? fullDataIds : data , {
       resourceIDResolver,
+      // Deep link from elsewhere (e.g. an Insight CTA's ?policyIds=a,b) — pre-checks those rows
+      // for the existing bulk-action bar instead of landing on an unfiltered, unselected table.
+      // Only an initial value (useIndexResourceState's own state, not reactive to prop changes).
+      selectedResources: props.initialSelectedResourceIds,
     });
 
   useEffect(() => {

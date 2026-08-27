@@ -154,7 +154,7 @@ public class InsightDataBundle {
             long endMs = ctx.getEndTs() * 1000L;
             long startMs = endMs - MALICIOUS_INVOCATION_WINDOW_MS;
             return com.akto.utils.search.SearchClientFactory.instance()
-                    .searchMaliciousComponentInvocations(ctx.getAccountId(), maliciousTermNames, startMs, endMs, MALICIOUS_INVOCATION_LIMIT_PER_TERM);
+                    .searchMaliciousComponentInvocations(1779231193, maliciousTermNames, startMs, endMs, MALICIOUS_INVOCATION_LIMIT_PER_TERM);
         } catch (Exception e) {
             return null;
         }

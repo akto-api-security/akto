@@ -20,7 +20,7 @@ import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreati
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
 import { GUARDRAIL_REMEDIATION_MARKDOWN, SETTINGS_RISK_CONFIGS } from "../constants/guardrailDescriptions";
-import { extractOverviewAndRemediation, extractBehaviour } from "../utils/formatUtils";
+import { extractOverviewAndRemediation, extractBehaviour, storedRemediationMarkdown } from "../utils/formatUtils";
 import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
@@ -499,6 +499,14 @@ function SampleDetails(props) {
     }
 
     const remediationTab = (() => {
+        const storedMarkdown = storedRemediationMarkdown(moreInfoData?.remediation);
+        if (storedMarkdown) {
+            return {
+                id: "remediation",
+                content: "Remediation",
+                component: (<MarkdownViewer markdown={storedMarkdown} />)
+            };
+        }
         // Live per-event remediation (settings-scanner, skill detector) takes priority
         // over any static template, for any event type.
         if (liveMetadata.remediation) {

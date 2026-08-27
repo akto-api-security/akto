@@ -441,8 +441,8 @@ const transform = {
         return (
             <Tooltip dismissOnMouseOut content={
                 <Box>
-                    <Text>Base score: {baseRiskScore}</Text>
-                    <Text>Remarks: {baseRiskScoreReason}</Text>
+                    {/* <Text>Base score: {baseRiskScore}</Text> */}
+                    <Text>{baseRiskScoreReason}</Text>
                 </Box>
             }>
                 {badge}

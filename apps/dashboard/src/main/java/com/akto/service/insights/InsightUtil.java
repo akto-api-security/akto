@@ -25,7 +25,7 @@ public final class InsightUtil {
     // ── Metric formatting — the narrative model copies these strings verbatim ──────────
 
     public static String count(long n, String noun) {
-        return n + " " + (n == 1 ? singular(noun) : noun);
+        return grouped(n) + " " + (n == 1 ? singular(noun) : noun);
     }
 
     private static String singular(String noun) {
@@ -34,7 +34,12 @@ public final class InsightUtil {
     }
 
     public static String ofTotal(long n, long total, String noun) {
-        return n + " of " + total + " " + noun;
+        return grouped(n) + " of " + grouped(total) + " " + noun;
+    }
+
+    /** Thousands-grouped, e.g. 18234 -> "18,234" — every formatted count/token number a reader sees goes through this. */
+    public static String grouped(long n) {
+        return String.format(Locale.US, "%,d", n);
     }
 
     public static String percent(double fraction) {
@@ -44,6 +49,33 @@ public final class InsightUtil {
     public static String daysAgo(long epochSeconds, long nowEpochSeconds) {
         long days = Math.max(0, (nowEpochSeconds - epochSeconds) / 86400);
         return days == 0 ? "today" : days + (days == 1 ? " day ago" : " days ago");
+    }
+
+    /** A plain-language description of the report window, for headlines that otherwise state only
+     *  raw counts with no sense of the time period they cover (e.g. "N violations" vs. "N violations
+     *  in the last 2 weeks"). ctx.getStartTs()/getEndTs() &lt;= 0 both means "all time" by the same
+     *  convention PolicyHygieneProvider's isWithinWindow uses. */
+    public static String dateRangeDescription(int startTs, int endTs) {
+        if (startTs <= 0 && endTs <= 0) {
+            return "over all recorded activity";
+        }
+        if (startTs <= 0 || endTs <= 0) {
+            return "in the selected window";
+        }
+        long days = Math.max(1, Math.round((endTs - startTs) / 86400.0));
+        boolean endsNearNow = endTs >= com.akto.dao.context.Context.now() - 86400;
+        if (endsNearNow) {
+            if (days == 1) return "in the last 24 hours";
+            if (days == 7) return "in the last week";
+            if (days == 14) return "in the last 2 weeks";
+            if (days >= 28 && days <= 31) return "in the last month";
+            return "in the last " + days + " days";
+        }
+        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("MMM d", Locale.US);
+        java.time.ZoneId utc = java.time.ZoneId.of("UTC");
+        String startStr = java.time.Instant.ofEpochSecond(startTs).atZone(utc).format(fmt);
+        String endStr = java.time.Instant.ofEpochSecond(endTs).atZone(utc).format(fmt);
+        return "between " + startStr + " and " + endStr;
     }
 
     // ── Agent purpose (on-domain reference for insights 6/7) ───────────────────────────
@@ -91,6 +123,63 @@ public final class InsightUtil {
 
     public static boolean isBlockingPolicy(GuardrailPolicies p) {
         return "block".equalsIgnoreCase(p.getBehaviour());
+    }
+
+    /** Raw `GuardrailPolicies.behaviour` ("block"/"warn"/"alert"/"approval") is backend jargon —
+     *  this is the one place every "Mode" column/caveat should get its display string from,
+     *  rather than each provider inventing its own fallback. A blank/unrecognized value means the
+     *  lookup missed (most commonly: the policy that fired has since been renamed or deleted), not
+     *  that the mode itself is unknown, so it says so plainly instead of "unknown". */
+    public static String humanizePolicyMode(String behaviour) {
+        if (behaviour == null || behaviour.trim().isEmpty()) {
+            return "Policy no longer exists";
+        }
+        switch (behaviour.trim().toLowerCase(Locale.ROOT)) {
+            case "block": return "Block";
+            case "warn": return "Warn";
+            case "alert": return "Alert only";
+            case "approval": return "Needs approval";
+            default: return behaviour;
+        }
+    }
+
+    // ── Taxonomy-mismatch fallback ─────────────────────────────────────────────────────
+    // On real accounts, a violation's `subCategory` frequently equals the firing policy's own
+    // name rather than the literal ("Secrets" / "PII-<type>" / "PromptInjection") several
+    // insights match against — confirmed independently across multiple real accounts. When
+    // subCategory doesn't match, fall back to asking the firing POLICY whether it has the
+    // relevant scanner enabled at all; a hit from a policy with that scanner on is real signal
+    // even when the literal it landed under doesn't say so.
+
+    public static boolean policyHasSecretsDetection(GuardrailPolicies p) {
+        return p != null && p.getSecretsDetection() != null && p.getSecretsDetection().isEnabled();
+    }
+
+    public static boolean policyHasPiiDetection(GuardrailPolicies p) {
+        return p != null && p.getPiiTypes() != null && !p.getPiiTypes().isEmpty();
+    }
+
+    public static boolean policyHasPromptInjectionDetection(GuardrailPolicies p) {
+        return p != null && p.getContentFiltering() != null && p.getContentFiltering().get("promptAttacks") != null;
+    }
+
+    /** Raw `subCategory` literals ("PII-email", "PromptInjection") leaking into evidence tables
+     *  and caveats — this turns them into a phrase a reader doesn't need backend context for. */
+    public static String humanizeSubCategory(String subCategory) {
+        if (subCategory == null || subCategory.trim().isEmpty()) {
+            return "(no category)";
+        }
+        String s = subCategory.trim();
+        if (s.regionMatches(true, 0, "PII-", 0, 4) && s.length() > 4) {
+            return "PII (" + s.substring(4) + ")";
+        }
+        if ("PromptInjection".equalsIgnoreCase(s)) {
+            return "Prompt injection";
+        }
+        if ("Secrets".equalsIgnoreCase(s)) {
+            return "Secrets";
+        }
+        return s;
     }
 
     public static boolean policyCoversHost(GuardrailPolicies p, String hostName) {

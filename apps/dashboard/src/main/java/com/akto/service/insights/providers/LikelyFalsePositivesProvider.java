@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -58,12 +59,34 @@ public class LikelyFalsePositivesProvider extends AbstractInsightProvider {
     @Override
     public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope) {
         List<ThreatCategoryCount> subCategoryCounts = bundle.subCategoryCounts;
-        if (subCategoryCounts == null) {
+        // subCategoryCounts is a threat-backend aggregate and the bundle never returns null
+        // for it — a failed call is signalled by threatBackendAvailable instead, so an empty
+        // list here can't be told apart from a real zero unless that flag is also checked.
+        if (!bundle.threatBackendAvailable) {
             return failed("THREAT_BACKEND", "Could not load violation counts");
         }
 
+        // Taxonomy-mismatch fallback (confirmed on real accounts): subCategory frequently carries
+        // the firing policy's own name instead of "PII-<type>". Recover the common, unambiguous
+        // case — a policy that does ONLY PII detection (no Secrets/prompt-injection scanner also
+        // enabled) — by trusting the policy's own config instead of the literal. A multi-scanner
+        // policy is left on the exact-literal path only, since which scanner fired can't be told
+        // apart from the aggregate alone.
+        Set<String> piiOnlyPolicyNamesLower = new HashSet<>();
+        Map<String, GuardrailPolicies> piiOnlyPolicyByLowerName = new HashMap<>();
+        if (bundle.policies != null) {
+            for (GuardrailPolicies p : bundle.policies) {
+                if (p.getName() != null && InsightUtil.policyHasPiiDetection(p)
+                        && !InsightUtil.policyHasSecretsDetection(p)
+                        && !InsightUtil.policyHasPromptInjectionDetection(p)) {
+                    piiOnlyPolicyNamesLower.add(lower(p.getName()));
+                    piiOnlyPolicyByLowerName.put(lower(p.getName()), p);
+                }
+            }
+        }
         List<ThreatCategoryCount> piiRows = subCategoryCounts.stream()
-                .filter(c -> c.getSubCategory() != null && c.getSubCategory().regionMatches(true, 0, PII_PREFIX, 0, PII_PREFIX.length()))
+                .filter(c -> (c.getSubCategory() != null && c.getSubCategory().regionMatches(true, 0, PII_PREFIX, 0, PII_PREFIX.length()))
+                        || piiOnlyPolicyNamesLower.contains(lower(c.getCategory())))
                 .collect(Collectors.toList());
         long totalPiiViolations = piiRows.stream().mapToLong(ThreatCategoryCount::getCount).sum();
         Set<String> policiesWithPii = piiRows.stream().map(ThreatCategoryCount::getCategory).collect(Collectors.toCollection(HashSet::new));
@@ -108,10 +131,39 @@ public class LikelyFalsePositivesProvider extends AbstractInsightProvider {
         // DETAIL: narrow the raw-event page to exactly the PII-* subCategory values discovered
         // above (the exact type list is per-account/dynamic — see PiiPatterns' doc — so it can't
         // be known in advance; the free aggregate just told us which ones actually occur here).
-        List<String> exactSubCategories = piiRows.stream().map(ThreatCategoryCount::getSubCategory).distinct().collect(Collectors.toList());
-        List<DashboardMaliciousEvent> events = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT,
-                Collections.singletonMap("subCategory", exactSubCategories), null);
-        if (events == null) events = new ArrayList<>();
+        // Only rows that are actually PII-<type>-labeled feed this — a piiOnlyPolicyNamesLower
+        // fallback row's subCategory is the policy's own name, not a real PII type.
+        List<String> exactSubCategories = piiRows.stream()
+                .map(ThreatCategoryCount::getSubCategory)
+                .filter(sc -> sc != null && sc.regionMatches(true, 0, PII_PREFIX, 0, PII_PREFIX.length()))
+                .distinct().collect(Collectors.toList());
+        List<DashboardMaliciousEvent> events = new ArrayList<>();
+        boolean anyFetchCapped = false;
+        if (!exactSubCategories.isEmpty()) {
+            List<DashboardMaliciousEvent> labeled = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT,
+                    Collections.singletonMap("subCategory", exactSubCategories), null);
+            if (labeled != null) {
+                events.addAll(labeled);
+                anyFetchCapped = anyFetchCapped || labeled.size() == EVENT_PAGE_LIMIT;
+            }
+        }
+        // Fallback: pull every hit from PII-only policies directly, regardless of what subCategory
+        // literal it landed under — these policies do nothing but PII detection, so every hit is one.
+        Set<String> fallbackPolicyNames = piiRows.stream()
+                .filter(c -> piiOnlyPolicyNamesLower.contains(lower(c.getCategory())))
+                .map(ThreatCategoryCount::getCategory)
+                .distinct().collect(Collectors.toCollection(LinkedHashSet::new));
+        if (!fallbackPolicyNames.isEmpty()) {
+            List<DashboardMaliciousEvent> fallbackEvents = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT,
+                    Collections.singletonMap("latestAttack", new ArrayList<>(fallbackPolicyNames)), null);
+            if (fallbackEvents != null) {
+                anyFetchCapped = anyFetchCapped || fallbackEvents.size() == EVENT_PAGE_LIMIT;
+                Set<String> seenIds = events.stream().map(DashboardMaliciousEvent::getId).collect(Collectors.toCollection(HashSet::new));
+                for (DashboardMaliciousEvent e : fallbackEvents) {
+                    if (seenIds.add(e.getId())) events.add(e);
+                }
+            }
+        }
 
         if (events.isEmpty()) {
             result.setStatus(InsightResult.Status.PARTIAL.name());
@@ -132,19 +184,33 @@ public class LikelyFalsePositivesProvider extends AbstractInsightProvider {
         long notCheckableCount = 0;
         for (DashboardMaliciousEvent event : events) {
             String subCategory = event.getSubCategory();
-            if (subCategory == null || !subCategory.regionMatches(true, 0, PII_PREFIX, 0, PII_PREFIX.length())) {
-                continue;
-            }
-            String piiType = subCategory.substring(PII_PREFIX.length());
             String policyName = StringUtils.defaultIfBlank(event.getFilterId(), "(unknown policy)");
-            PolicyStats stats = byPolicy.computeIfAbsent(policyName, PolicyStats::new);
+            List<String> candidateTypes;
+            if (subCategory != null && subCategory.regionMatches(true, 0, PII_PREFIX, 0, PII_PREFIX.length())) {
+                // Exactly labeled — the one true type is known.
+                candidateTypes = Collections.singletonList(subCategory.substring(PII_PREFIX.length()));
+            } else {
+                GuardrailPolicies fallbackPolicy = piiOnlyPolicyByLowerName.get(lower(event.getFilterId()));
+                if (fallbackPolicy == null || fallbackPolicy.getPiiTypes() == null) {
+                    continue; // neither exactly labeled nor a known PII-only policy fallback
+                }
+                // Fallback — subCategory doesn't say which type, so try every type this PII-only
+                // policy is configured to detect; a match against any of them is a true positive.
+                candidateTypes = fallbackPolicy.getPiiTypes().stream()
+                        .map(GuardrailPolicies.PiiType::getType)
+                        .filter(java.util.Objects::nonNull)
+                        .collect(Collectors.toList());
+            }
 
-            if (!PiiPatterns.isCheckable(piiType)) {
+            PolicyStats stats = byPolicy.computeIfAbsent(policyName, PolicyStats::new);
+            List<String> checkableTypes = candidateTypes.stream().filter(PiiPatterns::isCheckable).collect(Collectors.toList());
+            if (checkableTypes.isEmpty()) {
                 notCheckableCount++;
                 continue;
             }
             String evidenceText = EvidenceText.extract(event);
-            if (PiiPatterns.rawPatternPresent(piiType, evidenceText)) {
+            String matchedType = checkableTypes.stream().filter(t -> PiiPatterns.rawPatternPresent(t, evidenceText)).findFirst().orElse(null);
+            if (matchedType != null) {
                 stats.truePositive++;
             } else if (PiiPatterns.looksRedacted(evidenceText)) {
                 stats.inconclusive++;
@@ -155,7 +221,7 @@ public class LikelyFalsePositivesProvider extends AbstractInsightProvider {
                     stats.falsePositiveLooksLikeCredential++;
                 }
                 if (stats.sampleFalsePositive == null) {
-                    stats.sampleFalsePositive = new SampleFp(piiType, evidenceText, credentialLabel);
+                    stats.sampleFalsePositive = new SampleFp(checkableTypes.get(0), evidenceText, credentialLabel);
                 }
             }
         }
@@ -192,16 +258,6 @@ public class LikelyFalsePositivesProvider extends AbstractInsightProvider {
                     notCheckableCount, events.size(), "count", InsightUtil.ofTotal(notCheckableCount, events.size(), "violations"), null));
         }
 
-        Map<String, GuardrailPolicies> policyByLowerName = new HashMap<>();
-        List<GuardrailPolicies> policies = bundle.policies;
-        if (policies != null) {
-            for (GuardrailPolicies p : policies) {
-                if (p.getName() != null) {
-                    policyByLowerName.put(lower(p.getName()), p);
-                }
-            }
-        }
-
         PolicyStats worst = withSample.isEmpty() ? null : withSample.get(0);
         String severity;
         String headline;
@@ -214,7 +270,8 @@ public class LikelyFalsePositivesProvider extends AbstractInsightProvider {
                         + InsightUtil.count(notCheckableCount, "violations") + " not independently checkable, "
                         + InsightUtil.count(totalInconclusive, "violations") + " inconclusive).";
         } else {
-            severity = worst.precision() < 0.5 ? "HIGH" : (worst.precision() < 0.9 ? "MEDIUM" : "LOW");
+            severity = worst.precision() < 0.1 ? "CRITICAL"
+                    : (worst.precision() < 0.5 ? "HIGH" : (worst.precision() < 0.9 ? "MEDIUM" : "LOW"));
             headline = String.format(Locale.US,
                     "Worst policy \"%s\" is estimated %s precise (%s of %s checkable violations were likely real) — %s.",
                     worst.policyName, InsightUtil.percent(worst.precision()), InsightUtil.count(worst.truePositive, "hits"),
@@ -228,8 +285,30 @@ public class LikelyFalsePositivesProvider extends AbstractInsightProvider {
         caveats.add("Only PII types with a mirrored detection pattern are checked (email, SSN, credit card, and other well-known formats) — see the provider's own notes for the full list; types outside that set are counted separately, never assumed false.");
         caveats.add("Violations whose evidence text already looks redacted are excluded from the precision estimate rather than guessed either way, since request/response payloads are anonymized before storage and the exact redaction format used isn't confirmed.");
         caveats.add("Per-policy precision is only shown once a policy has at least " + MIN_SAMPLE_SIZE + " checkable violations in this window.");
-        if (events.size() == EVENT_PAGE_LIMIT) {
-            caveats.add("Violations examined are capped at " + EVENT_PAGE_LIMIT + "; more may exist beyond this page.");
+        if (!fallbackPolicyNames.isEmpty()) {
+            caveats.add("A hit is counted as PII if its subCategory says so, or if it came from a policy configured to do nothing but PII detection — subCategory alone understates this on some accounts. For a fallback hit, every PII type that policy checks for is tried against the evidence; a match on any of them counts as a true positive.");
+        }
+        if (anyFetchCapped) {
+            caveats.add("Violations examined are capped at " + EVENT_PAGE_LIMIT + " per lookup; more may exist beyond this page.");
+        }
+
+        String concern = null;
+        String impact = null;
+        String remediation = null;
+        if (worst != null) {
+            concern = String.format(Locale.US,
+                    "Policy \"%s\" is estimated %s precise — %s of the %s checkable violations it caught look like "
+                            + "false positives, not real PII.",
+                    worst.policyName, InsightUtil.percent(worst.precision()),
+                    InsightUtil.count(worst.falsePositive, "violations"), InsightUtil.count(worst.checkedTotal(), "hits"));
+            impact = "A noisy policy like this erodes trust in the alert queue — the team either starts ignoring its "
+                    + "alerts or, worse, disables it outright, which loses the real hits along with the noise.";
+            remediation = worst.falsePositiveLooksLikeCredential > 0
+                    ? String.format(Locale.US, "Some of \"%s\"'s false positives look like credentials rather than "
+                            + "PII — check the Credential Exposure insight, then narrow this policy's conditions to "
+                            + "cut the noise without disabling it.", worst.policyName)
+                    : String.format(Locale.US, "Narrow \"%s\"'s match conditions (tighter pattern, added context "
+                            + "requirements) to cut the false-positive rate without disabling it outright.", worst.policyName);
         }
 
         List<PolicyStats> topRows = withSample.stream().limit(EVIDENCE_ROW_CAP).collect(Collectors.toList());
@@ -255,8 +334,11 @@ public class LikelyFalsePositivesProvider extends AbstractInsightProvider {
         result.setMetricsComplete(true);
         result.setDataGaps(new ArrayList<>());
         result.setCaveats(caveats);
+        result.setConcern(concern);
+        result.setImpact(impact);
+        result.setRemediation(remediation);
         result.setEvidence(evidence);
-        result.setCtas(buildCtas(worst, policyByLowerName));
+        result.setCtas(buildCtas(worst));
         return result;
     }
 
@@ -309,7 +391,7 @@ public class LikelyFalsePositivesProvider extends AbstractInsightProvider {
         }
         String flat = sample.evidenceText.replaceAll("\\s+", " ").trim();
         String truncated = flat.length() <= 120 ? flat : flat.substring(0, 120) + "…";
-        return "declared \"" + sample.piiType + "\": " + truncated;
+        return "declared " + InsightUtil.humanizeSubCategory(PII_PREFIX + sample.piiType) + ": " + truncated;
     }
 
     private static String lower(String s) {
@@ -317,24 +399,23 @@ public class LikelyFalsePositivesProvider extends AbstractInsightProvider {
     }
 
 
-    private static List<InsightResult.Cta> buildCtas(PolicyStats worst, Map<String, GuardrailPolicies> policyByLowerName) {
+    private static List<InsightResult.Cta> buildCtas(PolicyStats worst) {
         if (worst == null) {
             return new ArrayList<>();
         }
-        GuardrailPolicies policy = policyByLowerName.get(lower(worst.policyName));
-        Map<String, Object> params = new HashMap<>();
-        params.put("policyId", policy != null ? policy.getHexId() : null);
-        params.put("policyName", worst.policyName);
+        // "?policy=<name>" is what both destinations actually read — GuardrailPolicies.jsx opens
+        // that policy's edit drawer, ViolationsPage.jsx seeds its existing policy-filter.
+        Map<String, Object> policyParams = InsightUtil.guardrailPolicyParams(worst.policyName);
 
         List<InsightResult.Cta> ctas = new ArrayList<>();
         ctas.add(new InsightResult.Cta("add_policy_conditions", "Add policy conditions",
-                "BULK_ACTION", "/dashboard/guardrails/policies", params, true));
+                "BULK_ACTION", "/dashboard/guardrails/policies", policyParams, true));
         if (worst.falsePositiveLooksLikeCredential > 0) {
             ctas.add(new InsightResult.Cta("reclassify_as_credential", "Reclassify as credential detection",
-                    "NAVIGATE", "/dashboard/guardrails/policies", params, false));
+                    "NAVIGATE", "/dashboard/guardrails/policies", policyParams, false));
         }
         ctas.add(new InsightResult.Cta("mark_false_positive", "Mark false positive",
-                "NAVIGATE", "/dashboard/guardrails/violations", params, false));
+                "NAVIGATE", "/dashboard/guardrails/violations", policyParams, false));
         return ctas;
     }
 }

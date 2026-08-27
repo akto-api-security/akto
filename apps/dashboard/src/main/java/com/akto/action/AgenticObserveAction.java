@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.DaoInit;
 import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.ApiCollectionsDao;
@@ -160,6 +161,16 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             this.misconfiguredCollectionIds = misconfiguredCollectionIds;
             this.builtAt = builtAt;
         }
+    }
+
+    public static void main(String[] args) {
+        Context.accountId.set(1785654409);
+        Context.contextSource.set(CONTEXT_SOURCE.ENDPOINT);
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
+
+        List<ApiCollection> colls = ApiCollectionsDao.instance.findAll(Filters.empty());
+        AgenticObserveAction ac = new AgenticObserveAction();
+        ac.fetchAgenticAssetsSummary();
     }
 
     private SkillDataCacheEntry getOrBuildSkillData() {
@@ -455,9 +466,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     // Java port of mcpClientHelper.js's hasPersonalAccountTag/hasLocalMcpServerTag/
     // hasMisconfiguredConfigTag — extracted (unlike GroupSummary.accumulateCheap's own inline copy
     // of this same logic) because fetchAgenticAssetEndpointsPage needs it per-child, not just once
-    // per group. {personal, localMcp, misconfigured}.
+    // per group. {personal, localMcp, misconfigured, owner}.
     private static boolean[] computeAgenticTagFlags(List<CollectionTags> envType) {
-        boolean personal = false, localMcp = false, misconfigured = false;
+        boolean personal = false, localMcp = false, misconfigured = false, owner = false;
         if (envType != null) {
             for (CollectionTags tag : envType) {
                 if (tag == null) continue;
@@ -468,9 +479,20 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 }
                 if ("local-mcp-server".equals(key)) localMcp = true;
                 if ("misconfigured-config".equals(key) && "true".equals(value)) misconfigured = true;
+                if (Constants.AKTO_AI_AGENT_OWNER_TAG.equals(key) && "true".equals(value)) owner = true;
             }
         }
-        return new boolean[]{personal, localMcp, misconfigured};
+        return new boolean[]{personal, localMcp, misconfigured, owner};
+    }
+
+    private static String extractEnvironmentName(List<CollectionTags> envType) {
+        if (envType == null) return null;
+        for (CollectionTags tag : envType) {
+            if (tag != null && Constants.AKTO_COPILOT_BOT_ENVIRONMENT_NAME_TAG.equals(tag.getKeyName())) {
+                return tag.getValue();
+            }
+        }
+        return null;
     }
 
     // Cheap per-group accumulator, built for EVERY group (agent/service/llm/skill — ~800 at real
@@ -797,6 +819,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         final String deviceId;
         String username = "-";
         double riskScore = 0;
+        Double baseRiskScore = null;
+        String baseRiskScoreReason = null;
         int lastSeenEpoch = 0;
         int startTs = 0; // 0 == "no discovered time seen yet"; matches JS's Infinity->0 fallback
         final Set<String> sensitiveTypes = new LinkedHashSet<>();
@@ -804,6 +828,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         boolean hasLocalMcpServer = false;
         boolean hasMisconfiguredConfig = false;
         boolean hasMaliciousSkill = false;
+        boolean hasOwnerTag = false;
+        String environmentName = null;
         final List<BasicDBObject> children = new ArrayList<>();
 
         EndpointGroup(String deviceId) { this.deviceId = deviceId; }
@@ -831,6 +857,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             double collRisk = r != null ? r : 0.0;
             List<String> collSensitive = sensitive != null ? sensitive.get(idStr) : null;
             boolean[] flags = computeAgenticTagFlags(c.getEnvType());
+            String environmentName = extractEnvironmentName(c.getEnvType());
             int childStartTs = c.getStartTs();
 
             int skillCount = 0;
@@ -859,6 +886,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             child.put("hasPersonalAccount", flags[0]);
             child.put("hasLocalMcpServer", flags[1]);
             child.put("hasMisconfiguredConfig", flags[2]);
+            child.put("hasOwnerTag", flags[3]);
+            if (StringUtils.isNotBlank(environmentName)) child.put("environmentName", environmentName);
             child.put("hasMaliciousSkill", childMalicious);
             child.put("skillCount", skillCount);
             child.put("baseRiskScore", c.getBaseRiskScore());
@@ -886,11 +915,21 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             g.children.add(child);
             if (collTraffic > g.lastSeenEpoch) g.lastSeenEpoch = collTraffic;
             if (childStartTs > 0 && (g.startTs == 0 || childStartTs < g.startTs)) g.startTs = childStartTs;
-            if (collRisk > g.riskScore) g.riskScore = collRisk;
+            // Carry the base score/remarks from whichever child owns the current max risk score,
+            // so the device row's tooltip can explain the score it displays (mirrors
+            // AgentEndpointTreeTable.jsx's groupByEndpointId).
+            if (collRisk >= g.riskScore) {
+                g.baseRiskScore = c.getBaseRiskScore();
+                g.baseRiskScoreReason = c.getBaseRiskScoreReason();
+                g.riskScore = collRisk;
+            }
             if (collSensitive != null) g.sensitiveTypes.addAll(collSensitive);
             if (flags[0]) g.hasPersonalAccount = true;
             if (flags[1]) g.hasLocalMcpServer = true;
             if (flags[2]) g.hasMisconfiguredConfig = true;
+            if (flags[3]) g.hasOwnerTag = true;
+            // First non-blank wins — every child of one owner-tagged group is the same bot, same environment.
+            if (g.environmentName == null && StringUtils.isNotBlank(environmentName)) g.environmentName = environmentName;
             if (childMalicious) g.hasMaliciousSkill = true;
         }
         return groups;
@@ -963,6 +1002,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 row.put("endpointId", g.deviceId);
                 row.put("username", g.username);
                 row.put("riskScore", g.riskScore > 0 ? AgenticObserveUtil.roundRiskScore(g.riskScore) : 0);
+                row.put("baseRiskScore", g.baseRiskScore);
+                row.put("baseRiskScoreReason", g.baseRiskScoreReason);
                 row.put("sensitiveInRespTypes", new ArrayList<>(g.sensitiveTypes));
                 row.put("lastSeenEpoch", g.lastSeenEpoch);
                 row.put("startTs", g.startTs);
@@ -970,6 +1011,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 row.put("hasLocalMcpServer", g.hasLocalMcpServer);
                 row.put("hasMisconfiguredConfig", g.hasMisconfiguredConfig);
                 row.put("hasMaliciousSkill", g.hasMaliciousSkill);
+                row.put("hasOwnerTag", g.hasOwnerTag);
+                row.put("environmentName", g.environmentName);
                 row.put("childCount", g.children.size());
                 row.put("children", g.children);
                 rows.add(row);
@@ -1005,6 +1048,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     if (wanted.contains("Local MCP Server") && Boolean.TRUE.equals(r.getBoolean("hasLocalMcpServer", false))) return false;
                     if (wanted.contains("Misconfigured") && Boolean.TRUE.equals(r.getBoolean("hasMisconfiguredConfig", false))) return false;
                     if (wanted.contains("Malicious Skills") && Boolean.TRUE.equals(r.getBoolean("hasMaliciousSkill", false))) return false;
+                    if (wanted.contains("Owner") && Boolean.TRUE.equals(r.getBoolean("hasOwnerTag", false))) return false;
                     return true;
                 });
             }
@@ -1629,9 +1673,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // "not-attached" hostname (an orphan skill bucket, not a real agent/service/llm) —
             // matches constants.js's groupCollectionsBySkill, which never checks
             // isNotAttachedHostName, unlike its Agent/Service/LLM siblings below.
+            boolean fannedOutSkillFromArray = false;
             if (c.getSkills() != null) {
                 for (String skill : c.getSkills()) {
                     if (StringUtils.isBlank(skill)) continue;
+                    fannedOutSkillFromArray = true;
                     GroupSummary g = groups.computeIfAbsent("skill|" + skill, k -> {
                         GroupSummary gs = new GroupSummary(skill, "skill");
                         gs.name = skill;
@@ -1648,6 +1694,35 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     // its "skill" tag names it, so this collection (c) is never the one contributing it.
                     if (g.owningPluginName == null) g.owningPluginName = AgenticObserveUtil.getOwningPluginName(c);
                     if (g.owningPluginName == null) g.owningPluginName = skillNameToOwningPlugin.get(skill);
+                }
+            }
+            // Standalone skill collections (no owning agent's .skills array lists them — the
+            // collection IS the skill, named by its own "skill" tag(s) rather than a member of some
+            // other collection's .skills array) never fan out above since .skills is empty/null on
+            // them. Without this fallback they fall through to the agent/service classification
+            // below, find no mcp-client/ai-agent/mcp-server/gen-ai/browser-llm tag, and get dropped
+            // by the `if (typeTag == null) continue;` a few lines down — silently excluded from every
+            // group despite being tagged AKTO_SKILL_TAG in the DB. Only applies when the array fan-out
+            // above found nothing, so a collection already counted via .skills isn't double-counted.
+            // A single collection can carry MULTIPLE "skill" tags (one per skill the owning
+            // user/agent has created) — unlike getOwningPluginName's single-value lookup, this must
+            // walk every tag, not just the first, or every skill past the first on that collection
+            // silently disappears from the count.
+            if (!fannedOutSkillFromArray && envType != null) {
+                for (CollectionTags tag : envType) {
+                    if (tag == null || !Constants.AKTO_SKILL_TAG.equals(tag.getKeyName()) || StringUtils.isBlank(tag.getValue())) {
+                        continue;
+                    }
+                    String ownSkillTag = tag.getValue();
+                    GroupSummary g = groups.computeIfAbsent("skill|" + ownSkillTag, k -> {
+                        GroupSummary gs = new GroupSummary(ownSkillTag, "skill");
+                        gs.name = ownSkillTag;
+                        gs.clientType = AgenticObserveUtil.CLIENT_TYPE_SKILL;
+                        return gs;
+                    });
+                    g.accumulateCheap(c, hostName, envType, collRisk, collTraffic, deviceId, sensitive);
+                    if (g.owningPluginName == null) g.owningPluginName = AgenticObserveUtil.getOwningPluginName(c);
+                    if (g.owningPluginName == null) g.owningPluginName = skillNameToOwningPlugin.get(ownSkillTag);
                 }
             }
 

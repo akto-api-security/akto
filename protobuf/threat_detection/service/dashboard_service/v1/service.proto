@@ -37,6 +37,7 @@ message ListMaliciousRequestsResponse {
       string dest_country = 24;  // Destination country code (where the request is going to)
       string session_id = 25;  // Session identifier for tracking user sessions
       repeated threat_detection.message.malicious_event.v1.OwaspCategory owasp_categories = 26;
+      string remediation = 27;  // Markdown/text remediation steps
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
