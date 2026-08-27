@@ -354,6 +354,10 @@ func agentSegmentMatch(nameLower, storedLower string) bool {
 	if strings.Contains(nameLower, "."+storedLower+".") {
 		return true
 	}
+
+	if strings.HasSuffix(nameLower, ".ai-agent."+storedLower) {
+		return true
+	}
 	return false
 }
 

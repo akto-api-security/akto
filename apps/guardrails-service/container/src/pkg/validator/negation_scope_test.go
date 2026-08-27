@@ -140,6 +140,25 @@ func TestFilterPoliciesByMcpServer_Negation(t *testing.T) {
 		}
 	})
 
+	// Mirrored/replayed traffic puts the agent value last, preceded by the literal "ai-agent" tag-key marker.
+	t.Run("agent bucket recognizes the ai-agent-marker host shape, not just the MCP-relay shape", func(t *testing.T) {
+		p := types.Policy{SelectedAgentServers: set("claudecli"), NegatedAgentServers: true}
+		got := s.filterPoliciesByMcpServer([]types.Policy{p}, "kingsgambit-bf066fa2.ai-agent.claudecli")
+		if len(got) != 0 {
+			t.Fatalf("expected excluded agent to be recognized in the ai-agent-marker shape, got %d results", len(got))
+		}
+		got = s.filterPoliciesByMcpServer([]types.Policy{p}, "kingsgambit-bf066fa2.ai-agent.cursor")
+		if len(got) != 1 {
+			t.Fatalf("expected a non-excluded agent to still match via elimination, got %d results", len(got))
+		}
+		// Without the marker, a value in the same trailing position must not spuriously match.
+		p2 := types.Policy{SelectedAgentServers: set("filesystem")}
+		got = s.filterPoliciesByMcpServer([]types.Policy{p2}, "device1.cursor.filesystem")
+		if len(got) != 0 {
+			t.Fatalf("agent bucket matched a host-position occurrence without the ai-agent marker, got %d results", len(got))
+		}
+	})
+
 	// Regression test using the exact policy shape captured from a live local run.
 	t.Run("real policy: MCP+Agent exclude specific values, LLM include allow-list", func(t *testing.T) {
 		p := types.Policy{
