@@ -389,9 +389,11 @@ function deriveAgenticType(url, method) {
     return METHOD_TO_TYPE[m] || "Prompt";
 }
 
-// Classify a violation by its POLICY name. This is the grouping used by the "Violations by Type"
-// pie, and the table's Type column uses it too so the two stay consistent (a policy like
-// "llm-test" is LLM in both). Distinct from deriveAgenticType, which classifies by request shape.
+// Classify by POLICY/category name. Used only for the "Violations by Type" pie, which is built
+// from a server-side aggregate (category/subCategory names, no URL) - deriveAgenticType can't be
+// used there. The per-row Type column uses deriveAgenticType instead (see typeLabel below), so
+// the pie and the table can disagree on a given row's bucket; that's an accepted tradeoff since
+// the aggregate endpoint doesn't return per-event request URLs to classify by shape.
 function classifyPolicyType(name) {
     const lower = (name || "").toLowerCase();
     if (lower.includes("prompt") || lower.includes("injection"))       return "Prompt";
@@ -406,8 +408,9 @@ function classifyPolicyType(name) {
 // Kept lightweight — runs only on the current page of results (not all data).
 function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceMap) {
     const meta = parseMetadata(event.metadata);
-    // typeLabel (request-shape) still drives evidence/asset-tag logic below;
-    // the Type column itself uses the policy classification so it matches the pie.
+    // typeLabel (request-shape, from the actual URL/method) drives the Type column and the
+    // flyout's Values tab extraction - not classifyPolicyType(policyName), which is user-editable
+    // text and would misclassify (or dump into "Other") the moment someone renames a policy.
     const typeLabel = deriveAgenticType(event.url, event.method);
     const policyName = meta.policy_name || meta.npolicy_name || event.filterId || "-";
 
@@ -444,7 +447,7 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         filterId: event.filterId,
         host: rawHost,
         behaviourRaw: rawBehaviour,
-        type: classifyPolicyType(policyName),
+        type: typeLabel,
         violation: meta.rule_violated || meta.nrule_violated || meta.nruleViolated || event.subCategory || event.filterId || "-",
         severity: (event.severity || "HIGH").toUpperCase(),
         // Same resolver the old UI and the flyout use, so the column, the flyout and the
