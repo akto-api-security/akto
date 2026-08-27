@@ -5,28 +5,23 @@ import SessionStore from '@/apps/main/SessionStore';
 import threatDetectionApi from '../api';
 import guardrailApi from '../../guardrails/api';
 
-// Regular expression to validate IP address (IPv4 and IPv6)
-const IPV4_REGEX = /^(\d{1,3}\.){3}\d{1,3}$/;
-const IPV6_REGEX = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
+const looksLikeSecret = (value) => {
+  const v = String(value).trim();
+  if (/^bearer\s+/i.test(v)) return true;
+  if (/^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\./.test(v)) return true;
+  return false;
+};
 
 export const formatActorId = (actorId) => {
   if (!actorId) return "-";
 
-  const isValidIP = IPV4_REGEX.test(actorId) || IPV6_REGEX.test(actorId);
+  const display = looksLikeSecret(actorId) ? "Non IP Value" : actorId;
 
-  if (isValidIP) {
-    return (
-      <Text variant="bodyMd" fontWeight="medium">
-        {actorId}
-      </Text>
-    );
-  } else {
-    return (
-      <Text variant="bodyMd" fontWeight="medium">
-        Non IP Value
-      </Text>
-    );
-  }
+  return (
+    <Text variant="bodyMd" fontWeight="medium">
+      {display}
+    </Text>
+  );
 };
 
 export const extractRuleViolated = (metadata) => {
