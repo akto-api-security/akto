@@ -138,7 +138,7 @@ public class PolicyHygieneProvider extends AbstractInsightProvider {
         Map<Integer, Integer> collectionLastTrafficSeen = bundle.collectionLastTrafficSeen;
         List<String> caveats = new ArrayList<>();
         caveats.add("\"Assets with no guardrail\" means an actively-used API or agent endpoint (an \"asset\") that no active policy's server scope currently covers.");
-        caveats.add("Coverage checks a policy's configured server scope (applyToAllServers / selectedMcpServersV2 / selectedAgentServersV2) case-insensitively by exact hostname match, mirroring the real enforcement matcher exactly — it does not distinguish YAML/CI-CD-sourced policies, which the real matcher always treats as applying everywhere.");
+        caveats.add("Coverage checks a policy's configured server scope (applyToAllServers / selectedMcpServersV2 / selectedAgentServersV2 / selectedLlmServersV2, honoring each list's independent negatedAgentServers/negatedMcpServers/negatedLlmServers Include-Exclude toggle) case-insensitively by exact hostname match — it doesn't replicate the real matcher's clientType/host segment-position awareness, only its Include/Exclude semantics, and it does not distinguish YAML/CI-CD-sourced policies, which the real matcher always treats as applying everywhere.");
 
         List<ApiCollection> uncoveredAssets = new ArrayList<>();
         long activelyUsedCount = 0;
@@ -148,20 +148,7 @@ public class PolicyHygieneProvider extends AbstractInsightProvider {
                 caveats.add("Traffic recency data was unavailable; falling back to each asset's creation time to decide whether it's actively used.");
             }
 
-            java.util.Set<String> coveredHostsLower = new java.util.HashSet<>();
             boolean anyApplyToAll = activePolicies.stream().anyMatch(GuardrailPolicies::isApplyToAllServers);
-            for (GuardrailPolicies p : activePolicies) {
-                for (GuardrailPolicies.SelectedServer s : p.getEffectiveSelectedMcpServers()) {
-                    if (s.getName() != null) {
-                        coveredHostsLower.add(lower(s.getName()));
-                    }
-                }
-                for (GuardrailPolicies.SelectedServer s : p.getEffectiveSelectedAgentServers()) {
-                    if (s.getName() != null) {
-                        coveredHostsLower.add(lower(s.getName()));
-                    }
-                }
-            }
 
             for (ApiCollection c : activeCollections) {
                 if (StringUtils.isBlank(c.getHostName())) {
@@ -173,7 +160,9 @@ public class PolicyHygieneProvider extends AbstractInsightProvider {
                     continue;
                 }
                 activelyUsedCount++;
-                boolean covered = anyApplyToAll || coveredHostsLower.contains(lower(c.getHostName()));
+                String hostLower = lower(c.getHostName());
+                boolean covered = anyApplyToAll
+                        || activePolicies.stream().anyMatch(p -> policyCoversHost(p, hostLower));
                 if (!covered) {
                     uncoveredAssets.add(c);
                 }
@@ -283,6 +272,33 @@ public class PolicyHygieneProvider extends AbstractInsightProvider {
 
     private static String lower(String s) {
         return s == null ? "" : s.trim().toLowerCase(Locale.US);
+    }
+
+    // Mirrors the real matcher's Include/Exclude semantics per bucket; empty+negated bucket covers every host (see GuardrailPolicies.negatedAgentServers).
+    private static boolean policyCoversHost(GuardrailPolicies p, String hostLower) {
+        List<GuardrailPolicies.SelectedServer> mcp = p.getEffectiveSelectedMcpServers();
+        List<GuardrailPolicies.SelectedServer> agent = p.getEffectiveSelectedAgentServers();
+        List<GuardrailPolicies.SelectedServer> llm = p.getEffectiveSelectedLlmServers();
+        if ((mcp.isEmpty() && p.isNegatedMcpServers())
+                || (agent.isEmpty() && p.isNegatedAgentServers())
+                || (llm.isEmpty() && p.isNegatedLlmServers())) {
+            return true;
+        }
+        return bucketCoversHost(mcp, p.isNegatedMcpServers(), hostLower)
+                || bucketCoversHost(agent, p.isNegatedAgentServers(), hostLower)
+                || bucketCoversHost(llm, p.isNegatedLlmServers(), hostLower);
+    }
+
+    private static boolean bucketCoversHost(List<GuardrailPolicies.SelectedServer> bucket, boolean negated, String hostLower) {
+        if (bucket.isEmpty()) {
+            return false;
+        }
+        // "__all__" is the Include-mode "select all" sentinel (present + future) — must match the value the frontend/matcher use.
+        if (!negated && bucket.stream().anyMatch(s -> "__all__".equals(s.getName()))) {
+            return true;
+        }
+        boolean matched = bucket.stream().anyMatch(s -> s.getName() != null && lower(s.getName()).equals(hostLower));
+        return matched != negated;
     }
 
     private static List<InsightResult.Cta> buildCtas(List<GuardrailPolicies> deadPolicies, List<ApiCollection> uncoveredAssets,
