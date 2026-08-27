@@ -313,8 +313,7 @@ export function PromptResponseSection({ detail }) {
         );
     }
 
-    // blockedAt is an epoch (seconds, from row.detected) on Atlas, or an ISO string
-    // (error.data.blocked_at, set by the policy validator itself) on Argus - format either.
+    // epoch or ISO string
     const blockedAtDisplay = (() => {
         if (!pr.blockedAt) return "N/A";
         if (typeof pr.blockedAt === "number") return func.epochToDateTime(pr.blockedAt);
