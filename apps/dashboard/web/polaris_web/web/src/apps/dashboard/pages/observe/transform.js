@@ -473,11 +473,15 @@ const transform = {
             return <></>
         }
 
-        // Sort tags to prioritize 'privatecloud.agoda.com/service' first
+        const aiAgentEmailKey = 'ai-agent-email'
+
+        // Sort tags to prioritize 'ai-agent-email', then 'privatecloud.agoda.com/service'
         const sortedEnvType = [...envType].sort((a, b) => {
             const aKey = a.split('=')[0];
             const bKey = b.split('=')[0];
 
+            if (aKey === aiAgentEmailKey) return -1;
+            if (bKey === aiAgentEmailKey) return 1;
             if (aKey === 'privatecloud.agoda.com/service') return -1;
             if (bKey === 'privatecloud.agoda.com/service') return 1;
             return 0;
@@ -491,6 +495,7 @@ const transform = {
                 useTooltip={true}
                 wrap={wrap}
                 allowFullWidth={true}
+                getItemStatus={(item) => item.split('=')[0] === aiAgentEmailKey ? 'success' : 'info'}
             />
         )
     },
