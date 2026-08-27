@@ -190,6 +190,10 @@ public class GuardrailPolicies {
         if (selectedAgentServersV2 != null && !selectedAgentServersV2.isEmpty()) {
             return selectedAgentServersV2;
         }
+
+        if (selectedLlmServersV2 != null) {
+            return new ArrayList<>();
+        }
         if (selectedAgentServers != null && !selectedAgentServers.isEmpty()) {
             return selectedAgentServers.stream()
                     .map(serverId -> new SelectedServer(serverId, serverId))
