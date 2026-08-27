@@ -3,6 +3,7 @@ import {
     Avatar,
     Box,
     Divider,
+    HorizontalGrid,
     HorizontalStack,
     Icon,
     Link,
@@ -290,6 +291,81 @@ export function OverviewSection({ row, detail }) {
                     </Box>
                 </>
             )}
+        </VerticalStack>
+    );
+}
+
+// ─── Prompt & Response tab ────────────────────────────────────────────────────────
+
+export function PromptResponseSection({ detail }) {
+    const pr = detail?.promptResponse;
+    const hasPrompt = !!pr?.promptBody;
+    const hasResponse = !!(pr && (pr.behaviour || pr.blockedBy || pr.blockedAt || pr.reason || pr.message));
+
+    if (!hasPrompt && !hasResponse) {
+        return (
+            <Box padding="8">
+                <VerticalStack gap="1" inlineAlign="center">
+                    <Text variant="bodySm" fontWeight="semibold">No prompt or response data</Text>
+                    <Text variant="bodySm" color="subdued">This violation has no captured prompt or response payload.</Text>
+                </VerticalStack>
+            </Box>
+        );
+    }
+
+    // blockedAt is an epoch (seconds, from row.detected) on Atlas, or an ISO string
+    // (error.data.blocked_at, set by the policy validator itself) on Argus - format either.
+    const blockedAtDisplay = (() => {
+        if (!pr.blockedAt) return "N/A";
+        if (typeof pr.blockedAt === "number") return func.epochToDateTime(pr.blockedAt);
+        const d = new Date(pr.blockedAt);
+        return Number.isNaN(d.getTime()) ? pr.blockedAt : d.toLocaleString();
+    })();
+
+    const responseItems = [
+        { label: "Behaviour", value: pr.behaviour ? func.toSentenceCase(pr.behaviour) : "N/A" },
+        { label: "Blocked At", value: blockedAtDisplay },
+        { label: "Blocked By", value: pr.blockedBy || "N/A" },
+    ];
+
+    return (
+        <VerticalStack gap="0">
+            <Box padding="4">
+                <VerticalStack gap="3">
+                    <Text variant="headingMd" color="subdued">{pr.valueLabel || "Flagged Content"}</Text>
+                    {hasPrompt
+                        ? <HighlightedText text={pr.promptBody} mono />
+                        : <Text variant="bodySm" color="subdued">No content captured for this violation.</Text>}
+                </VerticalStack>
+            </Box>
+
+            <Divider />
+
+            <Box padding="4">
+                <VerticalStack gap="4">
+                    <Text variant="headingMd" color="subdued">Response</Text>
+                    <HorizontalGrid columns={3} gap="3">
+                        {responseItems.map((item) => (
+                            <VerticalStack gap="1" key={item.label}>
+                                <Text variant="bodySm" fontWeight="semibold" color="subdued">{item.label}</Text>
+                                <Text variant="bodyMd">{item.value}</Text>
+                            </VerticalStack>
+                        ))}
+                    </HorizontalGrid>
+                    {pr.reason && (
+                        <VerticalStack gap="1">
+                            <Text variant="bodySm" fontWeight="semibold" color="subdued">Reason</Text>
+                            <Text variant="bodyMd">{pr.reason}</Text>
+                        </VerticalStack>
+                    )}
+                    {pr.message && (
+                        <VerticalStack gap="1">
+                            <Text variant="bodySm" fontWeight="semibold" color="subdued">Message</Text>
+                            <Text variant="bodyMd">{pr.message}</Text>
+                        </VerticalStack>
+                    )}
+                </VerticalStack>
+            </Box>
         </VerticalStack>
     );
 }

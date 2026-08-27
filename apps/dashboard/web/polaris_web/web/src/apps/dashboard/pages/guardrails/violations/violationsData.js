@@ -4,6 +4,20 @@ import { GUARDRAIL_REMEDIATION_MARKDOWN } from "@/apps/dashboard/pages/threat_de
 import { storedRemediationMarkdown } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
 // ─── Flyout detail helpers ───────────────────────────────────────────────────────
 
+// Values tab section heading, keyed by row.type (classifyPolicyType's output in
+// ViolationsPage.jsx: Prompt/Tool/Skill/Config/LLM/Other). "Other" is the catch-all for
+// content-classifier policies whose name doesn't match a known keyword (PII, financial info,
+// security info, credentials - most real Atlas policies) - they flag payload content by rule,
+// not by request shape, so "Flagged Content" fits better than a misleading "Prompt".
+const VALUE_SECTION_LABELS = {
+    Prompt: "Prompt",
+    Tool: "Tool Call",
+    Skill: "Skill",
+    Config: "Config Value",
+    LLM: "Flagged Content",
+    Other: "Flagged Content",
+};
+
 function _parseAktoOuter(payloadStr) {
     if (!payloadStr) return null;
     try { return JSON.parse(payloadStr); } catch { return null; }
@@ -29,6 +43,24 @@ export function coerceToText(value) {
     if (value == null) return null;
     if (typeof value === "string") return value;
     try { return JSON.stringify(value); } catch { return String(value); }
+}
+
+// Prompt-type requestPayloads come in two real shapes: a plain {body: "..."} (proxied/simple
+// requests) or a chat-style {messages: [{role, content}, ...]} (LLM SDK calls, e.g. Bedrock
+// Converse) - .body is absent there entirely, so falling back to it alone leaves the Values
+// tab blank for actual prompt violations. Pull the last user turn's content in that case.
+function _extractPromptBody(req) {
+    if (!req) return null;
+    if (req.body != null) return req.body;
+    const msgs = req.messages || req?.body?.messages;
+    if (Array.isArray(msgs) && msgs.length > 0) {
+        const lastUser = [...msgs].reverse().find(m => m.role === "user") || msgs[msgs.length - 1];
+        const content = lastUser?.content;
+        if (typeof content === "string") return content;
+        if (Array.isArray(content)) return content.map(c => c.text || "").join("\n");
+        return content;
+    }
+    return null;
 }
 
 // Raw request bodies can be captured terminal output — full of ANSI colour/cursor escape
@@ -260,12 +292,16 @@ export function buildFallbackDetail(row) {
     const policyName = meta.policyName || (row.policyName && row.policyName !== "-" ? row.policyName : null);
     const isPromptOrTool = row.type === "Prompt" || row.type === "Tool";
     const rawPrimaryValue = coerceToText(isPromptOrTool
-        ? (req?.body || null)
+        ? _extractPromptBody(req)
         : row.type === "Skill" ? (resp?.evidence || null) : (req?.evidence || null));
     // If the value is JSON (or JSON nested inside JSON, e.g. a proxied request captured as a
     // string field), unwrap and pretty-print it instead of showing raw escaped quotes.
     const { text: prettyPrimaryValue, isJson } = prettyPrintIfJson(rawPrimaryValue);
     const primaryValue = sanitizeDisplayText(prettyPrimaryValue, 1500);
+    // Values tab gets the untruncated text — 1500 chars is fine for the Overview evidence
+    // preview quote, but cuts real prompts (system context, scan history, etc.) off mid-sentence
+    // in the tab whose whole job is showing the full flagged content.
+    const primaryValueFull = sanitizeDisplayText(prettyPrimaryValue, Infinity);
     const evidenceText = primaryValue || row.evidenceText || row.violation;
     const evidenceIsMono = isJson && !!primaryValue && evidenceText === primaryValue;
 
@@ -303,6 +339,30 @@ export function buildFallbackDetail(row) {
         fileTabLabel: fileTabLabel || undefined,
         fileHighlights: fileHighlights || undefined,
         skillName: skillName || undefined,
+        // "Values" tab: the flagged content (left) + what the guardrail decided about it
+        // (right). Most Atlas events (PII/financial/security content-classifier policies,
+        // classified as "LLM"/"Other" by classifyPolicyType) never capture a requestPayload —
+        // row.payload is empty for them — so promptBody falls back to the same evidence/reason
+        // text Overview already derived, rather than going blank. valueLabel keys off row.type
+        // so the section heading actually names what's shown (a Tool's args aren't a "Prompt").
+        promptResponse: (() => {
+            const promptBody = primaryValueFull || reason || undefined;
+            return {
+                valueLabel: VALUE_SECTION_LABELS[row.type] || VALUE_SECTION_LABELS.Other,
+                promptBody,
+                behaviour: row.behaviourRaw || meta.behaviour || meta.nbehaviour || undefined,
+                // Argus events carry a real error.data.blocked_at (ISO string, set by the
+                // policy validator itself); Atlas events never do, so fall back to the row's
+                // own detection timestamp (epoch seconds) - the UI formats whichever it gets.
+                blockedAt: resp?.error?.data?.blocked_at || row.detected || undefined,
+                blockedBy: resp?.error?.data?.blocked_by || policyName || undefined,
+                // Omitted when it's the exact text already shown as the value above (the common
+                // case for content-classifier policies with no captured payload) - repeating the
+                // same sentence in both places reads as a copy-paste bug, not two distinct facts.
+                reason: (reason && reason !== promptBody) ? reason : undefined,
+                message: resp?.error?.message || resp?.message || undefined,
+            };
+        })(),
         overview: row.type === "Config" ? (metaOverview || undefined) : undefined,
         // Stored LLM markdown wins; otherwise per-event metadata, then
         // the frontend rule catalogue / generic template. Skill events keep the tab hidden
