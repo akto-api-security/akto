@@ -137,6 +137,14 @@ const fetchEndpointShieldUserMetadata = async (force = false) => {
                     userEmail: u.userEmail || '',
                     tags: u.deviceTags || [],
                 };
+
+                // AgentUsers fallback for hostname/deviceId resolution: ModuleInfo heartbeats are
+                // the only source buildUsernameMapFromModuleInfos above reads, so a real AgentUsers
+                // identity with no ModuleInfo record is otherwise invisible to every page using this
+                // map. Only fills a gap — ModuleInfo's own __deviceId__ keys are already registered by
+                // this point, so this never overrides a live heartbeat's answer.
+                const deviceIdKey = `__deviceId__${u.userName.toLowerCase()}`;
+                if (!usernameMap[deviceIdKey]) usernameMap[deviceIdKey] = u.userName;
             });
 
             const result = { usernameMap, userMetadataMap, userAnalysisKeysByDeviceId, moduleInfos };

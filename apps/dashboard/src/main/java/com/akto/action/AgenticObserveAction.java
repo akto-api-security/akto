@@ -3,18 +3,22 @@ package com.akto.action;
 import com.akto.DaoInit;
 import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
+import com.akto.dao.AgentUsersDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.AgenticUsers;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ComponentRiskAnalysis;
 import com.akto.dto.DeviceTag;
 import com.akto.dto.McpAuditInfo;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -771,13 +775,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
             Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
+            Map<String, String> usernames = getOrComputeUsernameMap();
 
             Map<String, DeviceAcc> devices = accumulateDevices(ids, byId, traffic, risk, userAnalysis);
 
             List<BasicDBObject> rows = new ArrayList<>();
             for (DeviceAcc d : devices.values()) {
                 BasicDBObject row = d.toResponse();
-                row.put("username", resolveUsernameByDeviceId(d.deviceId, usernameMap));
+                row.put("username", resolveUsernameByDeviceId(d.deviceId, usernames));
                 rows.add(row);
             }
 
@@ -994,7 +999,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             String effectiveRowType = StringUtils.isNotBlank(rowType) ? rowType : "agent";
 
             Map<String, EndpointGroup> groups = groupCollectionsByEndpointId(
-                    collections, traffic, risk, sensitive, maliciousSkillKeys, usernameMap, effectiveRowType);
+                    collections, traffic, risk, sensitive, maliciousSkillKeys, getOrComputeUsernameMap(), effectiveRowType);
 
             List<BasicDBObject> rows = new ArrayList<>();
             for (EndpointGroup g : groups.values()) {
@@ -1598,6 +1603,155 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         }).map;
     }
 
+    // Fallback for the identity-consuming endpoints below (fetchAgenticAssetDevicesPage,
+    // fetchAgenticAssetEndpointsPage, fetchAgenticAssetsSummary, fetchUsersAndDevicesSummary/Stats,
+    // fetchDeviceEndpointsSummary/Stats): use the client-supplied usernameMap/userMetadataMap/
+    // tagsByUsername if present (back-compat), else compute here from ModuleInfo + AgentUsers
+    // directly — same shape as getOrComputeTrafficMap/getOrComputeRiskScoreMap above, so the client
+    // no longer has to fetch both collections, join them in JS, and re-POST the joined result
+    // (measured 100k+ map entries at real account scale, resent in full on every sort/filter/page
+    // turn). ModuleInfo is resolved first and always wins on key collision; AgentUsers only fills a
+    // __deviceId__ key ModuleInfo has no heartbeat for — mirrors endpointShieldHelper.js's
+    // buildUsernameMapFromModuleInfos + fetchEndpointShieldUserMetadata's AgentUsers fallback.
+    private static final String[] MODULE_USERNAME_FIELDS = {"username", "userName", "user", "email"};
+
+    private static String resolveModuleUsername(Map<String, Object> additionalData) {
+        if (additionalData == null) return null;
+        for (String field : MODULE_USERNAME_FIELDS) {
+            Object v = additionalData.get(field);
+            if (v instanceof String) {
+                String s = ((String) v).trim();
+                if (!s.isEmpty() && !"-".equals(s)) return s;
+            }
+        }
+        return null;
+    }
+
+    private static String strVal(Map<String, Object> map, String key) {
+        Object v = map == null ? null : map.get(key);
+        return v == null ? null : String.valueOf(v);
+    }
+
+    private static final class IdentityMapsCacheEntry {
+        final Map<String, String> usernameMap;
+        final Map<String, Map<String, String>> userMetadataMap;
+        final Map<String, List<Map<String, String>>> tagsByUsername;
+        final long builtAt;
+        IdentityMapsCacheEntry(Map<String, String> usernameMap, Map<String, Map<String, String>> userMetadataMap,
+                Map<String, List<Map<String, String>>> tagsByUsername, long builtAt) {
+            this.usernameMap = usernameMap;
+            this.userMetadataMap = userMetadataMap;
+            this.tagsByUsername = tagsByUsername;
+            this.builtAt = builtAt;
+        }
+    }
+    private static final Map<Integer, IdentityMapsCacheEntry> identityMapsCache = new ConcurrentHashMap<>();
+
+    /**
+     * Called by ModuleInfoAction after a device-tag write (updateUserDeviceTag/bulkUpdateUserDeviceTag)
+     * so the next read doesn't serve up to CLASSIFICATION_CACHE_TTL_MS of stale tags for this account —
+     * without this, an edit would silently not show up in the Users-and-devices table for up to a minute.
+     */
+    public static void invalidateIdentityMapsCache(int accountId) {
+        identityMapsCache.remove(accountId);
+    }
+
+    private IdentityMapsCacheEntry getOrComputeIdentityMapsCached() {
+        int accountId = Context.accountId.get();
+        long now = System.currentTimeMillis();
+        IdentityMapsCacheEntry existing = identityMapsCache.get(accountId);
+        if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+            return existing;
+        }
+        if (identityMapsCache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
+            identityMapsCache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
+        }
+        // compute() serializes concurrent misses for the same account instead of each racing to Mongo.
+        return identityMapsCache.compute(accountId, (id, cached) -> {
+            long recheckNow = System.currentTimeMillis();
+            if (cached != null && (recheckNow - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                return cached;
+            }
+            try {
+                Map<String, String> resolvedUsernameMap = new HashMap<>();
+
+                // ---- ModuleInfo pass: mirrors endpointShieldHelper.js's buildUsernameMapFromModuleInfos ----
+                List<ModuleInfo> modules = ModuleInfoDao.instance.findAll(
+                        Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD),
+                        Projections.include(ModuleInfo.NAME, ModuleInfo.ADDITIONAL_DATA));
+                for (ModuleInfo m : modules) {
+                    Map<String, Object> ad = m.getAdditionalData();
+                    String username = resolveModuleUsername(ad);
+                    if (username == null) continue;
+                    for (String rawId : new String[]{ m.getName(), strVal(ad, "deviceId"), strVal(ad, "endpointId") }) {
+                        if (StringUtils.isNotBlank(rawId)) {
+                            resolvedUsernameMap.put("__deviceId__" + rawId.toLowerCase(Locale.ROOT), username);
+                        }
+                    }
+                    Object mcpServersObj = ad != null ? ad.get("mcpServers") : null;
+                    if (mcpServersObj instanceof Map) {
+                        for (Object serverObj : ((Map<?, ?>) mcpServersObj).values()) {
+                            if (!(serverObj instanceof Map)) continue;
+                            Object collectionName = ((Map<?, ?>) serverObj).get("collectionName");
+                            if (collectionName instanceof String && !((String) collectionName).isEmpty()) {
+                                resolvedUsernameMap.put(((String) collectionName).toLowerCase(Locale.ROOT), username);
+                            }
+                        }
+                    }
+                }
+
+                // ---- AgentUsers pass: tags + the "AgentUsers fills gaps ModuleInfo can't" fallback ----
+                Map<String, Map<String, String>> resolvedUserMetadataMap = new HashMap<>();
+                Map<String, List<Map<String, String>>> resolvedTagsByUsername = new HashMap<>();
+                for (AgenticUsers u : AgentUsersDao.instance.findAll(Filters.empty())) {
+                    if (StringUtils.isBlank(u.getUserName())) continue;
+
+                    Map<String, String> meta = new HashMap<>();
+                    meta.put("userEmail", StringUtils.defaultString(u.getUserEmail()));
+                    resolvedUserMetadataMap.put(u.getUserName(), meta);
+
+                    List<Map<String, String>> tags = new ArrayList<>();
+                    if (u.getDeviceTags() != null) {
+                        for (DeviceTag t : u.getDeviceTags()) {
+                            if (t == null) continue;
+                            Map<String, String> tm = new HashMap<>();
+                            tm.put(DeviceTag.KEY, t.getKey());
+                            tm.put(DeviceTag.VALUE, t.getValue());
+                            tm.put(DeviceTag.SOURCE, t.getSource());
+                            tags.add(tm);
+                        }
+                    }
+                    resolvedTagsByUsername.put(u.getUserName(), tags);
+
+                    // ModuleInfo always wins — only fill a __deviceId__ key it has no heartbeat for.
+                    String deviceIdKey = "__deviceId__" + u.getUserName().toLowerCase(Locale.ROOT);
+                    resolvedUsernameMap.putIfAbsent(deviceIdKey, u.getUserName());
+                }
+
+                return new IdentityMapsCacheEntry(resolvedUsernameMap, resolvedUserMetadataMap, resolvedTagsByUsername, recheckNow);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed computing identity maps server-side for agentic observe", LogDb.DASHBOARD);
+                return cached != null ? cached
+                        : new IdentityMapsCacheEntry(Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), recheckNow);
+            }
+        });
+    }
+
+    private Map<String, String> getOrComputeUsernameMap() {
+        if (usernameMap != null && !usernameMap.isEmpty()) return usernameMap;
+        return getOrComputeIdentityMapsCached().usernameMap;
+    }
+
+    private Map<String, Map<String, String>> getOrComputeUserMetadataMap() {
+        if (userMetadataMap != null && !userMetadataMap.isEmpty()) return userMetadataMap;
+        return getOrComputeIdentityMapsCached().userMetadataMap;
+    }
+
+    private Map<String, List<Map<String, String>>> getOrComputeTagsByUsername() {
+        if (tagsByUsername != null && !tagsByUsername.isEmpty()) return tagsByUsername;
+        return getOrComputeIdentityMapsCached().tagsByUsername;
+    }
+
     private  ClassificationCacheEntry getOrBuildClassification(Map<String, Integer> traffic,
             Map<String, Double> risk, Map<String, List<String>> sensitive) {
         int accountId = Context.accountId.get();
@@ -2103,7 +2257,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 // resolveUsernameByDeviceId's use elsewhere in this class (e.g. fetchAgenticAssetDetail).
                 if (filters.containsKey("username")) {
                     Set<String> allowedUsernames = new HashSet<>(filters.get("username"));
-                    Map<String, String> resolveMap = usernameMap != null ? usernameMap : Collections.emptyMap();
+                    Map<String, String> resolveMap = getOrComputeUsernameMap();
                     all.removeIf(g -> g.endpointIds.stream()
                             .noneMatch(id -> allowedUsernames.contains(resolveUsernameByDeviceId(id, resolveMap))));
                 }
@@ -2197,7 +2351,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // Current-page-only, same as fetchAgenticAssetEndpointsPage's distinctUsernames — the
             // client accumulates these across page turns to progressively populate the Username filter's
             // choices (see Endpoints.jsx's updateFilterChoicesIfChanged).
-            Map<String, String> resolveMapForChoices = usernameMap != null ? usernameMap : Collections.emptyMap();
+            Map<String, String> resolveMapForChoices = getOrComputeUsernameMap();
             Set<String> distinctUsernames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
             for (GroupSummary g : page) {
                 for (String id : g.endpointIds) {
@@ -2951,9 +3105,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
             Map<String, List<String>> sensitive = sensitiveMap != null ? sensitiveMap : Collections.emptyMap();
-            Map<String, String> usernames = usernameMap != null ? usernameMap : Collections.emptyMap();
-            Map<String, Map<String, String>> userMeta = userMetadataMap != null ? userMetadataMap : Collections.emptyMap();
-            Map<String, List<Map<String, String>>> tagsByUser = tagsByUsername != null ? tagsByUsername : Collections.emptyMap();
+            Map<String, String> usernames = getOrComputeUsernameMap();
+            Map<String, Map<String, String>> userMeta = getOrComputeUserMetadataMap();
+            Map<String, List<Map<String, String>>> tagsByUser = getOrComputeTagsByUsername();
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
@@ -3029,9 +3183,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         try {
             Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
-            Map<String, String> usernames = usernameMap != null ? usernameMap : Collections.emptyMap();
-            Map<String, Map<String, String>> userMeta = userMetadataMap != null ? userMetadataMap : Collections.emptyMap();
-            Map<String, List<Map<String, String>>> tagsByUser = tagsByUsername != null ? tagsByUsername : Collections.emptyMap();
+            Map<String, String> usernames = getOrComputeUsernameMap();
+            Map<String, Map<String, String>> userMeta = getOrComputeUserMetadataMap();
+            Map<String, List<Map<String, String>>> tagsByUser = getOrComputeTagsByUsername();
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS)
@@ -3228,9 +3382,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
             Map<String, Map<String, String>> deviceMeta = deviceMetadataMap != null ? deviceMetadataMap : Collections.emptyMap();
-            Map<String, String> usernames = usernameMap != null ? usernameMap : Collections.emptyMap();
+            Map<String, String> usernames = getOrComputeUsernameMap();
             Map<String, Map<String, Integer>> violations = violationsByCollectionId != null ? violationsByCollectionId : Collections.emptyMap();
-            Map<String, List<Map<String, String>>> tagsByUser = tagsByUsername != null ? tagsByUsername : Collections.emptyMap();
+            Map<String, List<Map<String, String>>> tagsByUser = getOrComputeTagsByUsername();
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
@@ -3420,7 +3574,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     public String fetchDeviceEndpointsStats() {
         response = new BasicDBObject();
         try {
-            Map<String, String> usernames = usernameMap != null ? usernameMap : Collections.emptyMap();
+            Map<String, String> usernames = getOrComputeUsernameMap();
             Map<String, Map<String, String>> deviceMeta = deviceMetadataMap != null ? deviceMetadataMap : Collections.emptyMap();
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
