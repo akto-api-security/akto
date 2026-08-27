@@ -76,7 +76,7 @@ public class CollectionDescriptionCron {
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void setUpCollectionDescriptionCronScheduler() {
-        scheduler.scheduleWithFixedDelay(this::run, 0, 1, TimeUnit.HOURS);
+        scheduler.scheduleWithFixedDelay(this::run, 0, 30, TimeUnit.MINUTES);
     }
 
     private void run() {
