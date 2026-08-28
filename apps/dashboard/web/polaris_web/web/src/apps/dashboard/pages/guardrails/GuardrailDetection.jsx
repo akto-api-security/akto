@@ -1,4 +1,4 @@
-import { useMemo, useReducer, useState } from "react";
+import { useMemo, useReducer, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Box, HorizontalStack, Popover, ActionList, Button, Icon } from '@shopify/polaris';
 import {FileMinor} from '@shopify/polaris-icons';
@@ -54,6 +54,7 @@ function GuardrailDetection() {
     const [currentEventId, setCurrentEventId] = useState(null)
     const [currentEventStatus, setCurrentEventStatus] = useState(null)
     const [triggerTableRefresh, setTriggerTableRefresh] = useState(0)
+    const applyPayloadSearchRef = useRef(() => {});
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
 
@@ -101,6 +102,7 @@ function GuardrailDetection() {
             rowClicked={rowClicked}
             triggerRefresh={() => setTriggerTableRefresh(prev => prev + 1)}
             label={LABELS.GUARDRAIL}
+            onRegisterPayloadSearch={(fn) => { applyPayloadSearchRef.current = fn; }}
         />,
         !showNewTab ? <NormalSampleDetails
             title={"Attacker payload"}
@@ -119,6 +121,7 @@ function GuardrailDetection() {
                 eventId={currentEventId}
                 eventStatus={currentEventStatus}
                 onStatusUpdate={handleStatusUpdate}
+                onAddAsSearchFilter={(text, side, line) => applyPayloadSearchRef.current?.(text, side, line)}
             />
     ]
 

@@ -14,7 +14,9 @@ import {
   Text,
   Link,
   Button,
-  Tooltip} from '@shopify/polaris';
+  Tooltip,
+  Box
+} from '@shopify/polaris';
 import { GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect, useMemo, useRef, useReducer } from 'react';
 import { createPortal } from 'react-dom';
@@ -775,10 +777,20 @@ function GithubServerTable(props) {
                   hideFilters={hideFilter}
                 />
               </span>
-              {exportPortalTarget && data.length > 0 && createPortal(
-                <Tooltip content="Export as CSV" dismissOnMouseOut>
-                  <Button size="slim" icon={ImportMinor} onClick={handleExportCsv} accessibilityLabel="Export as CSV" />
-                </Tooltip>,
+              {props.searchBelow ? (
+                <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="3" paddingBlockEnd="3">
+                  {props.searchBelow}
+                </Box>
+              ) : null}
+              {exportPortalTarget && (props.searchAccessory || data.length > 0) && createPortal(
+                <HorizontalStack gap="2" blockAlign="center">
+                  {props.searchAccessory}
+                  {data.length > 0 ? (
+                    <Tooltip content="Export as CSV" dismissOnMouseOut>
+                      <Button size="slim" icon={ImportMinor} onClick={handleExportCsv} accessibilityLabel="Export as CSV" />
+                    </Tooltip>
+                  ) : null}
+                </HorizontalStack>,
                 exportPortalTarget
               )}
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}

@@ -161,7 +161,7 @@ function ApproveServerButton({ policyName, serverId, alreadyApproved }) {
 }
 
 function SampleDetails(props) {
-    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
+    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate, onAddAsSearchFilter } = props
     const resolvedThreatFiltersMap = threatFiltersMap || {};
 
     // Determine if we should use hardcoded guardrail descriptions
@@ -478,6 +478,8 @@ function SampleDetails(props) {
                             currLine={configValues.fieldLine || undefined}
                             readOnly
                             wordWrap
+                            onAddAsSearchFilter={onAddAsSearchFilter}
+                            searchSide="any"
                         />
                     </VerticalStack>
                 </VerticalStack>
@@ -494,6 +496,7 @@ function SampleDetails(props) {
                         return { message: result.orig, highlightPaths: [], metadata: result.metadata }
                     }) : []}
                     redactHeaders={window.ACTIVE_ACCOUNT === 1758787662 ? ['authorization'] : []}
+                    onAddAsSearchFilter={onAddAsSearchFilter}
                 />
             </Box>)
     }

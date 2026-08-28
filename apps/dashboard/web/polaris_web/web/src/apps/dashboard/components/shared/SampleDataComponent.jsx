@@ -13,7 +13,8 @@ import transform from './customDiffEditor';
 
 function SampleDataComponent(props) {
 
-    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata, readOnly = false, getEditorData = () => {}, showResponse = true, simpleJson = false, redactHeaders = [], isWebSocket = false } = props;
+    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata, readOnly = false, getEditorData = () => {}, showResponse = true, simpleJson = false, redactHeaders = [], isWebSocket = false, onAddAsSearchFilter } = props;
+    const searchSide = type === "request" || type === "response" ? type : "any";
     const [sampleJsonData, setSampleJsonData] = useState({ request: { message: "" }, response: { message: "" } });
     const [popoverActive, setPopoverActive] = useState({});
     const [lineNumbers, setLineNumbers] = useState({request: [], response: []})
@@ -391,7 +392,7 @@ function SampleDataComponent(props) {
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                {sampleJsonData[type] ? <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage={simpleJson ? "json" : "custom_http"} currLine={currentLineActive} getLineNumbers={getLineNumbers} readOnly={readOnly} getEditorData={handleEditorData}/> : null}
+                {sampleJsonData[type] ? <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage={simpleJson ? "json" : "custom_http"} currLine={currentLineActive} getLineNumbers={getLineNumbers} readOnly={readOnly} getEditorData={handleEditorData} onAddAsSearchFilter={onAddAsSearchFilter} searchSide={searchSide}/> : null}
             </LegacyCard.Section>
 
             <Modal open={expanded} onClose={() => setExpanded(false)} title={simpleJson ? " " : (isWebSocket ? "Events" : func.toSentenceCase(type))} large>
@@ -403,6 +404,8 @@ function SampleDataComponent(props) {
                         editorLanguage={simpleJson ? "json" : "custom_http"}
                         minHeight="600px"
                         getLineNumbers={getLineNumbers}
+                        onAddAsSearchFilter={onAddAsSearchFilter}
+                        searchSide={searchSide}
                     /> : null}
                 </Modal.Section>
             </Modal>

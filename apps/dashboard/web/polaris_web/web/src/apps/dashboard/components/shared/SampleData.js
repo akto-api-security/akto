@@ -269,9 +269,13 @@ function ensureViolationMarkdownTheme() {
 
 function SampleData(props) {
 
-    let {showDiff, data, minHeight, editorLanguage, currLine, getLineNumbers, readOnly, getEditorData, wordWrap} = props;
+    let {showDiff, data, minHeight, editorLanguage, currLine, getLineNumbers, readOnly, getEditorData, wordWrap, onAddAsSearchFilter, searchSide} = props;
 
     const ref = useRef(null);
+    const onAddAsSearchFilterRef = useRef(onAddAsSearchFilter);
+    onAddAsSearchFilterRef.current = onAddAsSearchFilter;
+    const searchSideRef = useRef(searchSide);
+    searchSideRef.current = searchSide;
     const [instance, setInstance] = useState(undefined);
     const [editorData, setEditorData] = useState(data);
     const [showActionsModal, setShowActionsModal] = useState(false);
@@ -426,7 +430,24 @@ function SampleData(props) {
               }
             },
           });
-          
+          if (onAddAsSearchFilterRef.current) {
+            instance.addAction({
+              id: "add_search_filter",
+              label: "Add as search filter",
+              keybindings: [],
+              precondition: null,
+              keybindingContext: null,
+              contextMenuGroupId: "1_modification",
+              contextMenuOrder: 2,
+              run: function (ed) {
+                const model = ed.getModel();
+                const selection = ed.getSelection();
+                const textSelected = model.getValueInRange(selection);
+                const line = model.getLineContent(selection.startLineNumber);
+                onAddAsSearchFilterRef.current?.(textSelected, searchSideRef.current, line);
+              },
+            });
+          }
         }
         instance.updateOptions({ tabSize: 2 })
         setInstance(instance)

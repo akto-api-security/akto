@@ -342,6 +342,7 @@ function ThreatDetectionPage() {
         }
     }, [searchParams]);
     const [showDetails, setShowDetails] = useState(false);
+    const applyPayloadSearchRef = useRef(() => {});
     const [sampleData, setSampleData] = useState([])
     const [showNewTab, setShowNewTab] = useState(false)
     const [categoryCount, setCategoryCount] = useState([]);
@@ -749,6 +750,7 @@ function ThreatDetectionPage() {
             triggerRefresh={() => setTriggerTableRefresh(prev => prev + 1)}
             initialTab={queryParams.status ? queryParams.status.toLowerCase() : undefined}
             label={LABELS.THREAT}
+            onRegisterPayloadSearch={(fn) => { applyPayloadSearchRef.current = fn; }}
         />,
         !showNewTab ? <NormalSampleDetails
             title={"Attacker payload"}
@@ -769,6 +771,7 @@ function ThreatDetectionPage() {
                 onStatusUpdate={handleStatusUpdate}
                 jiraTicketUrl={eventState.currentJiraTicketUrl}
                 loading={detailsLoading}
+                onAddAsSearchFilter={(text, side, line) => applyPayloadSearchRef.current?.(text, side, line)}
             />
             
 
