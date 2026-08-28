@@ -267,6 +267,18 @@ contains_jwt:
       value:
         contains_jwt: true
 
+jwt_signing_alg_RS256:
+  request_headers:
+    for_one:
+      value:
+        jwt_signing_alg: RS256
+
+jwt_signing_alg_HS256:
+  request_headers:
+    for_one:
+      value:
+        jwt_signing_alg: HS256
+
 regex_filter:
   request_payload:
     for_one:
