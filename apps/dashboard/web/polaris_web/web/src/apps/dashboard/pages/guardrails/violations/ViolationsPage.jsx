@@ -169,6 +169,11 @@ function EvidenceCellRenderer({ value }) {
     return <Text variant="bodySm" truncate>{value}</Text>;
 }
 
+function RiskScoreCellRenderer({ value }) {
+    if (value == null || value === "") return null;
+    return <Text variant="bodySm">{value}</Text>;
+}
+
 // Needs Approval tab only. Stops the click from bubbling into the row's onRowClicked (which
 // would otherwise open the ViolationFlyout instead of the approve modal).
 function ApproveCellRenderer({ data, onApprove }) {
@@ -220,6 +225,19 @@ function buildColDefs(filterValues, showApprove, onApprove) {
             sortable: false,
             cellRenderer: TypeCellRenderer,
         },
+        // Atlas / Argus — risk score sits after Type (Detection Type in the old table).
+        ...((isEndpointSecurityCategory() || isAgenticSecurityCategory()) ? [{
+            field: "riskScore",
+            headerName: "Risk score",
+            minWidth: 130,
+            filter: "agNumberColumnFilter",
+            filterParams: {
+                filterOptions: ["equals", "greaterThan", "lessThan"],
+                maxNumConditions: 1,
+            },
+            cellRenderer: RiskScoreCellRenderer,
+            valueFormatter: p => (p.value == null || p.value === "") ? "" : String(p.value),
+        }] : []),
         {
             field: "evidenceText",
             headerName: "Evidence",
@@ -368,6 +386,13 @@ function parseMetadata(raw) {
     return result;
 }
 
+function parseStoredRiskScore(meta) {
+    const raw = meta?.riskScore ?? meta?.risk_score;
+    if (raw == null || raw === "") return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+}
+
 function parseAktoPayload(payloadStr) {
     if (!payloadStr) return {};
     try {
@@ -428,7 +453,7 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
     // flyout's Values tab extraction - not classifyPolicyType(policyName), which is user-editable
     // text and would misclassify (or dump into "Other") the moment someone renames a policy.
     const typeLabel = deriveAgenticType(event.url, event.method);
-    const policyName = meta.policy_name || meta.npolicy_name || event.filterId || "-";
+    const policyName = meta.rule_violated || meta.npolicy_name || event.filterId || "-";
 
     const { req: reqPayload, resp: respPayload } = parseAktoPayload(event.payload);
     const rawBehaviour = respPayload?.error?.data?.behaviour || meta.behaviour || meta.nbehaviour || null;
@@ -470,6 +495,7 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         // compliance report all agree on a row's clauses.
         complianceMap: resolveComplianceClauseMap(event, true, {}, guardrailComplianceMap || {}),
         evidenceText: primaryValue || normalizeReasonPunctuation(meta.reason) || "-",
+        riskScore: parseStoredRiskScore(meta),
         actor: event.actor || "",
         user: userDisplay,
         userHost: rawHost,
@@ -1241,8 +1267,9 @@ function Violations() {
         // AgGridTable sends sortOrder: -1 for asc, 1 for desc (opposite of MongoDB convention)
         const mongoSort = sortOrder ? -sortOrder : -1;
         const isSeveritySort = sortKey === "severity";
-        const SORT_FIELD_MAP = { detected: "detectedAt", severity: "severity" };
+        const SORT_FIELD_MAP = { detected: "detectedAt", severity: "severity", riskScore: "riskScore" };
         const sort = sortKey ? { [SORT_FIELD_MAP[sortKey] || sortKey]: mongoSort } : { detectedAt: -1 };
+        const riskScoreFilter = filters?.riskScore;
 
         return threatDetectionApi.fetchSuspectSampleData(
             effectiveSkip,
@@ -1265,6 +1292,9 @@ function Violations() {
             severityFilter.length > 0 ? severityFilter : undefined,
             skillEvaluationMode,
             configEvaluationMode,
+            riskScoreFilter?.type,
+            riskScoreFilter?.filter,
+            riskScoreFilter?.filterTo,
         ).then(result => {
             const events = result?.maliciousEvents || [];
             let transformed = events.map(e => transformEvent(e, collectionsMap, usernameMapRef.current, guardrailComplianceMapRef.current));

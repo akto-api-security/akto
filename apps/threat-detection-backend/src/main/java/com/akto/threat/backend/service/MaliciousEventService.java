@@ -576,6 +576,8 @@ public class MaliciousEventService {
       }
     }
 
+    applyRiskScoreFilter(query, filter);
+
     // if (filter.hasLabel()) {
     //   String labelString = filter.getLabel();
     //   MaliciousEventDto.Label labelEnum = convertStringLabelToModelLabel(labelString);
@@ -623,6 +625,8 @@ public class MaliciousEventService {
 
     // Check if sortBySeverity flag is set
     boolean sortBySeverity = filter.hasSortBySeverity() && filter.getSortBySeverity();
+    boolean sortByRiskScore = sort.containsKey("riskScore");
+    int riskScoreDir = sort.getOrDefault("riskScore", -1);
 
     long startTs = filter.hasDetectedAtTimeRange() && filter.getDetectedAtTimeRange().hasStart() ? filter.getDetectedAtTimeRange().getStart() : 0;
     long endTs   = filter.hasDetectedAtTimeRange() && filter.getDetectedAtTimeRange().hasEnd()   ? filter.getDetectedAtTimeRange().getEnd()   : 0;
@@ -656,15 +660,21 @@ public class MaliciousEventService {
       total = countCursor.hasNext() ? ((Number) countCursor.next().get("total")).longValue() : 0;
       countCursor.close();
 
-      cursor = maliciousEventDao.getCollection(accountId).aggregate(Arrays.asList(
+      List<Document> pipeline = new ArrayList<>(Arrays.asList(
           new Document("$match", query),
           new Document("$sort", new Document("detectedAt", -1)),
           new Document("$group", new Document("_id", dedupeGroupKey).append("doc", new Document("$first", "$$ROOT"))),
-          new Document("$replaceRoot", new Document("newRoot", "$doc")),
-          new Document("$sort", new Document("detectedAt", sort.getOrDefault("detectedAt", -1))),
-          new Document("$skip", skip),
-          new Document("$limit", limit)
-      )).cursor();
+          new Document("$replaceRoot", new Document("newRoot", "$doc"))
+      ));
+      if (sortByRiskScore) {
+        pipeline.add(new Document("$addFields", riskScoreSortAddFields()));
+        pipeline.add(new Document("$sort", new Document("riskScoreNum", riskScoreDir).append("detectedAt", -1)));
+      } else {
+        pipeline.add(new Document("$sort", new Document("detectedAt", sort.getOrDefault("detectedAt", -1))));
+      }
+      pipeline.add(new Document("$skip", skip));
+      pipeline.add(new Document("$limit", limit));
+      cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).cursor();
     } else if (sortBySeverity) {
       total = maliciousEventDao.countDocuments(accountId, query);
       // Use aggregation pipeline for custom severity sorting
@@ -683,6 +693,17 @@ public class MaliciousEventService {
                   )
               )),
               new Document("$sort", new Document("severityRank", sort.getOrDefault("severity", 1))),
+              new Document("$skip", skip),
+              new Document("$limit", limit)
+          ))
+          .cursor();
+    } else if (sortByRiskScore) {
+      total = maliciousEventDao.countDocuments(accountId, query);
+      cursor = maliciousEventDao.getCollection(accountId)
+          .aggregate(Arrays.asList(
+              new Document("$match", query),
+              new Document("$addFields", riskScoreSortAddFields()),
+              new Document("$sort", new Document("riskScoreNum", riskScoreDir).append("detectedAt", -1)),
               new Document("$skip", skip),
               new Document("$limit", limit)
           ))
@@ -765,6 +786,106 @@ public class MaliciousEventService {
         cursor.close();
       }
     }
+  }
+
+  // metadata is stored as proto-text (`risk_score: "0.95"`) or JSON (`"riskScore": "0.95"`).
+  private static final String RISK_SCORE_EXTRACT_REGEX = "(?:risk_score|riskScore)\\s*[:=]\\s*\"([0-9]*\\.?[0-9]+)\"";
+
+  private static Document riskScoreSortAddFields() {
+    Document regexFind = new Document("$regexFind",
+        new Document("input", new Document("$ifNull", Arrays.asList("$metadata", "")))
+            .append("regex", RISK_SCORE_EXTRACT_REGEX));
+    Document parsedScore = new Document("$cond", Arrays.asList(
+        new Document("$eq", Arrays.asList("$$m", null)),
+        -1,
+        new Document("$convert", new Document("input",
+            new Document("$arrayElemAt", Arrays.asList("$$m.captures", 0)))
+            .append("to", "double")
+            .append("onError", -1)
+            .append("onNull", -1))
+    ));
+    Document letExpr = new Document("$let",
+        new Document("vars", new Document("m", regexFind)).append("in", parsedScore));
+    return new Document("riskScoreNum", letExpr);
+  }
+
+  private void applyRiskScoreFilter(Document query, ListMaliciousRequestsRequest.Filter filter) {
+    if (!filter.hasRiskScoreFilterType() || filter.getRiskScoreFilterType().isEmpty()) {
+      return;
+    }
+    Document expr = buildRiskScoreExpr(filter);
+    if (expr == null) {
+      return;
+    }
+    List<Document> andConditions = new ArrayList<>();
+    andConditions.add(new Document(query));
+    andConditions.add(new Document("$expr", expr));
+    query.clear();
+    query.append("$and", andConditions);
+  }
+
+  private Document buildRiskScoreExpr(ListMaliciousRequestsRequest.Filter filter) {
+    String type = filter.getRiskScoreFilterType();
+    Document regexFind = new Document("$regexFind",
+        new Document("input", new Document("$ifNull", Arrays.asList("$metadata", "")))
+            .append("regex", RISK_SCORE_EXTRACT_REGEX));
+    Document parsedScore = new Document("$cond", Arrays.asList(
+        new Document("$eq", Arrays.asList("$$m", null)),
+        null,
+        new Document("$convert", new Document("input",
+            new Document("$arrayElemAt", Arrays.asList("$$m.captures", 0)))
+            .append("to", "double")
+            .append("onError", null)
+            .append("onNull", null))
+    ));
+
+    Document inExpr;
+    switch (type) {
+      case "blank":
+        inExpr = new Document("$eq", Arrays.asList("$$m", null));
+        break;
+      case "notBlank":
+        inExpr = new Document("$ne", Arrays.asList("$$m", null));
+        break;
+      case "equals":
+        if (!filter.hasRiskScoreFilterValue()) return null;
+        inExpr = new Document("$eq", Arrays.asList(parsedScore, filter.getRiskScoreFilterValue()));
+        break;
+      case "notEqual":
+        if (!filter.hasRiskScoreFilterValue()) return null;
+        inExpr = new Document("$and", Arrays.asList(
+            new Document("$ne", Arrays.asList(parsedScore, null)),
+            new Document("$ne", Arrays.asList(parsedScore, filter.getRiskScoreFilterValue()))
+        ));
+        break;
+      case "greaterThan":
+        if (!filter.hasRiskScoreFilterValue()) return null;
+        inExpr = new Document("$gt", Arrays.asList(parsedScore, filter.getRiskScoreFilterValue()));
+        break;
+      case "greaterThanOrEqual":
+        if (!filter.hasRiskScoreFilterValue()) return null;
+        inExpr = new Document("$gte", Arrays.asList(parsedScore, filter.getRiskScoreFilterValue()));
+        break;
+      case "lessThan":
+        if (!filter.hasRiskScoreFilterValue()) return null;
+        inExpr = new Document("$lt", Arrays.asList(parsedScore, filter.getRiskScoreFilterValue()));
+        break;
+      case "lessThanOrEqual":
+        if (!filter.hasRiskScoreFilterValue()) return null;
+        inExpr = new Document("$lte", Arrays.asList(parsedScore, filter.getRiskScoreFilterValue()));
+        break;
+      case "inRange":
+        if (!filter.hasRiskScoreFilterValue() || !filter.hasRiskScoreFilterValueTo()) return null;
+        inExpr = new Document("$and", Arrays.asList(
+            new Document("$gte", Arrays.asList(parsedScore, filter.getRiskScoreFilterValue())),
+            new Document("$lte", Arrays.asList(parsedScore, filter.getRiskScoreFilterValueTo()))
+        ));
+        break;
+      default:
+        return null;
+    }
+
+    return new Document("$let", new Document("vars", new Document("m", regexFind)).append("in", inExpr));
   }
 
   public void createIndexIfAbsent(String accountId) {

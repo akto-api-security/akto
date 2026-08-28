@@ -108,6 +108,8 @@ function extractFilterModel(model) {
             out[field] = state.values;
         } else if (state.filterType === "text" && state.filter) {
             out[field] = [state.filter];
+        } else if (state.filterType === "number") {
+            out[field] = { type: state.type, filter: state.filter, filterTo: state.filterTo };
         }
     });
     return out;
