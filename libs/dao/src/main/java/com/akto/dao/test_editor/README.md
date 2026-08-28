@@ -2,10 +2,10 @@
 
 # Filters
 
-Filters constitute of checks which are performed for checking whether an endpoint is eligible for a particular test. These filter configurations are maintained in yaml files under the setion ("apiSelectionFilters"). These filters can be of the following types - 
+Filters constitute of checks which are performed for checking whether an endpoint is eligible for a particular test. These filter configurations are maintained in yaml files under the section ("apiSelectionFilters"). These filters can be of the following types - 
 
 1. ## urlContains
-    This filter checks whether provided regex is present in url string excluding queryparams. In case of multiple regex's specified, this will try to match atleast one.
+    This filter checks whether provided regex is present in url string excluding queryparams. In case of multiple regex's specified, this will try to match at least one.
 
 2. ## userIdParamRegex
     This is not a filter in itself. A precheck will be triggered in case this condition exists in yaml
@@ -33,14 +33,14 @@ Filters constitute of checks which are performed for checking whether an endpoin
             - "login"
     Location can have the following values - 
     1. request-body - search in request body
-    2. response-body - search in reqresponseuest body
+    2. response-body - search in response body
     3. request-header - search in request header
     4. response-header - search in response header
     5. queryParam - search in queryParam
 
     KeyRegex can be any regex string.
 
-    A match is considered to be valid when any of the keyRegex strings is present in atleast 1 location. Also if there are multiple mustContainKey conditions, it's mandatory for each one to match
+    A match is considered to be valid when any of the keyRegex strings is present in at least 1 location. Also if there are multiple mustContainKey conditions, it's mandatory for each one to match
 
 8. ## versionMatchRegex
     This is a single regex string which should contain a match in the url string to be considered valid.
@@ -67,11 +67,11 @@ Filters constitute of checks which are performed for checking whether an endpoin
     
     SearchIn can contain the following values - 
     1. request-body - search in request body
-    2. response-body - search in reqresponseuest body
+    2. response-body - search in response body
     3. request-header - search in request header
     4. response-header - search in response header
     5. queryParam - search in queryParam
 
     
-    A match is considered to be valid when any of the paramRegex strings is present in atleast 1 searchIn location. Also if there are multiple containsParams conditions, it's mandatory for each one to match
+    A match is considered to be valid when any of the paramRegex strings is present in at least 1 searchIn location. Also if there are multiple containsParams conditions, it's mandatory for each one to match
     
