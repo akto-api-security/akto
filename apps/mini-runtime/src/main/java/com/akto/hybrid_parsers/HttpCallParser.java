@@ -359,6 +359,7 @@ public class HttpCallParser {
                     && !source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)
                     && !source.equals(Constants.AI_AGENT_SOURCE_ENDPOINT)
                     && !source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK)
+                    && !source.equals(Constants.AI_AGENT_SOURCE_AWS_QUICK)
                     )) {
                 // Not AI agent traffic, return base hostname
                 return baseHostname;
@@ -393,7 +394,7 @@ public class HttpCallParser {
                 }
             }
 
-            if (source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK)){
+            if (source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK) || source.equals(Constants.AI_AGENT_SOURCE_AWS_QUICK)){
                 return botName;
             }
             // Reconstruct full hostname: bot-name.base-hostname
@@ -581,7 +582,8 @@ public class HttpCallParser {
         if (tagsMap == null) {
             return false;
         }
-        return Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+        return Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE))
+                || Constants.AI_AGENT_SOURCE_AWS_QUICK.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
     }
 
     private boolean isCopilotTrafficRaw(Map<String,String> tagsMap) {
