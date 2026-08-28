@@ -1064,7 +1064,7 @@ public class Main {
                             Filters.eq(TestingRunResult.API_INFO_KEY, testingRunIssues.getId().getApiInfoKey())
                     );
                     TestingRunResult testingRunResult = VulnerableTestingRunResultDao.instance.findOneWithComparison(filterForRunResult, Projections.include("_id"));
-                    testRunResultId = testingRunResult.getHexId();
+                    testRunResultId = testingRunResult != null ? testingRunResult.getHexId() : "";
                 } else testRunResultId = "";
 
                 String issueCategory = testingRunIssues.getId().getTestSubCategory();
@@ -1093,7 +1093,7 @@ public class Main {
             CollectionWiseTestingEndpoints collectionWiseTestingEndpoints = (CollectionWiseTestingEndpoints) testingEndpoints;
             int apiCollectionId = collectionWiseTestingEndpoints.getApiCollectionId();
             ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
-            collection = apiCollection.getName();
+            collection = apiCollection != null ? apiCollection.getName() : null;
         } else if(testingEndpoints.getType().equals(TestingEndpoints.Type.MULTI_COLLECTION)) {
             MultiCollectionTestingEndpoints multiCollectionTestingEndpoints = (MultiCollectionTestingEndpoints) testingEndpoints;
             List<Integer> collectionIds = multiCollectionTestingEndpoints.getApiCollectionIds();
