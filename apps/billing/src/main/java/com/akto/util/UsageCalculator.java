@@ -138,6 +138,9 @@ public class UsageCalculator {
                 case MCP_ASSET_COUNT:
                     featureId = stiggConfig.getMcpAssetsLabel();
                     break;
+                case ENDPOINT_ASSET_COUNT:
+                    featureId = stiggConfig.getEndpointAssetsLabel();
+                    break;
 
                 default:
                     loggerMaker.errorAndAddToDb("This is not a standard metric type: " + metricType, LoggerMaker.LogDb.BILLING);
