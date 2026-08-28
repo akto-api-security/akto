@@ -110,6 +110,18 @@
             <!-- Must match struts2-core version. -->
             <version>6.10.0</version>
         </dependency>
+        <!-- Counterpart of @aws-sdk/util-arn-parser used by the Bedrock Lambda. -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>arns</artifactId>
+            <version>2.25.27</version>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.1</version>
+            <scope>test</scope>
+        </dependency>
 
     </dependencies>
     <build>

@@ -1,0 +1,107 @@
+[
+  {
+    "name": "sso-email",
+    "arn": "arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_AWS-SSO-VulcanAdmin-Role_7fddfd9b03a9a39f/mabba@example.com",
+    "actor": "mabba@example.com"
+  },
+  {
+    "name": "task-role-hex-session",
+    "arn": "arn:aws:sts::123456789012:assumed-role/aria-usertask-role/edf60249dbcf44b19f0c10eedfe1790f",
+    "actor": "aria-usertask-role"
+  },
+  {
+    "name": "task-role-uuid-session",
+    "arn": "arn:aws:sts::123456789012:assumed-role/aria-usertask-role/11111111-2222-3333-4444-555555555555",
+    "actor": "aria-usertask-role"
+  },
+  {
+    "name": "sso-username",
+    "arn": "arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_ReadOnly_abc/jdoe",
+    "actor": "jdoe"
+  },
+  {
+    "name": "human-session-on-app-role",
+    "arn": "arn:aws:sts::123456789012:assumed-role/my-app-role/jane.doe",
+    "actor": "jane.doe"
+  },
+  {
+    "name": "ec2-instance-session",
+    "arn": "arn:aws:sts::123456789012:assumed-role/ec2-role/i-0abc123def456789a",
+    "actor": "ec2-role"
+  },
+  {
+    "name": "assumed-role-no-session",
+    "arn": "arn:aws:sts::123456789012:assumed-role/my-role",
+    "actor": "my-role"
+  },
+  {
+    "name": "iam-user",
+    "arn": "arn:aws:iam::123456789012:user/BedrockAPIKey-cxsw",
+    "actor": "BedrockAPIKey-cxsw"
+  },
+  {
+    "name": "iam-user-with-path",
+    "arn": "arn:aws:iam::123456789012:user/Engineering/Alice",
+    "actor": "Alice"
+  },
+  {
+    "name": "iam-role-with-path",
+    "arn": "arn:aws:iam::123456789012:role/service-role/my-role",
+    "actor": "my-role"
+  },
+  {
+    "name": "federated-user",
+    "arn": "arn:aws:sts::123456789012:federated-user/bob",
+    "actor": "bob"
+  },
+  {
+    "name": "root",
+    "arn": "arn:aws:iam::123456789012:root",
+    "actor": "root"
+  },
+  {
+    "name": "govcloud-sso",
+    "arn": "arn:aws-us-gov:sts::123456789012:assumed-role/AWSReservedSSO_Admin_abc/mabba@gov.example",
+    "actor": "mabba@gov.example"
+  },
+  {
+    "name": "china-iam-user",
+    "arn": "arn:aws-cn:iam::123456789012:user/alice",
+    "actor": "alice"
+  },
+  {
+    "name": "regional-sts",
+    "arn": "arn:aws:sts:us-east-1:123456789012:assumed-role/my-role/user@example.com",
+    "actor": "user@example.com"
+  },
+  {
+    "name": "bedrock-agent",
+    "arn": "arn:aws:bedrock:us-east-1:123456789012:agent/ABCDEF",
+    "actor": ""
+  },
+  {
+    "name": "bedrock-harness",
+    "arn": "arn:aws:bedrock-agentcore:us-east-1:123456789012:harness/xyz",
+    "actor": ""
+  },
+  {
+    "name": "empty",
+    "arn": "",
+    "actor": ""
+  },
+  {
+    "name": "whitespace",
+    "arn": "   ",
+    "actor": ""
+  },
+  {
+    "name": "not-an-arn",
+    "arn": "assumed-role/foo/bar",
+    "actor": ""
+  },
+  {
+    "name": "malformed",
+    "arn": "arn:aws:sts",
+    "actor": ""
+  }
+]

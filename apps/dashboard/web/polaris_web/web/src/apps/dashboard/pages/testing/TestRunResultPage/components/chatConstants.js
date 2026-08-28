@@ -27,7 +27,7 @@ export const PLACEHOLDER_TEXT = {
 export const ANALYSIS_TEXT = {
     LOADING: 'Analyzing interaction...',
     EMPTY: 'No analysis available',
-    HEADER: 'Akto AI Overview',
+    HEADER: 'Ask Akto',
 };
 
 // Vulnerability badge text

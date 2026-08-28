@@ -9,35 +9,45 @@ import lombok.Getter;
  */
 @Getter
 public enum InsightId {
-    MALICIOUS_COMPONENT_IN_USE("Malicious component in active use", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY),
+    MALICIOUS_COMPONENT_IN_USE("Malicious component in active use", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY, true),
     UNGOVERNED_AI_RATIO("Ungoverned AI ratio", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY),
     GUARDRAIL_COVERAGE_GAP("Guardrail coverage gap", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY),
-    SENSITIVE_DATA_DESTINATIONS("Where sensitive data is actually going", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY),
+    SENSITIVE_DATA_DESTINATIONS("Where sensitive data is actually going", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY, true),
     EXPOSURE_CONCENTRATION("Exposure concentration", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY),
-    PERSONAL_USE_OF_ENTERPRISE_AI("Enterprise AI used for personal purposes", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY),
-    OFF_DOMAIN_TOKEN_BURN("Off-domain token burn", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY),
-    DANGEROUS_CAPABILITY_EXPOSURE("Dangerous capability exposure", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY),
+    PERSONAL_USE_OF_ENTERPRISE_AI("Enterprise AI used for personal purposes", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY, true),
+    OFF_DOMAIN_TOKEN_BURN("Off-domain token burn", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY, true),
+    DANGEROUS_CAPABILITY_EXPOSURE("Dangerous capability exposure", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY, true),
     MCP_SPRAWL("Unapproved & local MCP sprawl", InsightId.Category.READ_ONLY, InsightId.Group.ATLAS_DISCOVERY),
-    WHAT_CHANGED_THIS_WEEK("What changed this week", InsightId.Category.READ_ONLY, InsightId.Group.ATLAS_DISCOVERY),
+    WHAT_CHANGED_THIS_WEEK("What changed this week", InsightId.Category.READ_ONLY, InsightId.Group.ATLAS_DISCOVERY, true),
 
     // — guardrail/violation insights (feature/dashbaord/guardrail-insights) —
-    ALERT_FATIGUE("Alert fatigue — same user, same policy, over and over", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
-    TEST_POLICIES_ON_PROD("Test policies running against production users", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
-    SKILL_EVALUATION_CONCENTRATION("One user, one class, flooding the queue", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
-    CREDENTIAL_EXPOSURE("Credentials and secrets — separated from PII", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
-    PROMPT_INJECTION_REPEATS("Prompt injection attempts, grouped by source", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
-    LIKELY_FALSE_POSITIVES("Likely false positives — flag as min risk, don't hide", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
-    ALERT_MODE_REAL_HITS("Policies in alert mode that are catching real things", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
-    POLICY_HYGIENE("Policy hygiene — dead policies and uncovered assets", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS);
+    ALERT_FATIGUE("Alert fatigue", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+    TEST_POLICIES_ON_PROD("Test policies on production", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+    EVALUATION_CONCENTRATION("Evaluation concentration", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS, true),
+    CREDENTIAL_EXPOSURE("Credential exposure", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS, true),
+    PROMPT_INJECTION_REPEATS("Prompt injection repeats", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS, true),
+    LIKELY_FALSE_POSITIVES("Likely false positives", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS, true),
+    ALERT_MODE_REAL_HITS("Alert-mode policies catching real hits", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+    POLICY_HYGIENE("Policy hygiene", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS);
 
     private final String title;
     private final Category category;
     private final Group group;
+    // Static, hand-set "not ready" toggle — true only for an insight whose provider isn't wired up
+    // yet, same value for every account regardless of whether that account happens to have data.
+    // NOT for "this account has no data right now" — that's a real, checked result (see
+    // AbstractInsightProvider.skeleton, InsightResult.disabled), not an unimplemented insight.
+    private final boolean disabled;
 
     InsightId(String title, Category category, Group group) {
+        this(title, category, group, false);
+    }
+
+    InsightId(String title, Category category, Group group, boolean disabled) {
         this.title = title;
         this.category = category;
         this.group = group;
+        this.disabled = disabled;
     }
 
     /** How an insight is presented: ACTIONABLE cards carry CTAs, READ_ONLY cards are context only. */

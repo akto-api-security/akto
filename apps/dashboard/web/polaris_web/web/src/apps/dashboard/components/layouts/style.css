@@ -26,6 +26,18 @@
 .insight-row:hover {
     background: #FBFAFF;
 }
+/* status === "NO_DATA" — nothing could be computed (e.g. threat backend unavailable), as
+   opposed to a confirmed-clean READY/PARTIAL result. Not clickable; see .insight-row:hover
+   above for the normal-row hover, intentionally not applied here. */
+.insight-row-disabled {
+    cursor: default;
+    opacity: 0.5;
+}
+/* Two classes so this reliably beats the plain .insight-row:hover rule (there are two
+   duplicate copies of it in this file) regardless of source order. */
+.insight-row.insight-row-disabled:hover {
+    background: none;
+}
 .insight-severity-bar {
     width: 3px;
     border-radius: 2px;
@@ -120,18 +132,6 @@
     flex: 1;
     min-width: 0;
     overflow: hidden;
-}
-
-/* Hidden measurement layer for BreakdownLegend (AgenticStatsCard ResizeObserver pattern).
-   position/visibility/pointer-events cannot be expressed via Polaris Box. */
-.breakdown-legend-measure {
-    position: absolute;
-    visibility: hidden;
-    pointer-events: none;
-    display: flex;
-    gap: 4px;
-    top: 0;
-    left: 0;
 }
 
 /* Cursor + hover — DataTable owns all spacing/borders */

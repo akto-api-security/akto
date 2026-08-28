@@ -20,6 +20,7 @@ import { transformPolicyForBackend, SEVERITY, normalizeBehaviourValue } from "./
 import GUARDRAIL_PRESETS from "./guardrailPresets";
 import { addCreatedGuardrailPolicyName, clearGuardrailPolicyNamesCache } from "./topicGuardrailUtils";
 import PersistStore from '../../../main/PersistStore';
+import { ALL_VALUES_SENTINEL } from "../../components/shared/DropdownSearch";
 import {
     buildAgentFilterOptions,
     getApplicableAgentKeys,
@@ -471,10 +472,20 @@ function GuardrailPolicies() {
             details.push({ label: "Target Servers", value: "All servers" });
         } else {
             const { mcp, agents, llms } = getEffectiveServers(policy);
-            const serverDetails = [];
-            if (mcp.length > 0) serverDetails.push(`${mcp.length} MCP Server${mcp.length > 1 ? 's' : ''}`);
-            if (agents.length > 0) serverDetails.push(`${agents.length} Agent${agents.length > 1 ? 's' : ''}`);
-            if (llms.length > 0) serverDetails.push(`${llms.length} LLM${llms.length > 1 ? 's' : ''}`);
+            // Include-mode "select all" wildcard: sole entry is either the raw sentinel (deduped agents) or {name: sentinel} (mcp/llm objects).
+            const isWildcardOnly = (arr) => arr.length === 1 && (arr[0] === ALL_VALUES_SENTINEL || arr[0]?.name === ALL_VALUES_SENTINEL);
+            // Exclude-with-zero (negated, count 0) still needs a line — it means "all", not "unconfigured".
+            const part = (negated, arr, singular, plural) => {
+                const count = arr.length;
+                if (negated) return count > 0 ? `All ${plural} except ${count}` : `All ${plural}`;
+                if (isWildcardOnly(arr)) return `All ${plural}`;
+                return count > 0 ? `${count} ${count > 1 ? plural : singular}` : null;
+            };
+            const serverDetails = [
+                part(policy.negatedMcpServers, mcp, 'MCP Server', 'MCP Servers'),
+                part(policy.negatedAgentServers, agents, 'Agent', 'Agents'),
+                part(policy.negatedLlmServers, llms, 'LLM', 'LLMs'),
+            ].filter(Boolean);
             if (serverDetails.length > 0) {
                 details.push({ label: "Target Servers", value: serverDetails.join(", ") });
             }
@@ -655,6 +666,10 @@ function GuardrailPolicies() {
                 // Add V2 fields for enhanced server data
                 selectedMcpServersV2: guardrailData.selectedMcpServersV2 || [],
                 selectedAgentServersV2: guardrailData.selectedAgentServersV2 || [],
+                selectedLlmServersV2: guardrailData.selectedLlmServersV2 || [],
+                negatedAgentServers: guardrailData.negatedAgentServers || false,
+                negatedMcpServers: guardrailData.negatedMcpServers || false,
+                negatedLlmServers: guardrailData.negatedLlmServers || false,
                 // Block-only host blocklist
                 blockedHosts: guardrailData.blockedHosts || [],
                 blockPersonalAccounts: guardrailData.blockPersonalAccounts || false,

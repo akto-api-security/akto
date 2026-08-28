@@ -100,9 +100,15 @@ public class PromptInjectionRepeatsProvider extends AbstractInsightProvider {
         }
 
         if (scope == Scope.LIST) {
+            // A real, if approximate, severity from the volume alone — the actual repeat pattern
+            // still requires paging raw events (below), but a reader shouldn't see "Coming soon" for
+            // a card that already has real attempts behind it. Same template as
+            // TestPoliciesOnProdProvider's LIST-scope severityFromShare; DETAIL can still move this
+            // up (e.g. to CRITICAL for sustained repeats) or down once the real grouping is known.
             result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(InsightUtil.count(totalAttempts, "attempts")
                     + "; grouping by source and finding repeats requires the detail view.");
+            result.setSeverity(severityFromVolume(totalAttempts));
             result.setMetrics(Collections.singletonList(totalMetric));
             result.setMetricsComplete(false);
             result.setDataGaps(Collections.singletonList(new InsightResult.Gap(
@@ -117,7 +123,11 @@ public class PromptInjectionRepeatsProvider extends AbstractInsightProvider {
         // longer narrow the server-side query to subCategory == "PromptInjection" alone (a policy's
         // real hits may not carry that literal) — sweep unfiltered instead, like item #4's
         // credential scan, and keep only events that are actually injection-shaped by either signal.
-        List<DashboardMaliciousEvent> rawEvents = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT, null, null);
+        // "exclude" drops Skills Evaluations traffic — same convention as AlertFatigueProvider (see
+        // its comment): a skill's own safety-scan verdict isn't a live-traffic injection attempt, and
+        // on a real account it can outnumber genuine attempts by 70:1, drowning any real repeat
+        // pattern under near-unique per-skill evidence text that structurally never repeats.
+        List<DashboardMaliciousEvent> rawEvents = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT, null, "exclude");
         if (rawEvents == null) rawEvents = new ArrayList<>();
         boolean rawSweepCapped = rawEvents.size() == EVENT_PAGE_LIMIT;
         List<DashboardMaliciousEvent> events = rawEvents.stream()
@@ -308,6 +318,19 @@ public class PromptInjectionRepeatsProvider extends AbstractInsightProvider {
 
     private static String lower(String s) {
         return s == null ? "" : s.trim().toLowerCase(Locale.US);
+    }
+
+    /** LIST-scope approximation from raw volume alone, before repeats are known — an injection
+     *  attempt is a stronger per-event signal than routine PII noise, so even a single one is
+     *  worth flagging rather than waiting for a volume threshold. */
+    private static String severityFromVolume(long totalAttempts) {
+        if (totalAttempts >= HIGH_SEVERITY_REPEAT_COUNT * 3L) {
+            return "HIGH";
+        }
+        if (totalAttempts >= HIGH_SEVERITY_REPEAT_COUNT) {
+            return "MEDIUM";
+        }
+        return "LOW";
     }
 
 

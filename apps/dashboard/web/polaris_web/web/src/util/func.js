@@ -102,6 +102,8 @@ const agenticCategoryMapping = {
   "ROGUE_AGENTS": ASI10,
 }
 const stringCollator = new Intl.Collator(undefined, { sensitivity: 'base' });
+const IPV4_REGEX = /^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
+const IPV6_REGEX = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:)*[0-9a-fA-F]{1,4})?::(([0-9a-fA-F]{1,4}:)*[0-9a-fA-F]{1,4})?)$/;
 
 const func = {
   categoryMapping: categoryMapping,
@@ -2785,6 +2787,11 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
   },
 
+  isValidIpAddress(ip) {
+    if (!ip || ip === "-") return false;
+    const v = String(ip).trim();
+    return IPV4_REGEX.test(v) || IPV6_REGEX.test(v);
+  },
    getStiggFeatureGrants() {
       const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {}
       const agenticSecurityGranted = stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false

@@ -32,7 +32,7 @@ public class SkillEvaluationConcentrationProvider extends AbstractInsightProvide
     private static final int EVENT_PAGE_LIMIT = 2000;
     private static final int EVIDENCE_ROW_CAP = 20;
 
-    public SkillEvaluationConcentrationProvider() { super(InsightId.SKILL_EVALUATION_CONCENTRATION, 1); }
+    public SkillEvaluationConcentrationProvider() { super(InsightId.EVALUATION_CONCENTRATION, 1); }
 
     @Override
     public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope) {
@@ -75,10 +75,15 @@ public class SkillEvaluationConcentrationProvider extends AbstractInsightProvide
         List<InsightResult.Metric> baseMetrics = new ArrayList<>(Arrays.asList(totalMetric, skillCountMetric));
 
         if (scope == Scope.LIST) {
+            // Real per-user concentration still requires the detail view, but a reader shouldn't see
+            // "Coming soon" for a card that already has real evaluations behind it — any Critical-
+            // severity evaluation at all is worth at least a MEDIUM flag even before concentration is
+            // known; DETAIL can still move this to CRITICAL/HIGH once the real top-user share is in.
             result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(InsightUtil.count(total, "evaluations") + " across "
                     + InsightUtil.count(perSkill.size(), "skills")
                     + "; per-user concentration requires the detail view.");
+            result.setSeverity(totalCritical > 0 ? "MEDIUM" : "LOW");
             result.setMetrics(baseMetrics);
             result.setMetricsComplete(false);
             result.setDataGaps(Collections.singletonList(new InsightResult.Gap(

@@ -1,7 +1,7 @@
 import { VerticalStack, HorizontalStack, Text, FormLayout, Box, Checkbox, RadioButton, Popover, TextField, Link, Tag, Banner, Badge, Button, InlineError } from "@shopify/polaris";
 import { DeleteMinor } from "@shopify/polaris-icons";
 import { useState, useEffect, useRef, useReducer } from "react";
-import DropdownSearch from "../../../../components/shared/DropdownSearch";
+import DropdownSearch, { ALL_VALUES_SENTINEL } from "../../../../components/shared/DropdownSearch";
 import Dropdown from "../../../../components/layouts/Dropdown";
 import AssetIcon from "../../../observe/agentic/AssetIcon";
 import { formatDisplayName } from "../../../observe/agentic/mcpClientHelper";
@@ -23,7 +23,7 @@ export const ServerSettingsConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTags, targetDeviceIds }) => {
+    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, negatedAgentServers, negatedMcpServers, negatedLlmServers, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTags, targetDeviceIds }) => {
         const appSettings = (applyOnRequest || applyOnResponse) ?
             ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
         const behaviourSuffix = policyBehaviour ? `Rule behaviour: ${policyBehaviour}` : '';
@@ -32,9 +32,17 @@ export const ServerSettingsConfig = {
             summary += 'All assets';
         } else {
             const parts = [];
-            if (selectedMcpServers?.length > 0) parts.push(`${selectedMcpServers.length} MCP`);
-            if (selectedAgentServers?.length > 0) parts.push(`${selectedAgentServers.length} Agents`);
-            if (selectedBrowserLlms?.length > 0) parts.push(`${selectedBrowserLlms.length} LLMs`);
+            const part = (negated, arr, singular) => {
+                const count = arr?.length || 0;
+                if (negated) return count > 0 ? `All ${singular} except ${count}` : `All ${singular}`;
+                if (count === 1 && arr[0] === ALL_VALUES_SENTINEL) return `All ${singular}`;
+                return count > 0 ? `${count} ${singular}` : null;
+            };
+            [
+                part(negatedMcpServers, selectedMcpServers, 'MCP'),
+                part(negatedAgentServers, selectedAgentServers, 'Agents'),
+                part(negatedLlmServers, selectedBrowserLlms, 'LLMs'),
+            ].filter(Boolean).forEach(p => parts.push(p));
             summary += parts.join(', ') || 'No assets';
         }
         if (applyToAllUsers) {
@@ -133,6 +141,11 @@ const usePruneStaleConditionValues = (enabled, ready, conditions, dispatch, valS
                 dispatch({ type: 'delete', index });
                 continue;
             }
+            // Never prune a negated row's values: removing an excluded value silently WIDENS what the
+            // policy matches (e.g. an excluded server that's just offline right now must stay excluded).
+            if (c.negated) continue;
+            // Never prune the Include wildcard sentinel — it isn't a real option value by design.
+            if (c.values?.length === 1 && c.values[0] === ALL_VALUES_SENTINEL) continue;
             if (valSet.size === 0) continue;
             const valid = (c.values || []).filter(v => valSet.has(v));
             if (valid.length !== (c.values || []).length) {
@@ -151,6 +164,12 @@ const ServerSettingsStep = ({
     setSelectedAgentServers,
     selectedBrowserLlms,
     setSelectedBrowserLlms,
+    negatedAgentServers,
+    setNegatedAgentServers,
+    negatedMcpServers,
+    setNegatedMcpServers,
+    negatedLlmServers,
+    setNegatedLlmServers,
     applyOnResponse,
     setApplyOnResponse,
     applyOnRequest,
@@ -180,9 +199,10 @@ const ServerSettingsStep = ({
 
     const [agenticConditions, agenticDispatch] = useReducer(conditionsReducer, null, () => {
         const conds = [];
-        if ((selectedAgentServers || []).length > 0) conds.push({ type: 'AGENT', values: selectedAgentServers });
-        if ((selectedMcpServers || []).length > 0) conds.push({ type: 'MCP_SERVER', values: selectedMcpServers });
-        if ((selectedBrowserLlms || []).length > 0) conds.push({ type: 'LLM', values: selectedBrowserLlms });
+        // A negated row with zero values ("Exclude nothing") is meaningful — keep it, don't drop it on reopen
+        if ((selectedAgentServers || []).length > 0 || negatedAgentServers) conds.push({ type: 'AGENT', values: selectedAgentServers, negated: negatedAgentServers });
+        if ((selectedMcpServers || []).length > 0 || negatedMcpServers) conds.push({ type: 'MCP_SERVER', values: selectedMcpServers, negated: negatedMcpServers });
+        if ((selectedBrowserLlms || []).length > 0 || negatedLlmServers) conds.push({ type: 'LLM', values: selectedBrowserLlms, negated: negatedLlmServers });
         return conds;
     });
 
@@ -198,6 +218,7 @@ const ServerSettingsStep = ({
         setSelectedAgentServers(agenticConditions.filter(c => c.type === 'AGENT').flatMap(c => c.values).filter(Boolean));
         setSelectedMcpServers(agenticConditions.filter(c => c.type === 'MCP_SERVER').flatMap(c => c.values).filter(Boolean));
         setSelectedBrowserLlms(agenticConditions.filter(c => c.type === 'LLM').flatMap(c => c.values).filter(Boolean));
+        // negatedX isn't synced here — it's owned by the Include/Exclude tab; syncing it here would stomp the tab's choice on every value change
     }, [agenticConditions]);
 
     useEffect(() => {
@@ -256,24 +277,32 @@ const ServerSettingsStep = ({
         ];
     };
 
+    // A selected/excluded value not currently in the live options list (e.g. offline right now) still needs a row so it renders checked, not silently invisible.
+    // The wildcard sentinel isn't a real value — never give it its own row.
+    const withMissingSelected = (options, selected) => {
+        const known = new Set(options.map(o => o.value));
+        const missing = (selected || []).filter(v => v !== ALL_VALUES_SENTINEL && !known.has(v)).map(v => ({ value: v, label: v }));
+        return missing.length ? [...options, ...missing] : options;
+    };
+
     // Atlas: filterCollections() already groups by service/platform key — use directly.
     // Argus: raw per-device list with disabled state for block mode.
     const mcpOptions = isAtlas
-        ? sortSelectedFirst(mcpServers || [], selectedMcpServers)
+        ? sortSelectedFirst(withMissingSelected(mcpServers || [], selectedMcpServers), selectedMcpServers)
         : sortSelectedFirst(
-            isBlockMode ? (mcpServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (mcpServers || []),
+            withMissingSelected(isBlockMode ? (mcpServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (mcpServers || []), selectedMcpServers),
             selectedMcpServers
           );
     const agentOptions = isAtlas
-        ? sortSelectedFirst(agentServers || [], selectedAgentServers)
+        ? sortSelectedFirst(withMissingSelected(agentServers || [], selectedAgentServers), selectedAgentServers)
         : sortSelectedFirst(
-            isBlockMode ? (agentServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (agentServers || []),
+            withMissingSelected(isBlockMode ? (agentServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (agentServers || []), selectedAgentServers),
             selectedAgentServers
           );
     const llmOptions = isAtlas
-        ? sortSelectedFirst(browserLlmServers || [], selectedBrowserLlms)
+        ? sortSelectedFirst(withMissingSelected(browserLlmServers || [], selectedBrowserLlms), selectedBrowserLlms)
         : sortSelectedFirst(
-            isBlockMode ? (browserLlmServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (browserLlmServers || []),
+            withMissingSelected(isBlockMode ? (browserLlmServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (browserLlmServers || []), selectedBrowserLlms),
             selectedBrowserLlms
           );
 
@@ -317,11 +346,52 @@ const ServerSettingsStep = ({
         { label: `${deviceCount > 1 ? 'Users' : 'User'} [${deviceCount}]`, value: 'DEVICE', disabled: deviceCount === 0 },
     ];
 
-    const renderConditionRows = (conditions, typeOptions, dispatch, operator = 'OR', showError = false) => {
+    // Include/Exclude is independent per row (see negatedAgentServers/negatedMcpServers/negatedLlmServers on GuardrailPolicies); an empty Exclude row is the one case it can't stay type-scoped
+    const agenticNegationProps = (type) => {
+        switch (type) {
+            case 'AGENT': return { negated: negatedAgentServers, onToggle: setNegatedAgentServers };
+            case 'MCP_SERVER': return { negated: negatedMcpServers, onToggle: setNegatedMcpServers };
+            case 'LLM': return { negated: negatedLlmServers, onToggle: setNegatedLlmServers };
+            default: return null;
+        }
+    };
+    // Custom underline-tab strip, not Polaris LegacyTabs — LegacyTabs collapses into a "..." overflow menu at this popover's width
+    const NEGATION_TABS = [
+        { label: 'Include', value: false },
+        { label: 'Exclude', value: true },
+    ];
+    const negationHeader = (negated, onToggle) => (
+        <div style={{ display: 'flex' }}>
+            {NEGATION_TABS.map(tab => {
+                const isSelected = negated === tab.value;
+                return (
+                    <div
+                        key={tab.label}
+                        onClick={() => onToggle(tab.value)}
+                        style={{
+                            flex: 1,
+                            textAlign: 'center',
+                            padding: '10px 0 8px',
+                            cursor: 'pointer',
+                            borderBottom: isSelected ? '2px solid #6c5ce7' : '1px solid var(--p-border-subdued, #e1e3e5)',
+                        }}
+                    >
+                        <Text variant="bodyMd" fontWeight={isSelected ? 'semibold' : 'regular'} tone={isSelected ? undefined : 'subdued'}>
+                            {tab.label}
+                        </Text>
+                    </div>
+                );
+            })}
+        </div>
+    );
+
+    const renderConditionRows = (conditions, typeOptions, dispatch, operator = 'OR', showError = false, getNegationProps = null) => {
         const usedTypes = new Set(conditions.map(c => c.type));
         const availableTypeOptions = typeOptions.filter(o => !o.disabled);
         const allTypesFilled = availableTypeOptions.length === 0 || availableTypeOptions.every(o => usedTypes.has(o.value));
         const nextUnusedType = availableTypeOptions.find(o => !usedTypes.has(o.value))?.value;
+        // Zero rows is unfinished; Exclude-with-nothing is a deliberate "apply to everything" scope, not an unfinished one
+        const isDirty = conditions.length === 0;
 
         return (
             <VerticalStack gap="3">
@@ -331,6 +401,8 @@ const ServerSettingsStep = ({
                         ...o,
                         disabled: o.disabled || otherUsedTypes.has(o.value),
                     }));
+                    const negationProps = getNegationProps?.(condition.type);
+                    const negated = !!negationProps?.negated;
                     return (
                         <HorizontalStack key={index} gap="2" blockAlign="center">
                             <div style={{ minWidth: 64, textAlign: 'right' }}>
@@ -348,6 +420,8 @@ const ServerSettingsStep = ({
                                     selected={(val) => {
                                         dispatch({ type: 'updateKey', index, key: 'type', obj: val });
                                         dispatch({ type: 'updateKey', index, key: 'values', obj: [] });
+                                        // Row's type changed — reset the old type's toggle so Exclude can't linger with no row showing it
+                                        negationProps?.onToggle(false);
                                     }}
                                 />
                             </div>
@@ -356,26 +430,43 @@ const ServerSettingsStep = ({
                                 <DropdownSearch
                                     id={`cond-val-${condition.type}-${index}`}
                                     placeholder="Select value"
+                                    headerContent={negationProps ? negationHeader(negated, (val) => {
+                                        // Switching tabs starts fresh — carrying over values would silently reinterpret them (included <-> excluded).
+                                        negationProps.onToggle(val);
+                                        dispatch({ type: 'updateKey', index, key: 'values', obj: [] });
+                                    }) : undefined}
                                     optionsList={sortSelectedFirst(getOptionsForType(condition.type), condition.values || [])}
                                     setSelected={(vals) => dispatch({ type: 'updateKey', index, key: 'values', obj: vals })}
                                     preSelected={condition.values || []}
                                     allowMultiple={true}
+                                    negated={negated}
+                                    onToggleNegated={negationProps?.onToggle}
                                     disabled={getOptionsForType(condition.type).length === 0}
-                                    value={(condition.values || []).length > 0 ? `${condition.values.length} selected` : undefined}
+                                    value={negated
+                                        ? ((condition.values || []).length > 0 ? `All except ${condition.values.length}` : 'All selected')
+                                        : ((condition.values || []).length === 1 && condition.values[0] === ALL_VALUES_SENTINEL ? 'All selected'
+                                            : (condition.values || []).length > 0 ? `${condition.values.length} selected` : undefined)}
                                     sliceMaxVal={getOptionsForType(condition.type).length || 20}
                                 />
                             </div>
-                            <Button icon={DeleteMinor} onClick={() => dispatch({ type: 'delete', index })} />
+                            <Button icon={DeleteMinor} onClick={() => {
+                                dispatch({ type: 'delete', index });
+                                // Reset the toggle too, so "Exclude" can't linger with no row left to undo it
+                                negationProps?.onToggle(false);
+                            }} />
                         </HorizontalStack>
                     );
                 })}
                 <HorizontalStack gap="4" blockAlign="center">
                     {!allTypesFilled && <Button onClick={() => dispatch({ type: 'add', obj: { type: nextUnusedType, values: [] } })}>Add condition</Button>}
                     {conditions.length > 0 && (
-                        <Button plain destructive onClick={() => dispatch({ type: 'clear' })}>Clear all</Button>
+                        <Button plain destructive onClick={() => {
+                            conditions.forEach(c => getNegationProps?.(c.type)?.onToggle(false));
+                            dispatch({ type: 'clear' });
+                        }}>Clear all</Button>
                     )}
                 </HorizontalStack>
-                {showError && conditions.length === 0 && (
+                {showError && isDirty && (
                     <InlineError message='Add at least one condition, or switch to "Apply to all".' fieldID="" />
                 )}
             </VerticalStack>
@@ -395,16 +486,17 @@ const ServerSettingsStep = ({
         // Guard: don't run until options have loaded — an empty options list would
         // incorrectly clear every pre-selected value from a loaded policy.
         if (!(mcpServers?.length || agentServers?.length || browserLlmServers?.length)) return;
+        // The Include wildcard sentinel isn't a real server value — never filter it out here.
         if (selectedMcpServers?.length > 0) {
-            const compatible = selectedMcpServers.filter(val => (mcpServers || []).find(s => s.value === val && s.isInline));
+            const compatible = selectedMcpServers.filter(val => val === ALL_VALUES_SENTINEL || (mcpServers || []).find(s => s.value === val && s.isInline));
             if (compatible.length !== selectedMcpServers.length) setSelectedMcpServers(compatible);
         }
         if (selectedAgentServers?.length > 0) {
-            const compatible = selectedAgentServers.filter(val => (agentServers || []).find(s => s.value === val && s.isInline));
+            const compatible = selectedAgentServers.filter(val => val === ALL_VALUES_SENTINEL || (agentServers || []).find(s => s.value === val && s.isInline));
             if (compatible.length !== selectedAgentServers.length) setSelectedAgentServers(compatible);
         }
         if (selectedBrowserLlms?.length > 0) {
-            const compatible = selectedBrowserLlms.filter(val => (browserLlmServers || []).find(s => s.value === val && s.isInline));
+            const compatible = selectedBrowserLlms.filter(val => val === ALL_VALUES_SENTINEL || (browserLlmServers || []).find(s => s.value === val && s.isInline));
             if (compatible.length !== selectedBrowserLlms.length) setSelectedBrowserLlms(compatible);
         }
     }, [policyBehaviour, mcpServers?.length, agentServers?.length, browserLlmServers?.length]);
@@ -466,7 +558,7 @@ const ServerSettingsStep = ({
                                     />
                                     {!applyToAllServers && (
                                         <Box paddingInlineStart="6">
-                                            {renderConditionRows(agenticConditions, agenticTypeOptions, agenticDispatch, 'OR', showConditionError)}
+                                            {renderConditionRows(agenticConditions, agenticTypeOptions, agenticDispatch, 'OR', showConditionError, agenticNegationProps)}
                                         </Box>
                                     )}
                                 </VerticalStack>
@@ -595,7 +687,7 @@ const ServerSettingsStep = ({
                                     />
                                     {!applyToAllServers && (
                                         <Box paddingInlineStart="6">
-                                            {renderConditionRows(agenticConditions, agenticTypeOptions, agenticDispatch, 'OR', showConditionError)}
+                                            {renderConditionRows(agenticConditions, agenticTypeOptions, agenticDispatch, 'OR', showConditionError, agenticNegationProps)}
                                             {hasIncompatibleServers && (
                                                 <Banner tone="info">
                                                     Some agentic assets are disabled. Block mode requires servers running in inline (sync) mode.

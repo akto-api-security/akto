@@ -263,6 +263,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [applyOnResponse, setApplyOnResponse] = useState(false);
     const [applyOnRequest, setApplyOnRequest] = useState(false);
     const [policyBehaviour, setPolicyBehaviour] = useState(GUARDRAIL_BEHAVIOUR.BLOCK);
+    // Include/Exclude toggle, independent per list above — false (default) is an allow-list, back-compat with existing policies
+    const [negatedAgentServers, setNegatedAgentServers] = useState(false);
+    const [negatedMcpServers, setNegatedMcpServers] = useState(false);
+    const [negatedLlmServers, setNegatedLlmServers] = useState(false);
 
     // Step 12: User targeting
     const [applyToAllUsers, setApplyToAllUsers] = useState(true);
@@ -404,6 +408,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         selectedMcpServers,
         selectedAgentServers,
         selectedBrowserLlms,
+        negatedAgentServers,
+        negatedMcpServers,
+        negatedLlmServers,
         mcpServers,
         agentServers,
         browserLlmServers,
@@ -414,7 +421,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         targetTags,
         targetDeviceIds,
         enterpriseLicenseComplianceCategories,
+        // A negated row with zero values is a deliberate "apply to everything" scope, not an unfinished one
         serverScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllServers &&
+            !negatedAgentServers && !negatedMcpServers && !negatedLlmServers &&
             (selectedMcpServers || []).length === 0 &&
             (selectedAgentServers || []).length === 0 &&
             (selectedBrowserLlms || []).length === 0,
@@ -715,6 +724,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyOnResponse(false);
         setApplyOnRequest(false);
         setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
+        setNegatedAgentServers(false);
+        setNegatedMcpServers(false);
+        setNegatedLlmServers(false);
         setApplyToAllUsers(true);
         setTargetTags({});
         setEnterpriseLicenseComplianceCategories([]);
@@ -857,31 +869,38 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             : (policy.selectedMcpServers || []).map(name => ({ id: name, name }));
         setSelectedMcpServers(reverseToServiceKeys(storedMcpV2, allCollections));
 
-        // selectedAgentServersV2 stores both gen-ai and browser-llm entries.
-        // Split them back into their respective dropdowns.
+        // selectedAgentServersV2 is agent-only now; LLM entries live in selectedLlmServersV2 (see GuardrailPolicies.java). Old policies fall back to reclassifying below.
         const rawAgentServersV2 = policy.selectedAgentServersV2?.length > 0
             ? policy.selectedAgentServersV2
             : (policy.selectedAgentServers || []).map(id => ({ id, name: id }));
 
-        // Compute llmServiceKeySet for both Atlas and Argus — needed to classify new-format
-        // V2 entries where the id is a service key (not a numeric collection id).
-        const llmServiceKeySet = getLlmServiceKeySet(allCollections);
-        const rawAgentEntries = [];
-        const rawLlmEntries = [];
-        rawAgentServersV2.forEach(s => {
-            const col = allCollections?.find(c => c.id?.toString() === s.id?.toString());
-            const isBrowserLlm = col
-                ? col.envType?.some(e => e.keyName === 'browser-llm')
-                : llmServiceKeySet.has(s.name || '');
-            if (isBrowserLlm) rawLlmEntries.push(s);
-            else rawAgentEntries.push(s);
-        });
+        let rawAgentEntries, rawLlmEntries;
+        if (policy.selectedLlmServersV2?.length > 0) {
+            rawAgentEntries = rawAgentServersV2;
+            rawLlmEntries = policy.selectedLlmServersV2;
+        } else {
+            // Legacy path: classify each commingled entry using live collection data
+            const llmServiceKeySet = getLlmServiceKeySet(allCollections);
+            rawAgentEntries = [];
+            rawLlmEntries = [];
+            rawAgentServersV2.forEach(s => {
+                const col = allCollections?.find(c => c.id?.toString() === s.id?.toString());
+                const isBrowserLlm = col
+                    ? col.envType?.some(e => e.keyName === 'browser-llm')
+                    : llmServiceKeySet.has(s.name || '');
+                if (isBrowserLlm) rawLlmEntries.push(s);
+                else rawAgentEntries.push(s);
+            });
+        }
 
         setSelectedAgentServers(reverseAgentKeys(rawAgentEntries, allCollections));
         setSelectedBrowserLlms(reverseToServiceKeys(rawLlmEntries, allCollections));
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
         setApplyToAllServers(policy.applyToAllServers ?? true);
+        setNegatedAgentServers(policy.negatedAgentServers || false);
+        setNegatedMcpServers(policy.negatedMcpServers || false);
+        setNegatedLlmServers(policy.negatedLlmServers || false);
 
         // Blocked hosts (block-only glob patterns: { pattern })
         setBlockedHosts((policy.blockedHosts || []).map(entry => ({
@@ -926,10 +945,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setLoading(true);
         try {
             const transformedMcpServers = expandGroupsToV2(selectedMcpServers);
-            const transformedAgentServers = [
-                ...expandAgentGroupsToV2(selectedAgentServers),
-                ...expandGroupsToV2(selectedBrowserLlms)
-            ];
+            // Agent and LLM written as separate lists so each can be matched/negated independently
+            const transformedAgentServers = expandAgentGroupsToV2(selectedAgentServers);
+            const transformedLlmServers = expandGroupsToV2(selectedBrowserLlms);
 
             // Drop empty rows and normalize the glob patterns before persisting.
             const cleanedBlockedHosts = (blockedHosts || [])
@@ -1026,10 +1044,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 url: enableExternalModel ? (url || null) : null,
                 confidenceScore: enableExternalModel ? confidenceScore : null,
                 applyToAllServers,
+                negatedAgentServers,
+                negatedMcpServers,
+                negatedLlmServers,
                 selectedMcpServers: selectedMcpServers,
                 selectedAgentServers: [...selectedAgentServers, ...selectedBrowserLlms],
                 selectedMcpServersV2: transformedMcpServers,
                 selectedAgentServersV2: transformedAgentServers,
+                selectedLlmServersV2: transformedLlmServers,
                 blockedHosts: cleanedBlockedHosts,
                 blockPersonalAccounts,
                 ignorePhrases: cleanedIgnorePhrases,
@@ -1221,6 +1243,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setSelectedAgentServers={setSelectedAgentServers}
                         selectedBrowserLlms={selectedBrowserLlms}
                         setSelectedBrowserLlms={setSelectedBrowserLlms}
+                        negatedAgentServers={negatedAgentServers}
+                        setNegatedAgentServers={setNegatedAgentServers}
+                        negatedMcpServers={negatedMcpServers}
+                        setNegatedMcpServers={setNegatedMcpServers}
+                        negatedLlmServers={negatedLlmServers}
+                        setNegatedLlmServers={setNegatedLlmServers}
                         applyOnResponse={applyOnResponse}
                         setApplyOnResponse={setApplyOnResponse}
                         applyOnRequest={applyOnRequest}
@@ -1343,6 +1371,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             url: enableExternalModel ? (url || null) : null,
             confidenceScore: enableExternalModel ? confidenceScore : null,
             applyToAllServers: applyToAllServers,
+            negatedAgentServers: negatedAgentServers,
+            negatedMcpServers: negatedMcpServers,
+            negatedLlmServers: negatedLlmServers,
             selectedMcpServers: selectedMcpServers,
             selectedAgentServers: selectedAgentServers,
             blockedHosts: (blockedHosts || [])

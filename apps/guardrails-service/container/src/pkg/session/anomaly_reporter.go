@@ -56,6 +56,7 @@ func ReportAnomaly(event *AnomalyEvent, params *models.ValidateRequestParams, po
 		host,
 		event.SessionID,
 		behaviour,
+		"",
 	); err != nil {
 		logger.Warn("Failed to report anomaly",
 			zap.String("anomalyType", event.AnomalyType),

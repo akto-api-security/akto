@@ -133,7 +133,7 @@ function SkillValueView({ markdown, loading }) {
     return (
         <Box className="agentic-flex-fill">
             <Box paddingBlockStart="5" paddingBlockEnd="5" paddingInlineStart="5" paddingInlineEnd="5">
-                <MarkdownViewer markdown={markdown} />
+                <MarkdownViewer markdown={markdown} inertLinks />
             </Box>
         </Box>
     );
