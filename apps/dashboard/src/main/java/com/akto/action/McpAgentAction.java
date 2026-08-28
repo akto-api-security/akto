@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 public class McpAgentAction extends UserAction {
 
@@ -39,6 +40,7 @@ public class McpAgentAction extends UserAction {
     private String agentEndpoint;
     private int limit;
     private String conversationType;
+    private String searchQuery;
 
     private Map<String, Object> metaData;
 
@@ -265,8 +267,15 @@ public class McpAgentAction extends UserAction {
         try {
             int fetchLimit = limit > 0 ? limit : 5;
 
+            List<Bson> matchFilters = new ArrayList<>();
+            matchFilters.add(AgentConversationDao.instance.getContextSourceFilter());
+            if (StringUtils.isNotEmpty(searchQuery)) {
+                matchFilters.add(Filters.regex("title", Pattern.compile(Pattern.quote(searchQuery), Pattern.CASE_INSENSITIVE)));
+            }
+
             List<Bson> pipeline = new ArrayList<>();
-            
+
+            pipeline.add(Aggregates.match(Filters.and(matchFilters)));
             pipeline.add(Aggregates.sort(Sorts.descending("lastUpdatedAt")));
             BasicDBObject groupedId = new BasicDBObject("_id", "$conversationId");
             List<BsonField> groupAccumulators = new ArrayList<>();
@@ -340,6 +349,8 @@ public class McpAgentAction extends UserAction {
     public void setLimit(int limit) { this.limit = limit; }
     public String getConversationType() { return conversationType; }
     public void setConversationType(String conversationType) { this.conversationType = conversationType; }
+    public String getSearchQuery() { return searchQuery; }
+    public void setSearchQuery(String searchQuery) { this.searchQuery = searchQuery; }
     public Map<String, Object> getMetaData() { return metaData; }
     public void setMetaData(Map<String, Object> metaData) {
         this.metaData = metaData;

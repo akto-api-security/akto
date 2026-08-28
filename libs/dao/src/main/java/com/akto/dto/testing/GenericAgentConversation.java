@@ -36,4 +36,6 @@ public class GenericAgentConversation {
     private int externalApiTokens;
     private int tokensLimit;
     private ConversationType conversationType;
+    public static final String CONTEXT_SOURCE = "contextSource";
+    private String contextSource;
 }

@@ -114,7 +114,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                             title: title,
                             lastUpdatedAt: lastUpdatedAt
                         };
-                    });
+                    }).sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt);
                     console.log('Formatted history:', formattedHistory);
                     setHistoryItems(formattedHistory);
                 }

@@ -53,7 +53,8 @@ function AgenticMainPage() {
         try {
             const conversations = await getConversationsList(limit, searchQuery);
             if(conversations.history && conversations.history.length > 0) {
-                setHistoryItems(conversations.history.map(item => ({
+                const sortedHistory = [...conversations.history].sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt);
+                setHistoryItems(sortedHistory.map(item => ({
                     ...item,
                     id: item._id._id
                 })));
