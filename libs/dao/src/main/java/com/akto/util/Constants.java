@@ -90,6 +90,7 @@ public class Constants {
     public static final String AI_AGENT_SOURCE_ARCADE_DEV = "ARCADE_DEV";
     public static final String AI_AGENT_SOURCE_MICROSOFT_DEFENDER = "DEFENDER";
     public static final String AI_AGENT_SOURCE_AWS_BEDROCK="AWS_BEDROCK";
+    public static final String AI_AGENT_SOURCE_AWS_QUICK="AWS_QUICK";
     public static final String AI_AGENT_SOURCE_ENDPOINT = "ENDPOINT";
     public static final String AI_AGENT_TAG_BOT_NAME = "bot-name";
     public static final String AI_AGENT_TAG_BOT_SCHEMA_NAME = "bot-schemaname";
