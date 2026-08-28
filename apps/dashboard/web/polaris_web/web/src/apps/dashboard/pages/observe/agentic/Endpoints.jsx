@@ -72,6 +72,14 @@ const sortOptions = [
     { label: "Last traffic seen", value: "lastSeenEpoch asc", directionLabel: "Oldest", sortKey: "lastSeenEpoch", columnIndex: 7 },
 ];
 
+// Shared choices for the "Tag" / "Endpoint tags" filter toggles — same tag values either way.
+const TAG_FILTER_CHOICES = [
+    { label: "Contains personal account", value: "Contains personal account" },
+    { label: "Local MCP Server", value: "Local MCP Server" },
+    { label: "Misconfigured", value: "Misconfigured" },
+    { label: "Malicious Skill", value: "Malicious Skill" },
+];
+
 // Filter-only header (not a visible column) for the malicious/misconfigured tags on skills —
 // drives the "Tag" filter facet server-side (AgenticObserveAction.fetchAgenticAssetsSummary's
 // "tags" Set Filter branch) instead of the old client-side facet over a fully-loaded array.
@@ -217,12 +225,9 @@ function Endpoints() {
     // it does NOT surface a UI facet on its own (confirmed via UsersAndDevices.jsx's filtersDef).
     const filtersDef = useMemo(() => {
         const defs = [
-            { key: "assetTags", label: "Tag", choices: [
-                { label: "Contains personal account", value: "Contains personal account" },
-                { label: "Local MCP Server", value: "Local MCP Server" },
-                { label: "Misconfigured", value: "Misconfigured" },
-                { label: "Malicious Skill", value: "Malicious Skill" },
-            ] },
+            { key: "assetTags", label: "Tag", choices: TAG_FILTER_CHOICES },
+            // Same choices as "Tag" — a separate toggle, merged into the same backend filter below.
+            { key: "endpointTags", label: "Endpoint tags", choices: TAG_FILTER_CHOICES },
         ];
         if (usernameChoices.length) {
             defs.push({ key: "username", label: "Username", choices: usernameChoices.map((u) => ({ label: u, value: u })) });
@@ -318,10 +323,13 @@ function Endpoints() {
             const mongoSortOrder = sortOrder === -1 ? 1 : -1;
             const clientType = TAB_TO_CLIENT_TYPE[selectedTab];
             const tagValues = filtersObj?.assetTags;
+            const endpointTagValues = filtersObj?.endpointTags;
             const usernameValues = filtersObj?.username;
             const filters = {};
             if (clientType) filters.type = [clientType];
-            if (tagValues?.length) filters.tags = tagValues;
+            // Union "Tag" and "Endpoint tags" — two UI filters, one backend field.
+            const combinedTags = [...new Set([...(tagValues || []), ...(endpointTagValues || [])])];
+            if (combinedTags.length) filters.tags = combinedTags;
             if (usernameValues?.length) filters.username = usernameValues;
 
             const res = await api.fetchAgenticAssetsSummary({
