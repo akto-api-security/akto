@@ -33,25 +33,15 @@ public class AgentConversationDao extends AccountsContextDao<GenericAgentConvers
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
-    /**
-     * Filter for the chat-history listing: matches on contextSource, treating
-     * documents from before that field existed (or an unset current context) as
-     * belonging to API — the system-wide default context (UserDetailsFilter
-     * defaults Context.contextSource to API; the frontend defaults
-     * dashboardCategory to "API Security") — since Ask Akto conversations predate
-     * the contextSource concept entirely and have no prior tab affinity, unlike
-     * GuardrailPoliciesDao's AGENTIC fallback which is specific to that feature's
-     * Agentic-Security origin.
-     */
     public Bson getContextSourceFilter() {
         CONTEXT_SOURCE contextSource = Context.contextSource.get();
-        if (contextSource == null || contextSource == CONTEXT_SOURCE.API) {
-            return Filters.or(
-                Filters.eq(GenericAgentConversation.CONTEXT_SOURCE, CONTEXT_SOURCE.API.name()),
-                Filters.exists(GenericAgentConversation.CONTEXT_SOURCE, false)
-            );
+        if (contextSource == null) {
+            return Filters.exists(GenericAgentConversation.CONTEXT_SOURCE, false);
         }
-        return Filters.eq(GenericAgentConversation.CONTEXT_SOURCE, contextSource.name());
+        return Filters.or(
+            Filters.eq(GenericAgentConversation.CONTEXT_SOURCE, contextSource.name()),
+            Filters.exists(GenericAgentConversation.CONTEXT_SOURCE, false)
+        );
     }
 
 }
