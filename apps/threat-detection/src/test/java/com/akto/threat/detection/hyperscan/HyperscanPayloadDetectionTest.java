@@ -42,9 +42,9 @@ public class HyperscanPayloadDetectionTest {
     }
 
     private static void resetSingleton() throws Exception {
-        Field f = HyperscanThreatMatcher.class.getDeclaredField("INSTANCE");
+        Field f = HyperscanThreatMatcher.class.getDeclaredField("INSTANCE_REF");
         f.setAccessible(true);
-        f.set(null, null);
+        ((java.util.concurrent.atomic.AtomicReference<?>) f.get(null)).set(null);
     }
 
     // =====================================================================
@@ -2251,6 +2251,62 @@ public class HyperscanPayloadDetectionTest {
         // Or the match text itself is a substring of the phrase (very short match)
         if (mt.length() >= 3 && ph.contains(mt)) return true;
         return false;
+    }
+
+    // =====================================================================
+    //  FALSE POSITIVE — Real-world browser request with Dynatrace/APM headers
+    //  Validates that observability/tracing headers with semicolons, hex IDs,
+    //  and special characters do NOT trigger sqli_comment_evasion or any
+    //  other pattern.
+    //
+    //  Key concerns:
+    //   - tracestate/traceparent: semicolons + hex IDs (e.g. fw4;2;4db44f88)
+    //   - x-dynatrace: semicolons + hex chain (e.g. ;6hea258e...;7hbbd086...)
+    //   - sec-ch-ua: escaped quotes + semicolons (e.g. "Chrome";v="149")
+    //   - x-forwarded-for: 172.16.x.x without http:// — not SSRF
+    // =====================================================================
+
+    @Test
+    public void fp_dynatraceApmHeaders_noSqliOrSsrf() {
+        String headers =
+            "sec-fetch-mode=values: \"/*,*/*\", " +
+            "referer=values: \"https://portal.fgeguanajuato.gob.mx/PortalWebEstatal/Inicio/Formularios/index.aspx\", " +
+            "x-ruxit-apache-servernameports=values: \"portal.fgeguanajuato.gob.mx:443\", " +
+            "sec-fetch-site=values: \"same-origin\", " +
+            "x-dynatrace-requeststate=values: \"agentId=0x732d7cbb4db44f88&pathDepth=1\", " +
+            "accept-language=values: \"es-US,es-MX;q=0.9,es-419;q=0.8,es;q=0.7\", " +
+            "cookie=values: \"****\", " +
+            "x-forwarded-proto=values: \"https\", " +
+            "x-forwarded-port=values: \"443\", " +
+            "x-dynatrace-application=values: \"v=2;appId=d1a23b7b3011b5b8;injectionRule=auto;cookieDomain=fgeguanajuato.gob.mx;rid=-615665846;rpid=-1400787882;en=q9r4at6b\", " +
+            "x-forwarded-for=values: \"172.16.4.7\", " +
+            "accept=values: \"image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8\", " +
+            "sec-ch-ua=values: \"\\\"Google Chrome\\\";v=\\\"149\\\", \\\"Chromium\\\";v=\\\"149\\\", \\\"Not)A;Brand\\\";v=\\\"24\\\"\", " +
+            "sec-ch-ua-mobile=values: \"?1\", " +
+            "tracestate=values: \"4b797e96-c8b59c2d@dt=fw4;2;4db44f88;13e6b18;11;0;0;179;fb3b;2h01;3h4db44f88;4h013e6b18;5h01;7hbbd08611a57d8d28\", " +
+            "x-forwarded-server=values: \"portal.fgeguanajuato.gob.mx\", " +
+            "x-forwarded-host=values: \"wsc.fgeguanajuato.gob.mx\", " +
+            "sec-ch-ua-platform=values: \"\\\"Android\\\"\", " +
+            "traceparent=values: \"00-ea258eda53592cafcb2eb51657050ac6-bbd08611a57d8d28-01\", " +
+            "host=values: \"wsc.fgeguanajuato.gob.mx\", " +
+            "x-dynatrace=values: \"FW4;-927622099;2;1303662472;20867864;17;1266253462;377;f76d;2h01;3h4db44f88;4h013e6b18;5h01;6hea258eda53592cafcb2eb51657050ac6;7hbbd08611a57d8d28\", " +
+            "accept-encoding=values: \"gzip, deflate, br, zstd\", " +
+            "sec-fetch-dest=values: \"image\", " +
+            "user-agent=values: \"Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36\"";
+
+        List<HyperscanThreatMatcher.MatchResult> results = matcher.scan(headers, "headers");
+
+        // sqli_comment_evasion must not fire: semicolons in tracestate/x-dynatrace
+        // are NOT followed by '--', and there are no SQL comment sequences
+        assertNoPrefix(results, "sqli_comment_evasion",
+            "Dynatrace tracing headers with semicolons should not trigger sqli_comment_evasion");
+
+        // x-forwarded-for: 172.16.4.7 has no http:// prefix — not SSRF
+        assertNoPrefix(results, "ssrf_private_ip",
+            "x-forwarded-for with bare private IP (no http://) should not trigger ssrf_private_ip");
+
+        // Entire headers string should produce zero matches
+        assertEmpty(results, "Real-world Dynatrace/APM browser request headers");
     }
 
     private void assertNoCategory(List<HyperscanThreatMatcher.MatchResult> results, String cat, String msg) {
