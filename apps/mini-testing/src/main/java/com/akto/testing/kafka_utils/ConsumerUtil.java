@@ -295,7 +295,13 @@ public class ConsumerUtil {
                         loggerMaker.warnAndAddToDb("Error closing previous kafka consumer: " + e.getMessage());
                     }
                 }
-                consumer = new KafkaConsumer<>(properties);
+                Properties consumerProperties = properties;
+                if (Constants.CONCURRENT_TESTING) {
+                    consumerProperties = new Properties();
+                    consumerProperties.putAll(properties);
+                    consumerProperties.put(ConsumerConfig.GROUP_ID_CONFIG, Constants.getKafkaGroupIdConfig(summaryIdForTest));
+                }
+                consumer = new KafkaConsumer<>(consumerProperties);
                 ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
                     .consumer(consumer)
                     .ordering(ParallelConsumerOptions.ProcessingOrder.UNORDERED)
@@ -305,7 +311,7 @@ public class ConsumerUtil {
                     .maxFailureHistory(3)
                     .build();
                 parallelConsumer = ParallelStreamProcessor.createEosStreamProcessor(options);
-                parallelConsumer.subscribe(Arrays.asList(Constants.TEST_RESULTS_TOPIC_NAME));
+                parallelConsumer.subscribe(Arrays.asList(Constants.getTestResultsTopicName(summaryIdForTest)));
                 metrics.logConsumerUp(consumerAttempt);
 
                 parallelConsumer.poll(record -> {
@@ -457,7 +463,7 @@ public class ConsumerUtil {
                     loggerMaker.errorAndAddToDb(e,"Error closing kafka consumer: " + e.getMessage());
                 }
             }
-            Producer.deleteTestResultsTopic();
+            Producer.deleteTestResultsTopic(summaryIdForTest);
             TestingStateStore.clear();
         }
     }

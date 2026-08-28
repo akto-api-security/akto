@@ -75,17 +75,17 @@ public class Producer {
                 throw new Exception("Kafka producer not ready - fallback to legacy testing required");
             }
 
-            producer.sendWithCounter(messageString, Constants.TEST_RESULTS_TOPIC_NAME, throttleNumber);
+            producer.sendWithCounter(messageString, Constants.getTestResultsTopicName(singleTestPayload.getTestingRunResultSummaryId().toHexString()), throttleNumber);
         }
         return null;
     }
 
-    public static void deleteTestResultsTopic() {
+    public static void deleteTestResultsTopic(String runIdentifier) {
         if (!Constants.IS_NEW_TESTING_ENABLED || Constants.LOCAL_KAFKA_BROKER_URL == null) {
             return;
         }
         try {
-            deleteTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
+            deleteTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.getTestResultsTopicName(runIdentifier));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Failed to delete test results topic: " + e.getMessage());
         }
@@ -277,7 +277,7 @@ public class Producer {
         TestExecutor executor = new TestExecutor();
         if(!doInitOnly){
             try {
-                deleteTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
+                deleteTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.getTestResultsTopicName(summaryId.toHexString()));
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error deleting topic: " + e.getMessage());
                 e.printStackTrace();

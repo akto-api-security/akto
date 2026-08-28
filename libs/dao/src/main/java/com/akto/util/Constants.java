@@ -41,6 +41,27 @@ public class Constants {
     }
     public static final String TEST_RESULTS_TOPIC_NAME = withTopicPrefix("akto.test.messages");
     public static final String AKTO_KAFKA_GROUP_ID_CONFIG = withTopicPrefix("testing-group");
+
+    // For k8s horizontal scaling: identical replicas get identical env, so there's no per-replica
+    // value to namespace on (unlike AKTO_TOPIC_PREFIX). When true, derive the topic/group name from
+    // the run's own summaryId instead - Mongo's atomic run-claiming already guarantees no two
+    // replicas ever process the same summaryId, so this isolates concurrent runs with zero
+    // per-replica config. Falls back to the plain constants above when unset (no behavior change).
+    public static final boolean CONCURRENT_TESTING = (StringUtils.hasLength(System.getenv("CONCURRENT_TESTING")) && System.getenv("CONCURRENT_TESTING").equals("true"));
+
+    public static String getTestResultsTopicName(String runIdentifier) {
+        if (CONCURRENT_TESTING && runIdentifier != null && !runIdentifier.isEmpty()) {
+            return withTopicPrefix(runIdentifier + ".akto.test.messages");
+        }
+        return TEST_RESULTS_TOPIC_NAME;
+    }
+
+    public static String getKafkaGroupIdConfig(String runIdentifier) {
+        if (CONCURRENT_TESTING && runIdentifier != null && !runIdentifier.isEmpty()) {
+            return withTopicPrefix(runIdentifier + ".testing-group");
+        }
+        return AKTO_KAFKA_GROUP_ID_CONFIG;
+    }
     public static final int AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG = 1; // read one message at a time
     public static final String TESTING_STATE_FOLDER_PATH = System.getenv("TESTING_STATE_FOLDER_PATH") != null ? System.getenv("TESTING_STATE_FOLDER_PATH") : "testing-info";
     public static final String TESTING_STATE_FILE_NAME = "testing-state.json";
