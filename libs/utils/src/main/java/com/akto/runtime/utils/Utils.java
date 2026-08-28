@@ -226,16 +226,11 @@ public class Utils {
     }
 
     private static Set<String> initializeDebugUrlsSet() {
-        Set<String> ret = new HashSet<>();
-
         String debugUrls = ConfigHandler.readEnv("DEBUG_URLS", null);
         if (debugUrls == null || debugUrls.isEmpty()) {
-            ret = new HashSet<>();
-        } else {
-            ret = new HashSet<>(Arrays.asList(debugUrls.split(",")));
+            return new HashSet<>();
         }
-        logger.warn("DEBUG_URLS initialized with: " + ret.toString());
-        return ret;
+        return new HashSet<>(Arrays.asList(debugUrls.split(",")));
     }
 
     public static boolean printDebugUrlLog(String url) {
