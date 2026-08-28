@@ -461,7 +461,7 @@ public class TestExecutor {
             CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
             if(Constants.IS_NEW_TESTING_ENABLED){
                 try {
-                    Producer.createTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
+                    Producer.createTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.getTestResultsTopicName(summaryId.toHexString()));
                 } catch (Exception e) {
                     e.printStackTrace();
                     loggerMaker.errorAndAddToDb(e, "Error in creating topic");
@@ -557,7 +557,7 @@ public class TestExecutor {
 
                     if (!shouldContinueTestExecution(summaryId)) {
                         loggerMaker.infoAndAddToDb("Test run time expired during Kafka production; deleting topic and skipping consumer.");
-                        Producer.deleteTestResultsTopic();
+                        Producer.deleteTestResultsTopic(summaryId.toHexString());
                         TestingStateStore.clear();
                     } else if (unsentRecords == totalRecords.get()) {
                         // Check producer status
