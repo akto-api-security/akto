@@ -35,8 +35,10 @@ public class GuardrailPoliciesAction extends ActionSupport {
                         || (p.getTargetDeviceIds() != null && !p.getTargetDeviceIds().isEmpty());
                 if (hasTargeting) {
                     try {
-                        p.setApplyToDeviceIds(DbLayer.findDeviceIdsByTags(
+                        List<String> resolvedDeviceIds = new java.util.ArrayList<>(DbLayer.findDeviceIdsByTags(
                                 p.getTargetTags(), p.getTargetDeviceIds()));
+                        resolvedDeviceIds.addAll(p.resolveInferenceHooksDeviceLabels());
+                        p.setApplyToDeviceIds(resolvedDeviceIds);
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Error resolving device IDs for policy " + p.getHexId() + ": " + e.getMessage(), LogDb.DASHBOARD);
                         p.setApplyToDeviceIds(new java.util.ArrayList<>());
