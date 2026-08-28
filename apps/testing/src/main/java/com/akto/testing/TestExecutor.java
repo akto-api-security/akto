@@ -118,6 +118,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.StringUtils;
@@ -135,6 +136,21 @@ public class TestExecutor {
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
     private static final AtomicInteger totalTestsToBeExecuted = new AtomicInteger(0);
+
+    private static int runPickedUp;
+    private static int runMaxSec;
+
+    public static void initRunDeadline(TestingRunResultSummary trrs, int maxRunTime) {
+        runPickedUp = trrs.getStartTimestamp() > 0  ? trrs.getStartTimestamp() : 0;
+        runMaxSec = maxRunTime;
+    }
+
+    public static boolean shouldContinueTestExecution(ObjectId summaryId) {
+        if (!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)) {
+            return false;
+        }
+        return Context.now() - runPickedUp < runMaxSec;
+    }
 
     public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean shouldInitOnly) {
         totalTestsToBeExecuted.set(0);
@@ -465,12 +481,14 @@ public class TestExecutor {
                 if (messages == null || messages.isEmpty()) {
                     totalTestsToBeExecuted.set(temp.get());
                     loggerMaker.debugAndAddToDb("No sample messages found for apiInfoKey: " + apiInfoKey.toString(), LogDb.TESTING);
+                    latch.countDown();
                     continue;
                 }
                 String sample = messages.get(messages.size() - 1);
                 if(sample == null || sample.isEmpty()){
                     totalTestsToBeExecuted.set(temp.get());
                     loggerMaker.debugAndAddToDb("Sample message is empty for apiInfoKey: " + apiInfoKey.toString(), LogDb.TESTING);
+                    latch.countDown();
                     continue;
                 }
                 if(sample.contains("originalRequestPayload")){
@@ -514,11 +532,9 @@ public class TestExecutor {
     
             try {
                 if(!Constants.IS_NEW_TESTING_ENABLED){
-                    int waitTs = Context.now();
                     int prevCalcTime = Context.now();
                     int lastCheckedCount = 0;
-                    while(latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
-                        && (Context.now() - waitTs < maxRunTime)) {
+                    while(latch.getCount() > 0 && shouldContinueTestExecution(summaryId)) {
                             loggerMaker.infoAndAddToDb("waiting for tests to finish with count left: " + totalTestsToBeExecuted.get());
 
                             if(lastCheckedCount != totalTestsToBeExecuted.get()){
@@ -539,6 +555,9 @@ public class TestExecutor {
 
                             Thread.sleep(2000);
                     }
+                    if (latch.getCount() > 0 && !shouldContinueTestExecution(summaryId)) {
+                        loggerMaker.infoAndAddToDb("Max run time reached, stopping tests with count left: " + totalTestsToBeExecuted.get(), LogDb.TESTING);
+                    }
                 }else{
                     Thread.sleep(20000); // wait for 20 seconds to ensure all messages are processed
                     dbObject.put("PRODUCER_RUNNING", false);
@@ -548,9 +567,34 @@ public class TestExecutor {
                 }
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
+            } finally {
+                if (!Constants.IS_NEW_TESTING_ENABLED) {
+                    shutdownTestThreadPool(threadPool, testingRecords, latch);
+                }
             }
         }
         
+    }
+
+    private void shutdownTestThreadPool(ExecutorService threadPool, List<Future<Void>> testingRecords, CountDownLatch latch) {
+        boolean testsCompleted = latch.getCount() == 0;
+        if (!testsCompleted) {
+            for (Future<Void> future : testingRecords) {
+                future.cancel(true);
+            }
+            threadPool.shutdownNow();
+        } else {
+            threadPool.shutdown();
+        }
+        try {
+            if (!threadPool.awaitTermination(60, TimeUnit.SECONDS)) {
+                loggerMaker.infoAndAddToDb("Thread pool did not terminate within timeout, forcing shutdown", LogDb.TESTING);
+                threadPool.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            threadPool.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     private Void startWithLatch(List<String> testingRunSubCategories,int accountId,ApiInfo.ApiInfoKey apiInfoKey,
@@ -560,29 +604,32 @@ public class TestExecutor {
 
             Context.accountId.set(accountId);
             AtomicBoolean isApiInfoTested = new AtomicBoolean(false);
-            for (String testSubCategory: testingRunSubCategories) {
-                if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
-                    loggerMaker.debugAndAddToDb("Trying to run test for category: " + testSubCategory + " with summary state: " + GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId) );
-                    if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)
-                            && !TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
-                        insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit,
-                                apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun,
-                                isApiInfoTested, new AtomicInteger(), new AtomicInteger(), new AtomicInteger());
-                    }else{
-                        if(TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
-                            loggerMaker.infoAndAddToDb("Agent token limit reached, stopping further tests for run: " + testingRun.getHexId(), LogDb.TESTING);
-                        } else {
-                            loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
+            try {
+                for (String testSubCategory: testingRunSubCategories) {
+                    if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
+                        loggerMaker.debugAndAddToDb("Trying to run test for category: " + testSubCategory + " with summary state: " + GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId) );
+                        if(shouldContinueTestExecution(summaryId)
+                                && !TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
+                            insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit,
+                                    apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun,
+                                    isApiInfoTested, new AtomicInteger(), new AtomicInteger(), new AtomicInteger());
+                        }else{
+                            if(TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
+                                loggerMaker.infoAndAddToDb("Agent token limit reached, stopping further tests for run: " + testingRun.getHexId(), LogDb.TESTING);
+                            } else {
+                                loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
+                            }
+                            break;
                         }
-                        break;
                     }
                 }
+                if(isApiInfoTested.get()){
+                    loggerMaker.debug("Api: " + apiInfoKey.toString() + " has been successfully tested");
+                    ApiInfoDao.instance.updateLastTestedField(apiInfoKey);
+                }
+            } finally {
+                latch.countDown();
             }
-            if(isApiInfoTested.get()){
-                loggerMaker.debug("Api: " + apiInfoKey.toString() + " has been successfully tested");
-                ApiInfoDao.instance.updateLastTestedField(apiInfoKey);
-            }
-            latch.countDown();
 
         return null;
     }
@@ -641,7 +688,7 @@ public class TestExecutor {
             }
             
         }else{
-            if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)){
+            if(shouldContinueTestExecution(summaryId)){
                 TestingConfigurations instance = TestingConfigurations.getInstance();
                 String sampleMessage = messages.get(messages.size() - 1);
                 testingRunResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig, instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
