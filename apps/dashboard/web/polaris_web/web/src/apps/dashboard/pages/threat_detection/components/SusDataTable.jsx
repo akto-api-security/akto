@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import api from "../api";
@@ -17,6 +17,8 @@ import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "../../
 import IpReputationScore from "./IpReputationScore";
 import guardrailApi from "../../guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "../../guardrails/utils";
+import AdvancedPayloadSearch from "../../guardrails/violations/AdvancedPayloadSearch";
+import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "../../guardrails/violations/attributeSearch";
 
 const resourceName = {
   singular: "activity",
@@ -142,7 +144,7 @@ const getSortOptions = (headers) => {
 
 let filters = [];
 
-function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, initialTab }) {
+function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, initialTab, onRegisterPayloadSearch }) {
   const location = useLocation();
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
@@ -168,6 +170,28 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const [totalFilteredCount, setTotalFilteredCount] = useState(0)
   const [usernameMap, setUsernameMap] = useState({});
   const [usernameMapLoaded, setUsernameMapLoaded] = useState(!isEndpointSecurityCategory());
+  const [advancedFilters, setAdvancedFilters] = useState([]);
+  const [advancedFetchKey, setAdvancedFetchKey] = useState(0);
+
+  const handleAdvancedFiltersChange = (next) => {
+    setAdvancedFilters(next);
+    setAdvancedFetchKey((k) => k + 1);
+  };
+
+  useEffect(() => {
+    if (!onRegisterPayloadSearch) return undefined;
+    onRegisterPayloadSearch((text, side, line) => {
+      const parsed = filterFromEditorSelection(text, line, side);
+      if (!parsed) {
+        func.setToast(true, true, "Select a field and value, like host: example.com");
+        return;
+      }
+      setAdvancedFilters((prev) => addAdvancedFilter(prev, parsed));
+      setAdvancedFetchKey((k) => k + 1);
+      func.setToast(true, false, "Added as search filter");
+    });
+    return undefined;
+  }, [onRegisterPayloadSearch]);
 
   // Inline "Approve server" (Needs Approval tab). approveRow holds the raw event being approved.
   const [approveRow, setApproveRow] = useState(null);
@@ -699,7 +723,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       latestAttack = [],
       hostFilter = [],
       severityFilter = [];
-    let latestApiOrigRegex = queryValue.length > 3 ? queryValue : "";
+    let latestApiOrigRegex = toLatestApiOrigRegex(queryValue, advancedFilters) || "";
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
     }
@@ -769,7 +793,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
     // Store the total count for filtered results
     setTotalFilteredCount(res.total || 0);
-//    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
     if (isMisconfiguredSettings) {
       misconfigRowMetaRef.current = {};
@@ -1069,6 +1092,21 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         selected={selected}
         onSelect={handleSelectedTab}
         mode={IndexFiltersMode.Default}
+        searchAccessory={
+          <AdvancedPayloadSearch
+            filters={advancedFilters}
+            onChange={handleAdvancedFiltersChange}
+            showTags={false}
+          />
+        }
+        searchBelow={advancedFilters.length > 0 ? (
+          <AdvancedPayloadSearch
+            filters={advancedFilters}
+            onChange={handleAdvancedFiltersChange}
+            showButton={false}
+          />
+        ) : null}
+        callFromOutside={advancedFetchKey}
       />
 
       <Modal

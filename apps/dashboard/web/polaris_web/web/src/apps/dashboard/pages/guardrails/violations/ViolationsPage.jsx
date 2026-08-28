@@ -49,6 +49,8 @@ import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
 import { normalizeReasonPunctuation, coerceToText, sanitizeDisplayText } from "./violationsData";
+import AdvancedPayloadSearch from "./AdvancedPayloadSearch";
+import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "./attributeSearch";
 import InsightsFlyout from "@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout";
 import InsightsEntryButton from "@/apps/dashboard/pages/observe/agentic/insights/InsightsEntryButton";
 import useInsightsEntryPoint from "@/apps/dashboard/pages/observe/agentic/insights/useInsightsEntryPoint";
@@ -740,6 +742,8 @@ function Violations() {
     }, [navigate, setGuardrailViolationsNewLayout, legacyPath]);
 
     const [rows, setRows] = useState([]);
+    const [payloadSearch, setPayloadSearch] = useState("");
+    const [advancedFilters, setAdvancedFilters] = useState([]);
     const [summaryData, setSummaryData] = useState(null);
     const [summaryLoading, setSummaryLoading] = useState(true);
     const [selectedViolation, setSelectedViolation] = useState(null);
@@ -1244,6 +1248,7 @@ function Violations() {
         const SORT_FIELD_MAP = { detected: "detectedAt", severity: "severity" };
         const sort = sortKey ? { [SORT_FIELD_MAP[sortKey] || sortKey]: mongoSort } : { detectedAt: -1 };
 
+        const payloadRegex = toLatestApiOrigRegex(searchString, advancedFilters);
         return threatDetectionApi.fetchSuspectSampleData(
             effectiveSkip,
             filters?.actor || [],
@@ -1259,7 +1264,7 @@ function Violations() {
             undefined,      // successfulExploit
             undefined,      // label
             hostFilter.length > 0 ? hostFilter : undefined, // hosts
-            searchString && searchString.length >= 3 ? searchString : undefined,
+            payloadRegex || undefined,
             undefined,      // method
             isSeveritySort, // sortBySeverity — triggers aggregation-based rank sort in backend
             severityFilter.length > 0 ? severityFilter : undefined,
@@ -1281,7 +1286,7 @@ function Violations() {
             setRows(transformed);
             return { value: transformed, total };
         });
-    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, activeAssetFilter, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, guardrailApprovedByPolicy]);
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, activeAssetFilter, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, guardrailApprovedByPolicy, advancedFilters]);
 
     // Reload the grid when the Top Policies card selection changes (skip the initial mount).
     const policyFilterFirstRun = useRef(true);
@@ -1354,6 +1359,16 @@ function Violations() {
         if (e?.data) setSelectedViolation(e.data);
     };
 
+    const handleAddSearchFilter = useCallback((text, side, line) => {
+        const parsed = filterFromEditorSelection(text, line, side);
+        if (!parsed) {
+            func.setToast(true, true, "Select a field and value, like host: example.com");
+            return;
+        }
+        setAdvancedFilters((prev) => addAdvancedFilter(prev, parsed));
+        func.setToast(true, false, "Added as search filter");
+    }, []);
+
     useEffect(() => {
         const api = gridRef.current?.api;
         if (!api) return;
@@ -1419,6 +1434,23 @@ function Violations() {
                 defaultColDef={DEFAULT_COL_DEF}
                 autoSizeStrategy={AUTO_SIZE_STRATEGY}
                 searchPlaceholder="Search violations"
+                searchValue={payloadSearch}
+                onSearchChange={setPayloadSearch}
+                searchAccessory={
+                    <AdvancedPayloadSearch
+                        filters={advancedFilters}
+                        onChange={setAdvancedFilters}
+                        showTags={false}
+                    />
+                }
+                searchBelow={advancedFilters.length > 0 ? (
+                    <AdvancedPayloadSearch
+                        filters={advancedFilters}
+                        onChange={setAdvancedFilters}
+                        showButton={false}
+                    />
+                ) : null}
+                fetchTrigger={advancedFilters}
                 onRowClicked={handleRowClick}
                 suppressRowClickSelection
                 getRowStyle={() => ({ cursor: "pointer" })}
@@ -1493,6 +1525,7 @@ function Violations() {
             violation={selectedViolation}
             show={selectedViolation !== null}
             onClose={() => setSelectedViolation(null)}
+            onAddAsSearchFilter={handleAddSearchFilter}
         />,
         <Modal
             key="delete-confirm"
