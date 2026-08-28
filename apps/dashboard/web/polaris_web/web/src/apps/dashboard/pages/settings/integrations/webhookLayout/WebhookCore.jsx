@@ -83,7 +83,7 @@ function WebhookCore(props) {
                     const mapCustomWebhooks = filterCustomWebhooks.map(customWebhook => ({
                         ...customWebhook,
                         createTime: func.prettifyEpoch(customWebhook.createTime),
-                        lastSentTimestamp: func.prettifyEpoch(customWebhook.createTime),
+                        lastSentTimestamp: func.prettifyEpoch(customWebhook.lastSentTimestamp),
                         nextUrl: `${customWebhook.id}`
                     }))
 
