@@ -46,6 +46,7 @@ const ToolsGuardrailsStep = ({
                                 <ControlInfoIcon
                                     {...TOOLS_GUARDRAILS_DESCRIPTIONS.toolMisuse}
                                     onTryPrompt={onTryPrompt}
+                                    onEnable={() => setEnableToolMisuse(true)}
                                 />
                             </HorizontalStack>
                         }
@@ -62,6 +63,7 @@ const ToolsGuardrailsStep = ({
                                 <ControlInfoIcon
                                     {...TOOLS_GUARDRAILS_DESCRIPTIONS.maliciousTools}
                                     onTryPrompt={onTryPrompt}
+                                    onEnable={() => setEnableMaliciousTools(true)}
                                 />
                             </HorizontalStack>
                         }
@@ -78,6 +80,7 @@ const ToolsGuardrailsStep = ({
                                 <ControlInfoIcon
                                     {...TOOLS_GUARDRAILS_DESCRIPTIONS.toolNameDescriptionMismatch}
                                     onTryPrompt={onTryPrompt}
+                                    onEnable={() => setEnableToolNameDescriptionMismatch(true)}
                                 />
                             </HorizontalStack>
                         }

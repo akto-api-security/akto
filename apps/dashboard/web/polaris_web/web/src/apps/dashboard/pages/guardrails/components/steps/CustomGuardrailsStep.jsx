@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox, HorizontalStack, Badge, Banner } from "@shopify/polaris";
+import { VerticalStack, Text, FormLayout, TextField, Box, Checkbox, HorizontalStack, Badge, Banner } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import ControlInfoIcon from "../ControlInfoIcon";
 import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
@@ -78,8 +78,6 @@ const CustomGuardrailsStep = ({
     setEnableLlmPrompt,
     llmRule,
     setLlmRule,
-    llmConfidenceScore,
-    setLlmConfidenceScore,
     // LLM rule compliance (controlled by parent)
     llmCompliance,
     setLlmCompliance,
@@ -92,9 +90,7 @@ const CustomGuardrailsStep = ({
     enableExternalModel,
     setEnableExternalModel,
     url,
-    setUrl,
-    confidenceScore,
-    setConfidenceScore
+    setUrl
 }) => {
     const [urlError, setUrlError] = useState("");
     const [llmRuleCompliance, setLlmRuleCompliance] = useState({ loading: false, suggested: {}, accepted: {} });
@@ -214,6 +210,10 @@ const CustomGuardrailsStep = ({
                                 <ControlInfoIcon
                                     {...CUSTOM_GUARDRAILS_DESCRIPTIONS.llmPromptRule}
                                     onTryPrompt={onTryPrompt}
+                                    onEnable={() => {
+                                        setEnableLlmPrompt(true);
+                                        if (!llmRule.trim()) setLlmRule("Block requests for competitor pricing");
+                                    }}
                                 />
                             </HorizontalStack>
                         }
@@ -231,25 +231,6 @@ const CustomGuardrailsStep = ({
                                     multiline={4}
                                     placeholder="Enter your LLM evaluation prompt here..."
                                     helpText="This prompt will be used to evaluate whether content should be blocked. Be specific about what you want to detect."
-                                />
-
-                                <RangeSlider
-                                    label={
-                                        <HorizontalStack gap="1" blockAlign="center">
-                                            <Text as="span">Confidence score threshold</Text>
-                                            <ControlInfoIcon
-                                                {...CUSTOM_GUARDRAILS_DESCRIPTIONS.llmConfidenceThreshold}
-                                                onTryPrompt={onTryPrompt}
-                                            />
-                                        </HorizontalStack>
-                                    }
-                                    value={llmConfidenceScore}
-                                    onChange={setLlmConfidenceScore}
-                                    min={0}
-                                    max={1}
-                                    step={0.1}
-                                    output
-                                    helpText="Content will be blocked if the LLM's confidence score exceeds this threshold"
                                 />
 
                                 <ComplianceMappingTags
@@ -299,25 +280,6 @@ const CustomGuardrailsStep = ({
                                         placeholder="e.g. Redact customer full names and home addresses"
                                         helpText="Be specific about what to mask. Anything not described here is left untouched. To redact a second, unrelated category, create another policy."
                                     />
-
-                                    <RangeSlider
-                                        label={
-                                            <HorizontalStack gap="1" blockAlign="center">
-                                                <Text as="span">Confidence score threshold</Text>
-                                                <ControlInfoIcon
-                                                    {...CUSTOM_GUARDRAILS_DESCRIPTIONS.redactionConfidenceThreshold}
-                                                    onTryPrompt={onTryPrompt}
-                                                />
-                                            </HorizontalStack>
-                                        }
-                                        value={redactionRule.confidenceScore}
-                                        onChange={(value) => updateRedactionRule({ confidenceScore: value })}
-                                        min={0}
-                                        max={1}
-                                        step={0.1}
-                                        output
-                                        helpText="Text is only masked if the LLM's confidence that it matches your instruction exceeds this threshold"
-                                    />
                                 </FormLayout>
                             </VerticalStack>
                         </Box>
@@ -350,25 +312,6 @@ const CustomGuardrailsStep = ({
                                     placeholder="https://api.example.com/evaluate"
                                     helpText="The endpoint URL for your external evaluation model"
                                     error={urlError}
-                                />
-
-                                <RangeSlider
-                                    label={
-                                        <HorizontalStack gap="1" blockAlign="center">
-                                            <Text as="span">Confidence score threshold</Text>
-                                            <ControlInfoIcon
-                                                {...CUSTOM_GUARDRAILS_DESCRIPTIONS.externalConfidenceThreshold}
-                                                onTryPrompt={onTryPrompt}
-                                            />
-                                        </HorizontalStack>
-                                    }
-                                    value={confidenceScore}
-                                    onChange={setConfidenceScore}
-                                    min={0}
-                                    max={100}
-                                    step={25}
-                                    output
-                                    helpText="Content will be blocked if the model's confidence score exceeds this threshold (0-100)"
                                 />
                             </FormLayout>
                         </Box>
