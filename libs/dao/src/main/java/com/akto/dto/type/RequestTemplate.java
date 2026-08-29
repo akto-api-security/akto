@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 
 import com.akto.dao.context.Context;
+import com.akto.detection.DetectionBatch;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.SensitiveParamInfo;
@@ -98,6 +99,35 @@ public class RequestTemplate {
         return allParams.paramNames;
     }
 
+    /**
+     * Detects the data type of one value and records it, deferring to the batch's external
+     * corrector when the locally-detected type is configured as a trigger.
+     *
+     * With no batch open (or no corrector installed) this is exactly the old
+     * KeyTypes.process(): detect, then record.
+     */
+    private static void processValue(KeyTypes keyTypes, String url, String method, int responseCode,
+                                     boolean isHeader, String param, Object obj, String userId,
+                                     int apiCollectionId, String rawMessage,
+                                     Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap,
+                                     boolean isUrlParam, int timestamp) {
+
+        SingleTypeInfo.SubType localSubType = KeyTypes.detect(url, method, responseCode, isHeader, param, obj,
+                apiCollectionId, isUrlParam);
+
+        DetectionBatch batch = DetectionBatch.current();
+        if (batch != null && batch.shouldDefer(localSubType)) {
+            batch.defer(param, obj == null ? null : obj.toString(), localSubType,
+                    finalSubType -> keyTypes.record(url, method, responseCode, isHeader, param, obj, userId,
+                            apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap, isUrlParam, timestamp,
+                            finalSubType));
+            return;
+        }
+
+        keyTypes.record(url, method, responseCode, isHeader, param, obj, userId, apiCollectionId, rawMessage,
+                sensitiveParamInfoBooleanMap, isUrlParam, timestamp, localSubType);
+    }
+
     public void processHeaders(Map<String, List<String>> headerPayload, String url, String method, int responseCode, String userId,
                                int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap, int timestamp) {
         for (String header: headerPayload.keySet()) {
@@ -108,7 +138,7 @@ public class RequestTemplate {
             }
 
             for(String value: headerPayload.get(header)) {
-                keyTypes.process(url, method, responseCode, true, header, value, userId, apiCollectionId, rawMessage,  sensitiveParamInfoBooleanMap, false, timestamp);
+                processValue(keyTypes, url, method, responseCode, true, header, value, userId, apiCollectionId, rawMessage,  sensitiveParamInfoBooleanMap, false, timestamp);
             }
         }
     }
@@ -168,7 +198,7 @@ public class RequestTemplate {
                 }
 
                 for (Object obj: flattened.get(param)) {
-                    keyTypes.process(url, method, responseCode, false, param, obj, userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap, false, timestamp);
+                    processValue(keyTypes, url, method, responseCode, false, param, obj, userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap, false, timestamp);
                 }
             }
 
@@ -770,7 +800,7 @@ public class RequestTemplate {
             }
 
             String userId = "";
-            keyTypes.process(url, method, -1, false, idx+"", val,userId, apiCollectionId, "", new HashMap<>(), true, Context.now());
+            processValue(keyTypes, url, method, -1, false, idx+"", val, userId, apiCollectionId, "", new HashMap<>(), true, Context.now());
 
         }
     }

@@ -14,6 +14,7 @@ import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.detection.DetectionCorrectorInstaller;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
@@ -1295,6 +1296,10 @@ public class Main {
                 List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
                 SingleTypeInfo.fetchCustomDataTypes(accountId, customDataTypes, aktoDataTypes);
                 SingleTypeInfo.fetchCustomAuthTypes(accountId, customAuthTypes);
+
+                // Refreshed alongside data types on purpose: the corrector may only return labels
+                // that already exist as data types, so the two must not drift apart.
+                DetectionCorrectorInstaller.refresh(dataActor.fetchAccountSettings());
             }
         }, 0, 5, TimeUnit.MINUTES);
     }

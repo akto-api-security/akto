@@ -1,5 +1,7 @@
 package com.akto.hybrid_runtime;
 
+import com.akto.detection.DetectionBatch;
+
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 
 import java.security.interfaces.RSAPublicKey;
@@ -212,6 +214,16 @@ public class APICatalogSync {
     }
 
     public void computeDelta(URLAggregator origAggregator, boolean triggerTemplateGeneration, int apiCollectionId) {
+        // Values whose locally detected data type is configured as a corrector trigger have their
+        // recording deferred until this batch closes, so the whole batch is resolved in a single
+        // call rather than one per value. Returns null (and costs nothing) when no corrector is
+        // installed; a null resource is simply not closed.
+        try (DetectionBatch ignored = DetectionBatch.open()) {
+            computeDeltaInternal(origAggregator, triggerTemplateGeneration, apiCollectionId);
+        }
+    }
+
+    private void computeDeltaInternal(URLAggregator origAggregator, boolean triggerTemplateGeneration, int apiCollectionId) {
         long start = System.currentTimeMillis();
 
         APICatalog deltaCatalog = this.delta.get(apiCollectionId);
@@ -249,6 +261,8 @@ public class APICatalogSync {
 
         start = System.currentTimeMillis();
         Map<URLStatic, RequestTemplate> pendingRequests = createRequestTemplates(aggregator);
+
+        DetectionBatch.flushCurrent();
         loggerMaker.info("pendingRequests: " + (System.currentTimeMillis() - start));
 
         int totalApiCount = pendingRequests.size();

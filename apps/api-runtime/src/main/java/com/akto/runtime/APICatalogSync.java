@@ -1,5 +1,7 @@
 package com.akto.runtime;
 
+import com.akto.detection.DetectionBatch;
+
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -190,6 +192,16 @@ public class APICatalogSync {
     }
 
     public void computeDelta(URLAggregator origAggregator, boolean triggerTemplateGeneration, int apiCollectionId) {
+        // Values whose locally detected data type is configured as a corrector trigger have their
+        // recording deferred until this batch closes, so the whole batch is resolved in a single
+        // call rather than one per value. Returns null (and costs nothing) when no corrector is
+        // installed; a null resource is simply not closed.
+        try (DetectionBatch ignored = DetectionBatch.open()) {
+            computeDeltaInternal(origAggregator, triggerTemplateGeneration, apiCollectionId);
+        }
+    }
+
+    private void computeDeltaInternal(URLAggregator origAggregator, boolean triggerTemplateGeneration, int apiCollectionId) {
         long start = System.currentTimeMillis();
 
         APICatalog deltaCatalog = this.delta.get(apiCollectionId);
@@ -227,6 +239,11 @@ public class APICatalogSync {
 
         start = System.currentTimeMillis();
         Map<URLStatic, RequestTemplate> pendingRequests = createRequestTemplates(aggregator);
+
+        // Resolve everything detection deferred, BEFORE any template merging below. mergeFrom()
+        // deep-copies KeyTypes, so a deferred record applied after a merge would land on an
+        // orphaned object and be silently lost.
+        DetectionBatch.flushCurrent();
         logger.info("pendingRequests: " + (System.currentTimeMillis() - start));
 
         start = System.currentTimeMillis();
