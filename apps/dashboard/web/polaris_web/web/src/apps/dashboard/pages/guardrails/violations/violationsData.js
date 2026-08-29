@@ -40,6 +40,16 @@ export function coerceToText(value) {
     try { return JSON.stringify(value); } catch { return String(value); }
 }
 
+// Fallback for Prompt/Tool when no known shape matches: the full request body, headers
+// stripped, rather than `reason` - reason is the guardrail's own response-side explanation,
+// not request content, and showing it in place of the prompt misrepresents what was sent.
+function _fullRequestJsonNoHeaders(req) {
+    if (!req || typeof req !== "object") return null;
+    const { headers, requestHeaders, ...rest } = req;
+    if (Object.keys(rest).length === 0) return null;
+    try { return JSON.stringify(rest, null, 2); } catch { return null; }
+}
+
 function _extractPromptBody(req) {
     if (!req) return null;
     if (req.body != null) return req.body;
@@ -331,7 +341,10 @@ export function buildFallbackDetail(row) {
         fileHighlights: fileHighlights || undefined,
         skillName: skillName || undefined,
         promptResponse: (() => {
-            const promptBody = primaryValueFull || reason || undefined;
+            const promptBody = primaryValueFull
+                || (isPromptOrTool ? _fullRequestJsonNoHeaders(req) : null)
+                || reason
+                || undefined;
             return {
                 valueLabel: VALUE_SECTION_LABELS[row.type] || VALUE_SECTION_LABELS.Other,
                 promptBody,
