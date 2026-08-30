@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * that contract works unchanged:
  *
  *   POST { "detections":  [ { "idx": 0, "jsonpath": "...", "value": "...", "type": "EMAIL" } ] }
- *   200  { "corrections": [ { "idx": 0, "type": "AGODA_EMAIL_CUSTOMER" } ] }
+ *   200  { "corrections": [ { "idx": 0, "type": "VERIFIED_CUSTOMER_EMAIL" } ] }
  *
  * A candidate the service cannot place is left out of "corrections" and keeps its local type.
  *
