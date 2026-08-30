@@ -33,6 +33,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.task.Cluster;
 import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -44,10 +45,11 @@ import static com.akto.task.Cluster.callDibs;
 
 /**
  * Backfills a short, LLM-generated {@code description} for API collections that don't have one yet.
- * Runs hourly, capped at GLOBAL_RUN_LIMIT collections per run, up to CONCURRENCY LLM calls at a time.
- * Failed attempts are capped via an in-memory counter (resets on restart - acceptable, that's rare).
- * Per-endpoint descriptions (skills/MCP tools/agent-LLM endpoints) are a separate concern, handled by
- * {@link EndpointDescriptionCron} on its own schedule and budget.
+ * Runs every 30 minutes, sweeping every active account (via {@link AccountTask}) for Atlas/Argus
+ * collections that still have no description, capped at GLOBAL_RUN_LIMIT collections per run, up to
+ * CONCURRENCY LLM calls at a time. Failed attempts are capped via an in-memory counter (resets on
+ * restart - acceptable, that's rare). Per-endpoint descriptions (skills/MCP tools/agent-LLM endpoints)
+ * are a separate concern, handled by {@link EndpointDescriptionCron} on its own schedule and budget.
  */
 public class CollectionDescriptionCron {
 
@@ -58,10 +60,6 @@ public class CollectionDescriptionCron {
     private static final int MAX_FAILED_ATTEMPTS = 3;
     private static final int CONCURRENCY = 5;
     private static final int MAX_ENDPOINTS_FOR_CONTEXT = 15;
-
-    // Explicit allowlist - this cron no longer sweeps every account, only these. Add more IDs here as
-    // needed.
-    private static final List<Integer> ALLOWED_ACCOUNT_IDS = Arrays.asList(1779231193, 1783981503);
 
     // Skill/MCP-server collections can have hundreds of distinct skills or tools - sampled wide enough
     // to report the true count, but only a slice of names is ever put in a prompt.
@@ -93,12 +91,12 @@ public class CollectionDescriptionCron {
             ExecutorService pool = Executors.newFixedThreadPool(CONCURRENCY);
 
             try {
-                for (int accountId : ALLOWED_ACCOUNT_IDS) {
+                AccountTask.instance.executeTask(account -> {
                     if (remaining.get() <= 0) {
-                        break;
+                        return;
                     }
-                    processAccountCollections(accountId, remaining, pool);
-                }
+                    processAccountCollections(account.getId(), remaining, pool);
+                }, "collection-description-cron");
             } finally {
                 // Always shut the pool down, even if account iteration itself failed (e.g. the initial
                 // account fetch throwing) - otherwise these threads leak for good, since nothing else
@@ -118,7 +116,7 @@ public class CollectionDescriptionCron {
         }
     }
 
-    /** Sets Context.accountId itself - called once per account in ALLOWED_ACCOUNT_IDS. */
+    /** Sets Context.accountId itself - called once per active account by AccountTask.executeTask(). */
     private void processAccountCollections(int accountId, AtomicInteger remaining, ExecutorService pool) {
         Context.accountId.set(accountId);
         List<ApiCollection> pending = findPendingCollections(remaining.get());

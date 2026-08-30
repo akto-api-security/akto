@@ -16,6 +16,11 @@ DO NOT:
 - Do not use markdown.
 - Do not invent capabilities the endpoints don't support - stating a real technical fact about a recognized underlying runtime is not "inventing".
 - Do not enumerate every endpoint - a partial list read as exhaustive is worse than a tight summary.
+- Do not quote literal endpoint paths or routes (e.g. "/webhook/calculator", "/api/tags") in the
+  description - describe the functional capability instead. The endpoint set can grow or change over
+  time; a specific path baked into the description goes stale the moment a new one is added. Naming a
+  recognized underlying runtime/infrastructure by name (e.g. "Ollama") is fine - that's different from
+  quoting the path itself.
 - Do not use hedging words ("likely", "appears to", "designed to", "suggesting", "indicating").
 {{SERVICE_GRAPH_DO_NOT_BULLET}}
 IF YOU CANNOT DETERMINE PURPOSE:
