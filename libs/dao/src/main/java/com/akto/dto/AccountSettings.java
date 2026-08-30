@@ -51,6 +51,112 @@ public class AccountSettings {
 
     // Used by mini-runtime to send to threat topic.
     public static final String THREAT_KAFKA_PARTITION_KEY = "threatKafkaPartitionKey";
+
+    /*
+     * External detection corrector. Local detection can tell that a value looks like an email or a
+     * card; it cannot tell whose it is, because that lives in a system outside Akto. When enabled,
+     * values whose locally detected type is listed in detectionCorrectorTriggerTypes are sent to
+     * detectionCorrectorUrl, which may return a more specific data type for the ones it recognises.
+     *
+     * All of it, including the auth token, is configured here - the runtime reads no environment
+     * variables for this feature. Note the token therefore travels to the runtime over whatever
+     * channel serves account settings, and should never be echoed back to a UI.
+     */
+    public static final String DETECTION_CORRECTOR_ENABLED = "detectionCorrectorEnabled";
+    private boolean detectionCorrectorEnabled;
+
+    public static final String DETECTION_CORRECTOR_URL = "detectionCorrectorUrl";
+    private String detectionCorrectorUrl;
+
+    public static final String DETECTION_CORRECTOR_TRIGGER_TYPES = "detectionCorrectorTriggerTypes";
+    private List<String> detectionCorrectorTriggerTypes;
+
+    public static final String DETECTION_CORRECTOR_TIMEOUT_MS = "detectionCorrectorTimeoutMs";
+    private int detectionCorrectorTimeoutMs;
+
+    public static final String DETECTION_CORRECTOR_MAX_BATCH_SIZE = "detectionCorrectorMaxBatchSize";
+    private int detectionCorrectorMaxBatchSize;
+
+    public static final String DETECTION_CORRECTOR_AUTH_TOKEN = "detectionCorrectorAuthToken";
+    private String detectionCorrectorAuthToken;
+
+    /*
+     * Akto data type name -> the name the classifier expects on the wire, e.g. CREDIT_CARD -> CARD.
+     * Detection type vocabularies differ between systems, and a name the classifier does not
+     * recognise is silently ignored: it answers 200 with an empty corrections list, exactly as it
+     * would for "I looked and found nothing". Without a mapping that failure is invisible.
+     */
+    public static final String DETECTION_CORRECTOR_TYPE_ALIASES = "detectionCorrectorTypeAliases";
+    private Map<String, String> detectionCorrectorTypeAliases;
+
+    /* Per-value logging, including raw values. Off unless deliberately switched on. */
+    public static final String DETECTION_CORRECTOR_DEBUG = "detectionCorrectorDebug";
+    private boolean detectionCorrectorDebug;
+
+    public String getDetectionCorrectorAuthToken() {
+        return detectionCorrectorAuthToken;
+    }
+
+    public void setDetectionCorrectorAuthToken(String detectionCorrectorAuthToken) {
+        this.detectionCorrectorAuthToken = detectionCorrectorAuthToken;
+    }
+
+    public Map<String, String> getDetectionCorrectorTypeAliases() {
+        return detectionCorrectorTypeAliases;
+    }
+
+    public void setDetectionCorrectorTypeAliases(Map<String, String> detectionCorrectorTypeAliases) {
+        this.detectionCorrectorTypeAliases = detectionCorrectorTypeAliases;
+    }
+
+    public boolean isDetectionCorrectorEnabled() {
+        return detectionCorrectorEnabled;
+    }
+
+    public void setDetectionCorrectorEnabled(boolean detectionCorrectorEnabled) {
+        this.detectionCorrectorEnabled = detectionCorrectorEnabled;
+    }
+
+    public String getDetectionCorrectorUrl() {
+        return detectionCorrectorUrl;
+    }
+
+    public void setDetectionCorrectorUrl(String detectionCorrectorUrl) {
+        this.detectionCorrectorUrl = detectionCorrectorUrl;
+    }
+
+    public List<String> getDetectionCorrectorTriggerTypes() {
+        return detectionCorrectorTriggerTypes;
+    }
+
+    public void setDetectionCorrectorTriggerTypes(List<String> detectionCorrectorTriggerTypes) {
+        this.detectionCorrectorTriggerTypes = detectionCorrectorTriggerTypes;
+    }
+
+    public int getDetectionCorrectorTimeoutMs() {
+        return detectionCorrectorTimeoutMs;
+    }
+
+    public void setDetectionCorrectorTimeoutMs(int detectionCorrectorTimeoutMs) {
+        this.detectionCorrectorTimeoutMs = detectionCorrectorTimeoutMs;
+    }
+
+    public int getDetectionCorrectorMaxBatchSize() {
+        return detectionCorrectorMaxBatchSize;
+    }
+
+    public void setDetectionCorrectorMaxBatchSize(int detectionCorrectorMaxBatchSize) {
+        this.detectionCorrectorMaxBatchSize = detectionCorrectorMaxBatchSize;
+    }
+
+    public boolean isDetectionCorrectorDebug() {
+        return detectionCorrectorDebug;
+    }
+
+    public void setDetectionCorrectorDebug(boolean detectionCorrectorDebug) {
+        this.detectionCorrectorDebug = detectionCorrectorDebug;
+    }
+
     private ThreatKafkaPartitionKey threatKafkaPartitionKey;
 
     public enum ThreatKafkaPartitionKey {
