@@ -389,10 +389,12 @@ export function buildFallbackDetail(row) {
             // promptBody must come only from the request/tool-call payload. Never fall back to
             // `reason` (a response/evidence-derived explanation) here — that leaks response
             // content into what's meant to show what was actually requested; `reason` already
-            // renders in its own "Reason" field below. Config violations show the full captured
-            // config file (with the flagged field highlighted) instead of just the small
-            // evidence excerpt - same content the old separate Config.json tab used to show.
-            const promptBody = (row.type === "Config" ? fileContent : null) || primaryValueFull || undefined;
+            // renders in its own "Reason" field below. Config & Skill violations show the full
+            // captured file (Config.json with the flagged field highlighted / the skill's
+            // name+description+content) instead of just the small evidence excerpt - same
+            // content the old separate Config.json/Skill Info tabs used to show.
+            const showsFullFile = row.type === "Config" || row.type === "Skill";
+            const promptBody = (showsFullFile ? fileContent : null) || primaryValueFull || undefined;
             return {
                 valueLabel: VALUE_SECTION_LABELS[row.type] || VALUE_SECTION_LABELS.Other,
                 promptBody,
