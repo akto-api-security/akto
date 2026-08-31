@@ -1294,7 +1294,6 @@ function Violations() {
             configEvaluationMode,
             riskScoreFilter?.type,
             riskScoreFilter?.filter,
-            riskScoreFilter?.filterTo,
         ).then(result => {
             const events = result?.maliciousEvents || [];
             let transformed = events.map(e => transformEvent(e, collectionsMap, usernameMapRef.current, guardrailComplianceMapRef.current));

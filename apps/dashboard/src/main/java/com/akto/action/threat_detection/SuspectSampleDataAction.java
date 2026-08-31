@@ -95,7 +95,6 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter Boolean matchClaudeConfig;
   @Getter @Setter String riskScoreFilterType;
   @Getter @Setter Double riskScoreFilterValue;
-  @Getter @Setter Double riskScoreFilterValueTo;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -205,9 +204,6 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     }
     if (this.riskScoreFilterValue != null) {
       filter.put("riskScoreFilterValue", this.riskScoreFilterValue);
-    }
-    if (this.riskScoreFilterValueTo != null) {
-      filter.put("riskScoreFilterValueTo", this.riskScoreFilterValueTo);
     }
 
     Map<String, Integer> time_range = new HashMap<>();

@@ -874,13 +874,6 @@ public class MaliciousEventService {
         if (!filter.hasRiskScoreFilterValue()) return null;
         inExpr = new Document("$lte", Arrays.asList(parsedScore, filter.getRiskScoreFilterValue()));
         break;
-      case "inRange":
-        if (!filter.hasRiskScoreFilterValue() || !filter.hasRiskScoreFilterValueTo()) return null;
-        inExpr = new Document("$and", Arrays.asList(
-            new Document("$gte", Arrays.asList(parsedScore, filter.getRiskScoreFilterValue())),
-            new Document("$lte", Arrays.asList(parsedScore, filter.getRiskScoreFilterValueTo()))
-        ));
-        break;
       default:
         return null;
     }
