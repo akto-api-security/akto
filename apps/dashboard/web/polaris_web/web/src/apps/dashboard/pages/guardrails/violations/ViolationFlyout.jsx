@@ -26,6 +26,7 @@ import SampleDataList from "@/apps/dashboard/components/shared/SampleDataList";
 import func from "@/util/func";
 import guardrailsApi from "../api";
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
+import { redactSampleDataByKeywords } from "@/apps/dashboard/pages/threat_detection/utils/redactSampleData";
 import issuesApi from "@/apps/dashboard/pages/issues/api";
 import settingFunctions from "@/apps/dashboard/pages/settings/module";
 import issuesFunctions from "@/apps/dashboard/pages/issues/module";
@@ -376,13 +377,32 @@ function FlyoutHeader({ row, onClose, onStatusUpdate }) {
 
 export default function ViolationFlyout({ violation, show, onClose, onStatusUpdate }) {
     const [selectedTab, setSelectedTab] = useState(0);
+    const [enrichedPayload, setEnrichedPayload] = useState(null);
 
     useEffect(() => { setSelectedTab(0); }, [violation?.id]);
 
+    // The list endpoint's row doesn't always carry the full captured request/response
+    // (row.payload can be empty even though the event has one) - the same gap the old
+    // Threat Activity flyout covers by fetching it on open via refId/eventType/filterId.
+    // Do the same here, only when the row itself has nothing to show.
+    useEffect(() => {
+        setEnrichedPayload(null);
+        if (violation?.payload || !violation?.refId || !violation?.eventType || !violation?.filterId) return;
+        let cancelled = false;
+        threatDetectionApi.fetchMaliciousRequest(violation.refId, violation.eventType, violation.actor || "", violation.filterId)
+            .then(res => {
+                if (cancelled) return;
+                const orig = res?.maliciousPayloadsResponses?.[0]?.orig;
+                if (orig) setEnrichedPayload(redactSampleDataByKeywords(orig));
+            })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, [violation?.id, violation?.refId, violation?.eventType, violation?.filterId, violation?.actor, violation?.payload]);
+
     const detail = useMemo(() => {
         if (!violation) return null;
-        return buildFallbackDetail(violation);
-    }, [violation]);
+        return buildFallbackDetail(enrichedPayload ? { ...violation, payload: enrichedPayload } : violation);
+    }, [violation, enrichedPayload]);
 
     const chatMetadata = useMemo(() => {
         if (!violation || !detail) return null;
@@ -407,9 +427,7 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
             { id: "promptResponse", content: "Values" },
         ];
         let middle = null;
-        if (detail?.chatSession?.length) middle = "chat";
-        else if (detail?.fileContent && violation?.type !== "Skill") middle = "file";
-        if (middle === "chat") tabs.push({ id: "chat", content: "Chat Session" });
+        if (detail?.fileContent && violation?.type !== "Skill" && violation?.type !== "Tool") middle = "file";
         if (middle === "file") tabs.push({ id: "file", content: detail.fileTabLabel || "File" });
         if (detail?.remediation) tabs.push({ id: "remediation", content: "Remediation" });
         tabs.push({ id: "timeline", content: "Timeline" });

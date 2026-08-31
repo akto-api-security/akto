@@ -98,12 +98,22 @@ function _unwrapNestedJsonValue(obj, depth) {
     return out;
 }
 
+// A JSON-shaped string that fails to fully JSON.parse (e.g. a captured tool command whose own
+// escaping breaks the outer JSON) still reads far better with real line breaks instead of
+// literal "\n"/"\t" - do a conservative de-escape for display only. This doesn't attempt to
+// repair or validate the JSON, just make an already-broken/unparsed blob legible.
+function looseUnescapeForDisplay(text) {
+    const trimmed = text.trim();
+    if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) return text;
+    return text.replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\"/g, "\"");
+}
+
 // Returns { text, isJson } — pretty-printed JSON (with nested JSON-strings unwrapped) when
-// the input looks like JSON, otherwise the original text untouched.
+// the input looks like JSON, otherwise the original text (loosely de-escaped if JSON-shaped).
 export function prettyPrintIfJson(text) {
     if (!text) return { text, isJson: false };
     const unwrapped = _unwrapNestedJson(text);
-    if (unwrapped === text) return { text, isJson: false };
+    if (unwrapped === text) return { text: looseUnescapeForDisplay(text), isJson: false };
     return { text: JSON.stringify(unwrapped, null, 2), isJson: true };
 }
 
@@ -284,8 +294,15 @@ export function buildFallbackDetail(row) {
     const reason = normalizeReasonPunctuation(meta.reason || guardrailReason) || null;
     const policyName = meta.policyName || (row.policyName && row.policyName !== "-" ? row.policyName : null);
     const isPromptOrTool = row.type === "Prompt" || row.type === "Tool";
+    // Tool events store the request payload flat (req *is* the tool args, e.g.
+    // {file_path, content}) rather than wrapped in a {body: ...} envelope, so
+    // _extractPromptBody (which only looks for req.body/req.messages) finds nothing —
+    // fall back to the whole req object itself for Tool violations. And when
+    // outer.requestPayload fails to JSON.parse at all (e.g. a captured tool call whose
+    // command text breaks JSON escaping) - req is null even though the raw string has real
+    // content - fall back to that raw string rather than showing nothing.
     const rawPrimaryValue = coerceToText(isPromptOrTool
-        ? _extractPromptBody(req)
+        ? (_extractPromptBody(req) ?? (row.type === "Tool" ? req : null) ?? outer.requestPayload ?? null)
         : row.type === "Skill" ? (resp?.evidence || null) : (req?.evidence || null));
     // If the value is JSON (or JSON nested inside JSON, e.g. a proxied request captured as a
     // string field), unwrap and pretty-print it instead of showing raw escaped quotes.
@@ -331,14 +348,18 @@ export function buildFallbackDetail(row) {
         fileHighlights: fileHighlights || undefined,
         skillName: skillName || undefined,
         promptResponse: (() => {
-            const promptBody = primaryValueFull || reason || undefined;
+            // promptBody must come only from the request/tool-call payload. Never fall back to
+            // `reason` (a response/evidence-derived explanation) here — that leaks response
+            // content into what's meant to show what was actually requested; `reason` already
+            // renders in its own "Reason" field below.
+            const promptBody = primaryValueFull || undefined;
             return {
                 valueLabel: VALUE_SECTION_LABELS[row.type] || VALUE_SECTION_LABELS.Other,
                 promptBody,
-                behaviour: row.behaviourRaw || meta.behaviour || meta.nbehaviour || undefined,
+                behaviour: row.behaviourRaw || meta.behaviour || meta.nbehaviour || row.action || undefined,
                 blockedAt: resp?.error?.data?.blocked_at || row.detected || undefined,
                 blockedBy: resp?.error?.data?.blocked_by || policyName || undefined,
-                reason: (reason && reason !== promptBody) ? reason : undefined,
+                reason: reason || undefined,
                 message: resp?.error?.message || resp?.message || undefined,
             };
         })(),
