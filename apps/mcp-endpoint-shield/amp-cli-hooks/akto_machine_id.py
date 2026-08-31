@@ -7,6 +7,8 @@ import os
 import platform
 import subprocess
 import uuid
+import re
+import socket
 
 try:
     import pwd
@@ -16,6 +18,46 @@ except ImportError:
 
 
 _machine_id = None
+
+
+def _resolve_device_name_source() -> str:
+    """
+    Match Go GetDeviceName: resolve name then ToLower + [^a-zA-Z0-9] -> '-'.
+
+    1. macOS: scutil --get ComputerName
+    2. Hostname with .local stripped
+    3. _generate_machine_id() (IOPlatformUUID / MAC fallback)
+    """
+    raw = ""
+    if platform.system() == "Darwin":
+        try:
+            result = subprocess.run(
+                ["scutil", "--get", "ComputerName"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                raw = (result.stdout or "").strip()
+        except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+            pass
+
+    if not raw:
+        try:
+            h = socket.gethostname()
+            if h:
+                if h.endswith(".local"):
+                    h = h[: -len(".local")]
+                raw = h
+        except Exception:
+            pass
+
+    if not raw:
+        raw = _generate_machine_id()
+
+    if raw and raw.strip():
+        return re.sub(r"[^a-zA-Z0-9]", "-", raw.strip()).lower()
+    return ""
 
 
 def _generate_machine_id() -> str:
@@ -65,14 +107,26 @@ def _generate_machine_id() -> str:
 
 def get_machine_id() -> str:
     """
-    Get the cached machine ID, generating it on first call.
+    Get the cached device label, generating it on first call.
+
+    Mirrors the Go GetDeviceLabel() in utils/device.go: "{device-name}-{first8ofMachineID}"
+    (e.g. "macbook-pro-a1b2c3d4"). The installers bake the same value into DEVICE_ID, so a
+    hook that falls back to this function reports the label the agent heartbeat uses.
 
     Returns:
-        Machine ID as a lowercase string without dashes
+        Device label as a lowercase string
     """
     global _machine_id
     if _machine_id is None:
-        _machine_id = _generate_machine_id().lower()
+        device_name = _resolve_device_name_source()
+        machine_id = _generate_machine_id()
+        short_id = machine_id[:8]
+        if device_name and short_id:
+            _machine_id = f"{device_name}-{short_id}"
+        elif device_name:
+            _machine_id = device_name
+        else:
+            _machine_id = machine_id
     return _machine_id
 
 

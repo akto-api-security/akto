@@ -108,8 +108,8 @@ get_api_token() {
 # Device label matching Go's GetDeviceLabel(): "{ComputerName}-{first8ofMachineID}".
 generate_device_label() {
     local device_name
-    device_name=$(scutil --get ComputerName 2>/dev/null | tr ' ' '-')
-    [ -z "$device_name" ] && device_name=$(hostname 2>/dev/null | sed 's/\.local$//' | tr ' ' '-')
+    device_name=$(scutil --get ComputerName 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g')
+    [ -z "$device_name" ] && device_name=$(hostname 2>/dev/null | sed 's/\.local$//' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g')
 
     local machine_id=""
     if command -v ioreg >/dev/null 2>&1; then

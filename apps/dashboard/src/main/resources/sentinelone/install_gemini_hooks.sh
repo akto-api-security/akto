@@ -125,11 +125,11 @@ get_api_token() {
 # "{hostname}-{first8ofMachineID}" (e.g. "macbook-pro-a1b2c3d4")
 # This must stay in sync with utils/device.go GetDeviceLabel().
 generate_device_label() {
-    # Step 1: Computer Name from scutil (preserves casing like AJI-RAJAP-M02)
+    # Step 1: Computer Name from scutil, normalised to match Go's GetDeviceLabel
     # Fallback to hostname if scutil is unavailable
     local device_name
-    device_name=$(scutil --get ComputerName 2>/dev/null | tr ' ' '-')
-    [ -z "$device_name" ] && device_name=$(hostname 2>/dev/null | sed 's/\.local$//' | tr ' ' '-')
+    device_name=$(scutil --get ComputerName 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g')
+    [ -z "$device_name" ] && device_name=$(hostname 2>/dev/null | sed 's/\.local$//' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g')
 
     # Step 2: machine UUID — IOPlatformUUID, no dashes, lowercase
     local machine_id=""

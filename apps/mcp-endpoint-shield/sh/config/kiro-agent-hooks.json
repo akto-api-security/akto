@@ -1,0 +1,21 @@
+{
+  "hooks": {
+    "userPromptSubmit": [
+      {
+        "command": "~/.akto/hooks/akto-hook.sh kiro_cli userPromptSubmit"
+      }
+    ],
+    "preToolUse": [
+      {
+        "matcher": "*",
+        "command": "~/.akto/hooks/akto-hook.sh kiro_cli preToolUse"
+      }
+    ],
+    "postToolUse": [
+      {
+        "matcher": "*",
+        "command": "~/.akto/hooks/akto-hook.sh kiro_cli postToolUse"
+      }
+    ]
+  }
+}
