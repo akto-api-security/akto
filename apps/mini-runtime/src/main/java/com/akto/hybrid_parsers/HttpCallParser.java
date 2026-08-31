@@ -2021,26 +2021,48 @@ public class HttpCallParser {
         return deviceUserMapCache;
     }
 
-    private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {
-        if (McpRequestResponseUtils.isMcpRequest(responseParams).getFirst()) {
-            return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES));
+    private boolean isAgenticTaggingAllowed(HttpResponseParams responseParams) {
+        Map<String, String> tagsMap = parseTagsMap(responseParams.getTags());
+        String source = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+        if (Constants.AI_AGENT_SOURCE_ENDPOINT.equals(source)) {
+            return true;
         }
-        return Optional.empty();
+
+        return UsageMetricUtils.isFeatureAccessGranted(Context.getActualAccountId(), "SECURITY_TYPE_AGENTIC");
+    }
+
+    private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {
+        if (!McpRequestResponseUtils.isMcpRequest(responseParams).getFirst()) {
+            return Optional.empty();
+        }
+        if (!isAgenticTaggingAllowed(responseParams)) {
+            loggerMaker.infoAndAddToDb("Agentic tagging not allowed for request: " + responseParams.getRequestParams().getURL());
+            return Optional.empty();
+        }
+        return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES));
     }
 
     private Optional<CollectionTags> getRagTag(HttpResponseParams responseParams) {
-        if (RagDetector.isRagRequest(responseParams)) {
-            return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_RAG_DATABASE_TAG, "RAG Database", TagSource.KUBERNETES));
+        if (!RagDetector.isRagRequest(responseParams)) {
+            return Optional.empty();
         }
-        return Optional.empty();
+        if (!isAgenticTaggingAllowed(responseParams)) {
+            loggerMaker.infoAndAddToDb("Agentic tagging not allowed for request: " + responseParams.getRequestParams().getURL());
+            return Optional.empty();
+        }
+        return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_RAG_DATABASE_TAG, "RAG Database", TagSource.KUBERNETES));
     }
 
     private Optional<CollectionTags> getGenAiTag(HttpResponseParams responseParams) {
         Pair<Boolean, String> llmCollectionTag = GenAiCollectionUtils.checkAndTagLLMCollection(responseParams);
-        if (llmCollectionTag.getFirst()) {
-            return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_GEN_AI_TAG, llmCollectionTag.getSecond(), TagSource.KUBERNETES));
+        if (!llmCollectionTag.getFirst()) {
+            return Optional.empty();
         }
-        return Optional.empty();
+        if (!isAgenticTaggingAllowed(responseParams)) {
+            loggerMaker.infoAndAddToDb("Agentic tagging not allowed for request: " + responseParams.getRequestParams().getURL());
+            return Optional.empty();
+        }
+        return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_GEN_AI_TAG, llmCollectionTag.getSecond(), TagSource.KUBERNETES));
     }
 
     private SyncLimit fetchSyncLimit(Organization organization, MetricTypes metricType) {
