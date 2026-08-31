@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { Badge, Box, Button, HorizontalStack, Text, DataTable } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, VerticalStack, Text, DataTable } from "@shopify/polaris";
 import { ArrowLeftMinor } from "@shopify/polaris-icons";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import FlyLayout from "../../../components/layouts/FlyLayout";
@@ -312,13 +312,18 @@ export default function AgenticAssetDevicesPage() {
     // "<Type> - <Name>" template + TitleWithInfo's info icon) — that page and this one are the
     // two places this exact asset's device breakdown is shown, so the header should read the same
     // regardless of which one a click landed on.
+    const [description, setDescription] = useState("");
+
     const pageTitle = useMemo(() => (
-        <TitleWithInfo
-            tooltipContent={`Viewing devices for ${assetType || "asset"} ${assetName}`}
-            titleText={assetType ? `${assetType} - ${assetName}` : assetName}
-            docsUrl="https://ai-security-docs.akto.io/agentic-ai-discovery/get-started"
-        />
-    ), [assetType, assetName]);
+        <VerticalStack gap="1">
+            <TitleWithInfo
+                tooltipContent={`Viewing devices for ${assetType || "asset"} ${assetName}`}
+                titleText={assetType ? `${assetType} - ${assetName}` : assetName}
+                docsUrl="https://ai-security-docs.akto.io/agentic-ai-discovery/get-started"
+            />
+            {description && <Text variant="bodyMd">{description}</Text>}
+        </VerticalStack>
+    ), [assetType, assetName, description]);
 
     // Same "Explore mode" primaryAction ApiCollections.jsx always shows next to its title —
     // generic query-explorer shortcut, not scoped to this asset, kept only for header parity.
@@ -378,6 +383,7 @@ export default function AgenticAssetDevicesPage() {
                 enrichRef.current = { usernameMap: settledValue(usernameSettled, {}) };
                 const detail = settledValue(detailSettled, {});
                 collectionIdsRef.current = detail?.collectionIds || [];
+                setDescription(detail?.description || "");
                 setPluginBundle(rowType === "plugin" ? {
                     mcpServers: detail?.pluginMcpServers || [],
                     mcpServerCollectionIds: detail?.pluginMcpServerCollectionIds || {},
@@ -386,7 +392,7 @@ export default function AgenticAssetDevicesPage() {
                 } : null);
                 setOwningPluginName(rowType !== "plugin" ? (detail?.owningPluginName || null) : null);
             } catch {
-                if (!cancelled) { collectionIdsRef.current = []; setPluginBundle(null); setOwningPluginName(null); }
+                if (!cancelled) { collectionIdsRef.current = []; setDescription(""); setPluginBundle(null); setOwningPluginName(null); }
             } finally {
                 if (!cancelled) { setLoading(false); setRefreshKey((k) => k + 1); }
             }

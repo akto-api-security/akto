@@ -147,6 +147,14 @@ export function AgentMcpToolsView({ asset, selectedMcp, goToList, onNavChange, s
 
     return (
         <Box className="agentic-flex-fill">
+            {selectedMcp?.description && (
+                <>
+                    <Box paddingInlineStart="3" paddingInlineEnd="3" paddingBlockStart="3" paddingBlockEnd="3">
+                        <Text variant="bodySm">{selectedMcp.description}</Text>
+                    </Box>
+                    <Divider />
+                </>
+            )}
             {mcpTools.length === 0 ? (
                 <Box padding="4"><Text variant="bodySm" color="subdued">No tools found.</Text></Box>
             ) : (

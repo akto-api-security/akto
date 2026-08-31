@@ -145,6 +145,13 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
                     ))}
                 </HorizontalGrid>
 
+                {asset.description && (
+                    <VerticalStack gap="1">
+                        <Text variant="headingSm" color="subdued">Description</Text>
+                        <Text variant="bodyMd">{asset.description}</Text>
+                    </VerticalStack>
+                )}
+
                 <VerticalStack gap="3">
                     <Text variant="headingXs" color="subdued">Context graph</Text>
                     <AssetTopologyGraph asset={asset} assetDevices={assetDevices} agenticTreeData={agenticTreeData} agenticFlatData={agenticFlatData} inlineComponents={inlineComponents} />
