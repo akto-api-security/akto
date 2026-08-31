@@ -55,7 +55,10 @@
         </action>
 
         <action name="api/http-proxy" class="com.akto.action.HttpProxyAction" method="httpProxy">
-            <interceptor-ref name="json"/>
+            <interceptor-ref name="json">
+                <param name="maxStringLength">5242880</param>
+                <param name="maxLength">10485760</param>
+            </interceptor-ref>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <param name="includeProperties">^success,^message,^data.*</param>
