@@ -40,6 +40,7 @@ _CONNECTOR_TAG: Dict[str, str] = {
     "vscode": "vscode",
     "gemini_cli": "geminicli",
     "github": "github",
+    "github_cli": "copilot",
     "codex_cli": "codexcli",
     "kiro_cli": "kirocli"
 }
