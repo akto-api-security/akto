@@ -39,7 +39,7 @@ const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 // hostNames comes straight off the asset row itself (AgenticObserveAction's GroupSummary already
 // collects every member collection's hostName server-side) — no need to fetch/filter the account's
 // full collection list just to re-derive it client-side.
-export default function ViolationsTab({ asset, startTimestamp, endTimestamp, onViolationClick }) {
+export default function ViolationsTab({ asset, startTimestamp, endTimestamp, onViolationClick, onTotalChange }) {
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
         const isClaudeAsset = asset?.assetTagValue?.toLowerCase() === "claude";
         const hostNames = asset?.hostNames || [];
@@ -71,15 +71,21 @@ export default function ViolationsTab({ asset, startTimestamp, endTimestamp, onV
             sort: sortBySeverity ? { severity: mongoOrder } : { detectedAt: mongoOrder },
             sortBySeverity,
             searchText: searchString || undefined,
-        }).then((res) => ({
-            value: res.violations.map((r) => ({
-                ...r,
-                time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
-                deviceId: r.host ? r.host.split(".")[0] : "",
-            })),
-            total: res.total,
-        }));
-    }, [asset?.id, asset?.assetTagValue, asset?.hostNames, startTimestamp, endTimestamp]);
+        }).then((res) => {
+            // Reports the real, fully-attributed total up so callers relying on a coarser
+            // server-side tally (e.g. an exact-hostName join) can correct their own display
+            // once this - the same query the grid rows below come from - has an answer.
+            onTotalChange?.(res.total ?? 0);
+            return {
+                value: res.violations.map((r) => ({
+                    ...r,
+                    time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
+                    deviceId: r.host ? r.host.split(".")[0] : "",
+                })),
+                total: res.total,
+            };
+        });
+    }, [asset?.id, asset?.assetTagValue, asset?.hostNames, startTimestamp, endTimestamp, onTotalChange]);
 
     const handleViolationClick = useCallback((e) => {
         if (!e.data) return;

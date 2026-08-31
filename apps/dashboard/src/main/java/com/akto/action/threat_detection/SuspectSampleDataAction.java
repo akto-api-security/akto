@@ -93,6 +93,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter List<String> looseHostKeys; // "<firstSegment> <lastSegment>" — see ViolationsTab.jsx's looseHostSet
   @Getter @Setter List<String> claudeDeviceIds;
   @Getter @Setter Boolean matchClaudeConfig;
+  @Getter @Setter String riskScoreFilterType;
+  @Getter @Setter Double riskScoreFilterValue;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -195,6 +197,13 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
     if (this.sortBySeverity != null) {
       filter.put("sortBySeverity", this.sortBySeverity);
+    }
+
+    if (this.riskScoreFilterType != null && !this.riskScoreFilterType.isEmpty()) {
+      filter.put("riskScoreFilterType", this.riskScoreFilterType);
+    }
+    if (this.riskScoreFilterValue != null) {
+      filter.put("riskScoreFilterValue", this.riskScoreFilterValue);
     }
 
     Map<String, Integer> time_range = new HashMap<>();
