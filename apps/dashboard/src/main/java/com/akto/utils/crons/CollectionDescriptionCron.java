@@ -45,7 +45,7 @@ import static com.akto.task.Cluster.callDibs;
 
 /**
  * Backfills a short, LLM-generated {@code description} for API collections that don't have one yet.
- * Runs every 30 minutes, sweeping every active account (via {@link AccountTask}) for Atlas/Argus
+ * Runs hourly, sweeping every active account (via {@link AccountTask}) for Atlas/Argus
  * collections that still have no description, capped at GLOBAL_RUN_LIMIT collections per run, up to
  * CONCURRENCY LLM calls at a time. Failed attempts are capped via an in-memory counter (resets on
  * restart - acceptable, that's rare). Per-endpoint descriptions (skills/MCP tools/agent-LLM endpoints)
@@ -74,7 +74,7 @@ public class CollectionDescriptionCron {
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void setUpCollectionDescriptionCronScheduler() {
-        scheduler.scheduleWithFixedDelay(this::run, 0, 30, TimeUnit.MINUTES);
+        scheduler.scheduleWithFixedDelay(this::run, 0, 1, TimeUnit.HOURS);
     }
 
     private void run() {
