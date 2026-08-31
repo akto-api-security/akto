@@ -544,6 +544,80 @@ def send_ingestion_data(
         return None
 
 
+# ── Copilot CLI transcript (agentStop) ──────────────────────────────────────────
+# agentStop has no inline response text — only a transcript_path to events.jsonl.
+
+def _extract_last_turn(transcript_path: str) -> Tuple[str, str]:
+    """Read events.jsonl and return (last user prompt, that turn's assistant response)."""
+    if not transcript_path or not os.path.exists(transcript_path):
+        return "", ""
+    last_user = ""
+    response_parts: List[str] = []
+    try:
+        with open(transcript_path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                data = entry.get("data", {}) or {}
+                if entry.get("type") == "user.message":
+                    content = data.get("content", "")
+                    if content:
+                        last_user = content
+                        response_parts = []  # new turn started — drop the prior one
+                elif entry.get("type") == "assistant.message":
+                    content = data.get("content", "")
+                    if content:
+                        response_parts.append(content)
+    except OSError:
+        pass
+    return last_user, "".join(response_parts)
+
+
+def run_agent_stop_hook() -> None:
+    """Read the turn's transcript and ingest it; falls back to metadata-only if empty."""
+    logger = setup_logger("hook-executions.log")
+    logger.info("=== agentStop hook started ===")
+    try:
+        input_data = json.load(sys.stdin)
+        logger.info("agentStop input:\n%s", json.dumps(input_data, indent=2))
+        session_info = resolve_session_info(input_data, logger)
+        transcript_path = os.path.expanduser(input_data.get("transcript_path", ""))
+        user_prompt, response_text = _extract_last_turn(transcript_path)
+
+        if user_prompt or response_text:
+            logger.info(f"Extracted turn — prompt: {len(user_prompt)} chars, response: {len(response_text)} chars")
+            send_ingestion_data(
+                hook_name="agentStop",
+                request_payload=user_prompt,
+                response_payload=response_text,
+                session_info=session_info,
+                input_data=input_data,
+                guardrails=False,
+                logger=logger,
+            )
+        else:
+            logger.info("No conversational content found in transcript — ingesting metadata only")
+            send_ingestion_data(
+                hook_name="agentStop",
+                request_payload=input_data,
+                response_payload={},
+                session_info=session_info,
+                input_data=input_data,
+                guardrails=False,
+                logger=logger,
+            )
+        logger.info("=== agentStop hook completed ===")
+    except Exception as e:
+        logger.error(f"Main error: {e}")
+    print(json.dumps({}))
+    sys.exit(0)
+
+
 # ── Hook runners ──────────────────────────────────────────────────────────────
 
 def run_observability_hook(hook_name: str) -> None:

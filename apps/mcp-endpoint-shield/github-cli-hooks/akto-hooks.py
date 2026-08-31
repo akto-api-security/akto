@@ -6,7 +6,7 @@ import sys
 if not os.getenv("LOG_DIR"):
     os.environ["LOG_DIR"] = os.path.expanduser("~/akto/.github/akto/vscode/logs")
 
-from akto_ingestion_utility import run_observability_hook
+from akto_ingestion_utility import run_agent_stop_hook, run_observability_hook
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -15,6 +15,10 @@ if __name__ == "__main__":
 
     hook = sys.argv[1]
 
-    run_observability_hook(hook)
+    # agentStop has no inline response text — read its transcript instead.
+    if hook == "agentStop":
+        run_agent_stop_hook()
+    else:
+        run_observability_hook(hook)
     print("{}")
     sys.exit(0)
