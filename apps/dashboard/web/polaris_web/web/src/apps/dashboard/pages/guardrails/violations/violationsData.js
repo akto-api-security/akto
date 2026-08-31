@@ -42,9 +42,11 @@ export function coerceToText(value) {
     try { return JSON.stringify(value); } catch { return String(value); }
 }
 
-function _extractPromptBody(req) {
+// Checked before the plain req.body fallback below - a chat-shaped body ({messages: [...]})
+// must be unpacked to the actual last user message text, not dumped as raw
+// {"messages":[{"role":"user",...}]} JSON (which is what req.body != null would otherwise return).
+export function extractPromptBody(req) {
     if (!req) return null;
-    if (req.body != null) return req.body;
     const msgs = req.messages || req?.body?.messages;
     if (Array.isArray(msgs) && msgs.length > 0) {
         const lastUser = [...msgs].reverse().find(m => m.role === "user") || msgs[msgs.length - 1];
@@ -53,6 +55,7 @@ function _extractPromptBody(req) {
         if (Array.isArray(content)) return content.map(c => c.text || "").join("\n");
         return content;
     }
+    if (req.body != null) return req.body;
     return null;
 }
 
@@ -334,13 +337,13 @@ export function buildFallbackDetail(row) {
     const isPromptOrTool = row.type === "Prompt" || row.type === "Tool";
     // Tool events store the request payload flat (req *is* the tool args, e.g.
     // {file_path, content}) rather than wrapped in a {body: ...} envelope, so
-    // _extractPromptBody (which only looks for req.body/req.messages) finds nothing —
+    // extractPromptBody (which only looks for req.messages/req.body) finds nothing —
     // fall back to the whole req object itself for Tool violations. And when
     // outer.requestPayload fails to JSON.parse at all (e.g. a captured tool call whose
     // command text breaks JSON escaping) - req is null even though the raw string has real
     // content - fall back to that raw string rather than showing nothing.
     const rawPrimaryValue = coerceToText(isPromptOrTool
-        ? (_extractPromptBody(req) ?? (row.type === "Tool" ? req : null) ?? outer.requestPayload ?? null)
+        ? (extractPromptBody(req) ?? (row.type === "Tool" ? req : null) ?? outer.requestPayload ?? null)
         : row.type === "Skill" ? (resp?.evidence || null) : (req?.evidence || null));
     // If the value is JSON (or JSON nested inside JSON, e.g. a proxied request captured as a
     // string field), unwrap and pretty-print it instead of showing raw escaped quotes.

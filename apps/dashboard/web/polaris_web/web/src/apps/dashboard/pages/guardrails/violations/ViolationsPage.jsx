@@ -48,7 +48,7 @@ import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph"
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
-import { coerceToText, sanitizeDisplayText } from "./violationsData";
+import { coerceToText, sanitizeDisplayText, extractPromptBody } from "./violationsData";
 import AdvancedPayloadSearch from "./AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "./attributeSearch";
 import InsightsFlyout from "@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout";
@@ -474,14 +474,15 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
     const skillOrToolName = deriveSkillOrToolName(event.url);
 
     const isPromptOrTool = typeLabel === "Prompt" || typeLabel === "Tool";
-    // Tool events store the request payload flat (reqPayload *is* the tool args, e.g.
-    // {file_path, content}) rather than wrapped in a {body: ...} envelope, so checking
-    // reqPayload?.body alone finds nothing for those - fall back to the whole object. And
-    // when requestPayload fails to JSON.parse at all (e.g. a captured tool call whose command
-    // text breaks JSON escaping), reqPayload is null even though the raw string has real
-    // content - fall back to that raw string rather than showing nothing.
+    // extractPromptBody unpacks a chat-shaped body ({messages: [...]}) to the actual last user
+    // message instead of dumping raw {"messages":[{"role":"user",...}]} JSON. Tool events store
+    // the request payload flat (reqPayload *is* the tool args, e.g. {file_path, content}) rather
+    // than wrapped in a {body: ...} envelope, so it finds nothing for those - fall back to the
+    // whole object. And when requestPayload fails to JSON.parse at all (e.g. a captured tool
+    // call whose command text breaks JSON escaping), reqPayload is null even though the raw
+    // string has real content - fall back to that raw string rather than showing nothing.
     const primaryValue = sanitizeDisplayText(coerceToText(isPromptOrTool
-        ? (reqPayload?.body || (typeLabel === "Tool" ? reqPayload : null) || rawPayload?.requestPayload || null)
+        ? (extractPromptBody(reqPayload) ?? (typeLabel === "Tool" ? reqPayload : null) ?? rawPayload?.requestPayload ?? null)
         : typeLabel === "Skill" ? (respPayload?.evidence || null) : (reqPayload?.evidence || null)), 300);
 
     return {
