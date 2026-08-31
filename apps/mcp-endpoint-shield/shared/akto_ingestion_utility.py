@@ -258,6 +258,18 @@ def _id_fields(fm: Dict[str, Any]) -> List[str]:
     return fields
 
 
+# Terminal `copilot` CLI sends camelCase; VS Code's Copilot Chat sends snake_case.
+_CAMEL_TO_SNAKE_ALIASES = {"sessionId": "session_id", "transcriptPath": "transcript_path"}
+
+
+def _alias_camel_keys(input_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Fill in the snake_case key from its camelCase alias when only the latter is present."""
+    for camel, snake in _CAMEL_TO_SNAKE_ALIASES.items():
+        if snake not in input_data and camel in input_data:
+            input_data[snake] = input_data[camel]
+    return input_data
+
+
 def extract_session_info(input_data: Dict[str, Any]) -> Dict[str, Any]:
     """Pull the present (non-None) id/extra fields from a hook's stdin input, using
     this agent's field map. Keys are the agent's RAW field names."""
@@ -583,7 +595,7 @@ def run_agent_stop_hook() -> None:
     logger = setup_logger("hook-executions.log")
     logger.info("=== agentStop hook started ===")
     try:
-        input_data = json.load(sys.stdin)
+        input_data = _alias_camel_keys(json.load(sys.stdin))
         logger.info("agentStop input:\n%s", json.dumps(input_data, indent=2))
         session_info = resolve_session_info(input_data, logger)
         transcript_path = os.path.expanduser(input_data.get("transcript_path", ""))
@@ -625,7 +637,7 @@ def run_observability_hook(hook_name: str) -> None:
     logger = setup_logger("hook-executions.log")
     logger.info(f"=== {hook_name} hook started ===")
     try:
-        input_data = json.load(sys.stdin)
+        input_data = _alias_camel_keys(json.load(sys.stdin))
         logger.info(f"{hook_name} input:\n%s", json.dumps(input_data, indent=2))
         session_info = resolve_session_info(input_data, logger)
         send_ingestion_data(
