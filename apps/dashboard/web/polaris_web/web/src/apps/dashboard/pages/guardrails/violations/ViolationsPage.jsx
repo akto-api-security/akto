@@ -48,7 +48,7 @@ import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph"
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
-import { coerceToText, sanitizeDisplayText, extractPromptBody } from "./violationsData";
+import { coerceToText, sanitizeDisplayText, extractPromptBody, isEmptyJsonText } from "./violationsData";
 import AdvancedPayloadSearch from "./AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "./attributeSearch";
 import InsightsFlyout from "@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout";
@@ -481,9 +481,12 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
     // whole object. And when requestPayload fails to JSON.parse at all (e.g. a captured tool
     // call whose command text breaks JSON escaping), reqPayload is null even though the raw
     // string has real content - fall back to that raw string rather than showing nothing.
-    const primaryValue = sanitizeDisplayText(coerceToText(isPromptOrTool
+    const primaryValueRaw = coerceToText(isPromptOrTool
         ? (extractPromptBody(reqPayload) ?? (typeLabel === "Tool" ? reqPayload : null) ?? rawPayload?.requestPayload ?? null)
-        : typeLabel === "Skill" ? (respPayload?.evidence || null) : (reqPayload?.evidence || null)), 300);
+        : typeLabel === "Skill" ? (respPayload?.evidence || null) : (reqPayload?.evidence || null));
+    // An empty {}/[] carries no useful info - treat it the same as nothing captured rather
+    // than showing the literal "{}" in the Evidence column.
+    const primaryValue = isEmptyJsonText(primaryValueRaw) ? "" : sanitizeDisplayText(primaryValueRaw, 300);
 
     return {
         id: event.id,

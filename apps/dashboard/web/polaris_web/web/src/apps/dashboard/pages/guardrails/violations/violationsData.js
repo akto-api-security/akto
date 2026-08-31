@@ -42,6 +42,15 @@ export function coerceToText(value) {
     try { return JSON.stringify(value); } catch { return String(value); }
 }
 
+// An empty object/array literal (e.g. a tool call captured with no arguments) carries no
+// useful information - callers treat this the same as "nothing captured" rather than showing
+// the literal "{}" as if it were the flagged content.
+export function isEmptyJsonText(text) {
+    if (typeof text !== "string") return false;
+    const trimmed = text.trim();
+    return trimmed === "{}" || trimmed === "[]";
+}
+
 // Checked before the plain req.body fallback below - a chat-shaped body ({messages: [...]})
 // must be unpacked to the actual last user message text, not dumped as raw
 // {"messages":[{"role":"user",...}]} JSON (which is what req.body != null would otherwise return).
@@ -56,6 +65,12 @@ export function extractPromptBody(req) {
         return content;
     }
     if (req.body != null) return req.body;
+    // Other integrations capture the flagged text under a different single-value key instead
+    // of `body` (e.g. a ChatGPT connector event shaped {"prompt": "..."}) - recognize the common
+    // ones so the actual text shows up instead of the whole {"prompt":"..."} wrapper.
+    if (typeof req.prompt === "string") return req.prompt;
+    if (typeof req.command === "string") return req.command;
+    if (typeof req.message === "string") return req.message;
     return null;
 }
 
@@ -109,51 +124,18 @@ function looseUnescapeForDisplay(text) {
     return text.replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\"/g, "\"");
 }
 
-// Bracket-depth indenter for JSON-shaped text that JSON.parse can't fully consume (so
-// JSON.stringify(..., null, 2) isn't an option). Walks the text tracking string/escape state
-// (respecting \" so it doesn't mistake an escaped quote for a string boundary) and inserts a
-// newline + indent at each structural {, [, ,, } and ] outside of a string. It doesn't validate
-// or repair the JSON - just adds the same indentation a valid document would get, so an
-// otherwise-broken blob still reads like structured JSON instead of one dense line.
-function looseFormatJsonText(text) {
-    let out = "";
-    let depth = 0;
-    let inString = false;
-    let escape = false;
-    const indent = (d) => "  ".repeat(d);
-    for (const ch of text) {
-        if (inString) {
-            out += ch;
-            if (escape) escape = false;
-            else if (ch === "\\") escape = true;
-            else if (ch === '"') inString = false;
-            continue;
-        }
-        if (ch === '"') { inString = true; out += ch; continue; }
-        if (ch === "{" || ch === "[") { depth++; out += ch + "\n" + indent(depth); continue; }
-        if (ch === "}" || ch === "]") {
-            depth = Math.max(0, depth - 1);
-            out = out.replace(/[ \t]*$/, "") + "\n" + indent(depth) + ch;
-            continue;
-        }
-        if (ch === ",") { out += ",\n" + indent(depth); continue; }
-        if (ch === ":") { out += ": "; continue; }
-        if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") continue; // re-flow, don't keep original spacing
-        out += ch;
-    }
-    return out;
-}
-
-// Returns { text, isJson } — pretty-printed JSON (with nested JSON-strings unwrapped) when
-// the input looks like JSON, otherwise a best-effort indented + de-escaped version of the
-// original text (when it's JSON-shaped) so a payload that fails to fully parse is still legible.
+// Returns { text, isJson } — pretty-printed JSON (with nested JSON-strings unwrapped) when the
+// input looks like JSON, otherwise the original text as-is, loosely de-escaped if JSON-shaped.
+// Same parse-or-fall-back-to-raw pattern func.requestJson() already uses for this exact
+// captured-payload data elsewhere in the app - no extra reformatting attempted on the
+// unparseable case, here or there.
 export function prettyPrintIfJson(text) {
     if (!text) return { text, isJson: false };
     const unwrapped = _unwrapNestedJson(text);
     if (unwrapped === text) {
         const trimmed = text.trim();
         if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) return { text, isJson: false };
-        return { text: looseUnescapeForDisplay(looseFormatJsonText(text)), isJson: false };
+        return { text: looseUnescapeForDisplay(text), isJson: false };
     }
     return { text: JSON.stringify(unwrapped, null, 2), isJson: true };
 }
@@ -342,9 +324,12 @@ export function buildFallbackDetail(row) {
     // outer.requestPayload fails to JSON.parse at all (e.g. a captured tool call whose
     // command text breaks JSON escaping) - req is null even though the raw string has real
     // content - fall back to that raw string rather than showing nothing.
-    const rawPrimaryValue = coerceToText(isPromptOrTool
+    const rawPrimaryValueUntrimmed = coerceToText(isPromptOrTool
         ? (extractPromptBody(req) ?? (row.type === "Tool" ? req : null) ?? outer.requestPayload ?? null)
         : row.type === "Skill" ? (resp?.evidence || null) : (req?.evidence || null));
+    // An empty {}/[] carries no useful info - treat it the same as nothing captured, rather
+    // than showing the empty-object literal as if it were the flagged content.
+    const rawPrimaryValue = isEmptyJsonText(rawPrimaryValueUntrimmed) ? null : rawPrimaryValueUntrimmed;
     // If the value is JSON (or JSON nested inside JSON, e.g. a proxied request captured as a
     // string field), unwrap and pretty-print it instead of showing raw escaped quotes.
     const { text: prettyPrimaryValue, isJson } = prettyPrintIfJson(rawPrimaryValue);
