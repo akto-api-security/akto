@@ -23,18 +23,62 @@ public class DetectionCorrectorConfig {
     private Set<String> triggerSubTypes = new HashSet<>();
     private int timeoutMs = 200;
     private int maxBatchSize = 100;
-    private int cacheSize = 50_000;
-    private int cacheTtlSeconds = 3600;
     /** Consecutive failures before the breaker opens. */
     private int failureThreshold = 20;
     /** How long the breaker stays open before a probe is allowed through. */
     private int breakerCoolOffSeconds = 30;
 
+    /* --- the queue parameters wait on, and how long an answer stands. --- */
+    private String candidateTopic = "akto.detection.candidates";
+    /**
+     * Partitions to ask for when creating the topic. This is what lets several runtime instances
+     * share classification work, and it cannot be raised later without a topic operation, so it is
+     * worth getting right at creation. Ignored if the topic already exists.
+     */
+    private int candidateTopicPartitions = 3;
+    private int paramCacheSize = 100_000;
+    private int paramCacheTtlSeconds = 86_400;
+
     public DetectionCorrectorConfig() {
     }
 
     public boolean isUsable() {
-        return enabled && url != null && !url.trim().isEmpty() && !triggerSubTypes.isEmpty();
+        return enabled
+                && url != null && !url.trim().isEmpty()
+                && !triggerSubTypes.isEmpty()
+                && candidateTopic != null && !candidateTopic.trim().isEmpty();
+    }
+
+    public String getCandidateTopic() {
+        return candidateTopic;
+    }
+
+    public void setCandidateTopic(String candidateTopic) {
+        if (candidateTopic != null && !candidateTopic.trim().isEmpty()) this.candidateTopic = candidateTopic.trim();
+    }
+
+    public int getCandidateTopicPartitions() {
+        return candidateTopicPartitions;
+    }
+
+    public void setCandidateTopicPartitions(int candidateTopicPartitions) {
+        if (candidateTopicPartitions > 0) this.candidateTopicPartitions = candidateTopicPartitions;
+    }
+
+    public int getParamCacheSize() {
+        return paramCacheSize;
+    }
+
+    public void setParamCacheSize(int paramCacheSize) {
+        if (paramCacheSize > 0) this.paramCacheSize = paramCacheSize;
+    }
+
+    public int getParamCacheTtlSeconds() {
+        return paramCacheTtlSeconds;
+    }
+
+    public void setParamCacheTtlSeconds(int paramCacheTtlSeconds) {
+        if (paramCacheTtlSeconds > 0) this.paramCacheTtlSeconds = paramCacheTtlSeconds;
     }
 
     public String getAuthToken() {
@@ -113,21 +157,9 @@ public class DetectionCorrectorConfig {
         if (maxBatchSize > 0) this.maxBatchSize = maxBatchSize;
     }
 
-    public int getCacheSize() {
-        return cacheSize;
-    }
 
-    public void setCacheSize(int cacheSize) {
-        if (cacheSize > 0) this.cacheSize = cacheSize;
-    }
 
-    public int getCacheTtlSeconds() {
-        return cacheTtlSeconds;
-    }
 
-    public void setCacheTtlSeconds(int cacheTtlSeconds) {
-        if (cacheTtlSeconds > 0) this.cacheTtlSeconds = cacheTtlSeconds;
-    }
 
     public int getFailureThreshold() {
         return failureThreshold;
@@ -154,6 +186,7 @@ public class DetectionCorrectorConfig {
         return "{ enabled=" + enabled + ", url='" + url + "', triggers=" + getTriggerSubTypes()
                 + ", typeAliases=" + getTypeAliases()
                 + ", timeoutMs=" + timeoutMs + ", maxBatchSize=" + maxBatchSize
+                + ", candidateTopic='" + candidateTopic + "'"
                 + ", token=" + tokenMarker + " }";
     }
 }

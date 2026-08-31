@@ -369,6 +369,10 @@ public class Main {
 
         DataControlFetcher.init(dataActor);
 
+        // Where Kafka is, for the detection corrector's async mode. Everything else it needs comes
+        // from account settings; this one is deployment topology, so it is handed over here.
+        DetectionCorrectorInstaller.setKafkaBrokerUrl(brokerUrlFinal);
+
         aSettings = dataActor.fetchAccountSettings();
         ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_RUNTIME, dataActor, customMiniRuntimeServiceName);
         LoggerMaker.setModuleId(customMiniRuntimeServiceName);

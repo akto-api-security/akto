@@ -1,78 +1,70 @@
 package com.akto.detection;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Objects;
 
 /**
- * LRU cache of param-level verdicts: (collectionId, url, method, param) -> correctedType.
- * Once a param is settled with a corrected type, all future values on that param use it
- * without hitting the async service. The runtime consumes verdicts from Kafka and populates this.
+ * Remembers what the external classifier decided about a parameter, so the runtime can apply that
+ * decision to later values on the same parameter without asking again.
  *
- * Thread-safe for reads. Writes (from verdict consumer) happen in a background thread;
- * collisions are fine (last-writer-wins).
+ * Keyed by the parameter rather than by the value on purpose. Values like customer emails are
+ * effectively unique per request, so a value-keyed memory would never be hit twice and every single
+ * request would need a fresh answer. What actually needs classifying is the parameter: once we know
+ * that {@code POST /booking/create -> guest#email} carries customer emails, the ten millionth email
+ * seen there teaches us nothing new.
+ *
+ * A parameter the classifier declined to refine is remembered too, under {@link #NO_CORRECTION}, so
+ * that a negative answer stops the runtime republishing the same parameter forever.
+ *
+ * Reads happen on the ingestion thread and writes on the Kafka consumer thread, so the map is
+ * synchronized. Entries expire so a parameter is eventually re-examined if its traffic changes.
  */
 public class ParamVerdictCache {
 
-    public static class ParamKey {
-        public final int apiCollectionId;
-        public final String url;
-        public final String method;
-        public final String param;
+    /** Stored when the classifier looked at a parameter and chose not to refine it. */
+    public static final String NO_CORRECTION = "__AKTO_NO_CORRECTION__";
 
-        public ParamKey(int apiCollectionId, String url, String method, String param) {
-            this.apiCollectionId = apiCollectionId;
-            this.url = url;
-            this.method = method;
-            this.param = param;
-        }
+    private static class Entry {
+        final String label;
+        final long insertedAtMs;
 
-        @Override
-        public boolean equals(Object o) {
-            if (!(o instanceof ParamKey)) return false;
-            ParamKey p = (ParamKey) o;
-            return apiCollectionId == p.apiCollectionId
-                    && url.equals(p.url)
-                    && method.equals(p.method)
-                    && param.equals(p.param);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(apiCollectionId, url, method, param);
+        Entry(String label, long insertedAtMs) {
+            this.label = label;
+            this.insertedAtMs = insertedAtMs;
         }
     }
 
-    private final Map<ParamKey, String> cache;
-    private final int maxSize;
+    private final Map<ParamLocation, Entry> cache;
+    private final long ttlMs;
 
-    public ParamVerdictCache(int maxSize) {
-        this.maxSize = maxSize;
-        // Access-order LinkedHashMap for LRU eviction
-        this.cache = new LinkedHashMap<ParamKey, String>(maxSize, 0.75f, true) {
+    public ParamVerdictCache(int maxSize, int ttlSeconds) {
+        this.ttlMs = ttlSeconds * 1000L;
+        final int cap = maxSize;
+        this.cache = Collections.synchronizedMap(new LinkedHashMap<ParamLocation, Entry>(16, 0.75f, true) {
             @Override
-            protected boolean removeEldestEntry(Map.Entry<ParamKey, String> eldest) {
-                return size() > maxSize;
+            protected boolean removeEldestEntry(Map.Entry<ParamLocation, Entry> eldest) {
+                return size() > cap;
             }
-        };
+        });
     }
 
     /**
-     * Get the corrected type for a param, or null if not in cache.
+     * The label the classifier gave this parameter, {@link #NO_CORRECTION} if it declined, or null
+     * if we have never heard about this parameter or the answer has expired.
      */
-    public String getVerdict(int apiCollectionId, String url, String method, String param) {
-        ParamKey key = new ParamKey(apiCollectionId, url, method, param);
-        return cache.get(key);
+    public String get(ParamLocation location) {
+        Entry entry = cache.get(location);
+        if (entry == null) return null;
+        if (System.currentTimeMillis() - entry.insertedAtMs > ttlMs) return null;
+        return entry.label;
     }
 
-    /**
-     * Store a verdict.
-     */
-    public void putVerdict(int apiCollectionId, String url, String method, String param, String correctedType) {
-        ParamKey key = new ParamKey(apiCollectionId, url, method, param);
-        cache.put(key, correctedType);
+    public void put(ParamLocation location, String label) {
+        cache.put(location, new Entry(label, System.currentTimeMillis()));
     }
 
-    public int size() { return cache.size(); }
-    public void clear() { cache.clear(); }
+    public int size() {
+        return cache.size();
+    }
 }

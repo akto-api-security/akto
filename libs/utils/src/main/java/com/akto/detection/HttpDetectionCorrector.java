@@ -47,27 +47,12 @@ public class HttpDetectionCorrector implements DetectionCorrector {
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private static final Gson gson = new Gson();
 
-    /** Cached marker for "the service looked and had nothing to say about this value". */
-    private static final String NO_CORRECTION = "__AKTO_NO_CORRECTION__";
-
-
     private final DetectionCorrectorConfig config;
     private final OkHttpClient client;
     private final String authHeader;
-    private final Map<String, CacheEntry> cache;
 
     private final AtomicInteger consecutiveFailures = new AtomicInteger();
     private volatile long breakerOpenUntilMs = 0L;
-
-    private static class CacheEntry {
-        final String label;
-        final long insertedAtMs;
-
-        CacheEntry(String label, long insertedAtMs) {
-            this.label = label;
-            this.insertedAtMs = insertedAtMs;
-        }
-    }
 
     public HttpDetectionCorrector(DetectionCorrectorConfig config) {
         this.config = config;
@@ -87,17 +72,9 @@ public class HttpDetectionCorrector implements DetectionCorrector {
                 + " timeoutMs=" + config.getTimeoutMs()
                 + " typeAliases=" + config.getTypeAliases()
                 + " maxBatchSize=" + config.getMaxBatchSize()
-                + " cacheSize=" + config.getCacheSize()
                 + " auth=" + (authHeader == null ? "none" : "bearer")
                 + " debugLogging=" + DetectionCorrectorRegistry.isDebugEnabled());
 
-        final int maxEntries = config.getCacheSize();
-        this.cache = Collections.synchronizedMap(new LinkedHashMap<String, CacheEntry>(16, 0.75f, true) {
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<String, CacheEntry> eldest) {
-                return size() > maxEntries;
-            }
-        });
     }
 
     @Override
@@ -111,77 +88,28 @@ public class HttpDetectionCorrector implements DetectionCorrector {
         Map<Integer, String> out = new HashMap<>();
         if (candidates == null || candidates.isEmpty()) return out;
 
-        // Distinct values that still need an answer, each mapped to the candidates waiting on it.
-        Map<String, List<DetectionCandidate>> unresolved = new LinkedHashMap<>();
-        int cacheHits = 0;
-        int duplicates = 0;
-
-        for (DetectionCandidate candidate : candidates) {
-            String value = candidate.getValue();
-            if (value == null) continue;
-
-            String cached = lookup(value);
-            if (cached != null) {
-                cacheHits++;
-                if (!NO_CORRECTION.equals(cached)) out.put(candidate.getIdx(), cached);
-                continue;
-            }
-            List<DetectionCandidate> waiting = unresolved.get(value);
-            if (waiting == null) {
-                waiting = new ArrayList<>();
-                unresolved.put(value, waiting);
-            } else {
-                duplicates++;   // same value already queued in this batch, costs no extra lookup
-            }
-            waiting.add(candidate);
-        }
-
-        if (unresolved.isEmpty()) {
-            loggerMaker.info("[detection-corrector] candidates=" + candidates.size()
-                    + " cacheHits=" + cacheHits + " lookups=0 (no call made) cacheSize=" + cache.size());
-            return out;
-        }
-
         if (isBreakerOpen()) {
-            loggerMaker.warn("[detection-corrector] breaker is open, skipping " + unresolved.size()
-                    + " unresolved values and keeping their locally detected types");
+            loggerMaker.warn("[detection-corrector] breaker is open, skipping " + candidates.size()
+                    + " parameters; they stay unclassified and are offered again later");
             return out;
         }
 
-        // candidates = cacheHits + duplicates + lookups. Kept separate on purpose: cache hits and
-        // in-batch duplicates avoid work for different reasons and tune differently.
-        loggerMaker.info("[detection-corrector] candidates=" + candidates.size()
-                + " cacheHits=" + cacheHits
-                + " inBatchDuplicates=" + duplicates
-                + " lookups=" + unresolved.size()
-                + " cacheSize=" + cache.size());
-
-        List<Map.Entry<String, List<DetectionCandidate>>> pending = new ArrayList<>(unresolved.entrySet());
+        // Chunked so one call never carries an unbounded request body.
         int batchSize = config.getMaxBatchSize();
-
-        for (int from = 0; from < pending.size(); from += batchSize) {
-            int to = Math.min(from + batchSize, pending.size());
-            List<Map.Entry<String, List<DetectionCandidate>>> chunk = pending.subList(from, to);
+        for (int from = 0; from < candidates.size(); from += batchSize) {
+            int to = Math.min(from + batchSize, candidates.size());
+            List<DetectionCandidate> chunk = candidates.subList(from, to);
 
             Map<Integer, String> answers = post(chunk);
             if (answers == null) {
-                // Call failed. Leave the rest uncached so they are retried later, and stop early:
-                // the breaker has been told, and hammering a sick dependency helps nobody.
+                // Call failed. Stop early: the breaker has been told, and hammering a sick
+                // dependency helps nobody. Anything unanswered is asked about again later.
                 return out;
             }
 
-            long now = System.currentTimeMillis();
             for (int i = 0; i < chunk.size(); i++) {
-                Map.Entry<String, List<DetectionCandidate>> entry = chunk.get(i);
                 String label = answers.get(i);
-
-                // Negative answers are cached too, else every unrecognised value is re-asked forever.
-                cache.put(entry.getKey(), new CacheEntry(label == null ? NO_CORRECTION : label, now));
-
-                if (label == null) continue;
-                for (DetectionCandidate waiting : entry.getValue()) {
-                    out.put(waiting.getIdx(), label);
-                }
+                if (label != null) out.put(chunk.get(i).getIdx(), label);
             }
         }
 
@@ -192,20 +120,19 @@ public class HttpDetectionCorrector implements DetectionCorrector {
      * @return chunk relative idx -> corrected type for the entries the service placed, or null if
      *         the call failed. An empty map means the service answered and placed nothing.
      */
-    private Map<Integer, String> post(List<Map.Entry<String, List<DetectionCandidate>>> chunk) {
+    private Map<Integer, String> post(List<DetectionCandidate> chunk) {
         long start = System.currentTimeMillis();
         try {
             JsonArray detections = new JsonArray();
             for (int i = 0; i < chunk.size(); i++) {
-                Map.Entry<String, List<DetectionCandidate>> entry = chunk.get(i);
-                DetectionCandidate representative = entry.getValue().get(0);
+                DetectionCandidate candidate = chunk.get(i);
 
                 JsonObject detection = new JsonObject();
                 detection.addProperty("idx", i);
-                detection.addProperty("jsonpath", representative.getJsonPath());
-                detection.addProperty("value", entry.getKey());
+                detection.addProperty("jsonpath", candidate.getJsonPath());
+                detection.addProperty("value", candidate.getValue());
                 // Akto's name is translated to the classifier's vocabulary here.
-                detection.addProperty("type", config.wireTypeFor(representative.getType()));
+                detection.addProperty("type", config.wireTypeFor(candidate.getType()));
                 detections.add(detection);
             }
 
@@ -276,18 +203,6 @@ public class HttpDetectionCorrector implements DetectionCorrector {
         return corrections;
     }
 
-    private String lookup(String value) {
-        CacheEntry entry = cache.get(value);
-        if (entry == null) return null;
-
-        long ageMs = System.currentTimeMillis() - entry.insertedAtMs;
-        if (ageMs > config.getCacheTtlSeconds() * 1000L) {
-            cache.remove(value);
-            return null;
-        }
-
-        return entry.label;
-    }
 
     private void onSuccess() {
         consecutiveFailures.set(0);
@@ -321,7 +236,4 @@ public class HttpDetectionCorrector implements DetectionCorrector {
     }
 
     /** Test and metrics helper. */
-    public int cacheSize() {
-        return cache.size();
-    }
 }
