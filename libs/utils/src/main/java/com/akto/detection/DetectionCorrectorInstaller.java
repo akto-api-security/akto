@@ -18,8 +18,13 @@ public class DetectionCorrectorInstaller {
     private static final LoggerMaker loggerMaker = new LoggerMaker(DetectionCorrectorInstaller.class);
 
     private static volatile String installedSignature = null;
+    private static final ParamVerdictCache paramCache = new ParamVerdictCache(50_000);
 
     private DetectionCorrectorInstaller() {
+    }
+
+    public static ParamVerdictCache getParamCache() {
+        return paramCache;
     }
 
     public static synchronized void refresh(AccountSettings accountSettings) {

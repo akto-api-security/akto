@@ -50,12 +50,21 @@ public class DetectionBatch implements AutoCloseable {
         final String value;
         final SubType localSubType;
         final DeferredRecord recorder;
+        final int apiCollectionId;
+        final String url;
+        final String method;
+        final String param;
 
-        Pending(String jsonPath, String value, SubType localSubType, DeferredRecord recorder) {
+        Pending(String jsonPath, String value, SubType localSubType, DeferredRecord recorder,
+                int apiCollectionId, String url, String method, String param) {
             this.jsonPath = jsonPath;
             this.value = value;
             this.localSubType = localSubType;
             this.recorder = recorder;
+            this.apiCollectionId = apiCollectionId;
+            this.url = url;
+            this.method = method;
+            this.param = param;
         }
     }
 
@@ -110,8 +119,9 @@ public class DetectionBatch implements AutoCloseable {
      * Defers recording until the batch is flushed. If the corrector places this value, the recorder
      * runs with the corrected subtype; otherwise it runs with localSubType.
      */
-    public void defer(String jsonPath, String value, SubType localSubType, DeferredRecord recorder) {
-        pending.add(new Pending(jsonPath, value, localSubType, recorder));
+    public void defer(String jsonPath, String value, SubType localSubType, DeferredRecord recorder,
+                     int apiCollectionId, String url, String method, String param) {
+        pending.add(new Pending(jsonPath, value, localSubType, recorder, apiCollectionId, url, method, param));
         if (pending.size() >= MAX_DEFERRED) {
             flush();
         }
@@ -132,7 +142,12 @@ public class DetectionBatch implements AutoCloseable {
             List<DetectionCandidate> candidates = new ArrayList<>(batch.size());
             for (int i = 0; i < batch.size(); i++) {
                 Pending p = batch.get(i);
-                candidates.add(new DetectionCandidate(i, p.jsonPath, p.value, p.localSubType.getName()));
+                DetectionCandidate c = new DetectionCandidate(i, p.jsonPath, p.value, p.localSubType.getName());
+                c.setApiCollectionId(p.apiCollectionId);
+                c.setUrl(p.url);
+                c.setMethod(p.method);
+                c.setParam(p.param);
+                candidates.add(c);
             }
             if (DetectionCorrectorRegistry.isDebugEnabled()) {
                 for (DetectionCandidate candidate : candidates) {

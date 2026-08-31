@@ -120,7 +120,8 @@ public class RequestTemplate {
             batch.defer(param, obj == null ? null : obj.toString(), localSubType,
                     finalSubType -> keyTypes.record(url, method, responseCode, isHeader, param, obj, userId,
                             apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap, isUrlParam, timestamp,
-                            finalSubType));
+                            finalSubType),
+                    apiCollectionId, url, method, param);
             return;
         }
 
