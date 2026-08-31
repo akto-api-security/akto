@@ -508,6 +508,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     public String registerViaOkta() throws IOException {
         try {
+            String oktaError = servletRequest.getParameter("error");
+            if (!StringUtils.isEmpty(oktaError)) {
+                logger.errorAndAddToDb("Okta returned an error on callback: " + oktaError + ", description: "
+                        + servletRequest.getParameter("error_description"), LogDb.DASHBOARD);
+                servletResponse.sendRedirect("/login");
+                return ERROR.toUpperCase();
+            }
             Config.OktaConfig oktaConfig = null;
             if (DashboardMode.isOnPremDeployment()) {
                 OktaLogin oktaLoginInstance = OktaLogin.getInstance();
@@ -550,6 +557,19 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             params.put("client_secret", oktaConfig.getClientSecret());
             params.put("redirect_uri", oktaConfig.getRedirectUri());
 
+            List<String> missingTokenParams = new ArrayList<>();
+            for (Map.Entry<String, Object> param : params.entrySet()) {
+                if (param.getValue() == null) {
+                    missingTokenParams.add(param.getKey());
+                }
+            }
+            if (!missingTokenParams.isEmpty()) {
+                logger.errorAndAddToDb("Cannot exchange okta code, missing params: " + missingTokenParams
+                        + ", accountId: " + this.accountId, LogDb.DASHBOARD);
+                servletResponse.sendRedirect("/login");
+                return ERROR.toUpperCase();
+            }
+
             Map<String,Object> tokenData = CustomHttpRequest.postRequestEncodedType(domainUrl + "/token", params);
             String accessToken = tokenData.get("access_token").toString();
             Map<String, Object> userInfo = CustomHttpRequest.getRequest(domainUrl + "/userinfo", "Bearer " + accessToken, false);
@@ -559,9 +579,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String oktaUserId = userInfo.get("sub") != null ? userInfo.get("sub").toString() : null;
             if (!StringUtils.isEmpty(oktaConfig.getOrganizationDomain())) {
                 String userDomain = email.contains("@") ? email.substring(email.indexOf('@') + 1) : null;
-                if (userDomain == null || !oktaConfig.getOrganizationDomain().equalsIgnoreCase(userDomain)) {
+                if (!oktaConfig.isDomainAllowed(userDomain)) {
                     logger.errorAndAddToDb("Domain mismatch: user " + email + " attempted to access account " + accountId +
-                        " with required domain " + oktaConfig.getOrganizationDomain(), LogDb.DASHBOARD);
+                        " with allowed domains " + oktaConfig.allowedDomainsForLog(), LogDb.DASHBOARD);
                     servletResponse.sendRedirect("/login?error=unauthorized");
                     return ERROR.toUpperCase();
                 }
