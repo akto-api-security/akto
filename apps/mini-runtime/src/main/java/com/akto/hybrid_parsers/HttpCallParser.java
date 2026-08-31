@@ -87,6 +87,10 @@ public class HttpCallParser {
     public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
     private static final String NON_HOSTNAME_KEY = "null" + " "; // used for collections created without hostnames
 
+    // Requests that get tagged mcp-server/rag-database/gen-ai are routed to a sibling "agentic-<host>" collection
+    // instead of the whole host collection, so only the endpoints that actually earned the tag show up in Argus.
+    private static final String AGENTIC_COLLECTION_PREFIX = "agentic-";
+
     private static final List<Integer> INPROCESS_ADVANCED_FILTERS_ACCOUNTS = Arrays.asList(1736798101, 1718042191, 1759692400);
     private DataActor dataActor = DataActorFactory.fetchInstance();
     private Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
@@ -1430,6 +1434,20 @@ public class HttpCallParser {
             hostName = hostName.toLowerCase();
             hostName = hostName.trim();
 
+            // Detect once per request, reused both to decide routing and (below) to build the new collection's tags.
+            Optional<CollectionTags> mcpServerTagOpt = getMcpServerTag(httpResponseParam);
+            Optional<CollectionTags> ragTagOpt = mcpServerTagOpt.isPresent() ? Optional.empty() : getRagTag(httpResponseParam);
+            Optional<CollectionTags> genAiTagOpt = getGenAiTag(httpResponseParam);
+            boolean isAgenticEndpoint = mcpServerTagOpt.isPresent() || ragTagOpt.isPresent() || genAiTagOpt.isPresent();
+            // ENDPOINT-sourced traffic is already scoped to its own collection (see getHostnameForCollection) -
+            // the Argus-scoping split is only needed for ordinary mirrored traffic tagged via SECURITY_TYPE_AGENTIC.
+            boolean isEndpointSource = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+
+            if (isAgenticEndpoint && !isEndpointSource) {
+                // Only this endpoint's traffic moves - the rest of the host's collection is untouched.
+                hostName = AGENTIC_COLLECTION_PREFIX + hostName;
+            }
+
             String key = hostName;
             boolean ismcpServer = false;
 
@@ -1441,24 +1459,19 @@ public class HttpCallParser {
             } else {
                 int id = hostName.hashCode();
 
-                Optional<CollectionTags> mcpServerTagOpt = getMcpServerTag(httpResponseParam);
                 if (mcpServerTagOpt.isPresent()) {
                     if (tagList == null) {
                         tagList = new ArrayList<>();
                     }
                     tagList.add(mcpServerTagOpt.get());
                     ismcpServer = true;
-                } else {
-                    Optional<CollectionTags> ragTagOpt = getRagTag(httpResponseParam);
-                    if (ragTagOpt.isPresent()) {
-                        if (tagList == null) {
-                            tagList = new ArrayList<>();
-                        }
-                        tagList.add(ragTagOpt.get());
+                } else if (ragTagOpt.isPresent()) {
+                    if (tagList == null) {
+                        tagList = new ArrayList<>();
                     }
+                    tagList.add(ragTagOpt.get());
                 }
 
-                Optional<CollectionTags> genAiTagOpt = getGenAiTag(httpResponseParam);
                 if (genAiTagOpt.isPresent()) {
                     if (tagList == null) {
                         tagList = new ArrayList<>();
