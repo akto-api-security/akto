@@ -2033,6 +2033,7 @@ public class HttpCallParser {
 
     private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {
         if (!isAgenticTaggingAllowed(responseParams)) {
+            loggerMaker.infoAndAddToDb("Agentic tagging not allowed for request: " + responseParams.getRequestParams().getURL());
             return Optional.empty();
         }
         if (McpRequestResponseUtils.isMcpRequest(responseParams).getFirst()) {
@@ -2043,6 +2044,7 @@ public class HttpCallParser {
 
     private Optional<CollectionTags> getRagTag(HttpResponseParams responseParams) {
         if (!isAgenticTaggingAllowed(responseParams)) {
+            loggerMaker.infoAndAddToDb("Agentic tagging not allowed for request: " + responseParams.getRequestParams().getURL());
             return Optional.empty();
         }
         if (RagDetector.isRagRequest(responseParams)) {
@@ -2053,6 +2055,7 @@ public class HttpCallParser {
 
     private Optional<CollectionTags> getGenAiTag(HttpResponseParams responseParams) {
         if (!isAgenticTaggingAllowed(responseParams)) {
+            loggerMaker.infoAndAddToDb("Agentic tagging not allowed for request: " + responseParams.getRequestParams().getURL());
             return Optional.empty();
         }
         Pair<Boolean, String> llmCollectionTag = GenAiCollectionUtils.checkAndTagLLMCollection(responseParams);
