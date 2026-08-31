@@ -442,6 +442,25 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return sb.toString();
     }
 
+    // Same "self collection" preference as GroupSummary's own description field (see its comment
+    // there) — duplicated rather than shared because this resolves one specific group's (e.g. one
+    // MCP server's) description from an ad-hoc collection map, not GroupSummary's incremental
+    // per-collection accumulation across the whole account.
+    private static String resolveGroupDescription(List<Integer> collectionIds, Map<Integer, ApiCollection> byId, String groupKey) {
+        if (collectionIds == null || collectionIds.isEmpty()) return null;
+        String fallback = null;
+        for (Integer id : collectionIds) {
+            ApiCollection c = byId.get(id);
+            if (c == null || StringUtils.isBlank(c.getDescription())) continue;
+            String serviceName = extractServiceNameForGrouping(c.getHostName());
+            if (serviceName != null && serviceName.equalsIgnoreCase(groupKey)) {
+                return c.getDescription();
+            }
+            if (fallback == null) fallback = c.getDescription();
+        }
+        return fallback;
+    }
+
     // Java port of transform.js's splitCollectionNameForEndpointSecurity's "sourceId" segment
     // (parts[1]) — used by fetchAgenticAssetEndpointsPage's child rows for MCP Server/LLM assets,
     // whose "source" column shows which agent/client called into them, not their own service name.
@@ -552,6 +571,17 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         boolean hasPersonalAccount = false;
         boolean hasLocalMcpServer = false;
         boolean hasMisconfiguredConfig = false;
+        // A group is a rollup of many collections — e.g. the "cursor" agent group contains both
+        // <device>.ai_agent.cursor (the agent client itself) and <device>.ai_agent.github (a
+        // service it happened to call). Prefer the description on the collection whose hostname
+        // service segment matches the group's own key (the canonical "self" collection) over any
+        // unrelated member's; fall back to the first non-blank description seen otherwise.
+        String selfDescription;
+        String fallbackDescription;
+
+        String description() {
+            return selfDescription != null ? selfDescription : fallbackDescription;
+        }
 
         GroupSummary(String groupKey, String rowType) {
             this.groupKey = groupKey;
@@ -574,6 +604,13 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
             String cPluginName = AgenticObserveUtil.getPluginName(c);
             if (cPluginName != null) pluginNames.add(cPluginName);
+            if (StringUtils.isNotBlank(c.getDescription())) {
+                if (fallbackDescription == null) fallbackDescription = c.getDescription();
+                String cServiceName = extractServiceNameForGrouping(hostName);
+                if (selfDescription == null && cServiceName != null && cServiceName.equalsIgnoreCase(groupKey)) {
+                    selfDescription = c.getDescription();
+                }
+            }
             if ("agent".equals(rowType) && !isConnectorIngested(envType)) {
                 String serviceName = extractServiceNameForGrouping(hostName);
                 if (serviceName != null && !serviceName.equalsIgnoreCase(groupKey)) {
@@ -641,6 +678,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             g.put("hasMisconfiguredConfig", hasMisconfiguredConfig);
             g.put("misconfiguredDeviceCount", misconfiguredEndpointIds.size());
             if (!sensitiveTypes.isEmpty()) g.put("sensitiveInRespTypes", new ArrayList<>(sensitiveTypes));
+            if (StringUtils.isNotBlank(description())) g.put("description", description());
             return g;
         }
     }
@@ -1412,6 +1450,23 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             // ---- Connected MCP servers — already known/cheap, no re-derivation ----
             if (mcpServerNames != null) {
+                // These are a DIFFERENT set of collections than this agent's own `ids`/`collectionById`
+                // above (the MCP server's own collections), so its description needs its own small,
+                // separately-scoped query rather than reusing collectionById.
+                Set<Integer> mcpCollectionIdSet = new HashSet<>();
+                if (mcpServerCollectionIds != null) {
+                    for (List<Integer> v : mcpServerCollectionIds.values()) {
+                        if (v != null) mcpCollectionIdSet.addAll(v);
+                    }
+                }
+                Map<Integer, ApiCollection> mcpCollectionById = new HashMap<>();
+                if (!mcpCollectionIdSet.isEmpty()) {
+                    List<ApiCollection> mcpCollections = ApiCollectionsDao.instance.findAll(
+                            Filters.in(Constants.ID, new ArrayList<>(mcpCollectionIdSet)),
+                            Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.DESCRIPTION));
+                    for (ApiCollection c : mcpCollections) mcpCollectionById.put(c.getId(), c);
+                }
+
                 Set<String> seen = new HashSet<>();
                 for (String mcpName : mcpServerNames) {
                     if (StringUtils.isBlank(mcpName) || !seen.add(mcpName.toLowerCase(Locale.ROOT))) continue;
@@ -1422,6 +1477,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     row.put("toolCount", 0);
                     List<Integer> mcpCollectionIds = mcpServerCollectionIds != null ? mcpServerCollectionIds.get(mcpName) : null;
                     row.put("collectionIds", mcpCollectionIds != null ? mcpCollectionIds : Collections.emptyList());
+                    String description = resolveGroupDescription(mcpCollectionIds, mcpCollectionById, mcpName);
+                    if (StringUtils.isNotBlank(description)) row.put("description", description);
                     rows.add(row);
                 }
             }
@@ -1618,7 +1675,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS,
-                            ApiCollection.BASE_RISK_SCORE, ApiCollection.BASE_RISK_SCORE_REASON, ApiCollection._DEACTIVATED)
+                            ApiCollection.BASE_RISK_SCORE, ApiCollection.BASE_RISK_SCORE_REASON, ApiCollection._DEACTIVATED,ApiCollection.DESCRIPTION)
             );
             long tFindAll = System.currentTimeMillis();
             Map<String, GroupSummary> groups = classifyAllGroups(collections, traffic, risk, sensitive);
@@ -2222,6 +2279,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     @Getter private List<String> assetHostNames;
     @Getter private List<Integer> assetCollectionIds;
+    // Same "self collection" description GroupSummary.toSummaryResponse() ships on the new-UI
+    // summary rows — not included there for old-UI's dedicated AgenticAssetDevicesPage.jsx, which
+    // never fetches the summary list and only ever calls this endpoint for its page title.
+    @Getter private String assetDescription;
     // Count only, not the full name list — the only consumer is the Overview tab's topology graph,
     // which just needs a "N Skills" summary node (see AssetTopologyGraph.jsx). The actual skill
     // *names* are never read off this response: the Components tab's fetchAgenticComponentsPage
@@ -2311,6 +2372,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (g == null) {
                 assetHostNames = Collections.emptyList();
                 assetCollectionIds = Collections.emptyList();
+                assetDescription = null;
                 assetSkillCount = 0;
                 assetPluginNames = Collections.emptyList();
                 assetPluginVersion = null;
@@ -2338,6 +2400,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             assetHostNames = new ArrayList<>(g.hostNames);
             assetCollectionIds = g.collectionIds;
+            assetDescription = g.description();
             assetSkillCount = g.skillNames.size();
             assetPluginNames = new ArrayList<>(g.pluginNames);
             assetPluginVersion = g.pluginVersion;

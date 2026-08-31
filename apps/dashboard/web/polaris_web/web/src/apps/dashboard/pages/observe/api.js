@@ -284,6 +284,7 @@ export default {
         return {
             hostNames: resp?.assetHostNames || [],
             collectionIds: resp?.assetCollectionIds || [],
+            description: resp?.assetDescription || "",
             skillCount: resp?.assetSkillCount || 0,
             pluginNames: resp?.assetPluginNames || [],
             pluginVersion: resp?.assetPluginVersion || null,
