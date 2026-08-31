@@ -42,9 +42,11 @@ export function coerceToText(value) {
     try { return JSON.stringify(value); } catch { return String(value); }
 }
 
-function _extractPromptBody(req) {
+// Checked before the plain req.body fallback below - a chat-shaped body ({messages: [...]})
+// must be unpacked to the actual last user message text, not dumped as raw
+// {"messages":[{"role":"user",...}]} JSON (which is what req.body != null would otherwise return).
+export function extractPromptBody(req) {
     if (!req) return null;
-    if (req.body != null) return req.body;
     const msgs = req.messages || req?.body?.messages;
     if (Array.isArray(msgs) && msgs.length > 0) {
         const lastUser = [...msgs].reverse().find(m => m.role === "user") || msgs[msgs.length - 1];
@@ -53,6 +55,7 @@ function _extractPromptBody(req) {
         if (Array.isArray(content)) return content.map(c => c.text || "").join("\n");
         return content;
     }
+    if (req.body != null) return req.body;
     return null;
 }
 
@@ -98,12 +101,60 @@ function _unwrapNestedJsonValue(obj, depth) {
     return out;
 }
 
+// A JSON-shaped string that fails to fully JSON.parse (e.g. a captured tool command whose own
+// escaping breaks the outer JSON) still reads far better with real line breaks instead of
+// literal "\n"/"\t" - do a conservative de-escape for display only. This doesn't attempt to
+// repair or validate the JSON, just make an already-broken/unparsed blob legible.
+function looseUnescapeForDisplay(text) {
+    return text.replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\"/g, "\"");
+}
+
+// Bracket-depth indenter for JSON-shaped text that JSON.parse can't fully consume (so
+// JSON.stringify(..., null, 2) isn't an option). Walks the text tracking string/escape state
+// (respecting \" so it doesn't mistake an escaped quote for a string boundary) and inserts a
+// newline + indent at each structural {, [, ,, } and ] outside of a string. It doesn't validate
+// or repair the JSON - just adds the same indentation a valid document would get, so an
+// otherwise-broken blob still reads like structured JSON instead of one dense line.
+function looseFormatJsonText(text) {
+    let out = "";
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    const indent = (d) => "  ".repeat(d);
+    for (const ch of text) {
+        if (inString) {
+            out += ch;
+            if (escape) escape = false;
+            else if (ch === "\\") escape = true;
+            else if (ch === '"') inString = false;
+            continue;
+        }
+        if (ch === '"') { inString = true; out += ch; continue; }
+        if (ch === "{" || ch === "[") { depth++; out += ch + "\n" + indent(depth); continue; }
+        if (ch === "}" || ch === "]") {
+            depth = Math.max(0, depth - 1);
+            out = out.replace(/[ \t]*$/, "") + "\n" + indent(depth) + ch;
+            continue;
+        }
+        if (ch === ",") { out += ",\n" + indent(depth); continue; }
+        if (ch === ":") { out += ": "; continue; }
+        if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") continue; // re-flow, don't keep original spacing
+        out += ch;
+    }
+    return out;
+}
+
 // Returns { text, isJson } — pretty-printed JSON (with nested JSON-strings unwrapped) when
-// the input looks like JSON, otherwise the original text untouched.
+// the input looks like JSON, otherwise a best-effort indented + de-escaped version of the
+// original text (when it's JSON-shaped) so a payload that fails to fully parse is still legible.
 export function prettyPrintIfJson(text) {
     if (!text) return { text, isJson: false };
     const unwrapped = _unwrapNestedJson(text);
-    if (unwrapped === text) return { text, isJson: false };
+    if (unwrapped === text) {
+        const trimmed = text.trim();
+        if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) return { text, isJson: false };
+        return { text: looseUnescapeForDisplay(looseFormatJsonText(text)), isJson: false };
+    }
     return { text: JSON.stringify(unwrapped, null, 2), isJson: true };
 }
 
@@ -284,8 +335,15 @@ export function buildFallbackDetail(row) {
     const reason = normalizeReasonPunctuation(meta.reason || guardrailReason) || null;
     const policyName = meta.policyName || (row.policyName && row.policyName !== "-" ? row.policyName : null);
     const isPromptOrTool = row.type === "Prompt" || row.type === "Tool";
+    // Tool events store the request payload flat (req *is* the tool args, e.g.
+    // {file_path, content}) rather than wrapped in a {body: ...} envelope, so
+    // extractPromptBody (which only looks for req.messages/req.body) finds nothing —
+    // fall back to the whole req object itself for Tool violations. And when
+    // outer.requestPayload fails to JSON.parse at all (e.g. a captured tool call whose
+    // command text breaks JSON escaping) - req is null even though the raw string has real
+    // content - fall back to that raw string rather than showing nothing.
     const rawPrimaryValue = coerceToText(isPromptOrTool
-        ? _extractPromptBody(req)
+        ? (extractPromptBody(req) ?? (row.type === "Tool" ? req : null) ?? outer.requestPayload ?? null)
         : row.type === "Skill" ? (resp?.evidence || null) : (req?.evidence || null));
     // If the value is JSON (or JSON nested inside JSON, e.g. a proxied request captured as a
     // string field), unwrap and pretty-print it instead of showing raw escaped quotes.
@@ -331,14 +389,23 @@ export function buildFallbackDetail(row) {
         fileHighlights: fileHighlights || undefined,
         skillName: skillName || undefined,
         promptResponse: (() => {
-            const promptBody = primaryValueFull || reason || undefined;
+            // promptBody must come only from the request/tool-call payload. Never fall back to
+            // `reason` (a response/evidence-derived explanation) here — that leaks response
+            // content into what's meant to show what was actually requested; `reason` already
+            // renders in its own "Reason" field below. Config & Skill violations show the full
+            // captured file (Config.json with the flagged field highlighted / the skill's
+            // name+description+content) instead of just the small evidence excerpt - same
+            // content the old separate Config.json/Skill Info tabs used to show.
+            const showsFullFile = row.type === "Config" || row.type === "Skill";
+            const promptBody = (showsFullFile ? fileContent : null) || primaryValueFull || undefined;
             return {
                 valueLabel: VALUE_SECTION_LABELS[row.type] || VALUE_SECTION_LABELS.Other,
                 promptBody,
-                behaviour: row.behaviourRaw || meta.behaviour || meta.nbehaviour || undefined,
+                highlights: row.type === "Config" ? (fileHighlights || undefined) : undefined,
+                behaviour: row.behaviourRaw || meta.behaviour || meta.nbehaviour || row.action || undefined,
                 blockedAt: resp?.error?.data?.blocked_at || row.detected || undefined,
                 blockedBy: resp?.error?.data?.blocked_by || policyName || undefined,
-                reason: (reason && reason !== promptBody) ? reason : undefined,
+                reason: reason || undefined,
                 message: resp?.error?.message || resp?.message || undefined,
             };
         })(),

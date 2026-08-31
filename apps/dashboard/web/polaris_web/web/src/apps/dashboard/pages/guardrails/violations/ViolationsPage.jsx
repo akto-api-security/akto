@@ -48,7 +48,7 @@ import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph"
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
-import { normalizeReasonPunctuation, coerceToText, sanitizeDisplayText } from "./violationsData";
+import { coerceToText, sanitizeDisplayText, extractPromptBody } from "./violationsData";
 import AdvancedPayloadSearch from "./AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "./attributeSearch";
 import InsightsFlyout from "@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout";
@@ -219,6 +219,9 @@ function buildColDefs(filterValues, showApprove, onApprove) {
             headerName: "Detected",
             minWidth: 150,
             valueFormatter: p => p.value != null ? func.epochToDateTime(p.value) : "",
+            // Most recent first by default. Declared here (rather than defaulting inside
+            // onServerFetch) so the header's sort indicator matches what's actually requested.
+            sort: "desc",
         },
         {
             field: "type",
@@ -256,10 +259,8 @@ function buildColDefs(filterValues, showApprove, onApprove) {
             filter: "agSetColumnFilter",
             filterParams: { values: ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
             cellRenderer: SeverityCellRenderer,
-            // Critical first by default. Declared on the column (rather than defaulting inside
-            // onServerFetch) so the header's sort indicator matches what's actually requested:
-            // asc here means ascending severityRank, and the backend ranks CRITICAL as 1.
-            sort: "asc",
+            // Not sorted by default (detected is) — asc here would mean ascending severityRank,
+            // and the backend ranks CRITICAL as 1, so clicking this header still ranks Critical first.
         },
         // Atlas: username from Endpoint Shield metadata. Argus: identity actor (IAM ARN, etc.),
         // distinct from the Agentic Asset column.
@@ -457,7 +458,7 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
     const typeLabel = deriveAgenticType(event.url, event.method);
     const policyName = meta.rule_violated || meta.npolicy_name || event.filterId || "-";
 
-    const { req: reqPayload, resp: respPayload } = parseAktoPayload(event.payload);
+    const { req: reqPayload, resp: respPayload, raw: rawPayload } = parseAktoPayload(event.payload);
     const rawBehaviour = respPayload?.error?.data?.behaviour || meta.behaviour || meta.nbehaviour || null;
     const action = rawBehaviour === "block" ? "Blocked"
         : (rawBehaviour === "warn" || rawBehaviour === "flag") ? "Flagged"
@@ -473,8 +474,15 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
     const skillOrToolName = deriveSkillOrToolName(event.url);
 
     const isPromptOrTool = typeLabel === "Prompt" || typeLabel === "Tool";
+    // extractPromptBody unpacks a chat-shaped body ({messages: [...]}) to the actual last user
+    // message instead of dumping raw {"messages":[{"role":"user",...}]} JSON. Tool events store
+    // the request payload flat (reqPayload *is* the tool args, e.g. {file_path, content}) rather
+    // than wrapped in a {body: ...} envelope, so it finds nothing for those - fall back to the
+    // whole object. And when requestPayload fails to JSON.parse at all (e.g. a captured tool
+    // call whose command text breaks JSON escaping), reqPayload is null even though the raw
+    // string has real content - fall back to that raw string rather than showing nothing.
     const primaryValue = sanitizeDisplayText(coerceToText(isPromptOrTool
-        ? (reqPayload?.body || null)
+        ? (extractPromptBody(reqPayload) ?? (typeLabel === "Tool" ? reqPayload : null) ?? rawPayload?.requestPayload ?? null)
         : typeLabel === "Skill" ? (respPayload?.evidence || null) : (reqPayload?.evidence || null)), 300);
 
     return {
@@ -488,6 +496,10 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         // for the Needs Approval tab's client-side filter and "Approve server" action, which need
         // the exact values the backend expects (approveServerForPolicy takes policyName + serverId).
         filterId: event.filterId,
+        // refId/eventType: same fields SusDataTable uses to deep-link into fetchMaliciousRequest -
+        // lets the flyout fetch the full captured request/response when row.payload is empty.
+        refId: event.refId,
+        eventType: event.eventType,
         host: rawHost,
         behaviourRaw: rawBehaviour,
         type: typeLabel,
@@ -496,7 +508,9 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         // Same resolver the old UI and the flyout use, so the column, the flyout and the
         // compliance report all agree on a row's clauses.
         complianceMap: resolveComplianceClauseMap(event, true, {}, guardrailComplianceMap || {}),
-        evidenceText: primaryValue || normalizeReasonPunctuation(meta.reason) || "-",
+        // Request-derived only - never falls back to meta.reason (a response/guardrail
+        // explanation), which would show up as if it were the captured request content.
+        evidenceText: primaryValue || "-",
         riskScore: parseStoredRiskScore(meta),
         actor: event.actor || "",
         user: userDisplay,
