@@ -1443,6 +1443,10 @@ public class HttpCallParser {
             // the Argus-scoping split is only needed for ordinary mirrored traffic tagged via SECURITY_TYPE_AGENTIC.
             boolean isEndpointSource = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
 
+            // Preserve the real host identity for the MCP audit log (Audit Data dashboard) - it should show the
+            // actual server hostname, not our internal "agentic-" routing name.
+            String realHostName = hostName;
+
             if (isAgenticEndpoint && !isEndpointSource) {
                 // Only this endpoint's traffic moves - the rest of the host's collection is untouched.
                 hostName = AGENTIC_COLLECTION_PREFIX + hostName;
@@ -1494,7 +1498,7 @@ public class HttpCallParser {
                         try {
                             auditInfo = new McpAuditInfo(
                                 Context.now(), "", AKTO_MCP_SERVER_TAG, 0,
-                                hostName, "", null,
+                                realHostName, "", null,
                                 apiCollectionId,
                                 null
                             );
