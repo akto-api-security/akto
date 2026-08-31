@@ -126,6 +126,10 @@ public class HttpCallParser {
         for (ApiCollection apiCollection: apiCollections) {
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
 
+            if (apiCollection.getHostName() != null && !apiCollection.getHostName().isEmpty()) {
+                hostNameToIdMap.put(apiCollection.getHostName().toLowerCase().trim(), apiCollection.getId());
+            }
+
             // Initialize cache for service-tag collections with existing hostNames
             if (apiCollection.getServiceTag() != null) {
                 serviceTagCollectionHostNamesCache.put(
@@ -1438,12 +1442,15 @@ public class HttpCallParser {
             Optional<CollectionTags> genAiTagOpt = getGenAiTag(httpResponseParam);
             boolean isAgenticEndpoint = mcpServerTagOpt.isPresent() || ragTagOpt.isPresent() || genAiTagOpt.isPresent();
             String contextSource = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
-            boolean isEndpointSource = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(contextSource)
-                    || CONTEXT_SOURCE.AGENTIC.name().equals(contextSource);
+            boolean isEndpointSource = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(contextSource);
 
             String realHostName = hostName;
 
-            if (isAgenticEndpoint && !isEndpointSource) {
+            Integer realHostCollectionId = hostNameToIdMap.get(realHostName);
+            ApiCollection realHostCollection = realHostCollectionId != null ? apiCollectionsMap.get(realHostCollectionId) : null;
+
+            if (realHostCollection != null && !hasAtlasOrArgusTag(realHostCollection)
+                    && isAgenticEndpoint && !isEndpointSource) {
                 hostName = AGENTIC_COLLECTION_PREFIX + hostName;
             }
 
@@ -2031,6 +2038,24 @@ public class HttpCallParser {
             deviceUserMapLastFetchTs = Context.now();
         }
         return deviceUserMapCache;
+    }
+
+    private boolean hasAtlasOrArgusTag(ApiCollection collection) {
+        List<CollectionTags> existingTags = collection.getTagsList();
+        if (existingTags == null) {
+            return false;
+        }
+        for (CollectionTags tag : existingTags) {
+            if (Constants.AKTO_MCP_SERVER_TAG.equals(tag.getKeyName())
+                    || Constants.AKTO_GEN_AI_TAG.equals(tag.getKeyName())) {
+                return true;
+            }
+            if (Constants.AI_AGENT_TAG_SOURCE.equals(tag.getKeyName())
+                    && Constants.AI_AGENT_SOURCE_ENDPOINT.equals(tag.getValue())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isAgenticTaggingAllowed(HttpResponseParams responseParams) {
