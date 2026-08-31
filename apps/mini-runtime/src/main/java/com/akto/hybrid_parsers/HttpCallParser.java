@@ -2021,7 +2021,20 @@ public class HttpCallParser {
         return deviceUserMapCache;
     }
 
+    private boolean isAgenticTaggingAllowed(HttpResponseParams responseParams) {
+        Map<String, String> tagsMap = parseTagsMap(responseParams.getTags());
+        String source = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+        if (Constants.AI_AGENT_SOURCE_ENDPOINT.equals(source)) {
+            return true;
+        }
+
+        return UsageMetricUtils.isFeatureAccessGranted(Context.getActualAccountId(), "SECURITY_TYPE_AGENTIC");
+    }
+
     private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {
+        if (!isAgenticTaggingAllowed(responseParams)) {
+            return Optional.empty();
+        }
         if (McpRequestResponseUtils.isMcpRequest(responseParams).getFirst()) {
             return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES));
         }
@@ -2029,6 +2042,9 @@ public class HttpCallParser {
     }
 
     private Optional<CollectionTags> getRagTag(HttpResponseParams responseParams) {
+        if (!isAgenticTaggingAllowed(responseParams)) {
+            return Optional.empty();
+        }
         if (RagDetector.isRagRequest(responseParams)) {
             return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_RAG_DATABASE_TAG, "RAG Database", TagSource.KUBERNETES));
         }
@@ -2036,6 +2052,9 @@ public class HttpCallParser {
     }
 
     private Optional<CollectionTags> getGenAiTag(HttpResponseParams responseParams) {
+        if (!isAgenticTaggingAllowed(responseParams)) {
+            return Optional.empty();
+        }
         Pair<Boolean, String> llmCollectionTag = GenAiCollectionUtils.checkAndTagLLMCollection(responseParams);
         if (llmCollectionTag.getFirst()) {
             return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_GEN_AI_TAG, llmCollectionTag.getSecond(), TagSource.KUBERNETES));
