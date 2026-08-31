@@ -182,13 +182,16 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         long now = System.currentTimeMillis();
         SkillDataCacheEntry existing = skillDataCache.get(accountId);
         if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+            loggerMaker.debug("[agenticSkillDataCache] HIT accountId={} age={}ms", accountId, now - existing.builtAt);
             return existing;
         }
+        loggerMaker.debug("[agenticSkillDataCache] MISS accountId={}", accountId);
         if (skillDataCache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
             skillDataCache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
         }
         return skillDataCache.compute(accountId, (id, cached) -> {
             if (cached != null && (System.currentTimeMillis() - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                loggerMaker.debug("[agenticSkillDataCache] HIT (race, already rebuilt) accountId={}", accountId);
                 return cached;
             }
             long tStart = System.currentTimeMillis();
@@ -1543,13 +1546,18 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     }
 
     private Map<String, Integer> getOrComputeTrafficMap() {
-        if (trafficMap != null && !trafficMap.isEmpty()) return trafficMap;
+        if (trafficMap != null && !trafficMap.isEmpty()) {
+            loggerMaker.debug("[agenticTrafficMapCache] using client-supplied trafficMap, size={}", trafficMap.size());
+            return trafficMap;
+        }
         String key = scopedCacheKey();
         long now = System.currentTimeMillis();
         ScopedMapCacheEntry<Integer> existing = trafficMapFallbackCache.get(key);
         if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+            loggerMaker.debug("[agenticTrafficMapCache] HIT key={} age={}ms", key, now - existing.builtAt);
             return existing.map;
         }
+        loggerMaker.debug("[agenticTrafficMapCache] MISS key={}", key);
         if (trafficMapFallbackCache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
             trafficMapFallbackCache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
         }
@@ -1557,14 +1565,18 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return trafficMapFallbackCache.compute(key, (k, cached) -> {
             long recheckNow = System.currentTimeMillis();
             if (cached != null && (recheckNow - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                loggerMaker.debug("[agenticTrafficMapCache] HIT (race, already rebuilt) key={}", key);
                 return cached;
             }
+            long tStart = System.currentTimeMillis();
             try {
                 ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
                 apiCollectionsAction.fetchLastSeenInfoInCollections();
                 Map<Integer, Integer> raw = apiCollectionsAction.getLastTrafficSeenMap();
                 Map<String, Integer> result = new HashMap<>();
                 if (raw != null) raw.forEach((id, ts) -> result.put(String.valueOf(id), ts));
+                loggerMaker.debug("[agenticTrafficMapCache] rebuilt key={} tookMs={} size={}", key,
+                        System.currentTimeMillis() - tStart, result.size());
                 return new ScopedMapCacheEntry<>(result, recheckNow);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Failed computing traffic map server-side for agentic assets", LogDb.DASHBOARD);
@@ -1574,27 +1586,36 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     }
 
     private Map<String, Double> getOrComputeRiskScoreMap() {
-        if (riskScoreMap != null && !riskScoreMap.isEmpty()) return riskScoreMap;
+        if (riskScoreMap != null && !riskScoreMap.isEmpty()) {
+            loggerMaker.debug("[agenticRiskScoreMapCache] using client-supplied riskScoreMap, size={}", riskScoreMap.size());
+            return riskScoreMap;
+        }
         String key = scopedCacheKey();
         long now = System.currentTimeMillis();
         ScopedMapCacheEntry<Double> existing = riskScoreMapFallbackCache.get(key);
         if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+            loggerMaker.debug("[agenticRiskScoreMapCache] HIT key={} age={}ms", key, now - existing.builtAt);
             return existing.map;
         }
+        loggerMaker.debug("[agenticRiskScoreMapCache] MISS key={}", key);
         if (riskScoreMapFallbackCache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
             riskScoreMapFallbackCache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
         }
         return riskScoreMapFallbackCache.compute(key, (k, cached) -> {
             long recheckNow = System.currentTimeMillis();
             if (cached != null && (recheckNow - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                loggerMaker.debug("[agenticRiskScoreMapCache] HIT (race, already rebuilt) key={}", key);
                 return cached;
             }
+            long tStart = System.currentTimeMillis();
             try {
                 ApiCollectionsAction apiCollectionsAction = new ApiCollectionsAction();
                 apiCollectionsAction.fetchRiskScoreInfo();
                 Map<Integer, Double> raw = apiCollectionsAction.getRiskScoreOfCollectionsMap();
                 Map<String, Double> result = new HashMap<>();
                 if (raw != null) raw.forEach((id, score) -> result.put(String.valueOf(id), score));
+                loggerMaker.debug("[agenticRiskScoreMapCache] rebuilt key={} tookMs={} size={}", key,
+                        System.currentTimeMillis() - tStart, result.size());
                 return new ScopedMapCacheEntry<>(result, recheckNow);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Failed computing risk score map server-side for agentic assets", LogDb.DASHBOARD);
@@ -1654,6 +1675,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
      */
     public static void invalidateIdentityMapsCache(int accountId) {
         identityMapsCache.remove(accountId);
+        loggerMaker.debug("[agenticIdentityMapsCache] invalidated accountId={}", accountId);
     }
 
     private IdentityMapsCacheEntry getOrComputeIdentityMapsCached() {
@@ -1661,8 +1683,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         long now = System.currentTimeMillis();
         IdentityMapsCacheEntry existing = identityMapsCache.get(accountId);
         if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+            loggerMaker.debug("[agenticIdentityMapsCache] HIT accountId={} age={}ms", accountId, now - existing.builtAt);
             return existing;
         }
+        loggerMaker.debug("[agenticIdentityMapsCache] MISS accountId={}", accountId);
         if (identityMapsCache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
             identityMapsCache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
         }
@@ -1670,8 +1694,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return identityMapsCache.compute(accountId, (id, cached) -> {
             long recheckNow = System.currentTimeMillis();
             if (cached != null && (recheckNow - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                loggerMaker.debug("[agenticIdentityMapsCache] HIT (race, already rebuilt) accountId={}", accountId);
                 return cached;
             }
+            long tStart = System.currentTimeMillis();
             try {
                 Map<String, String> resolvedUsernameMap = new HashMap<>();
 
@@ -1728,6 +1754,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     resolvedUsernameMap.putIfAbsent(deviceIdKey, u.getUserName());
                 }
 
+                loggerMaker.debug("[agenticIdentityMapsCache] rebuilt accountId={} tookMs={} usernameMap={} userMetadataMap={} tagsByUsername={}",
+                        accountId, System.currentTimeMillis() - tStart, resolvedUsernameMap.size(),
+                        resolvedUserMetadataMap.size(), resolvedTagsByUsername.size());
                 return new IdentityMapsCacheEntry(resolvedUsernameMap, resolvedUserMetadataMap, resolvedTagsByUsername, recheckNow);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Failed computing identity maps server-side for agentic observe", LogDb.DASHBOARD);
@@ -1758,14 +1787,17 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         long now = System.currentTimeMillis();
         ClassificationCacheEntry existing = classificationCache.get(accountId);
         if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+            loggerMaker.debug("[agenticClassificationCache] HIT accountId={} age={}ms", accountId, now - existing.builtAt);
             return existing;
         }
+        loggerMaker.debug("[agenticClassificationCache] MISS accountId={}", accountId);
         if (classificationCache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
             classificationCache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
         }
         return classificationCache.compute(accountId, (id, cached) -> {
             long recheckNow = System.currentTimeMillis();
             if (cached != null && (recheckNow - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                loggerMaker.debug("[agenticClassificationCache] HIT (race, already rebuilt) accountId={}", accountId);
                 return cached;
             }
             long tStart = System.currentTimeMillis();
