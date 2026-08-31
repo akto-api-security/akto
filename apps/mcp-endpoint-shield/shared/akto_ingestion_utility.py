@@ -601,6 +601,13 @@ def run_agent_stop_hook() -> None:
         transcript_path = os.path.expanduser(input_data.get("transcript_path", ""))
         user_prompt, response_text = _extract_last_turn(transcript_path)
 
+        # transcript write can lag the agentStop event by a beat — retry briefly.
+        for _ in range(5):
+            if response_text or not user_prompt:
+                break
+            time.sleep(0.2)
+            user_prompt, response_text = _extract_last_turn(transcript_path)
+
         if user_prompt or response_text:
             logger.info(f"Extracted turn — prompt: {len(user_prompt)} chars, response: {len(response_text)} chars")
             send_ingestion_data(
