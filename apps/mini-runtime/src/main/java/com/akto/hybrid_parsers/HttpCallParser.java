@@ -2066,9 +2066,6 @@ public class HttpCallParser {
     }
 
     private Optional<CollectionTags> getGenAiTag(HttpResponseParams responseParams) {
-        if (!isAgenticTaggingAllowed(responseParams)) {
-            return Optional.empty();
-        }
         Pair<Boolean, String> llmCollectionTag = GenAiCollectionUtils.checkAndTagLLMCollection(responseParams);
         if (!llmCollectionTag.getFirst()) {
             return Optional.empty();
