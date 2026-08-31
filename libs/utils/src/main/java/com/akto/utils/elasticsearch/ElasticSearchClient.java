@@ -68,6 +68,9 @@ public class ElasticSearchClient extends SearchClient {
     // Nested agg: terms on topic.keyword → sub-agg terms on subTopic.keyword.
     // Preserves domain→subDomain link so the frontend can show the hierarchy correctly.
     private static final String AGG_TOPIC_HIERARCHY     = "topicHierarchyAgg";
+    // Distinct policy names hit by any span in the session — flat, no hierarchy to preserve.
+    private static final String AGG_GUARDRAIL_POLICIES  = "guardrailPoliciesAgg";
+    private static final int    GUARDRAIL_POLICIES_BREADTH = 10;
 
     private static final ElasticSearchClient INSTANCE = new ElasticSearchClient();
     public static ElasticSearchClient instance() { return INSTANCE; }
@@ -109,6 +112,12 @@ public class ElasticSearchClient extends SearchClient {
                 .put(AGG_IN_TOKENS,   new JSONObject().put("sum", new JSONObject().put("field", AgentQueryRecord.F_INPUT_TOKENS)))
                 .put(AGG_OUT_TOKENS,  new JSONObject().put("sum", new JSONObject().put("field", AgentQueryRecord.F_OUTPUT_TOKENS)))
                 .put(KEY_MSG_COUNT,   new JSONObject().put("cardinality", new JSONObject().put("field", AgentQueryRecord.F_TRACE_ID_KW)))
+                // Boolean fields aggregate as 0/1 — max is 1 (true) as soon as any span in the
+                // session tripped a guardrail. Sessions with no guardrail-evaluated spans at all
+                // (field absent on every doc) get a null value, which subAggLong reads as 0/false.
+                .put(KEY_HAS_ACTIVE_GUARDRAIL, new JSONObject().put("max", new JSONObject().put("field", AgentQueryRecord.F_GUARDRAIL_VIOLATED)))
+                .put(AGG_GUARDRAIL_POLICIES, new JSONObject()
+                    .put("terms", new JSONObject().put("field", AgentQueryRecord.F_GUARDRAIL_POLICY_KW).put("size", GUARDRAIL_POLICIES_BREADTH)))
                 .put(AGG_TOPIC_HIERARCHY, new JSONObject()
                     .put("terms", new JSONObject().put("field", AgentQueryRecord.F_TOPIC_KW).put("size", 5))
                     .put("aggs", new JSONObject()
@@ -630,7 +639,8 @@ public class ElasticSearchClient extends SearchClient {
                 .put(AgentQueryRecord.F_DEVICE_ID,  new JSONObject().put("terms", new JSONObject().put("field", AgentQueryRecord.F_DEVICE_ID_KW).put("size", 500)))
                 .put(AgentQueryRecord.F_SERVICE_ID, new JSONObject().put("terms", new JSONObject().put("field", AgentQueryRecord.F_SERVICE_ID_KW).put("size", 500)))
                 .put(AgentQueryRecord.F_TOPIC,    new JSONObject().put("terms", new JSONObject().put("field", AgentQueryRecord.F_TOPIC_KW).put("size", 100)))
-                .put(AgentQueryRecord.F_SUB_TOPIC, new JSONObject().put("terms", new JSONObject().put("field", AgentQueryRecord.F_SUB_TOPIC_KW).put("size", 200)));
+                .put(AgentQueryRecord.F_SUB_TOPIC, new JSONObject().put("terms", new JSONObject().put("field", AgentQueryRecord.F_SUB_TOPIC_KW).put("size", 200)))
+                .put(AgentQueryRecord.F_GUARDRAIL_POLICY, new JSONObject().put("terms", new JSONObject().put("field", AgentQueryRecord.F_GUARDRAIL_POLICY_KW).put("size", 100)));
 
             JSONObject aggsResult = aggregate(query, aggs);
             filterChoices.put(AgentQueryRecord.F_USER_NAME,  extractBucketKeys(aggsResult, AgentQueryRecord.F_USER_NAME));
@@ -638,6 +648,7 @@ public class ElasticSearchClient extends SearchClient {
             filterChoices.put(AgentQueryRecord.F_SERVICE_ID, extractBucketKeys(aggsResult, AgentQueryRecord.F_SERVICE_ID));
             filterChoices.put("topic",    extractBucketKeys(aggsResult, "topic"));
             filterChoices.put("subTopic", extractBucketKeys(aggsResult, "subTopic"));
+            filterChoices.put(AgentQueryRecord.F_GUARDRAIL_POLICY, extractBucketKeys(aggsResult, AgentQueryRecord.F_GUARDRAIL_POLICY));
         } catch (Exception e) {
             return new HashMap<>();
         }
@@ -828,7 +839,14 @@ public class ElasticSearchClient extends SearchClient {
                 List<String> vals = e.getValue();
                 if (vals == null || vals.isEmpty()) continue;
                 JSONArray arr = new JSONArray();
-                for (String v : vals) arr.put(v);
+                // guardrailViolated is mapped as a boolean field — a "true"/"false" string in a
+                // terms clause would be matched against the field's indexed term, not coerced,
+                // so it must go in as an actual boolean the same way isAtlasTraffic does below.
+                if (AgentQueryRecord.F_GUARDRAIL_VIOLATED.equals(e.getKey())) {
+                    for (String v : vals) arr.put(Boolean.parseBoolean(v));
+                } else {
+                    for (String v : vals) arr.put(v);
+                }
                 must.put(new JSONObject().put("terms", new JSONObject().put(e.getKey(), arr)));
             }
         }
@@ -1037,6 +1055,8 @@ public class ElasticSearchClient extends SearchClient {
             row.put(AgentQueryRecord.F_OUTPUT_TOKENS, outTokens);
             row.put(KEY_TOTAL_TOKENS,                inTokens + outTokens);
             row.put(KEY_MSG_COUNT,                   subAggLong(bucket, KEY_MSG_COUNT));
+            row.put(KEY_HAS_ACTIVE_GUARDRAIL,         subAggLong(bucket, KEY_HAS_ACTIVE_GUARDRAIL) > 0);
+            row.put(KEY_GUARDRAIL_POLICIES,           extractBucketKeyList(bucket.optJSONObject(AGG_GUARDRAIL_POLICIES)));
 
             JSONObject src = firstHitSource(bucket);
             if (src != null) {
