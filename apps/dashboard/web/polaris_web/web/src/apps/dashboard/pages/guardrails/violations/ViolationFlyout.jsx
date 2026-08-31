@@ -426,9 +426,9 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
             { id: "overview", content: "Overview" },
             { id: "promptResponse", content: "Values" },
         ];
+        // "file" middle tab (Config.json/Skill Info/Tool call) is hidden - Config now shows
+        // its full file content inline on the Values tab instead of a separate tab.
         let middle = null;
-        if (detail?.fileContent && violation?.type !== "Skill" && violation?.type !== "Tool") middle = "file";
-        if (middle === "file") tabs.push({ id: "file", content: detail.fileTabLabel || "File" });
         if (detail?.remediation) tabs.push({ id: "remediation", content: "Remediation" });
         tabs.push({ id: "timeline", content: "Timeline" });
         return { tabs, middle };
