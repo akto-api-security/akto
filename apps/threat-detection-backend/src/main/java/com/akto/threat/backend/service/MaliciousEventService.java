@@ -186,7 +186,8 @@ public class MaliciousEventService {
         .setSuccessfulExploit(evt.getSuccessfulExploit())
         .setStatus(MaliciousEventDto.Status.valueOf(status.toUpperCase()))
         .setLabel(label)
-        .setHost(evt.getHost() != null ? evt.getHost() : "");
+        .setHost(evt.getHost() != null ? evt.getHost() : "")
+        .setEvidenceLine(evt.getEvidenceLine() != null ? evt.getEvidenceLine() : "");
 
     // Set contextSource if available
     if (contextSource != null && !contextSource.isEmpty()) {
