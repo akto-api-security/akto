@@ -1530,13 +1530,6 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.Error(err))
 		return nil, fmt.Errorf("failed to get MCP allowed host list: %w", err)
 	}
-	s.logger.Info("ValidateRequest - loaded policies",
-		zap.String("contextSource", contextSource),
-		zap.Int("policiesCount", len(policies)),
-		zap.Strings("policyNames", policyNames(policies)),
-		zap.Any("policies", policies),
-		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
-
 	// Create validation context with full request metadata (matching batch flow)
 	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList, compiledRules)
 
