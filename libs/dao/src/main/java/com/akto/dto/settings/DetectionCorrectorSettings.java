@@ -7,9 +7,9 @@ import java.util.Map;
  * Configuration for the external detection corrector.
  *
  * Local detection can tell that a value looks like an email or a card; it cannot tell whose it is,
- * because that lives in a system outside Akto. When enabled, values whose locally detected type is
- * listed in triggerTypes are sent to url, which may return a more specific data type for the ones
- * it recognises.
+ * because that lives in a system outside Akto. When enabled, parameters carrying a type listed in
+ * triggerTypes are queued on candidateTopic and classified against url, which may return a more
+ * specific data type for the ones it recognises. Ingestion never waits for that answer.
  *
  * Grouped into its own object rather than sitting flat on AccountSettings: it is one optional
  * feature, and flattening it added a tenth of that class's fields on its own.
@@ -59,12 +59,21 @@ public class DetectionCorrectorSettings {
     public static final String BREAKER_COOL_OFF_SECONDS = "breakerCoolOffSeconds";
     private int breakerCoolOffSeconds;
 
-    /* --- answer cache: lookups then scale with distinct values first seen, not traffic volume. --- */
-    public static final String CACHE_SIZE = "cacheSize";
-    private int cacheSize;
+    /** Kafka topic parameters awaiting classification are queued on. */
+    public static final String CANDIDATE_TOPIC = "candidateTopic";
+    private String candidateTopic;
 
-    public static final String CACHE_TTL_SECONDS = "cacheTtlSeconds";
-    private int cacheTtlSeconds;
+    /** Partitions to create the topic with. Caps how many runtime instances can share the work. */
+    public static final String CANDIDATE_TOPIC_PARTITIONS = "candidateTopicPartitions";
+    private int candidateTopicPartitions;
+
+    /** How many parameters to remember. Sized by distinct parameters, not by traffic volume. */
+    public static final String PARAM_CACHE_SIZE = "paramCacheSize";
+    private int paramCacheSize;
+
+    /** How long a parameter's classification stands before it is worth asking again. */
+    public static final String PARAM_CACHE_TTL_SECONDS = "paramCacheTtlSeconds";
+    private int paramCacheTtlSeconds;
 
     public DetectionCorrectorSettings() {
     }
@@ -99,16 +108,23 @@ public class DetectionCorrectorSettings {
     public int getBreakerCoolOffSeconds() { return breakerCoolOffSeconds; }
     public void setBreakerCoolOffSeconds(int breakerCoolOffSeconds) { this.breakerCoolOffSeconds = breakerCoolOffSeconds; }
 
-    public int getCacheSize() { return cacheSize; }
-    public void setCacheSize(int cacheSize) { this.cacheSize = cacheSize; }
+    public String getCandidateTopic() { return candidateTopic; }
+    public void setCandidateTopic(String candidateTopic) { this.candidateTopic = candidateTopic; }
 
-    public int getCacheTtlSeconds() { return cacheTtlSeconds; }
-    public void setCacheTtlSeconds(int cacheTtlSeconds) { this.cacheTtlSeconds = cacheTtlSeconds; }
+    public int getCandidateTopicPartitions() { return candidateTopicPartitions; }
+    public void setCandidateTopicPartitions(int candidateTopicPartitions) { this.candidateTopicPartitions = candidateTopicPartitions; }
+
+    public int getParamCacheSize() { return paramCacheSize; }
+    public void setParamCacheSize(int paramCacheSize) { this.paramCacheSize = paramCacheSize; }
+
+    public int getParamCacheTtlSeconds() { return paramCacheTtlSeconds; }
+    public void setParamCacheTtlSeconds(int paramCacheTtlSeconds) { this.paramCacheTtlSeconds = paramCacheTtlSeconds; }
 
     @Override
     public String toString() {
         return "{ enabled=" + enabled + ", url='" + url + "', triggerTypes=" + triggerTypes
                 + ", typeAliases=" + typeAliases + ", timeoutMs=" + timeoutMs
-                + ", maxBatchSize=" + maxBatchSize + ", debug=" + debug + " }";
+                + ", maxBatchSize=" + maxBatchSize + ", debug=" + debug
+                + ", candidateTopic='" + candidateTopic + "' }";
     }
 }
