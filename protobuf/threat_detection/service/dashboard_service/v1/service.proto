@@ -38,6 +38,7 @@ message ListMaliciousRequestsResponse {
       string session_id = 25;  // Session identifier for tracking user sessions
       repeated threat_detection.message.malicious_event.v1.OwaspCategory owasp_categories = 26;
       string remediation = 27;  // Markdown/text remediation steps
+      string evidence_line = 28;  // Verbatim line of the prompt that triggered the violation (scrubbed)
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;

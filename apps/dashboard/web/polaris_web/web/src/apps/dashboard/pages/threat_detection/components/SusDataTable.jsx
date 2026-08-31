@@ -6,7 +6,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
-import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, VerticalStack } from "@shopify/polaris";
+import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap } from "../utils/formatUtils";
@@ -24,6 +24,26 @@ const resourceName = {
   singular: "activity",
   plural: "activities",
 };
+
+// The payload line that triggered the violation. The gateway scrubs secrets and
+// PII out of it before storing, so what lands here is safe to render as-is - but
+// it is still attacker-controlled text, so it goes in as a plain string and is
+// never interpreted as markup.
+function EvidenceLineCell({ line }) {
+  const text = typeof line === "string" ? line.trim() : "";
+  if (!text) {
+    return <Text variant="bodyMd" color="subdued">-</Text>;
+  }
+  return (
+    <Tooltip content={text} preferredPosition="below" width="wide">
+      <Box maxWidth="240px">
+        <Text variant="bodyMd" fontWeight="medium" truncate breakWord={false}>
+          <span style={{ fontFamily: "monospace", fontSize: "12px" }}>{text}</span>
+        </Text>
+      </Box>
+    </Tooltip>
+  );
+}
 
 const getHeaders = () => {
   const baseHeaders = [
@@ -82,6 +102,12 @@ const getHeaders = () => {
       value: "behaviour",
       title: "Behaviour",
       maxWidth: "120px",
+    });
+    baseHeaders.push({
+      text: "Evidence",
+      value: "evidenceLineComp",
+      title: "Evidence",
+      maxWidth: "260px",
     });
   }
   baseHeaders.push({
@@ -884,6 +910,10 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           // (the raw `metadata` passthrough is dropped by the table); used by the flyout's
           // "Approve server" action for "approval" behaviour policies.
           behaviourRaw: extractBehaviour(x?.metadata),
+          // Patched in asynchronously after the event lands (see the gateway's
+          // enqueueGuardrailEnrichment), so an event that has only just arrived
+          // legitimately shows "-" until the enrichment call returns.
+          evidenceLineComp: <EvidenceLineCell line={x?.evidenceLine} />,
           behaviour: (() => {
             const b = extractBehaviour(x?.metadata);
             if (!b) return '-';

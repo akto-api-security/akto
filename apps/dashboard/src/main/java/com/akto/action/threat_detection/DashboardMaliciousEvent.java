@@ -56,6 +56,7 @@ public class DashboardMaliciousEvent {
   private String sessionId;
   private List<OwaspCategory> owaspCategories;
   private String remediation;
+  private String evidenceLine;
   public DashboardMaliciousEvent() {}
 
   public DashboardMaliciousEvent(
@@ -315,6 +316,14 @@ public class DashboardMaliciousEvent {
 
   public void setRemediation(String remediation) {
     this.remediation = remediation;
+  }
+
+  public String getEvidenceLine() {
+    return evidenceLine;
+  }
+
+  public void setEvidenceLine(String evidenceLine) {
+    this.evidenceLine = evidenceLine;
   }
 
 }
