@@ -20,6 +20,7 @@ AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
+AKTO_ACCOUNT_ID = os.getenv("AKTO_ACCOUNT_ID", "1000000")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 MODE = os.getenv("MODE", "argus").lower()
 # /mcp matches Akto's JsonRpcUtils.isMcpPath; non-MCP keeps the legacy /copilot/tool/{name} path.
@@ -86,8 +87,8 @@ def mcp_mirror_host(device_id: str, ai_agent_tag: str, mcp_server_name: str) -> 
 
 
 def detect_connector(input_data: dict) -> str:
-    """Detect connector from hook payload. hookEventName is present in all VSCode payloads."""
-    if "hookEventName" in input_data:
+    """Detect connector; VSCode payloads carry hookEventName or hook_event_name, depending on event."""
+    if "hookEventName" in input_data or "hook_event_name" in input_data:
         return "vscode"
     return os.getenv("AKTO_CONNECTOR", "copilot_cli")
 
@@ -116,6 +117,40 @@ def get_connector_config(connector: str) -> dict:
             "atlas_domain": "ai-agent.copilot",
             "log_dir_default": "~/.github/akto/copilot/logs",
         }
+
+
+def _session_state_path(log_dir: str) -> str:
+    return os.path.join(log_dir, "akto_session_state.json")
+
+
+def _load_session_row(log_dir: str, session_id: str, logger) -> Dict[str, Any]:
+    if not session_id:
+        return {}
+    path = _session_state_path(log_dir)
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get(session_id, {}) if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f"Could not read session state: {e}")
+        return {}
+
+
+def session_headers(session_id: str, message_id: str) -> Dict[str, str]:
+    """x-akto-installer-* headers mini-runtime reads to stitch and attribute a trace."""
+    headers: Dict[str, str] = {}
+    if session_id:
+        headers["x-akto-installer-akto_session_id"] = str(session_id)
+    if message_id:
+        headers["x-akto-installer-akto_message_id"] = str(message_id)
+    return headers
+
+
+def current_message_turn(log_dir: str, session_id: str, logger) -> str:
+    """Reads back the turn id the prompt hook opened, without advancing it."""
+    return _load_session_row(log_dir, session_id, logger).get("current_message_id", "")
 
 
 def setup_logging(log_dir: str):
@@ -219,6 +254,7 @@ def build_akto_request(
     }
     if is_mcp and mcp_server_name:
         request_header_dict["x-mcp-server"] = mcp_server_name
+    request_header_dict.update(cfg.get("session_headers", {}))
     request_headers = json.dumps(request_header_dict)
 
     response_headers = json.dumps({
@@ -266,7 +302,7 @@ def build_akto_request(
         "statusCode": status_code,
         "type": "HTTP/1.1",
         "status": status_code,
-        "akto_account_id": "1000000",
+        "akto_account_id": AKTO_ACCOUNT_ID,
         "akto_vxlan_id": device_id,
         "is_pending": "false",
         "source": "MIRRORING",
@@ -533,6 +569,11 @@ def main():
     send_heartbeat(log_dir, logger)
     warn_state_path = os.path.join(log_dir, "akto_posttool_warn_pending.json")
 
+    # Check both sessionId (camelCase) and session_id (VS Code) forms.
+    session_id = str(input_data.get("session_id") or input_data.get("sessionId") or "")
+    message_id = current_message_turn(log_dir, session_id, logger)
+    cfg["session_headers"] = session_headers(session_id, message_id)
+
     logger.info(f"=== Post-Tool Use Hook - Connector: {connector}, Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
 
     if LOG_PAYLOADS:
@@ -540,26 +581,29 @@ def main():
 
     logger.info(f"MODE: {MODE}, API_URL: {cfg['api_url']}")
 
-    # Parse input — key names and result format differ between connectors.
-    # toolArgs/tool_input may arrive as a JSON string OR a dict (Copilot CLI is inconsistent
-    # between preToolUse and postToolUse). Normalise to a JSON string here.
-    if cfg["is_vscode"]:
-        tool_name = input_data.get("tool_name", "unknown")
+    # VSCode sends camelCase toolName/toolArgs on live payloads despite its own docs — try both.
+    tool_name = input_data.get("toolName") or input_data.get("tool_name", "unknown")
+    raw_args = input_data.get("toolArgs")
+    if raw_args is None:
         raw_args = input_data.get("tool_input", {})
-        tool_response = input_data.get("tool_response", "")
-        result_text = tool_response if isinstance(tool_response, str) else json.dumps(tool_response)
-        result_type = "unknown"
-        status_code = "200"
-    else:
-        tool_name = input_data.get("toolName") or input_data.get("tool_name", "unknown")
-        raw_args = input_data.get("toolArgs")
-        if raw_args is None:
-            raw_args = input_data.get("tool_input", {})
-        tool_result = input_data.get("toolResult", {})
-        result_text = tool_result.get("textResultForLlm", "")
-        result_type = tool_result.get("resultType", "unknown")
-        status_code = {"failure": "500", "denied": "403"}.get(result_type, "200")
     tool_args = raw_args if isinstance(raw_args, str) else json.dumps(raw_args)
+
+    # toolResult (camelCase) or tool_result (VS Code) — real payloads also send a flat "result".
+    camel_result = input_data.get("toolResult")
+    snake_result = input_data.get("tool_result")
+    if isinstance(camel_result, dict):
+        result_text = camel_result.get("textResultForLlm", "")
+        result_type = camel_result.get("resultType", "unknown")
+    elif isinstance(snake_result, dict):
+        result_text = snake_result.get("text_result_for_llm", "")
+        result_type = snake_result.get("result_type", "unknown")
+    else:
+        raw_result = input_data.get("result")
+        if raw_result is None:
+            raw_result = input_data.get("tool_response", "")
+        result_text = raw_result if isinstance(raw_result, str) else json.dumps(raw_result)
+        result_type = "unknown"
+    status_code = {"failure": "500", "denied": "403"}.get(result_type, "200")
 
     is_mcp, mcp_server_name, mcp_tool_name = parse_github_tool(tool_name, logger)
 

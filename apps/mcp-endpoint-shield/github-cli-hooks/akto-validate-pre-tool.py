@@ -8,6 +8,7 @@ import ssl
 import sys
 import time
 import urllib.request
+from datetime import datetime
 from typing import Any, Dict, Set, Tuple, Union
 from akto_machine_id import get_machine_id, get_username
 from akto_heartbeat import send_heartbeat
@@ -20,6 +21,7 @@ AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
+AKTO_ACCOUNT_ID = os.getenv("AKTO_ACCOUNT_ID", "1000000")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 MODE = os.getenv("MODE", "argus").lower()
 # /mcp matches Akto's JsonRpcUtils.isMcpPath; non-MCP keeps the legacy /copilot/tool/{name} path.
@@ -86,9 +88,21 @@ def mcp_mirror_host(device_id: str, ai_agent_tag: str, mcp_server_name: str) -> 
     return f"{device_id}.{ai_agent_tag}.{mcp_server_name}"
 
 
+def parse_timestamp_ms(raw_ts: Any) -> int:
+    """Handles both epoch-ms number (camelCase config) and ISO 8601 string (VS Code)."""
+    if isinstance(raw_ts, str):
+        try:
+            return int(datetime.fromisoformat(raw_ts.replace("Z", "+00:00")).timestamp() * 1000)
+        except ValueError:
+            return int(time.time() * 1000)
+    if isinstance(raw_ts, (int, float)):
+        return int(raw_ts)
+    return int(time.time() * 1000)
+
+
 def detect_connector(input_data: dict) -> str:
-    """Detect connector from hook payload. hookEventName is present in all VSCode payloads."""
-    if "hookEventName" in input_data:
+    """Detect connector; VSCode payloads carry hookEventName or hook_event_name, depending on event."""
+    if "hookEventName" in input_data or "hook_event_name" in input_data:
         return "vscode"
     return os.getenv("AKTO_CONNECTOR", "copilot_cli")
 
@@ -119,6 +133,40 @@ def get_connector_config(connector: str) -> dict:
             "log_dir_default": "~/.github/akto/copilot/logs",
             "blocked_exit_code": 0,
         }
+
+
+def _session_state_path(log_dir: str) -> str:
+    return os.path.join(log_dir, "akto_session_state.json")
+
+
+def _load_session_row(log_dir: str, session_id: str, logger) -> Dict[str, Any]:
+    if not session_id:
+        return {}
+    path = _session_state_path(log_dir)
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get(session_id, {}) if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f"Could not read session state: {e}")
+        return {}
+
+
+def session_headers(session_id: str, message_id: str) -> Dict[str, str]:
+    """x-akto-installer-* headers mini-runtime reads to stitch and attribute a trace."""
+    headers: Dict[str, str] = {}
+    if session_id:
+        headers["x-akto-installer-akto_session_id"] = str(session_id)
+    if message_id:
+        headers["x-akto-installer-akto_message_id"] = str(message_id)
+    return headers
+
+
+def current_message_turn(log_dir: str, session_id: str, logger) -> str:
+    """Reads back the turn id the prompt hook opened, without advancing it."""
+    return _load_session_row(log_dir, session_id, logger).get("current_message_id", "")
 
 
 def setup_logging(log_dir: str):
@@ -220,6 +268,7 @@ def build_akto_request(
     }
     if is_mcp and mcp_server_name:
         request_header_dict["x-mcp-server"] = mcp_server_name
+    request_header_dict.update(cfg.get("session_headers", {}))
     request_headers = json.dumps(request_header_dict)
 
     response_headers = json.dumps({
@@ -254,7 +303,7 @@ def build_akto_request(
         "statusCode": "200",
         "type": "HTTP/1.1",
         "status": "200",
-        "akto_account_id": "1000000",
+        "akto_account_id": AKTO_ACCOUNT_ID,
         "akto_vxlan_id": device_id,
         "is_pending": "false",
         "source": "MIRRORING",
@@ -448,6 +497,44 @@ def ingest_blocked_tool_use(
         logger.error(f"Ingestion error: {e}")
 
 
+def ingest_allowed_tool_use(
+    tool_name: str,
+    tool_args: str,
+    cwd: str,
+    timestamp: int,
+    cfg: dict,
+    logger,
+    *,
+    is_mcp: bool,
+    mcp_server_name: str,
+    mcp_tool_name: str,
+):
+    """Ingest allowed tool use — the guardrails-check call above used ingest_data=false."""
+    if not AKTO_DATA_INGESTION_URL:
+        return
+
+    logger.info("Ingesting allowed tool use")
+    try:
+        request_body = build_akto_request(
+            tool_name,
+            tool_args,
+            cwd,
+            timestamp,
+            cfg,
+            is_mcp=is_mcp,
+            mcp_server_name=mcp_server_name,
+            mcp_tool_name=mcp_tool_name,
+        )
+        post_to_akto(
+            build_http_proxy_url(cfg, guardrails=False, ingest_data=True),
+            request_body,
+            logger
+        )
+        logger.info("Allowed tool use ingested successfully")
+    except Exception as e:
+        logger.error(f"Ingestion error: {e}")
+
+
 def main():
     try:
         input_data = json.load(sys.stdin)
@@ -471,6 +558,11 @@ def main():
     warn_state_path = os.path.join(log_dir, "akto_pretool_warn_pending.json")
     send_heartbeat(log_dir, logger)
 
+    # Check both sessionId (camelCase) and session_id (VS Code) forms.
+    session_id = str(input_data.get("session_id") or input_data.get("sessionId") or "")
+    message_id = current_message_turn(log_dir, session_id, logger)
+    cfg["session_headers"] = session_headers(session_id, message_id)
+
     logger.info(f"=== Pre-Tool Use Hook - Connector: {connector}, Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
 
     if LOG_PAYLOADS:
@@ -478,21 +570,15 @@ def main():
 
     logger.info(f"MODE: {MODE}, API_URL: {cfg['api_url']}")
 
-    # Parse input — key names differ between connectors. toolArgs/tool_input may arrive
-    # as a JSON string OR a dict (Copilot CLI is inconsistent between pre/postToolUse).
-    # Normalise to a JSON string here.
-    if cfg["is_vscode"]:
-        tool_name = input_data.get("tool_name", "unknown")
+    # VSCode sends camelCase toolName/toolArgs on live payloads despite its own docs — try both.
+    tool_name = input_data.get("toolName") or input_data.get("tool_name", "unknown")
+    raw_args = input_data.get("toolArgs")
+    if raw_args is None:
         raw_args = input_data.get("tool_input", {})
-    else:
-        tool_name = input_data.get("toolName") or input_data.get("tool_name", "unknown")
-        raw_args = input_data.get("toolArgs")
-        if raw_args is None:
-            raw_args = input_data.get("tool_input", {})
     tool_args = raw_args if isinstance(raw_args, str) else json.dumps(raw_args)
 
     cwd = input_data.get("cwd", "")
-    timestamp = input_data.get("timestamp", int(time.time() * 1000))
+    timestamp = parse_timestamp_ms(input_data.get("timestamp"))
     is_mcp, mcp_server_name, mcp_tool_name = parse_github_tool(tool_name, logger)
 
     logger.info(
@@ -567,6 +653,17 @@ def main():
         sys.exit(cfg["blocked_exit_code"])
 
     logger.info(f"Tool use PASSED guardrails for {tool_name}")
+    ingest_allowed_tool_use(
+        tool_name,
+        tool_args,
+        cwd,
+        timestamp,
+        cfg,
+        logger,
+        is_mcp=is_mcp,
+        mcp_server_name=mcp_server_name,
+        mcp_tool_name=mcp_tool_name,
+    )
     sys.exit(0)
 
 
