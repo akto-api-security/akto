@@ -278,6 +278,7 @@ public class PostmanAction extends UserAction {
     private final boolean skipKafka = DashboardMode.isLocalDeployment() || DashboardMode.isKubernetes();
 
     private boolean allowReplay;
+    private boolean forceCreateCollection;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -317,7 +318,7 @@ public class PostmanAction extends UserAction {
                 try {
                     loggerMaker.debugAndAddToDb("Starting postman thread", LogDb.DASHBOARD);
                     Context.accountId.set(accountId);
-                    importDataFromPostmanMain(workspace_id, postmanCredential.getApiKey(), allowReplay, uploadId);
+                    importDataFromPostmanMain(workspace_id, postmanCredential.getApiKey(), allowReplay, forceCreateCollection, uploadId);
                 } catch (Exception e){
                     loggerMaker.errorAndAddToDb(e,"Error while importing data from postman: " + e.getMessage(), LogDb.DASHBOARD);
                     FileUploadsDao.instance.updateOne(Filters.eq("_id", uploadId), new BasicDBObject("$set", new BasicDBObject("uploadStatus", FileUpload.UploadStatus.FAILED)));
@@ -337,7 +338,7 @@ public class PostmanAction extends UserAction {
         return postmanUploadLoader.getId();
     }
 
-    private void importDataFromPostmanMain(String workspaceId, String apiKey, boolean allowReplay, ObjectId uploadId) {
+    private void importDataFromPostmanMain(String workspaceId, String apiKey, boolean allowReplay, boolean forceCreateCollection, ObjectId uploadId) {
         PostmanWorkspaceUpload upload = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", uploadId)).first();
         if(upload == null){
             loggerMaker.debugAndAddToDb("No upload found with id: " + uploadId, LogDb.DASHBOARD);
@@ -408,7 +409,7 @@ public class PostmanAction extends UserAction {
             String collectionName = collectionDetailsObj.get("info").get("name").asText();
 
             loggerMaker.debugAndAddToDb("Processing collection " + collectionName, LogDb.DASHBOARD);
-            List<FileUploadError> collectionErrors = generateMessages(collectionDetailsObj, workspaceId, aktoCollectionId, collectionName, collectionId, allowReplay, upload);
+            List<FileUploadError> collectionErrors = generateMessages(collectionDetailsObj, workspaceId, aktoCollectionId, collectionName, collectionId, allowReplay, forceCreateCollection, upload);
             if(!collectionErrors.isEmpty()){
                 upload.addError(collectionId, collectionErrors);
             }
@@ -465,7 +466,7 @@ public class PostmanAction extends UserAction {
                 loggerMaker.debugAndAddToDb("Starting thread to process postman file", LogDb.DASHBOARD);
                 Context.accountId.set(accountId);
                 try {
-                    importDataFromPostmanFileMain(collectionDetailsObj, postmanAktoCollectionId, collectionId, collectionName, allowReplay, uploadId);
+                    importDataFromPostmanFileMain(collectionDetailsObj, postmanAktoCollectionId, collectionId, collectionName, allowReplay, forceCreateCollection, uploadId);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error while importing data from postman file: " + e);
                     FileUploadsDao.instance.updateOne(Filters.eq("_id", uploadId), new BasicDBObject("$set", new BasicDBObject("uploadStatus", FileUpload.UploadStatus.FAILED)));
@@ -640,7 +641,7 @@ public class PostmanAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private void importDataFromPostmanFileMain(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionId, String collectionName, boolean allowReplay, ObjectId uploadId) {
+    private void importDataFromPostmanFileMain(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionId, String collectionName, boolean allowReplay, boolean forceCreateCollection, ObjectId uploadId) {
         PostmanWorkspaceUpload postmanWorkspaceUpload = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", uploadId)).first();
         if(postmanWorkspaceUpload == null){
             loggerMaker.debugAndAddToDb("No upload found with id: " + uploadId, LogDb.DASHBOARD);
@@ -650,7 +651,7 @@ public class PostmanAction extends UserAction {
         postmanWorkspaceUpload.setCount(count);
         loggerMaker.debugAndAddToDb("API count in postman.json: " + count, LogDb.DASHBOARD);
 
-        List<FileUploadError> fileUploadErrors = generateMessages(collectionDetailsObj, null, aktoCollectionId, collectionName, collectionId, allowReplay, postmanWorkspaceUpload);
+        List<FileUploadError> fileUploadErrors = generateMessages(collectionDetailsObj, null, aktoCollectionId, collectionName, collectionId, allowReplay, forceCreateCollection, postmanWorkspaceUpload);
 
         if (!fileUploadErrors.isEmpty()) {
             postmanWorkspaceUpload.setCollectionErrors(new HashMap<String, List<FileUploadError>>() {{
@@ -668,7 +669,7 @@ public class PostmanAction extends UserAction {
         return jsonNodes.size();
     }
 
-    private List<FileUploadError> generateMessages(JsonNode collectionDetailsObj, String workspaceId, int aktoCollectionId, String collectionName, String postmanCollectionId, boolean allowReplay, PostmanWorkspaceUpload fileUpload) {
+    private List<FileUploadError> generateMessages(JsonNode collectionDetailsObj, String workspaceId, int aktoCollectionId, String collectionName, String postmanCollectionId, boolean allowReplay, boolean forceCreateCollection, PostmanWorkspaceUpload fileUpload) {
         int accountId = Context.accountId.get();
         int noUrls = 0;
         List<FileUploadError> collectionErrors = new ArrayList<>();
@@ -706,7 +707,7 @@ public class PostmanAction extends UserAction {
                 continue;
             }
             uploadLog.setUrl(path);
-            Pair<Map<String, String>,List<FileUploadError>> result = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(accountId), allowReplay, authMap, this.miniTestingName);
+            Pair<Map<String, String>,List<FileUploadError>> result = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(accountId), allowReplay, authMap, this.miniTestingName, forceCreateCollection);
             List<FileUploadError> errors = result.getRight();
             if(result.getLeft() != null){
                 Map<String, String> apiInAktoFormat = result.getLeft();
@@ -767,6 +768,10 @@ public class PostmanAction extends UserAction {
 
     public void setAllowReplay(boolean allowReplay) {
         this.allowReplay = allowReplay;
+    }
+
+    public void setForceCreateCollection(boolean forceCreateCollection) {
+        this.forceCreateCollection = forceCreateCollection;
     }
 
 

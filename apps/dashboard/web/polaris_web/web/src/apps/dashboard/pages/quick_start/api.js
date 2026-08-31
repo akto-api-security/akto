@@ -25,18 +25,18 @@ const api = {
         })
     },
 
-    importDataFromPostmanFile(postmanCollectionFile, allowReplay, miniTestingName) {
+    importDataFromPostmanFile(postmanCollectionFile, allowReplay, miniTestingName, forceCreateCollection) {
         return request({
             url: '/api/importDataFromPostmanFile',
             method: 'post',
-            data: {postmanCollectionFile, allowReplay, miniTestingName}
+            data: {postmanCollectionFile, allowReplay, miniTestingName, forceCreateCollection}
         })
     },
-    importPostmanWorkspace(workspace_id, allowReplay, api_key, miniTestingName) {
+    importPostmanWorkspace(workspace_id, allowReplay, api_key, miniTestingName, forceCreateCollection) {
         return request({
             url: '/api/importPostmanWorkspace',
             method: 'post',
-            data: {workspace_id, allowReplay, api_key, miniTestingName}
+            data: {workspace_id, allowReplay, api_key, miniTestingName, forceCreateCollection}
         })
     },
 
