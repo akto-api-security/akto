@@ -227,9 +227,6 @@ public class Gateway {
         putIfNotNull(validateRequest, requestData, "metadata");
 
         String contextSource = getStringField(requestData, "contextSource");
-        if(contextSource == null){
-            contextSource = getStringField(requestData, "source");
-        }
         String endpoint = isResponse ? "/validate/response" : "/validate/request";
         loggerMaker.infoAndAddToDb("Calling guardrails {}, contextSource: {}", endpoint, contextSource);
 
