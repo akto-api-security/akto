@@ -11,7 +11,6 @@ import func from "@/util/func";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
-import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 import { CollectionIcon } from "../../../components/shared/CollectionIcon";
 import useTable from "@/apps/dashboard/components/tables/TableContext";
 import NewLayoutTooltip from "./NewLayoutTooltip";
@@ -190,7 +189,7 @@ function Endpoints() {
     // itself — populated once at mount (Tier 1: trafficMap/riskScoreMap/sensitiveMap; Tier 2,
     // async: skill risk/malicious/misconfigured data), read (not reacted to) by fetchTableData.
     const enrichRef = useRef({
-        trafficMap: {}, riskScoreMap: {}, sensitiveMap: {}, usernameMap: {},
+        trafficMap: {}, riskScoreMap: {}, sensitiveMap: {},
         skillScoreMap: {},
     });
     // Progressively populated from each page's distinctUsernames (server-computed, current page
@@ -267,16 +266,17 @@ function Endpoints() {
             // deduped) — this leaner sibling of fetchAndCacheAgenticCollectionsBundle skips
             // getAllCollectionsBasic entirely (see AgenticAssetsPage.jsx's own switch to it).
             // Sensitive info is cached separately since only this page + UsersAndDevices.jsx use it.
-            const [trafficRiskBundle, sensitiveMap, shieldResult] = await Promise.all([
+            const [trafficRiskBundle, sensitiveMap] = await Promise.all([
                 fetchAndCacheAgenticTrafficRiskBundle({ api, PersistStore }),
                 fetchAndCacheAgenticSensitiveInfo({ api, PersistStore }),
-                fetchEndpointShieldUserMetadata().catch(() => ({})),
             ]);
             if (!isMountedRef.current) return;
 
             const { trafficMap = {}, riskScoreMap = {} } = trafficRiskBundle || {};
-            const { usernameMap = {} } = shieldResult || {};
-            enrichRef.current = { ...enrichRef.current, trafficMap, riskScoreMap, sensitiveMap, usernameMap };
+            // usernameMap is no longer fetched+sent from here — fetchAgenticAssetsSummary resolves it
+            // server-side directly from ModuleInfo + AgentUsers (see
+            // AgenticObserveAction.getOrComputeIdentityMapsCached).
+            enrichRef.current = { ...enrichRef.current, trafficMap, riskScoreMap, sensitiveMap };
             setRefreshKey((k) => k + 1); // mount the table now that enrichRef is populated
             setLoading(false);
 
@@ -312,7 +312,7 @@ function Endpoints() {
     const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
         setTableLoading(true);
         try {
-            const { trafficMap, riskScoreMap, sensitiveMap, usernameMap, skillScoreMap } = enrichRef.current;
+            const { trafficMap, riskScoreMap, sensitiveMap, skillScoreMap } = enrichRef.current;
             // GithubServerTable: asc=-1/desc=1, inverted vs Mongo (matches AgenticAssetsPage.jsx/
             // NhiGovernanceIdentitiesAction's own onServerFetch convention).
             const mongoSortOrder = sortOrder === -1 ? 1 : -1;
@@ -330,7 +330,7 @@ function Endpoints() {
                 sortKey: sortKey || "riskScore",
                 sortOrder: mongoSortOrder,
                 queryValue,
-                trafficMap, riskScoreMap, sensitiveMap, usernameMap,
+                trafficMap, riskScoreMap, sensitiveMap,
                 filters: Object.keys(filters).length ? filters : undefined,
             });
             // Same progressive-population pattern as AgenticAssetDevicesPage.jsx — union rather than

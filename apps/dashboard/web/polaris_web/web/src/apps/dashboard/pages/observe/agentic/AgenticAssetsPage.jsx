@@ -42,7 +42,6 @@ import {
 } from "./constants";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
-import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import values from "@/util/values";
 import func from "@/util/func";
@@ -373,8 +372,6 @@ export default function AgenticAssetsPage() {
   const enrichRef = useRef({
     violationsByCollectionId: {},
     skillViolationsByName: {},
-    usernameMap: {},
-    userMetadataMap: {},
     analysisByKey: new Map(),
     userAnalysisFlatMap: {},
   });
@@ -430,16 +427,9 @@ export default function AgenticAssetsPage() {
 
     (async () => {
       try {
-        const shieldResult = await fetchEndpointShieldUserMetadata();
-        if (!isMountedRef.current) return;
-
-        const { usernameMap = {}, userMetadataMap = {} } = shieldResult || {};
-
-        enrichRef.current = {
-          ...enrichRef.current,
-          usernameMap,
-          userMetadataMap,
-        };
+        // usernameMap/userMetadataMap are no longer fetched+sent from here — fetchAgenticAssetsSummary
+        // resolves them server-side directly from ModuleInfo + AgentUsers (see
+        // AgenticObserveAction.getOrComputeIdentityMapsCached).
 
         // The only grid remount — Tier 2 used to also bump this, causing an unwanted second refetch.
         setRefreshKey((k) => k + 1);
@@ -507,7 +497,7 @@ export default function AgenticAssetsPage() {
     // AG Grid SSRM sends sortOrder: -1 for asc, 1 for desc — opposite of the backend's Mongo
     // convention (1 asc / -1 desc, matching NhiGovernanceViolationsAction's own onServerFetch).
     const mongoSortOrder = sortOrder ? -sortOrder : -1;
-    const { userAnalysisFlatMap, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap } = enrichRef.current;
+    const { userAnalysisFlatMap, violationsByCollectionId, skillViolationsByName } = enrichRef.current;
 
     // trafficMap/riskScoreMap omitted — backend computes both server-side now.
     return api.fetchAgenticAssetsSummary({
@@ -529,11 +519,9 @@ export default function AgenticAssetsPage() {
       // is shared with the agent/device that invoked it, so collection-based attribution can't
       // give a skill its own count (see fetchAgenticSkillViolationCounts's own comment).
       skillViolationsByName,
-      // Endpoint Shield maps, so the server can precompute each row's own Teams breakdown/AI
-      // interactions total from its own per-device list, instead of sending that raw list (up to
-      // hundreds of entries per row) just for the browser to derive these few small values.
-      usernameMap,
-      userMetadataMap,
+      // usernameMap/userMetadataMap omitted — the server now resolves both itself directly from
+      // ModuleInfo + AgentUsers (see AgenticObserveAction.getOrComputeIdentityMapsCached), instead
+      // of the browser fetching both collections, joining them, and re-POSTing the result.
     }).then((res) => ({
       value: (res.rows || []).map((row) => shapeRow(row)),
       total: res.total || 0,

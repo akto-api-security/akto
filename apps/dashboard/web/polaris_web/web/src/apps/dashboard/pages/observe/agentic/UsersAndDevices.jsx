@@ -13,7 +13,6 @@ import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
 import settingRequests from "../../settings/api";
-import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 import NewLayoutTooltip from "./NewLayoutTooltip";
 import {
     getHeaders,
@@ -114,7 +113,7 @@ function UsersAndDevices() {
     // only gets selected IDs from GithubServerTable — selection is only ever made on currently
     // rendered rows, so this is always in sync).
     const enrichRef = useRef({
-        trafficMap: {}, riskScoreMap: {}, sensitiveMap: {}, usernameMap: {}, userMetadataMap: {},
+        trafficMap: {}, riskScoreMap: {}, sensitiveMap: {},
         maliciousSkills: new Set(),
     });
     const lastRowsRef = useRef([]);
@@ -123,19 +122,20 @@ function UsersAndDevices() {
         const isMountedRef = { current: true };
         (async () => {
             try {
-                const [collectionsBundle, sensitiveMap, shieldResult] = await Promise.all([
+                const [collectionsBundle, sensitiveMap] = await Promise.all([
                     fetchAndCacheAgenticCollectionsBundle({ api, PersistStore }),
                     fetchAndCacheAgenticSensitiveInfo({ api, PersistStore }),
-                    fetchEndpointShieldUserMetadata(),
                 ]);
                 if (!isMountedRef.current) return;
 
                 const { trafficMap = {}, riskScoreMap = {} } = collectionsBundle || {};
-                const { usernameMap = {}, userMetadataMap = {} } = shieldResult || {};
 
+                // usernameMap/userMetadataMap/tagsByUsername are no longer fetched+sent from here —
+                // fetchUsersAndDevicesSummary/Stats now resolve them server-side directly from
+                // ModuleInfo + AgentUsers (see AgenticObserveAction.getOrComputeIdentityMapsCached).
                 enrichRef.current = {
                     ...enrichRef.current,
-                    trafficMap, riskScoreMap, sensitiveMap: sensitiveMap || {}, usernameMap, userMetadataMap,
+                    trafficMap, riskScoreMap, sensitiveMap: sensitiveMap || {},
                 };
                 setLoading(false);
                 setRefreshKey((k) => k + 1);
@@ -155,23 +155,16 @@ function UsersAndDevices() {
         return () => { isMountedRef.current = false; };
     }, []);
 
-    const tagsByUsernameFor = useCallback((userMetadataMap) => Object.fromEntries(
-        Object.entries(userMetadataMap || {}).map(([u, m]) => [u, m.tags || []])
-    ), []);
-
     const loadStats = useCallback(async () => {
         try {
-            const { trafficMap, riskScoreMap, usernameMap, userMetadataMap } = enrichRef.current;
-            const result = await api.fetchUsersAndDevicesStats({
-                trafficMap, riskScoreMap, usernameMap, userMetadataMap,
-                tagsByUsername: tagsByUsernameFor(userMetadataMap),
-            });
+            const { trafficMap, riskScoreMap } = enrichRef.current;
+            const result = await api.fetchUsersAndDevicesStats({ trafficMap, riskScoreMap });
             setStats(result);
         } catch (e) {
             // eslint-disable-next-line no-console
             console.error("fetchUsersAndDevicesStats failed:", e);
         }
-    }, [tagsByUsernameFor]);
+    }, []);
 
     useEffect(() => {
         if (refreshKey === 0) return;
@@ -222,7 +215,7 @@ function UsersAndDevices() {
     const fetchData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
         setTableLoading(true);
         try {
-            const { trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap } = enrichRef.current;
+            const { trafficMap, riskScoreMap, sensitiveMap } = enrichRef.current;
             const mappedSortKey = SORT_FIELD_MAP[sortKey] || "riskScore";
             const mongoSortOrder = sortOrder === -1 ? 1 : -1; // GithubServerTable: asc=-1/desc=1, inverted vs Mongo
             const filters = {};
@@ -231,8 +224,7 @@ function UsersAndDevices() {
             const res = await api.fetchUsersAndDevicesSummary({
                 groupBy: isUsersTab ? "user" : "device",
                 skip, limit, sortKey: mappedSortKey, sortOrder: mongoSortOrder, queryValue, filters,
-                trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap,
-                tagsByUsername: tagsByUsernameFor(userMetadataMap),
+                trafficMap, riskScoreMap, sensitiveMap,
             });
             const prettified = prettifyRows(res.rows || []);
             lastRowsRef.current = prettified;
@@ -241,7 +233,7 @@ function UsersAndDevices() {
             setTableLoading(false);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isUsersTab, prettifyRows, tagsByUsernameFor]);
+    }, [isUsersTab, prettifyRows]);
 
     const headers = useMemo(() => {
         const h = getHeaders({
@@ -404,18 +396,10 @@ function UsersAndDevices() {
 
             await settingRequests.bulkUpdateUserDeviceTag(groupNames, tags);
 
-            // fetchData/loadStats build tagsByUsername from enrichRef.current.userMetadataMap, which
-            // was only ever fetched once at mount — without refreshing it here, the table/stats
-            // refetch below would keep sending the pre-edit tags and the save would look like it
-            // silently did nothing. force=true also bypasses fetchEndpointShieldUserMetadata's TTL
-            // cache, which would otherwise likely still be warm from that same mount fetch.
-            const shieldResult = await fetchEndpointShieldUserMetadata(true);
-            enrichRef.current = {
-                ...enrichRef.current,
-                usernameMap: shieldResult?.usernameMap || {},
-                userMetadataMap: shieldResult?.userMetadataMap || {},
-            };
-
+            // Tags/usernames are now resolved server-side (see AgenticObserveAction.
+            // getOrComputeIdentityMapsCached) — bulkUpdateUserDeviceTag invalidates that cache for
+            // this account on write, so the refetch below already sees the just-saved values with no
+            // client-side re-fetch-and-resend needed.
             func.setToast(true, false, "Tags updated successfully");
             closeEditTagModal();
             setRefreshKey((k) => k + 1);

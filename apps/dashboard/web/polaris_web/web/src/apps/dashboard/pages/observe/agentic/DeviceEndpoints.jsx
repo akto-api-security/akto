@@ -449,7 +449,7 @@ export default function DeviceEndpoints() {
     }, [navigate, setAgenticNewLayout]);
 
     const enrichRef = useRef({
-        trafficMap: {}, riskScoreMap: {}, usernameMap: {}, userMetadataMap: {},
+        trafficMap: {}, riskScoreMap: {}, userMetadataMap: {},
         deviceMetadataMap: {}, violationsByCollectionId: {},
     });
 
@@ -472,7 +472,7 @@ export default function DeviceEndpoints() {
                 const shieldResult = settledValue(shieldSettled, {});
                 const hostCounts = settledValue(hostCountsSettled, {});
                 const { collections = [], trafficMap = {}, riskScoreMap = {} } = collectionsBundle || {};
-                const { usernameMap = {}, userMetadataMap = {}, moduleInfos = [] } = shieldResult || {};
+                const { userMetadataMap = {}, moduleInfos = [] } = shieldResult || {};
                 const violationsByCollectionId = aggregateViolationCountsByCollectionId(hostCounts, collections);
                 const deviceMetadataMap = buildModuleDeviceMap(moduleInfos);
                 const severitySums = { critical: 0, high: 0, medium: 0, low: 0 };
@@ -483,7 +483,7 @@ export default function DeviceEndpoints() {
                     severitySums.low += c.low || 0;
                 });
                 enrichRef.current = {
-                    trafficMap, riskScoreMap, usernameMap, userMetadataMap, deviceMetadataMap, violationsByCollectionId,
+                    trafficMap, riskScoreMap, userMetadataMap, deviceMetadataMap, violationsByCollectionId,
                 };
                 setCollections(collections);
                 setViolationsBySeverity([
@@ -508,8 +508,10 @@ export default function DeviceEndpoints() {
 
     const loadStats = useCallback(async () => {
         try {
-            const { usernameMap, deviceMetadataMap } = enrichRef.current;
-            const result = await api.fetchDeviceEndpointsStats({ usernameMap, deviceMetadataMap, startTimestamp, endTimestamp });
+            const { deviceMetadataMap } = enrichRef.current;
+            // usernameMap is no longer sent — fetchDeviceEndpointsStats resolves it server-side
+            // directly from ModuleInfo + AgentUsers (see AgenticObserveAction.getOrComputeUsernameMap).
+            const result = await api.fetchDeviceEndpointsStats({ deviceMetadataMap, startTimestamp, endTimestamp });
             setStats(result);
         } catch (e) {
             // eslint-disable-next-line no-console
@@ -549,16 +551,15 @@ export default function DeviceEndpoints() {
     }, [refreshKey, stats.deviceIds]);
 
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString, groupKeys, filters }) => {
-        const { trafficMap, riskScoreMap, usernameMap, userMetadataMap, deviceMetadataMap, violationsByCollectionId } = enrichRef.current;
+        const { trafficMap, riskScoreMap, deviceMetadataMap, violationsByCollectionId } = enrichRef.current;
         const mappedSortKey = SORT_FIELD_MAP[sortKey] || "riskScore";
         const mongoSortOrder = sortOrder === -1 ? 1 : -1; // AG Grid asc=-1/desc=1 is inverted vs Mongo
         const parentDeviceId = groupKeys && groupKeys.length === 1 ? groupKeys[0] : undefined;
-        const tagsByUsername = Object.fromEntries(
-            Object.entries(userMetadataMap || {}).map(([u, m]) => [u, m.tags || []])
-        );
+        // usernameMap/tagsByUsername are no longer built+sent here — resolved server-side directly
+        // from ModuleInfo + AgentUsers (see AgenticObserveAction.getOrComputeIdentityMapsCached).
         return api.fetchDeviceEndpointsSummary({
             parentDeviceId, skip, limit, sortKey: mappedSortKey, sortOrder: mongoSortOrder, queryValue: searchString,
-            trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters, tagsByUsername,
+            trafficMap, riskScoreMap, deviceMetadataMap, violationsByCollectionId, filters,
         }).then((res) => ({ value: (res.rows || []).map(shapeRow), total: res.total || 0 }));
     }, []);
 
