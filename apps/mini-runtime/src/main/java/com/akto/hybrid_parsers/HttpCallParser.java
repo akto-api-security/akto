@@ -56,6 +56,7 @@ import com.akto.hybrid_runtime.URLAggregator;
 import com.akto.util.Pair;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.google.gson.Gson;
@@ -87,8 +88,6 @@ public class HttpCallParser {
     public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
     private static final String NON_HOSTNAME_KEY = "null" + " "; // used for collections created without hostnames
 
-    // Requests that get tagged mcp-server/rag-database/gen-ai are routed to a sibling "agentic-<host>" collection
-    // instead of the whole host collection, so only the endpoints that actually earned the tag show up in Argus.
     private static final String AGENTIC_COLLECTION_PREFIX = "agentic-";
 
     private static final List<Integer> INPROCESS_ADVANCED_FILTERS_ACCOUNTS = Arrays.asList(1736798101, 1718042191, 1759692400);
@@ -1434,21 +1433,17 @@ public class HttpCallParser {
             hostName = hostName.toLowerCase();
             hostName = hostName.trim();
 
-            // Detect once per request, reused both to decide routing and (below) to build the new collection's tags.
             Optional<CollectionTags> mcpServerTagOpt = getMcpServerTag(httpResponseParam);
             Optional<CollectionTags> ragTagOpt = mcpServerTagOpt.isPresent() ? Optional.empty() : getRagTag(httpResponseParam);
             Optional<CollectionTags> genAiTagOpt = getGenAiTag(httpResponseParam);
             boolean isAgenticEndpoint = mcpServerTagOpt.isPresent() || ragTagOpt.isPresent() || genAiTagOpt.isPresent();
-            // ENDPOINT-sourced traffic is already scoped to its own collection (see getHostnameForCollection) -
-            // the Argus-scoping split is only needed for ordinary mirrored traffic tagged via SECURITY_TYPE_AGENTIC.
-            boolean isEndpointSource = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+            String contextSource = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+            boolean isEndpointSource = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(contextSource)
+                    || CONTEXT_SOURCE.AGENTIC.name().equals(contextSource);
 
-            // Preserve the real host identity for the MCP audit log (Audit Data dashboard) - it should show the
-            // actual server hostname, not our internal "agentic-" routing name.
             String realHostName = hostName;
 
             if (isAgenticEndpoint && !isEndpointSource) {
-                // Only this endpoint's traffic moves - the rest of the host's collection is untouched.
                 hostName = AGENTIC_COLLECTION_PREFIX + hostName;
             }
 
