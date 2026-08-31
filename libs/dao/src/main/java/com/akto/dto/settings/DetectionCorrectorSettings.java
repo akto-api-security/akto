@@ -8,8 +8,8 @@ import java.util.Map;
  *
  * Local detection can tell that a value looks like an email or a card; it cannot tell whose it is,
  * because that lives in a system outside Akto. When enabled, parameters carrying a type listed in
- * triggerTypes are queued on candidateTopic and classified against url, which may return a more
- * specific data type for the ones it recognises. Ingestion never waits for that answer.
+ * triggerTypes are queued for classification against url, which may return a more specific data type
+ * for the ones it recognises. Ingestion never waits for that answer.
  *
  * Grouped into its own object rather than sitting flat on AccountSettings: it is one optional
  * feature, and flattening it added a tenth of that class's fields on its own.
@@ -59,14 +59,6 @@ public class DetectionCorrectorSettings {
     public static final String BREAKER_COOL_OFF_SECONDS = "breakerCoolOffSeconds";
     private int breakerCoolOffSeconds;
 
-    /** Kafka topic parameters awaiting classification are queued on. */
-    public static final String CANDIDATE_TOPIC = "candidateTopic";
-    private String candidateTopic;
-
-    /** Partitions to create the topic with. Caps how many runtime instances can share the work. */
-    public static final String CANDIDATE_TOPIC_PARTITIONS = "candidateTopicPartitions";
-    private int candidateTopicPartitions;
-
     /** How many parameters to remember. Sized by distinct parameters, not by traffic volume. */
     public static final String PARAM_CACHE_SIZE = "paramCacheSize";
     private int paramCacheSize;
@@ -108,12 +100,6 @@ public class DetectionCorrectorSettings {
     public int getBreakerCoolOffSeconds() { return breakerCoolOffSeconds; }
     public void setBreakerCoolOffSeconds(int breakerCoolOffSeconds) { this.breakerCoolOffSeconds = breakerCoolOffSeconds; }
 
-    public String getCandidateTopic() { return candidateTopic; }
-    public void setCandidateTopic(String candidateTopic) { this.candidateTopic = candidateTopic; }
-
-    public int getCandidateTopicPartitions() { return candidateTopicPartitions; }
-    public void setCandidateTopicPartitions(int candidateTopicPartitions) { this.candidateTopicPartitions = candidateTopicPartitions; }
-
     public int getParamCacheSize() { return paramCacheSize; }
     public void setParamCacheSize(int paramCacheSize) { this.paramCacheSize = paramCacheSize; }
 
@@ -124,7 +110,6 @@ public class DetectionCorrectorSettings {
     public String toString() {
         return "{ enabled=" + enabled + ", url='" + url + "', triggerTypes=" + triggerTypes
                 + ", typeAliases=" + typeAliases + ", timeoutMs=" + timeoutMs
-                + ", maxBatchSize=" + maxBatchSize + ", debug=" + debug
-                + ", candidateTopic='" + candidateTopic + "' }";
+                + ", maxBatchSize=" + maxBatchSize + ", debug=" + debug + " }";
     }
 }

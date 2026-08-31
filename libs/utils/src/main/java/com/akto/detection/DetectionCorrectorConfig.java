@@ -28,14 +28,15 @@ public class DetectionCorrectorConfig {
     /** How long the breaker stays open before a probe is allowed through. */
     private int breakerCoolOffSeconds = 30;
 
-    /* --- the queue parameters wait on, and how long an answer stands. --- */
-    private String candidateTopic = "akto.detection.candidates";
     /**
-     * Partitions to ask for when creating the topic. This is what lets several runtime instances
-     * share classification work, and it cannot be raised later without a topic operation, so it is
-     * worth getting right at creation. Ignored if the topic already exists.
+     * The queue parameters wait on. Fixed rather than configurable: it is an internal detail of how
+     * the runtime talks to itself, not something a deployment has a reason to vary.
      */
-    private int candidateTopicPartitions = 3;
+    public static final String CANDIDATE_TOPIC = "akto.detection.candidates";
+
+    /** Partitions to create the topic with. */
+    public static final int CANDIDATE_TOPIC_PARTITIONS = 1;
+
     private int paramCacheSize = 100_000;
     private int paramCacheTtlSeconds = 86_400;
 
@@ -45,25 +46,12 @@ public class DetectionCorrectorConfig {
     public boolean isUsable() {
         return enabled
                 && url != null && !url.trim().isEmpty()
-                && !triggerSubTypes.isEmpty()
-                && candidateTopic != null && !candidateTopic.trim().isEmpty();
+                && !triggerSubTypes.isEmpty();
     }
 
-    public String getCandidateTopic() {
-        return candidateTopic;
-    }
 
-    public void setCandidateTopic(String candidateTopic) {
-        if (candidateTopic != null && !candidateTopic.trim().isEmpty()) this.candidateTopic = candidateTopic.trim();
-    }
 
-    public int getCandidateTopicPartitions() {
-        return candidateTopicPartitions;
-    }
 
-    public void setCandidateTopicPartitions(int candidateTopicPartitions) {
-        if (candidateTopicPartitions > 0) this.candidateTopicPartitions = candidateTopicPartitions;
-    }
 
     public int getParamCacheSize() {
         return paramCacheSize;
@@ -186,7 +174,6 @@ public class DetectionCorrectorConfig {
         return "{ enabled=" + enabled + ", url='" + url + "', triggers=" + getTriggerSubTypes()
                 + ", typeAliases=" + getTypeAliases()
                 + ", timeoutMs=" + timeoutMs + ", maxBatchSize=" + maxBatchSize
-                + ", candidateTopic='" + candidateTopic + "'"
                 + ", token=" + tokenMarker + " }";
     }
 }

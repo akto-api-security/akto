@@ -93,17 +93,18 @@ public class DetectionCorrectorInstaller {
                         + "calling without an Authorization header");
             }
 
-            ensureTopicExists(config.getCandidateTopic(), config.getCandidateTopicPartitions());
+            ensureTopicExists(DetectionCorrectorConfig.CANDIDATE_TOPIC,
+                    DetectionCorrectorConfig.CANDIDATE_TOPIC_PARTITIONS);
 
             ParamVerdictCache cache = new ParamVerdictCache(config.getParamCacheSize(),
                     config.getParamCacheTtlSeconds());
             DetectionCorrector corrector = new HttpDetectionCorrector(config);
-            publisher = new KafkaCandidatePublisher(kafkaBrokerUrl, config.getCandidateTopic());
+            publisher = new KafkaCandidatePublisher(kafkaBrokerUrl, DetectionCorrectorConfig.CANDIDATE_TOPIC);
 
             // A group per process, not a shared one: each instance needs answers for the parameters
             // its own traffic touches, and a shared group would hand a parameter to one instance
             // while another kept asking about it forever.
-            worker = new ClassificationWorker(kafkaBrokerUrl, config.getCandidateTopic(),
+            worker = new ClassificationWorker(kafkaBrokerUrl, DetectionCorrectorConfig.CANDIDATE_TOPIC,
                     "akto-detection-classifier-" + UUID.randomUUID(), corrector, cache);
 
             workerThread = new Thread(worker, "detection-classification-worker");
@@ -200,8 +201,6 @@ public class DetectionCorrectorInstaller {
         config.setMaxBatchSize(settings.getMaxBatchSize());
         config.setFailureThreshold(settings.getFailureThreshold());
         config.setBreakerCoolOffSeconds(settings.getBreakerCoolOffSeconds());
-        config.setCandidateTopic(settings.getCandidateTopic());
-        config.setCandidateTopicPartitions(settings.getCandidateTopicPartitions());
         config.setParamCacheSize(settings.getParamCacheSize());
         config.setParamCacheTtlSeconds(settings.getParamCacheTtlSeconds());
 
