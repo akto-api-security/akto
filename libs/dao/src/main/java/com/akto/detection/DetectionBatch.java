@@ -70,9 +70,14 @@ public class DetectionBatch implements AutoCloseable {
 
     private final DetectionCorrector corrector;
     private final List<Pending> pending = new ArrayList<>();
+    private static volatile CandidatePublisher candidatePublisher;
 
     private DetectionBatch(DetectionCorrector corrector) {
         this.corrector = corrector;
+    }
+
+    public static void setCandidatePublisher(CandidatePublisher publisher) {
+        candidatePublisher = publisher;
     }
 
     /**
@@ -158,6 +163,18 @@ public class DetectionBatch implements AutoCloseable {
 
             Map<Integer, String> result = corrector.correct(candidates);
             if (result != null) corrections = result;
+
+            // Also publish candidates to Kafka for async refinement. Allows the external classifier to refine
+            // param labels without blocking the runtime, and verdicts populate the cache for future batches.
+            if (candidatePublisher != null) {
+                for (DetectionCandidate candidate : candidates) {
+                    try {
+                        candidatePublisher.publish(candidate);
+                    } catch (Exception e) {
+                        // Ignore - async publishing failure doesn't block detection.
+                    }
+                }
+            }
         } catch (Exception e) {
             // Fail open: every value below falls back to its locally detected type.
             logger.error("[detection-corrector] failed for " + batch.size()

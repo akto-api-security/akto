@@ -14,24 +14,25 @@ import java.util.Collections;
 import java.util.Properties;
 
 /**
- * Consumes detection verdicts from Kafka and updates the param-level cache.
- * Runs in a background thread, allowing the runtime to apply cached corrections immediately
- * on the next batch after a verdict arrives.
+ * Subscribes to verdicts from the external classifier and populates the param-level cache.
  *
- * Topic format (from async detection-corrector service):
- *   { "apiCollectionId": 1, "url": "/api/user", "method": "POST", "param": "email",
- *     "correctedType": "VERIFIED_CUSTOMER_EMAIL", "timestamp": 1234567890 }
+ * Flow: external classifier calls this param (url + method + param) has this refined type.
+ * The verdict is cached so all future values on that param skip the classifier call.
+ *
+ * Runs in a background thread. Topic: akto.detection-verdicts
+ * Message format: { "apiCollectionId": 1, "url": "/api/user", "method": "POST", "param": "email",
+ *                   "correctedType": "VERIFIED_CUSTOMER_EMAIL", "timestamp": 1234567890 }
  */
-public class KafkaVerdictConsumer implements Runnable {
+public class ParamCorrectionSubscriber implements Runnable {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(KafkaVerdictConsumer.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ParamCorrectionSubscriber.class);
     private static final Gson gson = new Gson();
 
     private final String brokerUrl;
     private final String topic;
     private volatile boolean running = true;
 
-    public KafkaVerdictConsumer(String brokerUrl, String topic) {
+    public ParamCorrectionSubscriber(String brokerUrl, String topic) {
         this.brokerUrl = brokerUrl;
         this.topic = topic;
     }
