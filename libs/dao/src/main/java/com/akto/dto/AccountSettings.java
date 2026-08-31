@@ -1,6 +1,7 @@
 package com.akto.dto;
 
 import com.akto.dto.settings.DefaultPayload;
+import com.akto.dto.settings.DetectionCorrectorSettings;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -140,106 +141,18 @@ public class AccountSettings {
 
     /*
      * External detection corrector. Local detection can tell that a value looks like an email or a
-     * card; it cannot tell whose it is, because that lives in a system outside Akto. When enabled,
-     * values whose locally detected type is listed in detectionCorrectorTriggerTypes are sent to
-     * detectionCorrectorUrl, which may return a more specific data type for the ones it recognises.
-     *
-     * The auth token is deliberately not stored here. It is read from the AKTO_DETECTION_CORRECTOR_TOKEN
-     * environment variable on the runtime pod so the secret never travels with account settings.
+     * card; it cannot tell whose it is, because that lives in a system outside Akto. Grouped into
+     * its own object - it is one optional feature and does not need a dozen fields at this level.
      */
-    public static final String DETECTION_CORRECTOR_ENABLED = "detectionCorrectorEnabled";
-    private boolean detectionCorrectorEnabled;
+    public static final String DETECTION_CORRECTOR = "detectionCorrector";
+    private DetectionCorrectorSettings detectionCorrector;
 
-    public static final String DETECTION_CORRECTOR_URL = "detectionCorrectorUrl";
-    private String detectionCorrectorUrl;
-
-    public static final String DETECTION_CORRECTOR_TRIGGER_TYPES = "detectionCorrectorTriggerTypes";
-    private List<String> detectionCorrectorTriggerTypes;
-
-    public static final String DETECTION_CORRECTOR_TIMEOUT_MS = "detectionCorrectorTimeoutMs";
-    private int detectionCorrectorTimeoutMs;
-
-    public static final String DETECTION_CORRECTOR_MAX_BATCH_SIZE = "detectionCorrectorMaxBatchSize";
-    private int detectionCorrectorMaxBatchSize;
-
-    public static final String DETECTION_CORRECTOR_AUTH_TOKEN = "detectionCorrectorAuthToken";
-    private String detectionCorrectorAuthToken;
-
-    /*
-     * Akto data type name -> the name the classifier expects on the wire, e.g. CREDIT_CARD -> CARD.
-     * Detection type vocabularies differ between systems, and a name the classifier does not
-     * recognise is silently ignored: it answers 200 with an empty corrections list, exactly as it
-     * would for "I looked and found nothing". Without a mapping that failure is invisible.
-     */
-    public static final String DETECTION_CORRECTOR_TYPE_ALIASES = "detectionCorrectorTypeAliases";
-    private Map<String, String> detectionCorrectorTypeAliases;
-
-    /* Per-value logging, including raw values. Off unless deliberately switched on. */
-    public static final String DETECTION_CORRECTOR_DEBUG = "detectionCorrectorDebug";
-    private boolean detectionCorrectorDebug;
-
-    public String getDetectionCorrectorAuthToken() {
-        return detectionCorrectorAuthToken;
+    public DetectionCorrectorSettings getDetectionCorrector() {
+        return detectionCorrector;
     }
 
-    public void setDetectionCorrectorAuthToken(String detectionCorrectorAuthToken) {
-        this.detectionCorrectorAuthToken = detectionCorrectorAuthToken;
-    }
-
-    public Map<String, String> getDetectionCorrectorTypeAliases() {
-        return detectionCorrectorTypeAliases;
-    }
-
-    public void setDetectionCorrectorTypeAliases(Map<String, String> detectionCorrectorTypeAliases) {
-        this.detectionCorrectorTypeAliases = detectionCorrectorTypeAliases;
-    }
-
-    public boolean isDetectionCorrectorDebug() {
-        return detectionCorrectorDebug;
-    }
-
-    public void setDetectionCorrectorDebug(boolean detectionCorrectorDebug) {
-        this.detectionCorrectorDebug = detectionCorrectorDebug;
-    }
-
-    public boolean isDetectionCorrectorEnabled() {
-        return detectionCorrectorEnabled;
-    }
-
-    public void setDetectionCorrectorEnabled(boolean detectionCorrectorEnabled) {
-        this.detectionCorrectorEnabled = detectionCorrectorEnabled;
-    }
-
-    public String getDetectionCorrectorUrl() {
-        return detectionCorrectorUrl;
-    }
-
-    public void setDetectionCorrectorUrl(String detectionCorrectorUrl) {
-        this.detectionCorrectorUrl = detectionCorrectorUrl;
-    }
-
-    public List<String> getDetectionCorrectorTriggerTypes() {
-        return detectionCorrectorTriggerTypes;
-    }
-
-    public void setDetectionCorrectorTriggerTypes(List<String> detectionCorrectorTriggerTypes) {
-        this.detectionCorrectorTriggerTypes = detectionCorrectorTriggerTypes;
-    }
-
-    public int getDetectionCorrectorTimeoutMs() {
-        return detectionCorrectorTimeoutMs;
-    }
-
-    public void setDetectionCorrectorTimeoutMs(int detectionCorrectorTimeoutMs) {
-        this.detectionCorrectorTimeoutMs = detectionCorrectorTimeoutMs;
-    }
-
-    public int getDetectionCorrectorMaxBatchSize() {
-        return detectionCorrectorMaxBatchSize;
-    }
-
-    public void setDetectionCorrectorMaxBatchSize(int detectionCorrectorMaxBatchSize) {
-        this.detectionCorrectorMaxBatchSize = detectionCorrectorMaxBatchSize;
+    public void setDetectionCorrector(DetectionCorrectorSettings detectionCorrector) {
+        this.detectionCorrector = detectionCorrector;
     }
     private ThreatKafkaPartitionKey threatKafkaPartitionKey;
 

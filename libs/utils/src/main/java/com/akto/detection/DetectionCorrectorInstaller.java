@@ -1,6 +1,7 @@
 package com.akto.detection;
 
 import com.akto.dto.AccountSettings;
+import com.akto.dto.settings.DetectionCorrectorSettings;
 import com.akto.log.LoggerMaker;
 
 
@@ -54,16 +55,25 @@ public class DetectionCorrectorInstaller {
     static DetectionCorrectorConfig fromAccountSettings(AccountSettings accountSettings) {
         if (accountSettings == null) return null;
 
-        DetectionCorrectorConfig config = new DetectionCorrectorConfig();
-        config.setEnabled(accountSettings.isDetectionCorrectorEnabled());
-        config.setUrl(accountSettings.getDetectionCorrectorUrl());
-        config.setAuthToken(accountSettings.getDetectionCorrectorAuthToken());
-        config.setTriggerSubTypesFromList(accountSettings.getDetectionCorrectorTriggerTypes());
-        config.setTypeAliases(accountSettings.getDetectionCorrectorTypeAliases());
-        config.setTimeoutMs(accountSettings.getDetectionCorrectorTimeoutMs());
-        config.setMaxBatchSize(accountSettings.getDetectionCorrectorMaxBatchSize());
+        DetectionCorrectorSettings settings = accountSettings.getDetectionCorrector();
+        if (settings == null) return null;
 
-        DetectionCorrectorRegistry.setDebugEnabled(accountSettings.isDetectionCorrectorDebug());
+        DetectionCorrectorConfig config = new DetectionCorrectorConfig();
+        config.setEnabled(settings.isEnabled());
+        config.setUrl(settings.getUrl());
+        config.setAuthToken(settings.getAuthToken());
+        config.setTriggerSubTypesFromList(settings.getTriggerTypes());
+        config.setTypeAliases(settings.getTypeAliases());
+
+        // The setters below ignore non-positive values, so an unset field keeps the built-in default.
+        config.setTimeoutMs(settings.getTimeoutMs());
+        config.setMaxBatchSize(settings.getMaxBatchSize());
+        config.setFailureThreshold(settings.getFailureThreshold());
+        config.setBreakerCoolOffSeconds(settings.getBreakerCoolOffSeconds());
+        config.setCacheSize(settings.getCacheSize());
+        config.setCacheTtlSeconds(settings.getCacheTtlSeconds());
+
+        DetectionCorrectorRegistry.setDebugEnabled(settings.isDebug());
         return config;
     }
 }

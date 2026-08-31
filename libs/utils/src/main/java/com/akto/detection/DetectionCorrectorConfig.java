@@ -26,7 +26,7 @@ public class DetectionCorrectorConfig {
     private int cacheSize = 50_000;
     private int cacheTtlSeconds = 3600;
     /** Consecutive failures before the breaker opens. */
-    private int failureThreshold = 5;
+    private int failureThreshold = 20;
     /** How long the breaker stays open before a probe is allowed through. */
     private int breakerCoolOffSeconds = 30;
 
