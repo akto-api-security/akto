@@ -76,6 +76,8 @@ message ListMaliciousRequestsRequest {
       // matching collection of their own — attributed via device id instead. See match_claude_config.
       repeated string claude_device_ids = 19;
       optional bool match_claude_config = 20;  // true: match ANY claude-config host (the queried asset IS a Claude agent)
+      optional string risk_score_filter_type = 21 [json_name = "riskScoreFilterType"];  // equals, greaterThan, lessThan
+      optional double risk_score_filter_value = 22 [json_name = "riskScoreFilterValue"];
     }
 
     // The number of alerts to return
