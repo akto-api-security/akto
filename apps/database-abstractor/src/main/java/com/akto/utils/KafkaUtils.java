@@ -242,6 +242,24 @@ public class KafkaUtils {
             return;
         }
 
+        // TestingRunResult writes are raw-document inserts, not BulkUpdates filter+diff pairs, so
+        // they carry their own payload shape too. Reuse DbAction's conversion logic (workflow node
+        // remap, aiSummaryTraces placement, id conversions) by driving it through the same action
+        // methods the live HTTP endpoints call, instead of re-parsing straight into TestingRunResult.
+        if ("insertTestingRunResults".equals(triggerMethod)) {
+            BasicDBObject raw = gson.fromJson(payload, BasicDBObject.class);
+            dbAction.setTestingRunResult(raw);
+            dbAction.insertTestingRunResults();
+            return;
+        }
+
+        if ("bulkWriteTestingRunResults".equals(triggerMethod)) {
+            List<BasicDBObject> raw = gson.fromJson(payload, new com.google.gson.reflect.TypeToken<List<BasicDBObject>>(){}.getType());
+            dbAction.setTestingRunResultsForBulkWrite(raw);
+            dbAction.bulkWriteTestingRunResults();
+            return;
+        }
+
         List<BulkUpdates> bulkWrites = mapper.readValue(payload, new TypeReference<List<BulkUpdates>>(){});
 
 
