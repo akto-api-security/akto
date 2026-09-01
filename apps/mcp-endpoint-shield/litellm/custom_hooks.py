@@ -44,6 +44,30 @@ MCP_INGEST_PATH = os.getenv("MCP_INGEST_PATH", "/mcp")
 NON_MCP_TOOL_PATH_PREFIX = os.getenv("NON_MCP_TOOL_PATH_PREFIX", "/tool")
 CALL_HEADERS_CACHE_TTL_SECONDS = float(os.getenv("CALL_HEADERS_CACHE_TTL_SECONDS", str(15 * 60)))
 
+# The guardrails service reads message content only as a plain string. Anthropic
+# Messages style content BLOCKS - content: [{"type": "text", "text": "..."}] - are
+# not read, so a prompt injection inside a content block is never seen and the
+# service answers Allowed=true. Every Claude Code request uses blocks, so
+# prompt-injection enforcement was silently inert for those clients while looking
+# healthy. Flatten blocks to text for the verdict call.
+#
+# `stream` and `tools` in the mirrored body suppress detection the same way, and
+# are call metadata rather than content to judge, so they come off too.
+#
+# Measured by replaying captured verdict envelopes against the live service,
+# 4 trials each:
+#     content as blocks, with stream + tools   -> allowed 4/4
+#     same, tools removed                      -> blocked 4/4
+#     same, content flattened to a string      -> blocked 4/4
+#     headers reduced / tags reduced           -> allowed (not the cause)
+#
+# Verdict-only: the request forwarded to the provider and the payload sent for
+# ingestion both keep the original structure, so inventory data is unchanged.
+VERDICT_FLATTEN_CONTENT = os.getenv("VERDICT_FLATTEN_CONTENT", "true").strip().lower() == "true"
+VERDICT_DROP_BODY_KEYS = tuple(
+    k.strip() for k in os.getenv("VERDICT_DROP_BODY_KEYS", "stream,tools").split(",") if k.strip()
+)
+
 INVALID_AGENT_CHARS = re.compile(r"[^a-z0-9\-._]")
 INVALID_TOOL_NAME_CHARS = re.compile(r"[^a-zA-Z0-9._~-]+")
 # Never mirror credentials/session cookies to the ingestion service; host/content-type
@@ -609,11 +633,55 @@ class GuardrailsHandler(CustomLogger):
         except Exception as e:
             logger.error(f"Guardrails async validation error: {e}")
 
+    @staticmethod
+    def normalize_verdict_payload(payload: dict) -> dict:
+        """Shape the mirrored body so the guardrail can actually read the prompt.
+
+        Flattens Anthropic-style content blocks to plain text and removes call
+        metadata (`stream`, `tools`) that suppresses detection. See the comment on
+        VERDICT_FLATTEN_CONTENT for the measurements. Verdict path only - the
+        ingestion envelope is built separately and keeps the original structure.
+        """
+        try:
+            request_payload = json.loads(payload.get("requestPayload") or "{}")
+            body = request_payload.get("body")
+            if not isinstance(body, dict):
+                return payload
+
+            changed = False
+            for key in VERDICT_DROP_BODY_KEYS:
+                if key in body:
+                    body.pop(key, None)
+                    changed = True
+
+            if VERDICT_FLATTEN_CONTENT:
+                for message in body.get("messages") or []:
+                    if not isinstance(message, dict):
+                        continue
+                    content = message.get("content")
+                    if isinstance(content, list):
+                        message["content"] = " ".join(
+                            block.get("text", "")
+                            for block in content
+                            if isinstance(block, dict) and block.get("type", "text") == "text"
+                        ).strip()
+                        changed = True
+
+            if changed:
+                normalized = dict(payload)
+                normalized["requestPayload"] = json.dumps(request_payload)
+                return normalized
+        except (json.JSONDecodeError, TypeError, AttributeError) as e:
+            logger.warning(f"Could not normalize guardrail verdict payload: {e}")
+        return payload
+
     async def call_guardrails_validation(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> Tuple[bool, str, Optional[str]]:
         if not DATA_INGESTION_SERVICE_URL:
             return True, "", None
 
-        http_proxy_payload = self.build_payload(data, call_type, None, user_api_key_dict, kwargs=kwargs)
+        http_proxy_payload = self.normalize_verdict_payload(
+            self.build_payload(data, call_type, None, user_api_key_dict, kwargs=kwargs)
+        )
 
         try:
             response = await self.post_http_proxy(guardrails=True, ingest_data=False, http_proxy_payload=http_proxy_payload)
