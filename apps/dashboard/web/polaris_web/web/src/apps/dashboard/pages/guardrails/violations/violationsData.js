@@ -87,6 +87,54 @@ export function sanitizeDisplayText(text, max = 500) {
     return s.length > max ? `${s.slice(0, max).trim()}...` : s;
 }
 
+const METHOD_TO_TYPE = {
+    POST: "Prompt",
+    SKILL: "Skill",
+    TOOL: "Tool",
+    CONFIG: "Config",
+    LLM: "LLM",
+};
+
+export function parseAktoPayload(payloadStr) {
+    if (!payloadStr) return {};
+    try {
+        const outer = JSON.parse(payloadStr);
+        const safeJson = (s) => { try { return JSON.parse(s); } catch { return null; } };
+        const reqStr = outer.requestPayload || outer.request_body;
+        const respStr = outer.responsePayload || outer.response_body;
+        const req = reqStr ? safeJson(reqStr) : null;
+        const resp = respStr ? safeJson(respStr) : null;
+        return { req, resp, raw: outer };
+    } catch {
+        return {};
+    }
+}
+
+export function deriveAgenticType(url, method) {
+    const lower = (url || "").toLowerCase();
+    if (lower.includes("tool")) return "Tool";
+    if (lower.includes("skill")) return "Skill";
+    if (lower.includes("resource")) return "Resource";
+    if (lower.includes("prompt")) return "Prompt";
+    if (lower.includes("config") || lower.includes("setting")) return "Config";
+    if (lower.includes("mcp") || lower.includes("server")) return "Tool";
+    if (lower.includes("message") || lower.includes("completion") || lower.includes("chat")) return "Prompt";
+    const m = method ? String(method).toUpperCase() : null;
+    return METHOD_TO_TYPE[m] || "Prompt";
+}
+
+// Same Evidence-column extraction the new UI uses: Prompt/Tool → last user message / body /
+// tool args; Skill → response evidence; Config → request evidence. Never uses metadata.reason.
+export function extractEvidenceText(payload, type, max = 300) {
+    const { req: reqPayload, resp: respPayload, raw: rawPayload } = parseAktoPayload(payload);
+    const isPromptOrTool = type === "Prompt" || type === "Tool";
+    const primaryValueRaw = coerceToText(isPromptOrTool
+        ? (extractPromptBody(reqPayload) ?? (type === "Tool" ? reqPayload : null) ?? rawPayload?.requestPayload ?? null)
+        : type === "Skill" ? (respPayload?.evidence || null) : (reqPayload?.evidence || null));
+    if (isEmptyJsonText(primaryValueRaw)) return "";
+    return sanitizeDisplayText(primaryValueRaw, max) || "";
+}
+
 // Request bodies are sometimes JSON-inside-JSON — a field like `requestPayload` whose value
 // is itself a JSON-encoded string (e.g. a proxied/forwarded request captured as a string
 // field). Printed raw, every nested quote shows up as a literal backslash ("\"..\""), which

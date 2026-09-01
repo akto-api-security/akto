@@ -21,6 +21,7 @@ AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
+AKTO_ACCOUNT_ID = os.getenv("AKTO_ACCOUNT_ID", "1000000")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 MODE = os.getenv("MODE", "argus").lower()
 
@@ -30,8 +31,8 @@ SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
 
 
 def detect_connector(input_data: dict) -> str:
-    """Detect connector from hook payload. hookEventName is present in all VSCode payloads."""
-    if "hookEventName" in input_data:
+    """Detect connector; VSCode payloads carry hookEventName or hook_event_name, depending on event."""
+    if "hookEventName" in input_data or "hook_event_name" in input_data:
         return "vscode"
     return os.getenv("AKTO_CONNECTOR", "copilot_cli")
 
@@ -44,9 +45,9 @@ def get_connector_config(connector: str) -> dict:
             "connector": connector,
             "is_vscode": True,
             "api_url": api_url,
-            "ai_agent_tag": "vscode",
+            "ai_agent_tag": "copilot",
             "hook_header": "x-vscode-hook",
-            "atlas_domain": "ai-agent.vscode",
+            "atlas_domain": "ai-agent.copilot",
             "log_dir_default": "~/.github/akto/vscode/logs",
             "blocked_exit_code": 2
         }
@@ -56,12 +57,80 @@ def get_connector_config(connector: str) -> dict:
             "connector": connector,
             "is_vscode": False,
             "api_url": api_url,
-            "ai_agent_tag": "copilotcli",
+            "ai_agent_tag": "copilot",
             "hook_header": "x-copilot-hook",
             "atlas_domain": "ai-agent.copilot",
             "log_dir_default": "~/.github/akto/copilot/logs",
             "blocked_exit_code": 0,  # github-cli cannot block prompts
         }
+
+
+def _session_state_path(log_dir: str) -> str:
+    return os.path.join(log_dir, "akto_session_state.json")
+
+
+def _load_session_row(log_dir: str, session_id: str, logger) -> Dict[str, Any]:
+    if not session_id:
+        logger.debug("_load_session_row: no session_id on this event, skipping state lookup")
+        return {}
+    path = _session_state_path(log_dir)
+    if not os.path.exists(path):
+        logger.debug(f"_load_session_row: no session state file yet at {path}")
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        row = data.get(session_id, {}) if isinstance(data, dict) else {}
+        if not row:
+            logger.debug(f"_load_session_row: no stored row for session_id={session_id}")
+        return row
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f"Could not read session state: {e}")
+        return {}
+
+
+def _save_session_row(log_dir: str, session_id: str, row: Dict[str, Any], logger) -> None:
+    if not session_id:
+        return
+    path = _session_state_path(log_dir)
+    tmp_path = path + ".tmp"
+    try:
+        data: Dict[str, Any] = {}
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    data = loaded
+        data[session_id] = row
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+            f.write("\n")
+        os.replace(tmp_path, path)
+    except OSError as e:
+        logger.error(f"Could not persist session state: {e}")
+
+
+def session_headers(session_id: str, message_id: str) -> Dict[str, str]:
+    """x-akto-installer-* headers mini-runtime reads to stitch and attribute a trace."""
+    headers: Dict[str, str] = {}
+    if session_id:
+        headers["x-akto-installer-akto_session_id"] = str(session_id)
+    if message_id:
+        headers["x-akto-installer-akto_message_id"] = str(message_id)
+    return headers
+
+
+def advance_message_turn(log_dir: str, session_id: str, logger) -> str:
+    """Prompt hook only: opens a new message/turn id for pre/postToolUse to read back."""
+    if not session_id:
+        return ""
+    row = _load_session_row(log_dir, session_id, logger)
+    next_seq = int(row.get("turn_seq", 0)) + 1
+    message_id = f"{session_id}:{next_seq}"
+    row["turn_seq"] = next_seq
+    row["current_message_id"] = message_id
+    _save_session_row(log_dir, session_id, row, logger)
+    return message_id
 
 
 def setup_logging(log_dir: str):
@@ -139,11 +208,13 @@ def build_akto_request(prompt: str, cwd: str, timestamp: int, cfg: dict) -> Dict
     hook_header = cfg["hook_header"]
     hook_value = "UserPromptSubmitted"
 
-    request_headers = json.dumps({
+    request_header_dict = {
         "host": host,
         hook_header: hook_value,
         "content-type": "application/json"
-    })
+    }
+    request_header_dict.update(cfg.get("session_headers", {}))
+    request_headers = json.dumps(request_header_dict)
 
     response_headers = json.dumps({
         hook_header: hook_value
@@ -168,7 +239,7 @@ def build_akto_request(prompt: str, cwd: str, timestamp: int, cfg: dict) -> Dict
         "statusCode": "200",
         "type": "HTTP/1.1",
         "status": "200",
-        "akto_account_id": "1000000",
+        "akto_account_id": AKTO_ACCOUNT_ID,
         "akto_vxlan_id": device_id,
         "is_pending": "false",
         "source": "MIRRORING",
@@ -343,6 +414,11 @@ def main():
     warn_state_path = os.path.join(log_dir, "akto_prompt_warn_pending.json")
     send_heartbeat(log_dir, logger)
 
+    # Opens a new turn; check both sessionId (camelCase) and session_id (VS Code) forms.
+    session_id = str(input_data.get("session_id") or input_data.get("sessionId") or "")
+    message_id = advance_message_turn(log_dir, session_id, logger)
+    cfg["session_headers"] = session_headers(session_id, message_id)
+
     logger.info(f"=== User Prompt Submitted Hook - Connector: {connector}, Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
 
     if LOG_PAYLOADS:
@@ -391,6 +467,9 @@ def main():
             sys.stdout.write(json.dumps(output))
             sys.stdout.flush()
             sys.exit(cfg["blocked_exit_code"])
+
+        # Guardrails-check above used ingest_data=false; allowed prompts still need ingesting.
+        ingest_request(prompt, cwd, timestamp, "", blocked=False, cfg=cfg, logger=logger)
 
     logger.info("Hook completed")
     sys.exit(0)

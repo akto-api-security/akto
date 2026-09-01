@@ -1,12 +1,13 @@
 #!/bin/bash
-# Generic Akto VSCode Copilot hook wrapper
+# Generic Akto observability hook wrapper -- shared by GitHub Copilot CLI and VS Code Copilot
 # Usage: bash ./.github/hooks/akto-hook-wrapper.sh akto-hooks.py <hookName>
 
 export MODE="atlas"
 export AKTO_DATA_INGESTION_URL="{{AKTO_DATA_INGESTION_URL}}"
 export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
-export AKTO_CONNECTOR="vscode"
+# Both surfaces report under the same "copilot" ai_agent_tag, so one hardcoded value is correct for both.
+export AKTO_CONNECTOR="github_cli"
 export CONTEXT_SOURCE="ENDPOINT"
 export AKTO_API_TOKEN="{{AKTO_API_TOKEN}}"
 export DEVICE_ID="{{DEVICE_ID (optional)}}"
