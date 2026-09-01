@@ -40,21 +40,9 @@ export function coerceToText(value) {
     try { return JSON.stringify(value); } catch { return String(value); }
 }
 
-// Fallback for Prompt/Tool when no known shape matches: the full request body, headers
-// stripped, rather than `reason` - reason is the guardrail's own response-side explanation,
-// not request content, and showing it in place of the prompt misrepresents what was sent.
-function _fullRequestJsonNoHeaders(req) {
-    if (!req || typeof req !== "object") return null;
-    const { headers, requestHeaders, ...rest } = req;
-    if (Object.keys(rest).length === 0) return null;
-    try { return JSON.stringify(rest, null, 2); } catch { return null; }
-}
-
 function _extractPromptBody(req) {
     if (!req) return null;
     if (req.body != null) return req.body;
-    // MCP JSON-RPC tool calls: {method:"tools/call", params:{name, arguments}} - no .body at all.
-    if (req.params?.arguments != null) return req.params.arguments;
     const msgs = req.messages || req?.body?.messages;
     if (Array.isArray(msgs) && msgs.length > 0) {
         const lastUser = [...msgs].reverse().find(m => m.role === "user") || msgs[msgs.length - 1];
@@ -341,10 +329,7 @@ export function buildFallbackDetail(row) {
         fileHighlights: fileHighlights || undefined,
         skillName: skillName || undefined,
         promptResponse: (() => {
-            const promptBody = primaryValueFull
-                || (isPromptOrTool ? _fullRequestJsonNoHeaders(req) : null)
-                || reason
-                || undefined;
+            const promptBody = primaryValueFull || reason || undefined;
             return {
                 valueLabel: VALUE_SECTION_LABELS[row.type] || VALUE_SECTION_LABELS.Other,
                 promptBody,
