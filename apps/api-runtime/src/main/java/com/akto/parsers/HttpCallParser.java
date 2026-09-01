@@ -75,6 +75,8 @@ public class HttpCallParser {
     private Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap = new HashMap<>();
     public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
     private static final String trafficMetricsUrl = "https://logs.akto.io/traffic-metrics";
+
+    private static final String AGENTIC_COLLECTION_PREFIX = "-agentic";
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
             .writeTimeout(1, TimeUnit.SECONDS)
             .readTimeout(1, TimeUnit.SECONDS)
@@ -115,7 +117,12 @@ public class HttpCallParser {
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
         apiCollectionMap = new HashMap<>();
         DbLayer.fetchAllApiCollections()
-            .forEach(apiCollection -> apiCollectionMap.put(apiCollection.getId(), apiCollection));
+            .forEach(apiCollection -> {
+                apiCollectionMap.put(apiCollection.getId(), apiCollection);
+                if (apiCollection.getHostName() != null && !apiCollection.getHostName().isEmpty()) {
+                    hostNameToIdMap.put(apiCollection.getHostName().toLowerCase().trim(), apiCollection.getId());
+                }
+            });
 
         this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, !Main.isOnprem);
     }
@@ -502,25 +509,38 @@ public class HttpCallParser {
 
         int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
 
-        boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(httpResponseParam).getFirst();
-
         List<CollectionTags> tagsToApply = new ArrayList<>();
-        
+
         String tagsJson = httpResponseParam.getTags();
+        BasicDBObject parsedTags = null;
         if (tagsJson != null && !tagsJson.isEmpty()) {
             try {
-                BasicDBObject parsedTags = BasicDBObject.parse(tagsJson);
+                parsedTags = BasicDBObject.parse(tagsJson);
                 for (String key : parsedTags.keySet()) {
                     tagsToApply.add(new CollectionTags(Context.now(), key, String.valueOf(parsedTags.get(key)), TagSource.AKTO));
                 }
             } catch (Exception ignored) {}
         }
 
+        boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(httpResponseParam).getFirst()
+                && isAgenticTaggingAllowed(parsedTags);
+
         if (isMcpRequest) tagsToApply.add(getMcpServerTag());
 
         if (useHostCondition(hostName, httpResponseParam.getSource())) {
             hostName = hostName.toLowerCase();
             hostName = hostName.trim();
+
+            boolean isEndpointSource = Constants.AKTO_ENDPOINT_SOURCE_VALUE.equals(
+                    parsedTags != null ? parsedTags.getString(Constants.AKTO_ENDPOINT_SOURCE_TAG) : null);
+
+            Integer realHostCollectionId = hostNameToIdMap.get(hostName);
+            ApiCollection realHostCollection = realHostCollectionId != null ? apiCollectionMap.get(realHostCollectionId) : null;
+
+            if (realHostCollection != null && !hasAtlasOrArgusTag(realHostCollection)
+                    && isMcpRequest && !isEndpointSource) {
+                hostName = hostName + AGENTIC_COLLECTION_PREFIX;
+            }
 
             String key = hostName;
 
@@ -534,6 +554,15 @@ public class HttpCallParser {
                 try {
 
                     apiCollectionId = createCollectionBasedOnHostName(id, hostName, tagsToApply);
+
+                    // Add to the in-memory cache immediately instead of waiting for the next periodic
+                    // catalog sync - otherwise a same-session follow-up request for this same host can't
+                    // see this collection via apiCollectionMap, even though hostNameToIdMap already does.
+                    ApiCollection newCollection = new ApiCollection(
+                        apiCollectionId, hostName, Context.now(), new HashSet<>(), hostName, 0, false, true
+                    );
+                    newCollection.setTagsList(tagsToApply);
+                    apiCollectionMap.put(apiCollectionId, newCollection);
 
                     hostNameToIdMap.put(key, apiCollectionId);
                 } catch (Exception e) {
@@ -828,6 +857,31 @@ public class HttpCallParser {
 
     private CollectionTags getMcpServerTag() {
         return new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES);
+    }
+
+    private boolean hasAtlasOrArgusTag(ApiCollection collection) {
+        List<CollectionTags> existingTags = collection.getTagsList();
+        if (existingTags == null) {
+            return false;
+        }
+        for (CollectionTags tag : existingTags) {
+            if (Constants.AKTO_MCP_SERVER_TAG.equals(tag.getKeyName())) {
+                return true;
+            }
+            if (Constants.AKTO_ENDPOINT_SOURCE_TAG.equals(tag.getKeyName())
+                    && Constants.AKTO_ENDPOINT_SOURCE_VALUE.equals(tag.getValue())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isAgenticTaggingAllowed(BasicDBObject parsedTags) {
+        String source = parsedTags != null ? parsedTags.getString(Constants.AKTO_ENDPOINT_SOURCE_TAG) : null;
+        if (Constants.AKTO_ENDPOINT_SOURCE_VALUE.equals(source)) {
+            return true;
+        }
+        return UsageMetricUtils.isSecurityTypeAgenticGranted(Context.accountId.get());
     }
 
     private Bson getUpdatesForTags(List<CollectionTags> tagsToApply, Bson updates) {
