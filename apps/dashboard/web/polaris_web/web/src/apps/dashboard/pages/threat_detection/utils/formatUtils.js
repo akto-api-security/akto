@@ -86,6 +86,13 @@ export const truncateToWords = (text, maxWords = 30) => {
   return { preview: `${words.slice(0, maxWords).join(" ")}...`, full, isTruncated: true };
 };
 
+export const truncateToChars = (text, maxChars = 30) => {
+  const full = text == null ? "" : String(text).trim();
+  if (!full) return { preview: "", full: "", isTruncated: false };
+  if (full.length <= maxChars) return { preview: full, full, isTruncated: false };
+  return { preview: `${full.slice(0, maxChars)}...`, full, isTruncated: true };
+};
+
 /**
  * Resolves the compliance-clause map for a single threat/malicious event.
  * Guardrail (Agentic/Endpoint): keyed by capability derived from metadata.rule_violated.

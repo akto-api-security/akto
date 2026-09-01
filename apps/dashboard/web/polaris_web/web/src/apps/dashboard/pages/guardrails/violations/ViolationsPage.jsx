@@ -48,7 +48,7 @@ import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph"
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
-import { coerceToText, sanitizeDisplayText, extractPromptBody, isEmptyJsonText } from "./violationsData";
+import { coerceToText, sanitizeDisplayText, extractPromptBody, isEmptyJsonText, normalizeReasonPunctuation } from "./violationsData";
 import AdvancedPayloadSearch from "./AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "./attributeSearch";
 import InsightsFlyout from "@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout";
@@ -176,6 +176,26 @@ function RiskScoreCellRenderer({ value }) {
     return <Text variant="bodySm">{value}</Text>;
 }
 
+function ReasonCellRenderer({ value }) {
+    if (!value) return null;
+    return (
+        <div style={{ width: "100%", minWidth: 0, overflow: "hidden" }}>
+            <Tooltip content={value} dismissOnMouseOut width="wide">
+                <div
+                    style={{
+                        width: "100%",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                    }}
+                >
+                    <Text variant="bodySm" as="span">{value}</Text>
+                </div>
+            </Tooltip>
+        </div>
+    );
+}
+
 // Needs Approval tab only. Stops the click from bubbling into the row's onRowClicked (which
 // would otherwise open the ViolationFlyout instead of the approve modal).
 function ApproveCellRenderer({ data, onApprove }) {
@@ -230,19 +250,6 @@ function buildColDefs(filterValues, showApprove, onApprove) {
             sortable: false,
             cellRenderer: TypeCellRenderer,
         },
-        // Atlas / Argus — risk score sits after Type (Detection Type in the old table).
-        ...((isEndpointSecurityCategory() || isAgenticSecurityCategory()) ? [{
-            field: "riskScore",
-            headerName: "Risk score",
-            minWidth: 130,
-            filter: "agNumberColumnFilter",
-            filterParams: {
-                filterOptions: ["equals", "greaterThan", "lessThan"],
-                maxNumConditions: 1,
-            },
-            cellRenderer: RiskScoreCellRenderer,
-            valueFormatter: p => (p.value == null || p.value === "") ? "" : String(p.value),
-        }] : []),
         {
             field: "evidenceText",
             headerName: "Evidence",
@@ -283,6 +290,29 @@ function buildColDefs(filterValues, showApprove, onApprove) {
                 valueFormatter: (p) => actorIdDisplayText(p.value),
             },
             cellRenderer: ActorCellRenderer,
+        }] : []),
+        ...((isEndpointSecurityCategory() || isAgenticSecurityCategory()) ? [{
+            field: "reason",
+            headerName: "Reason",
+            width: 200,
+            minWidth: 120,
+            suppressAutoSize: true,
+            resizable: true,
+            sortable: false,
+            wrapText: false,
+            cellRenderer: ReasonCellRenderer,
+            cellStyle: { display: "flex", alignItems: "center", overflow: "hidden" },
+        }, {
+            field: "riskScore",
+            headerName: "Risk score",
+            minWidth: 130,
+            filter: "agNumberColumnFilter",
+            filterParams: {
+                filterOptions: ["equals", "greaterThan", "lessThan"],
+                maxNumConditions: 1,
+            },
+            cellRenderer: RiskScoreCellRenderer,
+            valueFormatter: p => (p.value == null || p.value === "") ? "" : String(p.value),
         }] : []),
         {
             field: "agenticAsset",
@@ -515,6 +545,7 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         // explanation), which would show up as if it were the captured request content.
         evidenceText: primaryValue || "-",
         riskScore: parseStoredRiskScore(meta),
+        reason: normalizeReasonPunctuation(meta.reason || meta.nreason) || "",
         actor: event.actor || "",
         user: userDisplay,
         userHost: rawHost,
