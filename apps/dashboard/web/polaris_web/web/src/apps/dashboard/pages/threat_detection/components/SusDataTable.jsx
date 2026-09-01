@@ -6,7 +6,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
-import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris";
+import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, VerticalStack } from "@shopify/polaris";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap, parseStoredRiskScore, parseStoredReason, truncateToWords } from "../utils/formatUtils";
@@ -24,22 +24,6 @@ const resourceName = {
   singular: "activity",
   plural: "activities",
 };
-
-function EvidenceLineCell({ line }) {
-  const text = typeof line === "string" ? line.trim() : "";
-  if (!text) {
-    return <Text variant="bodyMd" color="subdued">-</Text>;
-  }
-  return (
-    <Tooltip content={text} preferredPosition="below" width="wide">
-      <Box maxWidth="240px">
-        <Text variant="bodyMd" fontWeight="medium" truncate breakWord={false}>
-          <span style={{ fontFamily: "monospace", fontSize: "12px" }}>{text}</span>
-        </Text>
-      </Box>
-    </Tooltip>
-  )
-}
 
 const RISK_SCORE_OPS = [
   { label: "Equals", value: "equals" },
@@ -152,6 +136,14 @@ const getHeaders = () => {
 
   if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
     baseHeaders.push({
+      text: "Evidence",
+      value: "evidenceLine",
+      title: "Evidence",
+      maxWidth: "260px",
+      type: CellType.TEXT,
+      tooltipKey: "evidenceLineFull",
+    });
+    baseHeaders.push({
       text: "Reason",
       value: "reason",
       title: "Reason",
@@ -199,12 +191,6 @@ const getHeaders = () => {
       value: "behaviour",
       title: "Behaviour",
       maxWidth: "120px",
-    });
-    baseHeaders.push({
-      text: "Evidence",
-      value: "evidenceLineComp",
-      title: "Evidence",
-      maxWidth: "260px",
     });
   }
   baseHeaders.push({
@@ -720,7 +706,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     await handleFilteredOperation('markForTraining', 'TRAINING');
   };
 
-
   const promotedBulkActions = (selectedIds) => {
     const actions = [];
 
@@ -1051,10 +1036,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           // (the raw `metadata` passthrough is dropped by the table); used by the flyout's
           // "Approve server" action for "approval" behaviour policies.
           behaviourRaw: extractBehaviour(x?.metadata),
-          // Patched in asynchronously after the event lands (see the gateway's
-          // enqueueGuardrailEnrichment), so an event that has only just arrived
-          // legitimately shows "-" until the enrichment call returns.
-          evidenceLineComp: <EvidenceLineCell line={x?.evidenceLine} />,
+          ...(() => {
+            const e = typeof x?.evidenceLine === "string" ? x.evidenceLine.trim() : "";
+            if (!e) return { evidenceLine: "", evidenceLineFull: "" };
+            const { preview, full } = truncateToWords(e, 30);
+            return { evidenceLine: preview, evidenceLineFull: full };
+          })(),
           behaviour: (() => {
             const b = extractBehaviour(x?.metadata);
             if (!b) return '-';
