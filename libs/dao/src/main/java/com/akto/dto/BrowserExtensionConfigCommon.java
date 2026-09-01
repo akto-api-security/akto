@@ -94,6 +94,13 @@ public class BrowserExtensionConfigCommon {
     public static final String BLOCK_RESPONSE_FRAMES = "blockResponseFrames";
     private List<Object> blockResponseFrames;
 
+    // file-upload endpoints for this host: an array of self-describing descriptor objects
+    // ({ path, method, transport, encoding, field?, filePath?, contentType?, crossHost?, reportPath? }).
+    // A separate concern from prompt extraction (validates against /validate/file). Mirrored as
+    // stored so the browser extension's GenericRequestInterceptor can read schema.fileUpload.
+    public static final String FILE_UPLOAD = "fileUpload";
+    private List<Object> fileUpload;
+
     public static final String ENFORCE_AT = "enforceAt";
     private String enforceAt;
 
@@ -147,6 +154,7 @@ public class BrowserExtensionConfigCommon {
         config.modelHeader = asMap(doc.get(MODEL_HEADER));
         config.triggerFrame = asMap(doc.get(TRIGGER_FRAME));
         config.blockResponseFrames = asObjectList(doc.get(BLOCK_RESPONSE_FRAMES));
+        config.fileUpload = asObjectList(doc.get(FILE_UPLOAD));
         config.enforceAt = asString(doc.get(ENFORCE_AT));
 
         return config;

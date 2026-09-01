@@ -171,6 +171,43 @@ public class TestBrowserExtensionConfigCommon {
         assertNull(config.getFrameMatch());
     }
 
+    @Test
+    public void testFileUploadDescriptorsPreserved() {
+        Document doc = Document.parse("{" +
+                "'host': 'copilot.microsoft.com'," +
+                "'active': true," +
+                "'paths': ['/c/api/chat']," +
+                "'transport': 'websocket'," +
+                "'format': 'ws-frame'," +
+                "'path': 'content[?type=text][*].text'," +
+                "'fileUpload': [" +
+                "  { 'path': '/c/api/attachments', 'method': 'POST', 'transport': 'http', 'encoding': 'multipart' }" +
+                "]" +
+                "}");
+
+        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
+
+        assertNotNull(config);
+        List<Object> fileUpload = config.getFileUpload();
+        assertNotNull(fileUpload);
+        assertEquals(1, fileUpload.size());
+
+        // Descriptor is mirrored as stored (a nested Document), so every field survives the round trip.
+        Document descriptor = (Document) fileUpload.get(0);
+        assertEquals("/c/api/attachments", descriptor.getString("path"));
+        assertEquals("POST", descriptor.getString("method"));
+        assertEquals("http", descriptor.getString("transport"));
+        assertEquals("multipart", descriptor.getString("encoding"));
+    }
+
+    @Test
+    public void testFileUploadAbsentIsNull() {
+        Document doc = Document.parse("{ 'host': 'chatgpt.com', 'active': true, 'paths': ['/x'] }");
+        BrowserExtensionConfigCommon config = BrowserExtensionConfigCommon.fromDocument(doc);
+        assertNotNull(config);
+        assertNull(config.getFileUpload());
+    }
+
     // ---- merge(common, account) ----
 
     private static BrowserExtensionConfigCommon cfg(String host, boolean active) {
