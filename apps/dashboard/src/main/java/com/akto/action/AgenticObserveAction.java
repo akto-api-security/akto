@@ -59,6 +59,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * Violations for agentic observe flyouts and assets table.
@@ -504,6 +505,32 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return new boolean[]{personal, localMcp, misconfigured, owner};
     }
 
+    // The agent's signed-in email, written onto the collection by Endpoint Shield's login detector
+    // alongside login-user-email-type (see CreateCollectionForAgentSkills). Read from the same
+    // already-projected tagsList computeAgenticTagFlags above walks, so this costs no extra query.
+    private static final String AI_AGENT_EMAIL_TAG = "ai-agent-email";
+
+    // McpClientRegistry canonical group keys the ai-agent-email filter is offered for. "claude1" is
+    // Claude Desktop (raw tag value "claude-desktop" folds into it via resolveClientKey); "claude2"
+    // is Claude CLI. Scoped to Claude Desktop for now — add keys here to widen it. Kept in sync with
+    // AI_AGENT_EMAIL_GROUP_KEYS in AgenticAssetDevicesPage.jsx, which decides whether to show the chip.
+    private static final Set<String> AI_AGENT_EMAIL_GROUP_KEYS = new HashSet<>(Arrays.asList("claude1"));
+
+    // Upper bound on a user-supplied regex. The pattern runs against every row's emails, so this
+    // caps how much catastrophic backtracking one request can buy.
+    private static final int MAX_AI_AGENT_EMAIL_REGEX_LEN = 200;
+
+    private static String extractAiAgentEmail(List<CollectionTags> envType) {
+        if (envType == null) return null;
+        for (CollectionTags tag : envType) {
+            if (tag != null && AI_AGENT_EMAIL_TAG.equals(tag.getKeyName())
+                    && StringUtils.isNotBlank(tag.getValue())) {
+                return tag.getValue().trim();
+            }
+        }
+        return null;
+    }
+
     private static String extractEnvironmentName(List<CollectionTags> envType) {
         if (envType == null) return null;
         for (CollectionTags tag : envType) {
@@ -868,6 +895,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         boolean hasMaliciousSkill = false;
         boolean hasOwnerTag = false;
         String environmentName = null;
+        // A Set, not a single value: one device row merges several collections, and nothing
+        // guarantees they were all signed in as the same account.
+        final Set<String> aiAgentEmails = new LinkedHashSet<>();
         final List<BasicDBObject> children = new ArrayList<>();
 
         EndpointGroup(String deviceId) { this.deviceId = deviceId; }
@@ -896,6 +926,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             List<String> collSensitive = sensitive != null ? sensitive.get(idStr) : null;
             boolean[] flags = computeAgenticTagFlags(c.getEnvType());
             String environmentName = extractEnvironmentName(c.getEnvType());
+            String aiAgentEmail = extractAiAgentEmail(c.getEnvType());
             int childStartTs = c.getStartTs();
 
             int skillCount = 0;
@@ -926,6 +957,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             child.put("hasMisconfiguredConfig", flags[2]);
             child.put("hasOwnerTag", flags[3]);
             if (StringUtils.isNotBlank(environmentName)) child.put("environmentName", environmentName);
+            if (aiAgentEmail != null) child.put("aiAgentEmail", aiAgentEmail);
             child.put("hasMaliciousSkill", childMalicious);
             child.put("skillCount", skillCount);
             child.put("baseRiskScore", c.getBaseRiskScore());
@@ -968,6 +1000,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (flags[3]) g.hasOwnerTag = true;
             // First non-blank wins — every child of one owner-tagged group is the same bot, same environment.
             if (g.environmentName == null && StringUtils.isNotBlank(environmentName)) g.environmentName = environmentName;
+            // Unlike environmentName above, every distinct email is kept: the device row matches the
+            // ai-agent-email filter if ANY of its collections was signed in as a matching account.
+            if (aiAgentEmail != null) g.aiAgentEmails.add(aiAgentEmail);
             if (childMalicious) g.hasMaliciousSkill = true;
         }
         return groups;
@@ -1051,6 +1086,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 row.put("hasMaliciousSkill", g.hasMaliciousSkill);
                 row.put("hasOwnerTag", g.hasOwnerTag);
                 row.put("environmentName", g.environmentName);
+                row.put("aiAgentEmails", new ArrayList<>(g.aiAgentEmails));
                 row.put("childCount", g.children.size());
                 row.put("children", g.children);
                 rows.add(row);
@@ -1101,6 +1137,42 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (usernameFilters != null && !usernameFilters.isEmpty()) {
                 Set<String> wanted = new HashSet<>(usernameFilters);
                 rows.removeIf(r -> !wanted.contains(String.valueOf(r.get("username"))));
+            }
+
+            // ai-agent-email regex filter. Sits with the other filters — after grouping, before the
+            // sort/subList below — so it applies across every device of this asset, not just the
+            // page being returned. Offered only for the asset groups in AI_AGENT_EMAIL_GROUP_KEYS;
+            // the check is repeated here (the UI already hides the chip elsewhere) so a stale URL
+            // carrying this filter onto another asset is ignored rather than silently applied.
+            List<String> aiAgentEmailFilters = filters != null ? filters.get("aiAgentEmail") : null;
+            boolean aiAgentEmailFilterAllowed = "agent".equals(effectiveRowType)
+                    && AI_AGENT_EMAIL_GROUP_KEYS.contains(groupKey);
+            if (aiAgentEmailFilterAllowed && aiAgentEmailFilters != null && !aiAgentEmailFilters.isEmpty()
+                    && StringUtils.isNotBlank(aiAgentEmailFilters.get(0))) {
+                String rawPattern = aiAgentEmailFilters.get(0).trim();
+                Pattern compiled = null;
+                if (rawPattern.length() <= MAX_AI_AGENT_EMAIL_REGEX_LEN) {
+                    try {
+                        compiled = Pattern.compile(rawPattern, Pattern.CASE_INSENSITIVE);
+                    } catch (PatternSyntaxException e) {
+                        // Half-typed regex ("...gmail.com[") is a normal intermediate state on a
+                        // debounced text field — treat it as no filter instead of erroring the page.
+                        compiled = null;
+                    }
+                }
+                if (compiled != null) {
+                    final Pattern emailPattern = compiled; // compiled once, not per row
+                    rows.removeIf(r -> {
+                        Object raw = r.get("aiAgentEmails");
+                        if (!(raw instanceof List)) return true;
+                        for (Object e : (List<?>) raw) {
+                            // find(), not matches(): "gmail" works as a substring search while
+                            // "^.*@akto\.io$" still anchors.
+                            if (e != null && emailPattern.matcher(String.valueOf(e)).find()) return false;
+                        }
+                        return true;
+                    });
+                }
             }
 
             Comparator<BasicDBObject> cmp = buildEndpointGroupComparator(sortKey);
