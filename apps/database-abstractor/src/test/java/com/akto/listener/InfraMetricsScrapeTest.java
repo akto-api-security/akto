@@ -24,7 +24,9 @@ public class InfraMetricsScrapeTest {
         assertNotNull(out);
         assertTrue("scrape output should contain the metric name", out.contains("cyborg_scrape_test_total"));
         assertTrue("scrape output should be Prometheus exposition format", out.contains("# TYPE"));
-        // common tags applied in the static block must be present on emitted series
-        assertTrue("service tag should be present", out.contains("service=\"cyborg\""));
+        // common tag applied in the static block must be present on emitted series.
+        // The app stamps only "app" (from APP_NAME, default "unknown"); the fleet-level
+        // "service" label is appended by the Prometheus scrape job, not the app.
+        assertTrue("app tag should be present", out.contains("app=\"unknown\""));
     }
 }
