@@ -16,6 +16,8 @@ function GithubSimpleTable(props) {
     return <GithubServerTable
         key={tableKey}
         pageLimit={props.pageLimit}
+        pageSizeOptions={props.pageSizeOptions}
+        hidePageSizeSelector={props.hidePageSizeSelector}
         fetchData={fetchFunction}
         sortOptions={props.sortOptions}
         resourceName={props.resourceName}
