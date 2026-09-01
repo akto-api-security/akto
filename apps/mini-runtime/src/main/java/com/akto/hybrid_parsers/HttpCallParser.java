@@ -1491,6 +1491,17 @@ public class HttpCallParser {
                         );
                     }
 
+                    // Add to the in-memory cache immediately (same pattern as the service-tag branch below)
+                    // instead of waiting for the next periodic catalog sync - otherwise a same-session
+                    // follow-up request for this same host can't see this collection via apiCollectionsMap,
+                    // even though hostNameToIdMap already knows about it.
+                    ApiCollection newCollection = new ApiCollection(
+                        apiCollectionId, hostName, Context.now(), new HashSet<>(), hostName, 0, false, true
+                    );
+                    newCollection.setTagsList(tagList);
+                    newCollection.setAccessType(accessType);
+                    apiCollectionsMap.put(apiCollectionId, newCollection);
+
                     //New MCP server detected, audit it
                     if(ismcpServer) {
                         McpAuditInfo auditInfo;
