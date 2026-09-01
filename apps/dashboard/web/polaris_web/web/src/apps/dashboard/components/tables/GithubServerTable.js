@@ -15,7 +15,8 @@ import {
   Link,
   Button,
   Tooltip,
-  Box
+  Box,
+  Select
 } from '@shopify/polaris';
 import { GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect, useMemo, useRef, useReducer } from 'react';
@@ -101,7 +102,20 @@ function GithubServerTable(props) {
   const [data, setData] = useState([]);
   const [total, setTotal] = useState([]);
   const [page, setPage] = useState(0);
-  const pageLimit = props?.pageLimit || 20;
+  // The page-size selector defaults every table to 50, regardless of whatever pageLimit a given
+  // page happens to pass in — a page only keeps its own smaller pageLimit (e.g. a compact 10-row
+  // flyout list) by also opting out of the selector via hidePageSizeSelector.
+  const [pageLimit, setPageLimit] = useState(props?.hidePageSizeSelector ? (props?.pageLimit || 50) : 50);
+  const handlePageLimitChange = (value) => {
+    setPage(0);
+    setPageLimit(Number(value));
+  }
+  // Selector is on by default for every GithubServerTable/GithubSimpleTable — opt out per-table
+  // with hidePageSizeSelector, or override the choices with pageSizeOptions. The table's own
+  // configured pageLimit (e.g. a flyout using 10) is always included so the Select's value is
+  // never left pointing at an option that doesn't exist.
+  const pageSizeOptions = props?.hidePageSizeSelector ? null :
+    [...new Set([...(props?.pageSizeOptions || [20, 50, 100]), props?.pageLimit || 50])].sort((a, b) => a - b);
   const [appliedFilters, setAppliedFilters] = useState(initialStateFilters);
   const [queryValue, setQueryValue] = useState('');
   const [fullDataIds, setFullDataIds] = useState([])
@@ -261,7 +275,7 @@ function GithubServerTable(props) {
   useEffect(() => {
     setActiveColumnSort(tableFunc.getColumnSort(sortSelected, props?.sortOptions))
     fetchData(queryValue);
-  }, [sortSelected, appliedFilters, page, pageFiltersMap])
+  }, [sortSelected, appliedFilters, page, pageLimit, pageFiltersMap])
 
   useEffect(()=> {
     setSortableColumns(tableFunc.getSortableChoices(props?.headers))
@@ -835,7 +849,9 @@ function GithubServerTable(props) {
             </LegacyCard.Section>
             {(total !== 0 && !props?.hidePagination) && <LegacyCard.Section>
               <HorizontalStack
-                align="center">
+                align="center"
+                blockAlign="center"
+                gap="4">
                 <Pagination
                   label={
                     total == 0 ? 'No data found' :
@@ -850,6 +866,17 @@ function GithubServerTable(props) {
                   nextKeys={[Key.RightArrow]}
                   onNext={onPageNext}
                 />
+                {pageSizeOptions && pageSizeOptions.length > 0 && (
+                  <Box minWidth="110px">
+                    <Select
+                      label="Show"
+                      labelInline
+                      options={pageSizeOptions.map((size) => ({ label: String(size), value: String(size) }))}
+                      value={String(pageLimit)}
+                      onChange={handlePageLimitChange}
+                    />
+                  </Box>
+                )}
               </HorizontalStack>
             </LegacyCard.Section>}
           </div>

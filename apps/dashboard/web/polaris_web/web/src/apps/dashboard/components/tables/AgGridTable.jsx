@@ -151,7 +151,11 @@ export default function AgGridTable({
     bulkActions = [],
     onClearBulk,
     pagination,
-    paginationPageSize = 20,
+    // Every table defaults to 50, regardless of whatever paginationPageSize a given page passes —
+    // a page only keeps its own smaller size (e.g. a compact 10-row list) by also opting out of
+    // the selector via hidePageSizeSelector. Mirrors GithubServerTable's page-size default.
+    paginationPageSize: paginationPageSizeProp = 50,
+    hidePageSizeSelector = false,
     paginationPageSizeSelector = [20, 50, 100],
     sideBar = { toolPanels: ["columns", "filters"], defaultToolPanel: null },
     gridRef: gridRefProp,
@@ -173,6 +177,7 @@ export default function AgGridTable({
     serverSideRowModel = false,
     ...rest
 }) {
+    const paginationPageSize = hidePageSizeSelector ? (paginationPageSizeProp || 20) : 50;
     const hasSearch = !!searchPlaceholder || !!renderSearch;
     const isSearchControlled = searchValueProp !== undefined;
     const [uncontrolledSearch, setUncontrolledSearch] = useState("");
