@@ -241,19 +241,6 @@ function buildColDefs(filterValues, showApprove, onApprove) {
             sortable: false,
             cellRenderer: TypeCellRenderer,
         },
-        // Atlas / Argus — risk score sits after Type (Detection Type in the old table).
-        ...((isEndpointSecurityCategory() || isAgenticSecurityCategory()) ? [{
-            field: "riskScore",
-            headerName: "Risk score",
-            minWidth: 130,
-            filter: "agNumberColumnFilter",
-            filterParams: {
-                filterOptions: ["equals", "greaterThan", "lessThan"],
-                maxNumConditions: 1,
-            },
-            cellRenderer: RiskScoreCellRenderer,
-            valueFormatter: p => (p.value == null || p.value === "") ? "" : String(p.value),
-        }] : []),
         {
             field: "evidenceText",
             headerName: "Evidence",
@@ -301,6 +288,17 @@ function buildColDefs(filterValues, showApprove, onApprove) {
             minWidth: 180,
             sortable: false,
             cellRenderer: ReasonCellRenderer,
+        }, {
+            field: "riskScore",
+            headerName: "Risk score",
+            minWidth: 130,
+            filter: "agNumberColumnFilter",
+            filterParams: {
+                filterOptions: ["equals", "greaterThan", "lessThan"],
+                maxNumConditions: 1,
+            },
+            cellRenderer: RiskScoreCellRenderer,
+            valueFormatter: p => (p.value == null || p.value === "") ? "" : String(p.value),
         }] : []),
         {
             field: "agenticAsset",
