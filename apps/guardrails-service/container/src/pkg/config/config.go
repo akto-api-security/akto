@@ -85,7 +85,15 @@ type FileConfig struct {
 	MaxRetries       int
 	MaxConcurrent    int
 	URLTimeoutSec    int
-	Media            MediaConfig
+
+	// BlockOnRedaction fails an upload whose content a policy masked, instead of
+	// letting it through. /api/validate/file answers with a verdict only — it has no
+	// field to hand the masked text back in — so a "mask" verdict that does not block
+	// means the original, unmasked file is what actually gets used. Defaults to true;
+	// set FILE_VALIDATE_BLOCK_ON_REDACTION=false to go back to allowing them.
+	BlockOnRedaction bool
+
+	Media MediaConfig
 }
 
 // MediaConfig holds configuration for external media processing APIs.
@@ -172,6 +180,7 @@ func LoadConfig() *Config {
 			MaxRetries:       getEnvAsInt("FILE_VALIDATE_MAX_RETRIES", 2),
 			MaxConcurrent:    getEnvAsInt("FILE_VALIDATE_MAX_CONCURRENT", 5),
 			URLTimeoutSec:    getEnvAsInt("FILE_VALIDATE_URL_TIMEOUT_SEC", 30),
+			BlockOnRedaction: getEnvAsBool("FILE_VALIDATE_BLOCK_ON_REDACTION", true),
 			Media: MediaConfig{
 				Provider:      getEnv("MEDIA_PROVIDER", ""),
 				VisionAPIKey:  getEnv("MEDIA_VISION_API_KEY", ""),

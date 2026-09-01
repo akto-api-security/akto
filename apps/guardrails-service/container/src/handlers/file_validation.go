@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
-	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -218,18 +218,44 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 			fr.FailedChunkIndex = i + 1
 			return fr
 		}
-		if !r.Result.Allowed {
+		if h.chunkStopsFile(r.Result) {
 			fr.Allowed = false
-			fr.Reason = r.Result.Reason
-			if fr.Reason == "" {
-				fr.Reason = "content blocked by guardrail policy"
-			}
+			fr.Reason = chunkBlockReason(r.Result)
 			fr.FailedChunkIndex = i + 1
 			fr.FailedResult = r.Result
 			return fr
 		}
 	}
 	return fr
+}
+
+// chunkStopsFile reports whether a chunk's verdict fails the whole upload.
+//
+// A masked chunk counts. This endpoint answers with a verdict and nothing else — it
+// discards ModifiedPayload — so allowing a "mask" verdict hands the caller a green light
+// on the original file with the sensitive spans still in it. Blocking is the only
+// enforcement the response shape can express; see FileConfig.BlockOnRedaction to opt out.
+func (h *ValidationHandler) chunkStopsFile(r *mcp.ValidationResult) bool {
+	if r == nil {
+		return false
+	}
+	return !r.Allowed || (h.cfg.File.BlockOnRedaction && r.Modified)
+}
+
+// chunkBlockReason describes why a chunk failed the upload. A masked chunk carries no
+// Reason of its own (Reason is lifted off the blocked response, which a mask never
+// builds), so name the behaviour that masked it instead.
+func chunkBlockReason(r *mcp.ValidationResult) string {
+	if r.Reason != "" {
+		return r.Reason
+	}
+	if r.Allowed && r.Modified {
+		if r.Behaviour != "" {
+			return "file contains sensitive content redacted by guardrail policy (" + r.Behaviour + ")"
+		}
+		return "file contains sensitive content redacted by guardrail policy"
+	}
+	return "content blocked by guardrail policy"
 }
 
 func (h *ValidationHandler) resolveInputs(c *gin.Context) ([]*fileInput, int, error) {
@@ -413,7 +439,7 @@ func (h *ValidationHandler) validateChunks(ctx context.Context, chunks []string,
 			}
 			payload := marshalPromptPayload(chunk)
 			results[i] = h.validateWithRetry(gCtx, payload, meta, sessionID, requestID)
-			if results[i].Err != nil || !results[i].Result.Allowed {
+			if results[i].Err != nil || h.chunkStopsFile(results[i].Result) {
 				return errChunkBlocked
 			}
 			return nil
@@ -469,7 +495,6 @@ func (h *ValidationHandler) writeMultiFileResponse(c *gin.Context, results []*fi
 
 	c.JSON(http.StatusOK, resp)
 }
-
 
 func marshalPromptPayload(content string) string {
 	b, err := json.Marshal(map[string]string{"prompt": content})
