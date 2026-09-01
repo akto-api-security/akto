@@ -1,7 +1,9 @@
 import React, { useMemo } from "react";
 import {
     Avatar,
+    Badge,
     Box,
+    Button,
     Divider,
     HorizontalGrid,
     HorizontalStack,
@@ -24,6 +26,34 @@ import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/co
 import { getOwaspThreatsForRule } from "@/apps/dashboard/pages/guardrails/components/owaspConfig";
 import OwaspTag from "@/apps/dashboard/pages/guardrails/components/OwaspTag";
 import ComplianceTags from "@/apps/dashboard/pages/guardrails/components/ComplianceTags";
+
+export function HumanResponseBadge({ response }) {
+    const key = String(response || "PENDING").toUpperCase();
+    const isApproved = key === "APPROVED";
+    const isBlocked = key === "BLOCKED";
+    return (
+        <Badge size="small" status={isApproved ? "success" : isBlocked ? "critical" : "warning"}>
+            {isApproved ? "Approved" : isBlocked ? "Blocked" : "Pending"}
+        </Badge>
+    );
+}
+
+export function isHumanApprovalPending(response) {
+    const key = String(response || "PENDING").toUpperCase();
+    return key !== "APPROVED" && key !== "BLOCKED";
+}
+
+export function HumanApprovalActions({ pending, response, onApprove, onBlock, loading, subtle }) {
+    if (!pending) {
+        return <HumanResponseBadge response={response} />;
+    }
+    return (
+        <>
+            <Button size="slim" primary={!subtle} plain={!!subtle} loading={loading} onClick={onApprove}>Approve</Button>
+            <Button size="slim" destructive plain={!!subtle} loading={loading} onClick={onBlock}>Block</Button>
+        </>
+    );
+}
 
 // ─── Evidence block (Blocked Prompt / Suspicious Skill / Suspicious Config) ──────
 

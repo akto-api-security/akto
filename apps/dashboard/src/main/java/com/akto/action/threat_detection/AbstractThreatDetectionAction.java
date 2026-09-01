@@ -162,6 +162,7 @@ public class AbstractThreatDetectionAction extends UserAction {
                   smr.getSessionId() != null && !smr.getSessionId().isEmpty() ? smr.getSessionId() : ""
                 );
                 event.setRemediation(smr.getRemediation());
+                event.setHumanResponse(smr.getHumanResponse());
                 return event;
               })
               .collect(Collectors.toList())

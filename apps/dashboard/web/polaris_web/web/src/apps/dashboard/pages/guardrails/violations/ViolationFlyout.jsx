@@ -34,9 +34,11 @@ import issuesFunctions from "@/apps/dashboard/pages/issues/module";
 import {
     ChatSessionSection,
     FileSection,
+    HumanApprovalActions,
     OverviewSection,
     PromptResponseSection,
     RemediationSection,
+    isHumanApprovalPending,
 } from "./ViolationFlyoutSections";
 import { buildFallbackDetail, buildViolationChatContext } from "./violationsData";
 import "../../../components/layouts/style.css";
@@ -342,7 +344,11 @@ function ApproveServerButton({ row }) {
 
 // ─── Header ─────────────────────────────────────────────────────────────────────
 
-function FlyoutHeader({ row, onClose, onStatusUpdate }) {
+function FlyoutHeader({ row, onClose, onStatusUpdate, onHumanApproval }) {
+    const isHumanApprovalEvent = String(row?._status || "").toUpperCase() === "HUMAN_APPROVAL";
+    const humanResponse = String(row?.humanResponse || "PENDING").toUpperCase();
+    const pending = isHumanApprovalEvent && isHumanApprovalPending(humanResponse);
+
     return (
         <>
             <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="3" paddingBlockEnd="3">
@@ -357,13 +363,24 @@ function FlyoutHeader({ row, onClose, onStatusUpdate }) {
                         )}
                     </HorizontalStack>
                     <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                        <EventActionsDropdown
-                            violationId={row.id}
-                            eventStatus={row._status}
-                            onStatusUpdate={onStatusUpdate}
-                            row={row}
-                        />
-                        {row.behaviour === "approval" && <ApproveServerButton row={row} />}
+                        {!isHumanApprovalEvent && (
+                            <EventActionsDropdown
+                                violationId={row.id}
+                                eventStatus={row._status}
+                                onStatusUpdate={onStatusUpdate}
+                                row={row}
+                            />
+                        )}
+                        {isHumanApprovalEvent ? (
+                            <HumanApprovalActions
+                                pending={pending}
+                                response={humanResponse}
+                                onApprove={() => onHumanApproval?.("APPROVED")}
+                                onBlock={() => onHumanApproval?.("BLOCKED")}
+                            />
+                        ) : (
+                            row.behaviour === "approval" && <ApproveServerButton row={row} />
+                        )}
                         <Button plain icon={MobileCancelMajor} onClick={onClose} accessibilityLabel="Close" />
                     </HorizontalStack>
                 </HorizontalStack>
@@ -375,7 +392,7 @@ function FlyoutHeader({ row, onClose, onStatusUpdate }) {
 
 // ─── Flyout ─────────────────────────────────────────────────────────────────────
 
-export default function ViolationFlyout({ violation, show, onClose, onStatusUpdate }) {
+export default function ViolationFlyout({ violation, show, onClose, onStatusUpdate, onHumanApproval }) {
     const [selectedTab, setSelectedTab] = useState(0);
     const [enrichedPayload, setEnrichedPayload] = useState(null);
 
@@ -420,19 +437,22 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
         }];
     }, [violation]);
 
+    const isHumanApprovalEvent = String(violation?._status || "").toUpperCase() === "HUMAN_APPROVAL";
+
     // Tabs: Overview · Values · (type-specific middle tab) · Remediation · Timeline.
+    // Human Approval only needs Overview and Values.
     const tabModel = useMemo(() => {
         const tabs = [
             { id: "overview", content: "Overview" },
             { id: "promptResponse", content: "Values" },
         ];
-        // "file" middle tab (Config.json/Skill Info/Tool call) is hidden - Config now shows
-        // its full file content inline on the Values tab instead of a separate tab.
         let middle = null;
-        if (detail?.remediation) tabs.push({ id: "remediation", content: "Remediation" });
-        tabs.push({ id: "timeline", content: "Timeline" });
+        if (!isHumanApprovalEvent) {
+            if (detail?.remediation) tabs.push({ id: "remediation", content: "Remediation" });
+            tabs.push({ id: "timeline", content: "Timeline" });
+        }
         return { tabs, middle };
-    }, [detail, violation]);
+    }, [detail, violation, isHumanApprovalEvent]);
 
     const handleTabSelect = useCallback((idx) => setSelectedTab(idx), []);
 
@@ -471,7 +491,7 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
             width={840}
             header={
                 <>
-                    <FlyoutHeader row={violation} onClose={onClose} onStatusUpdate={onStatusUpdate} />
+                    <FlyoutHeader row={violation} onClose={onClose} onStatusUpdate={onStatusUpdate} onHumanApproval={onHumanApproval} />
                     <Box paddingInlineStart="1" paddingInlineEnd="1">
                         <Tabs tabs={tabModel.tabs} selected={selectedTab} onSelect={handleTabSelect} />
                     </Box>

@@ -53,6 +53,7 @@ function GuardrailDetection() {
     const [sampleData, setSampleData] = useState({})
     const [currentEventId, setCurrentEventId] = useState(null)
     const [currentEventStatus, setCurrentEventStatus] = useState(null)
+    const [currentHumanResponse, setCurrentHumanResponse] = useState(null)
     const [triggerTableRefresh, setTriggerTableRefresh] = useState(0)
     const applyPayloadSearchRef = useRef(() => {});
 
@@ -75,6 +76,7 @@ function GuardrailDetection() {
             setSampleData(data)
             setCurrentEventId(data.id)
             setCurrentEventStatus(data.status)
+            setCurrentHumanResponse(data.humanResponse)
             setMoreInfoData({
                 url: data.url,
                 method: data.method,
@@ -120,6 +122,7 @@ function GuardrailDetection() {
                 threatFiltersMap={threatFiltersMap}
                 eventId={currentEventId}
                 eventStatus={currentEventStatus}
+                humanResponse={currentHumanResponse}
                 onStatusUpdate={handleStatusUpdate}
                 onAddAsSearchFilter={(text, side, line) => applyPayloadSearchRef.current?.(text, side, line)}
             />

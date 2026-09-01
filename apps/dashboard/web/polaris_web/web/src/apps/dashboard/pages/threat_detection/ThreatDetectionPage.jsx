@@ -223,7 +223,8 @@ const initialEventState = {
     moreInfoData: {},
     currentEventId: '',
     currentEventStatus: '',
-    currentJiraTicketUrl: ''
+    currentJiraTicketUrl: '',
+    currentHumanResponse: ''
 };
 
 function ThreatDetectionPage() {
@@ -458,7 +459,8 @@ function ThreatDetectionPage() {
             metadata: data.metadata || '',
             behaviourRaw: data.behaviourRaw || extractBehaviour(data.metadata) || '',
             host: data.host || '',
-            remediation: data.remediation || ''
+            remediation: data.remediation || '',
+            humanResponse: data.humanResponse || '',
         });
 
         setShowDetails(true);
@@ -483,7 +485,8 @@ function ThreatDetectionPage() {
             },
             currentEventId: data.id || '',
             currentEventStatus: data.status || '',
-            currentJiraTicketUrl: data.jiraTicketUrl || ''
+            currentJiraTicketUrl: data.jiraTicketUrl || '',
+            currentHumanResponse: data.humanResponse || ''
         });
         if (data.nextUrl) {
             navigate(data.nextUrl, { replace: eventState.currentRefId === data.refId });
@@ -686,7 +689,8 @@ function ThreatDetectionPage() {
             },
             currentEventId: rowContext?.eventId || '',
             currentEventStatus: queryParams.status || rowContext?.status || '',
-            currentJiraTicketUrl: rowContext?.jiraTicketUrl || ''
+            currentJiraTicketUrl: rowContext?.jiraTicketUrl || '',
+            currentHumanResponse: rowContext?.humanResponse || ''
           });
         } catch (error) {
           console.error('Error fetching event:', error);
@@ -770,6 +774,7 @@ function ThreatDetectionPage() {
                 eventStatus={eventState.currentEventStatus}
                 onStatusUpdate={handleStatusUpdate}
                 jiraTicketUrl={eventState.currentJiraTicketUrl}
+                humanResponse={eventState.currentHumanResponse}
                 loading={detailsLoading}
                 onAddAsSearchFilter={(text, side, line) => applyPayloadSearchRef.current?.(text, side, line)}
             />

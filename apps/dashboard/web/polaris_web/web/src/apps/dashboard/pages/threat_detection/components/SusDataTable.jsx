@@ -19,6 +19,7 @@ import guardrailApi from "../../guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "../../guardrails/utils";
 import AdvancedPayloadSearch from "../../guardrails/violations/AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "../../guardrails/violations/attributeSearch";
+import { HumanApprovalActions, HumanResponseBadge, isHumanApprovalPending } from "../../guardrails/violations/ViolationFlyoutSections";
 
 const resourceName = {
   singular: "activity",
@@ -265,6 +266,8 @@ const getSortOptions = (headers) => {
 
 let filters = [];
 
+const HUMAN_RESPONSE = { PENDING: "PENDING", APPROVED: "APPROVED", BLOCKED: "BLOCKED" };
+
 function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, initialTab, onRegisterPayloadSearch }) {
   const location = useLocation();
   const getTimeEpoch = (key) => {
@@ -275,6 +278,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   const [loading, setLoading] = useState(true);
   const misconfigRowMetaRef = useRef({});
+  const humanResponseByIdRef = useRef({});
   const collectionsMap = PersistStore((state) => state.collectionsMap);
   const hostNameMap = PersistStore((state) => state.hostNameMap);
   const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
@@ -283,12 +287,13 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const guardrailApprovedByPolicy = SessionStore((state) => state.guardrailApprovedByPolicy);
   const setGuardrailApprovedByPolicy = SessionStore((state) => state.setGuardrailApprovedByPolicy);
   const needsGuardrailCompliance = label === LABELS.GUARDRAIL || isAgenticSecurityCategory() || isEndpointSecurityCategory();
-  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, needs_approval: 3, training: 4, skills_evaluations: 4, misconfigured_settings: 5 };
+  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, needs_approval: 3, human_approval: 3, training: 4, skills_evaluations: 4, misconfigured_settings: 5 };
   const resolvedInitialTab = initialTab || 'active';
   const [currentTab, setCurrentTab] = useState(resolvedInitialTab);
   const [selected, setSelected] = useState(tabIndexMap[resolvedInitialTab] || 0)
   const [currentFilters, setCurrentFilters] = useState({})
   const [totalFilteredCount, setTotalFilteredCount] = useState(0)
+  const [pendingHumanApprovalCount, setPendingHumanApprovalCount] = useState(null)
   const [usernameMap, setUsernameMap] = useState({});
   const [usernameMapLoaded, setUsernameMapLoaded] = useState(!isEndpointSecurityCategory());
   const [advancedFilters, setAdvancedFilters] = useState([]);
@@ -385,6 +390,22 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     }
   };
 
+  const handleBulkHumanApproval = async (selectedIds, response) => {
+    if (!Array.isArray(selectedIds) || selectedIds.length === 0) return;
+    try {
+      const result = await api.updateMaliciousEventStatus({ eventIds: selectedIds, humanResponse: response });
+      if (result?.updateSuccess) {
+        const verb = response === HUMAN_RESPONSE.APPROVED ? "approved" : "blocked";
+        func.setToast(true, false, `${selectedIds.length} event${selectedIds.length === 1 ? "" : "s"} ${verb}`);
+        if (triggerRefresh) triggerRefresh();
+      } else {
+        func.setToast(true, true, "Failed to update selected events");
+      }
+    } catch {
+      func.setToast(true, true, "Failed to update selected events");
+    }
+  };
+
   useEffect(() => {
     if (isEndpointSecurityCategory()) {
       fetchEndpointShieldUsernameMap().then(map => {
@@ -393,6 +414,19 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       });
     }
   }, []);
+
+  useEffect(() => {
+    if (!isAgenticSecurityCategory()) return;
+    let cancelled = false;
+    api.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "HUMAN_APPROVAL", undefined, undefined, undefined, undefined, undefined, false, [], undefined, undefined, undefined, undefined, HUMAN_RESPONSE.PENDING)
+      .then(res => {
+        if (!cancelled) setPendingHumanApprovalCount(res?.total || 0);
+      })
+      .catch(() => {
+        if (!cancelled) setPendingHumanApprovalCount(0);
+      });
+    return () => { cancelled = true; };
+  }, [startTimestamp, endTimestamp]);
 
   useEffect(() => {
     if (!needsGuardrailCompliance) return;
@@ -460,6 +494,15 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       badge: 'Beta',
       onAction: () => { setCurrentTab('needs_approval'); },
       id: 'needs_approval',
+      index: 3
+    });
+  }
+  if (isAgenticSecurityCategory()) {
+    guardrailExtraTabs.push({
+      content: 'Human Approval',
+      badge: pendingHumanApprovalCount != null ? String(pendingHumanApprovalCount) : undefined,
+      onAction: () => { setCurrentTab('human_approval'); },
+      id: 'human_approval',
       index: 3
     });
   }
@@ -588,7 +631,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       delete: { ing: 'deleting', ed: 'deleted' },
       markForReview: { ing: 'marking for review', ed: 'marked for review' },
       removeFromReview: { ing: 'removing from review', ed: 'removed from review' },
-      markForTraining: { ing: 'marking for training', ed: 'marked for training' }
+      markForTraining: { ing: 'marking for training', ed: 'marked for training' },
+      approve: { ing: 'approving', ed: 'approved' },
+      block: { ing: 'blocking', ed: 'blocked' }
     };
 
     const label = actionLabels[operation];
@@ -619,6 +664,18 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           startTimestamp: filterParams[4],
           endTimestamp: filterParams[5],
           statusFilter: filterParams[6],
+          hosts: filterParams[7]
+        });
+      } else if (operation === 'approve' || operation === 'block') {
+        response = await threatDetectionRequests.updateMaliciousEventStatus({
+          actors: filterParams[0],
+          urls: filterParams[1],
+          types: filterParams[2],
+          latestAttack: filterParams[3],
+          startTimestamp: filterParams[4],
+          endTimestamp: filterParams[5],
+          statusFilter: 'HUMAN_APPROVAL',
+          humanResponse: operation === 'approve' ? HUMAN_RESPONSE.APPROVED : HUMAN_RESPONSE.BLOCKED,
           hosts: filterParams[7]
         });
       } else {
@@ -697,6 +754,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     // Execute the filtered operation
     await handleFilteredOperation('markForTraining', 'TRAINING');
   };
+  const handleApproveAllFiltered = () => handleFilteredOperation('approve');
+  const handleBlockAllFiltered = () => handleFilteredOperation('block');
 
 
   const promotedBulkActions = (selectedIds) => {
@@ -723,47 +782,75 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     if (eventCount === 0) return actions;
 
     // Helper function to create an action button
-    const createAction = (label, actionType, validationType = null, includeWarning = false) => {
+    const createAction = (label, actionType, validationType = null, includeWarning = false, override = null) => {
       const warningText = includeWarning
         ? '\n\nNote: Future events matching these URL and Attack Type combinations will be automatically blocked.'
         : '';
+      const actionIds = override?.ids ?? selectedIds;
+      const displayText = override?.text ?? eventText;
+      const useFilters = override?.useFilters ?? useFilterBasedUpdate;
 
       return {
-        content: `${label} ${eventText}`,
+        content: `${label} ${displayText}`,
         onAction: () => {
-          if (useFilterBasedUpdate) {
+          if (useFilters) {
             if (!validateFiltersForBulkOperation(validationType)) return;
             const message = actionType === 'delete'
-              ? `Are you sure you want to permanently delete ${eventText}? This action cannot be undone.`
-              : `Are you sure you want to ${label.toLowerCase()} ${eventText}?${warningText}`;
+              ? `Are you sure you want to permanently delete ${displayText}? This action cannot be undone.`
+              : `Are you sure you want to ${label.toLowerCase()} ${displayText}?${warningText}`;
             const handlers = {
               markForReview: handleMarkAllFilteredForReview,
               ignore: handleIgnoreAllFiltered,
               removeFromReview: handleRemoveAllFilteredFromReview,
               reactivate: handleRemoveAllFilteredFromReview,
               delete: handleDeleteAllFiltered,
-              markForTraining: handleMarkAllFilteredForTraining
+              markForTraining: handleMarkAllFilteredForTraining,
+              approve: handleApproveAllFiltered,
+              block: handleBlockAllFiltered,
             };
             func.showConfirmationModal(message, label, handlers[actionType]);
           } else {
             const message = actionType === 'delete'
-              ? `Are you sure you want to permanently delete ${eventText}? This action cannot be undone.`
+              ? `Are you sure you want to permanently delete ${displayText}? This action cannot be undone.`
               : includeWarning && actionType === 'ignore'
-                ? `Are you sure you want to ${label.toLowerCase()} ${eventText}?`
-                : `Are you sure you want to ${label.toLowerCase()} ${eventText}?`;
+                ? `Are you sure you want to ${label.toLowerCase()} ${displayText}?`
+                : `Are you sure you want to ${label.toLowerCase()} ${displayText}?`;
             const handlers = {
-              markForReview: () => handleBulkMarkForReview(selectedIds),
-              ignore: () => handleBulkIgnore(selectedIds),
-              removeFromReview: () => handleBulkRemoveFromReview(selectedIds),
-              reactivate: () => handleBulkRemoveFromReview(selectedIds),
-              delete: () => (currentTab === 'misconfigured_settings' ? handleMisconfigGroupDelete(selectedIds) : handleBulkDelete(selectedIds)),
-              markForTraining: () => handleBulkMarkForTraining(selectedIds)
+              markForReview: () => handleBulkMarkForReview(actionIds),
+              ignore: () => handleBulkIgnore(actionIds),
+              removeFromReview: () => handleBulkRemoveFromReview(actionIds),
+              reactivate: () => handleBulkRemoveFromReview(actionIds),
+              delete: () => (currentTab === 'misconfigured_settings' ? handleMisconfigGroupDelete(actionIds) : handleBulkDelete(actionIds)),
+              markForTraining: () => handleBulkMarkForTraining(actionIds),
+              approve: () => handleBulkHumanApproval(actionIds, HUMAN_RESPONSE.APPROVED),
+              block: () => handleBulkHumanApproval(actionIds, HUMAN_RESPONSE.BLOCKED),
             };
             func.showConfirmationModal(message, label, handlers[actionType]);
           }
         },
       };
     };
+
+    if (currentTab === 'human_approval') {
+      const pendingIds = Array.isArray(selectedIds)
+        ? selectedIds.filter((id) => isHumanApprovalPending(humanResponseByIdRef.current[id]))
+        : [];
+      const pendingCount = selectedIds === 'All' ? (pendingHumanApprovalCount || 0) : pendingIds.length;
+      if (pendingCount > 0) {
+        const pendingText = selectedIds === 'All'
+          ? `ALL ${pendingCount} pending event${pendingCount === 1 ? '' : 's'}`
+          : `${pendingCount} selected event${pendingCount === 1 ? '' : 's'}`;
+        const pendingOverride = {
+          ids: selectedIds === 'All' ? 'All' : pendingIds,
+          text: pendingText,
+          useFilters: selectedIds === 'All',
+        };
+        actions.push(createAction('Approve', 'approve', null, false, pendingOverride));
+        actions.push(createAction('Block', 'block', null, false, pendingOverride));
+      }
+      actions.push(createAction('Delete', 'delete'));
+      return actions;
+    }
 
     // Define actions for each tab
     const tabActions = {
@@ -783,7 +870,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       ],
       'training': [
         // No actions for training data - training data cannot be removed
-      ]
+      ],
     };
 
     // Add tab-specific actions
@@ -818,14 +905,16 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     // "Needs Approval" is a client-side view over ACTIVE events filtered to behaviour==="approval".
     // Fetch active events with a high limit (single page) and filter after mapping.
     const isNeedsApproval = currentTab === 'needs_approval';
+    const isHumanApproval = currentTab === 'human_approval';
     const isSkillsEvaluations = currentTab === 'skills_evaluations';
     const isMisconfiguredSettings = currentTab === 'misconfigured_settings';
     // Needs Approval is a client-side view (fetch a big page, filter after mapping). Skills
-    // Evaluations / Misconfigured Settings are SERVER-paginated: each shows ACTIVE events narrowed
-    // to its own partition by the backend (x-skill-eval-mode / x-config-eval-mode headers), so
-    // totals/pagination are correct.
+    // Evaluations / Misconfigured Settings are SERVER-paginated. Human Approval is also
+    // server-paginated, isolated by status=HUMAN_APPROVAL (same pattern as Training Data).
     const isClientSideView = isNeedsApproval;
-    const effectiveStatus = (isNeedsApproval || isSkillsEvaluations || isMisconfiguredSettings) ? 'ACTIVE' : currentTab.toUpperCase();
+    const effectiveStatus = isHumanApproval
+      ? 'HUMAN_APPROVAL'
+      : ((isNeedsApproval || isSkillsEvaluations || isMisconfiguredSettings) ? 'ACTIVE' : currentTab.toUpperCase());
     const effectiveSkip = isClientSideView ? 0 : skip;
     const effectiveLimit = isClientSideView ? 200 : limit;
     // Skills Evaluations / Misconfigured Settings partitions (Atlas only): "only" on their own tab,
@@ -1063,7 +1152,24 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
             <Button size="slim" onClick={() => openInlineApprove(x)}>Approve</Button>
           </div>
-        )
+        ),
+        ...(isHumanApproval && {
+          humanResponseComp: (
+            <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+              <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                <HumanResponseBadge response={x.humanResponse} />
+                {isHumanApprovalPending(x.humanResponse) && (
+                  <HumanApprovalActions
+                    pending
+                    subtle
+                    onApprove={() => handleBulkHumanApproval([x.id], HUMAN_RESPONSE.APPROVED)}
+                    onBlock={() => handleBulkHumanApproval([x.id], HUMAN_RESPONSE.BLOCKED)}
+                  />
+                )}
+              </HorizontalStack>
+            </div>
+          ),
+        }),
       };
 
       if (func.shouldShowIpReputation()) {
@@ -1085,6 +1191,13 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     // x-skill-eval-mode: filterId == "skill_evaluation"), so total/pagination come straight from
     // the backend. Active applies the complementary "exclude" mode, so skill-evaluation rows don't
     // also appear there.
+    if (isHumanApproval) {
+      const next = {};
+      ret.forEach((row) => {
+        if (row?.id) next[row.id] = row.humanResponse;
+      });
+      humanResponseByIdRef.current = next;
+    }
     setLoading(false);
     return { value: ret, total: total };
   }
@@ -1226,10 +1339,20 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   // Recompute rows once the async guardrail compliance map has loaded (same pattern as usernameMapLoaded).
   const guardrailComplianceLoaded = !needsGuardrailCompliance || Object.keys(guardrailComplianceMap).length > 0;
-  const key = startTimestamp + endTimestamp + (usernameMapLoaded ? '_u' : '') + (guardrailComplianceLoaded ? '_gc' : '');
+  const key = startTimestamp + endTimestamp + currentTab + (usernameMapLoaded ? '_u' : '') + (guardrailComplianceLoaded ? '_gc' : '');
   const headers = getHeaders();
   if (currentTab === 'needs_approval') {
     headers.push({ text: "Action", value: "approveAction", title: "Action" });
+  }
+  if (currentTab === 'human_approval') {
+    const behaviourIdx = headers.findIndex((h) => h.value === "behaviour");
+    if (behaviourIdx >= 0) headers.splice(behaviourIdx, 1);
+    const detectedCol = headers.find((h) => h.value === "discoveredTs");
+    if (detectedCol) {
+      detectedCol.text = "Reported";
+      detectedCol.title = "Reported";
+    }
+    headers.unshift({ text: "Status", value: "humanResponseComp", title: "Status" });
   }
   const sortOptions = getSortOptions(headers);
   return (

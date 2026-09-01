@@ -88,6 +88,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   // the threat backend as headers.
   @Getter @Setter String skillEvaluationMode;
   @Getter @Setter String configEvaluationMode;
+  @Getter @Setter String humanResponse;
   // ---- Agentic Assets flyout Violations tab server-side pagination/search ----
   @Getter @Setter String searchText; // free-text match across filterId/host/actor
   @Getter @Setter List<String> looseHostKeys; // "<firstSegment> <lastSegment>" — see ViolationsTab.jsx's looseHostSet
@@ -126,6 +127,9 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     }
     if (this.configEvaluationMode != null && !this.configEvaluationMode.isEmpty()) {
       post.addHeader("x-config-eval-mode", this.configEvaluationMode);
+    }
+    if (this.humanResponse != null && !this.humanResponse.isEmpty()) {
+      post.addHeader("x-human-response", this.humanResponse);
     }
 
     Map<String, Object> filter = new HashMap<>();
@@ -266,6 +270,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                                 smr.getSeverity(),
                                 smr.getSessionId() != null && !smr.getSessionId().isEmpty() ? smr.getSessionId() : "");
                             event.setRemediation(smr.getRemediation());
+                            event.setHumanResponse(smr.getHumanResponse());
                             if (!smr.getOwaspCategoriesList().isEmpty()) {
                                 event.setOwaspCategories(smr.getOwaspCategoriesList().stream()
                                     .map(o -> new DashboardMaliciousEvent.OwaspCategory(
@@ -428,7 +433,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
             this.eventIds,
             filterBuilder,
             this.status,
-            null  // No Jira URL in this method
+            null,  // No Jira URL in this method
+            this.humanResponse
         );
 
     // Set response fields from result

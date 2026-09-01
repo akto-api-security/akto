@@ -1,6 +1,7 @@
 package com.akto.dto.threat_detection_backend;
 
 import com.akto.dto.type.URLMethods;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 import java.util.UUID;
@@ -34,6 +35,15 @@ public class MaliciousEventDto {
   private String sessionId;
   private List<OwaspCategory> owaspCategories;
   private String remediation;
+  public static final String HUMAN_RESPONSE = "humanResponse";
+  @JsonProperty("humanResponse")
+  private String humanResponse;
+
+  public enum HumanResponse {
+    PENDING,
+    APPROVED,
+    BLOCKED
+  }
 
   public enum EventType {
     SINGLE,
@@ -44,7 +54,8 @@ public class MaliciousEventDto {
     ACTIVE,
     UNDER_REVIEW,
     IGNORED,
-    TRAINING
+    TRAINING,
+    HUMAN_APPROVAL
   }
 
   public enum Label {
@@ -107,6 +118,7 @@ public class MaliciousEventDto {
     this.sessionId = builder.sessionId;
     this.owaspCategories = builder.owaspCategories;
     this.remediation = builder.remediation;
+    this.humanResponse = builder.humanResponse;
   }
 
   public static class Builder {
@@ -136,6 +148,7 @@ public class MaliciousEventDto {
     private String sessionId;
     private List<OwaspCategory> owaspCategories;
     private String remediation;
+    private String humanResponse;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -264,6 +277,11 @@ public class MaliciousEventDto {
 
     public Builder setOwaspCategories(List<OwaspCategory> owaspCategories) {
       this.owaspCategories = owaspCategories;
+      return this;
+    }
+
+    public Builder setHumanResponse(String humanResponse) {
+      this.humanResponse = humanResponse;
       return this;
     }
 
@@ -490,6 +508,14 @@ public class MaliciousEventDto {
 
   public void setOwaspCategories(List<OwaspCategory> owaspCategories) {
     this.owaspCategories = owaspCategories;
+  }
+
+  public String getHumanResponse() {
+    return humanResponse;
+  }
+
+  public void setHumanResponse(String humanResponse) {
+    this.humanResponse = humanResponse;
   }
 
 }

@@ -202,6 +202,14 @@ public class MaliciousEventService {
         builder.setOwaspCategories(owaspCategories);
     }
 
+    if (ThreatDetectionConstants.HUMAN_APPROVAL.equalsIgnoreCase(status)) {
+        String humanResponse = evt.getHumanResponse();
+        builder.setHumanResponse(
+            humanResponse != null && !humanResponse.isEmpty()
+                ? humanResponse
+                : MaliciousEventDto.HumanResponse.PENDING.name());
+    }
+
     MaliciousEventDto maliciousEventModel = builder.build();
 
     this.kafka.send(
@@ -439,6 +447,11 @@ public class MaliciousEventService {
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
       String accountId, ListMaliciousRequestsRequest request, String contextSource, String skillEvalMode, String configEvalMode) {
+    return listMaliciousRequests(accountId, request, contextSource, skillEvalMode, configEvalMode, null);
+  }
+
+  public ListMaliciousRequestsResponse listMaliciousRequests(
+      String accountId, ListMaliciousRequestsRequest request, String contextSource, String skillEvalMode, String configEvalMode, String humanResponseFilter) {
 
     if(!shouldNotCreateIndexes.getOrDefault(accountId, false)) {
       createIndexIfAbsent(accountId);
@@ -551,6 +564,7 @@ public class MaliciousEventService {
     if (filter.hasStatusFilter()) {
       applyStatusFilter(query, filter.getStatusFilter());
     }
+    applyHumanResponseFilter(query, humanResponseFilter);
 
     if (filter.hasDetectedAtTimeRange()) {
       TimeRangeFilter timeRange = filter.getDetectedAtTimeRange();
@@ -765,6 +779,7 @@ public class MaliciousEventService {
                 .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
                 .setSessionId(resolvedSessionId)
                 .setRemediation(evt.getRemediation() != null ? evt.getRemediation() : "")
+                .setHumanResponse(evt.getHumanResponse() != null ? evt.getHumanResponse() : "")
                 .addAllOwaspCategories(evt.getOwaspCategories() != null
                     ? evt.getOwaspCategories().stream()
                         .map(o -> OwaspCategory.newBuilder()
@@ -887,24 +902,42 @@ public class MaliciousEventService {
   }
 
   public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status, String jiraTicketUrl, String contextSource) {
+    return updateMaliciousEventStatus(accountId, eventIds, filterMap, status, jiraTicketUrl, contextSource, null);
+  }
+
+  public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status, String jiraTicketUrl, String contextSource, String humanResponse) {
     try {
-      Bson update = null;
+      List<Bson> updateOps = new ArrayList<>();
 
       if(status != null && !status.isEmpty()) {
         MaliciousEventDto.Status eventStatus = MaliciousEventDto.Status.valueOf(status.toUpperCase());
-        update = Updates.set("status", eventStatus.toString());
+        updateOps.add(Updates.set("status", eventStatus.toString()));
       }
       if (jiraTicketUrl != null && !jiraTicketUrl.isEmpty()) {
-        update = Updates.set("jiraTicketUrl", jiraTicketUrl);
+        updateOps.add(Updates.set("jiraTicketUrl", jiraTicketUrl));
       }
+      if (humanResponse != null && !humanResponse.isEmpty()) {
+        MaliciousEventDto.HumanResponse parsed = MaliciousEventDto.HumanResponse.valueOf(humanResponse.toUpperCase());
+        updateOps.add(Updates.set(MaliciousEventDto.HUMAN_RESPONSE, parsed.name()));
+      }
+      if (updateOps.isEmpty()) {
+        return 0;
+      }
+      Bson update = updateOps.size() == 1 ? updateOps.get(0) : Updates.combine(updateOps);
 
       Document query = buildQuery(eventIds, filterMap, "update", contextSource, accountId);
       if (query == null) {
         return 0;
       }
+      if (humanResponse != null && !humanResponse.isEmpty()) {
+        query.append("status", ThreatDetectionConstants.HUMAN_APPROVAL);
+        applyHumanResponseFilter(query, MaliciousEventDto.HumanResponse.PENDING.name());
+      }
 
-      String logMessage = String.format("Updating events %s to status: %s and jiraTicketUrl: %s",
-          getQueryDescription(eventIds, filterMap, accountId), status, jiraTicketUrl != null && !jiraTicketUrl.isEmpty() ? jiraTicketUrl : "null");
+      String logMessage = String.format("Updating events %s to status: %s jiraTicketUrl: %s humanResponse: %s",
+          getQueryDescription(eventIds, filterMap, accountId), status,
+          jiraTicketUrl != null && !jiraTicketUrl.isEmpty() ? jiraTicketUrl : "null",
+          humanResponse != null && !humanResponse.isEmpty() ? humanResponse : "null");
       logger.info(logMessage);
 
       long modifiedCount = maliciousEventDao.getCollection(accountId).updateMany(query, update).getModifiedCount();
@@ -970,9 +1003,27 @@ public class MaliciousEventService {
       query.append("status", ThreatDetectionConstants.IGNORED);
     } else if (ThreatDetectionConstants.TRAINING.equals(statusFilter)) {
       query.append("status", ThreatDetectionConstants.TRAINING);
+    } else if (ThreatDetectionConstants.HUMAN_APPROVAL.equals(statusFilter)) {
+      query.append("status", ThreatDetectionConstants.HUMAN_APPROVAL);
     } else if (ThreatDetectionConstants.ACTIVE.equals(statusFilter) || ThreatDetectionConstants.EVENTS_FILTER.equals(statusFilter)) {
       query.append("status", ThreatDetectionConstants.ACTIVE);
     }
+  }
+
+  private void applyHumanResponseFilter(Document query, String humanResponseFilter) {
+    if (humanResponseFilter == null || humanResponseFilter.isEmpty()) {
+      return;
+    }
+    String value = humanResponseFilter.toUpperCase();
+    if (MaliciousEventDto.HumanResponse.PENDING.name().equals(value)) {
+      query.append("$or", Arrays.asList(
+          new Document("humanResponse", MaliciousEventDto.HumanResponse.PENDING.name()),
+          new Document("humanResponse", ""),
+          new Document("humanResponse", new Document("$exists", false))
+      ));
+      return;
+    }
+    query.append("humanResponse", value);
   }
 
   private Document buildQueryFromFilter(Map<String, Object> filter, String contextSource, String accountId) {
