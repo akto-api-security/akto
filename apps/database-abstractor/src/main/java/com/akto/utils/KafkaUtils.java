@@ -25,6 +25,9 @@ import org.slf4j.LoggerFactory;
 import com.akto.action.DbAction;
 import com.akto.action.ESClientAction;
 import com.akto.dao.context.Context;
+import com.akto.listener.InfraMetricsListener;
+import com.akto.metrics.CyborgMetricsConfig;
+import io.micrometer.core.instrument.binder.kafka.KafkaClientMetrics;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.LogsEndpointShield;
 import com.akto.dto.bulk_updates.BulkUpdates;
@@ -135,6 +138,16 @@ public class KafkaUtils {
 
         Properties properties = configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
         this.consumer = new KafkaConsumer<>(properties);
+
+        // Bind Kafka consumer metrics (lag, consume-rate, offsets) — only when metrics are enabled.
+        if (CyborgMetricsConfig.isEnabled()) {
+            try {
+                new KafkaClientMetrics(this.consumer).bindTo(InfraMetricsListener.registry);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error binding main Kafka consumer metrics: " + e.toString());
+            }
+        }
+
         final Thread mainThread = Thread.currentThread();
         final AtomicBoolean exceptionOnCommitSync = new AtomicBoolean(false);
 

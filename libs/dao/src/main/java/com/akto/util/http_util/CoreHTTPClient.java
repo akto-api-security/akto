@@ -32,6 +32,7 @@ import inet.ipaddr.IPAddressString;
 import okhttp3.Authenticator;
 import okhttp3.Credentials;
 
+import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -77,8 +78,49 @@ public class CoreHTTPClient {
         }
     }
 
+    /**
+     * Optional hook to record outbound HTTP metrics. Implemented by the app that wants metrics
+     * (e.g. cyborg's Micrometer recorder) and registered via {@link #setOutboundMetricsRecorder}.
+     * libs/dao stays metrics-agnostic; when no recorder is set the interceptor is a no-op.
+     */
+    public interface OutboundHttpMetricsRecorder {
+        void record(String host, String path, String method, int statusCode, long durationMs);
+    }
+
+    private static volatile OutboundHttpMetricsRecorder metricsRecorder;
+
+    public static void setOutboundMetricsRecorder(OutboundHttpMetricsRecorder recorder) {
+        metricsRecorder = recorder;
+    }
+
+    // Times every outbound call and reports it to the registered recorder (if any). Tags are host +
+    // path only — never the query string, which can carry API keys/tokens.
+    private static Interceptor outboundMetricsInterceptor() {
+        return chain -> {
+            Request request = chain.request();
+            OutboundHttpMetricsRecorder recorder = metricsRecorder;
+            if (recorder == null) {
+                return chain.proceed(request);
+            }
+            long start = System.currentTimeMillis();
+            int code = 0;
+            try {
+                Response response = chain.proceed(request);
+                code = response.code();
+                return response;
+            } finally {
+                try {
+                    recorder.record(request.url().host(), request.url().encodedPath(),
+                            request.method(), code, System.currentTimeMillis() - start);
+                } catch (Exception ignored) {
+                }
+            }
+        };
+    }
+
     public static OkHttpClient client = new OkHttpClient.Builder()
             .sslSocketFactory(defaultSslSocketFactory, defaultTrustManager)
+            .addInterceptor(outboundMetricsInterceptor())
             .build();
 
     /*

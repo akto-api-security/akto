@@ -30,6 +30,11 @@
             </result>
         </action>
 
+        <!-- Prometheus scrape endpoint. Guarded by MetricsAuthFilter (see web.xml). The action
+             writes the exposition text directly to the response and returns null (no result). -->
+        <action name="metrics" class="com.akto.action.InfraMetricsAction">
+        </action>
+
         <action name="api/exchangeToken" class="com.akto.action.TokenExchangeAction" method="exchangeToken">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

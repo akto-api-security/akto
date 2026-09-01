@@ -80,6 +80,14 @@
             <version>12.25.1</version>
         </dependency>
 
+        <!-- Prometheus metrics (latest stable). Micrometer >=1.13 moved the registry package to
+             io.micrometer.prometheusmetrics.* (see InfraMetricsListener imports). -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+            <version>1.17.1</version>
+        </dependency>
+
     </dependencies>
     <build>
         <sourceDirectory>src/main/java</sourceDirectory>
