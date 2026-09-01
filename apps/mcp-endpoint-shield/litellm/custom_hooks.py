@@ -127,6 +127,10 @@ class GuardrailsHandler(CustomLogger):
         # doesn't pass it to async_should_run_agentic_loop - so we stash it here for the
         # tool-call hook to pick back up by the same call_id.
         self._call_headers_cache: dict = {}
+        # litellm_call_ids already ingested by ingest_blocked_request. Raising
+        # HTTPException also triggers async_log_failure_event, so without this the
+        # connector's own blocks would be recorded twice (measured: 2 ingests).
+        self._own_block_ingested: "OrderedDict[str, None]" = OrderedDict()
         logger.info(f"GuardrailsHandler initialized | sync_mode={SYNC_MODE}")
 
     def _cache_call_headers(self, litellm_call_id: Optional[str], headers: dict) -> None:
@@ -635,6 +639,73 @@ class GuardrailsHandler(CustomLogger):
         except Exception as e:
             logger.error(f"Guardrails post-call error: {e}")
 
+    async def async_log_failure_event(self, kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) -> None:
+        """Ingest requests that never completed, so they are still visible in Akto.
+
+        Without this, anything that does not reach the provider successfully is
+        invisible: the only other ingestion paths are async_log_success_event
+        (fires on success only) and ingest_blocked_request (fires only when THIS
+        connector blocks). So a request rejected by another guardrail - e.g. an
+        AWS Bedrock guardrail returning 400 - was recorded nowhere, and neither
+        were provider errors, rate limits or timeouts.
+
+        Verified against a live Bedrock guardrail block: this callback fires with
+        the original messages, the model, the raising exception (status 400) and
+        litellm's top-level applied_guardrails list.
+        """
+        if not DATA_INGESTION_SERVICE_URL:
+            return
+        try:
+            exception = kwargs.get("exception")
+            call_id = kwargs.get("litellm_call_id")
+
+            # Our own 403 is already recorded by ingest_blocked_request; recording
+            # it again here would double-count every block.
+            if call_id and str(call_id) in self._own_block_ingested:
+                self._own_block_ingested.pop(str(call_id), None)
+                return
+            detail = getattr(exception, "detail", None)
+            if isinstance(detail, str) and detail.startswith("Blocked by Akto Guardrails"):
+                return
+
+            litellm_params = kwargs.get("litellm_params", {}) or {}
+            metadata = litellm_params.get("metadata", {}) or {}
+            user_api_key_dict = metadata.get("user_api_key_dict")
+            call_type = kwargs.get("call_type", "completion")
+
+            request_data = {
+                "model": kwargs.get("model", ""),
+                "messages": kwargs.get("messages", []),
+                "stream": kwargs.get("stream", False),
+                "tools": kwargs.get("tools", []),
+            }
+
+            status_code = getattr(exception, "status_code", None)
+            try:
+                status_code = int(status_code)
+            except (TypeError, ValueError):
+                status_code = 500
+
+            failure_body = {"error": str(exception)[:2000] if exception else "request failed"}
+            applied = kwargs.get("applied_guardrails") or metadata.get("applied_guardrails")
+            if applied:
+                failure_body["applied_guardrails"] = applied
+
+            await self.ingest_response(
+                request_data,
+                call_type,
+                failure_body,
+                status_code,
+                user_api_key_dict,
+                kwargs,
+            )
+            logger.info(
+                f"Ingested failed request (status {status_code}"
+                + (f", blocked by {applied}" if applied else "") + ")"
+            )
+        except Exception as e:
+            logger.error(f"Guardrails failure-event ingestion error: {e}")
+
     async def validate_and_block(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> dict:
         try:
             allowed, reason, modified_payload = await self.call_guardrails_validation(data, call_type, user_api_key_dict, kwargs)
@@ -644,6 +715,11 @@ class GuardrailsHandler(CustomLogger):
                 # the client keeps rejected messages and resends them.
                 self.remember_blocked(data, kwargs)
                 await self.ingest_blocked_request(data, call_type, reason, user_api_key_dict, kwargs)
+                own_id = (kwargs or {}).get("litellm_call_id")
+                if own_id:
+                    self._own_block_ingested[str(own_id)] = None
+                    while len(self._own_block_ingested) > 500:
+                        self._own_block_ingested.popitem(last=False)
                 raise HTTPException(
                     status_code=403,
                     detail=f"Blocked by Akto Guardrails: {reason}" if reason else "Blocked by Akto Guardrails",
