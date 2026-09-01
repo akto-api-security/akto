@@ -906,6 +906,16 @@ public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<
         TestingRunResultDao.instance.insertOne(testingRunResult);
     }
 
+    public static void bulkWriteTestingRunResults(List<TestingRunResult> testingRunResults) {
+        List<WriteModel<TestingRunResult>> writes = new ArrayList<>();
+        for (TestingRunResult trr : testingRunResults) {
+            writes.add(new InsertOneModel<>(trr));
+        }
+        if (!writes.isEmpty()) {
+            TestingRunResultDao.instance.bulkWrite(writes, new BulkWriteOptions().ordered(false));
+        }
+    }
+
     public static void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount) {
         ObjectId summaryObjectId = new ObjectId(summaryId);
         TestingRunResultSummariesDao.instance.updateOne(
