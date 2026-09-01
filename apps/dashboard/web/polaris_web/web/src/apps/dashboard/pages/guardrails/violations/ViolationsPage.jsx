@@ -48,7 +48,7 @@ import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph"
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
-import { HumanApprovalActions, HumanResponseBadge, isHumanApprovalPending } from "./ViolationFlyoutSections";
+import { HumanApprovalActions, HumanApprovalTabLabel, HumanResponseBadge, humanApprovalTabAccessibilityLabel, isHumanApprovalPending } from "./ViolationFlyoutSections";
 import { coerceToText, sanitizeDisplayText, extractPromptBody, isEmptyJsonText, normalizeReasonPunctuation } from "./violationsData";
 import AdvancedPayloadSearch from "./AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "./attributeSearch";
@@ -1601,8 +1601,11 @@ function Violations() {
         }
         if (isAgenticSecurityCategory()) {
             const haCount = summaryData?.humanApprovalCount;
-            const haLabel = typeof haCount === "number" ? `Human Approval (${haCount.toLocaleString()})` : "Human Approval";
-            items.push({ id: "human_approval", content: haLabel });
+            items.push({
+                id: "human_approval",
+                content: <HumanApprovalTabLabel count={haCount} />,
+                accessibilityLabel: humanApprovalTabAccessibilityLabel(haCount),
+            });
         }
         return items;
     }, [summaryData]);

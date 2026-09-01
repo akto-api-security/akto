@@ -748,10 +748,11 @@ function ThreatDetectionPage() {
                 latencyData={latencyData}
             />
         ] : []),
-        <SusDataTable key={`sus-data-table-${triggerTableRefresh}`}
+        <SusDataTable
             currDateRange={currDateRange}
             rowClicked={rowClicked}
             triggerRefresh={() => setTriggerTableRefresh(prev => prev + 1)}
+            refreshNonce={triggerTableRefresh}
             initialTab={queryParams.status ? queryParams.status.toLowerCase() : undefined}
             label={LABELS.THREAT}
             onRegisterPayloadSearch={(fn) => { applyPayloadSearchRef.current = fn; }}

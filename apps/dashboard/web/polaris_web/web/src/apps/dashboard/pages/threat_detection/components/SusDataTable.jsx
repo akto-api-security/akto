@@ -19,7 +19,7 @@ import guardrailApi from "../../guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "../../guardrails/utils";
 import AdvancedPayloadSearch from "../../guardrails/violations/AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "../../guardrails/violations/attributeSearch";
-import { HumanApprovalActions, HumanResponseBadge, isHumanApprovalPending } from "../../guardrails/violations/ViolationFlyoutSections";
+import { HumanApprovalActions, HumanApprovalTabLabel, HumanResponseBadge, humanApprovalTabAccessibilityLabel, isHumanApprovalPending } from "../../guardrails/violations/ViolationFlyoutSections";
 import { deriveAgenticType, extractEvidenceText } from "../../guardrails/violations/violationsData";
 
 const resourceName = {
@@ -277,7 +277,7 @@ let filters = [];
 
 const HUMAN_RESPONSE = { PENDING: "PENDING", APPROVED: "APPROVED", BLOCKED: "BLOCKED" };
 
-function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, initialTab, onRegisterPayloadSearch }) {
+function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, initialTab, onRegisterPayloadSearch, refreshNonce = 0 }) {
   const location = useLocation();
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
@@ -435,7 +435,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         if (!cancelled) setPendingHumanApprovalCount(0);
       });
     return () => { cancelled = true; };
-  }, [startTimestamp, endTimestamp]);
+  }, [startTimestamp, endTimestamp, refreshNonce]);
 
   useEffect(() => {
     if (!needsGuardrailCompliance) return;
@@ -508,8 +508,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   }
   if (isAgenticSecurityCategory()) {
     guardrailExtraTabs.push({
-      content: 'Human Approval',
-      badge: pendingHumanApprovalCount != null ? String(pendingHumanApprovalCount) : undefined,
+      content: <HumanApprovalTabLabel count={pendingHumanApprovalCount} />,
+      accessibilityLabel: humanApprovalTabAccessibilityLabel(pendingHumanApprovalCount),
       onAction: () => { setCurrentTab('human_approval'); },
       id: 'human_approval',
       index: 3
@@ -1406,7 +1406,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
             showButton={false}
           />
         ) : null}
-        callFromOutside={advancedFetchKey}
+        callFromOutside={advancedFetchKey + refreshNonce}
+        clearSelectionKey={refreshNonce}
       />
 
       <Modal

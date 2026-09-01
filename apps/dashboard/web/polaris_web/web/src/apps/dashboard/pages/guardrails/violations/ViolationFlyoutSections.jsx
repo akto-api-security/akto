@@ -10,6 +10,7 @@ import {
     Icon,
     Link,
     Text,
+    Tooltip,
     VerticalStack,
 } from "@shopify/polaris";
 import { NoteMinor } from "@shopify/polaris-icons";
@@ -41,6 +42,28 @@ export function HumanResponseBadge({ response }) {
 export function isHumanApprovalPending(response) {
     const key = String(response || "PENDING").toUpperCase();
     return key !== "APPROVED" && key !== "BLOCKED";
+}
+
+const PENDING_HUMAN_APPROVAL_TOOLTIP = "Events waiting for you to approve or block";
+
+export function humanApprovalTabAccessibilityLabel(count) {
+    const n = typeof count === "number" && count > 0 ? count : 0;
+    return n > 0
+        ? `Human Approval, ${n.toLocaleString()} events pending a decision`
+        : "Human Approval";
+}
+
+export function HumanApprovalTabLabel({ count }) {
+    const n = typeof count === "number" && count > 0 ? count : 0;
+    if (n === 0) return "Human Approval";
+    return (
+        <Tooltip content={PENDING_HUMAN_APPROVAL_TOOLTIP} dismissOnMouseOut>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                Human Approval
+                <Badge size="small">{n.toLocaleString()}</Badge>
+            </span>
+        </Tooltip>
+    );
 }
 
 export function HumanApprovalActions({ pending, response, onApprove, onBlock, loading, subtle }) {

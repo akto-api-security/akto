@@ -99,10 +99,10 @@ function GuardrailDetection() {
 
     const components =  [
         <SusDataTable
-            key={`guardrail-data-table-${triggerTableRefresh}`}
             currDateRange={currDateRange}
             rowClicked={rowClicked}
             triggerRefresh={() => setTriggerTableRefresh(prev => prev + 1)}
+            refreshNonce={triggerTableRefresh}
             label={LABELS.GUARDRAIL}
             onRegisterPayloadSearch={(fn) => { applyPayloadSearchRef.current = fn; }}
         />,

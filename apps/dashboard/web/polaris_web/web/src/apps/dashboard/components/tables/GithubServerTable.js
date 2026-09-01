@@ -597,6 +597,16 @@ function GithubServerTable(props) {
   }, [allResourcesSelected])
 
   const selectedResources = allResourcesSelected && allDataIds.length > 0 ? allDataIds : rawSelectedResources;
+
+  useEffect(() => {
+    if (!props.clearSelectionKey) return;
+    handleSelectionChange("all", false);
+    selectItems([]);
+    setAllDataIds([]);
+    TableStore.getState().setSelectedItems([]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.clearSelectionKey]);
+
   const customSelectionChange = (selectionType,toggleType, selection) => {
     if(props?.treeView || props?.isMultipleItemsSelected === true){
       let tempItems = selection;
