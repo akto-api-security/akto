@@ -48,9 +48,10 @@ public class TestRunMetrics {
 
     /**
      * Pipeline stages timed per test. LOOKUP is config/sample resolution; RUN_TEST is the full
-     * {@code runTestNew} wall (the bulk of a test's cost).
+     * {@code runTestNew} wall; SEND_REQUEST is the slice of it spent hitting the API under test;
+     * INSERT_RESULTS is the ultron result-write round-trip.
      */
-    public enum Stage { LOOKUP, RUN_TEST }
+    public enum Stage { LOOKUP, RUN_TEST, SEND_REQUEST, INSERT_RESULTS }
 
     /** WARN-level progress + cost heartbeat cadence. */
     private static final long HEARTBEAT_INTERVAL_MS = 60_000L;
@@ -334,16 +335,22 @@ public class TestRunMetrics {
 
         long lookup   = stageNanos.get(Stage.LOOKUP).sum();
         long runTest  = stageNanos.get(Stage.RUN_TEST).sum();
+        long sendReq  = stageNanos.get(Stage.SEND_REQUEST).sum();
+        long insertRt = stageNanos.get(Stage.INSERT_RESULTS).sum();
         long runCpu   = runTestCpuNanos.sum();
-        long billed   = lookup + runTest;
+        long other    = Math.max(0, runTest - sendReq);   // RUN_TEST minus target-API send = compute/setup
+        long billed   = lookup + runTest + insertRt;
 
-        long avgWallMs = ms(runTest + lookup) / n;
+        long avgWallMs = ms(runTest + lookup + insertRt) / n;
         loggerMaker.warnAndAddToDb("TESTRUN COST summaryId=" + summaryId
                 + " n=" + n
                 + " avgPerTestMs=" + avgWallMs
                 + " cpuPerTestMs=" + msPer(runCpu, n)
                 + " | RUN_TEST=" + msPer(runTest, n) + "ms (" + pctOf(runTest, billed) + " of billed)"
-                + " LOOKUP=" + msPer(lookup, n) + "ms");
+                + " [SEND_REQUEST=" + msPer(sendReq, n) + "ms/" + pctOf(sendReq, runTest)
+                + " | OTHER=" + msPer(other, n) + "ms/" + pctOf(other, runTest) + "]"
+                + " LOOKUP=" + msPer(lookup, n) + "ms"
+                + " INSERT_RESULTS=" + msPer(insertRt, n) + "ms/" + pctOf(insertRt, billed) + " of billed");
     }
 
     private static long ms(long nanos) { return nanos / 1_000_000L; }

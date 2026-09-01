@@ -280,7 +280,9 @@ public class Executor {
                         McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
 
                         requestAttempted = true;
+                        long sendStart = System.nanoTime();
                         testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                        TestPhaseTimer.addSendRequest(System.nanoTime() - sendStart);
                         requestSent = true;
                         ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                         res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
