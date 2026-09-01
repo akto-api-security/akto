@@ -41,9 +41,9 @@ public class InfraMetricsListener implements ServletContextListener {
     private static final Logger logger = LoggerFactory.getLogger(InfraMetricsListener.class);
 
     static {
-        // service identity on every series (value from SERVICE_NAME, default "cyborg").
-        // Deployments are told apart by Prometheus' own job/instance labels, so no role tag is needed.
-        registry.config().commonTags("service", CyborgMetricsConfig.getServiceName());
+        // The app only stamps its role ("app" tag, from APP_NAME: api-service/consumer/traffic/...).
+        // The fleet-level "service" label (ultron/cyborg) is appended by the Prometheus scrape job.
+        registry.config().commonTags("app", CyborgMetricsConfig.getAppName());
     }
 
     @Override

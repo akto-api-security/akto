@@ -10,21 +10,25 @@ package com.akto.metrics;
  *
  * Env vars:
  *   PROMETHEUS_METRICS_ENABLED   master switch ("true" to enable; default off)
- *   SERVICE_NAME                 overall service name -> "service" common tag (default "cyborg")
+ *   APP_NAME                     this instance's role -> "app" common tag (default "unknown")
+ *                                e.g. api-service / consumer / traffic / consumer-acct.
+ *                                (The fleet-level "service" label is appended by the Prometheus
+ *                                 scrape job, NOT emitted by the app.)
  *   METRICS_AUTH_ENABLED         require a token on /metrics (default true; "false" to disable)
  *   METRICS_AUTH_TOKEN           bearer token for /metrics
  */
 public final class CyborgMetricsConfig {
 
-    private static final String DEFAULT_SERVICE_NAME = "cyborg";
+    private static final String DEFAULT_APP_NAME = "unknown";
 
     // volatile: read on every request; the setters exist only for tests, never for production use.
     private static volatile boolean enabled = "true".equalsIgnoreCase(env("PROMETHEUS_METRICS_ENABLED"));
     private static volatile boolean authEnabled = !"false".equalsIgnoreCase(env("METRICS_AUTH_ENABLED"));
     private static volatile String authToken = env("METRICS_AUTH_TOKEN");
 
-    // Overall service name (general SERVICE_NAME env, not a metrics-specific var).
-    private static final String serviceName = firstNonBlank(env("SERVICE_NAME"), DEFAULT_SERVICE_NAME);
+    // This instance's role/component -> the "app" common tag. The fleet ("service") is set by
+    // the Prometheus job, so the app only owns "app".
+    private static final String appName = firstNonBlank(env("APP_NAME"), DEFAULT_APP_NAME);
 
     private CyborgMetricsConfig() {
     }
@@ -44,9 +48,9 @@ public final class CyborgMetricsConfig {
         return authToken;
     }
 
-    /** Value of the "service" common tag applied to every metric. */
-    public static String getServiceName() {
-        return serviceName;
+    /** Value of the "app" common tag applied to every metric (this instance's role). */
+    public static String getAppName() {
+        return appName;
     }
 
     private static String env(String key) {
