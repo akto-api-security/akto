@@ -34,6 +34,7 @@ import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.test_editor.execution.TestPhaseTimer;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
 import com.akto.testing.kafka_utils.TestRunMetrics.Stage;
@@ -119,6 +120,7 @@ public class ConsumerUtil {
 
                 // RUN_TEST wall + CPU. Recorded in a finally so a test that times out / throws still
                 // gets its timing counted once it unwinds (else COST only ever sees fast completers).
+                TestPhaseTimer.reset();
                 long runCpuStart = CPU_TIME_SUPPORTED ? THREAD_MX.getCurrentThreadCpuTime() : -1L;
                 long runWallStart = System.nanoTime();
                 TestingRunResult runResult;
@@ -126,11 +128,14 @@ public class ConsumerUtil {
                     runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
                 } finally {
                     metrics.recordStage(Stage.RUN_TEST, System.nanoTime() - runWallStart);
+                    metrics.recordStage(Stage.SEND_REQUEST, TestPhaseTimer.sendReqNanos());
                     if (runCpuStart >= 0) metrics.recordRunTestCpu(THREAD_MX.getCurrentThreadCpuTime() - runCpuStart);
                 }
 
                 executor.persistTestLogsToDb(runResult != null ? runResult.getTestLogs() : null);
+                long insertStart = System.nanoTime();
                 executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+                metrics.recordStage(Stage.INSERT_RESULTS, System.nanoTime() - insertStart);
 
                 if (runResult != null && runResult.isVulnerable()) {
                     metrics.markVulnerable();
