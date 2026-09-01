@@ -1451,7 +1451,7 @@ public class HttpCallParser {
 
             if (realHostCollection != null && !hasAtlasOrArgusTag(realHostCollection)
                     && isAgenticEndpoint && !isEndpointSource) {
-                hostName = AGENTIC_COLLECTION_PREFIX + hostName;
+                hostName = hostName + AGENTIC_COLLECTION_PREFIX;
             }
 
             String key = hostName;
