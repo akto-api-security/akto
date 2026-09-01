@@ -125,14 +125,19 @@ def _session_state_path(log_dir: str) -> str:
 
 def _load_session_row(log_dir: str, session_id: str, logger) -> Dict[str, Any]:
     if not session_id:
+        logger.debug("_load_session_row: no session_id on this event, skipping state lookup")
         return {}
     path = _session_state_path(log_dir)
     if not os.path.exists(path):
+        logger.debug(f"_load_session_row: no session state file yet at {path}")
         return {}
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
-        return data.get(session_id, {}) if isinstance(data, dict) else {}
+        row = data.get(session_id, {}) if isinstance(data, dict) else {}
+        if not row:
+            logger.debug(f"_load_session_row: no stored row for session_id={session_id}")
+        return row
     except (json.JSONDecodeError, OSError) as e:
         logger.warning(f"Could not read session state: {e}")
         return {}
