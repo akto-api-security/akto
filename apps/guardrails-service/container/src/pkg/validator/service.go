@@ -1637,8 +1637,14 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// with any ignore-phrase placeholders reconciled back to real text (or discarded in
 	// favor of the untouched pre-redaction payload) — see reconciliation above.
 	result := &mcp.ValidationResult{
-		Allowed:         !processResult.IsBlocked,
-		Modified:        finalPayload != "" && finalPayload != payload,
+		Allowed: !processResult.IsBlocked,
+		// Compared against preRedactionPayload, not the caller's raw payload: what the
+		// processor scanned already differs from it by session-summary injection and
+		// payload extraction, and neither is a detection. Comparing against the raw
+		// payload reported Modified=true for a clean request whose only change was an
+		// ignore-phrase reconcile — and /api/validate/file now blocks on Modified.
+		// Matches ValidateRequestWithPolicy, which already compares this way.
+		Modified:        finalPayload != "" && finalPayload != preRedactionPayload,
 		ModifiedPayload: finalPayload,
 		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
 		Metadata:        types.ThreatMetadata{},
