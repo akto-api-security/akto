@@ -88,7 +88,7 @@ public class HttpCallParser {
     public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
     private static final String NON_HOSTNAME_KEY = "null" + " "; // used for collections created without hostnames
 
-    private static final String AGENTIC_COLLECTION_PREFIX = "agentic-";
+    private static final String AGENTIC_COLLECTION_PREFIX = "-agentic";
 
     private static final List<Integer> INPROCESS_ADVANCED_FILTERS_ACCOUNTS = Arrays.asList(1736798101, 1718042191, 1759692400);
     private DataActor dataActor = DataActorFactory.fetchInstance();
