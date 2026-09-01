@@ -12,6 +12,8 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 
 import com.akto.dao.context.Context;
+import com.akto.detection.DataTypeRefiner;
+import com.akto.detection.ParamLocation;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.SensitiveParamInfo;
@@ -98,6 +100,35 @@ public class RequestTemplate {
         return allParams.paramNames;
     }
 
+    /**
+     * Detects the data type of one value and records it.
+     *
+     * With the external classifier off this is exactly the old KeyTypes.process(): detect, then
+     * record. With it on, {@link DataTypeRefiner} gets a say in between - it either already knows
+     * what this parameter carries, or it queues the parameter to find out and lets the value be
+     * recorded under its local type meanwhile. Neither branch waits on the network.
+     *
+     * Correcting what a parameter was recorded as before an answer arrived does not belong here.
+     * This runs per value, against a template that is rebuilt every batch, so it can see neither the
+     * accumulated history nor whether an answer has only just landed. That is done once per sync
+     * instead, by APICatalogSync applying pending answers to the catalog it has been building up.
+     */
+    private static void processValue(KeyTypes keyTypes, String url, String method, int responseCode,
+                                     boolean isHeader, String param, Object obj, String userId,
+                                     int apiCollectionId, String rawMessage,
+                                     Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap,
+                                     boolean isUrlParam, int timestamp) {
+
+        SubType localSubType = KeyTypes.detect(url, method, responseCode, isHeader, param, obj,
+                apiCollectionId, isUrlParam);
+
+        SubType finalSubType = DataTypeRefiner.refine(new ParamLocation(apiCollectionId, url, method, param),
+                obj == null ? null : obj.toString(), localSubType);
+
+        keyTypes.record(url, method, responseCode, isHeader, param, obj, userId, apiCollectionId, rawMessage,
+                sensitiveParamInfoBooleanMap, isUrlParam, timestamp, finalSubType);
+    }
+
     public void processHeaders(Map<String, List<String>> headerPayload, String url, String method, int responseCode, String userId,
                                int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap, int timestamp) {
         for (String header: headerPayload.keySet()) {
@@ -108,7 +139,7 @@ public class RequestTemplate {
             }
 
             for(String value: headerPayload.get(header)) {
-                keyTypes.process(url, method, responseCode, true, header, value, userId, apiCollectionId, rawMessage,  sensitiveParamInfoBooleanMap, false, timestamp);
+                processValue(keyTypes, url, method, responseCode, true, header, value, userId, apiCollectionId, rawMessage,  sensitiveParamInfoBooleanMap, false, timestamp);
             }
         }
     }
@@ -168,7 +199,7 @@ public class RequestTemplate {
                 }
 
                 for (Object obj: flattened.get(param)) {
-                    keyTypes.process(url, method, responseCode, false, param, obj, userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap, false, timestamp);
+                    processValue(keyTypes, url, method, responseCode, false, param, obj, userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap, false, timestamp);
                 }
             }
 
@@ -770,7 +801,7 @@ public class RequestTemplate {
             }
 
             String userId = "";
-            keyTypes.process(url, method, -1, false, idx+"", val,userId, apiCollectionId, "", new HashMap<>(), true, Context.now());
+            processValue(keyTypes, url, method, -1, false, idx+"", val, userId, apiCollectionId, "", new HashMap<>(), true, Context.now());
 
         }
     }

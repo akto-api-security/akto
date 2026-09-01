@@ -14,6 +14,7 @@ import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.detection.DetectionCorrectorInstaller;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
@@ -367,6 +368,10 @@ public class Main {
         int maxPollRecordsConfig = maxPollRecordsConfigTemp;
 
         DataControlFetcher.init(dataActor);
+
+        // Where Kafka is, for the detection corrector's async mode. Everything else it needs comes
+        // from account settings; this one is deployment topology, so it is handed over here.
+        DetectionCorrectorInstaller.setKafkaBrokerUrl(brokerUrlFinal);
 
         aSettings = dataActor.fetchAccountSettings();
         ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_RUNTIME, dataActor, customMiniRuntimeServiceName);
@@ -1295,6 +1300,10 @@ public class Main {
                 List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
                 SingleTypeInfo.fetchCustomDataTypes(accountId, customDataTypes, aktoDataTypes);
                 SingleTypeInfo.fetchCustomAuthTypes(accountId, customAuthTypes);
+
+                // Refreshed alongside data types on purpose: the corrector may only return labels
+                // that already exist as data types, so the two must not drift apart.
+                DetectionCorrectorInstaller.refresh(dataActor.fetchAccountSettings());
             }
         }, 0, 5, TimeUnit.MINUTES);
     }
