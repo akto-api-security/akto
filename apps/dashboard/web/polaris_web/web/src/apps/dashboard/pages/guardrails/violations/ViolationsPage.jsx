@@ -35,7 +35,7 @@ import SessionStore from "@/apps/main/SessionStore";
 import LocalStore from "@/apps/main/LocalStorageStore";
 import guardrailApi from "@/apps/dashboard/pages/guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "@/apps/dashboard/pages/guardrails/utils";
-import { resolveComplianceClauseMap, loadGuardrailComplianceMap, formatActorId, actorIdDisplayText } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
+import { resolveComplianceClauseMap, loadGuardrailComplianceMap, formatActorId, actorIdDisplayText, truncateToChars } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
 import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
 
@@ -48,7 +48,7 @@ import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph"
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
-import { coerceToText, sanitizeDisplayText, extractPromptBody, isEmptyJsonText } from "./violationsData";
+import { coerceToText, sanitizeDisplayText, extractPromptBody, isEmptyJsonText, normalizeReasonPunctuation } from "./violationsData";
 import AdvancedPayloadSearch from "./AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "./attributeSearch";
 import InsightsFlyout from "@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout";
@@ -176,6 +176,17 @@ function RiskScoreCellRenderer({ value }) {
     return <Text variant="bodySm">{value}</Text>;
 }
 
+function ReasonCellRenderer({ value }) {
+    if (!value) return null;
+    const { preview, full, isTruncated } = truncateToChars(value, 30);
+    if (!isTruncated) return <Text variant="bodySm">{preview}</Text>;
+    return (
+        <Tooltip content={full} dismissOnMouseOut width="wide">
+            <Text variant="bodySm">{preview}</Text>
+        </Tooltip>
+    );
+}
+
 // Needs Approval tab only. Stops the click from bubbling into the row's onRowClicked (which
 // would otherwise open the ViolationFlyout instead of the approve modal).
 function ApproveCellRenderer({ data, onApprove }) {
@@ -283,6 +294,13 @@ function buildColDefs(filterValues, showApprove, onApprove) {
                 valueFormatter: (p) => actorIdDisplayText(p.value),
             },
             cellRenderer: ActorCellRenderer,
+        }] : []),
+        ...((isEndpointSecurityCategory() || isAgenticSecurityCategory()) ? [{
+            field: "reason",
+            headerName: "Reason",
+            minWidth: 180,
+            sortable: false,
+            cellRenderer: ReasonCellRenderer,
         }] : []),
         {
             field: "agenticAsset",
@@ -515,6 +533,7 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         // explanation), which would show up as if it were the captured request content.
         evidenceText: primaryValue || "-",
         riskScore: parseStoredRiskScore(meta),
+        reason: normalizeReasonPunctuation(meta.reason || meta.nreason) || "",
         actor: event.actor || "",
         user: userDisplay,
         userHost: rawHost,
