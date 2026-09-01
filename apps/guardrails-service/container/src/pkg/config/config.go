@@ -101,8 +101,35 @@ type MediaConfig struct {
 	MaxVideoBytes int
 }
 
+// defaultChunkSize keeps one chunk small enough that its LLM adjudication finishes well
+// inside the upstream ceiling. The LLM proxy (cyborg's LLMAction) has a hardcoded 60s read
+// timeout and answers 422 past it, and a measured 9.3KB payload already cost 8-10s — so a
+// 32000-char chunk could not reliably complete. Cost is per value enumerated, not just per
+// byte, so a dense PII table is the worst case and this is sized for it.
+const defaultChunkSize = 6000
+
+// defaultMaxChunks derives the chunk ceiling from the byte cap so shrinking ChunkSize can
+// never start rejecting files that used to pass. FILE_VALIDATE_MAX_CHUNKS still wins.
+//
+// Chunks advance by chunkSize-overlap, not chunkSize, so the overlap has to be in the
+// divisor: at 5MB/6000 the naive figure is 874 but the real count is 904.
+func defaultMaxChunks(maxTextFileBytes, chunkSize, overlap int) int {
+	if chunkSize <= 0 {
+		chunkSize = defaultChunkSize
+	}
+	advance := chunkSize - overlap
+	if advance < 1 {
+		advance = chunkSize
+	}
+	// +2 for the first chunk and the trailing partial one.
+	return (maxTextFileBytes / advance) + 2
+}
+
 func LoadConfig() *Config {
 	dbAbstractorToken := getEnv("DATABASE_ABSTRACTOR_SERVICE_TOKEN", "")
+	maxTextFileBytes := getEnvAsInt("FILE_VALIDATE_MAX_TEXT_FILE_BYTES", 5*1024*1024)
+	chunkSize := getEnvAsInt("FILE_VALIDATE_CHUNK_SIZE", defaultChunkSize)
+	chunkOverlap := getEnvAsInt("FILE_VALIDATE_CHUNK_OVERLAP", 200)
 	return &Config{
 		ServerPort:                       getEnvAsInt("SERVER_PORT", 8080),
 		DatabaseAbstractorURL:            getEnv("DATABASE_ABSTRACTOR_SERVICE_URL", "https://ultron.akto.io"),
@@ -138,10 +165,10 @@ func LoadConfig() *Config {
 		File: FileConfig{
 			Enabled:          getEnvAsBool("FILE_VALIDATION_ENABLED", false),
 			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
-			MaxTextFileBytes: getEnvAsInt("FILE_VALIDATE_MAX_TEXT_FILE_BYTES", 5*1024*1024),
-			ChunkSize:        getEnvAsInt("FILE_VALIDATE_CHUNK_SIZE", 32000),
-			ChunkOverlap:     getEnvAsInt("FILE_VALIDATE_CHUNK_OVERLAP", 200),
-			MaxChunks:        getEnvAsInt("FILE_VALIDATE_MAX_CHUNKS", 500),
+			MaxTextFileBytes: maxTextFileBytes,
+			ChunkSize:        chunkSize,
+			ChunkOverlap:     chunkOverlap,
+			MaxChunks:        getEnvAsInt("FILE_VALIDATE_MAX_CHUNKS", defaultMaxChunks(maxTextFileBytes, chunkSize, chunkOverlap)),
 			MaxRetries:       getEnvAsInt("FILE_VALIDATE_MAX_RETRIES", 2),
 			MaxConcurrent:    getEnvAsInt("FILE_VALIDATE_MAX_CONCURRENT", 5),
 			URLTimeoutSec:    getEnvAsInt("FILE_VALIDATE_URL_TIMEOUT_SEC", 30),
