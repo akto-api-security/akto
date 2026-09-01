@@ -483,6 +483,7 @@ public class DbAction extends ActionSupport {
     String newRefreshToken;
     Map<ObjectId, TestingRunResultSummary> testingRunResultSummaryMap;
     BasicDBObject testingRunResult;
+    List<BasicDBObject> testingRunResultsForBulkWrite;
     Tokens token;
     WorkflowTest workflowTest;
     List<YamlTemplate> yamlTemplates;
@@ -2808,60 +2809,85 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String insertTestingRunResults() {
+    /**
+     * Converts a raw TestingRunResult payload (as received over HTTP) into a {@link TestingRunResult},
+     * handling the workflow node details remap, aiSummaryTraces placement, testResults normalization
+     * and hex-id -> ObjectId conversions. Shared by the single-insert and bulk-insert endpoints.
+     */
+    private TestingRunResult buildTestingRunResultFromPayload(BasicDBObject rawPayload) throws Exception {
+        Map<String, WorkflowNodeDetails> data = new HashMap<>();
         try {
-
-            Map<String, WorkflowNodeDetails> data = new HashMap<>();
-            try {
-                if (this.testingRunResult != null && this.testingRunResult.get("workflowTest") != null) {
-                    Map<String, BasicDBObject> x = (Map) (((Map) this.testingRunResult.get("workflowTest"))
-                            .get("mapNodeIdToWorkflowNodeDetails"));
-                    if (x != null) {
-                        for (String tmp : x.keySet()) {
-                            ((Map) x.get(tmp)).remove("authMechanism");
-                            ((Map) x.get(tmp)).remove("customAuthTypes");
-                            data.put(tmp, objectMapper.convertValue(x.get(tmp), YamlNodeDetails.class));
-                        }
+            if (rawPayload != null && rawPayload.get("workflowTest") != null) {
+                Map<String, BasicDBObject> x = (Map) (((Map) rawPayload.get("workflowTest"))
+                        .get("mapNodeIdToWorkflowNodeDetails"));
+                if (x != null) {
+                    for (String tmp : x.keySet()) {
+                        ((Map) x.get(tmp)).remove("authMechanism");
+                        ((Map) x.get(tmp)).remove("customAuthTypes");
+                        data.put(tmp, objectMapper.convertValue(x.get(tmp), YamlNodeDetails.class));
                     }
                 }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails" + e.toString());
-                e.printStackTrace();
             }
-            TestingRunResult testingRunResult = objectMapper.readValue(this.testingRunResult.toJson(), TestingRunResult.class);
-            applyAiSummaryTracesFromPayload(testingRunResult, this.testingRunResult);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails" + e.toString());
+            e.printStackTrace();
+        }
+        TestingRunResult testingRunResult = objectMapper.readValue(rawPayload.toJson(), TestingRunResult.class);
+        applyAiSummaryTracesFromPayload(testingRunResult, rawPayload);
 
-            try {
-                if (!data.isEmpty()) {
-                    testingRunResult.getWorkflowTest().setMapNodeIdToWorkflowNodeDetails(data);
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails2" + e.toString());
-                e.printStackTrace();
+        try {
+            if (!data.isEmpty()) {
+                testingRunResult.getWorkflowTest().setMapNodeIdToWorkflowNodeDetails(data);
             }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails2" + e.toString());
+            e.printStackTrace();
+        }
 
-            if(testingRunResult.getSingleTestResults()!=null){
-                testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getSingleTestResults()));
-            }else if(testingRunResult.getMultiExecTestResults() !=null){
-                testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getMultiExecTestResults()));
-            }
-            applyAiSummaryTracesFromPayload(testingRunResult, this.testingRunResult);
+        if(testingRunResult.getSingleTestResults()!=null){
+            testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getSingleTestResults()));
+        }else if(testingRunResult.getMultiExecTestResults() !=null){
+            testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getMultiExecTestResults()));
+        }
 
-            if (testingRunResult.getTestRunHexId() != null) {
-                ObjectId id = new ObjectId(testingRunResult.getTestRunHexId());
-                testingRunResult.setTestRunId(id);
-            }
+        if (testingRunResult.getTestRunHexId() != null) {
+            ObjectId id = new ObjectId(testingRunResult.getTestRunHexId());
+            testingRunResult.setTestRunId(id);
+        }
 
-            if (testingRunResult.getTestRunResultSummaryHexId() != null) {
-                ObjectId id = new ObjectId(testingRunResult.getTestRunResultSummaryHexId());
-                testingRunResult.setTestRunResultSummaryId(id);
-            }
+        if (testingRunResult.getTestRunResultSummaryHexId() != null) {
+            ObjectId id = new ObjectId(testingRunResult.getTestRunResultSummaryHexId());
+            testingRunResult.setTestRunResultSummaryId(id);
+        }
 
+        return testingRunResult;
+    }
+
+    public String insertTestingRunResults() {
+        try {
+            TestingRunResult testingRunResult = buildTestingRunResultFromPayload(this.testingRunResult);
             DbLayer.insertTestingRunResults(testingRunResult);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults " + e.toString());
             if (kafkaUtils.isWriteEnabled()) {
                 kafkaUtils.insertDataSecondary(testingRunResult, "insertTestingRunResults", Context.accountId.get());
+            }
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String bulkWriteTestingRunResults() {
+        try {
+            List<TestingRunResult> results = new ArrayList<>();
+            for (BasicDBObject raw : testingRunResultsForBulkWrite) {
+                results.add(buildTestingRunResultFromPayload(raw));
+            }
+            DbLayer.bulkWriteTestingRunResults(results);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in bulkWriteTestingRunResults " + e.toString());
+            if (kafkaUtils.isWriteEnabled()) {
+                kafkaUtils.insertDataSecondary(testingRunResultsForBulkWrite, "bulkWriteTestingRunResults", Context.accountId.get());
             }
             return Action.ERROR.toUpperCase();
         }
@@ -5548,6 +5574,14 @@ public class DbAction extends ActionSupport {
 
     public void setTestingRunResult(BasicDBObject testingRunResult) {
         this.testingRunResult = testingRunResult;
+    }
+
+    public List<BasicDBObject> getTestingRunResultsForBulkWrite() {
+        return testingRunResultsForBulkWrite;
+    }
+
+    public void setTestingRunResultsForBulkWrite(List<BasicDBObject> testingRunResultsForBulkWrite) {
+        this.testingRunResultsForBulkWrite = testingRunResultsForBulkWrite;
     }
 
     public Tokens getToken() {

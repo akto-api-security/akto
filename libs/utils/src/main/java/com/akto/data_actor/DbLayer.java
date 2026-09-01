@@ -2069,6 +2069,24 @@ public class DbLayer {
         }
     }
 
+    public static void bulkWriteTestingRunResults(List<TestingRunResult> testingRunResults) {
+        List<WriteModel<TestingRunResult>> mainWrites = new ArrayList<>();
+        List<WriteModel<TestingRunResult>> vulnerableWrites = new ArrayList<>();
+        for (TestingRunResult trr : testingRunResults) {
+            mainWrites.add(new InsertOneModel<>(trr));
+            // from now store vulnerable results in separate collection also
+            if (trr.isVulnerable()) {
+                vulnerableWrites.add(new InsertOneModel<>(trr));
+            }
+        }
+        if (!mainWrites.isEmpty()) {
+            TestingRunResultDao.instance.bulkWrite(mainWrites, new BulkWriteOptions().ordered(false));
+        }
+        if (!vulnerableWrites.isEmpty()) {
+            VulnerableTestingRunResultDao.instance.bulkWrite(vulnerableWrites, new BulkWriteOptions().ordered(false));
+        }
+    }
+
     public static void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount) {
         ObjectId summaryObjectId = new ObjectId(summaryId);
         TestingRunResultSummariesDao.instance.updateOne(

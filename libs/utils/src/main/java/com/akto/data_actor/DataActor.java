@@ -188,6 +188,8 @@ public abstract class DataActor {
 
     public abstract void insertTestingRunResults(TestingRunResult testingRunResults);
 
+    public abstract void bulkWriteTestingRunResults(List<Object> writesForTestingRunResults);
+
     public abstract void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount);
 
     public abstract void insertActivity(int count);

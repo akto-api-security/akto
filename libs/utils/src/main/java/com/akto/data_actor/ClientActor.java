@@ -254,11 +254,11 @@ public class ClientActor extends DataActor {
 
 
     public void bulkWrite(List<Object> bulkWrites, String path, String key) {
-        ArrayList<BulkUpdates> writes = new ArrayList<>();
+        ArrayList<Object> writes = new ArrayList<>();
         for (int i = 0; i < bulkWrites.size(); i++) {
-            writes.add((BulkUpdates) bulkWrites.get(i));
+            writes.add(bulkWrites.get(i));
             if (writes.size() % batchWriteLimit == 0) {
-                List<BulkUpdates> finalWrites = writes;
+                List<Object> finalWrites = writes;
                 threadPool.submit(
                         () -> writeBatch(finalWrites, path, key)
                 );
@@ -266,14 +266,14 @@ public class ClientActor extends DataActor {
             }
         }
         if (writes.size() > 0) {
-            List<BulkUpdates> finalWrites = writes;
+            List<Object> finalWrites = writes;
             threadPool.submit(
                     () -> writeBatch(finalWrites, path, key)
             );
         }
     }
 
-    public void writeBatch(List<BulkUpdates> writesForSti, String path, String key) {
+    public void writeBatch(List<Object> writesForSti, String path, String key) {
         BasicDBObject obj = new BasicDBObject();
         obj.put(key, writesForSti);
         Map<String, List<String>> headers = buildHeaders();
@@ -313,6 +313,10 @@ public class ClientActor extends DataActor {
 
     public void bulkWriteTestingRunIssues(List<Object> writesForTestingRunIssues) {
         bulkWrite(writesForTestingRunIssues, "/bulkWriteTestingRunIssues", "writesForTestingRunIssues");
+    }
+
+    public void bulkWriteTestingRunResults(List<Object> writesForTestingRunResults) {
+        bulkWrite(writesForTestingRunResults, "/bulkWriteTestingRunResults", "testingRunResultsForBulkWrite");
     }
 
     public boolean overageApisExists(int apiCollectionId, String urlType, URLMethods.Method method, String url) {
