@@ -48,7 +48,7 @@ import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph"
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
-import { coerceToText, sanitizeDisplayText, extractPromptBody, isEmptyJsonText, normalizeReasonPunctuation } from "./violationsData";
+import { normalizeReasonPunctuation, extractEvidenceText } from "./violationsData";
 import AdvancedPayloadSearch from "./AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "./attributeSearch";
 import InsightsFlyout from "@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout";
@@ -488,7 +488,7 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
     const typeLabel = deriveAgenticType(event.url, event.method);
     const policyName = meta.rule_violated || meta.npolicy_name || event.filterId || "-";
 
-    const { req: reqPayload, resp: respPayload, raw: rawPayload } = parseAktoPayload(event.payload);
+    const { resp: respPayload } = parseAktoPayload(event.payload);
     const rawBehaviour = respPayload?.error?.data?.behaviour || meta.behaviour || meta.nbehaviour || null;
     const action = rawBehaviour === "block" ? "Blocked"
         : (rawBehaviour === "warn" || rawBehaviour === "flag") ? "Flagged"
@@ -503,20 +503,8 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
     const agenticAssetTag = rawAsset ? getAssetServiceName(rawAsset) : null;
     const skillOrToolName = deriveSkillOrToolName(event.url);
 
-    const isPromptOrTool = typeLabel === "Prompt" || typeLabel === "Tool";
-    // extractPromptBody unpacks a chat-shaped body ({messages: [...]}) to the actual last user
-    // message instead of dumping raw {"messages":[{"role":"user",...}]} JSON. Tool events store
-    // the request payload flat (reqPayload *is* the tool args, e.g. {file_path, content}) rather
-    // than wrapped in a {body: ...} envelope, so it finds nothing for those - fall back to the
-    // whole object. And when requestPayload fails to JSON.parse at all (e.g. a captured tool
-    // call whose command text breaks JSON escaping), reqPayload is null even though the raw
-    // string has real content - fall back to that raw string rather than showing nothing.
-    const primaryValueRaw = coerceToText(isPromptOrTool
-        ? (extractPromptBody(reqPayload) ?? (typeLabel === "Tool" ? reqPayload : null) ?? rawPayload?.requestPayload ?? null)
-        : typeLabel === "Skill" ? (respPayload?.evidence || null) : (reqPayload?.evidence || null));
-    // An empty {}/[] carries no useful info - treat it the same as nothing captured rather
-    // than showing the literal "{}" in the Evidence column.
-    const primaryValue = isEmptyJsonText(primaryValueRaw) ? "" : sanitizeDisplayText(primaryValueRaw, 300);
+    // Same Evidence-column extraction as the old table (extractEvidenceText).
+    const primaryValue = extractEvidenceText(event.payload, typeLabel, 300);
 
     return {
         id: event.id,

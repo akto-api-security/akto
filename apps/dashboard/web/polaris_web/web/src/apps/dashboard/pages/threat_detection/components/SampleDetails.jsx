@@ -2,7 +2,7 @@ import { Badge, Box, Button, ChoiceList, Divider, HorizontalStack, Modal, Text, 
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import SampleData from "../../../components/shared/SampleData";
-import { EvidenceBlock } from "@/apps/dashboard/pages/guardrails/violations/ViolationFlyoutSections";
+import { EvidenceBlock, PromptResponseSection } from "@/apps/dashboard/pages/guardrails/violations/ViolationFlyoutSections";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import func from "@/util/func";
 import { useEffect, useState } from "react";
@@ -26,7 +26,7 @@ import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig"
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import OwaspTag from "../../guardrails/components/OwaspTag";
 import ComplianceTags from "../../guardrails/components/ComplianceTags";
-import { parseConfigEvidence } from "../../guardrails/violations/violationsData";
+import { parseConfigEvidence, buildFallbackDetail, deriveAgenticType } from "../../guardrails/violations/violationsData";
 
 // For config-scan events: pull evidence/message/config_content out of the sample's raw orig.
 // requestPayload is normally valid JSON (repaired server-side if PII redaction corrupted it);
@@ -439,11 +439,32 @@ function SampleDetails(props) {
     }
 
     const configValues = data.length > 0 ? _configFromOrig(data[0]?.orig, moreInfoData?.ruleViolated) : null;
+    const payloadForEvidence = data[0]?.orig || moreInfoData?.payload;
+    const valuesDetail = useGuardrailDescription
+        ? buildFallbackDetail({
+            payload: payloadForEvidence,
+            metadata: moreInfoData?.metadata,
+            type: deriveAgenticType(moreInfoData?.url, moreInfoData?.method),
+            user: moreInfoData?.host,
+            violation: (moreInfoData?.ruleViolated && moreInfoData.ruleViolated !== "-")
+                ? moreInfoData.ruleViolated
+                : moreInfoData?.templateId,
+            policyName: moreInfoData?.templateId,
+            behaviourRaw: moreInfoData?.behaviour,
+            detected: data[0]?.ts || data[0]?.timestamp || data[0]?.detectedAt,
+            sessionId: moreInfoData?.sessionId,
+            agenticAsset: moreInfoData?.host,
+        })
+        : null;
 
-    const ValuesTab = data.length > 0 && {
+    // Always show this tab for Atlas/Argus so Evidence is visible even before the
+    // extra payload fetch finishes (list rows already carry `payload`).
+    const ValuesTab = (useGuardrailDescription || data.length > 0) && {
         id: 'values',
         content: "Values",
-        component: configValues ? (
+        component: valuesDetail ? (
+            <PromptResponseSection detail={valuesDetail} />
+        ) : configValues ? (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
                 <VerticalStack gap="4">
                     <Box padding="4" background="bg-critical-subdued" borderRadius="2">
