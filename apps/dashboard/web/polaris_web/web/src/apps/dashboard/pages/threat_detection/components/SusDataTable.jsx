@@ -9,7 +9,7 @@ import func from "../../../../../util/func";
 import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
-import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap } from "../utils/formatUtils";
+import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap, parseStoredRiskScore, parseStoredReason, truncateToWords } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory } from "../../../../main/labelHelper";
@@ -25,10 +25,6 @@ const resourceName = {
   plural: "activities",
 };
 
-// The payload line that triggered the violation. The gateway scrubs secrets and
-// PII out of it before storing, so what lands here is safe to render as-is - but
-// it is still attacker-controlled text, so it goes in as a plain string and is
-// never interpreted as markup.
 function EvidenceLineCell({ line }) {
   const text = typeof line === "string" ? line.trim() : "";
   if (!text) {
@@ -42,6 +38,90 @@ function EvidenceLineCell({ line }) {
         </Text>
       </Box>
     </Tooltip>
+  )
+}
+
+const RISK_SCORE_OPS = [
+  { label: "Equals", value: "equals" },
+  { label: "Greater than", value: "greaterThan" },
+  { label: "Less than", value: "lessThan" },
+];
+
+const RISK_SCORE_OP_LABELS = {
+  equals: "Equals",
+  greaterThan: "Greater than",
+  lessThan: "Less than",
+};
+
+function parseRiskScoreFilter(values) {
+  const raw = Array.isArray(values) ? values[0] : values;
+  if (!raw) return { operator: "greaterThan", amount: "" };
+  const text = String(raw);
+  const idx = text.indexOf(":");
+  if (idx === -1) return { operator: RISK_SCORE_OP_LABELS[text] ? text : "greaterThan", amount: "" };
+  return { operator: text.slice(0, idx), amount: text.slice(idx + 1) };
+}
+
+function encodeRiskScoreFilter(operator, amount) {
+  if (!operator || amount === "" || amount == null) return [];
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return [];
+  return [`${operator}:${amount}`];
+}
+
+function RiskScoreFilterControl({ selected, onChange, onClose }) {
+  const selectedKey = Array.isArray(selected) ? selected.join(",") : String(selected || "");
+  const initial = parseRiskScoreFilter(selected);
+  const [operator, setOperator] = useState(initial.operator);
+  const [amount, setAmount] = useState(initial.amount);
+
+  useEffect(() => {
+    const next = parseRiskScoreFilter(selectedKey ? selectedKey.split(",") : []);
+    setOperator(next.operator);
+    setAmount(next.amount);
+  }, [selectedKey]);
+
+  const commit = (nextOp, nextAmount) => {
+    const encoded = encodeRiskScoreFilter(nextOp, nextAmount);
+    if (encoded.length === 0 && !selectedKey) return;
+    onChange(encoded);
+  };
+
+  return (
+    <VerticalStack gap="2">
+      <ChoiceList
+        title="Condition"
+        titleHidden
+        choices={RISK_SCORE_OPS}
+        selected={operator ? [operator] : []}
+        onChange={(vals) => {
+          const v = vals[0];
+          if (!v) return;
+          setOperator(v);
+          if (amount !== "") commit(v, amount);
+        }}
+      />
+      <div
+        onKeyDown={(e) => {
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          e.stopPropagation();
+          commit(operator, amount);
+          onClose?.();
+        }}
+      >
+        <TextField
+          label="Value"
+          labelHidden
+          type="number"
+          value={amount}
+          placeholder="e.g. 0.8"
+          autoComplete="off"
+          onChange={setAmount}
+          onBlur={() => commit(operator, amount)}
+        />
+      </div>
+    </VerticalStack>
   );
 }
 
@@ -70,6 +150,17 @@ const getHeaders = () => {
     },
   ];
 
+  if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+    baseHeaders.push({
+      text: "Reason",
+      value: "reason",
+      title: "Reason",
+      maxWidth: "240px",
+      type: CellType.TEXT,
+      tooltipKey: "reasonFull",
+    });
+  }
+
   if (func.shouldShowIpReputation()) {
     baseHeaders.push({
       text: "Reputation",
@@ -90,6 +181,12 @@ const getHeaders = () => {
       text: "Detection Type",
       value: "detectionType",
       title: "Detection Type",
+    });
+    baseHeaders.push({
+      text: "Risk score",
+      value: "riskScore",
+      title: "Risk score",
+      sortActive: true,
     });
     baseHeaders.push({
       text: "Rule Violated",
@@ -148,24 +245,44 @@ const getHeaders = () => {
 };
 
 const getSortOptions = (headers) => {
-  const columnIndex = headers.findIndex((h) => h.value === "discoveredTs") + 1;
-  if (columnIndex === 0) return [];
-  return [
+  const detectedIdx = headers.findIndex((h) => h.value === "discoveredTs") + 1;
+  if (detectedIdx === 0) return [];
+  const options = [
     {
       label: "Discovered time",
       value: "detectedAt asc",
       directionLabel: "Newest",
       sortKey: "detectedAt",
-      columnIndex,
+      columnIndex: detectedIdx,
     },
     {
       label: "Discovered time",
       value: "detectedAt desc",
       directionLabel: "Oldest",
       sortKey: "detectedAt",
-      columnIndex,
+      columnIndex: detectedIdx,
     },
   ];
+  const riskIdx = headers.findIndex((h) => h.value === "riskScore") + 1;
+  if (riskIdx > 0) {
+    options.push(
+      {
+        label: "Risk score",
+        value: "riskScore asc",
+        directionLabel: "Highest",
+        sortKey: "riskScore",
+        columnIndex: riskIdx,
+      },
+      {
+        label: "Risk score",
+        value: "riskScore desc",
+        directionLabel: "Lowest",
+        sortKey: "riskScore",
+        columnIndex: riskIdx,
+      },
+    );
+  }
+  return options;
 };
 
 let filters = [];
@@ -772,6 +889,19 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       severityFilter = filters?.severity
     }
 
+    let riskScoreFilterType;
+    let riskScoreFilterValue;
+    if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+      const parsed = parseRiskScoreFilter(filters?.riskScore);
+      if (parsed.operator && parsed.amount !== "") {
+        const n = Number(parsed.amount);
+        if (Number.isFinite(n)) {
+          riskScoreFilterType = parsed.operator;
+          riskScoreFilterValue = n;
+        }
+      }
+    }
+
     // Store current filters for bulk operations
     setCurrentFilters({
       actor: sourceIpsFilter,
@@ -814,7 +944,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       undefined,
       severityFilter,
       skillEvaluationMode,
-      configEvaluationMode
+      configEvaluationMode,
+      riskScoreFilterType,
+      riskScoreFilterValue
     );
 
     // Store the total count for filtered results
@@ -888,6 +1020,15 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
         ),
+        ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && {
+          riskScore: parseStoredRiskScore(x?.metadata) ?? "",
+          ...(() => {
+            const r = parseStoredReason(x?.metadata);
+            if (!r) return { reason: "", reasonFull: "" };
+            const { preview, full } = truncateToWords(r, 30);
+            return { reason: preview, reasonFull: full };
+          })(),
+        }),
         // Successful Exploit is only shown for API Security (not Argus/Agentic or Atlas/Endpoint)
         ...(isApiSecurityCategory() && {
           successfulComp: (
@@ -1056,6 +1197,18 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       },
     ];
 
+    if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+      filters.push({
+        key: 'riskScore',
+        label: "Risk score",
+        title: "Risk score",
+        choices: [],
+        renderFilter: ({ selected, onChange }) => (
+          <RiskScoreFilterControl selected={selected} onChange={onChange} />
+        ),
+      });
+    }
+
     // Successful Exploit filter is only relevant for API Security (not Argus/Agentic or Atlas/Endpoint)
     if (isApiSecurityCategory()) {
       filters.push({
@@ -1087,6 +1240,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           ])
         );
         return func.convertToDisambiguateLabelObj(value, latestAttackLabelMap, 2);
+      case "riskScore": {
+        const parsed = parseRiskScoreFilter(value);
+        const opLabel = RISK_SCORE_OP_LABELS[parsed.operator] || parsed.operator;
+        return parsed.amount !== "" ? `${opLabel} ${parsed.amount}` : opLabel;
+      }
       default:
         return func.convertToDisambiguateLabelObj(value, null, 2);
     }

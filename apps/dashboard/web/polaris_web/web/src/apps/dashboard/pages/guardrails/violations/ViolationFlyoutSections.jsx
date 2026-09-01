@@ -65,7 +65,9 @@ export function EvidenceBlock({ evidence }) {
                                     {evidence.time && <Text variant="bodySm" color="subdued">{evidence.time}</Text>}
                                 </HorizontalStack>
                             )}
-                            <HighlightedText text={evidence.text} highlights={evidence.highlights} mono={evidence.mono} />
+                            <Box className="violation-evidence-clamp">
+                                <HighlightedText text={evidence.text} highlights={evidence.highlights} mono={evidence.mono} />
+                            </Box>
                         </VerticalStack>
                     </Box>
                 </Box>
@@ -332,9 +334,26 @@ export function PromptResponseSection({ detail }) {
             <Box padding="4">
                 <VerticalStack gap="3">
                     <Text variant="headingMd" color="subdued">{pr.valueLabel || "Flagged Content"}</Text>
-                    {hasPrompt
-                        ? <HighlightedText text={pr.promptBody} mono />
-                        : <Text variant="bodySm" color="subdued">No content captured for this violation.</Text>}
+                    {!hasPrompt
+                        ? <Text variant="bodySm" color="subdued">No content captured for this violation.</Text>
+                        : pr.valueLabel === "Prompt"
+                            ? <HighlightedText text={pr.promptBody} mono />
+                            : (
+                                <SampleData
+                                    data={{
+                                        message: pr.promptBody,
+                                        vulnerabilitySegments: (pr.highlights || []).map((highlight) =>
+                                            typeof highlight === "string"
+                                                ? { phrase: highlight }
+                                                : { ...highlight, includeKeyInHighlight: true }
+                                        ),
+                                    }}
+                                    editorLanguage="plaintext"
+                                    minHeight="400px"
+                                    readOnly
+                                    wordWrap
+                                />
+                            )}
                 </VerticalStack>
             </Box>
 

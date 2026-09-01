@@ -304,7 +304,7 @@ public class Utils {
         return sb.toString();
     }
 
-    public static Pair<Map<String, String>, List<FileUploadError>> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId, boolean allowReplay, Map<String, String> authMap, String miniTestingName) {
+    public static Pair<Map<String, String>, List<FileUploadError>> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId, boolean allowReplay, Map<String, String> authMap, String miniTestingName, boolean forceCreateCollection) {
         Pair<Map<String, String>, List<String>> resp;
         List<FileUploadError> errors = new ArrayList<>();
         try {
@@ -415,6 +415,22 @@ public class Utils {
 
                 JsonNode statusNode = response.get("status");
                 status = statusNode != null ? statusNode.asText() : "";
+
+                if (forceCreateCollection) {
+                    int statusCodeInt;
+                    try {
+                        statusCodeInt = Integer.parseInt(statusCode);
+                    } catch (NumberFormatException e) {
+                        statusCodeInt = 0;
+                    }
+
+                    if (!HttpResponseParams.validHttpResponseCode(statusCodeInt)) {
+                        statusCode = "200";
+                        status = "OK";
+                        responsePayload = "";
+                        responseHeadersString = "{}";
+                    }
+                }
             }
 
             result.put("responseHeaders", responseHeadersString);

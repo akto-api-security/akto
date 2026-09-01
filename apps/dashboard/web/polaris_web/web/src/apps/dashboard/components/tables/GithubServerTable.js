@@ -479,11 +479,21 @@ function GithubServerTable(props) {
                   </div>
                 </div>
               )}
-              {filter.choices.length < 10 ?
+              {filter.renderFilter ? filter.renderFilter({
+                selected: normalizedValue.values || [],
+                onChange: (value) => {
+                  const newValue = { ...normalizedValue, values: value };
+                  handleFilterStatusChange(filter.key, newValue);
+                },
+                onClose: () => {
+                  setHideFilter(true);
+                  setTimeout(() => setHideFilter(false), 10);
+                },
+              }) : (filter.choices || []).length < 10 ?
                 <ChoiceList
                   title={filter.title}
                   titleHidden
-                  choices={getSortedChoices(filter.choices)}
+                  choices={getSortedChoices(filter.choices || [])}
                   selected={normalizedValue.values || []}
                   onChange={(value) => {
                     const newValue = { ...normalizedValue, values: value };
@@ -494,7 +504,7 @@ function GithubServerTable(props) {
                 :
                 <DropdownSearch
                   placeHoder={"Apply filters"}
-                  optionsList={getSortedChoices(filter.choices)}
+                  optionsList={getSortedChoices(filter.choices || [])}
                   setSelected={(value) => {
                     const newValue = { ...normalizedValue, values: value };
                     handleFilterStatusChange(filter.key, newValue);

@@ -48,7 +48,7 @@ import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph"
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
-import { normalizeReasonPunctuation, coerceToText, sanitizeDisplayText } from "./violationsData";
+import { coerceToText, sanitizeDisplayText, extractPromptBody, isEmptyJsonText, normalizeReasonPunctuation } from "./violationsData";
 import AdvancedPayloadSearch from "./AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "./attributeSearch";
 import InsightsFlyout from "@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout";
@@ -171,6 +171,31 @@ function EvidenceCellRenderer({ value }) {
     return <Text variant="bodySm" truncate>{value}</Text>;
 }
 
+function RiskScoreCellRenderer({ value }) {
+    if (value == null || value === "") return null;
+    return <Text variant="bodySm">{value}</Text>;
+}
+
+function ReasonCellRenderer({ value }) {
+    if (!value) return null;
+    return (
+        <div style={{ width: "100%", minWidth: 0, overflow: "hidden" }}>
+            <Tooltip content={value} dismissOnMouseOut width="wide">
+                <div
+                    style={{
+                        width: "100%",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                    }}
+                >
+                    <Text variant="bodySm" as="span">{value}</Text>
+                </div>
+            </Tooltip>
+        </div>
+    );
+}
+
 // Needs Approval tab only. Stops the click from bubbling into the row's onRowClicked (which
 // would otherwise open the ViolationFlyout instead of the approve modal).
 function ApproveCellRenderer({ data, onApprove }) {
@@ -214,6 +239,9 @@ function buildColDefs(filterValues, showApprove, onApprove) {
             headerName: "Detected",
             minWidth: 150,
             valueFormatter: p => p.value != null ? func.epochToDateTime(p.value) : "",
+            // Most recent first by default. Declared here (rather than defaulting inside
+            // onServerFetch) so the header's sort indicator matches what's actually requested.
+            sort: "desc",
         },
         {
             field: "type",
@@ -238,10 +266,8 @@ function buildColDefs(filterValues, showApprove, onApprove) {
             filter: "agSetColumnFilter",
             filterParams: { values: ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
             cellRenderer: SeverityCellRenderer,
-            // Critical first by default. Declared on the column (rather than defaulting inside
-            // onServerFetch) so the header's sort indicator matches what's actually requested:
-            // asc here means ascending severityRank, and the backend ranks CRITICAL as 1.
-            sort: "asc",
+            // Not sorted by default (detected is) — asc here would mean ascending severityRank,
+            // and the backend ranks CRITICAL as 1, so clicking this header still ranks Critical first.
         },
         // Atlas: username from Endpoint Shield metadata. Argus: identity actor (IAM ARN, etc.),
         // distinct from the Agentic Asset column.
@@ -264,6 +290,29 @@ function buildColDefs(filterValues, showApprove, onApprove) {
                 valueFormatter: (p) => actorIdDisplayText(p.value),
             },
             cellRenderer: ActorCellRenderer,
+        }] : []),
+        ...((isEndpointSecurityCategory() || isAgenticSecurityCategory()) ? [{
+            field: "reason",
+            headerName: "Reason",
+            width: 200,
+            minWidth: 120,
+            suppressAutoSize: true,
+            resizable: true,
+            sortable: false,
+            wrapText: false,
+            cellRenderer: ReasonCellRenderer,
+            cellStyle: { display: "flex", alignItems: "center", overflow: "hidden" },
+        }, {
+            field: "riskScore",
+            headerName: "Risk score",
+            minWidth: 130,
+            filter: "agNumberColumnFilter",
+            filterParams: {
+                filterOptions: ["equals", "greaterThan", "lessThan"],
+                maxNumConditions: 1,
+            },
+            cellRenderer: RiskScoreCellRenderer,
+            valueFormatter: p => (p.value == null || p.value === "") ? "" : String(p.value),
         }] : []),
         {
             field: "agenticAsset",
@@ -370,6 +419,13 @@ function parseMetadata(raw) {
     return result;
 }
 
+function parseStoredRiskScore(meta) {
+    const raw = meta?.riskScore ?? meta?.risk_score;
+    if (raw == null || raw === "") return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+}
+
 function parseAktoPayload(payloadStr) {
     if (!payloadStr) return {};
     try {
@@ -430,9 +486,9 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
     // flyout's Values tab extraction - not classifyPolicyType(policyName), which is user-editable
     // text and would misclassify (or dump into "Other") the moment someone renames a policy.
     const typeLabel = deriveAgenticType(event.url, event.method);
-    const policyName = meta.policy_name || meta.npolicy_name || event.filterId || "-";
+    const policyName = meta.rule_violated || meta.npolicy_name || event.filterId || "-";
 
-    const { req: reqPayload, resp: respPayload } = parseAktoPayload(event.payload);
+    const { req: reqPayload, resp: respPayload, raw: rawPayload } = parseAktoPayload(event.payload);
     const rawBehaviour = respPayload?.error?.data?.behaviour || meta.behaviour || meta.nbehaviour || null;
     const action = rawBehaviour === "block" ? "Blocked"
         : (rawBehaviour === "warn" || rawBehaviour === "flag") ? "Flagged"
@@ -448,9 +504,19 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
     const skillOrToolName = deriveSkillOrToolName(event.url);
 
     const isPromptOrTool = typeLabel === "Prompt" || typeLabel === "Tool";
-    const primaryValue = sanitizeDisplayText(coerceToText(isPromptOrTool
-        ? (reqPayload?.body || null)
-        : typeLabel === "Skill" ? (respPayload?.evidence || null) : (reqPayload?.evidence || null)), 300);
+    // extractPromptBody unpacks a chat-shaped body ({messages: [...]}) to the actual last user
+    // message instead of dumping raw {"messages":[{"role":"user",...}]} JSON. Tool events store
+    // the request payload flat (reqPayload *is* the tool args, e.g. {file_path, content}) rather
+    // than wrapped in a {body: ...} envelope, so it finds nothing for those - fall back to the
+    // whole object. And when requestPayload fails to JSON.parse at all (e.g. a captured tool
+    // call whose command text breaks JSON escaping), reqPayload is null even though the raw
+    // string has real content - fall back to that raw string rather than showing nothing.
+    const primaryValueRaw = coerceToText(isPromptOrTool
+        ? (extractPromptBody(reqPayload) ?? (typeLabel === "Tool" ? reqPayload : null) ?? rawPayload?.requestPayload ?? null)
+        : typeLabel === "Skill" ? (respPayload?.evidence || null) : (reqPayload?.evidence || null));
+    // An empty {}/[] carries no useful info - treat it the same as nothing captured rather
+    // than showing the literal "{}" in the Evidence column.
+    const primaryValue = isEmptyJsonText(primaryValueRaw) ? "" : sanitizeDisplayText(primaryValueRaw, 300);
 
     return {
         id: event.id,
@@ -463,6 +529,10 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         // for the Needs Approval tab's client-side filter and "Approve server" action, which need
         // the exact values the backend expects (approveServerForPolicy takes policyName + serverId).
         filterId: event.filterId,
+        // refId/eventType: same fields SusDataTable uses to deep-link into fetchMaliciousRequest -
+        // lets the flyout fetch the full captured request/response when row.payload is empty.
+        refId: event.refId,
+        eventType: event.eventType,
         host: rawHost,
         behaviourRaw: rawBehaviour,
         type: typeLabel,
@@ -471,7 +541,11 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         // Same resolver the old UI and the flyout use, so the column, the flyout and the
         // compliance report all agree on a row's clauses.
         complianceMap: resolveComplianceClauseMap(event, true, {}, guardrailComplianceMap || {}),
-        evidenceText: primaryValue || normalizeReasonPunctuation(meta.reason) || "-",
+        // Request-derived only - never falls back to meta.reason (a response/guardrail
+        // explanation), which would show up as if it were the captured request content.
+        evidenceText: primaryValue || "-",
+        riskScore: parseStoredRiskScore(meta),
+        reason: normalizeReasonPunctuation(meta.reason || meta.nreason) || "",
         actor: event.actor || "",
         user: userDisplay,
         userHost: rawHost,
@@ -608,7 +682,10 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
             <AgenticStatsCard
                 title="Other Violations"
                 titleTooltip="Violations that are under review or ignored. Click a status to filter the table."
-                total={(statusCounts.UNDER_REVIEW || 0) + (statusCounts.IGNORED || 0)}
+                // Sum the same breakdown segments rendered below, so the headline number can never
+                // drift from the bar (it previously hardcoded Under Review + Ignored only, missing
+                // Skills Evaluations / Misconfigured Settings on Atlas).
+                total={otherBreakdown.reduce((sum, seg) => sum + (seg.count || 0), 0)}
                 delta={0}
                 deltaColor="subdued"
                 breakdown={otherBreakdown}
@@ -1245,8 +1322,9 @@ function Violations() {
         // AgGridTable sends sortOrder: -1 for asc, 1 for desc (opposite of MongoDB convention)
         const mongoSort = sortOrder ? -sortOrder : -1;
         const isSeveritySort = sortKey === "severity";
-        const SORT_FIELD_MAP = { detected: "detectedAt", severity: "severity" };
+        const SORT_FIELD_MAP = { detected: "detectedAt", severity: "severity", riskScore: "riskScore" };
         const sort = sortKey ? { [SORT_FIELD_MAP[sortKey] || sortKey]: mongoSort } : { detectedAt: -1 };
+        const riskScoreFilter = filters?.riskScore;
 
         const payloadRegex = toLatestApiOrigRegex(searchString, advancedFilters);
         return threatDetectionApi.fetchSuspectSampleData(
@@ -1270,6 +1348,8 @@ function Violations() {
             severityFilter.length > 0 ? severityFilter : undefined,
             skillEvaluationMode,
             configEvaluationMode,
+            riskScoreFilter?.type,
+            riskScoreFilter?.filter,
         ).then(result => {
             const events = result?.maliciousEvents || [];
             let transformed = events.map(e => transformEvent(e, collectionsMap, usernameMapRef.current, guardrailComplianceMapRef.current));

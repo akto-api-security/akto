@@ -132,11 +132,7 @@ const COL_DEFS = [
     width: 200,
     // Server-side sort via AgenticObserveAction.violationsTotalForGroup — not a stored field, so
     // it's computed from the already-fetched violationsByCollectionId/skillViolationsByName maps
-    // rather than a real Mongo sort. Default sort (was riskScore, which ties ~770 skills at the
-    // same score and buried every other asset type under them) — violations is a more actionable
-    // "what needs attention first" ordering and doesn't have that tie problem.
-    sort: "desc",
-    sortIndex: 0,
+    // rather than a real Mongo sort.
     filter: false,
     cellRenderer: ViolationsCellRenderer,
     cellStyle: { display: "flex", alignItems: "center" },
@@ -244,27 +240,29 @@ function TableSection({
 }) {
   const didAutoOpenRef = useRef(false);
 
-  // ?asset= deep link — best-effort: matches against whatever the grid has already fetched (the
-  // first page, at minimum). A row further down the sorted list that hasn't loaded yet won't be
-  // found; this only regressed the corner case (a very old exact link to a low-ranked asset), not
-  // the common one (a link to something high-risk/recent, which sorts near the top by default).
   useEffect(() => {
     if (didAutoOpenRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const assetName = params.get("asset");
     if (!assetName) return;
-    const api2 = gridRef.current?.api;
-    if (!api2) return;
     didAutoOpenRef.current = true;
     const decoded = decodeURIComponent(assetName.replace(/\+/g, " ")).toLowerCase();
-    let found = null;
-    api2.forEachNode((node) => {
-      if (found || !node.data) return;
-      const n = (node.data.name || "").toLowerCase();
-      if (n === decoded || node.data.id === assetName) found = node.data;
+    const normalize = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const normDecoded = normalize(decoded);
+    const assetType = params.get("type");
+
+    onServerFetch({
+      skip: 0,
+      limit: 20,
+      searchString: assetName,
+      filters: assetType ? { type: [assetType] } : undefined,
+    }).then((res) => {
+      const rows = res?.value || [];
+      const found = rows.find((r) =>
+        (r.name || "").toLowerCase() === decoded || r.id === assetName || normalize(r.name) === normDecoded);
+      if (found) setFlyout(found);
     });
-    if (found) setFlyout(found);
-  }, [setFlyout]);
+  }, [setFlyout, onServerFetch]);
 
   const handleRowClick = useCallback(
     (e) => {
@@ -505,7 +503,7 @@ export default function AgenticAssetsPage() {
   // ─── Server-side data fetch for AG Grid ─────────────────────────────────────
   const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString, filters }) => {
     const pageSize = limit || 50;
-    const mappedSortKey = SORT_FIELD_MAP[sortKey] || sortKey || "violations";
+    const mappedSortKey = SORT_FIELD_MAP[sortKey] || sortKey || "riskScore";
     // AG Grid SSRM sends sortOrder: -1 for asc, 1 for desc — opposite of the backend's Mongo
     // convention (1 asc / -1 desc, matching NhiGovernanceViolationsAction's own onServerFetch).
     const mongoSortOrder = sortOrder ? -sortOrder : -1;
@@ -598,9 +596,23 @@ export default function AgenticAssetsPage() {
     { label: "Low",      key: "low",      count: violationTotals.low,  color: "#D1D5DB" },
   ], [violationTotals]);
 
+  const openAssetByName = useCallback((name, type) => {
+    onServerFetch({
+      skip: 0,
+      limit: 20,
+      searchString: name,
+      filters: type ? { type: [type] } : undefined,
+    }).then((res) => {
+      const rows = res?.value || [];
+      const found = rows.find((r) => (r.name || "").toLowerCase() === (name || "").toLowerCase()) || rows[0];
+      if (found) setFlyout(found);
+    });
+  }, [onServerFetch, setFlyout]);
+
   const topAppsRows = useMemo(() =>
     (stats.topUsedApplications || []).map((row) => ({
       ...row,
+      onClick: (r) => openAssetByName(r.name, r.type),
       renderValue: (r) => (
         <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
           <Box minHeight="28px">
@@ -608,11 +620,12 @@ export default function AgenticAssetsPage() {
           </Box>
         </HorizontalStack>
       ),
-    })), [stats.topUsedApplications]);
+    })), [stats.topUsedApplications, openAssetByName]);
 
   const topViolRows = useMemo(() =>
     (stats.topAssetsWithViolations || []).map((row) => ({
       ...row,
+      onClick: (r) => openAssetByName(r.name, r.type),
       renderValue: (r) => (
         <HorizontalStack align="end" blockAlign="center" gap="3" wrap={false}>
           <Text variant="bodyMd">{func.prettifyShort(r.violations)}</Text>
@@ -626,7 +639,7 @@ export default function AgenticAssetsPage() {
           />
         </HorizontalStack>
       ),
-    })), [stats.topAssetsWithViolations, stats.monthLabels]);
+    })), [stats.topAssetsWithViolations, stats.monthLabels, openAssetByName]);
 
   const topCards = useMemo(() => (
     <HorizontalGrid key="top-row" columns={3} gap="4">

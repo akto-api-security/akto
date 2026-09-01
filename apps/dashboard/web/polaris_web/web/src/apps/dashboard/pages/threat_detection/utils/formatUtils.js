@@ -54,6 +54,45 @@ export const extractRuleViolated = (metadata) => {
   }
 };
 
+function parseMetadataObj(metadata) {
+  if (!metadata) return {};
+  if (typeof metadata === "object") return metadata;
+  try { return JSON.parse(metadata); } catch { return {}; }
+}
+
+export const parseStoredRiskScore = (metadata) => {
+  const meta = parseMetadataObj(metadata);
+  const raw = meta.riskScore ?? meta.risk_score;
+  if (raw == null || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+};
+
+export const parseStoredReason = (metadata) => {
+  const meta = parseMetadataObj(metadata);
+  const raw = meta.reason || meta.nreason || "";
+  if (!raw) return "";
+  const text = String(raw);
+  const idx = text.indexOf(": ");
+  if (idx === -1 || idx > 60) return text;
+  return text.slice(idx + 2);
+};
+
+export const truncateToWords = (text, maxWords = 30) => {
+  const full = text == null ? "" : String(text).trim();
+  if (!full) return { preview: "", full: "", isTruncated: false };
+  const words = full.split(/\s+/);
+  if (words.length <= maxWords) return { preview: full, full, isTruncated: false };
+  return { preview: `${words.slice(0, maxWords).join(" ")}...`, full, isTruncated: true };
+};
+
+export const truncateToChars = (text, maxChars = 30) => {
+  const full = text == null ? "" : String(text).trim();
+  if (!full) return { preview: "", full: "", isTruncated: false };
+  if (full.length <= maxChars) return { preview: full, full, isTruncated: false };
+  return { preview: `${full.slice(0, maxChars)}...`, full, isTruncated: true };
+};
+
 /**
  * Resolves the compliance-clause map for a single threat/malicious event.
  * Guardrail (Agentic/Endpoint): keyed by capability derived from metadata.rule_violated.

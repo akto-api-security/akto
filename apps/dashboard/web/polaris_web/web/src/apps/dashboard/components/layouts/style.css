@@ -193,6 +193,14 @@
     overflow-wrap: break-word;
     word-break: break-word;
 }
+/* Overview tab's evidence excerpt — clamp to 4 lines so a huge captured payload doesn't
+   dominate the tab; the Values tab still shows the full content. */
+.violation-evidence-clamp {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
 /* Avatar + quote row — force top-alignment regardless of content height.
    HorizontalStack blockAlign="start" relies on a CSS custom property pipeline that
    can fail in some Polaris builds; an explicit class is the reliable fallback. */
