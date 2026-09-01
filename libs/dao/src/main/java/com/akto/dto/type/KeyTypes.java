@@ -52,11 +52,35 @@ public class KeyTypes {
                         String userId, int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap,
                         boolean isUrlParam, int timestamp) {
 
+        SubType subType = detect(url, method, responseCode, isHeader, param, object, apiCollectionId, isUrlParam);
+        record(url, method, responseCode, isHeader, param, object, userId, apiCollectionId, rawMessage,
+                sensitiveParamInfoBooleanMap, isUrlParam, timestamp, subType);
+    }
+
+    /**
+     * Resolves the data type of a single value, without recording anything.
+     *
+     * Split out of {@link #process} so a caller can resolve every value in a batch first, hand the
+     * candidates to an external classifier, and only then {@link #record} them under their final
+     * subtype. Detection stays pure and free of side effects.
+     */
+    public static SubType detect(String url, String method, int responseCode, boolean isHeader, String param,
+                                 Object object, int apiCollectionId, boolean isUrlParam) {
         String key = param.replaceAll("#", ".").replaceAll("\\.\\$", "");
         String[] keyArr = key.split("\\.");
         String lastField = keyArr[keyArr.length - 1].split("_queryParam")[0];
         ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, SingleTypeInfo.GENERIC, apiCollectionId, isUrlParam);
-        SubType subType = findSubType(object,lastField,paramId);
+        return findSubType(object, lastField, paramId);
+    }
+
+    /**
+     * Records a value against an already-resolved subtype. Pass the result of {@link #detect}, or a
+     * subtype supplied by an external classifier when the locally-detected one was refined.
+     */
+    public void record(String url, String method, int responseCode, boolean isHeader, String param, Object object,
+                       String userId, int apiCollectionId, String rawMessage,
+                       Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap, boolean isUrlParam,
+                       int timestamp, SubType subType) {
 
         SingleTypeInfo singleTypeInfo = occurrences.get(subType);
         if (singleTypeInfo == null) {
@@ -68,6 +92,7 @@ public class KeyTypes {
 
             Set<String> userIds = new HashSet<>();
             userIds.add(userId);
+            ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, SingleTypeInfo.GENERIC, apiCollectionId, isUrlParam);
             paramId.setSubType(subType);
             singleTypeInfo = new SingleTypeInfo(paramId, examples, userIds, 0, timestamp, 0, new CappedSet<>(), SingleTypeInfo.Domain.ENUM, SingleTypeInfo.ACCEPTED_MAX_VALUE, SingleTypeInfo.ACCEPTED_MIN_VALUE);
 
