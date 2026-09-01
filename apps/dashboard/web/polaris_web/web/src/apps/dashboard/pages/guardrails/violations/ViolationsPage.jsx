@@ -35,7 +35,7 @@ import SessionStore from "@/apps/main/SessionStore";
 import LocalStore from "@/apps/main/LocalStorageStore";
 import guardrailApi from "@/apps/dashboard/pages/guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "@/apps/dashboard/pages/guardrails/utils";
-import { resolveComplianceClauseMap, loadGuardrailComplianceMap, formatActorId, actorIdDisplayText, truncateToChars } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
+import { resolveComplianceClauseMap, loadGuardrailComplianceMap, formatActorId, actorIdDisplayText } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
 import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
 
@@ -178,12 +178,21 @@ function RiskScoreCellRenderer({ value }) {
 
 function ReasonCellRenderer({ value }) {
     if (!value) return null;
-    const { preview, full, isTruncated } = truncateToChars(value, 30);
-    if (!isTruncated) return <Text variant="bodySm">{preview}</Text>;
     return (
-        <Tooltip content={full} dismissOnMouseOut width="wide">
-            <Text variant="bodySm">{preview}</Text>
-        </Tooltip>
+        <div style={{ width: "100%", minWidth: 0, overflow: "hidden" }}>
+            <Tooltip content={value} dismissOnMouseOut width="wide">
+                <div
+                    style={{
+                        width: "100%",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                    }}
+                >
+                    <Text variant="bodySm" as="span">{value}</Text>
+                </div>
+            </Tooltip>
+        </div>
     );
 }
 
@@ -285,9 +294,14 @@ function buildColDefs(filterValues, showApprove, onApprove) {
         ...((isEndpointSecurityCategory() || isAgenticSecurityCategory()) ? [{
             field: "reason",
             headerName: "Reason",
-            minWidth: 180,
+            width: 200,
+            minWidth: 120,
+            suppressAutoSize: true,
+            resizable: true,
             sortable: false,
+            wrapText: false,
             cellRenderer: ReasonCellRenderer,
+            cellStyle: { display: "flex", alignItems: "center", overflow: "hidden" },
         }, {
             field: "riskScore",
             headerName: "Risk score",
