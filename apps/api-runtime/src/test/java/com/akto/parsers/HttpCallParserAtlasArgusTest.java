@@ -36,6 +36,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -82,8 +83,10 @@ class HttpCallParserAtlasArgusTest {
         OrganizationsDao.instance.getMCollection().drop();
         SetupDao.instance.getMCollection().drop();
 
-        // ON_PREM makes DashboardMode.isMetered() true so the org's featureWiseAllowed is actually consulted.
-        SetupDao.instance.insertOne(new Setup("ON_PREM"));
+        // In this repo, DashboardMode.isMetered() only reads dashboardMode from the DB for the
+        // SAAS check (the ON_PREM check requires the DASHBOARD_MODE env var, unsettable here) -
+        // so seed SAAS to make isMetered() true and the org's featureWiseAllowed actually consulted.
+        SetupDao.instance.insertOne(new Setup("SAAS"));
     }
 
     private void grantSecurityTypeAgentic() {
@@ -230,10 +233,20 @@ class HttpCallParserAtlasArgusTest {
         assertFalse(getHostNameToIdMap(parser).containsKey(host + "-agentic"));
     }
 
-    // case4 (fresh mixed collection actually forks on an agentic match) lives on the
-    // nayan/fix-apicollectionmap-cache-sync branch - it depends on a fix not present here yet
-    // (apiCollectionMap isn't updated immediately when createApiCollectionId creates a new
-    // collection, only hostNameToIdMap is, so a same-session follow-up request can't see it).
+    @Test
+    public void case4_plainCollection_agenticMatch_forks() throws Exception {
+        grantSecurityTypeAgentic();
+        HttpCallParser parser = newParser();
+        String host = "case4-forks.akto.internal";
+
+        int normalId = parser.createApiCollectionId(normalRequest(host, "/api/users/1"));
+        int mcpId = parser.createApiCollectionId(mcpRequest(host, "/mcp", null));
+
+        assertNotEquals(normalId, mcpId, "agentic match on a clean mixed collection must fork");
+        Map<String, Integer> map = getHostNameToIdMap(parser);
+        assertTrue(map.containsKey(host + "-agentic"));
+        assertEquals((Integer) mcpId, map.get(host + "-agentic"));
+    }
 
     @Test
     public void case5_alreadyTaggedCollection_neverReForks() throws Exception {
