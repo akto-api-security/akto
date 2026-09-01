@@ -9,7 +9,7 @@ import ssl
 import sys
 import time
 import urllib.request
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 try:
     from akto_machine_id import get_machine_id, get_username
@@ -40,6 +40,7 @@ _CONNECTOR_TAG: Dict[str, str] = {
     "vscode": "vscode",
     "gemini_cli": "geminicli",
     "github": "github",
+    "github_cli": "copilot",
     "codex_cli": "codexcli",
     "kiro_cli": "kirocli"
 }
@@ -255,6 +256,18 @@ def _id_fields(fm: Dict[str, Any]) -> List[str]:
         if key not in fields:
             fields.append(key)
     return fields
+
+
+# Terminal `copilot` CLI sends camelCase; VS Code's Copilot Chat sends snake_case.
+INPUT_FIELD_TRANSFORMATIONS = {"sessionId": "session_id", "transcriptPath": "transcript_path"}
+
+
+def _alias_camel_keys(input_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Fill in the snake_case key from its camelCase alias when only the latter is present."""
+    for camel, snake in INPUT_FIELD_TRANSFORMATIONS.items():
+        if snake not in input_data and camel in input_data:
+            input_data[snake] = input_data[camel]
+    return input_data
 
 
 def extract_session_info(input_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -550,7 +563,7 @@ def run_observability_hook(hook_name: str) -> None:
     logger = setup_logger("hook-executions.log")
     logger.info(f"=== {hook_name} hook started ===")
     try:
-        input_data = json.load(sys.stdin)
+        input_data = _alias_camel_keys(json.load(sys.stdin))
         logger.info(f"{hook_name} input:\n%s", json.dumps(input_data, indent=2))
         session_info = resolve_session_info(input_data, logger)
         send_ingestion_data(
