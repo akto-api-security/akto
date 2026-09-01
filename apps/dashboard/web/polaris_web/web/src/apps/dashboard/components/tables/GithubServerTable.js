@@ -819,14 +819,7 @@ function GithubServerTable(props) {
               )}
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
               {props?.customFilterContent && mode === IndexFiltersMode.Filtering && props.customFilterContent}
-              <div
-                className={tableHeightClass}
-                style={
-                  pageSizeOptions
-                    ? { paddingTop: '8px', maxHeight: '640px', overflowY: 'auto' }
-                    : { paddingTop: '8px' }
-                }
-              >
+              <div className={tableHeightClass} style={{ paddingTop: '8px' }}>
               {props.loading && props.loadingText ? (
                 <SpinnerCentered text={props.loadingText}/>
               ) : (
