@@ -37,7 +37,7 @@ CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 _CONNECTOR_TAG: Dict[str, str] = {
     "claude_code_cli": "claudecli",
     "cursor": "cursor",
-    "vscode": "vscode",
+    "vscode": "copilot",
     "gemini_cli": "geminicli",
     "github": "github",
     "github_cli": "copilot",
