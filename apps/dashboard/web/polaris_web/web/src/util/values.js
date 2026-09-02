@@ -73,7 +73,7 @@ const ranges = [
         title: 'All time',
         alias: "allTime",
         period:{
-            since: new Date(1000),
+            since: new Date(10),
             until: new Date(new Date().setFullYear(today.getFullYear() + 1)),
         }
     }

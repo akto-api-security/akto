@@ -2,7 +2,7 @@ import { Text, HorizontalStack, VerticalStack, Box, Badge, Button, Icon, Tooltip
 import { useRef, useMemo, useCallback, useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from 'framer-motion'
-import { CodeMinor, DynamicSourceMinor, ClockMinor, CalendarMinor, ExportMinor, RefreshMinor, ChevronLeftMinor, ChevronRightMinor } from '@shopify/polaris-icons'
+import { CodeMinor, DynamicSourceMinor, ClockMinor, CalendarMinor, ExportMinor, RefreshMinor, ChevronLeftMinor, ChevronRightMinor, CircleTickMajor, DiamondAlertMinor } from '@shopify/polaris-icons'
 import InlineEditableText from "../../../components/shared/InlineEditableText"
 import func from "@/util/func"
 import FlyLayout from "../../../components/layouts/FlyLayout";
@@ -148,9 +148,31 @@ const mcpServersHeaders = [
 ];
 
 const installedAppsHeaders = [
+    createSimpleHeader("Vulnerability Status", "vulnComp"),
     createSimpleHeader("App Name", "name"),
     createSimpleHeader("Version", "version"),
 ];
+
+// vuln is an InstalledAppVulnerability ({ misconfiguredApp, vulnIds }) from
+// checkInstalledAppVulnerabilities, keyed by "name#version". The apps table itself renders
+// immediately from selectedAgent; this column alone trails behind while the check is in flight —
+// checking is true until that fetch settles, vuln stays null/undefined until this row's result lands.
+const getAppVulnStatusComp = (vuln, checking) => {
+    if (!vuln) return checking ? <Spinner size="small" accessibilityLabel="Checking for known vulnerabilities" /> : null;
+    if (vuln.misconfiguredApp) {
+        const detail = (vuln.vulnIds || []).join(', ') || 'See osv.dev for details';
+        return (
+            <Tooltip content={`Known vulnerabilities: ${detail}`} dismissOnMouseOut>
+                <Icon source={DiamondAlertMinor} color="critical" />
+            </Tooltip>
+        );
+    }
+    return (
+        <Tooltip content="No known vulnerabilities found" dismissOnMouseOut>
+            <Icon source={CircleTickMajor} color="success" />
+        </Tooltip>
+    );
+};
 
 function AgentDetails({
     show,
@@ -180,6 +202,12 @@ function AgentDetails({
     const [description, setDescription] = useState("");
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState("");
+    const [appVulnerabilities, setAppVulnerabilities] = useState({}); // "name#version" -> InstalledAppVulnerability
+    const [appVulnLoading, setAppVulnLoading] = useState(false);
+    // GithubSimpleTable wraps `data` in a fetchData callback that GithubServerTable only re-invokes on
+    // sort/filter/page changes or when this callFromOutside value changes — not on every parent re-render
+    // — so without bumping it, the table keeps showing its initial (pre-fetch) snapshot forever.
+    const [appVulnRefreshKey, setAppVulnRefreshKey] = useState(0);
 
     const fetchPage = useCallback(async (afterId, updateTotal = false) => {
         if (!selectedAgent) return;
@@ -291,6 +319,9 @@ function AgentDetails({
         setDescription("");
         setEditableDescription("");
         setIsEditingDescription(false);
+        setAppVulnerabilities({});
+        setAppVulnLoading(false);
+        setAppVulnRefreshKey(0);
 
         setLoading(true);
         settingRequests.getMcpServersByAgent(selectedAgent.agentId, selectedAgent.hostname)
@@ -322,6 +353,25 @@ function AgentDetails({
                 await fetchPage(null, true);
                 break;
             }
+            case 'installed-apps': {
+                // Apps table renders immediately from selectedAgent — don't gate it behind this fetch.
+                // Only the per-row Status cell (getAppVulnStatusComp) waits on appVulnLoading.
+                const appsToCheck = (selectedAgent.installedApps || [])
+                    .map(app => ({ name: sanitizeAppText(app.name), version: app.version ? sanitizeAppText(app.version) : '' }))
+                    .filter(app => app.name && app.version);
+                if (appsToCheck.length === 0) break;
+                setAppVulnLoading(true);
+                try {
+                    const res = await settingRequests.checkInstalledAppVulnerabilities(appsToCheck);
+                    setAppVulnerabilities(res);
+                } catch {
+                    setAppVulnerabilities({});
+                } finally {
+                    setAppVulnLoading(false);
+                    setAppVulnRefreshKey(k => k + 1);
+                }
+                break;
+            }
             default:
                 break;
         }
@@ -339,11 +389,17 @@ function AgentDetails({
     const installedAppsTableData = useMemo(() =>
         [...(selectedAgent?.installedApps || [])]
             .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-            .map(app => ({
-                name: sanitizeAppText(app.name) || '\u2014',
-                version: app.version ? sanitizeAppText(app.version) : '\u2014',
-            })),
-    [selectedAgent]);
+            .map(app => {
+                const name = sanitizeAppText(app.name);
+                const version = app.version ? sanitizeAppText(app.version) : '';
+                const vuln = (name && version) ? appVulnerabilities[`${name}#${version}`] : null;
+                return {
+                    name: name || '\u2014',
+                    version: version || '\u2014',
+                    vulnComp: getAppVulnStatusComp(vuln, appVulnLoading),
+                };
+            }),
+    [selectedAgent, appVulnerabilities, appVulnLoading]);
 
     const handleServerClick = useCallback((server) => {
         const collection = allCollections.find(col =>
@@ -564,6 +620,7 @@ function AgentDetails({
                 <GithubSimpleTable
                     key="installed-apps-table"
                     data={installedAppsTableData}
+                    callFromOutside={appVulnRefreshKey}
                     resourceName={{ singular: "app", plural: "apps" }}
                     headers={installedAppsHeaders}
                     headings={installedAppsHeaders}
