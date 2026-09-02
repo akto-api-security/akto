@@ -19,6 +19,7 @@ import guardrailApi from "../../guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "../../guardrails/utils";
 import AdvancedPayloadSearch from "../../guardrails/violations/AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "../../guardrails/violations/attributeSearch";
+import { deriveAgenticType, extractEvidenceText } from "../../guardrails/violations/violationsData";
 
 const resourceName = {
   singular: "activity",
@@ -150,6 +151,14 @@ const getHeaders = () => {
       maxWidth: "240px",
       type: CellType.TEXT,
       tooltipKey: "reasonFull",
+    });
+    baseHeaders.push({
+      text: "Evidence",
+      value: "evidence",
+      title: "Evidence",
+      maxWidth: "200px",
+      type: CellType.TEXT,
+      tooltipKey: "evidenceFull",
     });
   }
 
@@ -1012,6 +1021,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
             if (!r) return { reason: "", reasonFull: "" };
             const { preview, full } = truncateToWords(r, 30);
             return { reason: preview, reasonFull: full };
+          })(),
+          ...(() => {
+            const typeLabel = deriveAgenticType(x.url, x.method);
+            const full = extractEvidenceText(x.payload, typeLabel, 1500);
+            const preview = extractEvidenceText(x.payload, typeLabel, 300);
+            return { evidence: preview || "-", evidenceFull: full || "-" };
           })(),
         }),
         // Successful Exploit is only shown for API Security (not Argus/Agentic or Atlas/Endpoint)

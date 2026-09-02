@@ -52,6 +52,8 @@ public class LLMObservabilityAction extends UserAction {
     @Setter private List<String> sessionIds     = new ArrayList<>();
     @Setter private List<String> topicFilters    = new ArrayList<>();
     @Setter private List<String> subTopicFilters = new ArrayList<>();
+    @Setter private List<String> guardrailFilters = new ArrayList<>();
+    @Setter private List<String> guardrailPolicyFilters = new ArrayList<>();
 
     @Getter private String       nextAfterKey;
     @Getter private long         totalSessions    = 0;
@@ -272,6 +274,12 @@ public class LLMObservabilityAction extends UserAction {
         if (!topics.isEmpty()) f.put(AgentQueryRecord.F_TOPIC_KW, topics);
         List<String> subTopics = nonEmpty(subTopicFilters);
         if (!subTopics.isEmpty()) f.put(AgentQueryRecord.F_SUB_TOPIC_KW, subTopics);
+        // hasActiveGuardrail: "true"/"false" values selected on the Guardrail column's set filter
+        List<String> guardrails = nonEmpty(guardrailFilters);
+        if (!guardrails.isEmpty()) f.put(AgentQueryRecord.F_GUARDRAIL_VIOLATED, guardrails);
+        // Guardrail Policy: which policy name(s) were triggered
+        List<String> guardrailPolicies = nonEmpty(guardrailPolicyFilters);
+        if (!guardrailPolicies.isEmpty()) f.put(AgentQueryRecord.F_GUARDRAIL_POLICY_KW, guardrailPolicies);
         return f;
     }
 
