@@ -62,6 +62,9 @@ public class Constants {
     public static final String TESTING_STATE_FILE_NAME = "testing-state.json";
     public static final boolean IS_NEW_TESTING_ENABLED = (StringUtils.hasLength(System.getenv("NEW_TESTING_ENABLED")) && System.getenv("NEW_TESTING_ENABLED").equals("true"));
     public static final boolean KAFKA_DEBUG_MODE = (StringUtils.hasLength(System.getenv("KAFKA_DEBUG_MODE")) && System.getenv("KAFKA_DEBUG_MODE").equals("true"));
+    // RCA flag: when true, mini-testing skips the insertResultsAndMakeIssues() DB write entirely (result + issue
+    // creation are not persisted) so the per-test cost/throughput of everything BUT that I/O can be isolated.
+    public static final boolean SKIP_INSERT_TEST_RESULTS = (StringUtils.hasLength(System.getenv("SKIP_INSERT_TEST_RESULTS")) && System.getenv("SKIP_INSERT_TEST_RESULTS").equals("true"));
     public static final int MAX_REQUEST_TIMEOUT = StringUtils.hasLength(System.getenv("MAX_REQUEST_TIMEOUT")) ? Integer.parseInt(System.getenv("MAX_REQUEST_TIMEOUT")) : 15000;
     public static final int LINGER_MS_KAFKA = StringUtils.hasLength(System.getenv("LINGER_MS_KAFKA")) ?  Integer.parseInt(System.getenv("LINGER_MS_KAFKA")) : 5000;
     public static final int MAX_POLL_INTERVAL_MS = StringUtils.hasLength(System.getenv("MAX_POLL_INTERVAL_MS")) ? Integer.parseInt(System.getenv("MAX_POLL_INTERVAL_MS")) : 300000;
