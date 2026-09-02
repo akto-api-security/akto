@@ -48,6 +48,7 @@ import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph"
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
+import { HumanApprovalActions, HumanApprovalTabLabel, HumanResponseBadge, humanApprovalTabAccessibilityLabel, isHumanApprovalPending } from "./ViolationFlyoutSections";
 import { coerceToText, sanitizeDisplayText, extractPromptBody, isEmptyJsonText, normalizeReasonPunctuation } from "./violationsData";
 import AdvancedPayloadSearch from "./AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "./attributeSearch";
@@ -206,8 +207,10 @@ function ApproveCellRenderer({ data, onApprove }) {
     );
 }
 
-const STATUS_LABEL = { ACTIVE: "Open", FIXED: "Fixed", IGNORED: "Ignored", UNDER_REVIEW: "In Review" };
-const STATUS_DOT_COLOR = { ACTIVE: "#9642FC", FIXED: "#5BC0DE", IGNORED: "#F5C451", UNDER_REVIEW: "#637381" };
+const HUMAN_RESPONSE = { PENDING: "PENDING", APPROVED: "APPROVED", BLOCKED: "BLOCKED" };
+
+const STATUS_LABEL = { ACTIVE: "Open", FIXED: "Fixed", IGNORED: "Ignored", UNDER_REVIEW: "In Review", HUMAN_APPROVAL: "Human Approval" };
+const STATUS_DOT_COLOR = { ACTIVE: "#9642FC", FIXED: "#5BC0DE", IGNORED: "#F5C451", UNDER_REVIEW: "#637381", HUMAN_APPROVAL: "#5BC0DE" };
 function StatusCellRenderer({ value }) {
     if (!value) return null;
     const key = String(value).toUpperCase();
@@ -230,13 +233,48 @@ const DEFAULT_COL_DEF = {
     cellStyle: { display: "flex", alignItems: "center" },
 };
 
+function HumanResponseCellRenderer({ value, data, onHumanApproval }) {
+    const response = data?.humanResponse ?? value;
+    const pending = isHumanApprovalPending(response);
+    return (
+        <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <HumanResponseBadge response={response} />
+            {pending && (
+                <HumanApprovalActions
+                    pending
+                    subtle
+                    onApprove={() => onHumanApproval?.(data, "APPROVED")}
+                    onBlock={() => onHumanApproval?.(data, "BLOCKED")}
+                />
+            )}
+        </div>
+    );
+}
+
 // Column defs are built dynamically so we can inject backend filter values. showApprove/onApprove
-// add the Needs Approval tab's Action column (mirrors SusDataTable.jsx's conditional "Action" header).
-function buildColDefs(filterValues, showApprove, onApprove) {
+// add the Needs Approval tab's Action column. On Human Approval the Status column is
+// pending/approved/blocked (every row already has event status HUMAN_APPROVAL).
+function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, onHumanApproval) {
+    const humanStatusCol = {
+        field: "humanResponse",
+        headerName: "Status",
+        minWidth: 220,
+        sortable: false,
+        cellRenderer: HumanResponseCellRenderer,
+        cellRendererParams: { onHumanApproval },
+    };
+    const eventStatusCol = {
+        field: "_status",
+        headerName: "Status",
+        minWidth: 110,
+        sortable: false,
+        cellRenderer: StatusCellRenderer,
+    };
     const cols = [
+        ...(isHumanApprovalTab ? [humanStatusCol] : []),
         {
             field: "detected",
-            headerName: "Detected",
+            headerName: isHumanApprovalTab ? "Reported" : "Detected",
             minWidth: 150,
             valueFormatter: p => p.value != null ? func.epochToDateTime(p.value) : "",
             // Most recent first by default. Declared here (rather than defaulting inside
@@ -349,13 +387,7 @@ function buildColDefs(filterValues, showApprove, onApprove) {
             sortable: false,
             cellRenderer: ComplianceCellRenderer,
         },
-        {
-            field: "_status",
-            headerName: "Status",
-            minWidth: 110,
-            sortable: false,
-            cellRenderer: StatusCellRenderer,
-        },
+        ...(!isHumanApprovalTab ? [eventStatusCol] : []),
     ];
     if (showApprove) {
         cols.push({
@@ -561,6 +593,7 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         sessionId: event.sessionId || null,
         deviceId: rawHost,
         remediation: event.remediation || null,
+        humanResponse: String(event.humanResponse || HUMAN_RESPONSE.PENDING).toUpperCase(),
     };
 }
 
@@ -570,7 +603,7 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
     if (summaryLoading) return <SpinnerCentered />;
     if (!summaryData) return null;
 
-    const { severityDistribution, categoryTotal, statusCounts, topPolicies, topHosts, byType, skillsEvaluationsCount, misconfiguredSettingsCount } = summaryData;
+    const { severityDistribution, categoryTotal, statusCounts, topPolicies, topHosts, byType, skillsEvaluationsCount, misconfiguredSettingsCount, humanApprovalCount } = summaryData;
 
     const totalBreakdown = ["CRITICAL", "HIGH", "MEDIUM", "LOW"].map(k => ({
         label: k.charAt(0) + k.slice(1).toLowerCase(),
@@ -593,6 +626,9 @@ function ViolationsDashboard({ summaryData, usernameMap, loading: summaryLoading
         ...(isEndpointSecurityCategory() ? [
             { label: "Skills Evaluations",     count: skillsEvaluationsCount || 0,     color: TYPE_COLORS.Skill,  key: "SKILLS_EVALUATIONS" },
             { label: "Misconfigured Settings", count: misconfiguredSettingsCount || 0, color: TYPE_COLORS.Config, key: "MISCONFIGURED_SETTINGS" },
+        ] : []),
+        ...(isAgenticSecurityCategory() ? [
+            { label: "Human Approval", count: humanApprovalCount || 0, color: TYPE_COLORS.Prompt, key: "HUMAN_APPROVAL" },
         ] : []),
     ];
 
@@ -826,6 +862,7 @@ function Violations() {
     const [summaryLoading, setSummaryLoading] = useState(true);
     const [selectedViolation, setSelectedViolation] = useState(null);
     const [bulkSelectedCount, setBulkSelectedCount] = useState(0);
+    const [bulkPendingCount, setBulkPendingCount] = useState(0);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [filterValues, setFilterValues] = useState({ hosts: [], subCategory: [], actors: [] });
     const [latencyData, setLatencyData] = useState(null);
@@ -844,14 +881,14 @@ function Violations() {
     const isSkillsEvaluationsTab = currentTab === "skills_evaluations";
     const isNeedsApprovalTab = currentTab === "needs_approval";
     const isMisconfiguredTab = currentTab === "misconfigured_settings";
-    // Needs Approval, Skills Evaluations, and Misconfigured Settings are all views over ACTIVE
-    // events narrowed by other means (client-side behaviour filter / skillEvaluationMode /
-    // configEvaluationMode below), not their own status value - same convention as
-    // SusDataTable's effectiveStatus.
+    const isHumanApprovalTab = currentTab === "human_approval";
+    // Needs Approval / Skills Evaluations / Misconfigured Settings are views over ACTIVE events
+    // narrowed by other means. Human Approval is its own status (HUMAN_APPROVAL) so Active's
+    // existing status index already excludes those rows — same isolation as Training Data.
     const activeStatusValue = (isSkillsEvaluationsTab || isNeedsApprovalTab || isMisconfiguredTab) ? "ACTIVE" : currentTab.toUpperCase();
     // Drives the summary cards' outline - neither "open" nor "other" card highlights on these
     // orthogonal views, since they're not a status.
-    const selectedCard = currentTab === "active" ? "open" : ((isSkillsEvaluationsTab || isNeedsApprovalTab || isMisconfiguredTab) ? "other-view" : "other");
+    const selectedCard = currentTab === "active" ? "open" : ((isSkillsEvaluationsTab || isNeedsApprovalTab || isMisconfiguredTab || isHumanApprovalTab) ? "other-view" : "other");
     const gridRef = useRef(null);
     const prevSelectedIdRef = useRef(null);
     const gridFilterKey = useRef(`violations-${Date.now()}`);
@@ -1046,6 +1083,7 @@ function Violations() {
         const target = key === "IGNORED" ? "ignored"
             : key === "SKILLS_EVALUATIONS" ? "skills_evaluations"
             : key === "MISCONFIGURED_SETTINGS" ? "misconfigured_settings"
+            : key === "HUMAN_APPROVAL" ? "human_approval"
             : "under_review";
         setCurrentTab(prev => prev === target ? "under_review" : target);
         triggerTableRefresh();
@@ -1129,7 +1167,30 @@ function Violations() {
         }
     }, [approveRow, approveMode, approveDays, refreshApprovedByPolicy, triggerTableRefresh]);
 
-    const colDefs = useMemo(() => buildColDefs(filterValues, isNeedsApprovalTab, openInlineApprove), [filterValues, isNeedsApprovalTab, openInlineApprove]);
+    const handleHumanApproval = useCallback(async (row, response) => {
+        if (!row?.id) return;
+        try {
+            const result = await threatDetectionApi.updateMaliciousEventStatus({
+                eventIds: [row.id],
+                humanResponse: response,
+            });
+            if (result?.updateSuccess) {
+                const verb = response === HUMAN_RESPONSE.APPROVED ? "approved" : "blocked";
+                func.setToast(true, false, `Event ${verb}`);
+                setSelectedViolation(prev => prev?.id === row.id ? { ...prev, humanResponse: response } : prev);
+                triggerTableRefresh();
+            } else {
+                func.setToast(true, true, "Failed to update human approval");
+            }
+        } catch {
+            func.setToast(true, true, "Failed to update human approval");
+        }
+    }, [triggerTableRefresh]);
+
+    const colDefs = useMemo(
+        () => buildColDefs(filterValues, isNeedsApprovalTab, openInlineApprove, isHumanApprovalTab, handleHumanApproval),
+        [filterValues, isNeedsApprovalTab, openInlineApprove, isHumanApprovalTab, handleHumanApproval],
+    );
 
     // ─── Fetch summary stats from existing backend APIs ─────────────────────
     // Replaces the old client-side computeSummary() that required all data loaded.
@@ -1147,6 +1208,7 @@ function Violations() {
                 // both counts the same way the tabs themselves do: skillEvaluationMode/configEvaluationMode
                 // "only", limit 1, read .total. Atlas (ENDPOINT) only — undefined elsewhere skips the calls.
                 const wantsPartitionCounts = isEndpointSecurityCategory();
+                const wantsHumanApprovalCount = isAgenticSecurityCategory();
                 // getDailyThreatActorsCount's totalActiveStatus (below, dailyResp) excludes /skills/
                 // events server-side (ThreatUtils.excludeSkillEndpointFilter in ThreatActorService.java)
                 // but has NO equivalent config-exclusion filter anywhere in that file, so it overcounts
@@ -1176,6 +1238,9 @@ function Violations() {
                     wantsPartitionCounts
                         ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "IGNORED", undefined, undefined, undefined, undefined, undefined, false, [], undefined, undefined)
                         : Promise.resolve(null),
+                    wantsHumanApprovalCount
+                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "HUMAN_APPROVAL", undefined, undefined, undefined, undefined, undefined, false, [], undefined, undefined, undefined, undefined, HUMAN_RESPONSE.PENDING)
+                        : Promise.resolve(null),
                 ]);
 
                 const severityResp = results[0].status === 'fulfilled' ? results[0].value : {};
@@ -1187,8 +1252,10 @@ function Violations() {
                 const activeCountResp = results[6].status === 'fulfilled' ? results[6].value : null;
                 const underReviewCountResp = results[7].status === 'fulfilled' ? results[7].value : null;
                 const ignoredCountResp = results[8].status === 'fulfilled' ? results[8].value : null;
+                const humanApprovalCountResp = results[9].status === 'fulfilled' ? results[9].value : null;
                 const skillsEvaluationsCount = skillsCountResp?.total || 0;
                 const misconfiguredSettingsCount = configCountResp?.total || 0;
+                const humanApprovalCount = humanApprovalCountResp?.total || 0;
 
                 // Severity counts
                 const severityDistribution = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
@@ -1246,7 +1313,7 @@ function Violations() {
                     host: h.host || "",
                 }));
 
-                setSummaryData({ severityDistribution, totalCount, categoryTotal, statusCounts, topPolicies, topHosts, byType, typeToSubCategories, skillsEvaluationsCount, misconfiguredSettingsCount });
+                setSummaryData({ severityDistribution, totalCount, categoryTotal, statusCounts, topPolicies, topHosts, byType, typeToSubCategories, skillsEvaluationsCount, misconfiguredSettingsCount, humanApprovalCount });
             } catch {
                 setSummaryData(null);
             } finally {
@@ -1254,7 +1321,7 @@ function Violations() {
             }
         }
         loadSummary();
-    }, [startTimestamp, endTimestamp, activeStatusValue]);
+    }, [startTimestamp, endTimestamp, activeStatusValue, tableKey]);
 
     // ─── Fetch latency data ──────────────────────────────────────────────────
     useEffect(() => {
@@ -1390,9 +1457,20 @@ function Violations() {
         return ids;
     }, []);
 
+    const getSelectedPendingIds = useCallback(() => {
+        const ids = [];
+        gridRef.current?.api?.forEachNode(node => {
+            if (!node.stub && node.isSelected() && node.data?.id && isHumanApprovalPending(node.data.humanResponse)) {
+                ids.push(node.data.id);
+            }
+        });
+        return ids;
+    }, []);
+
     const clearBulkSelection = useCallback(() => {
         gridRef.current?.api?.deselectAll();
         setBulkSelectedCount(0);
+        setBulkPendingCount(0);
     }, []);
 
     const handleBulkStatusUpdate = useCallback(async (status, pastTenseLabel) => {
@@ -1430,11 +1508,43 @@ function Violations() {
         }
     }, [getSelectedIds, clearBulkSelection, triggerTableRefresh]);
 
-    const bulkActions = useMemo(() => [
-        { label: "Mark for Review", onAction: () => handleBulkStatusUpdate("UNDER_REVIEW", "marked for review") },
-        { label: "Ignore", onAction: () => handleBulkStatusUpdate("IGNORED", "ignored") },
-        { label: "Delete", destructive: true, onAction: () => setDeleteConfirmOpen(true) },
-    ], [handleBulkStatusUpdate]);
+    const handleBulkHumanApproval = useCallback(async (response) => {
+        const ids = getSelectedPendingIds();
+        if (!ids.length) {
+            func.setToast(true, true, "No pending events selected");
+            return;
+        }
+        try {
+            const result = await threatDetectionApi.updateMaliciousEventStatus({ eventIds: ids, humanResponse: response });
+            if (result?.updateSuccess) {
+                const verb = response === HUMAN_RESPONSE.APPROVED ? "approved" : "blocked";
+                func.setToast(true, false, `${ids.length} event${ids.length === 1 ? "" : "s"} ${verb}`);
+                clearBulkSelection();
+                triggerTableRefresh();
+            } else {
+                func.setToast(true, true, "Failed to update selected events");
+            }
+        } catch {
+            func.setToast(true, true, "Failed to update selected events");
+        }
+    }, [getSelectedPendingIds, clearBulkSelection, triggerTableRefresh]);
+
+    const bulkActions = useMemo(() => {
+        if (isHumanApprovalTab) {
+            const actions = [];
+            if (bulkPendingCount > 0) {
+                actions.push({ label: "Approve", onAction: () => handleBulkHumanApproval(HUMAN_RESPONSE.APPROVED) });
+                actions.push({ label: "Block", onAction: () => handleBulkHumanApproval(HUMAN_RESPONSE.BLOCKED) });
+            }
+            actions.push({ label: "Delete", destructive: true, onAction: () => setDeleteConfirmOpen(true) });
+            return actions;
+        }
+        return [
+            { label: "Mark for Review", onAction: () => handleBulkStatusUpdate("UNDER_REVIEW", "marked for review") },
+            { label: "Ignore", onAction: () => handleBulkStatusUpdate("IGNORED", "ignored") },
+            { label: "Delete", destructive: true, onAction: () => setDeleteConfirmOpen(true) },
+        ];
+    }, [isHumanApprovalTab, bulkPendingCount, handleBulkStatusUpdate, handleBulkHumanApproval]);
 
     const handleRowClick = (e) => {
         if (e?.data) setSelectedViolation(e.data);
@@ -1495,6 +1605,14 @@ function Violations() {
             items.push({ id: "skills_evaluations", content: "Skills Evaluations (Beta)" });
             items.push({ id: "misconfigured_settings", content: "Misconfigured Settings (Beta)" });
         }
+        if (isAgenticSecurityCategory()) {
+            const haCount = summaryData?.humanApprovalCount;
+            items.push({
+                id: "human_approval",
+                content: <HumanApprovalTabLabel count={haCount} />,
+                accessibilityLabel: humanApprovalTabAccessibilityLabel(haCount),
+            });
+        }
         return items;
     }, [summaryData]);
     const selectedTabIndex = Math.max(0, tabItems.findIndex(t => t.id === currentTab));
@@ -1553,8 +1671,15 @@ function Violations() {
                 }}
                 onSelectionChanged={(e) => {
                     let count = 0;
-                    e.api.forEachNode(node => { if (!node.stub && node.isSelected()) count++; });
+                    let pendingCount = 0;
+                    e.api.forEachNode(node => {
+                        if (!node.stub && node.isSelected()) {
+                            count++;
+                            if (isHumanApprovalPending(node.data?.humanResponse)) pendingCount++;
+                        }
+                    });
                     setBulkSelectedCount(count);
+                    setBulkPendingCount(pendingCount);
                 }}
                 bulkActionCount={bulkSelectedCount}
                 bulkActions={bulkActions}
@@ -1607,6 +1732,7 @@ function Violations() {
             show={selectedViolation !== null}
             onClose={() => setSelectedViolation(null)}
             onAddAsSearchFilter={handleAddSearchFilter}
+            onHumanApproval={(response) => selectedViolation && handleHumanApproval(selectedViolation, response)}
         />,
         <Modal
             key="delete-confirm"

@@ -149,6 +149,7 @@ public class DashboardRouter implements ARouter {
                 // filter fields.
                 String skillEvalMode = ctx.request().getHeader("x-skill-eval-mode");
                 String configEvalMode = ctx.request().getHeader("x-config-eval-mode");
+                String humanResponseFilter = ctx.request().getHeader("x-human-response");
 
                 RequestBody reqBody = ctx.body();
                 ListMaliciousRequestsRequest req = ProtoMessageUtils.<
@@ -164,7 +165,7 @@ public class DashboardRouter implements ARouter {
                 }
 
                 ProtoMessageUtils.toString(
-                    dsService.listMaliciousRequests(ctx.get("accountId"), req, contextSource, skillEvalMode, configEvalMode)
+                    dsService.listMaliciousRequests(ctx.get("accountId"), req, contextSource, skillEvalMode, configEvalMode, humanResponseFilter)
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
@@ -570,7 +571,8 @@ public class DashboardRouter implements ARouter {
                     filterMap,
                     req.getStatus(),
                     req.getJiraTicketUrl(),
-                    contextSource
+                    contextSource,
+                    req.hasHumanResponse() ? req.getHumanResponse() : null
                 );
 
                 UpdateMaliciousEventStatusResponse resp = UpdateMaliciousEventStatusResponse.newBuilder()

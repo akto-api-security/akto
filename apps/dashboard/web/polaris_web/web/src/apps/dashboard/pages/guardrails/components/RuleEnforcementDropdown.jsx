@@ -2,7 +2,7 @@ import { HorizontalStack, VerticalStack, Text, Box, Banner } from "@shopify/pola
 import Dropdown from "../../../components/layouts/Dropdown";
 import GuardrailEnforcementInfoIcon from "./GuardrailEnforcementInfoIcon";
 import { GUARDRAIL_BEHAVIOUR, GUARDRAIL_BEHAVIOUR_OPTIONS, normalizeBehaviourValue } from "../utils";
-import { isEndpointSecurityCategory } from "@/apps/main/labelHelper";
+import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
 
 export default function RuleEnforcementDropdown({
     id,
@@ -12,13 +12,18 @@ export default function RuleEnforcementDropdown({
     disabled = false,
 }) {
     const initial = normalizeBehaviourValue(value);
-    // "Approval" behaviour is Endpoint (Atlas) only — hide the option for Agentic/other categories.
-    const menuItems = isEndpointSecurityCategory()
-        ? GUARDRAIL_BEHAVIOUR_OPTIONS
-        : GUARDRAIL_BEHAVIOUR_OPTIONS.filter((o) => o.value !== GUARDRAIL_BEHAVIOUR.APPROVAL);
+    const isAtlas = isEndpointSecurityCategory();
+    const isArgus = isAgenticSecurityCategory();
+    // "Approval" (Atlas server-preapproval) is Endpoint-only; "Human Approval" (Argus per-call
+    // pending/poll) is Agentic-only — each category only ever sees its own option.
+    const menuItems = GUARDRAIL_BEHAVIOUR_OPTIONS.filter((o) => {
+        if (o.value === GUARDRAIL_BEHAVIOUR.APPROVAL) return isAtlas;
+        if (o.value === GUARDRAIL_BEHAVIOUR.HUMAN_APPROVAL) return isArgus;
+        return true;
+    });
     const showLabelRow = typeof label === "string" && label.trim().length > 0;
-    const showEndpointOnlyNote = initial === GUARDRAIL_BEHAVIOUR.ALERT
-        || initial === GUARDRAIL_BEHAVIOUR.APPROVAL;
+    const showEndpointOnlyNote = isAtlas
+        && (initial === GUARDRAIL_BEHAVIOUR.ALERT || initial === GUARDRAIL_BEHAVIOUR.APPROVAL);
 
     return (
         <VerticalStack gap="2">

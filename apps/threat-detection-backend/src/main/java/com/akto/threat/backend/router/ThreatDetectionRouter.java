@@ -6,7 +6,10 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Fe
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.UpdateRemediationRequest;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.UpdateRemediationResponse;
+import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.GetApprovalStatusRequest;
+import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.GetApprovalStatusResponse;
 import com.akto.proto.generated.threat_detection.service.agentic_session_service.v1.BulkUpdateAgenticSessionContextRequest;
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.threat.backend.service.ApiDistributionDataService;
 import com.akto.threat.backend.service.MaliciousEventService;
 import io.vertx.core.Vertx;
@@ -76,6 +79,38 @@ public class ThreatDetectionRouter implements ARouter {
               int statusCode = updatedCount > 0 ? 200 : 404;
               ProtoMessageUtils.toString(response)
                   .ifPresent(s -> ctx.response().setStatusCode(statusCode).end(s));
+            });
+
+    router
+        .post("/get_approval_status")
+        .blockingHandler(
+            ctx -> {
+              RequestBody reqBody = ctx.body();
+              GetApprovalStatusRequest req =
+                  ProtoMessageUtils.<GetApprovalStatusRequest>toProtoMessage(
+                          GetApprovalStatusRequest.class, reqBody.asString())
+                      .orElse(null);
+
+              if (req == null || req.getRefId() == null || req.getRefId().isEmpty()) {
+                ctx.response().setStatusCode(400).end("Invalid request");
+                return;
+              }
+
+              MaliciousEventDto event =
+                  maliciousEventService.getApprovalStatus(ctx.get("accountId"), req.getRefId());
+
+              GetApprovalStatusResponse.Builder response = GetApprovalStatusResponse.newBuilder();
+              if (event == null) {
+                response.setFound(false);
+              } else {
+                response.setFound(true);
+                response.setStatus(event.getStatus() == null ? "" : event.getStatus().name());
+                response.setHumanResponse(
+                    event.getHumanResponse() == null ? "" : event.getHumanResponse());
+              }
+
+              ProtoMessageUtils.toString(response.build())
+                  .ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
     router

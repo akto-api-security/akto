@@ -2,7 +2,7 @@ import { Badge, Box, Button, ChoiceList, Divider, HorizontalStack, Modal, Text, 
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import SampleData from "../../../components/shared/SampleData";
-import { EvidenceBlock } from "@/apps/dashboard/pages/guardrails/violations/ViolationFlyoutSections";
+import { EvidenceBlock, HumanApprovalActions, isHumanApprovalPending as isPendingHumanResponse } from "@/apps/dashboard/pages/guardrails/violations/ViolationFlyoutSections";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import func from "@/util/func";
 import { useEffect, useState } from "react";
@@ -161,7 +161,7 @@ function ApproveServerButton({ policyName, serverId, alreadyApproved }) {
 }
 
 function SampleDetails(props) {
-    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate, onAddAsSearchFilter } = props
+    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate, onAddAsSearchFilter, humanResponse: humanResponseProp } = props
     const resolvedThreatFiltersMap = threatFiltersMap || {};
 
     // Determine if we should use hardcoded guardrail descriptions
@@ -250,6 +250,11 @@ function SampleDetails(props) {
     const [showModal, setShowModal] = useState(false);
     const [triageLoading, setTriageLoading] = useState(false);
     const [actionPopoverActive, setActionPopoverActive] = useState(false);
+    const [humanResponse, setHumanResponse] = useState((humanResponseProp || "PENDING").toUpperCase());
+
+    useEffect(() => {
+        setHumanResponse((humanResponseProp || "PENDING").toUpperCase());
+    }, [eventId, humanResponseProp]);
 
     // Approve-server: modal/mode/days state lives in the small ApproveServerButton component
     // (not here) so typing the duration re-renders only that button, not the whole flyout.
@@ -886,6 +891,28 @@ function SampleDetails(props) {
         }
     }
 
+    const isHumanApprovalEvent = String(eventStatus || "").toUpperCase() === "HUMAN_APPROVAL";
+    const isHumanApprovalPending = isHumanApprovalEvent && isPendingHumanResponse(humanResponse);
+
+    const handleHumanApproval = async (response) => {
+        if (!eventId) return;
+        setTriageLoading(true);
+        try {
+            const result = await threatDetectionApi.updateMaliciousEventStatus({ eventIds: [eventId], humanResponse: response });
+            if (result?.updateSuccess) {
+                setHumanResponse(response);
+                onStatusUpdate?.(eventStatus);
+                func.setToast(true, false, `Event ${response === "APPROVED" ? "approved" : "blocked"}`);
+            } else {
+                func.setToast(true, true, "Failed to update human approval");
+            }
+        } catch {
+            func.setToast(true, true, "Failed to update human approval");
+        } finally {
+            setTriageLoading(false);
+        }
+    }
+
     // ── Approve server (bypass an "approval" behaviour guardrail) ──────────────
     // Endpoint (Atlas) only — approval behaviour is not supported for Agentic (Argus).
     const rawBehaviour = moreInfoData?.behaviour || extractBehaviour(moreInfoData?.metadata) || "";
@@ -1156,6 +1183,7 @@ Reference URL: ${window.location.href}`.trim();
                         </HorizontalStack>
                     </Box>
                     <HorizontalStack gap={"2"} wrap={false}>
+                        {!isHumanApprovalEvent && (
                         <Popover
                             active={actionPopoverActive}
                             activator={
@@ -1190,6 +1218,17 @@ Reference URL: ${window.location.href}`.trim();
                                 ].filter(item => item)}
                             />
                         </Popover>
+                        )}
+                        {isHumanApprovalEvent ? (
+                            <HumanApprovalActions
+                                pending={isHumanApprovalPending}
+                                response={humanResponse}
+                                loading={triageLoading}
+                                onApprove={() => handleHumanApproval("APPROVED")}
+                                onBlock={() => handleHumanApproval("BLOCKED")}
+                            />
+                        ) : (
+                        <>
                         {isApprovalEvent && (
                             <ApproveServerButton
                                 policyName={approvePolicyName}
@@ -1269,6 +1308,8 @@ Reference URL: ${window.location.href}`.trim();
                                 isAzureModal={true}
                             />
                         )}
+                        </>
+                        )}
                     </HorizontalStack>
                 </HorizontalStack>
                 <HorizontalStack gap={"1"} wrap={false} align="start">
@@ -1299,7 +1340,9 @@ Reference URL: ${window.location.href}`.trim();
     const tabsComponent = (
         <LayoutWithTabs
             key={`tabs-comp-${eventId || 'default'}`}
-            tabs={ window.location.href.indexOf("guardrails") > -1
+            tabs={ isHumanApprovalEvent
+                ? [overviewTab, ValuesTab].filter(Boolean)
+                : window.location.href.indexOf("guardrails") > -1
                 ? (showSessionContext ? [overviewTab, ValuesTab, sessionContextTab] : [overviewTab, ValuesTab]).filter(Boolean)
                 : (showSessionContext ? [overviewTab, timelineTab, ValuesTab, sessionContextTab, remediationTab] : [overviewTab, timelineTab, ValuesTab, remediationTab]).filter(Boolean)}
             currTab = {() => {}}

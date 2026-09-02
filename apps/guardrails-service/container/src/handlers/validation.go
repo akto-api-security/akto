@@ -146,6 +146,11 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 
 	applyAuthenticatedAccount(c, &req)
 
+	if req.ActivityID != "" {
+		h.checkHumanApprovalStatus(c, req.ActivityID)
+		return
+	}
+
 	if req.RequestPayload == "" {
 		h.logger.Error("ValidateRequest - missing requestPayload",
 			zap.Int64("latencyMs", time.Since(start).Milliseconds()))
@@ -191,7 +196,7 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 	// Measure only the guardrail validation work for the P95 metric, excluding
 	// JSON binding, session extraction and logging overhead captured by `start`.
 	valStart := time.Now()
-	result, err := h.validatorService.ValidateRequest(c.Request.Context(), &req, sessionID, requestID)
+	result, activityID, err := h.validatorService.ValidateRequest(c.Request.Context(), &req, sessionID, requestID)
 	valLatency := time.Since(valStart)
 	if err != nil {
 		if h.metrics != nil && req.AktoAccountID != "" {
@@ -235,6 +240,18 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 	}
 	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Request %s | Path: %s | Method: %s | Account: %s | Session: %s | Modified: %v | Payload: %.300s",
 		status, req.Path, req.Method, req.AktoAccountID, sessionID, result.Modified, req.RequestPayload))
+
+	if activityID != "" {
+		c.JSON(http.StatusOK, models.PendingApprovalResponse{
+			Allowed:    false,
+			Behaviour:  result.Behaviour,
+			Status:     "pending",
+			ActivityID: activityID,
+			Reason:     result.Reason,
+			Modified:   result.Modified,
+		})
+		return
+	}
 
 	c.JSON(http.StatusOK, result)
 }
@@ -390,6 +407,11 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 
 	applyAuthenticatedAccount(c, &req)
 
+	if req.ActivityID != "" {
+		h.checkHumanApprovalStatus(c, req.ActivityID)
+		return
+	}
+
 	// Response body: prefer responsePayload; legacy field "payload" still supported (see models.ValidateRequestParams.LegacyPayload).
 	responseBody := req.ResponsePayload
 	if responseBody == "" {
@@ -439,7 +461,7 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 	// Measure only the guardrail validation work for the P95 metric, excluding
 	// JSON binding, session extraction and logging overhead captured by `start`.
 	valStart := time.Now()
-	result, err := h.validatorService.ValidateResponse(c.Request.Context(), &req, responseBody, sessionID, requestID)
+	result, activityID, err := h.validatorService.ValidateResponse(c.Request.Context(), &req, responseBody, sessionID, requestID)
 	valLatency := time.Since(valStart)
 	if err != nil {
 		if h.metrics != nil && req.AktoAccountID != "" {
@@ -484,7 +506,34 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Response %s | Path: %s | Method: %s | Account: %s | Session: %s | Modified: %v | Payload: %.300s",
 		responseStatus, req.Path, req.Method, req.AktoAccountID, sessionID, result.Modified, responseBody))
 
+	if activityID != "" {
+		c.JSON(http.StatusOK, models.PendingApprovalResponse{
+			Allowed:    false,
+			Behaviour:  result.Behaviour,
+			Status:     "pending",
+			ActivityID: activityID,
+			Reason:     result.Reason,
+			Modified:   result.Modified,
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, result)
+}
+
+// checkHumanApprovalStatus looks up a pending activity's status — reached via the same
+// /validate/request and /validate/response endpoints whenever activityId is set.
+func (h *ValidationHandler) checkHumanApprovalStatus(c *gin.Context, activityID string) {
+	resp, err := h.validatorService.CheckHumanApprovalStatus(c.Request.Context(), activityID)
+	if err != nil {
+		h.logger.Error("checkHumanApprovalStatus failed",
+			zap.String("activityId", activityID),
+			zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Poll failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 // HealthCheck handles health check requests

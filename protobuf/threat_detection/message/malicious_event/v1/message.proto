@@ -39,6 +39,7 @@ message MaliciousEventMessage {
   repeated OwaspCategory owasp_categories = 21;
   optional string ref_id = 22;  // Pre-generated UUID from caller (optional)
   string evidence_line = 23;  // Payload line that triggered the violation (scrubbed), when offsets make it exact
+  string human_response = 24;  // PENDING, APPROVED, BLOCKED — used when status is HUMAN_APPROVAL
 }
 
 message MaliciousEventKafkaEnvelope {
