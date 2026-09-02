@@ -2205,7 +2205,7 @@ public class DbLayer {
             updates.add(Updates.set(TestingRunIssues.KEY_SEVERITY, getSeverityFromTestingRunResult(runResult).name()));
             updates.add(Updates.set(TestingRunIssues.LAST_SEEN, lastSeen));
             updates.add(Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString()));
-            writeModelList.add(new UpdateOneModel<>(Filters.eq(Constants.ID, issuesId), Updates.combine(updates)));
+            writeModelList.add(new UpdateOneModel<>(Filters.eq(Constants.ID, issuesId), Updates.combine(updates), new UpdateOptions().upsert(true)));
         }
 
         // vulnerable-result writes - creates/updates the issue doc + tallies severity counts for the summary
@@ -2249,10 +2249,12 @@ public class DbLayer {
             updates.add(Updates.set(TestingRunIssues.UNREAD, true));
             updates.add(Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString()));
             if (testingIssuesId.getApiInfoKey() != null) {
-                updates.add(Updates.set(TestingRunIssues.COLLECTION_IDS,
+                // setOnInsert, not set - only written once at issue creation, matching the original conversion
+                // (DbAction.bulkWriteTestingRunIssues); never overwrite an existing issue's accumulated collectionIds.
+                updates.add(Updates.setOnInsert(TestingRunIssues.COLLECTION_IDS,
                         Collections.singletonList(testingIssuesId.getApiInfoKey().getApiCollectionId())));
             }
-            writeModelList.add(new UpdateOneModel<>(Filters.eq(Constants.ID, testingIssuesId), Updates.combine(updates)));
+            writeModelList.add(new UpdateOneModel<>(Filters.eq(Constants.ID, testingIssuesId), Updates.combine(updates), new UpdateOptions().upsert(true)));
         }
 
         if (!writeModelList.isEmpty()) {
