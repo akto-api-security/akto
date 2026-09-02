@@ -483,8 +483,11 @@ public class DbAction extends ActionSupport {
     String newRefreshToken;
     Map<ObjectId, TestingRunResultSummary> testingRunResultSummaryMap;
     BasicDBObject testingRunResult;
+    @Getter @Setter
     List<BasicDBObject> testingRunResultsForRecord;
+    @Getter @Setter
     List<String> rerunDeleteIds;
+    @Getter @Setter
     boolean doNotMarkIssuesAsFixed;
     Tokens token;
     WorkflowTest workflowTest;
@@ -5585,30 +5588,6 @@ public class DbAction extends ActionSupport {
 
     public void setTestingRunResult(BasicDBObject testingRunResult) {
         this.testingRunResult = testingRunResult;
-    }
-
-    public List<BasicDBObject> getTestingRunResultsForRecord() {
-        return testingRunResultsForRecord;
-    }
-
-    public void setTestingRunResultsForRecord(List<BasicDBObject> testingRunResultsForRecord) {
-        this.testingRunResultsForRecord = testingRunResultsForRecord;
-    }
-
-    public List<String> getRerunDeleteIds() {
-        return rerunDeleteIds;
-    }
-
-    public void setRerunDeleteIds(List<String> rerunDeleteIds) {
-        this.rerunDeleteIds = rerunDeleteIds;
-    }
-
-    public boolean isDoNotMarkIssuesAsFixed() {
-        return doNotMarkIssuesAsFixed;
-    }
-
-    public void setDoNotMarkIssuesAsFixed(boolean doNotMarkIssuesAsFixed) {
-        this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
     }
 
     public Tokens getToken() {
