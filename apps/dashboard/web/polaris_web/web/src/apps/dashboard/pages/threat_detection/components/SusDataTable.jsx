@@ -1037,9 +1037,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           // (the raw `metadata` passthrough is dropped by the table); used by the flyout's
           // "Approve server" action for "approval" behaviour policies.
           behaviourRaw: extractBehaviour(x?.metadata),
-          // One Evidence column, two sources. The gateway's evidenceLine is preferred:
-          // exact for rules that report offsets, LLM-derived for the rest. Events that
-          // pre-date it have none, so fall back to extracting from the stored payload.
           ...(() => {
             const line = typeof x?.evidenceLine === "string" ? x.evidenceLine.trim() : "";
             if (line) {
