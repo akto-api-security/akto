@@ -23,7 +23,7 @@ export const GUARDRAIL_BEHAVIOUR_OPTIONS = [
     { label: "Block", value: GUARDRAIL_BEHAVIOUR.BLOCK },
     { label: "Alert", value: GUARDRAIL_BEHAVIOUR.ALERT },
     { label: "Human Approval", value: GUARDRAIL_BEHAVIOUR.APPROVAL },
-    { label: "Human Approval", value: GUARDRAIL_BEHAVIOUR.HUMAN_APPROVAL },
+    { label: "Human Approval (Beta)", value: GUARDRAIL_BEHAVIOUR.HUMAN_APPROVAL },
 ];
 
 export const GUARDRAIL_BEHAVIOUR_TOOLTIP_LINES = [
