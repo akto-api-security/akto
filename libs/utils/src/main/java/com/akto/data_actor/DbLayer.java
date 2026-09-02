@@ -2132,15 +2132,25 @@ public class DbLayer {
     }
 
     /**
-     * Fields that should only ever be written once, at issue creation, and never overwritten on a later update.
-     * Single source of truth for the set-vs-setOnInsert distinction: DbAction.bulkWriteTestingRunIssues's
-     * BulkUpdates conversion has to make the same call per field, so if a field's write semantics ever change,
-     * this is the one place both paths should be checked against.
+     * Single source of truth for turning a (field, value) intent for a TestingRunIssues write into the actual
+     * Bson operation - a direct, faithful port of every field-specific branch in DbAction.bulkWriteTestingRunIssues's
+     * BulkUpdates conversion loop (that conversion exists because that endpoint's input crosses an HTTP/JSON
+     * boundary from mini-testing; this is the same per-field logic applied to already-typed values instead).
+     * Both this method and that conversion special-case the exact same set of fields; if either changes, check
+     * the other. Anything not explicitly special-cased here falls through to a plain Updates.set, matching the
+     * conversion's own default branch.
      */
-    private static final Set<String> ISSUE_FIELDS_SET_ON_INSERT = Collections.singleton(TestingRunIssues.COLLECTION_IDS);
-
     private static Bson issueFieldUpdate(String field, Object value) {
-        return ISSUE_FIELDS_SET_ON_INSERT.contains(field) ? Updates.setOnInsert(field, value) : Updates.set(field, value);
+        if (TestingRunIssues.COLLECTION_IDS.equals(field)) {
+            // Written once, at issue creation, never overwritten on a later update.
+            return Updates.setOnInsert(field, value);
+        }
+        if (TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID.equals(field)) {
+            // The conversion writes the *_ID (ObjectId) field, not the *_HEX_ID (String) one the intent is
+            // named after - the hex id is only ever an input representation, never the actual stored field.
+            return Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, new ObjectId((String) value));
+        }
+        return Updates.set(field, value);
     }
 
     /** First-seen-wins index of the batch's distinct issue ids. See recordIssuesForTestingRunResults for why
@@ -2243,7 +2253,8 @@ public class DbLayer {
                 updates.add(issueFieldUpdate(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name()));
             }
             // When doNotMarkIssuesAsFixed is true we intentionally avoid touching the status for non-vulnerable results
-            updates.add(issueFieldUpdate(TestingRunIssues.KEY_SEVERITY, getSeverityFromTestingRunResult(runResult).name()));
+            updates.add(issueFieldUpdate(TestingRunIssues.KEY_SEVERITY,
+                    resolveIssueSeverityForWrite(runResult.getTestSubType(), getSeverityFromTestingRunResult(runResult))));
             updates.add(issueFieldUpdate(TestingRunIssues.LAST_SEEN, lastSeen));
             updates.add(issueFieldUpdate(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString()));
             writes.add(new UpdateOneModel<>(Filters.eq(Constants.ID, issuesId), Updates.combine(updates), new UpdateOptions().upsert(true)));
@@ -2304,7 +2315,12 @@ public class DbLayer {
         return new VulnerableIssueWrites(writes, countIssuesMap, summaryId);
     }
 
-    /** Ported from apps/mini-testing's TestExecutor.getSeverityFromTestingRunResult - same default/fallback behavior. */
+    /**
+     * Ported from apps/mini-testing's TestExecutor.getSeverityFromTestingRunResult - same default/fallback
+     * behavior. This is the value the original uses for severity-count tallying (updateIssueCountInSummary),
+     * computed client-side. See resolveIssueSeverityForWrite for the (separately-computed, can genuinely
+     * diverge) value the original writes into the issue document's own severity field.
+     */
     private static Severity getSeverityFromTestingRunResult(TestingRunResult testingRunResult) {
         Severity severity = Severity.HIGH;
         try {
@@ -2314,6 +2330,30 @@ public class DbLayer {
             // keep default HIGH - matches the original's catch-all fallback
         }
         return severity;
+    }
+
+    /**
+     * Ported from DbAction.bulkWriteTestingRunIssues's KEY_SEVERITY conversion branch: overrides the
+     * confidence-derived severity with the test subcategory's configured YAML template severity, unless the
+     * template has none configured or its severity is "dynamic_severity". Matches that logic exactly,
+     * including operating on the raw string rather than validating it against the Severity enum.
+     *
+     * Deliberately NOT the same value used for count tallying (getSeverityFromTestingRunResult) - the
+     * original computes and sends these independently (the count is computed and sent from mini-testing
+     * before this override ever runs, server-side), so they can genuinely disagree today. Not unifying that
+     * here since it would change already-live counting behavior for any subcategory with a fixed template
+     * severity; preserving it as-is, just no longer re-derived by eye in two places.
+     */
+    private static String resolveIssueSeverityForWrite(String testSubCategory, Severity computedSeverity) {
+        String value = computedSeverity.name();
+        YamlTemplate template = YamlTemplateDao.instance.findOne(Filters.eq(Constants.ID, testSubCategory));
+        if (template != null) {
+            String templateSeverity = template.getInfo().getSeverity();
+            if (templateSeverity != null && !"dynamic_severity".equals(templateSeverity)) {
+                value = templateSeverity;
+            }
+        }
+        return value;
     }
 
     public static void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount) {
