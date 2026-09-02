@@ -6,9 +6,11 @@ import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.DeviceTag;
+import com.akto.dto.monitoring.InstalledAppVulnerability;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.akto.dto.monitoring.ModuleInfoConstants;
+import com.akto.utils.vulnerability.InstalledAppVulnerabilityAnalysis;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
@@ -229,6 +231,34 @@ public class ModuleInfoAction extends UserAction {
         filterOptions.put("usernames", distinctStrings(AD_USERNAME, base));
         filterOptions.put("deviceIds", distinctStrings(AD_DEVICE_ID, base));
         filterOptions.put("oses", distinctStrings(AD_OS, base));
+        return SUCCESS.toUpperCase();
+    }
+
+    @Setter private List<Map<String, String>> installedAppsToCheck; // [{name, version}, ...]
+    @Getter private Map<String, InstalledAppVulnerability> installedAppVulnerabilities;
+
+    /**
+     * Known-vulnerability check for the "Apps" tab of the agent details flyout — one cache-or-compute
+     * lookup per {name, version} pair (see InstalledAppVulnerabilityAnalysis), keyed in the response by
+     * "{name}#{version}" so the frontend can match each row back to its verdict. Runs sequentially and
+     * calls out to OSV.dev on every cache miss, so a host's first-ever check (dozens of apps) is slower
+     * than repeat checks once the cache is warm.
+     */
+    public String checkInstalledAppVulnerabilities() {
+        installedAppVulnerabilities = new HashMap<>();
+        if (installedAppsToCheck == null) {
+            return SUCCESS.toUpperCase();
+        }
+
+        for (Map<String, String> app : installedAppsToCheck) {
+            String name = app == null ? null : app.get("name");
+            String version = app == null ? null : app.get("version");
+            InstalledAppVulnerability info = InstalledAppVulnerabilityAnalysis.getVulnerabilityInfo(name, version);
+            if (info != null) {
+                installedAppVulnerabilities.put(info.getId(), info);
+            }
+        }
+
         return SUCCESS.toUpperCase();
     }
 
