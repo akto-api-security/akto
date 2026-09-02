@@ -2132,22 +2132,79 @@ public class DbLayer {
     }
 
     /**
+     * Fields that should only ever be written once, at issue creation, and never overwritten on a later update.
+     * Single source of truth for the set-vs-setOnInsert distinction: DbAction.bulkWriteTestingRunIssues's
+     * BulkUpdates conversion has to make the same call per field, so if a field's write semantics ever change,
+     * this is the one place both paths should be checked against.
+     */
+    private static final Set<String> ISSUE_FIELDS_SET_ON_INSERT = Collections.singleton(TestingRunIssues.COLLECTION_IDS);
+
+    private static Bson issueFieldUpdate(String field, Object value) {
+        return ISSUE_FIELDS_SET_ON_INSERT.contains(field) ? Updates.setOnInsert(field, value) : Updates.set(field, value);
+    }
+
+    /** First-seen-wins index of the batch's distinct issue ids. See recordIssuesForTestingRunResults for why
+     *  lookups below are a linear scan over orderedIds rather than a HashMap/HashSet keyed on TestingIssuesId. */
+    private record IssueIndex(List<TestingIssuesId> orderedIds, Map<TestingIssuesId, TestingRunResult> byId) {
+        TestingIssuesId findEquivalent(TestingIssuesId target) {
+            for (TestingIssuesId candidate : orderedIds) {
+                if (candidate.equals(target)) {
+                    return candidate;
+                }
+            }
+            return null;
+        }
+    }
+
+    /**
      * Ported 1:1 from apps/mini-testing's TestingIssuesHandler (listOfIssuesIdsFromTestingRunResults +
      * writeUpdateQueryIntoWriteModel + insertVulnerableTestsIntoIssuesCollection), batched across the whole
      * result list instead of one result at a time, and building native Bson WriteModels directly instead of
      * round-tripping through BulkUpdates/UpdatePayload JSON strings - that indirection only ever existed to
      * cross the old HTTP boundary from mini-testing to database-abstractor, which no longer applies once this
      * logic runs in-process against Mongo.
-     *
-     * Deliberately mirrors the original's dedup-by-first-seen-id and per-id linear existing-issue lookup
-     * (not a HashMap/HashSet on TestingIssuesId, whose equals() does a case-insensitive testSubCategory
-     * compare but whose hashCode() does not - same behavior as the original, not fixing that inconsistency
-     * here) so results for this call are identical to running the original per-result flow N times.
      */
     private static void recordIssuesForTestingRunResults(List<TestingRunResult> testingRunResults, boolean doNotMarkIssuesAsFixed) {
-        List<TestingIssuesId> idList = new ArrayList<>();
-        Map<TestingIssuesId, TestingRunResult> issueIdToResult = new HashMap<>();
+        IssueIndex index = buildIssueIndex(testingRunResults);
+        if (index.byId().isEmpty()) {
+            return;
+        }
+
+        List<TestingRunIssues> existingIssues = fetchIssuesByIds(new HashSet<>(index.orderedIds()));
+        int lastSeen = Context.now();
+
+        List<WriteModel<TestingRunIssues>> writeModelList = new ArrayList<>();
+        writeModelList.addAll(buildExistingIssueUpdates(existingIssues, index, doNotMarkIssuesAsFixed, lastSeen));
+
+        VulnerableIssueWrites vulnerable = buildVulnerableIssueWrites(existingIssues, index, lastSeen);
+        writeModelList.addAll(vulnerable.writeModels());
+
+        if (!writeModelList.isEmpty()) {
+            bulkWriteTestingRunIssues(writeModelList);
+        }
+
+        int totalIssuesCreated = vulnerable.countIssuesMap().values().stream().mapToInt(Integer::intValue).sum();
+        if (vulnerable.summaryId() != null && totalIssuesCreated > 0) {
+            updateIssueCountInSummary(vulnerable.summaryId().toHexString(), vulnerable.countIssuesMap(), "increment");
+        }
+    }
+
+    /**
+     * Dedups the batch's results down to distinct issue ids, first-seen wins - matches
+     * TestingIssuesHandler.listOfIssuesIdsFromTestingRunResults's own dedup semantics exactly (that method
+     * already takes a List<TestingRunResult>, even though every current caller only ever passes one item).
+     *
+     * Uses a linear scan (via IssueIndex.findEquivalent), not a HashMap/HashSet keyed on TestingIssuesId,
+     * because that class's equals() does a case-insensitive testSubCategory compare but its hashCode() does
+     * not - an equals/hashCode contract violation that would make hash-based lookups unreliable. Not fixed
+     * here since it's a shared DTO used elsewhere; this just avoids relying on the broken contract.
+     */
+    private static IssueIndex buildIssueIndex(List<TestingRunResult> testingRunResults) {
+        List<TestingIssuesId> orderedIds = new ArrayList<>();
+        Map<TestingIssuesId, TestingRunResult> byId = new HashMap<>();
         Map<String, TestSourceConfig> sourceConfigCache = new HashMap<>();
+        IssueIndex index = new IssueIndex(orderedIds, byId);
+
         for (TestingRunResult runResult : testingRunResults) {
             String subCategory = runResult.getTestSubType();
             TestSourceConfig config = null;
@@ -2158,57 +2215,47 @@ public class DbLayer {
             // TestExecutor.insertResultsAndMakeIssues -> handleIssuesCreationFromTestingRunResults
             TestingIssuesId issueId = new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
                     subCategory, config != null ? config.getId() : null);
-            boolean alreadySeen = false;
-            for (TestingIssuesId seen : idList) {
-                if (seen.equals(issueId)) {
-                    alreadySeen = true;
-                    break;
-                }
-            }
-            if (!alreadySeen) {
-                idList.add(issueId);
-                issueIdToResult.put(issueId, runResult);
+            if (index.findEquivalent(issueId) == null) {
+                orderedIds.add(issueId);
+                byId.put(issueId, runResult);
             }
         }
+        return index;
+    }
 
-        if (issueIdToResult.isEmpty()) {
-            return;
-        }
-
-        List<TestingRunIssues> existingIssues = fetchIssuesByIds(new HashSet<>(idList));
-
-        List<WriteModel<TestingRunIssues>> writeModelList = new ArrayList<>();
-        int lastSeen = Context.now();
-
-        // update-existing-issue writes - only touches issues that already exist in the DB
+    /** Update-existing-issue writes - only touches issues that already exist in the DB. */
+    private static List<WriteModel<TestingRunIssues>> buildExistingIssueUpdates(
+            List<TestingRunIssues> existingIssues, IssueIndex index, boolean doNotMarkIssuesAsFixed, int lastSeen) {
+        List<WriteModel<TestingRunIssues>> writes = new ArrayList<>();
         for (TestingRunIssues testingRunIssues : existingIssues) {
             TestingIssuesId issuesId = testingRunIssues.getId();
-            TestingRunResult runResult = null;
-            for (TestingIssuesId seen : idList) {
-                if (seen.equals(issuesId)) {
-                    runResult = issueIdToResult.get(seen);
-                    break;
-                }
-            }
+            TestingIssuesId matched = index.findEquivalent(issuesId);
+            TestingRunResult runResult = matched == null ? null : index.byId().get(matched);
             if (runResult == null) {
                 continue;
             }
             List<Bson> updates = new ArrayList<>();
             TestRunIssueStatus status = testingRunIssues.getTestRunIssueStatus();
             if (runResult.isVulnerable()) {
-                updates.add(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
+                updates.add(issueFieldUpdate(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
                         (status == TestRunIssueStatus.IGNORED ? TestRunIssueStatus.IGNORED : TestRunIssueStatus.OPEN).name()));
             } else if (!doNotMarkIssuesAsFixed) {
-                updates.add(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name()));
+                updates.add(issueFieldUpdate(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name()));
             }
             // When doNotMarkIssuesAsFixed is true we intentionally avoid touching the status for non-vulnerable results
-            updates.add(Updates.set(TestingRunIssues.KEY_SEVERITY, getSeverityFromTestingRunResult(runResult).name()));
-            updates.add(Updates.set(TestingRunIssues.LAST_SEEN, lastSeen));
-            updates.add(Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString()));
-            writeModelList.add(new UpdateOneModel<>(Filters.eq(Constants.ID, issuesId), Updates.combine(updates), new UpdateOptions().upsert(true)));
+            updates.add(issueFieldUpdate(TestingRunIssues.KEY_SEVERITY, getSeverityFromTestingRunResult(runResult).name()));
+            updates.add(issueFieldUpdate(TestingRunIssues.LAST_SEEN, lastSeen));
+            updates.add(issueFieldUpdate(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString()));
+            writes.add(new UpdateOneModel<>(Filters.eq(Constants.ID, issuesId), Updates.combine(updates), new UpdateOptions().upsert(true)));
         }
+        return writes;
+    }
 
-        // vulnerable-result writes - creates/updates the issue doc + tallies severity counts for the summary
+    private record VulnerableIssueWrites(List<WriteModel<TestingRunIssues>> writeModels, Map<String, Integer> countIssuesMap, ObjectId summaryId) {}
+
+    /** Vulnerable-result writes - creates/updates the issue doc + tallies severity counts for the summary. */
+    private static VulnerableIssueWrites buildVulnerableIssueWrites(List<TestingRunIssues> existingIssues, IssueIndex index, int lastSeen) {
+        List<WriteModel<TestingRunIssues>> writes = new ArrayList<>();
         Map<String, Integer> countIssuesMap = new HashMap<>();
         countIssuesMap.put(Severity.CRITICAL.toString(), 0);
         countIssuesMap.put(Severity.HIGH.toString(), 0);
@@ -2216,8 +2263,8 @@ public class DbLayer {
         countIssuesMap.put(Severity.LOW.toString(), 0);
         ObjectId summaryId = null;
 
-        for (TestingIssuesId testingIssuesId : idList) {
-            TestingRunResult runResult = issueIdToResult.get(testingIssuesId);
+        for (TestingIssuesId testingIssuesId : index.orderedIds()) {
+            TestingRunResult runResult = index.byId().get(testingIssuesId);
             if (!runResult.isVulnerable()) {
                 continue;
             }
@@ -2237,34 +2284,24 @@ public class DbLayer {
             }
             Severity severity = getSeverityFromTestingRunResult(runResult);
             List<Bson> updates = new ArrayList<>();
-            updates.add(Updates.set(TestingRunIssues.KEY_SEVERITY, severity.name()));
+            updates.add(issueFieldUpdate(TestingRunIssues.KEY_SEVERITY, severity.name()));
             if (!doesExist || shouldCountIssue) {
-                updates.add(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name()));
+                updates.add(issueFieldUpdate(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name()));
                 int count = countIssuesMap.getOrDefault(severity.name(), 0);
                 countIssuesMap.put(severity.name(), count + 1);
             }
-            updates.add(Updates.set(TestingRunIssues.CREATION_TIME, lastSeen));
-            updates.add(Updates.set(TestingRunIssues.LAST_SEEN, lastSeen));
-            updates.add(Updates.set(TestingRunIssues.LAST_UPDATED, lastSeen));
-            updates.add(Updates.set(TestingRunIssues.UNREAD, true));
-            updates.add(Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString()));
+            updates.add(issueFieldUpdate(TestingRunIssues.CREATION_TIME, lastSeen));
+            updates.add(issueFieldUpdate(TestingRunIssues.LAST_SEEN, lastSeen));
+            updates.add(issueFieldUpdate(TestingRunIssues.LAST_UPDATED, lastSeen));
+            updates.add(issueFieldUpdate(TestingRunIssues.UNREAD, true));
+            updates.add(issueFieldUpdate(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString()));
             if (testingIssuesId.getApiInfoKey() != null) {
-                // setOnInsert, not set - only written once at issue creation, matching the original conversion
-                // (DbAction.bulkWriteTestingRunIssues); never overwrite an existing issue's accumulated collectionIds.
-                updates.add(Updates.setOnInsert(TestingRunIssues.COLLECTION_IDS,
+                updates.add(issueFieldUpdate(TestingRunIssues.COLLECTION_IDS,
                         Collections.singletonList(testingIssuesId.getApiInfoKey().getApiCollectionId())));
             }
-            writeModelList.add(new UpdateOneModel<>(Filters.eq(Constants.ID, testingIssuesId), Updates.combine(updates), new UpdateOptions().upsert(true)));
+            writes.add(new UpdateOneModel<>(Filters.eq(Constants.ID, testingIssuesId), Updates.combine(updates), new UpdateOptions().upsert(true)));
         }
-
-        if (!writeModelList.isEmpty()) {
-            bulkWriteTestingRunIssues(writeModelList);
-        }
-
-        int totalIssuesCreated = countIssuesMap.values().stream().mapToInt(Integer::intValue).sum();
-        if (summaryId != null && totalIssuesCreated > 0) {
-            updateIssueCountInSummary(summaryId.toHexString(), countIssuesMap, "increment");
-        }
+        return new VulnerableIssueWrites(writes, countIssuesMap, summaryId);
     }
 
     /** Ported from apps/mini-testing's TestExecutor.getSeverityFromTestingRunResult - same default/fallback behavior. */
