@@ -134,7 +134,9 @@ public class ConsumerUtil {
 
                 executor.persistTestLogsToDb(runResult != null ? runResult.getTestLogs() : null);
                 long insertStart = System.nanoTime();
-                executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+                if (!Constants.SKIP_INSERT_TEST_RESULTS) {
+                    executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+                }
                 metrics.recordStage(Stage.INSERT_RESULTS, System.nanoTime() - insertStart);
 
                 if (runResult != null && runResult.isVulnerable()) {
@@ -176,7 +178,9 @@ public class ConsumerUtil {
             String testSubType = testConfig.getInfo().getSubCategory();
 
             TestingRunResult runResult = Utils.generateFailedRunResultForMessage(singleTestPayload.getTestingRunId(), singleTestPayload.getApiInfoKey(), testSuperType, testSubType, singleTestPayload.getTestingRunResultSummaryId(), new ArrayList<>(),  TestError.TEST_TIMED_OUT.getMessage());
-            testExecutor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+            if (!Constants.SKIP_INSERT_TEST_RESULTS) {
+                testExecutor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+            }
         } catch (Exception e) {
             String errMsg = "createTimedOutResultFromMessage failed"
                     + (singleTestPayload != null

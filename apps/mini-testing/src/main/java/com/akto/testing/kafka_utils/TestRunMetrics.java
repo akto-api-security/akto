@@ -63,6 +63,12 @@ public class TestRunMetrics {
     private static final int STALL_DUMP_LIMIT = 15;
     /** A slot is "stuck" if a single task has held it at least this long (live capacity-waste signal). */
     private static final long STUCK_AGE_MS = 60_000L;
+    /**
+     * slotsClogged fires once at least 1/STALL_CLOGGED_DIVISOR of the pool is stuck. Was 2 (half the pool) —
+     * too high to catch chronic partial degradation (observed stuckSlots plateauing around 35-40% of pool
+     * while still limping forward, never freezing and never reaching 50%, so STALL never fired). Lowered to 3.
+     */
+    private static final int STALL_CLOGGED_DIVISOR = 3;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestRunMetrics.class, LogDb.TESTING);
 
@@ -245,11 +251,11 @@ public class TestRunMetrics {
 
         // Two independent stall triggers, sharing the spam guard + dump:
         //   1. progress frozen  -> aggregate processed hasn't moved for STALL_THRESHOLD_MS (total hang)
-        //   2. slots clogged    -> half+ the pool is tied up in tasks older than STUCK_AGE_MS (partial starvation)
+        //   2. slots clogged    -> STALL_CLOGGED_FRACTION+ of the pool is tied up in tasks older than STUCK_AGE_MS (partial starvation)
         int pool = poolSize();
         long stuck = inflightAgeStats()[0];
         boolean progressFrozen = !inflightTasks.isEmpty() && (nowMs - lastProgressMs) >= STALL_THRESHOLD_MS;
-        boolean slotsClogged = pool > 0 && stuck >= (pool / 2);
+        boolean slotsClogged = pool > 0 && stuck * STALL_CLOGGED_DIVISOR >= pool;
         if ((progressFrozen || slotsClogged) && (nowMs - lastStallLogMs) >= STALL_LOG_INTERVAL_MS) {
             lastStallLogMs = nowMs;
             String reason = progressFrozen
