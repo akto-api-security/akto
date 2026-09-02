@@ -152,14 +152,6 @@ const getHeaders = () => {
       type: CellType.TEXT,
       tooltipKey: "reasonFull",
     });
-    baseHeaders.push({
-      text: "Evidence",
-      value: "evidence",
-      title: "Evidence",
-      maxWidth: "200px",
-      type: CellType.TEXT,
-      tooltipKey: "evidenceFull",
-    });
   }
 
   if (func.shouldShowIpReputation()) {
@@ -1022,12 +1014,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
             const { preview, full } = truncateToWords(r, 30);
             return { reason: preview, reasonFull: full };
           })(),
-          ...(() => {
-            const typeLabel = deriveAgenticType(x.url, x.method);
-            const full = extractEvidenceText(x.payload, typeLabel, 1500);
-            const preview = extractEvidenceText(x.payload, typeLabel, 300);
-            return { evidence: preview || "-", evidenceFull: full || "-" };
-          })(),
         }),
         // Successful Exploit is only shown for API Security (not Argus/Agentic or Atlas/Endpoint)
         ...(isApiSecurityCategory() && {
@@ -1051,11 +1037,19 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           // (the raw `metadata` passthrough is dropped by the table); used by the flyout's
           // "Approve server" action for "approval" behaviour policies.
           behaviourRaw: extractBehaviour(x?.metadata),
+          // One Evidence column, two sources. The gateway's evidenceLine is preferred:
+          // exact for rules that report offsets, LLM-derived for the rest. Events that
+          // pre-date it have none, so fall back to extracting from the stored payload.
           ...(() => {
-            const e = typeof x?.evidenceLine === "string" ? x.evidenceLine.trim() : "";
-            if (!e) return { evidenceLine: "", evidenceLineFull: "" };
-            const { preview, full } = truncateToWords(e, 30);
-            return { evidenceLine: preview, evidenceLineFull: full };
+            const line = typeof x?.evidenceLine === "string" ? x.evidenceLine.trim() : "";
+            if (line) {
+              const { preview, full } = truncateToWords(line, 30);
+              return { evidenceLine: preview, evidenceLineFull: full };
+            }
+            const typeLabel = deriveAgenticType(x.url, x.method);
+            const full = extractEvidenceText(x.payload, typeLabel, 1500);
+            const preview = extractEvidenceText(x.payload, typeLabel, 300);
+            return { evidenceLine: preview || "-", evidenceLineFull: full || "-" };
           })(),
           behaviour: (() => {
             const b = extractBehaviour(x?.metadata);

@@ -517,6 +517,12 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
     // An empty {}/[] carries no useful info - treat it the same as nothing captured rather
     // than showing the literal "{}" in the Evidence column.
     const primaryValue = isEmptyJsonText(primaryValueRaw) ? "" : sanitizeDisplayText(primaryValueRaw, 300);
+    // The gateway's evidence line wins when present: exact for rules that report offsets
+    // (PII/regex/BanSubstrings, sliced straight from the payload), LLM-quoted otherwise,
+    // and scrubbed either way. Both paths are request-derived, so it satisfies the same
+    // constraint primaryValue does - never meta.reason. Events that pre-date the field
+    // fall back to the extraction above. Same sanitiser/cap so the two sources render alike.
+    const gatewayEvidence = sanitizeDisplayText(coerceToText(event.evidenceLine), 300) || "";
 
     return {
         id: event.id,
@@ -543,7 +549,7 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         complianceMap: resolveComplianceClauseMap(event, true, {}, guardrailComplianceMap || {}),
         // Request-derived only - never falls back to meta.reason (a response/guardrail
         // explanation), which would show up as if it were the captured request content.
-        evidenceText: primaryValue || "-",
+        evidenceText: gatewayEvidence || primaryValue || "-",
         riskScore: parseStoredRiskScore(meta),
         reason: normalizeReasonPunctuation(meta.reason || meta.nreason) || "",
         actor: event.actor || "",
