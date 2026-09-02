@@ -167,6 +167,15 @@ function ActionCellRenderer({ value }) {
     return <Badge size="small" status={status}>{value}</Badge>;
 }
 
+function BetaHeader({ displayName }) {
+    return (
+        <HorizontalStack gap="1" blockAlign="center">
+            <Text variant="bodySm" fontWeight="medium">{displayName}</Text>
+            <Badge status="info" size="small">Beta</Badge>
+        </HorizontalStack>
+    );
+}
+
 function EvidenceCellRenderer({ value }) {
     if (!value) return null;
     return <Text variant="bodySm" truncate>{value}</Text>;
@@ -291,6 +300,7 @@ function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, 
         {
             field: "evidenceText",
             headerName: "Evidence",
+            headerComponent: BetaHeader,
             width: 200,
             minWidth: 200,
             suppressAutoSize: true,

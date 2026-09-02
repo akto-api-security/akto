@@ -140,7 +140,12 @@ const getHeaders = () => {
     baseHeaders.push({
       text: "Evidence",
       value: "evidenceLine",
-      title: "Evidence",
+      title: (
+        <HorizontalStack gap="1" blockAlign="center">
+          <span>Evidence</span>
+          <Badge status="info" size="small">Beta</Badge>
+        </HorizontalStack>
+      ),
       maxWidth: "260px",
       type: CellType.TEXT,
       tooltipKey: "evidenceLineFull",
