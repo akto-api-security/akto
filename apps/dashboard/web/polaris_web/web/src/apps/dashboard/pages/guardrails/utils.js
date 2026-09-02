@@ -7,19 +7,23 @@ export const SEVERITY = {
 
 export const SEVERITY_OPTIONS = Object.values(SEVERITY);
 
-/** Rule behaviour (block / warn / alert / approval); stored as policy-wide `behaviour`. */
+/** Rule behaviour (block / warn / alert / approval / human_approval); stored as policy-wide `behaviour`. */
 export const GUARDRAIL_BEHAVIOUR = {
     BLOCK: "block",
     WARN: "warn",
     ALERT: "alert",
     APPROVAL: "approval",
+    // Argus's equivalent of APPROVAL — distinct per-call pending/poll mechanism, never touches
+    // Atlas's server-preapproval bypass.
+    HUMAN_APPROVAL: "human_approval",
 };
 
-// Display label only — the stored `value` stays "approval" (backend + guardrails-service depend on it).
+// Display label only — the stored `value` stays "approval"/"human_approval" (backend + guardrails-service depend on it).
 export const GUARDRAIL_BEHAVIOUR_OPTIONS = [
     { label: "Block", value: GUARDRAIL_BEHAVIOUR.BLOCK },
     { label: "Alert", value: GUARDRAIL_BEHAVIOUR.ALERT },
     { label: "Human Approval", value: GUARDRAIL_BEHAVIOUR.APPROVAL },
+    { label: "Human Approval", value: GUARDRAIL_BEHAVIOUR.HUMAN_APPROVAL },
 ];
 
 export const GUARDRAIL_BEHAVIOUR_TOOLTIP_LINES = [
@@ -38,6 +42,9 @@ export const normalizeBehaviourValue = (raw) => {
     }
     if (v === GUARDRAIL_BEHAVIOUR.APPROVAL) {
         return GUARDRAIL_BEHAVIOUR.APPROVAL;
+    }
+    if (v === GUARDRAIL_BEHAVIOUR.HUMAN_APPROVAL) {
+        return GUARDRAIL_BEHAVIOUR.HUMAN_APPROVAL;
     }
     if (v === GUARDRAIL_BEHAVIOUR.BLOCK) {
         return GUARDRAIL_BEHAVIOUR.BLOCK;

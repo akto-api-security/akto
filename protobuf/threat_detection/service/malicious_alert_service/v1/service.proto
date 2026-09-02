@@ -28,3 +28,14 @@ message UpdateRemediationResponse {
   string message = 2;
   int32 updated_count = 3;  // Should be 1 for single update
 }
+
+// Looks up a malicious event's human-approval decision by refId.
+message GetApprovalStatusRequest {
+  string ref_id = 1;  // Same UUID passed on the original RecordMaliciousEventRequest
+}
+
+message GetApprovalStatusResponse {
+  bool found = 1;             // false if the event hasn't landed yet
+  string status = 2;          // MaliciousEventDto.Status, e.g. "HUMAN_APPROVAL"
+  string human_response = 3;  // PENDING | APPROVED | BLOCKED
+}
