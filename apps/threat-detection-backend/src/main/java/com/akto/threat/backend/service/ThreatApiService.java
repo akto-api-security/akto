@@ -186,15 +186,19 @@ public class ThreatApiService {
       pipeline.add(new Document("$group",
           new Document("_id", dedupeKey)
               .append("category", new Document("$first", "$category"))
-              .append("subCategory", new Document("$first", "$subCategory"))));
+              .append("subCategory", new Document("$first", "$subCategory"))
+              .append("latestApiEndpoint", new Document("$first", "$latestApiEndpoint"))));
     }
 
-    // 4. Group by category and subCategory
+    // 4. Group by category and subCategory. url is a representative request path for the
+    // group (first doc seen), used by the frontend to classify by request shape instead of
+    // free-text category/policy names.
     pipeline.add(new Document("$group",
         new Document("_id",
             new Document("category", "$category")
             .append("subCategory", "$subCategory"))
-            .append("count", new Document("$sum", 1))));
+            .append("count", new Document("$sum", 1))
+            .append("url", new Document("$first", "$latestApiEndpoint"))));
 
     // 5. Sort by count descending
     pipeline.add(new Document("$sort", new Document("count", -1)));
@@ -207,11 +211,14 @@ public class ThreatApiService {
         Document doc = cursor.next();
         Document agg = (Document) doc.get("_id");
 
+        String url = doc.getString("url");
+
         categoryWiseCounts.add(
             ThreatCategoryWiseCountResponse.SubCategoryCount.newBuilder()
                 .setCategory(agg.getString("category"))
                 .setSubCategory(agg.getString("subCategory"))
                 .setCount(doc.getInteger("count", 0))
+                .setUrl(url != null ? url : "")
                 .build());
       }
     }

@@ -1216,20 +1216,29 @@ function Violations() {
                 // be a raw config-path string (e.g. "mcp_servers.computer-use.command" for a
                 // config-risk finding), not a name meant to stand alone as a policy label.
                 const subcategoryMap = {};
+                // Representative request URL per category name (backend now returns one per
+                // group) - lets byType classify by request shape instead of free-text name.
+                const subcategoryUrlMap = {};
                 (categoryResp?.categoryCounts || []).forEach(item => {
                     const sub = item.category || item.subCategory || "Unknown";
                     subcategoryMap[sub] = (subcategoryMap[sub] || 0) + (item.count || 0);
+                    if (!subcategoryUrlMap[sub] && item.url) subcategoryUrlMap[sub] = item.url;
                 });
                 const topPolicies = Object.entries(subcategoryMap)
                     .sort((a, b) => b[1] - a[1])
                     .slice(0, 5)
                     .map(([name, count]) => ({ name, count }));
 
-                // By type — derive from category data, also build reverse map for filtering
+                // By type — derive from category data, also build reverse map for filtering.
+                // Prefer the request-shape classifier (matches the table's Type column); only
+                // fall back to name-based classifyPolicyType when no URL came through (e.g. a
+                // cached response from before this field existed).
                 const byType = {};
                 const typeToSubCategories = {};
                 Object.entries(subcategoryMap).forEach(([name, count]) => {
-                    const type = classifyPolicyType(name);
+                    const type = subcategoryUrlMap[name]
+                        ? deriveAgenticType(subcategoryUrlMap[name], undefined)
+                        : classifyPolicyType(name);
 
                     if (!byType[type]) byType[type] = { text: 0, color: TYPE_COLORS[type] || "#999", filterKey: type };
                     byType[type].text += count;

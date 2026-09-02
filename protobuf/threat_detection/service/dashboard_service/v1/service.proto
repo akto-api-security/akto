@@ -226,6 +226,7 @@ message ThreatCategoryWiseCountResponse {
     string category = 1;
     string sub_category = 2;
     uint32 count = 3;
+    string url = 4;
   }
 
   repeated SubCategoryCount  category_wise_counts = 1;
