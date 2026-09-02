@@ -1050,7 +1050,7 @@ public class TestExecutor {
             }
             trr.setTestResults(null);
             trr.setTestLogs(null);
-            dataActor.bulkWriteTestingRunResults(Collections.singletonList(trr));
+            dataActor.insertTestingRunResults(trr);
             loggerMaker.infoAndAddToDb("Inserted testing results");
             dataActor.updateTestResultsCountInTestSummary(testRunResultSummaryId.toHexString(), resultSize);
             loggerMaker.infoAndAddToDb("Updated count in summary");

@@ -496,14 +496,6 @@ public class DbActor extends DataActor {
         DbLayer.insertTestingRunResults(testingRunResults);
     }
 
-    public void bulkWriteTestingRunResults(List<Object> writesForTestingRunResults) {
-        List<TestingRunResult> results = new ArrayList<>();
-        for (Object obj : writesForTestingRunResults) {
-            results.add((TestingRunResult) obj);
-        }
-        DbLayer.bulkWriteTestingRunResults(results);
-    }
-
     public void insertWorkflowTestResult(WorkflowTestResult workflowTestResult) {
         DbLayer.insertWorkflowTestResult(workflowTestResult);
     }
