@@ -167,9 +167,6 @@ function ActionCellRenderer({ value }) {
     return <Badge size="small" status={status}>{value}</Badge>;
 }
 
-// AG-Grid header with a Beta badge. headerName is still set on the column so the
-// grid keeps a plain-text label for its column menu, tooltips and CSV export -
-// displayName is what AG-Grid passes here.
 function BetaHeader({ displayName }) {
     return (
         <HorizontalStack gap="1" blockAlign="center">
