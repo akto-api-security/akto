@@ -253,13 +253,6 @@ public class KafkaUtils {
             return;
         }
 
-        if ("bulkWriteTestingRunResults".equals(triggerMethod)) {
-            List<BasicDBObject> raw = gson.fromJson(payload, new com.google.gson.reflect.TypeToken<List<BasicDBObject>>(){}.getType());
-            dbAction.setTestingRunResultsForBulkWrite(raw);
-            dbAction.bulkWriteTestingRunResults();
-            return;
-        }
-
         List<BulkUpdates> bulkWrites = mapper.readValue(payload, new TypeReference<List<BulkUpdates>>(){});
 
 

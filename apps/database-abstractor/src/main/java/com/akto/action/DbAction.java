@@ -483,7 +483,6 @@ public class DbAction extends ActionSupport {
     String newRefreshToken;
     Map<ObjectId, TestingRunResultSummary> testingRunResultSummaryMap;
     BasicDBObject testingRunResult;
-    List<BasicDBObject> testingRunResultsForBulkWrite;
     List<BasicDBObject> testingRunResultsForRecord;
     List<String> rerunDeleteIds;
     boolean doNotMarkIssuesAsFixed;
@@ -2880,31 +2879,14 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String bulkWriteTestingRunResults() {
-        try {
-            List<TestingRunResult> results = new ArrayList<>();
-            for (BasicDBObject raw : testingRunResultsForBulkWrite) {
-                results.add(buildTestingRunResultFromPayload(raw));
-            }
-            DbLayer.bulkWriteTestingRunResults(results);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in bulkWriteTestingRunResults " + e.toString());
-            if (kafkaUtils.isWriteEnabled()) {
-                kafkaUtils.insertDataSecondary(testingRunResultsForBulkWrite, "bulkWriteTestingRunResults", Context.accountId.get());
-            }
-            return Action.ERROR.toUpperCase();
-        }
-        return Action.SUCCESS.toUpperCase();
-    }
-
     /**
-     * Consolidated bulk endpoint: does the work of insertTestingRunResults/bulkWriteTestingRunResults +
-     * deleteTestingRunResults[rerun] + updateTestResultsCountInTestSummary + the whole issue-creation flow
-     * (findTestSourceConfig + fetchIssuesByIds + bulkWriteTestingRunIssues + updateIssueCountInSummary, ported
-     * from apps/mini-testing's TestingIssuesHandler into DbLayer.recordIssuesForTestingRunResults) as ONE call,
-     * batched across N results. This is intentionally a brand-new endpoint - the existing insertTestingRunResults/
-     * bulkWriteTestingRunResults endpoints and their DbLayer/DataActor methods are untouched; only
-     * buildTestingRunResultFromPayload is reused (it already existed as a shared helper).
+     * Consolidated bulk endpoint: does the work of insertTestingRunResults + deleteTestingRunResults[rerun] +
+     * updateTestResultsCountInTestSummary + the whole issue-creation flow (findTestSourceConfig +
+     * fetchIssuesByIds + bulkWriteTestingRunIssues + updateIssueCountInSummary, ported from apps/mini-testing's
+     * TestingIssuesHandler into DbLayer.recordIssuesForTestingRunResults) as ONE call, batched across N results.
+     * This is intentionally a brand-new endpoint - the existing insertTestingRunResults endpoint and its
+     * DbLayer/DataActor methods are untouched; only buildTestingRunResultFromPayload is reused (it already
+     * existed as a shared helper).
      */
     public String bulkRecordTestingRunResults() {
         try {
@@ -5603,14 +5585,6 @@ public class DbAction extends ActionSupport {
 
     public void setTestingRunResult(BasicDBObject testingRunResult) {
         this.testingRunResult = testingRunResult;
-    }
-
-    public List<BasicDBObject> getTestingRunResultsForBulkWrite() {
-        return testingRunResultsForBulkWrite;
-    }
-
-    public void setTestingRunResultsForBulkWrite(List<BasicDBObject> testingRunResultsForBulkWrite) {
-        this.testingRunResultsForBulkWrite = testingRunResultsForBulkWrite;
     }
 
     public List<BasicDBObject> getTestingRunResultsForRecord() {
