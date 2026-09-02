@@ -465,12 +465,20 @@ const behaviourHumanApproval = "human_approval"
 // resolveHumanApprovalPolicyName returns the first policy's name whose behaviour is
 // "human_approval" (first-match-wins if more than one applies).
 func resolveHumanApprovalPolicyName(policies []types.Policy) string {
+	name, _ := resolveHumanApprovalPolicy(policies)
+	return name
+}
+
+// resolveHumanApprovalPolicy returns the name and configured severity of the first
+// human_approval policy in the (already-filtered) applicable list — first-match-wins,
+// same caveat as resolveHumanApprovalPolicyName.
+func resolveHumanApprovalPolicy(policies []types.Policy) (name, severity string) {
 	for _, p := range policies {
 		if strings.EqualFold(p.Behaviour, behaviourHumanApproval) {
-			return p.Info.Name
+			return p.Info.Name, p.Severity
 		}
 	}
-	return ""
+	return "", ""
 }
 
 // CreateHumanApprovalActivity records a pending Human Approval activity and returns its
@@ -478,26 +486,25 @@ func resolveHumanApprovalPolicyName(policies []types.Policy) string {
 // other verdict in this file (see reportAndBlockHost); akto-gateway/mcp-endpoint-shield sets
 // Status=HUMAN_APPROVAL/HumanResponse=PENDING automatically for this behaviour. Fire-and-forget:
 // the id is returned before the write completes, matching every other ReportThreat call site.
-//
-// Known gap: the external processor's own automatic reporting also fires for this verdict
-// with its own untracked refId, so one "human_approval" call produces two dashboard rows —
-// the untracked one has no effect on live traffic. Not fixable from this repo.
-func (s *Service) CreateHumanApprovalActivity(ctx context.Context, policies []types.Policy, valCtx *mcp.ValidationContext, params *models.ValidateRequestParams, payloadToValidate, sessionID, reason string) string {
-	policyName := resolveHumanApprovalPolicyName(policies)
+func (s *Service) CreateHumanApprovalActivity(ctx context.Context, policies []types.Policy, valCtx *mcp.ValidationContext, params *models.ValidateRequestParams, payloadToValidate, sessionID string, resultMetadata types.ThreatMetadata) string {
+	policyName, policySeverity := resolveHumanApprovalPolicy(policies)
 
 	activityID := uuid.NewString()
 
-	metadata := types.ThreatMetadata{
-		PolicyName:   policyName,
-		RuleViolated: "HumanApproval",
-		Reason:       reason,
+	metadata := resultMetadata
+	metadata.PolicyName = policyName
+	if metadata.Severity == "" {
+		metadata.Severity = policySeverity
+	}
+	if metadata.RuleViolated == "" {
+		metadata.RuleViolated = "HumanApproval"
 	}
 
 	go func() {
 		err := mcp.ReportThreat(
 			context.Background(),
 			payloadToValidate,
-			"",
+			valCtx.ResponsePayload,
 			metadata,
 			params.IP,
 			params.Path,
@@ -535,7 +542,7 @@ func (s *Service) pendingIfHumanApproval(ctx context.Context, result *mcp.Valida
 	if !shouldCreatePendingApproval(result) {
 		return result, ""
 	}
-	return result, s.CreateHumanApprovalActivity(ctx, policies, valCtx, params, payloadToValidate, sessionID, result.Reason)
+	return result, s.CreateHumanApprovalActivity(ctx, policies, valCtx, params, payloadToValidate, sessionID, result.Metadata)
 }
 
 // CheckHumanApprovalStatus looks up activityID's current decision. Pure read, no policy
@@ -1866,7 +1873,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		Modified:        finalPayload != "" && finalPayload != payload,
 		ModifiedPayload: finalPayload,
 		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
-		Metadata:        types.ThreatMetadata{},
+		Metadata:        processResult.Metadata,
 		Behaviour:       processResult.Behaviour,
 	}
 
@@ -2042,7 +2049,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		Modified:        finalResponsePayload != "" && finalResponsePayload != responseBody,
 		ModifiedPayload: finalResponsePayload,
 		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
-		Metadata:        types.ThreatMetadata{},
+		Metadata:        processResult.Metadata,
 		Behaviour:       processResult.Behaviour,
 	}
 
