@@ -592,11 +592,9 @@ public class MaliciousEventService {
       query.append("severity", new Document("$in", filter.getSeverityList()));
     }
 
-    // Handle status filter
     if (filter.hasStatusFilter()) {
       applyStatusFilter(query, filter.getStatusFilter());
     }
-    applyHumanResponseFilter(query, humanResponseFilter);
 
     if (filter.hasDetectedAtTimeRange()) {
       TimeRangeFilter timeRange = filter.getDetectedAtTimeRange();
@@ -633,8 +631,9 @@ public class MaliciousEventService {
     // Apply simple context filter (only for ENDPOINT and AGENTIC)
     Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
     if (!contextFilter.isEmpty()) {
-      query.putAll(contextFilter);
+      andDocument(query, contextFilter);
     }
+    applyHumanResponseFilter(query, humanResponseFilter);
 
     // Skills Evaluations / Misconfigured Settings partitions — Atlas (ENDPOINT) only. An event
     // belongs to Skills Evaluations iff latestApiEndpoint starts with "/skills/"; it belongs to
@@ -1048,15 +1047,34 @@ public class MaliciousEventService {
       return;
     }
     String value = humanResponseFilter.toUpperCase();
+    Document clause;
     if (MaliciousEventDto.HumanResponse.PENDING.name().equals(value)) {
-      query.append("$or", Arrays.asList(
+      clause = new Document("$or", Arrays.asList(
           new Document("humanResponse", MaliciousEventDto.HumanResponse.PENDING.name()),
           new Document("humanResponse", ""),
           new Document("humanResponse", new Document("$exists", false))
       ));
+    } else {
+      clause = new Document("humanResponse", value);
+    }
+    andDocument(query, clause);
+  }
+
+  // Combine with $and so a clause that uses $or (legacy context, PENDING humanResponse)
+  // cannot overwrite another $or already on the query.
+  private void andDocument(Document query, Document clause) {
+    if (clause == null || clause.isEmpty()) {
       return;
     }
-    query.append("humanResponse", value);
+    if (query.isEmpty()) {
+      query.putAll(clause);
+      return;
+    }
+    List<Document> clauses = new ArrayList<>();
+    clauses.add(new Document(query));
+    clauses.add(clause);
+    query.clear();
+    query.append("$and", clauses);
   }
 
   private Document buildQueryFromFilter(Map<String, Object> filter, String contextSource, String accountId) {
@@ -1140,7 +1158,7 @@ public class MaliciousEventService {
     // Apply simple context filter (only for ENDPOINT and AGENTIC)
     Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
     if (!contextFilter.isEmpty()) {
-      query.putAll(contextFilter);
+      andDocument(query, contextFilter);
     }
 
     return query;
