@@ -35,6 +35,7 @@ public class MaliciousEventDto {
   private String sessionId;
   private List<OwaspCategory> owaspCategories;
   private String remediation;
+  private String evidenceLine;
   public static final String HUMAN_RESPONSE = "humanResponse";
   @JsonProperty("humanResponse")
   private String humanResponse;
@@ -119,6 +120,7 @@ public class MaliciousEventDto {
     this.owaspCategories = builder.owaspCategories;
     this.remediation = builder.remediation;
     this.humanResponse = builder.humanResponse;
+    this.evidenceLine = builder.evidenceLine;
   }
 
   public static class Builder {
@@ -149,6 +151,7 @@ public class MaliciousEventDto {
     private List<OwaspCategory> owaspCategories;
     private String remediation;
     private String humanResponse;
+    private String evidenceLine;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -272,6 +275,11 @@ public class MaliciousEventDto {
 
     public Builder setRemediation(String remediation) {
       this.remediation = remediation;
+      return this;
+    }
+
+    public Builder setEvidenceLine(String evidenceLine) {
+      this.evidenceLine = evidenceLine;
       return this;
     }
 
@@ -500,6 +508,14 @@ public class MaliciousEventDto {
 
   public void setRemediation(String remediation) {
     this.remediation = remediation;
+  }
+
+  public String getEvidenceLine() {
+    return evidenceLine;
+  }
+
+  public void setEvidenceLine(String evidenceLine) {
+    this.evidenceLine = evidenceLine;
   }
 
   public List<OwaspCategory> getOwaspCategories() {

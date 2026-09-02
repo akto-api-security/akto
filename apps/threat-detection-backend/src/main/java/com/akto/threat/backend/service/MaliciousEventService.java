@@ -186,7 +186,8 @@ public class MaliciousEventService {
         .setSuccessfulExploit(evt.getSuccessfulExploit())
         .setStatus(MaliciousEventDto.Status.valueOf(status.toUpperCase()))
         .setLabel(label)
-        .setHost(evt.getHost() != null ? evt.getHost() : "");
+        .setHost(evt.getHost() != null ? evt.getHost() : "")
+        .setEvidenceLine(evt.getEvidenceLine() != null ? evt.getEvidenceLine() : "");
 
     // Set contextSource if available
     if (contextSource != null && !contextSource.isEmpty()) {
@@ -219,13 +220,33 @@ public class MaliciousEventService {
   }
 
   public int updateRemediation(String accountId, String refId, String remediation) {
+    return updateEnrichment(accountId, refId, remediation, null);
+  }
+
+  /**
+   * Patches LLM-generated enrichment onto an already-recorded event, keyed on refId.
+   * Both fields are optional and independently gated on the gateway, so only the
+   * non-empty ones are written - otherwise a remediation-only call would wipe an
+   * evidence line already patched in by the same goroutine (and vice versa).
+   */
+  public int updateEnrichment(String accountId, String refId, String remediation, String evidenceLine) {
     try {
       if (refId == null || refId.isEmpty()) {
-        logger.error("refId is required to update remediation");
+        logger.error("refId is required to update enrichment");
         return 0;
       }
 
-      Bson update = Updates.set("remediation", remediation);
+      List<Bson> updates = new ArrayList<>();
+      if (remediation != null && !remediation.isEmpty()) {
+        updates.add(Updates.set("remediation", remediation));
+      }
+      if (evidenceLine != null && !evidenceLine.isEmpty()) {
+        updates.add(Updates.set("evidenceLine", evidenceLine));
+      }
+      if (updates.isEmpty()) {
+        return 0;
+      }
+      Bson update = Updates.combine(updates);
 
       Bson filters = Filters.eq("refId", refId);
 
@@ -235,7 +256,7 @@ public class MaliciousEventService {
 
       return (int) modifiedCount;
     } catch (Exception e) {
-      logger.error("Error updating remediation for refId: " + refId, e);
+      logger.error("Error updating enrichment for refId: " + refId, e);
       return 0;
     }
   }
@@ -790,6 +811,7 @@ public class MaliciousEventService {
                 .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
                 .setSessionId(resolvedSessionId)
                 .setRemediation(evt.getRemediation() != null ? evt.getRemediation() : "")
+                .setEvidenceLine(evt.getEvidenceLine() != null ? evt.getEvidenceLine() : "")
                 .setHumanResponse(evt.getHumanResponse() != null ? evt.getHumanResponse() : "")
                 .addAllOwaspCategories(evt.getOwaspCategories() != null
                     ? evt.getOwaspCategories().stream()

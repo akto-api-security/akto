@@ -31,9 +31,12 @@ export default function SessionsView({ currDateRange, onOpenSession, initialFilt
                     topic:     mergeUnique(choices.topic,     initialFilters?.topic),
                     subTopic:  mergeUnique(choices.subTopic,  initialFilters?.subTopic),
                     serviceId: choices.serviceId || [],
+                    guardrailPolicy: mergeUnique(choices.guardrailPolicy, initialFilters?.guardrailPolicy),
+                    // Boolean column — fixed two-value domain, not sourced from fetchFilterChoices.
+                    hasActiveGuardrail: ["true", "false"],
                 };
                 setColumnDefs(SESSION_COLUMN_DEFS.map(col =>
-                    col.filterAllowed ? { ...col, filterParams: { values: merged[col.field] || [] } } : col
+                    col.filterAllowed ? { ...col, filterParams: { ...col.filterParams, values: merged[col.field] || [] } } : col
                 ));
 
                 // Apply AG Grid filter model so the filter icon lights up on those columns.

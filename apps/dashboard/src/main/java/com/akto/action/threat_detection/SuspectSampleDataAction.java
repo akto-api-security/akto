@@ -270,6 +270,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                                 smr.getSeverity(),
                                 smr.getSessionId() != null && !smr.getSessionId().isEmpty() ? smr.getSessionId() : "");
                             event.setRemediation(smr.getRemediation());
+                            event.setEvidenceLine(smr.getEvidenceLine());
                             event.setHumanResponse(smr.getHumanResponse());
                             if (!smr.getOwaspCategoriesList().isEmpty()) {
                                 event.setOwaspCategories(smr.getOwaspCategoriesList().stream()

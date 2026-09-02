@@ -175,13 +175,13 @@ public class Gateway {
             out.put("guardrailViolated", !isAllowed(guardrailsResult));
             putIfNotBlank(out, "guardrailAction", firstNonBlank(verdict, "behaviour", "Behaviour"));
             putIfNotBlank(out, "guardrailReason", firstNonBlank(verdict, "reason", "Reason"));
+            putIfNotBlank(out, "guardrailSeverity", firstNonBlank(verdict, "severity", "Severity"));
 
             Object metaObj = verdict.get("Metadata") != null ? verdict.get("Metadata") : verdict.get("metadata");
             if (metaObj instanceof Map) {
                 Map<?, ?> meta = (Map<?, ?>) metaObj;
-                putIfNotBlank(out, "guardrailPolicy", asString(meta.get("policy_name")));
-                putIfNotBlank(out, "guardrailRule", asString(meta.get("rule_violated")));
-                putIfNotBlank(out, "guardrailSeverity", asString(meta.get("severity")));
+                putIfNotBlank(out, "guardrailPolicy", asString(meta.get("policyName")));
+                putIfNotBlank(out, "guardrailRule", asString(meta.get("ruleViolated")));
             }
 
             requestData.put(GUARDRAIL_FIELD, objectMapper.writeValueAsString(out));

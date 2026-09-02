@@ -64,14 +64,15 @@ public class ThreatDetectionRouter implements ARouter {
                 return;
               }
 
-              int updatedCount = maliciousEventService.updateRemediation(
+              int updatedCount = maliciousEventService.updateEnrichment(
                   ctx.get("accountId"),
                   req.getRefId(),
-                  req.getRemediation());
+                  req.getRemediation(),
+                  req.getEvidenceLine());
 
               UpdateRemediationResponse response = UpdateRemediationResponse.newBuilder()
                   .setSuccess(updatedCount > 0)
-                  .setMessage(updatedCount > 0 ? "Remediation updated successfully" : "Event not found")
+                  .setMessage(updatedCount > 0 ? "Enrichment updated successfully" : "Event not found")
                   .setUpdatedCount(updatedCount)
                   .build();
 

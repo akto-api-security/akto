@@ -1,7 +1,9 @@
 from litellm.integrations.custom_logger import CustomLogger
 from litellm.proxy.proxy_server import UserAPIKeyAuth
 from fastapi import HTTPException
-from typing import Literal, Tuple, Optional, Any
+from typing import Dict, Literal, Tuple, Optional, Any
+from collections import OrderedDict
+import hashlib
 import httpx
 import json
 import os
@@ -44,6 +46,67 @@ MCP_INGEST_PATH = os.getenv("MCP_INGEST_PATH", "/mcp")
 NON_MCP_TOOL_PATH_PREFIX = os.getenv("NON_MCP_TOOL_PATH_PREFIX", "/tool")
 CALL_HEADERS_CACHE_TTL_SECONDS = float(os.getenv("CALL_HEADERS_CACHE_TTL_SECONDS", str(15 * 60)))
 
+# The guardrails service reads message content only as a plain string. Anthropic
+# Messages style content BLOCKS - content: [{"type": "text", "text": "..."}] - are
+# not read, so a prompt injection inside a content block is never seen and the
+# service answers Allowed=true. Every Claude Code request uses blocks, so
+# prompt-injection enforcement was silently inert for those clients while looking
+# healthy. Flatten blocks to text for the verdict call.
+#
+# `stream` and `tools` in the mirrored body suppress detection the same way, and
+# are call metadata rather than content to judge, so they come off too.
+#
+# Measured by replaying captured verdict envelopes against the live service,
+# 4 trials each:
+#     content as blocks, with stream + tools   -> allowed 4/4
+#     same, tools removed                      -> blocked 4/4
+#     same, content flattened to a string      -> blocked 4/4
+#     headers reduced / tags reduced           -> allowed (not the cause)
+#
+# Verdict-only: the request forwarded to the provider and the payload sent for
+# ingestion both keep the original structure, so inventory data is unchanged.
+VERDICT_FLATTEN_CONTENT = os.getenv("VERDICT_FLATTEN_CONTENT", "true").strip().lower() == "true"
+VERDICT_DROP_BODY_KEYS = tuple(
+    k.strip() for k in os.getenv("VERDICT_DROP_BODY_KEYS", "stream,tools").split(",") if k.strip()
+)
+
+# Akto's guardrail detects reliably on short inputs but not on whole agent
+# requests: an identical prompt-injection blocks at 63 chars yet is allowed
+# inside an 86KB coding-agent request, where the user's text is buried under a
+# large system prompt and tool catalogue. When the payload is big enough for
+# that to bite, send only the newest user turn for the VERDICT call. Ingestion
+# is never narrowed and always records the complete request.
+#   "auto"      (default) narrow to the newest user turn when messages exceed
+#               the threshold below
+#   "true"      always narrow to the newest user turn
+#   "all_user"  narrow to ALL user turns (harness context stripped, tools and
+#               system dropped). Keeps the payload small enough for the guardrail
+#               to work while still re-checking history, so a message that was
+#               blocked once cannot reach the model as history on the next turn.
+#               Cost: a session containing blocked content keeps being blocked.
+#   "false"     never narrow (identical to upstream behaviour)
+VALIDATE_LAST_USER_MESSAGE_ONLY = os.getenv("VALIDATE_LAST_USER_MESSAGE_ONLY", "auto").strip().lower()
+GUARDRAIL_NARROW_THRESHOLD_BYTES = int(os.getenv("GUARDRAIL_NARROW_THRESHOLD_BYTES", "8000"))
+# Coding agents inline their own scaffolding into the user turn wrapped in
+# <system-reminder>. It is harness context, not user input, so it is stripped
+# from the narrowed verdict view. Applies only when narrowing is already active.
+STRIP_HARNESS_CONTEXT = os.getenv("STRIP_HARNESS_CONTEXT", "true").strip().lower() == "true"
+# Diagnostic: log the exact text handed to the guardrail. Off by default because
+# it writes prompt content to the container log.
+LOG_VERDICT_TEXT = os.getenv("LOG_VERDICT_TEXT", "false").strip().lower() == "true"
+
+# A guardrail can only reject a request; it cannot make the CLIENT forget. Claude
+# Code keeps a rejected message in its local transcript and resends it as history
+# on the next turn, so content blocked once still reaches the model afterwards.
+# When enabled, the connector remembers what it blocked (per session) and strips
+# those turns out of history before forwarding, so the model never sees them while
+# later benign turns keep working. Bounded in-memory only; nothing is persisted.
+QUARANTINE_BLOCKED_HISTORY = os.getenv("QUARANTINE_BLOCKED_HISTORY", "true").strip().lower() == "true"
+QUARANTINE_MAX_SESSIONS = int(os.getenv("QUARANTINE_MAX_SESSIONS", "500"))
+QUARANTINE_MAX_PER_SESSION = int(os.getenv("QUARANTINE_MAX_PER_SESSION", "50"))
+
+HARNESS_CONTEXT_RE = re.compile(r"<system-reminder>.*?</system-reminder>", re.S | re.I)
+
 INVALID_AGENT_CHARS = re.compile(r"[^a-z0-9\-._]")
 INVALID_TOOL_NAME_CHARS = re.compile(r"[^a-zA-Z0-9._~-]+")
 # Never mirror credentials/session cookies to the ingestion service; host/content-type
@@ -64,6 +127,10 @@ class GuardrailsHandler(CustomLogger):
         # doesn't pass it to async_should_run_agentic_loop - so we stash it here for the
         # tool-call hook to pick back up by the same call_id.
         self._call_headers_cache: dict = {}
+        # litellm_call_ids already ingested by ingest_blocked_request. Raising
+        # HTTPException also triggers async_log_failure_event, so without this the
+        # connector's own blocks would be recorded twice (measured: 2 ingests).
+        self._own_block_ingested: "OrderedDict[str, None]" = OrderedDict()
         logger.info(f"GuardrailsHandler initialized | sync_mode={SYNC_MODE}")
 
     def _cache_call_headers(self, litellm_call_id: Optional[str], headers: dict) -> None:
@@ -463,7 +530,7 @@ class GuardrailsHandler(CustomLogger):
             tags.setdefault(k, v)
 
         host = self._resolve_host({"metadata": metadata or {}}, user_api_key_dict)
-        request_headers_out = self.build_forwarded_headers(request_headers_raw, host)
+        request_headers_out = self.build_forwarded_headers(request_headers_raw, host, kwargs)
         # Only server-executed tools (web_search, code_execution) have a result at this
         # point - it's already in the same response this hook fired on. Client-executed
         # tools (the caller runs them after receiving the response) genuinely have no
@@ -572,21 +639,104 @@ class GuardrailsHandler(CustomLogger):
         except Exception as e:
             logger.error(f"Guardrails post-call error: {e}")
 
+    async def async_log_failure_event(self, kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) -> None:
+        """Ingest requests that never completed, so they are still visible in Akto.
+
+        Without this, anything that does not reach the provider successfully is
+        invisible: the only other ingestion paths are async_log_success_event
+        (fires on success only) and ingest_blocked_request (fires only when THIS
+        connector blocks). So a request rejected by another guardrail - e.g. an
+        AWS Bedrock guardrail returning 400 - was recorded nowhere, and neither
+        were provider errors, rate limits or timeouts.
+
+        Verified against a live Bedrock guardrail block: this callback fires with
+        the original messages, the model, the raising exception (status 400) and
+        litellm's top-level applied_guardrails list.
+        """
+        if not DATA_INGESTION_SERVICE_URL:
+            return
+        try:
+            exception = kwargs.get("exception")
+            call_id = kwargs.get("litellm_call_id")
+
+            # Our own 403 is already recorded by ingest_blocked_request; recording
+            # it again here would double-count every block.
+            if call_id and str(call_id) in self._own_block_ingested:
+                self._own_block_ingested.pop(str(call_id), None)
+                return
+            detail = getattr(exception, "detail", None)
+            if isinstance(detail, str) and detail.startswith("Blocked by Akto Guardrails"):
+                return
+
+            litellm_params = kwargs.get("litellm_params", {}) or {}
+            metadata = litellm_params.get("metadata", {}) or {}
+            user_api_key_dict = metadata.get("user_api_key_dict")
+            call_type = kwargs.get("call_type", "completion")
+
+            request_data = {
+                "model": kwargs.get("model", ""),
+                "messages": kwargs.get("messages", []),
+                "stream": kwargs.get("stream", False),
+                "tools": kwargs.get("tools", []),
+            }
+
+            status_code = getattr(exception, "status_code", None)
+            try:
+                status_code = int(status_code)
+            except (TypeError, ValueError):
+                status_code = 500
+
+            failure_body = {"error": str(exception)[:2000] if exception else "request failed"}
+            applied = kwargs.get("applied_guardrails") or metadata.get("applied_guardrails")
+            if applied:
+                failure_body["applied_guardrails"] = applied
+
+            await self.ingest_response(
+                request_data,
+                call_type,
+                failure_body,
+                status_code,
+                user_api_key_dict,
+                kwargs,
+            )
+            logger.info(
+                f"Ingested failed request (status {status_code}"
+                + (f", blocked by {applied}" if applied else "") + ")"
+            )
+        except Exception as e:
+            logger.error(f"Guardrails failure-event ingestion error: {e}")
+
     async def validate_and_block(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> dict:
         try:
             allowed, reason, modified_payload = await self.call_guardrails_validation(data, call_type, user_api_key_dict, kwargs)
             
             if not allowed:
+                # Remember this turn so it can be stripped from history later -
+                # the client keeps rejected messages and resends them.
+                self.remember_blocked(data, kwargs)
                 await self.ingest_blocked_request(data, call_type, reason, user_api_key_dict, kwargs)
+                own_id = (kwargs or {}).get("litellm_call_id")
+                if own_id:
+                    self._own_block_ingested[str(own_id)] = None
+                    while len(self._own_block_ingested) > 500:
+                        self._own_block_ingested.popitem(last=False)
                 raise HTTPException(
                     status_code=403,
                     detail=f"Blocked by Akto Guardrails: {reason}" if reason else "Blocked by Akto Guardrails",
                 )
             
-            # If Akto returned a redacted version, apply it to the user message
+            # If Akto returned a redacted version, apply it to the user message.
+            # When the verdict ran on a narrowed view, ModifiedPayload contains
+            # only that turn, so splice rather than replace the whole body.
             if modified_payload:
-                data = self.apply_redaction(data, modified_payload)
-            
+                if self._should_narrow(data):
+                    data = self._merge_redacted_last_user(data, modified_payload)
+                else:
+                    data = self.apply_redaction(data, modified_payload)
+
+            # Allowed: remove any turn blocked earlier in this session so the
+            # model never sees content the guardrail already rejected.
+            data = self.strip_quarantined_history(data, kwargs)
             return data
         except HTTPException as e:
             logger.info(f"Guardrails validation failed: {e}")
@@ -609,11 +759,145 @@ class GuardrailsHandler(CustomLogger):
         except Exception as e:
             logger.error(f"Guardrails async validation error: {e}")
 
+    @staticmethod
+    def _should_narrow(data: dict) -> bool:
+        """Whether this request is large enough that the guardrail would miss the
+        user's text. Provider-agnostic: only looks at roles, never at content
+        shape, so OpenAI-style string content and Anthropic-style content-block
+        lists both work. Anything without a usable user turn is left alone."""
+        if VALIDATE_LAST_USER_MESSAGE_ONLY == "false":
+            return False
+        msgs = data.get("messages")
+        if not isinstance(msgs, list) or not msgs:
+            return False  # embeddings / image_generation / audio_transcription
+        if not any(isinstance(m, dict) and m.get("role") == "user" for m in msgs):
+            return False
+        if VALIDATE_LAST_USER_MESSAGE_ONLY in ("true", "all_user"):
+            return True
+        try:
+            return len(json.dumps(msgs, default=str)) > GUARDRAIL_NARROW_THRESHOLD_BYTES
+        except Exception:
+            return False
+
+    @classmethod
+    def _strip_harness_context(cls, msg: dict) -> dict:
+        """Remove harness-injected <system-reminder> scaffolding from a user turn.
+
+        Coding agents inline their own context into the user message - Claude Code
+        sends ~12KB of agent/skill/session reminders wrapped in <system-reminder>
+        around a 63-char prompt. That scaffolding is not user input: judging it
+        both buries the real prompt and makes the agent's own text trip policies.
+        A no-op when no reminders are present, so ordinary apps are unaffected."""
+        content = msg.get("content")
+
+        if isinstance(content, str):
+            cleaned = HARNESS_CONTEXT_RE.sub("", content).strip()
+            if not cleaned or cleaned == content:
+                return msg
+            out = dict(msg)
+            out["content"] = cleaned
+            return out
+
+        if isinstance(content, list):
+            kept = []
+            for block in content:
+                if not isinstance(block, dict) or block.get("type") != "text":
+                    kept.append(block)
+                    continue
+                cleaned = HARNESS_CONTEXT_RE.sub("", block.get("text") or "").strip()
+                if cleaned:
+                    nb = dict(block)
+                    nb["text"] = cleaned
+                    kept.append(nb)
+            if not kept or kept == content:
+                return msg  # nothing stripped, or stripping left nothing: keep original
+            out = dict(msg)
+            out["content"] = kept
+            return out
+
+        return msg
+
+
+    @classmethod
+    def _validation_view(cls, data: dict) -> dict:
+        """The request as the guardrail should see it. Returns a shallow copy;
+        the real request forwarded to the LLM is never modified here."""
+        if not cls._should_narrow(data):
+            return data
+        msgs = data["messages"]
+
+        if VALIDATE_LAST_USER_MESSAGE_ONLY == "all_user":
+            # Every user turn, so content blocked earlier is re-checked rather
+            # than slipping through as history on a later turn.
+            kept = [m for m in msgs if isinstance(m, dict) and m.get("role") == "user"]
+            if STRIP_HARNESS_CONTEXT:
+                kept = [cls._strip_harness_context(m) for m in kept]
+            trimmed = dict(data)
+            trimmed["messages"] = kept
+            trimmed["tools"] = []
+            logger.info(
+                f"Narrowed guardrail view: {len(msgs)} messages -> {len(kept)} user turns "
+                f"({len(json.dumps(kept, default=str)):,}B after stripping harness context)"
+            )
+            if LOG_VERDICT_TEXT:
+                joined = " || ".join(
+                    (" ".join(b.get("text", "") for b in m.get("content") if isinstance(b, dict))
+                     if isinstance(m.get("content"), list) else str(m.get("content")))
+                    for m in kept
+                )
+                logger.info(f"Verdict text sent to Akto ({len(joined)} chars): {joined[:400]!r}")
+            return trimmed
+
+        last_user = next(m for m in reversed(msgs) if isinstance(m, dict) and m.get("role") == "user")
+        if STRIP_HARNESS_CONTEXT:
+            last_user = cls._strip_harness_context(last_user)
+        trimmed = dict(data)
+        trimmed["messages"] = [last_user]
+        trimmed["tools"] = []
+        logger.info(
+            f"Narrowed guardrail view: {len(msgs)} messages -> newest user turn "
+            f"({len(json.dumps(last_user, default=str)):,}B after stripping harness context)"
+        )
+        if LOG_VERDICT_TEXT:
+            c = last_user.get("content")
+            txt = (" ".join(b.get("text", "") for b in c if isinstance(b, dict))
+                   if isinstance(c, list) else str(c))
+            logger.info(f"Verdict text sent to Akto ({len(txt)} chars): {txt[:400]!r}")
+        return trimmed
+
+    def _merge_redacted_last_user(self, data: dict, modified_payload: Any) -> dict:
+        """Splice Akto's redacted turn back in, preserving conversation history.
+
+        We only showed Akto one turn, so ModifiedPayload carries only that turn.
+        apply_redaction() replaces the whole body wholesale, which here would
+        silently drop every other message."""
+        try:
+            obj = json.loads(modified_payload) if isinstance(modified_payload, str) else modified_payload
+            redacted = ((obj or {}).get("body") or {}).get("messages") or []
+            if not redacted:
+                return data
+            new_turn = redacted[-1]
+            msgs = list(data.get("messages") or [])
+            for i in range(len(msgs) - 1, -1, -1):
+                if isinstance(msgs[i], dict) and msgs[i].get("role") == "user":
+                    merged = dict(data)
+                    merged["messages"] = msgs[:i] + [new_turn] + msgs[i + 1:]
+                    logger.info(f"Applied Akto redaction to newest user turn ({len(msgs)} messages preserved)")
+                    return merged
+            return data
+        except Exception as e:
+            logger.error(f"Failed to merge redaction (keeping original): {e}")
+            return data
+
     async def call_guardrails_validation(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> Tuple[bool, str, Optional[str]]:
         if not DATA_INGESTION_SERVICE_URL:
             return True, "", None
 
-        http_proxy_payload = self.build_payload(data, call_type, None, user_api_key_dict, kwargs=kwargs)
+        # _validation_view scopes WHAT gets judged; normalize_verdict_payload fixes
+        # the SHAPE it is judged in. Both apply to the verdict copy only.
+        http_proxy_payload = self.normalize_verdict_payload(
+            self.build_payload(self._validation_view(data), call_type, None, user_api_key_dict, kwargs=kwargs)
+        )
 
         try:
             response = await self.post_http_proxy(guardrails=True, ingest_data=False, http_proxy_payload=http_proxy_payload)
@@ -628,6 +912,48 @@ class GuardrailsHandler(CustomLogger):
         except Exception as e:
             logger.error(f"Guardrails validation error (fail-open): {e}")
             return True, "", None
+
+    @staticmethod
+    def normalize_verdict_payload(payload: dict) -> dict:
+        """Shape the mirrored body so the guardrail can actually read the prompt.
+
+        Flattens Anthropic-style content blocks to plain text and removes call
+        metadata (`stream`, `tools`) that suppresses detection. See the comment on
+        VERDICT_FLATTEN_CONTENT for the measurements. Verdict path only - the
+        ingestion envelope is built separately and keeps the original structure.
+        """
+        try:
+            request_payload = json.loads(payload.get("requestPayload") or "{}")
+            body = request_payload.get("body")
+            if not isinstance(body, dict):
+                return payload
+
+            changed = False
+            for key in VERDICT_DROP_BODY_KEYS:
+                if key in body:
+                    body.pop(key, None)
+                    changed = True
+
+            if VERDICT_FLATTEN_CONTENT:
+                for message in body.get("messages") or []:
+                    if not isinstance(message, dict):
+                        continue
+                    content = message.get("content")
+                    if isinstance(content, list):
+                        message["content"] = " ".join(
+                            block.get("text", "")
+                            for block in content
+                            if isinstance(block, dict) and block.get("type", "text") == "text"
+                        ).strip()
+                        changed = True
+
+            if changed:
+                normalized = dict(payload)
+                normalized["requestPayload"] = json.dumps(request_payload)
+                return normalized
+        except (json.JSONDecodeError, TypeError, AttributeError) as e:
+            logger.warning(f"Could not normalize guardrail verdict payload: {e}")
+        return payload
 
     async def ingest_response(
         self,
@@ -701,6 +1027,75 @@ class GuardrailsHandler(CustomLogger):
         key_metadata = metadata.get("user_api_key_metadata") or {}
         return {str(k): self._tag_value(v) for k, v in key_metadata.items() if v is not None}
 
+    def client_identity_tags(self, kwargs: Optional[dict] = None) -> dict:
+        """Identity the CLIENT supplied, surfaced as queryable Akto tags.
+
+        Reachable without any virtual key, so traffic stays attributable even
+        behind a shared key:
+          metadata.user_id            Anthropic `metadata.user_id`. Claude Code
+                                      puts {device_id, account_uuid, session_id}
+                                      here on every request.
+          user_agent                  e.g. claude-cli/2.1.252 (...)
+          session_id / trace_id       LiteLLM session correlation
+          tags                        from the x-litellm-tags header
+          spend_logs_metadata         from x-litellm-spend-logs-metadata (JSON)
+          user_api_key_end_user_id    from x-litellm-end-user-id
+          user_api_key_* identity     user/team/org/project the key belongs to
+        """
+        md = (kwargs.get("litellm_params", {}) if kwargs else {}).get("metadata", {}) or {}
+        tags: Dict[str, str] = {}
+
+        # Anthropic metadata.user_id - a JSON blob for Claude Code, opaque string
+        # for other clients. Flatten known sub-fields, else keep it whole.
+        raw_user = md.get("user_id")
+        if raw_user:
+            parsed = None
+            if isinstance(raw_user, str):
+                try:
+                    parsed = json.loads(raw_user)
+                except (json.JSONDecodeError, TypeError):
+                    parsed = None
+            elif isinstance(raw_user, dict):
+                parsed = raw_user
+            if isinstance(parsed, dict):
+                for src, dst in (("account_uuid", "client_account_uuid"),
+                                 ("device_id", "client_device_id"),
+                                 ("session_id", "client_session_id")):
+                    if parsed.get(src):
+                        tags[dst] = self._tag_value(parsed[src])
+                for k, v in parsed.items():
+                    if k not in ("account_uuid", "device_id", "session_id") and v is not None:
+                        tags.setdefault(f"client_{k}", self._tag_value(v))
+            else:
+                tags["client_user_id"] = self._tag_value(raw_user)
+
+        for src, dst in (("user_agent", "client_user_agent"),
+                         ("session_id", "session_id"),
+                         ("trace_id", "trace_id"),
+                         ("user_api_key_end_user_id", "end_user_id"),
+                         ("user_api_key_user_id", "user_id"),
+                         ("user_api_key_user_email", "user_email"),
+                         ("user_api_key_team_alias", "team_alias"),
+                         ("user_api_key_org_alias", "org_alias"),
+                         ("user_api_key_project_alias", "project_alias")):
+            v = md.get(src)
+            if v:
+                tags.setdefault(dst, self._tag_value(v))
+
+        caller_tags = md.get("tags") or md.get("caller_tags")
+        if caller_tags:
+            tags.setdefault("caller_tags", ",".join(str(t) for t in caller_tags)
+                            if isinstance(caller_tags, (list, tuple)) else self._tag_value(caller_tags))
+
+        # Arbitrary caller-supplied JSON, flattened so each field is queryable.
+        slm = md.get("spend_logs_metadata")
+        if isinstance(slm, dict):
+            for k, v in slm.items():
+                if v is not None:
+                    tags.setdefault(str(k), self._tag_value(v))
+
+        return tags
+
     def build_tags(self, call_type: str, data: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None, litellm_call_id: Optional[str] = None, kwargs: Optional[dict] = None) -> dict:
         tags = {"gen-ai": "Gen AI", "litellm": "LiteLLM"}
         if call_type:
@@ -728,16 +1123,213 @@ class GuardrailsHandler(CustomLogger):
         # Surface all virtual-key metadata as tags, without clobbering the core tags above.
         for k, v in self.key_metadata_tags(data, kwargs).items():
             tags.setdefault(k, v)
+        # Then client-supplied identity (Claude Code account/device/session,
+        # user-agent, caller tags, x-litellm-spend-logs-metadata). setdefault so
+        # key metadata always wins on a name clash.
+        for k, v in self.client_identity_tags(kwargs).items():
+            tags.setdefault(k, v)
         return tags
 
-    def build_forwarded_headers(self, request_headers_raw: dict, host: str) -> dict:
+    # ---- quarantine of previously blocked turns -----------------------------
+    # session id -> ordered dict of fingerprint -> None (insertion-ordered FIFO)
+    _quarantine: Dict[str, "OrderedDict"] = {}
+
+    @staticmethod
+    def _session_key(kwargs: Optional[dict], data: Optional[dict] = None) -> Optional[str]:
+        """Session id for quarantine bookkeeping.
+
+        At pre-call time litellm_params.metadata is NOT populated yet (the same
+        reason extract_request_path falls back), so the id has to be recovered
+        from the request body and headers as well. Claude Code carries it in the
+        Anthropic metadata.user_id blob and in x-claude-code-session-id.
+        """
+        for md in (
+            (kwargs.get("litellm_params", {}) if kwargs else {}).get("metadata") or {},
+            (data or {}).get("metadata") or {},
+            (data or {}).get("litellm_metadata") or {},
+        ):
+            if not isinstance(md, dict):
+                continue
+            sid = md.get("session_id") or md.get("trace_id")
+            if sid:
+                return str(sid)
+            # Anthropic metadata.user_id: Claude Code packs session_id inside.
+            raw = md.get("user_id")
+            if raw:
+                try:
+                    parsed = json.loads(raw) if isinstance(raw, str) else raw
+                except (json.JSONDecodeError, TypeError):
+                    parsed = None
+                if isinstance(parsed, dict) and parsed.get("session_id"):
+                    return str(parsed["session_id"])
+
+        psr = (data or {}).get("proxy_server_request") or {}
+        headers = psr.get("headers") or {}
+        for h in ("x-claude-code-session-id", "x-litellm-session-id", "x-session-id"):
+            if headers.get(h):
+                return str(headers[h])
+        return None
+
+    @classmethod
+    def _turn_text(cls, msg: Any) -> str:
+        """Normalized text of one message, harness context stripped, for matching."""
+        if not isinstance(msg, dict):
+            return ""
+        c = msg.get("content")
+        if isinstance(c, list):
+            txt = " ".join(b.get("text", "") for b in c if isinstance(b, dict) and b.get("type") == "text")
+        else:
+            txt = str(c or "")
+        return " ".join(HARNESS_CONTEXT_RE.sub("", txt).split())
+
+    # Minimum length before a turn is trackable, so short pleasantries can never
+    # match something else by accident.
+    QUARANTINE_MIN_CHARS = 12
+    QUARANTINE_MAX_TEXT = 4000
+
+    @classmethod
+    def _fingerprint(cls, msg: Any) -> Optional[str]:
+        """Normalized text used both as the quarantine key and for matching.
+
+        Exact hashing is not enough: when a request is rejected, Claude Code keeps
+        the message and resends it with its own additions appended (e.g.
+        "Continue from where you left off."), so the history copy never hashes to
+        the same value. We keep the text and match by containment instead.
+        """
+        t = cls._turn_text(msg)
+        if len(t) < cls.QUARANTINE_MIN_CHARS:
+            return None
+        return t[: cls.QUARANTINE_MAX_TEXT]
+
+    @classmethod
+    def _matches_quarantined(cls, text: str, bucket: Any) -> bool:
+        """True if this turn is (or contains, or is contained by) a blocked turn."""
+        if len(text) < cls.QUARANTINE_MIN_CHARS:
+            return False
+        for held in bucket:
+            if held == text or held in text or text in held:
+                return True
+        return False
+
+    @classmethod
+    def remember_blocked(cls, data: dict, kwargs: Optional[dict] = None) -> None:
+        """Record the user turn(s) that were just blocked, so later requests can
+        have them stripped out of history."""
+        if not QUARANTINE_BLOCKED_HISTORY:
+            return
+        key = cls._session_key(kwargs, data)
+        if not key:
+            logger.info("Quarantine: no session id on this request, cannot track blocked turn")
+            return
+        msgs = data.get("messages")
+        if not isinstance(msgs, list):
+            return
+        last_user = next((m for m in reversed(msgs)
+                          if isinstance(m, dict) and m.get("role") == "user"), None)
+        fp = cls._fingerprint(last_user)
+        if not fp:
+            return
+        bucket = cls._quarantine.setdefault(key, OrderedDict())
+        bucket[fp] = None
+        while len(bucket) > QUARANTINE_MAX_PER_SESSION:
+            bucket.popitem(last=False)
+        while len(cls._quarantine) > QUARANTINE_MAX_SESSIONS:
+            cls._quarantine.pop(next(iter(cls._quarantine)))
+        logger.info(f"Quarantined blocked turn for session {key} ({len(bucket)} held)")
+
+    @classmethod
+    def strip_quarantined_history(cls, data: dict, kwargs: Optional[dict] = None) -> dict:
+        """Drop previously blocked user turns (and any assistant reply that
+        immediately followed them) from the request before it reaches the model."""
+        if not QUARANTINE_BLOCKED_HISTORY:
+            return data
+        key = cls._session_key(kwargs, data)
+        if not key:
+            return data
+        bucket = cls._quarantine.get(key)
+        if not bucket:
+            return data
+        msgs = data.get("messages")
+        if not isinstance(msgs, list) or len(msgs) < 2:
+            return data
+
+        # Never strip the newest user turn - that one is being judged right now.
+        last_user_idx = next((i for i in range(len(msgs) - 1, -1, -1)
+                              if isinstance(msgs[i], dict) and msgs[i].get("role") == "user"), None)
+        drop = set()
+        for i, m in enumerate(msgs):
+            if i == last_user_idx or not isinstance(m, dict) or m.get("role") != "user":
+                continue
+            if cls._matches_quarantined(cls._turn_text(m), bucket):
+                drop.add(i)
+                if i + 1 < len(msgs) and isinstance(msgs[i + 1], dict) and msgs[i + 1].get("role") == "assistant":
+                    drop.add(i + 1)
+        if not drop:
+            return data
+        cleaned = dict(data)
+        cleaned["messages"] = [m for i, m in enumerate(msgs) if i not in drop]
+        logger.info(
+            f"Stripped {len(drop)} quarantined message(s) from history before forwarding "
+            f"({len(msgs)} -> {len(cleaned['messages'])} messages)"
+        )
+        return cleaned
+
+    def session_trace_headers(self, kwargs: Optional[dict] = None) -> Dict[str, str]:
+        """x-akto-installer-* session/trace headers, matching the convention the
+        other Akto connectors use (shared/akto_ingestion_utility.installer_headers)
+        so the backend indexes LiteLLM traces the same way.
+
+        Mapping for this connector:
+          akto_session_id     LiteLLM metadata.session_id - for Claude Code this is
+                              the CLI's own session id, so turns of one conversation
+                              group together in traces.
+          akto_message_id     litellm_call_id - unique per request, and the same id
+                              build_tags() stamps, so a completion and its tool
+                              calls join up.
+          akto_conversation_id  only when the caller supplied a distinct one.
+        Raw field names are forwarded alongside, as the shared helper does.
+        """
+        md = (kwargs.get("litellm_params", {}) if kwargs else {}).get("metadata", {}) or {}
+        headers: Dict[str, str] = {}
+
+        def put(name: str, value: Any) -> None:
+            if value is None or value == "":
+                return
+            headers[f"x-akto-installer-{name}"] = (
+                json.dumps(value) if isinstance(value, (dict, list)) else str(value)
+            )
+
+        session_id = md.get("session_id") or md.get("trace_id")
+        call_id = (kwargs or {}).get("litellm_call_id") or md.get("litellm_call_id")
+
+        # raw field names, as the shared helper forwards them
+        put("session_id", md.get("session_id"))
+        put("trace_id", md.get("trace_id"))
+        put("litellm_call_id", call_id)
+        put("user_agent", md.get("user_agent"))
+
+        # normalized ids the backend keys traces on
+        put("akto_session_id", session_id)
+        put("akto_message_id", call_id)
+        conversation = md.get("conversation_id")
+        if conversation and conversation != session_id:
+            put("akto_conversation_id", conversation)
+
+        return headers
+
+    def build_forwarded_headers(self, request_headers_raw: dict, host: str, kwargs: Optional[dict] = None) -> dict:
         """Mirrors all original client request headers (e.g. x-akto-* passthrough
         headers) to the ingested request, except credentials/cookies (never forwarded)
-        and host/content-type (overridden to reflect the mirrored envelope)."""
+        and host/content-type (overridden to reflect the mirrored envelope).
+
+        Session/trace identity is added as x-akto-installer-* headers; the client's
+        own headers win on a clash so nothing it sent is overwritten."""
         headers_out = {
             k: v for k, v in (request_headers_raw or {}).items()
             if k.lower() not in EXCLUDED_FORWARD_HEADERS
         }
+        for k, v in self.session_trace_headers(kwargs).items():
+            headers_out.setdefault(k, v)
         headers_out["host"] = host
         headers_out["content-type"] = "application/json"
         return headers_out
@@ -817,7 +1409,7 @@ class GuardrailsHandler(CustomLogger):
             or "0.0.0.0"
         )
 
-        headers_out = self.build_forwarded_headers(request_headers_raw, host)
+        headers_out = self.build_forwarded_headers(request_headers_raw, host, kwargs)
 
         request_payload = json.dumps({
             "body": request_body,

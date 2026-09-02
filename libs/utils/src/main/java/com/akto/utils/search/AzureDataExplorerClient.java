@@ -648,6 +648,7 @@ public class AzureDataExplorerClient extends SearchClient {
             // topic/subTopic live only in the Mongo mapping under this backend, not on ADX rows.
             filterChoices.put("topic",    AgentQueryTopicMappingDao.instance.distinctTopics(100));
             filterChoices.put("subTopic", AgentQueryTopicMappingDao.instance.distinctSubTopics(200));
+            filterChoices.put(AgentQueryRecord.F_GUARDRAIL_POLICY, distinctValues(where, AgentQueryRecord.F_GUARDRAIL_POLICY, 100));
         } catch (Exception e) {
             return new HashMap<>();
         }
@@ -872,6 +873,14 @@ public class AzureDataExplorerClient extends SearchClient {
                 if (vals == null || vals.isEmpty()) continue;
                 if (AgentQueryRecord.F_TOPIC_KW.equals(e.getKey())) { topics = vals; continue; }
                 if (AgentQueryRecord.F_SUB_TOPIC_KW.equals(e.getKey())) { subTopics = vals; continue; }
+                if (AgentQueryRecord.F_GUARDRAIL_VIOLATED.equals(e.getKey())) {
+                    // guardrailViolated is a bool column — quoting it as a string ("true") would
+                    // compare a bool to a string and never match, so emit unquoted KQL literals.
+                    String bools = vals.stream().map(v -> String.valueOf(Boolean.parseBoolean(v)))
+                        .collect(Collectors.joining(","));
+                    sb.append(" and ").append(AgentQueryRecord.F_GUARDRAIL_VIOLATED).append(" in (").append(bools).append(")");
+                    continue;
+                }
                 sb.append(" and ").append(adxField(e.getKey())).append(" in (").append(quotedList(vals)).append(")");
             }
             if (topics != null || subTopics != null) {

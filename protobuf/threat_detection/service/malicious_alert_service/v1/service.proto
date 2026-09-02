@@ -21,6 +21,7 @@ message RecordMaliciousEventRequest {
 message UpdateRemediationRequest {
   string ref_id = 1;             // UUID refId of the malicious event
   string remediation = 2;        // Remediation steps from LLM
+  string evidence_line = 3;      // Verbatim line of the prompt that triggered the violation (scrubbed)
 }
 
 message UpdateRemediationResponse {
