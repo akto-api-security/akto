@@ -12,7 +12,7 @@ import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.YamlTestResult;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.test_editor.utils.Utils;
+import com.akto.test_editor.Utils;
 
 public class Strategy {
     
