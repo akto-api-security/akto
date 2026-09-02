@@ -484,6 +484,9 @@ public class DbAction extends ActionSupport {
     Map<ObjectId, TestingRunResultSummary> testingRunResultSummaryMap;
     BasicDBObject testingRunResult;
     List<BasicDBObject> testingRunResultsForBulkWrite;
+    List<BasicDBObject> testingRunResultsForRecord;
+    List<String> rerunDeleteIds;
+    boolean doNotMarkIssuesAsFixed;
     Tokens token;
     WorkflowTest workflowTest;
     List<YamlTemplate> yamlTemplates;
@@ -2888,6 +2891,32 @@ public class DbAction extends ActionSupport {
             loggerMaker.errorAndAddToDb(e, "Error in bulkWriteTestingRunResults " + e.toString());
             if (kafkaUtils.isWriteEnabled()) {
                 kafkaUtils.insertDataSecondary(testingRunResultsForBulkWrite, "bulkWriteTestingRunResults", Context.accountId.get());
+            }
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Consolidated bulk endpoint: does the work of insertTestingRunResults/bulkWriteTestingRunResults +
+     * deleteTestingRunResults[rerun] + updateTestResultsCountInTestSummary + the whole issue-creation flow
+     * (findTestSourceConfig + fetchIssuesByIds + bulkWriteTestingRunIssues + updateIssueCountInSummary, ported
+     * from apps/mini-testing's TestingIssuesHandler into DbLayer.recordIssuesForTestingRunResults) as ONE call,
+     * batched across N results. This is intentionally a brand-new endpoint - the existing insertTestingRunResults/
+     * bulkWriteTestingRunResults endpoints and their DbLayer/DataActor methods are untouched; only
+     * buildTestingRunResultFromPayload is reused (it already existed as a shared helper).
+     */
+    public String bulkRecordTestingRunResults() {
+        try {
+            List<TestingRunResult> results = new ArrayList<>();
+            for (BasicDBObject raw : testingRunResultsForRecord) {
+                results.add(buildTestingRunResultFromPayload(raw));
+            }
+            DbLayer.bulkRecordTestingRunResults(results, rerunDeleteIds, doNotMarkIssuesAsFixed);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in bulkRecordTestingRunResults " + e.toString());
+            if (kafkaUtils.isWriteEnabled()) {
+                kafkaUtils.insertDataSecondary(testingRunResultsForRecord, "bulkRecordTestingRunResults", Context.accountId.get());
             }
             return Action.ERROR.toUpperCase();
         }
@@ -5582,6 +5611,30 @@ public class DbAction extends ActionSupport {
 
     public void setTestingRunResultsForBulkWrite(List<BasicDBObject> testingRunResultsForBulkWrite) {
         this.testingRunResultsForBulkWrite = testingRunResultsForBulkWrite;
+    }
+
+    public List<BasicDBObject> getTestingRunResultsForRecord() {
+        return testingRunResultsForRecord;
+    }
+
+    public void setTestingRunResultsForRecord(List<BasicDBObject> testingRunResultsForRecord) {
+        this.testingRunResultsForRecord = testingRunResultsForRecord;
+    }
+
+    public List<String> getRerunDeleteIds() {
+        return rerunDeleteIds;
+    }
+
+    public void setRerunDeleteIds(List<String> rerunDeleteIds) {
+        this.rerunDeleteIds = rerunDeleteIds;
+    }
+
+    public boolean isDoNotMarkIssuesAsFixed() {
+        return doNotMarkIssuesAsFixed;
+    }
+
+    public void setDoNotMarkIssuesAsFixed(boolean doNotMarkIssuesAsFixed) {
+        this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
     }
 
     public Tokens getToken() {
