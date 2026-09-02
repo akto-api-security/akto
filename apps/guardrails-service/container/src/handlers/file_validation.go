@@ -438,7 +438,7 @@ func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload strin
 				return &chunkResult{Err: ctx.Err()}
 			}
 		}
-		result, err := h.validatorService.ValidateRequest(ctx, &params, sessionID, requestID)
+		result, _, err := h.validatorService.ValidateRequest(ctx, &params, sessionID, requestID)
 		if err != nil {
 			lastErr = err
 			continue

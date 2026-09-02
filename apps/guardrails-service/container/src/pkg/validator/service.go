@@ -16,6 +16,8 @@ import (
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
+	"github.com/akto-api-security/guardrails-service/pkg/threatapi"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/singleflight"
@@ -86,6 +88,7 @@ type Service struct {
 	skipPaths             *pathSkipper
 	policyRefreshGroup    singleflight.Group
 	allowlistRefreshGroup singleflight.Group
+	threatAPIClient       *threatapi.Client
 }
 
 // NewService creates a new validator service
@@ -165,6 +168,7 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		anomalyDetector:     anomalyDetector,
 		schemaFetcher:       schemaFetcher,
 		skipPaths:           skipPaths,
+		threatAPIClient:     threatapi.NewClient(),
 	}
 	bp := mcp.GetScanBackpressureSnapshot()
 	logger.Info("Scan backpressure breaker active (mcp processor, remote-scanner boundary)",
@@ -452,6 +456,123 @@ func isServerApproved(approved []types.ApprovedServer, mcpServerName string, now
 		}
 	}
 	return false
+}
+
+// behaviourHumanApproval is Argus's per-call pending/poll behaviour — distinct from
+// Atlas's "approval" (filterApprovedServers/isServerApproved above), untouched by this.
+const behaviourHumanApproval = "human_approval"
+
+// resolveHumanApprovalPolicyName returns the first policy's name whose behaviour is
+// "human_approval" (first-match-wins if more than one applies).
+func resolveHumanApprovalPolicyName(policies []types.Policy) string {
+	for _, p := range policies {
+		if strings.EqualFold(p.Behaviour, behaviourHumanApproval) {
+			return p.Info.Name
+		}
+	}
+	return ""
+}
+
+// CreateHumanApprovalActivity records a pending Human Approval activity and returns its
+// activity id (self-generated UUID, used as refId). Reports via mcp.ReportThreat like every
+// other verdict in this file (see reportAndBlockHost); akto-gateway/mcp-endpoint-shield sets
+// Status=HUMAN_APPROVAL/HumanResponse=PENDING automatically for this behaviour. Fire-and-forget:
+// the id is returned before the write completes, matching every other ReportThreat call site.
+//
+// Known gap: the external processor's own automatic reporting also fires for this verdict
+// with its own untracked refId, so one "human_approval" call produces two dashboard rows —
+// the untracked one has no effect on live traffic. Not fixable from this repo.
+func (s *Service) CreateHumanApprovalActivity(ctx context.Context, policies []types.Policy, valCtx *mcp.ValidationContext, params *models.ValidateRequestParams, payloadToValidate, sessionID, reason string) string {
+	policyName := resolveHumanApprovalPolicyName(policies)
+
+	activityID := uuid.NewString()
+
+	metadata := types.ThreatMetadata{
+		PolicyName:   policyName,
+		RuleViolated: "HumanApproval",
+		Reason:       reason,
+	}
+
+	go func() {
+		err := mcp.ReportThreat(
+			context.Background(),
+			payloadToValidate,
+			"",
+			metadata,
+			params.IP,
+			params.Path,
+			params.Method,
+			valCtx.RequestHeaders,
+			valCtx.ResponseHeaders,
+			valCtx.StatusCode,
+			valCtx.ContextSource,
+			valCtx.McpServerName,
+			sessionID,
+			behaviourHumanApproval,
+			activityID,
+		)
+		if err != nil {
+			s.logger.Warn("CreateHumanApprovalActivity - failed to report human approval event",
+				zap.String("activityId", activityID),
+				zap.String("policy", policyName),
+				zap.Error(err))
+		}
+	}()
+
+	return activityID
+}
+
+// shouldCreatePendingApproval reports whether result needs to become a pending Human
+// Approval activity instead of being returned as-is.
+func shouldCreatePendingApproval(result *mcp.ValidationResult) bool {
+	return result != nil && !result.Allowed && strings.EqualFold(result.Behaviour, behaviourHumanApproval)
+}
+
+// pendingIfHumanApproval turns a blocked result into a pending Human Approval activity when
+// its Behaviour is "human_approval" — lets the pre-engine guard checks (personal-account,
+// blocked-host) participate in the same pending/poll flow as the main rule engine.
+func (s *Service) pendingIfHumanApproval(ctx context.Context, result *mcp.ValidationResult, policies []types.Policy, valCtx *mcp.ValidationContext, params *models.ValidateRequestParams, payloadToValidate, sessionID string) (*mcp.ValidationResult, string) {
+	if !shouldCreatePendingApproval(result) {
+		return result, ""
+	}
+	return result, s.CreateHumanApprovalActivity(ctx, policies, valCtx, params, payloadToValidate, sessionID, result.Reason)
+}
+
+// CheckHumanApprovalStatus looks up activityID's current decision. Pure read, no policy
+// re-evaluation. Not-found (write not yet landed) is reported the same as PENDING.
+func (s *Service) CheckHumanApprovalStatus(ctx context.Context, activityID string) (*models.ApprovalPollResponse, error) {
+	status, err := s.threatAPIClient.CheckHumanApprovalStatus(ctx, activityID)
+	if err != nil {
+		return nil, err
+	}
+	return buildApprovalPollResponse(activityID, status), nil
+}
+
+// buildApprovalPollResponse maps a raw threatapi.ApprovalStatus onto the wire response.
+func buildApprovalPollResponse(activityID string, status *threatapi.ApprovalStatus) *models.ApprovalPollResponse {
+	resp := &models.ApprovalPollResponse{
+		Behaviour:  behaviourHumanApproval,
+		ActivityID: activityID,
+	}
+
+	humanResponse := ""
+	if status != nil {
+		humanResponse = strings.ToUpper(status.HumanResponse)
+	}
+
+	switch humanResponse {
+	case "APPROVED":
+		resp.Allowed = true
+		resp.Status = "approved"
+	case "BLOCKED":
+		resp.Allowed = false
+		resp.Status = "blocked"
+	default:
+		// PENDING, or not found yet (async write still in flight) — treat the same.
+		resp.Allowed = false
+		resp.Status = "pending"
+	}
+	return resp
 }
 
 func (s *Service) getMcpAllowedHostList() ([]types.McpAllowedList, error) {
@@ -1525,8 +1646,9 @@ func (s *Service) withValidationDeadline(ctx context.Context) (context.Context, 
 	return context.WithTimeout(ctx, time.Duration(s.config.ValidationTimeoutMs)*time.Millisecond)
 }
 
-// ValidateRequest validates a request payload against guardrail policies with session tracking
-func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRequestParams, sessionID string, requestID string) (*mcp.ValidationResult, error) {
+// ValidateRequest validates a request against guardrail policies. Returns (result,
+// activityID, err); activityID is non-empty only for a pending Human Approval verdict.
+func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRequestParams, sessionID string, requestID string) (*mcp.ValidationResult, string, error) {
 	start := time.Now()
 	payload := params.RequestPayload
 	contextSource := params.ContextSource
@@ -1552,7 +1674,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		if s.skipPaths.shouldSkip(host, params.Path) {
 			s.logger.Info("ValidateRequest - host+path in GUARDRAILS_SKIP_PATHS, skipping guardrails",
 				zap.String("host", host), zap.String("path", params.Path), zap.String("method", params.Method))
-			return &mcp.ValidationResult{Allowed: true, ModifiedPayload: payload}, nil
+			return &mcp.ValidationResult{Allowed: true, ModifiedPayload: payload}, "", nil
 		}
 	}
 
@@ -1562,7 +1684,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.String("method", params.Method),
 			zap.String("sessionID", sessionID),
 			zap.String("requestID", requestID))
-		return result, nil
+		return result, "", nil
 	}
 
 	// Track request and generate summary asynchronously
@@ -1595,7 +1717,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.String("sessionID", sessionID),
 			zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()),
 			zap.Error(err))
-		return nil, fmt.Errorf("failed to load policies: %w", err)
+		return nil, "", fmt.Errorf("failed to load policies: %w", err)
 	}
 
 	mcpAllowedHostList, err := s.getMcpAllowedHostList()
@@ -1607,7 +1729,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.String("contextSource", contextSource),
 			zap.String("sessionID", sessionID),
 			zap.Error(err))
-		return nil, fmt.Errorf("failed to get MCP allowed host list: %w", err)
+		return nil, "", fmt.Errorf("failed to get MCP allowed host list: %w", err)
 	}
 	s.logger.Info("ValidateRequest - loaded policies",
 		zap.String("contextSource", contextSource),
@@ -1637,19 +1759,22 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// selection is respected (a personal-account policy scoped to server A should
 	// not block requests arriving on server B).
 	if policyName, blocked := s.resolvePersonalAccountBlock(policies, valCtx.Tag, valCtx.RequestHeaders, params.Path, sessionID); blocked {
-		return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName)), nil
+		result := s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName))
+		result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, payloadToValidate, sessionID)
+		return result, activityID, nil
 	}
 
 	// Host blocklist (block-only). Evaluated after server filtering so only rules from
 	// policies scoped to this server are considered.
 	if blockResult := s.checkBlockedHost(params, valCtx, payloadToValidate, sessionID, requestID, policies); blockResult != nil {
-		return blockResult, nil
+		blockResult, activityID := s.pendingIfHumanApproval(ctx, blockResult, policies, valCtx, params, payloadToValidate, sessionID)
+		return blockResult, activityID, nil
 	}
 
 	// Anomaly detection: check each filtered policy's anomaly config.
 	// Tool calls and errors are recorded per-policy so scoped limits are respected.
 	if blockResult := s.checkToolCallAnomaly(ctx, params, sessionID, policies, contextSource); blockResult != nil {
-		return blockResult, nil
+		return blockResult, "", nil
 	}
 
 	s.logger.Info("ValidateRequest - calling ProcessRequest",
@@ -1686,7 +1811,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.String("sessionID", sessionID),
 			zap.Int64("latencyMs", time.Since(processStart).Milliseconds()),
 			zap.Error(err))
-		return nil, fmt.Errorf("failed to process request: %w", err)
+		return nil, "", fmt.Errorf("failed to process request: %w", err)
 	}
 
 	// Reconcile ignore-phrase redaction: the real origin must never see a placeholder.
@@ -1755,11 +1880,13 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.Bool("allowed", result.Allowed))
 	}
 
-	return result, nil
+	result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, payloadToValidate, sessionID)
+	return result, activityID, nil
 }
 
-// ValidateResponse validates a response payload against guardrail policies with session tracking
-func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateRequestParams, responseBody string, sessionID string, requestID string) (*mcp.ValidationResult, error) {
+// ValidateResponse validates a response against guardrail policies — see ValidateRequest
+// for the (result, activityID, err) contract.
+func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateRequestParams, responseBody string, sessionID string, requestID string) (*mcp.ValidationResult, string, error) {
 	start := time.Now()
 	contextSource := params.ContextSource
 
@@ -1784,7 +1911,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		if s.skipPaths.shouldSkip(host, params.Path) {
 			s.logger.Info("ValidateResponse - host+path in GUARDRAILS_SKIP_PATHS, skipping guardrails",
 				zap.String("host", host), zap.String("path", params.Path), zap.String("method", params.Method))
-			return &mcp.ValidationResult{Allowed: true, ModifiedPayload: responseBody}, nil
+			return &mcp.ValidationResult{Allowed: true, ModifiedPayload: responseBody}, "", nil
 		}
 	}
 
@@ -1802,7 +1929,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 			zap.String("sessionID", sessionID),
 			zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()),
 			zap.Error(err))
-		return nil, fmt.Errorf("failed to load policies: %w", err)
+		return nil, "", fmt.Errorf("failed to load policies: %w", err)
 	}
 
 	s.logger.Info("ValidateResponse - loaded policies",
@@ -1820,7 +1947,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 			zap.String("contextSource", contextSource),
 			zap.String("sessionID", sessionID),
 			zap.Error(err))
-		return nil, fmt.Errorf("failed to get MCP allowed host list: %w", err)
+		return nil, "", fmt.Errorf("failed to get MCP allowed host list: %w", err)
 	}
 
 	// Create validation context with full request metadata (matching batch flow)
@@ -1867,7 +1994,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 			zap.String("sessionID", sessionID),
 			zap.Int64("latencyMs", time.Since(processStart).Milliseconds()),
 			zap.Error(err))
-		return nil, fmt.Errorf("failed to process response: %w", err)
+		return nil, "", fmt.Errorf("failed to process response: %w", err)
 	}
 
 	// Reconcile ignore-phrase redaction: the real origin must never see a placeholder.
@@ -1887,7 +2014,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	// Anomaly detection: record error if tool call returned error status (4xx/5xx).
 	// Uses the same filtered policies from the request path.
 	if blockResult := s.checkErrorAnomaly(ctx, params, sessionID, policies, contextSource); blockResult != nil {
-		return blockResult, nil
+		return blockResult, "", nil
 	}
 
 	// Convert ProcessResult to ValidationResult for backward compatibility
@@ -1912,7 +2039,8 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("reason", result.Reason),
 		zap.Int64("totalLatencyMs", time.Since(start).Milliseconds()))
 
-	return result, nil
+	result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, responseBodyForValidation, sessionID)
+	return result, activityID, nil
 }
 
 // ValidateRequestWithPolicy validates a request payload with an optional provided policy

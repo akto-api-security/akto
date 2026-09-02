@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
@@ -44,6 +45,14 @@ func CheckAndHandleMaliciousSession(sessionMgr *SessionManager, logger *zap.Logg
 	}, true
 }
 
+// shouldMarkSessionMalicious reports whether a blocked verdict should lock the whole session
+// via IsMalicious. "human_approval" is a pending review, not a confirmed-malicious call —
+// marking the session here would permanently lock it out via CheckAndHandleMaliciousSession
+// even after an admin approves, since nothing ever resets IsMalicious back to false.
+func shouldMarkSessionMalicious(behaviour string) bool {
+	return !strings.EqualFold(behaviour, "human_approval")
+}
+
 // TrackBlockedResponse tracks blocked response in session manager
 func TrackBlockedResponse(sessionMgr *SessionManager, logger *zap.Logger, sessionID, requestID string, processResult *mcp.ProcessResult) {
 	if sessionMgr == nil || sessionID == "" || !processResult.IsBlocked {
@@ -76,7 +85,7 @@ func TrackBlockedResponse(sessionMgr *SessionManager, logger *zap.Logger, sessio
 		}
 	}
 
-	sessionMgr.TrackResponse(sessionID, requestID, blockedResponseMsg, true)
+	sessionMgr.TrackResponse(sessionID, requestID, blockedResponseMsg, shouldMarkSessionMalicious(processResult.Behaviour))
 	if blockReason != "" {
 		sessionMgr.UpdateBlockedReason(sessionID, blockReason)
 	}

@@ -240,6 +240,17 @@ public class MaliciousEventService {
     }
   }
 
+  /** Looks up an event's human-approval decision by refId. Null (not found) is normal — the async write may not have landed yet. */
+  public MaliciousEventDto getApprovalStatus(String accountId, String refId) {
+    if (refId == null || refId.isEmpty()) {
+      logger.error("refId is required to fetch approval status");
+      return null;
+    }
+
+    Bson filters = Filters.eq("refId", refId);
+    return maliciousEventDao.getCollection(accountId).find(filters).first();
+  }
+
   private <T> Set<T> findDistinctFields(
       String accountId, String fieldName, Class<T> tClass, Bson filters) {
     DistinctIterable<T> r = maliciousEventDao.getCollection(accountId).distinct(fieldName, filters, tClass);

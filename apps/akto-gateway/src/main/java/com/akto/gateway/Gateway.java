@@ -36,12 +36,18 @@ public class Gateway {
 
     public Map<String, Object> processHttpProxy(Map<String, Object> requestData) {
         loggerMaker.infoAndAddToDb(
-            "Processing HTTP proxy request - path: {}, method: {}, guardrails: {}, response_guardrails: {}, ingest_data: {}",
+            "Processing HTTP proxy request - path: {}, method: {}, guardrails: {}, response_guardrails: {}, ingest_data: {}, activityId: {}",
             requestData.get("path"),
             requestData.get("method"),
             requestData.get("guardrails"),
             requestData.get("response_guardrails"),
-            requestData.get("ingest_data"));
+            requestData.get("ingest_data"),
+            requestData.get("activityId"));
+
+        String activityId = getStringField(requestData, "activityId");
+        if (activityId != null && !activityId.isEmpty()) {
+            return checkHumanApprovalStatus(activityId);
+        }
 
         long start = System.currentTimeMillis();
         try {
@@ -109,6 +115,19 @@ public class Gateway {
             error.put("error", e.getMessage());
             return error;
         }
+    }
+
+    /** Checks a pending Human Approval activity's status via the same /api/http-proxy path. */
+    private Map<String, Object> checkHumanApprovalStatus(String activityId) {
+        Map<String, Object> validateRequest = new HashMap<>();
+        validateRequest.put("activityId", activityId);
+        Map<String, Object> guardrailsResponse = guardrailsClient.callValidateRequest(validateRequest);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("message", "Approval status checked");
+        result.put("guardrailsResult", guardrailsResponse);
+        return result;
     }
 
     private static boolean shouldForceGuardrailsForAccount(Integer accountId) {
