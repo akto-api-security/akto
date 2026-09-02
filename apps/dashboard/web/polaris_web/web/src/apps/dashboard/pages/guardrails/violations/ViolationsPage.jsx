@@ -234,10 +234,11 @@ const DEFAULT_COL_DEF = {
 };
 
 function HumanResponseCellRenderer({ value, data, onHumanApproval }) {
-    const pending = isHumanApprovalPending(value);
+    const response = data?.humanResponse ?? value;
+    const pending = isHumanApprovalPending(response);
     return (
         <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-            <HumanResponseBadge response={value} />
+            <HumanResponseBadge response={response} />
             {pending && (
                 <HumanApprovalActions
                     pending
@@ -860,6 +861,7 @@ function Violations() {
     const [summaryLoading, setSummaryLoading] = useState(true);
     const [selectedViolation, setSelectedViolation] = useState(null);
     const [bulkSelectedCount, setBulkSelectedCount] = useState(0);
+    const [bulkPendingCount, setBulkPendingCount] = useState(0);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [filterValues, setFilterValues] = useState({ hosts: [], subCategory: [], actors: [] });
     const [latencyData, setLatencyData] = useState(null);
@@ -1467,6 +1469,7 @@ function Violations() {
     const clearBulkSelection = useCallback(() => {
         gridRef.current?.api?.deselectAll();
         setBulkSelectedCount(0);
+        setBulkPendingCount(0);
     }, []);
 
     const handleBulkStatusUpdate = useCallback(async (status, pastTenseLabel) => {
@@ -1527,18 +1530,20 @@ function Violations() {
 
     const bulkActions = useMemo(() => {
         if (isHumanApprovalTab) {
-            return [
-                { label: "Approve", onAction: () => handleBulkHumanApproval(HUMAN_RESPONSE.APPROVED) },
-                { label: "Block", onAction: () => handleBulkHumanApproval(HUMAN_RESPONSE.BLOCKED) },
-                { label: "Delete", destructive: true, onAction: () => setDeleteConfirmOpen(true) },
-            ];
+            const actions = [];
+            if (bulkPendingCount > 0) {
+                actions.push({ label: "Approve", onAction: () => handleBulkHumanApproval(HUMAN_RESPONSE.APPROVED) });
+                actions.push({ label: "Block", onAction: () => handleBulkHumanApproval(HUMAN_RESPONSE.BLOCKED) });
+            }
+            actions.push({ label: "Delete", destructive: true, onAction: () => setDeleteConfirmOpen(true) });
+            return actions;
         }
         return [
             { label: "Mark for Review", onAction: () => handleBulkStatusUpdate("UNDER_REVIEW", "marked for review") },
             { label: "Ignore", onAction: () => handleBulkStatusUpdate("IGNORED", "ignored") },
             { label: "Delete", destructive: true, onAction: () => setDeleteConfirmOpen(true) },
         ];
-    }, [isHumanApprovalTab, handleBulkStatusUpdate, handleBulkHumanApproval]);
+    }, [isHumanApprovalTab, bulkPendingCount, handleBulkStatusUpdate, handleBulkHumanApproval]);
 
     const handleRowClick = (e) => {
         if (e?.data) setSelectedViolation(e.data);
@@ -1665,8 +1670,15 @@ function Violations() {
                 }}
                 onSelectionChanged={(e) => {
                     let count = 0;
-                    e.api.forEachNode(node => { if (!node.stub && node.isSelected()) count++; });
+                    let pendingCount = 0;
+                    e.api.forEachNode(node => {
+                        if (!node.stub && node.isSelected()) {
+                            count++;
+                            if (isHumanApprovalPending(node.data?.humanResponse)) pendingCount++;
+                        }
+                    });
                     setBulkSelectedCount(count);
+                    setBulkPendingCount(pendingCount);
                 }}
                 bulkActionCount={bulkSelectedCount}
                 bulkActions={bulkActions}

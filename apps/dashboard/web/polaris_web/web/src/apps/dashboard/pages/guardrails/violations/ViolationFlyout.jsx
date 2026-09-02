@@ -35,6 +35,7 @@ import {
     ChatSessionSection,
     FileSection,
     HumanApprovalActions,
+    HumanResponseBadge,
     OverviewSection,
     PromptResponseSection,
     RemediationSection,
@@ -364,22 +365,25 @@ function FlyoutHeader({ row, onClose, onStatusUpdate, onHumanApproval }) {
                     </HorizontalStack>
                     <HorizontalStack gap="2" blockAlign="center" wrap={false}>
                         {!isHumanApprovalEvent && (
-                            <EventActionsDropdown
-                                violationId={row.id}
-                                eventStatus={row._status}
-                                onStatusUpdate={onStatusUpdate}
-                                row={row}
-                            />
+                            <>
+                                <EventActionsDropdown
+                                    violationId={row.id}
+                                    eventStatus={row._status}
+                                    onStatusUpdate={onStatusUpdate}
+                                    row={row}
+                                />
+                                {row.behaviour === "approval" && <ApproveServerButton row={row} />}
+                            </>
                         )}
-                        {isHumanApprovalEvent ? (
+                        {isHumanApprovalEvent && pending && (
                             <HumanApprovalActions
-                                pending={pending}
-                                response={humanResponse}
+                                pending
                                 onApprove={() => onHumanApproval?.("APPROVED")}
                                 onBlock={() => onHumanApproval?.("BLOCKED")}
                             />
-                        ) : (
-                            row.behaviour === "approval" && <ApproveServerButton row={row} />
+                        )}
+                        {isHumanApprovalEvent && !pending && (
+                            <HumanResponseBadge response={humanResponse} />
                         )}
                         <Button plain icon={MobileCancelMajor} onClick={onClose} accessibilityLabel="Close" />
                     </HorizontalStack>
