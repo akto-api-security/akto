@@ -1575,10 +1575,29 @@ func (s *Service) validationContextFromParams(
 	}
 }
 
+func isMCPToolsCall(payload string) bool {
+	var request struct {
+		JSONRPC string `json:"jsonrpc"`
+		Method  string `json:"method"`
+	}
+	if err := json.Unmarshal([]byte(payload), &request); err != nil {
+		return false
+	}
+	return request.JSONRPC == "2.0" && request.Method == "tools/call"
+}
+
 // extractPayloadForValidation extracts configured JSON fields for guardrail evaluation.
-// Priority: dashboard guardrailSchema → GUARDRAIL_FIELD_MAPPING env → raw payload.
+// MCP tools/call keeps its complete protocol envelope so mcp-endpoint-shield can
+// generically inspect params.arguments. Other traffic uses dashboard
+// guardrailSchema → GUARDRAIL_FIELD_MAPPING env → raw payload.
 func (s *Service) extractPayloadForValidation(payload, method, path string, isRequest bool) string {
 	key := EndpointKey(method, path)
+
+	if isRequest && isMCPToolsCall(payload) {
+		s.logger.Debug("[SchemaExtract] preserving MCP tools/call for protocol-aware extraction",
+			zap.String("endpoint", key))
+		return payload
+	}
 
 	fields := resolveFieldsForEndpoint(method, path, isRequest)
 	if len(fields) == 0 {

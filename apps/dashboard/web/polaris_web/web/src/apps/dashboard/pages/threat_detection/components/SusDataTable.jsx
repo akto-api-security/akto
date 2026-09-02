@@ -20,7 +20,6 @@ import { buildApprovedByPolicy, isServerApproved } from "../../guardrails/utils"
 import AdvancedPayloadSearch from "../../guardrails/violations/AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "../../guardrails/violations/attributeSearch";
 import { HumanApprovalActions, HumanApprovalTabLabel, HumanResponseBadge, humanApprovalTabAccessibilityLabel, isHumanApprovalPending } from "../../guardrails/violations/ViolationFlyoutSections";
-import { deriveAgenticType, extractEvidenceText } from "../../guardrails/violations/violationsData";
 
 const resourceName = {
   singular: "activity",
@@ -137,14 +136,6 @@ const getHeaders = () => {
   ];
 
   if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
-    baseHeaders.push({
-      text: "Evidence",
-      value: "evidenceLine",
-      title: "Evidence",
-      maxWidth: "260px",
-      type: CellType.TEXT,
-      tooltipKey: "evidenceLineFull",
-    });
     baseHeaders.push({
       text: "Reason",
       value: "reason",
@@ -1126,17 +1117,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           // (the raw `metadata` passthrough is dropped by the table); used by the flyout's
           // "Approve server" action for "approval" behaviour policies.
           behaviourRaw: extractBehaviour(x?.metadata),
-          ...(() => {
-            const line = typeof x?.evidenceLine === "string" ? x.evidenceLine.trim() : "";
-            if (line) {
-              const { preview, full } = truncateToWords(line, 30);
-              return { evidenceLine: preview, evidenceLineFull: full };
-            }
-            const typeLabel = deriveAgenticType(x.url, x.method);
-            const full = extractEvidenceText(x.payload, typeLabel, 1500);
-            const preview = extractEvidenceText(x.payload, typeLabel, 300);
-            return { evidenceLine: preview || "-", evidenceLineFull: full || "-" };
-          })(),
           behaviour: (() => {
             const b = extractBehaviour(x?.metadata);
             if (!b) return '-';

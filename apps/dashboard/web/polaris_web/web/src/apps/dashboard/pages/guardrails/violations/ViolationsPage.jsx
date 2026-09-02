@@ -167,11 +167,6 @@ function ActionCellRenderer({ value }) {
     return <Badge size="small" status={status}>{value}</Badge>;
 }
 
-function EvidenceCellRenderer({ value }) {
-    if (!value) return null;
-    return <Text variant="bodySm" truncate>{value}</Text>;
-}
-
 function RiskScoreCellRenderer({ value }) {
     if (value == null || value === "") return null;
     return <Text variant="bodySm">{value}</Text>;
@@ -287,15 +282,6 @@ function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, 
             minWidth: 100,
             sortable: false,
             cellRenderer: TypeCellRenderer,
-        },
-        {
-            field: "evidenceText",
-            headerName: "Evidence",
-            width: 200,
-            minWidth: 200,
-            suppressAutoSize: true,
-            sortable: false,
-            cellRenderer: EvidenceCellRenderer,
         },
         {
             field: "severity",
@@ -549,7 +535,6 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
     // An empty {}/[] carries no useful info - treat it the same as nothing captured rather
     // than showing the literal "{}" in the Evidence column.
     const primaryValue = isEmptyJsonText(primaryValueRaw) ? "" : sanitizeDisplayText(primaryValueRaw, 300);
-    const gatewayEvidence = sanitizeDisplayText(coerceToText(event.evidenceLine), 300) || "";
 
     return {
         id: event.id,
@@ -576,7 +561,7 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         complianceMap: resolveComplianceClauseMap(event, true, {}, guardrailComplianceMap || {}),
         // Request-derived only - never falls back to meta.reason (a response/guardrail
         // explanation), which would show up as if it were the captured request content.
-        evidenceText: gatewayEvidence || primaryValue || "-",
+        evidenceText: primaryValue || "-",
         riskScore: parseStoredRiskScore(meta),
         reason: normalizeReasonPunctuation(meta.reason || meta.nreason) || "",
         actor: event.actor || "",

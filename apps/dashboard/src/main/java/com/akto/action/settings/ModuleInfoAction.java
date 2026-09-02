@@ -6,9 +6,15 @@ import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.DeviceTag;
+import com.akto.dto.monitoring.InstalledAppVulnerability;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.akto.dto.monitoring.ModuleInfoConstants;
+import com.akto.utils.vulnerability.InstalledAppVulnerabilityAnalysis;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Field;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
@@ -17,9 +23,11 @@ import com.mongodb.client.model.Updates;
 import lombok.Getter;
 import lombok.Setter;
 
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -119,20 +127,97 @@ public class ModuleInfoAction extends UserAction {
         }
     }
 
+    private static final int ENDPOINT_SHIELD_ACTIVE_THRESHOLD_SECONDS = 4 * 60 * 60;
+    private static final int ENDPOINT_SHIELD_INACTIVE_THRESHOLD_SECONDS = 2 * 24 * 60 * 60;
+    private static final String STATUS_FAILED = "failed";
+    private static final String STATUS_ACTIVE = "active";
+    private static final String STATUS_INACTIVE = "inactive";
+    private static final String STATUS_ERROR = "error";
+    private static final String ORIG_ID_FIELD = "origId";
+
+    // A physical host can show up as multiple ModuleInfo docs per {name, os} (reinstall/reconnect) — this
+    // is the dedup key used to collapse those down to one row per host.
+    private static Bson endpointShieldGroupId() {
+        return new Document(ModuleInfo.NAME, "$" + ModuleInfo.NAME).append("os", "$" + AD_OS);
+    }
+
+    // $group's $first materializes a source field that's missing on every doc in the group as an explicit
+    // null (unlike find(), which just leaves the Java field at its default) — fine for reference-typed
+    // fields, but a null decoded into a primitive boolean/int setter NPEs on unboxing. Default it in the
+    // pipeline instead for the four primitive-backed ModuleInfo fields.
+    private static Document ifNullExpr(String fieldPath, Object defaultValue) {
+        return new Document("$ifNull", Arrays.asList("$" + fieldPath, defaultValue));
+    }
+
+    private static Document endpointShieldCurrentStatusExpr(int now) {
+        return new Document("$switch", new Document()
+                .append("branches", Arrays.asList(
+                        new Document("case", new Document("$eq", Arrays.asList("$" + ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)))
+                                .append("then", STATUS_FAILED),
+                        new Document("case", new Document("$gte", Arrays.asList(
+                                "$" + ModuleInfo.LAST_HEARTBEAT_RECEIVED, now - ENDPOINT_SHIELD_ACTIVE_THRESHOLD_SECONDS)))
+                                .append("then", STATUS_ACTIVE),
+                        new Document("case", new Document("$gte", Arrays.asList(
+                                "$" + ModuleInfo.LAST_HEARTBEAT_RECEIVED, now - ENDPOINT_SHIELD_INACTIVE_THRESHOLD_SECONDS)))
+                                .append("then", STATUS_INACTIVE)
+                ))
+                .append("default", STATUS_ERROR));
+    }
+
     /**
      * Server-side paginated Endpoint Shield agent list (ATLAS). Replaces the old load-all fetchModuleInfo
      * on that page which pulled every device's full module doc at once (~10MB at 1000 devices).
+     *
+     * Collapses multiple docs per {name, os} down to the latest one (by lastHeartbeatReceived, always
+     * descending for the dedup — independent of whatever sortKey/sortOrder the UI asked for the final
+     * list order) and adds a computed additionalData.currentStatus, all inside the aggregation so
+     * skip/limit/filters still apply against the deduped set.
      */
     public String fetchEndpointShieldAgents() {
         Bson filter = buildEndpointShieldFilter();
-        total = ModuleInfoDao.instance.count(filter);
+        Bson groupId = endpointShieldGroupId();
+
+        Document countResult = ModuleInfoDao.instance.getMCollection().aggregate(Arrays.asList(
+                Aggregates.match(filter),
+                Aggregates.group(groupId),
+                Aggregates.count("total")
+        ), Document.class).first();
+        total = countResult == null ? 0 : ((Number) countResult.get("total")).longValue();
 
         String sortField = mapEndpointShieldSortField(sortKey);
-        Bson sort = (sortOrder < 0) ? Sorts.descending(sortField) : Sorts.ascending(sortField);
-
+        Bson finalSort = (sortOrder < 0) ? Sorts.descending(sortField) : Sorts.ascending(sortField);
         int lim = (limit <= 0) ? 20 : Math.min(limit, 200);
         int sk = Math.max(skip, 0);
-        moduleInfos = ModuleInfoDao.instance.findAll(filter, sk, lim, sort);
+
+        List<Bson> pipeline = Arrays.asList(
+                Aggregates.match(filter),
+                Aggregates.sort(Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED)),
+                Aggregates.group(groupId,
+                        Accumulators.first(ORIG_ID_FIELD, "$" + ModuleInfoDao.ID),
+                        Accumulators.first(ModuleInfo.MODULE_TYPE, "$" + ModuleInfo.MODULE_TYPE),
+                        Accumulators.first(ModuleInfo.CURRENT_VERSION, "$" + ModuleInfo.CURRENT_VERSION),
+                        Accumulators.first(ModuleInfo.STARTED_TS, ifNullExpr(ModuleInfo.STARTED_TS, 0)),
+                        Accumulators.first(ModuleInfo.LAST_HEARTBEAT_RECEIVED, ifNullExpr(ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)),
+                        Accumulators.first(ModuleInfo.NAME, "$" + ModuleInfo.NAME),
+                        Accumulators.first(ModuleInfo.ADDITIONAL_DATA, "$" + ModuleInfo.ADDITIONAL_DATA),
+                        Accumulators.first(ModuleInfo._REBOOT, ifNullExpr(ModuleInfo._REBOOT, false)),
+                        Accumulators.first(ModuleInfo.DELETE_TOPIC_AND_REBOOT, ifNullExpr(ModuleInfo.DELETE_TOPIC_AND_REBOOT, false)),
+                        Accumulators.first(ModuleInfo.MINI_RUNTIME_NAME, "$" + ModuleInfo.MINI_RUNTIME_NAME)),
+                Aggregates.addFields(
+                        new Field<>(ModuleInfoDao.ID, "$" + ORIG_ID_FIELD),
+                        new Field<>(ModuleInfo.ADDITIONAL_DATA + ".currentStatus", endpointShieldCurrentStatusExpr(Context.now()))),
+                Aggregates.project(Projections.exclude(ORIG_ID_FIELD)),
+                Aggregates.sort(finalSort),
+                Aggregates.skip(sk),
+                Aggregates.limit(lim)
+        );
+
+        moduleInfos = new ArrayList<>();
+        MongoCursor<ModuleInfo> cursor = ModuleInfoDao.instance.getMCollection().aggregate(pipeline, ModuleInfo.class).cursor();
+        while (cursor.hasNext()) {
+            moduleInfos.add(cursor.next());
+        }
+
         filterEnvironmentVariables(moduleInfos);
         allowedEnvFields = computeAllowedEnvFields();
         return SUCCESS.toUpperCase();
@@ -146,6 +231,34 @@ public class ModuleInfoAction extends UserAction {
         filterOptions.put("usernames", distinctStrings(AD_USERNAME, base));
         filterOptions.put("deviceIds", distinctStrings(AD_DEVICE_ID, base));
         filterOptions.put("oses", distinctStrings(AD_OS, base));
+        return SUCCESS.toUpperCase();
+    }
+
+    @Setter private List<Map<String, String>> installedAppsToCheck; // [{name, version}, ...]
+    @Getter private Map<String, InstalledAppVulnerability> installedAppVulnerabilities;
+
+    /**
+     * Known-vulnerability check for the "Apps" tab of the agent details flyout — one cache-or-compute
+     * lookup per {name, version} pair (see InstalledAppVulnerabilityAnalysis), keyed in the response by
+     * "{name}#{version}" so the frontend can match each row back to its verdict. Runs sequentially and
+     * calls out to OSV.dev on every cache miss, so a host's first-ever check (dozens of apps) is slower
+     * than repeat checks once the cache is warm.
+     */
+    public String checkInstalledAppVulnerabilities() {
+        installedAppVulnerabilities = new HashMap<>();
+        if (installedAppsToCheck == null) {
+            return SUCCESS.toUpperCase();
+        }
+
+        for (Map<String, String> app : installedAppsToCheck) {
+            String name = app == null ? null : app.get("name");
+            String version = app == null ? null : app.get("version");
+            InstalledAppVulnerability info = InstalledAppVulnerabilityAnalysis.getVulnerabilityInfo(name, version);
+            if (info != null) {
+                installedAppVulnerabilities.put(info.getId(), info);
+            }
+        }
+
         return SUCCESS.toUpperCase();
     }
 
