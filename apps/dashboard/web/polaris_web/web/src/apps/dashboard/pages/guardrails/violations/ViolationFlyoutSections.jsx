@@ -34,7 +34,7 @@ export function HumanResponseBadge({ response }) {
     const isBlocked = key === "BLOCKED";
     return (
         <Badge size="small" status={isApproved ? "success" : isBlocked ? "critical" : "warning"}>
-            {isApproved ? "Approved" : isBlocked ? "Blocked" : "Pending"}
+            {isApproved ? "Approved" : isBlocked ? "Denied" : "Pending"}
         </Badge>
     );
 }
@@ -55,11 +55,19 @@ export function humanApprovalTabAccessibilityLabel(count) {
 
 export function HumanApprovalTabLabel({ count }) {
     const n = typeof count === "number" && count > 0 ? count : 0;
-    if (n === 0) return "Human Approval";
+    if (n === 0) {
+        return (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                Human Approval
+                <Badge size="small" status="info">Beta</Badge>
+            </span>
+        );
+    }
     return (
         <Tooltip content={PENDING_HUMAN_APPROVAL_TOOLTIP} dismissOnMouseOut>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                 Human Approval
+                <Badge size="small" status="info">Beta</Badge>
                 <Badge size="small">{n.toLocaleString()}</Badge>
             </span>
         </Tooltip>
@@ -73,7 +81,7 @@ export function HumanApprovalActions({ pending, response, onApprove, onBlock, lo
     return (
         <>
             <Button size="slim" primary={!subtle} plain={!!subtle} loading={loading} onClick={onApprove}>Approve</Button>
-            <Button size="slim" destructive plain={!!subtle} loading={loading} onClick={onBlock}>Block</Button>
+            <Button size="slim" destructive plain={!!subtle} loading={loading} onClick={onBlock}>Deny</Button>
         </>
     );
 }

@@ -1519,7 +1519,7 @@ function Violations() {
             const actions = [];
             if (bulkPendingCount > 0) {
                 actions.push({ label: "Approve", onAction: () => handleBulkHumanApproval(HUMAN_RESPONSE.APPROVED) });
-                actions.push({ label: "Block", onAction: () => handleBulkHumanApproval(HUMAN_RESPONSE.BLOCKED) });
+                actions.push({ label: "Deny", onAction: () => handleBulkHumanApproval(HUMAN_RESPONSE.BLOCKED) });
             }
             actions.push({ label: "Delete", destructive: true, onAction: () => setDeleteConfirmOpen(true) });
             return actions;
