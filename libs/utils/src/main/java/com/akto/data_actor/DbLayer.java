@@ -120,6 +120,9 @@ import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.TestResult.Confidence;
+import com.akto.dto.bulk_updates.BulkUpdates;
+import com.akto.dto.bulk_updates.UpdatePayload;
+import com.google.gson.Gson;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.TestingRun.State;
@@ -161,6 +164,7 @@ import com.mongodb.client.MongoCursor;
 public class DbLayer {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbLayer.class, LoggerMaker.LogDb.DASHBOARD);
+    private static final Gson gson = new Gson();
     public static final String DEFAULT_MINI_TESTING_NAME = "Default_";
 
     private static final ConcurrentHashMap<Integer, Integer> lastUpdatedTsMap = new ConcurrentHashMap<>();
@@ -756,6 +760,93 @@ public class DbLayer {
         loggerMaker.infoAndAddToDb(String.format("Matched records : %s", result.getMatchedCount()), LogDb.TESTING);
         loggerMaker.infoAndAddToDb(String.format("inserted counts : %s", result.getInsertedCount()), LogDb.TESTING);
         loggerMaker.infoAndAddToDb(String.format("Modified counts : %s", result.getModifiedCount()), LogDb.TESTING);
+    }
+
+    /**
+     * Extracted, unchanged, from DbAction.bulkWriteTestingRunIssues's per-item loop body (that action method
+     * now just calls this per BulkUpdates). Single source of truth for turning a TestingRunIssues update
+     * intent into the actual Mongo write - both that HTTP-facing endpoint and
+     * recordIssuesForTestingRunResults (which builds the same BulkUpdates shape in-process, see
+     * buildIssueBulkUpdate) go through this one place, instead of each re-deriving the field-by-field
+     * set/setOnInsert/override rules independently.
+     */
+    public static WriteModel<TestingRunIssues> convertBulkUpdateToTestingRunIssuesWrite(BulkUpdates bulkUpdate) {
+        Object filterObj = bulkUpdate.getFilters().get("_id");
+        HashMap<String, Object> filterMap = (HashMap) filterObj;
+        HashMap<String, Object> keyMap = (HashMap) filterMap.get("apiInfoKey");
+        int apiCollectionId = 0;
+        try {
+            apiCollectionId = (int)(long) keyMap.get("apiCollectionId");
+        } catch(Exception f){
+            apiCollectionId = (int) keyMap.get("apiCollectionId");
+        }
+        ApiInfoKey key = new ApiInfoKey(apiCollectionId, (String)keyMap.get("url"), Method.valueOf((String)keyMap.get("method")));
+        TestingIssuesId idd = new TestingIssuesId(key, TestErrorSource.valueOf((String)filterMap.get("testErrorSource")), (String)filterMap.get("testSubCategory"));
+        Bson filters = Filters.eq("_id", idd);
+        List<String> updatePayloadList = bulkUpdate.getUpdates();
+
+        List<Bson> updates = new ArrayList<>();
+        for (String payload: updatePayloadList) {
+            Map<String, Object> json = gson.fromJson(payload, Map.class);
+
+            String field = (String) json.get("field");
+            if (field.equals(TestingRunIssues.COLLECTION_IDS)) {
+                List<Double> dVal = (List) json.get("val");
+                List<Integer> val = new ArrayList<>();
+                for (int i = 0; i < dVal.size(); i++) {
+                    val.add(dVal.get(i).intValue());
+                }
+                updates.add(Updates.setOnInsert(field, val));
+            }else if(field.equals(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID)){
+                String val = (String)json.get("val");
+                ObjectId id = new ObjectId(val);
+                updates.add(Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, id));
+            } else if(field.equals(TestingRunIssues.UNREAD)){
+                boolean dVal = (boolean) json.get("val");
+                UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
+                updates.add(Updates.set(updatePayload.getField(), dVal));
+            } else if (field.equals(TestingRunIssues.LAST_UPDATED) ||
+                    field.equals(TestingRunIssues.LAST_SEEN) ||
+                    field.equals(TestingRunIssues.CREATION_TIME)) {
+                Double val = (double) json.get("val");
+                int dVal = val.intValue();
+                UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
+                updates.add(Updates.set(updatePayload.getField(), dVal));
+            } else if (field.equals(TestingRunIssues.KEY_SEVERITY)) {
+
+                /*
+                 * Fixing severity temp. here,
+                 * cause the info. from mini-testing always contains HIGH.
+                 * To be fixed in mini-testing.
+                 */
+                /*
+                 * Severity from info. fixed,
+                 * so taking for dynamic_severity,
+                 * since rest would be same and for old deployments.
+                 */
+                String testSubCategory = idd.getTestSubCategory();
+                YamlTemplate template = YamlTemplateDao.instance
+                        .findOne(Filters.eq(Constants.ID, testSubCategory));
+                String dVal = (String) json.get("val");
+
+                if (template != null) {
+                    String severity = template.getInfo().getSeverity();
+                    if (severity != null && !"dynamic_severity".equals(severity)) {
+                        dVal = severity;
+                    }
+                }
+
+                UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal,
+                        (String) json.get("op"));
+                updates.add(Updates.set(updatePayload.getField(), dVal));
+            } else {
+                String dVal = (String) json.get("val");
+                UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
+                updates.add(Updates.set(updatePayload.getField(), dVal));
+            }
+        }
+
+        return new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true));
     }
 
     public static void bulkWriteOverageInfo(List<WriteModel<UningestedApiOverage>> writeModelList) {
@@ -2131,26 +2222,34 @@ public class DbLayer {
         recordIssuesForTestingRunResults(testingRunResults, doNotMarkIssuesAsFixed);
     }
 
+    private static final String SET_OPERATION = "set";
+
     /**
-     * Single source of truth for turning a (field, value) intent for a TestingRunIssues write into the actual
-     * Bson operation - a direct, faithful port of every field-specific branch in DbAction.bulkWriteTestingRunIssues's
-     * BulkUpdates conversion loop (that conversion exists because that endpoint's input crosses an HTTP/JSON
-     * boundary from mini-testing; this is the same per-field logic applied to already-typed values instead).
-     * Both this method and that conversion special-case the exact same set of fields; if either changes, check
-     * the other. Anything not explicitly special-cased here falls through to a plain Updates.set, matching the
-     * conversion's own default branch.
+     * Builds the same BulkUpdates shape TestingIssuesHandler (mini-testing) builds client-side - a filter Map
+     * mirroring what the JSON interceptor would decode a TestingIssuesId into, and UpdatePayload.toString()
+     * (a real gson round trip, same as production) for each update. This lets both this in-process caller and
+     * the HTTP-facing bulkWriteTestingRunIssues endpoint hand off to the exact same conversion
+     * (convertBulkUpdateToTestingRunIssuesWrite) instead of each independently deciding how a field should be
+     * written - that duplication is what caused the upsert/setOnInsert/severity-override/summary-id bugs this
+     * replaced.
      */
-    private static Bson issueFieldUpdate(String field, Object value) {
-        if (TestingRunIssues.COLLECTION_IDS.equals(field)) {
-            // Written once, at issue creation, never overwritten on a later update.
-            return Updates.setOnInsert(field, value);
+    private static BulkUpdates buildIssueBulkUpdate(TestingIssuesId issuesId, List<UpdatePayload> payloads) {
+        Map<String, Object> apiInfoKeyMap = new HashMap<>();
+        apiInfoKeyMap.put("apiCollectionId", (long) issuesId.getApiInfoKey().getApiCollectionId());
+        apiInfoKeyMap.put("url", issuesId.getApiInfoKey().getUrl());
+        apiInfoKeyMap.put("method", issuesId.getApiInfoKey().getMethod().name());
+        Map<String, Object> filterMap = new HashMap<>();
+        filterMap.put("apiInfoKey", apiInfoKeyMap);
+        filterMap.put(TestingIssuesId.TEST_ERROR_SOURCE, issuesId.getTestErrorSource().name());
+        filterMap.put(TestingIssuesId.TEST_SUB_CATEGORY, issuesId.getTestSubCategory());
+        Map<String, Object> filters = new HashMap<>();
+        filters.put("_id", filterMap);
+
+        ArrayList<String> updateStrings = new ArrayList<>();
+        for (UpdatePayload payload : payloads) {
+            updateStrings.add(payload.toString());
         }
-        if (TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID.equals(field)) {
-            // The conversion writes the *_ID (ObjectId) field, not the *_HEX_ID (String) one the intent is
-            // named after - the hex id is only ever an input representation, never the actual stored field.
-            return Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, new ObjectId((String) value));
-        }
-        return Updates.set(field, value);
+        return new BulkUpdates(filters, updateStrings);
     }
 
     /** First-seen-wins index of the batch's distinct issue ids. See recordIssuesForTestingRunResults for why
@@ -2169,10 +2268,9 @@ public class DbLayer {
     /**
      * Ported 1:1 from apps/mini-testing's TestingIssuesHandler (listOfIssuesIdsFromTestingRunResults +
      * writeUpdateQueryIntoWriteModel + insertVulnerableTestsIntoIssuesCollection), batched across the whole
-     * result list instead of one result at a time, and building native Bson WriteModels directly instead of
-     * round-tripping through BulkUpdates/UpdatePayload JSON strings - that indirection only ever existed to
-     * cross the old HTTP boundary from mini-testing to database-abstractor, which no longer applies once this
-     * logic runs in-process against Mongo.
+     * result list instead of one result at a time. Builds the same BulkUpdates shape that flow always has and
+     * hands off to convertBulkUpdateToTestingRunIssuesWrite (shared with the HTTP-facing
+     * bulkWriteTestingRunIssues endpoint) for the actual field-write decisions.
      */
     private static void recordIssuesForTestingRunResults(List<TestingRunResult> testingRunResults, boolean doNotMarkIssuesAsFixed) {
         IssueIndex index = buildIssueIndex(testingRunResults);
@@ -2244,20 +2342,19 @@ public class DbLayer {
             if (runResult == null) {
                 continue;
             }
-            List<Bson> updates = new ArrayList<>();
+            List<UpdatePayload> payloads = new ArrayList<>();
             TestRunIssueStatus status = testingRunIssues.getTestRunIssueStatus();
             if (runResult.isVulnerable()) {
-                updates.add(issueFieldUpdate(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
-                        (status == TestRunIssueStatus.IGNORED ? TestRunIssueStatus.IGNORED : TestRunIssueStatus.OPEN).name()));
+                payloads.add(new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
+                        (status == TestRunIssueStatus.IGNORED ? TestRunIssueStatus.IGNORED : TestRunIssueStatus.OPEN).name(), SET_OPERATION));
             } else if (!doNotMarkIssuesAsFixed) {
-                updates.add(issueFieldUpdate(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name()));
+                payloads.add(new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name(), SET_OPERATION));
             }
             // When doNotMarkIssuesAsFixed is true we intentionally avoid touching the status for non-vulnerable results
-            updates.add(issueFieldUpdate(TestingRunIssues.KEY_SEVERITY,
-                    resolveIssueSeverityForWrite(runResult.getTestSubType(), getSeverityFromTestingRunResult(runResult))));
-            updates.add(issueFieldUpdate(TestingRunIssues.LAST_SEEN, lastSeen));
-            updates.add(issueFieldUpdate(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString()));
-            writes.add(new UpdateOneModel<>(Filters.eq(Constants.ID, issuesId), Updates.combine(updates), new UpdateOptions().upsert(true)));
+            payloads.add(new UpdatePayload(TestingRunIssues.KEY_SEVERITY, getSeverityFromTestingRunResult(runResult).name(), SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.LAST_SEEN, lastSeen, SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString(), SET_OPERATION));
+            writes.add(convertBulkUpdateToTestingRunIssuesWrite(buildIssueBulkUpdate(issuesId, payloads)));
         }
         return writes;
     }
@@ -2293,33 +2390,37 @@ public class DbLayer {
                     break;
                 }
             }
+            // Sent as-is, same as the original client - the KEY_SEVERITY conversion branch (shared, see
+            // convertBulkUpdateToTestingRunIssuesWrite) may override this with a configured template severity
+            // before it's written; countIssuesMap below intentionally tallies the pre-override value, matching
+            // the original's independent client-side count computation.
             Severity severity = getSeverityFromTestingRunResult(runResult);
-            List<Bson> updates = new ArrayList<>();
-            updates.add(issueFieldUpdate(TestingRunIssues.KEY_SEVERITY, severity.name()));
+            List<UpdatePayload> payloads = new ArrayList<>();
+            payloads.add(new UpdatePayload(TestingRunIssues.KEY_SEVERITY, severity.name(), SET_OPERATION));
             if (!doesExist || shouldCountIssue) {
-                updates.add(issueFieldUpdate(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name()));
+                payloads.add(new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name(), SET_OPERATION));
                 int count = countIssuesMap.getOrDefault(severity.name(), 0);
                 countIssuesMap.put(severity.name(), count + 1);
             }
-            updates.add(issueFieldUpdate(TestingRunIssues.CREATION_TIME, lastSeen));
-            updates.add(issueFieldUpdate(TestingRunIssues.LAST_SEEN, lastSeen));
-            updates.add(issueFieldUpdate(TestingRunIssues.LAST_UPDATED, lastSeen));
-            updates.add(issueFieldUpdate(TestingRunIssues.UNREAD, true));
-            updates.add(issueFieldUpdate(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString()));
+            payloads.add(new UpdatePayload(TestingRunIssues.CREATION_TIME, lastSeen, SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.LAST_SEEN, lastSeen, SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.LAST_UPDATED, lastSeen, SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.UNREAD, true, SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString(), SET_OPERATION));
             if (testingIssuesId.getApiInfoKey() != null) {
-                updates.add(issueFieldUpdate(TestingRunIssues.COLLECTION_IDS,
-                        Collections.singletonList(testingIssuesId.getApiInfoKey().getApiCollectionId())));
+                payloads.add(new UpdatePayload(TestingRunIssues.COLLECTION_IDS,
+                        Collections.singletonList(testingIssuesId.getApiInfoKey().getApiCollectionId()), SET_OPERATION));
             }
-            writes.add(new UpdateOneModel<>(Filters.eq(Constants.ID, testingIssuesId), Updates.combine(updates), new UpdateOptions().upsert(true)));
+            writes.add(convertBulkUpdateToTestingRunIssuesWrite(buildIssueBulkUpdate(testingIssuesId, payloads)));
         }
         return new VulnerableIssueWrites(writes, countIssuesMap, summaryId);
     }
 
     /**
      * Ported from apps/mini-testing's TestExecutor.getSeverityFromTestingRunResult - same default/fallback
-     * behavior. This is the value the original uses for severity-count tallying (updateIssueCountInSummary),
-     * computed client-side. See resolveIssueSeverityForWrite for the (separately-computed, can genuinely
-     * diverge) value the original writes into the issue document's own severity field.
+     * behavior. This is the value sent as KEY_SEVERITY's update payload (and used for count tallying) -
+     * whether it's what actually gets written is decided by convertBulkUpdateToTestingRunIssuesWrite's shared
+     * template-override logic, same as it always was for the existing HTTP-facing flow.
      */
     private static Severity getSeverityFromTestingRunResult(TestingRunResult testingRunResult) {
         Severity severity = Severity.HIGH;
@@ -2330,30 +2431,6 @@ public class DbLayer {
             // keep default HIGH - matches the original's catch-all fallback
         }
         return severity;
-    }
-
-    /**
-     * Ported from DbAction.bulkWriteTestingRunIssues's KEY_SEVERITY conversion branch: overrides the
-     * confidence-derived severity with the test subcategory's configured YAML template severity, unless the
-     * template has none configured or its severity is "dynamic_severity". Matches that logic exactly,
-     * including operating on the raw string rather than validating it against the Severity enum.
-     *
-     * Deliberately NOT the same value used for count tallying (getSeverityFromTestingRunResult) - the
-     * original computes and sends these independently (the count is computed and sent from mini-testing
-     * before this override ever runs, server-side), so they can genuinely disagree today. Not unifying that
-     * here since it would change already-live counting behavior for any subcategory with a fixed template
-     * severity; preserving it as-is, just no longer re-derived by eye in two places.
-     */
-    private static String resolveIssueSeverityForWrite(String testSubCategory, Severity computedSeverity) {
-        String value = computedSeverity.name();
-        YamlTemplate template = YamlTemplateDao.instance.findOne(Filters.eq(Constants.ID, testSubCategory));
-        if (template != null) {
-            String templateSeverity = template.getInfo().getSeverity();
-            if (templateSeverity != null && !"dynamic_severity".equals(templateSeverity)) {
-                value = templateSeverity;
-            }
-        }
-        return value;
     }
 
     public static void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount) {
