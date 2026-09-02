@@ -266,6 +266,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                                 smr.getSeverity(),
                                 smr.getSessionId() != null && !smr.getSessionId().isEmpty() ? smr.getSessionId() : "");
                             event.setRemediation(smr.getRemediation());
+                            event.setEvidenceLine(smr.getEvidenceLine());
                             if (!smr.getOwaspCategoriesList().isEmpty()) {
                                 event.setOwaspCategories(smr.getOwaspCategoriesList().stream()
                                     .map(o -> new DashboardMaliciousEvent.OwaspCategory(

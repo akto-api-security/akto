@@ -38,6 +38,7 @@ message MaliciousEventMessage {
   string session_id = 20;  // Session identifier for tracking user sessions
   repeated OwaspCategory owasp_categories = 21;
   optional string ref_id = 22;  // Pre-generated UUID from caller (optional)
+  string evidence_line = 23;  // Payload line that triggered the violation (scrubbed), when offsets make it exact
 }
 
 message MaliciousEventKafkaEnvelope {

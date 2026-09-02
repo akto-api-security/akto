@@ -137,6 +137,14 @@ const getHeaders = () => {
 
   if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
     baseHeaders.push({
+      text: "Evidence",
+      value: "evidenceLine",
+      title: "Evidence",
+      maxWidth: "260px",
+      type: CellType.TEXT,
+      tooltipKey: "evidenceLineFull",
+    });
+    baseHeaders.push({
       text: "Reason",
       value: "reason",
       title: "Reason",
@@ -707,7 +715,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     await handleFilteredOperation('markForTraining', 'TRAINING');
   };
 
-
   const promotedBulkActions = (selectedIds) => {
     const actions = [];
 
@@ -1044,6 +1051,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           // (the raw `metadata` passthrough is dropped by the table); used by the flyout's
           // "Approve server" action for "approval" behaviour policies.
           behaviourRaw: extractBehaviour(x?.metadata),
+          ...(() => {
+            const e = typeof x?.evidenceLine === "string" ? x.evidenceLine.trim() : "";
+            if (!e) return { evidenceLine: "", evidenceLineFull: "" };
+            const { preview, full } = truncateToWords(e, 30);
+            return { evidenceLine: preview, evidenceLineFull: full };
+          })(),
           behaviour: (() => {
             const b = extractBehaviour(x?.metadata);
             if (!b) return '-';
