@@ -4303,7 +4303,11 @@ public class ClientActor extends DataActor {
             try {
                 payloadObj = BasicDBObject.parse(responsePayload);
                 BasicDBObject testScriptObj = (BasicDBObject) payloadObj.get("testScript");
-                testScript = objectMapper.readValue(testScriptObj.toJson(), TestScript.class);
+                // No script configured for this type is a normal, common outcome (most accounts
+                // don't set one) — not an error. Avoid NPE-ing on toJson() and don't log it.
+                if (testScriptObj != null) {
+                    testScript = objectMapper.readValue(testScriptObj.toJson(), TestScript.class);
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("error extracting response in fetchTestScript" + e, LoggerMaker.LogDb.RUNTIME);
             }
