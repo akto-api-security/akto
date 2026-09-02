@@ -30,6 +30,9 @@ public class AgentQueryRecord {
     public static final String F_TOPIC_KW              = "topic.keyword";
     public static final String F_SUB_TOPIC             = "subTopic";
     public static final String F_SUB_TOPIC_KW          = "subTopic.keyword";
+    public static final String F_GUARDRAIL_VIOLATED    = "guardrailViolated";
+    public static final String F_GUARDRAIL_POLICY      = "guardrailPolicy";
+    public static final String F_GUARDRAIL_POLICY_KW   = "guardrailPolicy.keyword";
 
     private final String docId;
     private final int accountId;
@@ -47,6 +50,13 @@ public class AgentQueryRecord {
     private final boolean isAtlasTraffic;
     private final String topic;
     private final String subTopic;
+
+    private Boolean guardrailViolated;
+    private String guardrailAction;
+    private String guardrailPolicy;
+    private String guardrailRule;
+    private String guardrailReason;
+    private String guardrailSeverity;
 
     public AgentQueryRecord(String docId, int accountId, String serviceId, String deviceId,
                             String userName, String sessionIdentifier,
@@ -88,4 +98,11 @@ public class AgentQueryRecord {
     public boolean getIsAtlasTraffic() { return isAtlasTraffic; }
     public String getTopic() { return topic; }
     public String getSubTopic() { return subTopic; }
+
+    public Boolean getGuardrailViolated() { return guardrailViolated; }
+    public String getGuardrailAction()    { return guardrailAction; }
+    public String getGuardrailPolicy()    { return guardrailPolicy; }
+    public String getGuardrailRule()      { return guardrailRule; }
+    public String getGuardrailReason()    { return guardrailReason; }
+    public String getGuardrailSeverity()  { return guardrailSeverity; }
 }

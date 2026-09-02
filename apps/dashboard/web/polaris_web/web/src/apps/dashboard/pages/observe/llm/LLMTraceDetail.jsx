@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Box, Divider, HorizontalStack, Scrollable, Spinner, Text, VerticalStack } from "@shopify/polaris";
+import { Box, Divider, HorizontalStack, Scrollable, Spinner, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 import DetailGrid from "../agentic/DetailGrid";
 import SpanSection from "./LLMSpanSection";
 import api from "./api";
 import { enrichRow } from "./utils";
 import { formatDurationMs, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
+
+// Shared with the SpanSection list below the waterfall — a bar and its detail card for the
+// same span must resolve to the same id so a bar click can scroll straight to it.
+function spanSectionId(span, index) {
+    return `span-detail-${span.spanId || index}`;
+}
 
 // ─── Waterfall ────────────────────────────────────────────────────────────────
 
@@ -82,14 +88,29 @@ function WaterfallGraph({ spans }) {
                     const color       = spanBarColor(span.durationMs, totalDuration);
                     const hasDuration = span.durationMs > 0;
                     const isLast      = i === resolved.length - 1;
+                    const violated    = !!span.guardrailViolated;
                     return (
-                        <Box key={span.spanId || i}>
-                            <Box paddingBlockStart="2" paddingBlockEnd="2" paddingInlineStart="3" paddingInlineEnd="3">
+                        <Box key={span.spanId || i} style={{cursor: "pointer"}}>
+                            <Box
+                                paddingBlockStart="2" paddingBlockEnd="2" paddingInlineStart="3" paddingInlineEnd="3"
+                                onClick={() => document.getElementById(spanSectionId(span, i))
+                                    ?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                            >
                                 <HorizontalStack gap="3" blockAlign="center" wrap={false}>
                                     <Box width="180px" minWidth="0">
-                                        <Text variant="bodySm" color="subdued" truncate>
-                                            {truncate(spanWaterfallLabel(span, i), 32)}
-                                        </Text>
+                                        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+                                            {violated && (
+                                                <Tooltip content={span.guardrailPolicy ? `Guardrail hit: ${span.guardrailPolicy}` : "Guardrail hit"} dismissOnMouseOut>
+                                                    <div style={{
+                                                        flexShrink: 0, width: 8, height: 8, borderRadius: "50%",
+                                                        background: WATERFALL_COLORS.red,
+                                                    }} />
+                                                </Tooltip>
+                                            )}
+                                            <Text variant="bodySm" color="subdued" truncate>
+                                                {truncate(spanWaterfallLabel(span, i), 32)}
+                                            </Text>
+                                        </HorizontalStack>
                                     </Box>
                                     {/* flex:1 + position:absolute bar — inexpressible via Box props */}
                                     <div style={{ flex: 1, position: "relative", height: 12, background: "#F3F4F6", borderRadius: 4 }}>
@@ -208,7 +229,7 @@ export default function TraceDetailView({ trace, currDateRange, initialSpans }) 
                     ) : spans.length ? (
                         <VerticalStack gap="3">
                             {spans.map((span, i) => (
-                                <SpanSection key={span.spanId || i} span={span} index={i} />
+                                <SpanSection key={span.spanId || i} span={span} index={i} id={spanSectionId(span, i)} />
                             ))}
                         </VerticalStack>
                     ) : (

@@ -34,6 +34,8 @@ public abstract class SearchClient {
     protected static final String KEY_TERM            = "term";
     protected static final String KEY_TRACE_ID        = "traceId";
     protected static final String KEY_TIMESTAMP       = "timestamp";
+    protected static final String KEY_HAS_ACTIVE_GUARDRAIL = "hasActiveGuardrail";
+    protected static final String KEY_GUARDRAIL_POLICIES   = "guardrailPolicies";
 
     public abstract boolean isConfigured();
 

@@ -54,13 +54,18 @@ function SessionTopicsSection({ topicHierarchy }) {
 
 // ─── Overview ─────────────────────────────────────────────────────────────────
 
-function OverviewContent({ session, traceCount }) {
+function OverviewContent({ session, traceCount, guardrailViolationCount }) {
     const totalTokens = (Number(session._inputTokens) || 0) + (Number(session._outputTokens) || 0);
 
     const stats = [
         { label: "Traces",       value: traceCount },
         { label: "Total tokens", value: formatCompact(totalTokens), tooltip: TOKEN_ESTIMATE_TOOLTIP },
         { label: "Duration",     value: formatDurationMs(session.durationMs) },
+        {
+            label: "Guardrail violations",
+            value: `${guardrailViolationCount} / ${traceCount}`,
+            valueColor: guardrailViolationCount > 0 ? "critical" : undefined,
+        },
     ];
 
     const detailItems = [
@@ -77,7 +82,7 @@ function OverviewContent({ session, traceCount }) {
                 <HorizontalGrid columns={4} gap="3">
                     {stats.map(s => (
                         <VerticalStack gap="1" key={s.label}>
-                            <Text variant="heading2xl" as="p">{s.value}</Text>
+                            <Text variant="heading2xl" as="p" color={s.valueColor}>{s.value}</Text>
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text variant="bodySm" color="subdued">{s.label}</Text>
                                 <InfoTooltipIcon content={s.tooltip} />
@@ -213,13 +218,18 @@ export default function SessionFlyout({ session, currDateRange, onClose }) {
     const traceCount = hasMessages === true  ? traceRows.length
                      : hasMessages === false ? spanRows.length
                      : (session.messageCount || 0);
+    // Traces are pre-aggregated (hasActiveGuardrail); old traceId-less sessions fall back to the
+    // flat span rows, which carry the raw guardrailViolated field straight from the ES source.
+    const guardrailViolationCount = hasMessages === true  ? traceRows.filter(r => r.hasActiveGuardrail).length
+                                   : hasMessages === false ? spanRows.filter(r => r.guardrailViolated).length
+                                   : 0;
 
     function renderContent() {
         if (topNav) return <TraceDetailView trace={topNav.trace} currDateRange={currDateRange} />;
         switch (activeTab) {
             case TAB_OVERVIEW: return (
                 <Scrollable style={{ flex: 1 }}>
-                    <OverviewContent session={session} traceCount={traceCount} />
+                    <OverviewContent session={session} traceCount={traceCount} guardrailViolationCount={guardrailViolationCount} />
                 </Scrollable>
             );
             case TAB_TRACES: return (

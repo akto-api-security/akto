@@ -1,5 +1,5 @@
 import React from "react";
-import { HorizontalStack, Text, Link } from "@shopify/polaris";
+import { Badge, HorizontalStack, Text, Link } from "@shopify/polaris";
 import func from "@/util/func";
 import { formatDurationMs, latencyColor, truncate } from "./constants";
 import { OsIcon } from "../agentic/DeviceEndpoints";
@@ -152,6 +152,23 @@ export function TopicCell({ data, isTopic = true }) {
             useTooltip={true}
         />
     );
+}
+
+// Whether any span in this session/trace tripped a guardrail (see AgentQueryRecord.guardrailViolated).
+// Only the hit case gets a badge — a session with no guardrail-evaluated spans at all (predates the
+// feature, or guardrails weren't configured) reads the same as a clean one, so a "Clean" label here
+// would overclaim, same reasoning as GuardrailVerdict.hasGuardrailVerdict on the span level.
+export function GuardrailStatusCell({ value }) {
+    if (!value) return <Text variant="bodySm" color="subdued">{DASH}</Text>;
+    return <Badge status="critical" size="small">Guardrail hit</Badge>;
+}
+
+// Policy name(s) that tripped on this session/trace (AgentQueryRecord.guardrailPolicy). A session
+// can hit more than one policy across its spans, so this mirrors TopicCell's list-of-badges shape.
+export function GuardrailPolicyCell({ data }) {
+    const policies = (data?.guardrailPolicies || []).filter(Boolean);
+    if (!policies.length) return <Text variant="bodySm" color="subdued">{DASH}</Text>;
+    return <ShowListInBadge itemsArr={policies} maxItems={2} useTooltip={true} />;
 }
 
 // Clickable session id (used in unscoped Traces table).
