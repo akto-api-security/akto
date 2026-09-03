@@ -109,10 +109,6 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 return invocation.invoke();
             }
 
-            if(!(UsageMetricCalculator.isRbacFeatureAvailable(sessionAccId) || featureLabel.equalsIgnoreCase(RbacEnums.Feature.ADMIN_ACTIONS.toString()))){
-                logger.debug("Time by feature label check in: " + (Context.now() - timeNow));
-                return invocation.invoke();
-            }
             timeNow = Context.now();
             int userId = user.getId();
 
@@ -129,6 +125,16 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 userRole = userRoleRecord.getName().toUpperCase();
             }
 
+            // Product-scope (NO_ACCESS) enforcement must run regardless of whether this account
+            // has paid for the RBAC feature — it's a distinct, more fundamental boundary ("does
+            // this user have any access to this product line at all") from the fine-grained,
+            // per-feature read/write check further below, which the RBAC-paid-feature gate
+            // legitimately relaxes to "full access" for accounts without the custom-roles add-on.
+            // The isRbacFeatureAvailable() skip used to sit BEFORE this block, so on any account
+            // without that add-on it skipped the NO_ACCESS denial too, for every endpoint except
+            // the hardcoded ADMIN_ACTIONS ones — silently leaking product-scoped data to users
+            // explicitly denied access to that product (e.g. a user with no Atlas access could
+            // still read Atlas data through any non-ADMIN_ACTIONS-labeled endpoint).
             if (!isOnboardingRequest && userRoleRecord.equals(Role.NO_ACCESS)) {
                 HttpServletResponse response = (HttpServletResponse) ServletActionContext.getResponse();
                 response.setHeader("X-No-Access-Error", "true");
@@ -168,6 +174,15 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 return invocation.invoke();
             }
             // ===== END PRODUCT SCOPE VALIDATION =====
+
+            // Fine-grained, per-feature read/write check — relaxed to "full access" for accounts
+            // that haven't paid for the RBAC feature (custom roles). ADMIN_ACTIONS is exempt from
+            // this relaxation: it gates a genuinely dangerous capability and is always enforced
+            // regardless of billing tier.
+            if(!(UsageMetricCalculator.isRbacFeatureAvailable(sessionAccId) || featureLabel.equalsIgnoreCase(RbacEnums.Feature.ADMIN_ACTIONS.toString()))){
+                logger.debug("Time by feature label check in: " + (Context.now() - timeNow));
+                return invocation.invoke();
+            }
 
             Feature featureType = Feature.valueOf(this.featureLabel.toUpperCase());
 
