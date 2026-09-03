@@ -28,11 +28,15 @@ import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -565,31 +569,69 @@ public class ModuleInfoAction extends UserAction {
     }
 
     public String fetchAgenticUsers() {
-        agenticUsers = AgentUsersDao.instance.findAll(Filters.empty());
+        // The list is the plain union of both identity sources — every agent_users doc plus every
+        // username reporting a device in module_info — deduped by username. A user with no device
+        // in either source still belongs in the list: they are a real identity that can be tagged,
+        // they just have nothing to enforce against yet. Devices are therefore merged (stored ∪
+        // reported), never overwritten, so a source that happens to be empty can never delete a
+        // user from the list.
+        Map<String, AgenticUsers> byUsername = new LinkedHashMap<>();
+        for (AgenticUsers u : AgentUsersDao.instance.findAll(Filters.empty())) {
+            String username = u.getUserName() == null ? "" : u.getUserName().trim();
+            // Nothing to key or display on, and its devices are pre-migration raw machine IDs that
+            // never match at enforcement — dropping it is what dedupe by username means.
+            if (username.isEmpty()) continue;
+            u.setUserName(username);
+            u.setDevices(u.getDevices() == null ? new ArrayList<>() : new ArrayList<>(new LinkedHashSet<>(u.getDevices())));
 
-        // AgenticUsers.devices is only ever backfilled once by a startup migration and never
-        // kept in sync afterwards — overwrite with live devices from module_info (updated every
-        // heartbeat) instead of trusting the stored field.
-        Map<String, Set<String>> liveDevicesByUsername = ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield();
-        for (AgenticUsers u : agenticUsers) {
-            Set<String> liveDevices = liveDevicesByUsername.remove(u.getUserName());
-            // Inference-hooks-tagged identities have no heartbeat to overwrite from, so their stored devices are kept and unioned with any live ones.
-            boolean fromInferenceHooks = u.getDeviceTags() != null
-                    && u.getDeviceTags().stream().anyMatch(t -> DeviceTag.SOURCE_INFERENCE_HOOKS.equals(t.getSource()));
-            Set<String> devices = new HashSet<>();
-            if (liveDevices != null) devices.addAll(liveDevices);
-            if (fromInferenceHooks && u.getDevices() != null) devices.addAll(u.getDevices());
-            u.setDevices(new ArrayList<>(devices));
+            AgenticUsers existing = byUsername.get(username);
+            if (existing == null) {
+                byUsername.put(username, u);
+            } else {
+                mergeInto(existing, u);
+            }
         }
-        // Any username reporting devices but with no team/role ever assigned has no AgenticUsers
-        // doc yet — synthesize a lightweight entry so it still shows up as filterable/previewable.
-        for (Map.Entry<String, Set<String>> entry : liveDevicesByUsername.entrySet()) {
-            AgenticUsers synthetic = new AgenticUsers();
-            synthetic.setUserName(entry.getKey());
-            synthetic.setDevices(new ArrayList<>(entry.getValue()));
-            agenticUsers.add(synthetic);
+
+        Map<String, Set<String>> reportedDevicesByUsername = ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield();
+        for (Map.Entry<String, Set<String>> entry : reportedDevicesByUsername.entrySet()) {
+            AgenticUsers existing = byUsername.get(entry.getKey());
+            if (existing == null) {
+                // Reporting a device but never tagged, so no agent_users doc exists — synthesize a
+                // lightweight entry so the identity still shows up as filterable/previewable.
+                AgenticUsers synthetic = new AgenticUsers();
+                synthetic.setUserName(entry.getKey());
+                synthetic.setDevices(new ArrayList<>(entry.getValue()));
+                byUsername.put(entry.getKey(), synthetic);
+            } else {
+                addDevices(existing, entry.getValue());
+            }
         }
+
+        agenticUsers = new ArrayList<>(byUsername.values());
         return SUCCESS.toUpperCase();
+    }
+
+    /** Folds a duplicate agent_users row into the one already kept for that username. */
+    private static void mergeInto(AgenticUsers target, AgenticUsers duplicate) {
+        addDevices(target, duplicate.getDevices());
+        if (duplicate.getDeviceTags() != null) {
+            List<DeviceTag> tags = target.getDeviceTags() == null ? new ArrayList<>() : new ArrayList<>(target.getDeviceTags());
+            for (DeviceTag t : duplicate.getDeviceTags()) {
+                boolean alreadyPresent = tags.stream().anyMatch(
+                        e -> Objects.equals(e.getKey(), t.getKey()) && Objects.equals(e.getValue(), t.getValue()));
+                if (!alreadyPresent) tags.add(t);
+            }
+            target.setDeviceTags(tags);
+        }
+        if (target.getUserEmail() == null) target.setUserEmail(duplicate.getUserEmail());
+        if (target.getUserId() == null) target.setUserId(duplicate.getUserId());
+    }
+
+    private static void addDevices(AgenticUsers target, Collection<String> devices) {
+        if (devices == null || devices.isEmpty()) return;
+        Set<String> merged = new LinkedHashSet<>(target.getDevices() == null ? Collections.emptyList() : target.getDevices());
+        merged.addAll(devices);
+        target.setDevices(new ArrayList<>(merged));
     }
 
     public String updateModuleEnvAndReboot() {
