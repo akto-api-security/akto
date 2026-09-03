@@ -18,14 +18,14 @@ public enum InsightId {
     OFF_DOMAIN_TOKEN_BURN("Off-domain token burn", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY, true),
     DANGEROUS_CAPABILITY_EXPOSURE("Dangerous capability exposure", InsightId.Category.ACTIONABLE, InsightId.Group.ATLAS_DISCOVERY, true),
     MCP_SPRAWL("Unapproved & local MCP sprawl", InsightId.Category.READ_ONLY, InsightId.Group.ATLAS_DISCOVERY),
-    WHAT_CHANGED_THIS_WEEK("What changed this week", InsightId.Category.READ_ONLY, InsightId.Group.ATLAS_DISCOVERY, true),
+    WHAT_CHANGED_THIS_WEEK("What changed this week", InsightId.Category.READ_ONLY, InsightId.Group.ATLAS_DISCOVERY),
 
     // — guardrail/violation insights (feature/dashbaord/guardrail-insights) —
     ALERT_FATIGUE("Alert fatigue", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
     TEST_POLICIES_ON_PROD("Test policies on production", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
     EVALUATION_CONCENTRATION("Evaluation concentration", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS, true),
     CREDENTIAL_EXPOSURE("Credential exposure", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS, true),
-    PROMPT_INJECTION_REPEATS("Prompt injection repeats", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS, true),
+    PROMPT_INJECTION_REPEATS("Prompt injection repeats", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
     LIKELY_FALSE_POSITIVES("Likely false positives", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS, true),
     ALERT_MODE_REAL_HITS("Alert-mode policies catching real hits", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
     POLICY_HYGIENE("Policy hygiene", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS);
