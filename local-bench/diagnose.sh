@@ -19,7 +19,7 @@
 # Usage: local-bench/diagnose.sh [interval_sec]   (default 20; runs until the JVM exits)
 set -uo pipefail
 INTERVAL="${1:-20}"
-REPO=/Users/mann/workspace/akto
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
 JSTACK="$(/usr/libexec/java_home -v 17 2>/dev/null)/bin/jstack"
 JAR_NAME="mini-testing-1.0-SNAPSHOT-jar"

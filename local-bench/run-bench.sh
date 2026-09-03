@@ -16,7 +16,7 @@ REF="${1:?usage: run-bench.sh <git-ref> <label> [max-minutes]}"
 LABEL="${2:?label required (e.g. fast|slow)}"
 MAX_MIN="${3:-60}"
 
-REPO=/Users/mann/workspace/akto
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
 
 JAR_NAME="mini-testing-1.0-SNAPSHOT-jar-with-dependencies.jar"
