@@ -79,7 +79,8 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
                 if (categoryResp?.categoryCounts) {
                     const subcategoryMap = {};
                     categoryResp.categoryCounts.forEach((item) => {
-                        const sub = item.subCategory || item.category || "Unknown";
+                        // prefer category (resolved guardrail policy / display name) over subCategory (raw rule id)
+                    const sub = item.category || item.subCategory || "Unknown";
                         if (!subcategoryMap[sub]) {
                             subcategoryMap[sub] = { rawName: sub, name: formatCategoryName(sub), count: 0 };
                         }

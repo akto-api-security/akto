@@ -172,22 +172,10 @@ public class ThreatApiService {
 
     pipeline.add(new Document("$match", match));
 
-    // 3. Collapse misconfiguration re-detections (same host+actor+setting) to one before counting
-    if ("ENDPOINT".equalsIgnoreCase(contextSource)) {
-      Document isConfigEvent = new Document("$regexMatch",
-          new Document("input", new Document("$ifNull", Arrays.asList("$latestApiEndpoint", "")))
-              .append("regex", "/config/"));
-
-      Document dedupeKey = new Document("$cond", Arrays.asList(
-          isConfigEvent,
-          new Document("host", "$host").append("actor", "$actor").append("latestApiEndpoint", "$latestApiEndpoint"),
-          new Document("uniqueId", "$_id")));
-
-      pipeline.add(new Document("$group",
-          new Document("_id", dedupeKey)
-              .append("category", new Document("$first", "$category"))
-              .append("subCategory", new Document("$first", "$subCategory"))));
-    }
+    // 3. Collapse misconfiguration re-detections (same host+actor+category+setting) to one before
+    // counting - shared with ThreatActorService's total/status counts so "Total Violations" and this
+    // breakdown agree on what counts as one violation.
+    pipeline.addAll(ThreatUtils.configScanDedupeStages(contextSource));
 
     // 4. Group by category and subCategory
     pipeline.add(new Document("$group",

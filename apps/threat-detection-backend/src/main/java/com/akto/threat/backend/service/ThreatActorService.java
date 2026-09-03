@@ -687,23 +687,41 @@ public class ThreatActorService {
             }
         }
 
-        // Calculate summary counts using MaliciousEventDao
-        // Total analysed - count all documents matching the filter
-        long totalAnalysed = maliciousEventDao.getCollection(accountId).countDocuments(matchConditions);
+        // Calculate summary counts using MaliciousEventDao. Collapsed through the same config-scan
+        // dedup as the category breakdown (ThreatApiService.getSubCategoryWiseCount) so "Total
+        // Violations" and that breakdown agree on what counts as one violation.
+        List<Document> dedupedEventsPipeline = new ArrayList<>();
+        if (!matchConditions.isEmpty()) {
+            dedupedEventsPipeline.add(new Document("$match", matchConditions));
+        }
+        dedupedEventsPipeline.addAll(ThreatUtils.configScanDedupeStages(contextSource));
 
-        // Total attacks - count documents with successfulExploit = true
-        long totalAttacks = maliciousEventDao.getCollection(accountId).countDocuments(new Document(matchConditions).append("successfulExploit", true));
+        List<Document> totalAnalysedPipeline = new ArrayList<>(dedupedEventsPipeline);
+        totalAnalysedPipeline.add(new Document("$count", "total"));
+        long totalAnalysed = 0;
+        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, totalAnalysedPipeline).cursor()) {
+            if (cursor.hasNext()) {
+                totalAnalysed = cursor.next().getInteger("total", 0);
+            }
+        }
+
+        // Total attacks - count (deduped) documents with successfulExploit = true
+        List<Document> totalAttacksPipeline = new ArrayList<>(dedupedEventsPipeline);
+        totalAttacksPipeline.add(new Document("$match", new Document("successfulExploit", true)));
+        totalAttacksPipeline.add(new Document("$count", "total"));
+        long totalAttacks = 0;
+        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, totalAttacksPipeline).cursor()) {
+            if (cursor.hasNext()) {
+                totalAttacks = cursor.next().getInteger("total", 0);
+            }
+        }
 
         int criticalActorsCount = 0;
         for (DailyActorsCountResponse.ActorsCount ac : actors) {
             criticalActorsCount += ac.getCriticalActors();
         }
-        // Status aggregation for totalActive, totalIgnored, totalUnderReview
-        List<Document> statusPipeline = new ArrayList<>();
-        if (!matchConditions.isEmpty()) {
-            statusPipeline.add(new Document("$match", matchConditions));
-        }
-        // Group by status and actor to get distinct actors per status
+        // Status aggregation for totalActive, totalIgnored, totalUnderReview - same deduped documents
+        List<Document> statusPipeline = new ArrayList<>(dedupedEventsPipeline);
         statusPipeline.add(new Document("$group",
             new Document("_id", "$status").append("count", new Document("$sum", 1))));
 
