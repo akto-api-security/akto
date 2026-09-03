@@ -1046,18 +1046,7 @@ public class MaliciousEventService {
     if (humanResponseFilter == null || humanResponseFilter.isEmpty()) {
       return;
     }
-    String value = humanResponseFilter.toUpperCase();
-    Document clause;
-    if (MaliciousEventDto.HumanResponse.PENDING.name().equals(value)) {
-      clause = new Document("$or", Arrays.asList(
-          new Document("humanResponse", MaliciousEventDto.HumanResponse.PENDING.name()),
-          new Document("humanResponse", ""),
-          new Document("humanResponse", new Document("$exists", false))
-      ));
-    } else {
-      clause = new Document("humanResponse", value);
-    }
-    andDocument(query, clause);
+    query.append("humanResponse", humanResponseFilter.toUpperCase());
   }
 
   // Combine with $and so a clause that uses $or (legacy context, PENDING humanResponse)

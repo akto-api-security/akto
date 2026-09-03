@@ -210,6 +210,27 @@ public class HttpCallParser {
         }
     }
 
+    /*
+     * Traffic imported from a file (postman, har, openAPI, ...) is explicitly uploaded by the user,
+     * so advanced traffic filters only enrich it (eg. modify_url) and never discard it.
+     * Collected traffic keeps the allow-list behaviour: no matching filter means the api is dropped.
+     */
+    public static boolean isImportedTraffic(HttpResponseParams.Source source) {
+        if (source == null) {
+            return false;
+        }
+        switch (source) {
+            case POSTMAN:
+            case HAR:
+            case OPEN_API:
+            case BURP:
+            case IMPERVA:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     public static FILTER_TYPE isValidResponseParam(HttpResponseParams responseParam, Map<String, FilterConfig> filterMap, Map<String, List<ExecutorNode>> executorNodesMap){
         FILTER_TYPE filterType = FILTER_TYPE.UNCHANGED;
         String message = responseParam.getOrig();
@@ -708,7 +729,8 @@ public class HttpCallParser {
             if (!skipAdvancedFilters) {
                 Pair<HttpResponseParams, FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
                 HttpResponseParams param = temp.getFirst();
-                if (param == null || temp.getSecond().equals(FILTER_TYPE.UNCHANGED)) {
+                boolean unmatched = temp.getSecond().equals(FILTER_TYPE.UNCHANGED);
+                if (param == null || (unmatched && !isImportedTraffic(httpResponseParam.getSource()))) {
                     continue;
                 } else {
                     httpResponseParam = param;

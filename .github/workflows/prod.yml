@@ -363,6 +363,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Check mcp-endpoint-shield pin is akto-gateway HEAD
+        env:
+          GH_TOKEN: ${{ secrets.AKTO_GITHUB_TOKEN }}
+        run: bash .github/scripts/check-akto-gateway-pin.sh
+
       - name: DockerHub login
         env:
           DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
