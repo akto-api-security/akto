@@ -158,8 +158,18 @@ const installedAppsHeaders = [
     createSimpleHeader("Version", "version"),
 ];
 
+const vulnStatusHeader = {
+    ...createSimpleHeader("Vulnerability Status", "vulnComp"),
+    title: (
+        <HorizontalStack gap="1" wrap={false} blockAlign="center">
+            <Text as="span">Vulnerability Status</Text>
+            <Badge size="small" status="info">Beta</Badge>
+        </HorizontalStack>
+    ),
+};
+
 const installedAppsHeadersWithVulnStatus = [
-    createSimpleHeader("Vulnerability Status", "vulnComp"),
+    vulnStatusHeader,
     ...installedAppsHeaders,
 ];
 
