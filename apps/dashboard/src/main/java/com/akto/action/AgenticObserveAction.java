@@ -2211,11 +2211,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 // fixed (see fetchAgenticAssetDetail, the lazy per-asset endpoint the Overview tab's
                 // full device list — topology graph, etc. — now comes from instead).
                 List<BasicDBObject> devices = buildDevicesForGroup(g, byId, traffic, risk, userAnalysis);
-                // Skill rows deliberately carry no "aiInteractions" here — UserAnalysisData has no
-                // skill-level granularity (it's keyed per agent-app-per-device, not per skill), so
-                // summing a skill's member collections' parent-agent totals would attribute unrelated
-                // agents' token usage to the skill. Same reasoning as the "violations" exclusion below.
-                if (!"skill".equals(g.rowType)) {
+                if (!"skill".equals(g.rowType) && !"plugin".equals(g.rowType)) {
                     int aiInteractionsTotal = 0;
                     for (BasicDBObject d : devices) {
                         Object v = d.get("aiInteractions");
@@ -2251,7 +2247,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     row.remove("baseRiskScore");
                     row.remove("baseRiskScoreReason");
                 }
-                if ("plugin".equals(g.rowType) || "skill".equals(g.rowType)) row.put("aiInteractions", null);
                 rowsOut.add(row);
             }
             loggerMaker.warnAndAddToDb("[fetchAgenticAssetsSummary-timing] TOTAL=" + (System.currentTimeMillis() - tStart)
