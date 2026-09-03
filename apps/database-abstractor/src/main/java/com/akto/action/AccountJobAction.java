@@ -39,8 +39,6 @@ public class AccountJobAction extends ActionSupport {
 
     private static final ObjectMapper mapper = new ObjectMapper()
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
-    private static final String CYBORG_COMPLIANCE_STATE_KEY = "CYBORG_COMPLIANCE_STATE";
     private static final String ZERO_TIME = "0001-01-01T00:00:00Z";
 
     // Input/Output fields
@@ -277,7 +275,7 @@ public class AccountJobAction extends ActionSupport {
      */
     public String fetchComplianceState() {
         try {
-            AccountJobConfig cfg = AccountJobConfigDao.instance.findOne(AccountJobConfig.CONFIG_KEY, CYBORG_COMPLIANCE_STATE_KEY);
+            AccountJobConfig cfg = AccountJobConfigDao.instance.findOne(AccountJobConfig.CONFIG_KEY, "ANTHROPIC_COMPLIANCE");
             Map<String, Object> state = (cfg != null && cfg.getConfig() != null) ? cfg.getConfig() : null;
 
             this.userCursors = state != null ? (Map<String, String>) state.get("userCursors") : new HashMap<>();
@@ -308,9 +306,9 @@ public class AccountJobAction extends ActionSupport {
             state.put("sessionWindow", sessionWindow != null ? sessionWindow : defaultSessionWindow());
 
             int nowSeconds = Context.now();
-            Bson filter = Filters.eq(AccountJobConfig.CONFIG_KEY, CYBORG_COMPLIANCE_STATE_KEY);
+            Bson filter = Filters.eq(AccountJobConfig.CONFIG_KEY, "ANTHROPIC_COMPLIANCE");
             Bson update = Updates.combine(
-                Updates.set(AccountJobConfig.CONFIG_KEY, CYBORG_COMPLIANCE_STATE_KEY),
+                Updates.set(AccountJobConfig.CONFIG_KEY, "ANTHROPIC_COMPLIANCE"),
                 Updates.set(AccountJobConfig.CONFIG, state),
                 Updates.set(AccountJobConfig.LAST_UPDATED_AT, nowSeconds),
                 Updates.setOnInsert(AccountJobConfig.CREATED_AT, nowSeconds)
