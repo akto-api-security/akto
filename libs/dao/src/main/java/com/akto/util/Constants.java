@@ -47,7 +47,7 @@ public class Constants {
 
     public static final String AKTO_COLLECTION_CONTEXT_TAG_KEY = "source";
 
-    public static final String AKTO_AGENT_EMAIL_TAG = "x-agent-email";
+    public static final String AKTO_AGENT_EMAIL_TAG = "ai-agent-email";
 
     public static boolean SHOULD_SAVE_TAGS = System.getenv("SHOULD_SAVE_TAGS") == null || System.getenv("SHOULD_SAVE_TAGS").equalsIgnoreCase("true");
 

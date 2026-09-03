@@ -78,7 +78,7 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
     }
 
     /**
-     * Upserts an agent user identity sourced from an "x-agent-email" collection tag — the email
+     * Upserts an agent user identity sourced from an "ai-agent-email" collection tag — the email
      * itself doubles as this source's external id (there's no separate identity system to key
      * off), and the username is derived the same way SSO identities are (see
      * deriveUsernameFromEmail).
