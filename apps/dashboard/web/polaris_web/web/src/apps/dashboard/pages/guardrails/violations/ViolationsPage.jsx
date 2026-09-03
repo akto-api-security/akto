@@ -846,6 +846,10 @@ function Violations() {
     const [summaryData, setSummaryData] = useState(null);
     const [summaryLoading, setSummaryLoading] = useState(true);
     const [selectedViolation, setSelectedViolation] = useState(null);
+    // Deep link from openViolationInGuardrailViolations (?refId=...) — auto-opens that exact
+    // row's flyout as soon as it shows up in a fetched page, instead of only landing on the
+    // filtered list. Cleared once matched so it doesn't re-trigger on a later, unrelated fetch.
+    const pendingDeepLinkRefId = useRef(new URLSearchParams(location.search).get("refId") || null);
     const [bulkSelectedCount, setBulkSelectedCount] = useState(0);
     const [bulkPendingCount, setBulkPendingCount] = useState(0);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -1417,6 +1421,13 @@ function Violations() {
                 total = transformed.length;
             }
             setRows(transformed);
+            if (pendingDeepLinkRefId.current) {
+                const deepLinkMatch = transformed.find(r => r.refId === pendingDeepLinkRefId.current);
+                if (deepLinkMatch) {
+                    setSelectedViolation(deepLinkMatch);
+                    pendingDeepLinkRefId.current = null;
+                }
+            }
             return { value: transformed, total };
         });
     }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, activeAssetFilter, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, guardrailApprovedByPolicy, advancedFilters]);
