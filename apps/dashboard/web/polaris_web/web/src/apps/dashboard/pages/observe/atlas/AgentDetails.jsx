@@ -2,8 +2,9 @@ import { Text, HorizontalStack, VerticalStack, Box, Badge, Button, Icon, Tooltip
 import { useRef, useMemo, useCallback, useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from 'framer-motion'
-import { CodeMinor, DynamicSourceMinor, ClockMinor, CalendarMinor, ExportMinor, RefreshMinor, ChevronLeftMinor, ChevronRightMinor, CircleTickMajor, DiamondAlertMinor } from '@shopify/polaris-icons'
+import { CodeMinor, DynamicSourceMinor, ClockMinor, CalendarMinor, ExportMinor, RefreshMinor, ChevronLeftMinor, ChevronRightMinor, CircleTickMajor } from '@shopify/polaris-icons'
 import InlineEditableText from "../../../components/shared/InlineEditableText"
+import ShowListInBadge from "../../../components/shared/ShowListInBadge"
 import func from "@/util/func"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -147,32 +148,46 @@ const mcpServersHeaders = [
     createSimpleHeader("Last Updated", "lastSeenFormatted")
 ];
 
+// Vulnerability scanning for installed apps is still being validated (NVD-backed CPE matching can
+// misidentify apps sharing a name with an unrelated product) — restricted to this account until it's
+// ready for general rollout.
+const VULN_STATUS_ENABLED_ACCOUNT_ID = 1785654409;
+
 const installedAppsHeaders = [
-    // createSimpleHeader("Vulnerability Status", "vulnComp"),
     createSimpleHeader("App Name", "name"),
     createSimpleHeader("Version", "version"),
+];
+
+const vulnStatusHeader = {
+    ...createSimpleHeader("Vulnerability Status", "vulnComp"),
+    title: (
+        <HorizontalStack gap="1" wrap={false} blockAlign="center">
+            <Text as="span">Vulnerability Status</Text>
+            <Badge size="small" status="info">Beta</Badge>
+        </HorizontalStack>
+    ),
+};
+
+const installedAppsHeadersWithVulnStatus = [
+    vulnStatusHeader,
+    ...installedAppsHeaders,
 ];
 
 // vuln is an InstalledAppVulnerability ({ misconfiguredApp, vulnIds }) from
 // checkInstalledAppVulnerabilities, keyed by "name#version". The apps table itself renders
 // immediately from selectedAgent; this column alone trails behind while the check is in flight —
 // checking is true until that fetch settles, vuln stays null/undefined until this row's result lands.
-// const getAppVulnStatusComp = (vuln, checking) => {
-//     if (!vuln) return checking ? <Spinner size="small" accessibilityLabel="Checking for known vulnerabilities" /> : null;
-//     if (vuln.misconfiguredApp) {
-//         const detail = (vuln.vulnIds || []).join(', ') || 'See osv.dev for details';
-//         return (
-//             <Tooltip content={`Known vulnerabilities: ${detail}`} dismissOnMouseOut>
-//                 <Icon source={DiamondAlertMinor} color="critical" />
-//             </Tooltip>
-//         );
-//     }
-//     return (
-//         <Tooltip content="No known vulnerabilities found" dismissOnMouseOut>
-//             <Icon source={CircleTickMajor} color="success" />
-//         </Tooltip>
-//     );
-// };
+const getAppVulnStatusComp = (vuln, checking) => {
+    if (!vuln) return checking ? <Spinner size="small" accessibilityLabel="Checking for known vulnerabilities" /> : null;
+    if (vuln.misconfiguredApp) {
+        return <ShowListInBadge itemsArr={vuln.vulnIds} maxItems={3} status="critical" useTooltip={true} />;
+    }
+    return (
+        <Tooltip content="No known vulnerabilities found" dismissOnMouseOut>
+            <Icon source={CircleTickMajor} color="success" />
+        </Tooltip>
+    );
+};
 
 function AgentDetails({
     show,
@@ -186,6 +201,7 @@ function AgentDetails({
 }) {
     const navigate = useNavigate();
     const copyRef = useRef(null);
+    const isVulnStatusEnabled = window?.ACTIVE_ACCOUNT === VULN_STATUS_ENABLED_ACCOUNT_ID;
 
     const [loading, setLoading] = useState(false);
     const [tabLoading, setTabLoading] = useState(false);
@@ -202,8 +218,8 @@ function AgentDetails({
     const [description, setDescription] = useState("");
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState("");
-    // const [appVulnerabilities, setAppVulnerabilities] = useState({}); // "name#version" -> InstalledAppVulnerability
-    // const [appVulnLoading, setAppVulnLoading] = useState(false);
+    const [appVulnerabilities, setAppVulnerabilities] = useState({}); // "name#version" -> InstalledAppVulnerability
+    const [appVulnLoading, setAppVulnLoading] = useState(false);
     // GithubSimpleTable wraps `data` in a fetchData callback that GithubServerTable only re-invokes on
     // sort/filter/page changes or when this callFromOutside value changes — not on every parent re-render
     // — so without bumping it, the table keeps showing its initial (pre-fetch) snapshot forever.
@@ -319,8 +335,8 @@ function AgentDetails({
         setDescription("");
         setEditableDescription("");
         setIsEditingDescription(false);
-        // setAppVulnerabilities({});
-        // setAppVulnLoading(false);
+        setAppVulnerabilities({});
+        setAppVulnLoading(false);
         setAppVulnRefreshKey(0);
 
         setLoading(true);
@@ -353,29 +369,30 @@ function AgentDetails({
                 await fetchPage(null, true);
                 break;
             }
-            // case 'installed-apps': {
-            //     // Apps table renders immediately from selectedAgent — don't gate it behind this fetch.
-            //     // Only the per-row Status cell (getAppVulnStatusComp) waits on appVulnLoading.
-            //     const appsToCheck = (selectedAgent.installedApps || [])
-            //         .map(app => ({ name: sanitizeAppText(app.name), version: app.version ? sanitizeAppText(app.version) : '' }))
-            //         .filter(app => app.name && app.version);
-            //     if (appsToCheck.length === 0) break;
-            //     setAppVulnLoading(true);
-            //     try {
-            //         const res = await settingRequests.checkInstalledAppVulnerabilities(appsToCheck);
-            //         setAppVulnerabilities(res);
-            //     } catch {
-            //         setAppVulnerabilities({});
-            //     } finally {
-            //         setAppVulnLoading(false);
-            //         setAppVulnRefreshKey(k => k + 1);
-            //     }
-            //     break;
-            // }
+            case 'installed-apps': {
+                if (!isVulnStatusEnabled) break;
+                // Apps table renders immediately from selectedAgent — don't gate it behind this fetch.
+                // Only the per-row Status cell (getAppVulnStatusComp) waits on appVulnLoading.
+                const appsToCheck = (selectedAgent.installedApps || [])
+                    .map(app => ({ name: sanitizeAppText(app.name), version: app.version ? sanitizeAppText(app.version) : '' }))
+                    .filter(app => app.name && app.version);
+                if (appsToCheck.length === 0) break;
+                setAppVulnLoading(true);
+                try {
+                    const res = await settingRequests.checkInstalledAppVulnerabilities(appsToCheck);
+                    setAppVulnerabilities(res);
+                } catch {
+                    setAppVulnerabilities({});
+                } finally {
+                    setAppVulnLoading(false);
+                    setAppVulnRefreshKey(k => k + 1);
+                }
+                break;
+            }
             default:
                 break;
         }
-    }, [selectedAgent, fetchPage]);
+    }, [selectedAgent, fetchPage, isVulnStatusEnabled]);
 
     const mcpServersTableData = useMemo(() =>
         mcpServers.map(server => ({
@@ -386,20 +403,25 @@ function AgentDetails({
             collectionName: server.collectionName
         })), [mcpServers]);
 
-    const installedAppsTableData = useMemo(() =>
-        [...(selectedAgent?.installedApps || [])]
-            .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-            .map(app => {
-                const name = sanitizeAppText(app.name);
-                const version = app.version ? sanitizeAppText(app.version) : '';
-                // const vuln = (name && version) ? appVulnerabilities[`${name}#${version}`] : null;
-                return {
-                    name: name || '\u2014',
-                    version: version || '\u2014',
-                    // vulnComp: getAppVulnStatusComp(vuln, appVulnLoading),
-                };
-            }),
-    [selectedAgent]);
+    const installedAppsTableData = useMemo(() => {
+        const enriched = (selectedAgent?.installedApps || []).map(app => {
+            const name = sanitizeAppText(app.name);
+            const version = app.version ? sanitizeAppText(app.version) : '';
+            const vuln = (name && version) ? appVulnerabilities[`${name}#${version}`] : null;
+            return { name, version, vuln };
+        });
+
+        return enriched
+            .sort((a, b) => {
+                const vulnRank = (b.vuln?.misconfiguredApp ? 1 : 0) - (a.vuln?.misconfiguredApp ? 1 : 0);
+                return vulnRank !== 0 ? vulnRank : (a.name || '').localeCompare(b.name || '');
+            })
+            .map(({ name, version, vuln }) => ({
+                name: name || '\u2014',
+                version: version || '\u2014',
+                vulnComp: getAppVulnStatusComp(vuln, appVulnLoading),
+            }));
+    }, [selectedAgent, appVulnerabilities, appVulnLoading]);
 
     const handleServerClick = useCallback((server) => {
         const collection = allCollections.find(col =>
@@ -622,8 +644,8 @@ function AgentDetails({
                     data={installedAppsTableData}
                     callFromOutside={appVulnRefreshKey}
                     resourceName={{ singular: "app", plural: "apps" }}
-                    headers={installedAppsHeaders}
-                    headings={installedAppsHeaders}
+                    headers={isVulnStatusEnabled ? installedAppsHeadersWithVulnStatus : installedAppsHeaders}
+                    headings={isVulnStatusEnabled ? installedAppsHeadersWithVulnStatus : installedAppsHeaders}
                     useNewRow={true}
                     condensedHeight={true}
                     hideQueryField={true}
