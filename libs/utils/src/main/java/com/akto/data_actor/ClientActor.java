@@ -2593,6 +2593,31 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunResultsForRecord", testingRunResults);
+        obj.put("rerunDeleteIds", rerunDeleteIds);
+        obj.put("doNotMarkIssuesAsFixed", doNotMarkIssuesAsFixed);
+        String objString = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkRecordTestingRunResults", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response == null) {
+                loggerMaker.errorAndAddToDb("null response (all retries failed) in bulkRecordTestingRunResults", LoggerMaker.LogDb.TESTING);
+                return;
+            }
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in bulkRecordTestingRunResults: status=" + response.getStatusCode() + " body=" + responsePayload, LoggerMaker.LogDb.TESTING);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in bulkRecordTestingRunResults" + e, LoggerMaker.LogDb.TESTING);
+            return;
+        }
+    }
+
     public void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();

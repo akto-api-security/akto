@@ -496,6 +496,11 @@ public class DbActor extends DataActor {
         DbLayer.insertTestingRunResults(testingRunResults);
     }
 
+    // mini-testing always talks to DB via cyborg (ClientActor); direct-Mongo path intentionally unimplemented.
+    public void bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed) {
+        throw new UnsupportedOperationException("bulkRecordTestingRunResults is not supported via DbActor");
+    }
+
     public void insertWorkflowTestResult(WorkflowTestResult workflowTestResult) {
         DbLayer.insertWorkflowTestResult(workflowTestResult);
     }

@@ -211,6 +211,8 @@ public abstract class DataActor {
 
     public abstract void insertTestingRunResults(TestingRunResult testingRunResults);
 
+    public abstract void bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed);
+
     public abstract void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount);
 
     public abstract TestingRunResultSummary updateMetadataInSummary(String summaryId, Map<String, String> metadata);
