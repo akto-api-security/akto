@@ -101,6 +101,9 @@ import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.files.File;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.util.enums.GlobalEnums.TestErrorSource;
+import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -116,6 +119,10 @@ import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.dto.testing.TestResult.Confidence;
+import com.akto.dto.bulk_updates.BulkUpdates;
+import com.akto.dto.bulk_updates.UpdatePayload;
+import com.google.gson.Gson;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.TestingRun.State;
@@ -157,6 +164,7 @@ import com.mongodb.client.MongoCursor;
 public class DbLayer {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbLayer.class, LoggerMaker.LogDb.DASHBOARD);
+    private static final Gson gson = new Gson();
     public static final String DEFAULT_MINI_TESTING_NAME = "Default_";
 
     private static final ConcurrentHashMap<Integer, Integer> lastUpdatedTsMap = new ConcurrentHashMap<>();
@@ -752,6 +760,93 @@ public class DbLayer {
         loggerMaker.infoAndAddToDb(String.format("Matched records : %s", result.getMatchedCount()), LogDb.TESTING);
         loggerMaker.infoAndAddToDb(String.format("inserted counts : %s", result.getInsertedCount()), LogDb.TESTING);
         loggerMaker.infoAndAddToDb(String.format("Modified counts : %s", result.getModifiedCount()), LogDb.TESTING);
+    }
+
+    /**
+     * Extracted, unchanged, from DbAction.bulkWriteTestingRunIssues's per-item loop body (that action method
+     * now just calls this per BulkUpdates). Single source of truth for turning a TestingRunIssues update
+     * intent into the actual Mongo write - both that HTTP-facing endpoint and
+     * recordIssuesForTestingRunResults (which builds the same BulkUpdates shape in-process, see
+     * buildIssueBulkUpdate) go through this one place, instead of each re-deriving the field-by-field
+     * set/setOnInsert/override rules independently.
+     */
+    public static WriteModel<TestingRunIssues> convertBulkUpdateToTestingRunIssuesWrite(BulkUpdates bulkUpdate) {
+        Object filterObj = bulkUpdate.getFilters().get("_id");
+        HashMap<String, Object> filterMap = (HashMap) filterObj;
+        HashMap<String, Object> keyMap = (HashMap) filterMap.get("apiInfoKey");
+        int apiCollectionId = 0;
+        try {
+            apiCollectionId = (int)(long) keyMap.get("apiCollectionId");
+        } catch(Exception f){
+            apiCollectionId = (int) keyMap.get("apiCollectionId");
+        }
+        ApiInfoKey key = new ApiInfoKey(apiCollectionId, (String)keyMap.get("url"), Method.valueOf((String)keyMap.get("method")));
+        TestingIssuesId idd = new TestingIssuesId(key, TestErrorSource.valueOf((String)filterMap.get("testErrorSource")), (String)filterMap.get("testSubCategory"));
+        Bson filters = Filters.eq("_id", idd);
+        List<String> updatePayloadList = bulkUpdate.getUpdates();
+
+        List<Bson> updates = new ArrayList<>();
+        for (String payload: updatePayloadList) {
+            Map<String, Object> json = gson.fromJson(payload, Map.class);
+
+            String field = (String) json.get("field");
+            if (field.equals(TestingRunIssues.COLLECTION_IDS)) {
+                List<Double> dVal = (List) json.get("val");
+                List<Integer> val = new ArrayList<>();
+                for (int i = 0; i < dVal.size(); i++) {
+                    val.add(dVal.get(i).intValue());
+                }
+                updates.add(Updates.setOnInsert(field, val));
+            }else if(field.equals(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID)){
+                String val = (String)json.get("val");
+                ObjectId id = new ObjectId(val);
+                updates.add(Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, id));
+            } else if(field.equals(TestingRunIssues.UNREAD)){
+                boolean dVal = (boolean) json.get("val");
+                UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
+                updates.add(Updates.set(updatePayload.getField(), dVal));
+            } else if (field.equals(TestingRunIssues.LAST_UPDATED) ||
+                    field.equals(TestingRunIssues.LAST_SEEN) ||
+                    field.equals(TestingRunIssues.CREATION_TIME)) {
+                Double val = (double) json.get("val");
+                int dVal = val.intValue();
+                UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
+                updates.add(Updates.set(updatePayload.getField(), dVal));
+            } else if (field.equals(TestingRunIssues.KEY_SEVERITY)) {
+
+                /*
+                 * Fixing severity temp. here,
+                 * cause the info. from mini-testing always contains HIGH.
+                 * To be fixed in mini-testing.
+                 */
+                /*
+                 * Severity from info. fixed,
+                 * so taking for dynamic_severity,
+                 * since rest would be same and for old deployments.
+                 */
+                String testSubCategory = idd.getTestSubCategory();
+                YamlTemplate template = YamlTemplateDao.instance
+                        .findOne(Filters.eq(Constants.ID, testSubCategory));
+                String dVal = (String) json.get("val");
+
+                if (template != null) {
+                    String severity = template.getInfo().getSeverity();
+                    if (severity != null && !"dynamic_severity".equals(severity)) {
+                        dVal = severity;
+                    }
+                }
+
+                UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal,
+                        (String) json.get("op"));
+                updates.add(Updates.set(updatePayload.getField(), dVal));
+            } else {
+                String dVal = (String) json.get("val");
+                UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
+                updates.add(Updates.set(updatePayload.getField(), dVal));
+            }
+        }
+
+        return new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true));
     }
 
     public static void bulkWriteOverageInfo(List<WriteModel<UningestedApiOverage>> writeModelList) {
@@ -2067,6 +2162,263 @@ public class DbLayer {
         if(testingRunResult.isVulnerable()){
             VulnerableTestingRunResultDao.instance.insertOne(testingRunResult);
         }
+    }
+
+    public static void bulkWriteTestingRunResults(List<TestingRunResult> testingRunResults) {
+        List<WriteModel<TestingRunResult>> mainWrites = new ArrayList<>();
+        List<WriteModel<TestingRunResult>> vulnerableWrites = new ArrayList<>();
+        for (TestingRunResult trr : testingRunResults) {
+            mainWrites.add(new InsertOneModel<>(trr));
+            // from now store vulnerable results in separate collection also
+            if (trr.isVulnerable()) {
+                vulnerableWrites.add(new InsertOneModel<>(trr));
+            }
+        }
+        if (!mainWrites.isEmpty()) {
+            TestingRunResultDao.instance.bulkWrite(mainWrites, new BulkWriteOptions().ordered(false));
+        }
+        if (!vulnerableWrites.isEmpty()) {
+            VulnerableTestingRunResultDao.instance.bulkWrite(vulnerableWrites, new BulkWriteOptions().ordered(false));
+        }
+    }
+
+    /**
+     * Consolidated bulk endpoint support: does the work that previously required up to 7 separate calls per
+     * result (deleteTestingRunResults[rerun] + insert result + updateTestResultsCountInTestSummary +
+     * findTestSourceConfig + fetchIssuesByIds + bulkWriteTestingRunIssues + updateIssueCountInSummary), as one
+     * call batched across N results - so the caller pays one network round trip instead of up to 7 per result.
+     * All sub-operations already exist as local, direct-Mongo DbLayer methods; this only adds the batched
+     * orchestration and the issue-write-model computation (ported from apps/mini-testing's TestingIssuesHandler,
+     * see recordIssuesForTestingRunResults below).
+     *
+     * @param testingRunResults the batch of results to persist
+     * @param rerunDeleteIds hex ids of prior results being replaced by a rerun (client-computed - this decision
+     *                       depends on mini-testing's in-memory TestingConfigurations cache, not something the
+     *                       server can derive)
+     * @param doNotMarkIssuesAsFixed mirrors TestingConfigurations.getInstance().getDoNotMarkIssuesAsFixed(),
+     *                               also client/run config the server doesn't otherwise have
+     */
+    public static void bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed) {
+        if (rerunDeleteIds != null) {
+            for (String id : rerunDeleteIds) {
+                deleteTestingRunResults(id);
+            }
+        }
+
+        if (testingRunResults == null || testingRunResults.isEmpty()) {
+            return;
+        }
+
+        bulkWriteTestingRunResults(testingRunResults);
+
+        Map<ObjectId, Integer> countBySummary = new HashMap<>();
+        for (TestingRunResult trr : testingRunResults) {
+            countBySummary.merge(trr.getTestRunResultSummaryId(), 1, Integer::sum);
+        }
+        for (Map.Entry<ObjectId, Integer> entry : countBySummary.entrySet()) {
+            updateTestResultsCountInTestSummary(entry.getKey().toHexString(), entry.getValue());
+        }
+
+        recordIssuesForTestingRunResults(testingRunResults, doNotMarkIssuesAsFixed);
+    }
+
+    private static final String SET_OPERATION = "set";
+
+    /**
+     * Builds the same BulkUpdates shape TestingIssuesHandler (mini-testing) builds client-side - a filter Map
+     * mirroring what the JSON interceptor would decode a TestingIssuesId into, and UpdatePayload.toString()
+     * (a real gson round trip, same as production) for each update. This lets both this in-process caller and
+     * the HTTP-facing bulkWriteTestingRunIssues endpoint hand off to the exact same conversion
+     * (convertBulkUpdateToTestingRunIssuesWrite) instead of each independently deciding how a field should be
+     * written - that duplication is what caused the upsert/setOnInsert/severity-override/summary-id bugs this
+     * replaced.
+     */
+    private static BulkUpdates buildIssueBulkUpdate(TestingIssuesId issuesId, List<UpdatePayload> payloads) {
+        Map<String, Object> apiInfoKeyMap = new HashMap<>();
+        apiInfoKeyMap.put("apiCollectionId", (long) issuesId.getApiInfoKey().getApiCollectionId());
+        apiInfoKeyMap.put("url", issuesId.getApiInfoKey().getUrl());
+        apiInfoKeyMap.put("method", issuesId.getApiInfoKey().getMethod().name());
+        Map<String, Object> filterMap = new HashMap<>();
+        filterMap.put("apiInfoKey", apiInfoKeyMap);
+        filterMap.put(TestingIssuesId.TEST_ERROR_SOURCE, issuesId.getTestErrorSource().name());
+        filterMap.put(TestingIssuesId.TEST_SUB_CATEGORY, issuesId.getTestSubCategory());
+        Map<String, Object> filters = new HashMap<>();
+        filters.put("_id", filterMap);
+
+        ArrayList<String> updateStrings = new ArrayList<>();
+        for (UpdatePayload payload : payloads) {
+            updateStrings.add(payload.toString());
+        }
+        return new BulkUpdates(filters, updateStrings);
+    }
+
+    /**
+     * Ported from apps/mini-testing's TestingIssuesHandler (listOfIssuesIdsFromTestingRunResults +
+     * writeUpdateQueryIntoWriteModel + insertVulnerableTestsIntoIssuesCollection), batched across the whole
+     * result list instead of one result at a time: dedup ids -> one fetchIssuesByIds -> build writes ->
+     * one bulkWriteTestingRunIssues. Each per-field write decision goes through
+     * convertBulkUpdateToTestingRunIssuesWrite, the same conversion the HTTP-facing bulkWriteTestingRunIssues
+     * endpoint uses (so both paths make identical field/write decisions).
+     */
+    private static void recordIssuesForTestingRunResults(List<TestingRunResult> testingRunResults, boolean doNotMarkIssuesAsFixed) {
+        Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap = listOfIssuesIdsFromTestingRunResults(testingRunResults);
+        if (testingIssuesIdsMap.isEmpty()) {
+            return;
+        }
+
+        List<TestingRunIssues> existingIssues = fetchIssuesByIds(testingIssuesIdsMap.keySet());
+
+        List<WriteModel<TestingRunIssues>> writeModelList = new ArrayList<>();
+        writeUpdateQueryIntoWriteModel(writeModelList, testingIssuesIdsMap, existingIssues, doNotMarkIssuesAsFixed);
+        insertVulnerableTestsIntoIssuesCollection(writeModelList, testingIssuesIdsMap, existingIssues);
+
+        if (!writeModelList.isEmpty()) {
+            bulkWriteTestingRunIssues(writeModelList);
+        }
+    }
+
+    /**
+     * Mirrors TestingIssuesHandler.listOfIssuesIdsFromTestingRunResults: dedups the batch down to distinct
+     * issue ids, first-seen wins, for the isAutomatedTesting=true / triggeredByTestEditor=false call site.
+     *
+     * Dedup + later lookups use a linear scan (getIssuesIdFromMap over keySet), same as the original, because
+     * TestingIssuesId's equals() compares testSubCategory case-insensitively but its hashCode() does not - so
+     * a plain map.get(id) can miss. sourceConfigCache dedupes the per-custom-template findTestSourceConfig
+     * lookup (only reached for http-prefixed subtypes; distinct such subtypes still cost one lookup each).
+     */
+    private static Map<TestingIssuesId, TestingRunResult> listOfIssuesIdsFromTestingRunResults(List<TestingRunResult> testingRunResults) {
+        Map<TestingIssuesId, TestingRunResult> map = new HashMap<>();
+        Map<String, TestSourceConfig> sourceConfigCache = new HashMap<>();
+        for (TestingRunResult runResult : testingRunResults) {
+            String subCategory = runResult.getTestSubType();
+            TestSourceConfig config = null;
+            if (subCategory != null && subCategory.startsWith("http")) {
+                config = sourceConfigCache.computeIfAbsent(subCategory, DbLayer::findTestSourceConfig);
+            }
+            TestingIssuesId issueId = new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
+                    subCategory, config != null ? config.getId() : null);
+            if (getIssuesIdFromMap(issueId, map) == null) {
+                map.put(issueId, runResult);
+            }
+        }
+        return map;
+    }
+
+    /** Linear-scan lookup of the map's canonical key equal to issuesId - see
+     *  listOfIssuesIdsFromTestingRunResults for why map.get() can't be used directly. */
+    private static TestingIssuesId getIssuesIdFromMap(TestingIssuesId issuesId, Map<TestingIssuesId, TestingRunResult> map) {
+        for (TestingIssuesId candidate : map.keySet()) {
+            if (candidate.equals(issuesId)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /** Mirrors TestingIssuesHandler.writeUpdateQueryIntoWriteModel: update-existing-issue writes, only touches
+     *  issues already in the DB (iterates existingIssues, not the whole batch). */
+    private static void writeUpdateQueryIntoWriteModel(List<WriteModel<TestingRunIssues>> writeModelList,
+            Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap, List<TestingRunIssues> existingIssues,
+            boolean doNotMarkIssuesAsFixed) {
+        int lastSeen = Context.now();
+        for (TestingRunIssues testingRunIssues : existingIssues) {
+            TestingIssuesId issuesId = testingRunIssues.getId();
+            TestingRunResult runResult = testingIssuesIdsMap.get(getIssuesIdFromMap(issuesId, testingIssuesIdsMap));
+            if (runResult == null) {
+                continue;
+            }
+            List<UpdatePayload> payloads = new ArrayList<>();
+            TestRunIssueStatus status = testingRunIssues.getTestRunIssueStatus();
+            if (runResult.isVulnerable()) {
+                payloads.add(new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
+                        (status == TestRunIssueStatus.IGNORED ? TestRunIssueStatus.IGNORED : TestRunIssueStatus.OPEN).name(), SET_OPERATION));
+            } else if (!doNotMarkIssuesAsFixed) {
+                payloads.add(new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name(), SET_OPERATION));
+            }
+            // When doNotMarkIssuesAsFixed is true we intentionally avoid touching the status for non-vulnerable results
+            payloads.add(new UpdatePayload(TestingRunIssues.KEY_SEVERITY, getSeverityFromTestingRunResult(runResult).name(), SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.LAST_SEEN, lastSeen, SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString(), SET_OPERATION));
+            writeModelList.add(convertBulkUpdateToTestingRunIssuesWrite(buildIssueBulkUpdate(issuesId, payloads)));
+        }
+    }
+
+    /** Mirrors TestingIssuesHandler.insertVulnerableTestsIntoIssuesCollection: vulnerable-result writes plus
+     *  the severity-count tally, ending in a single updateIssueCountInSummary (after the loop - one call per
+     *  batch, not a query in a loop). Gated on summaryId != null only, matching the original exactly. */
+    private static void insertVulnerableTestsIntoIssuesCollection(List<WriteModel<TestingRunIssues>> writeModelList,
+            Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap, List<TestingRunIssues> existingIssues) {
+        int lastSeen = Context.now();
+        Map<String, Integer> countIssuesMap = new HashMap<>();
+        countIssuesMap.put(Severity.CRITICAL.toString(), 0);
+        countIssuesMap.put(Severity.HIGH.toString(), 0);
+        countIssuesMap.put(Severity.MEDIUM.toString(), 0);
+        countIssuesMap.put(Severity.LOW.toString(), 0);
+        ObjectId summaryId = null;
+
+        for (TestingIssuesId testingIssuesId : testingIssuesIdsMap.keySet()) {
+            TestingRunResult runResult = testingIssuesIdsMap.get(testingIssuesId);
+            if (!runResult.isVulnerable()) {
+                continue;
+            }
+            if (summaryId == null) {
+                summaryId = runResult.getTestRunResultSummaryId();
+            }
+            boolean doesExist = false;
+            boolean shouldCountIssue = false;
+            for (TestingRunIssues testingRunIssues : existingIssues) {
+                if (testingRunIssues.getId().equals(testingIssuesId)) {
+                    doesExist = true;
+                    if (testingRunIssues.getTestRunIssueStatus() == TestRunIssueStatus.OPEN) {
+                        shouldCountIssue = true;
+                    }
+                    break;
+                }
+            }
+            // Sent as-is, same as the original client - the KEY_SEVERITY conversion branch (shared, see
+            // convertBulkUpdateToTestingRunIssuesWrite) may override this with a configured template severity
+            // before it's written; countIssuesMap below intentionally tallies the pre-override value, matching
+            // the original's independent client-side count computation.
+            Severity severity = getSeverityFromTestingRunResult(runResult);
+            List<UpdatePayload> payloads = new ArrayList<>();
+            payloads.add(new UpdatePayload(TestingRunIssues.KEY_SEVERITY, severity.name(), SET_OPERATION));
+            if (!doesExist || shouldCountIssue) {
+                payloads.add(new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name(), SET_OPERATION));
+                int count = countIssuesMap.getOrDefault(severity.name(), 0);
+                countIssuesMap.put(severity.name(), count + 1);
+            }
+            payloads.add(new UpdatePayload(TestingRunIssues.CREATION_TIME, lastSeen, SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.LAST_SEEN, lastSeen, SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.LAST_UPDATED, lastSeen, SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.UNREAD, true, SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString(), SET_OPERATION));
+            if (testingIssuesId.getApiInfoKey() != null) {
+                payloads.add(new UpdatePayload(TestingRunIssues.COLLECTION_IDS,
+                        Collections.singletonList(testingIssuesId.getApiInfoKey().getApiCollectionId()), SET_OPERATION));
+            }
+            writeModelList.add(convertBulkUpdateToTestingRunIssuesWrite(buildIssueBulkUpdate(testingIssuesId, payloads)));
+        }
+
+        if (summaryId != null) {
+            updateIssueCountInSummary(summaryId.toHexString(), countIssuesMap, "increment");
+        }
+    }
+
+    /**
+     * Ported from apps/mini-testing's TestExecutor.getSeverityFromTestingRunResult - same default/fallback
+     * behavior. This is the value sent as KEY_SEVERITY's update payload (and used for count tallying) -
+     * whether it's what actually gets written is decided by convertBulkUpdateToTestingRunIssuesWrite's shared
+     * template-override logic, same as it always was for the existing HTTP-facing flow.
+     */
+    private static Severity getSeverityFromTestingRunResult(TestingRunResult testingRunResult) {
+        Severity severity = Severity.HIGH;
+        try {
+            Confidence confidence = testingRunResult.getTestResults().get(0).getConfidence();
+            severity = Severity.valueOf(confidence.toString());
+        } catch (Exception e) {
+            // keep default HIGH - matches the original's catch-all fallback
+        }
+        return severity;
     }
 
     public static void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount) {

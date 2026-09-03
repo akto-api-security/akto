@@ -483,6 +483,12 @@ public class DbAction extends ActionSupport {
     String newRefreshToken;
     Map<ObjectId, TestingRunResultSummary> testingRunResultSummaryMap;
     BasicDBObject testingRunResult;
+    @Getter @Setter
+    List<BasicDBObject> testingRunResultsForRecord;
+    @Getter @Setter
+    List<String> rerunDeleteIds;
+    @Getter @Setter
+    boolean doNotMarkIssuesAsFixed;
     Tokens token;
     WorkflowTest workflowTest;
     List<YamlTemplate> yamlTemplates;
@@ -1600,84 +1606,7 @@ public class DbAction extends ActionSupport {
             try {
                 ArrayList<WriteModel<TestingRunIssues>> writes = new ArrayList<>();
                 for (BulkUpdates bulkUpdate: writesForTestingRunIssues) {
-                    Object filterObj = bulkUpdate.getFilters().get("_id");
-                    HashMap<String, Object> filterMap = (HashMap) filterObj;
-                    HashMap<String, Object> keyMap = (HashMap) filterMap.get("apiInfoKey");
-                    int apiCollectionId = 0;
-                    try {
-                        apiCollectionId = (int)(long) keyMap.get("apiCollectionId");
-                    } catch(Exception f){
-                        apiCollectionId = (int) keyMap.get("apiCollectionId");
-                    }
-                    ApiInfoKey key = new ApiInfoKey(apiCollectionId, (String)keyMap.get("url"), Method.valueOf((String)keyMap.get("method")));
-                    TestingIssuesId idd = new TestingIssuesId(key, TestErrorSource.valueOf((String)filterMap.get("testErrorSource")), (String)filterMap.get("testSubCategory"));
-                    Bson filters = Filters.eq("_id", idd);
-                    List<String> updatePayloadList = bulkUpdate.getUpdates();
-    
-                    List<Bson> updates = new ArrayList<>();
-                    for (String payload: updatePayloadList) {
-                        Map<String, Object> json = gson.fromJson(payload, Map.class);
-    
-                        String field = (String) json.get("field");
-                        if (field.equals(TestingRunIssues.COLLECTION_IDS)) {
-                            List<Double> dVal = (List) json.get("val");
-                            List<Integer> val = new ArrayList<>();
-                            for (int i = 0; i < dVal.size(); i++) {
-                                val.add(dVal.get(i).intValue());
-                            }
-                            updates.add(Updates.setOnInsert(field, val));
-                        }else if(field.equals(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID)){
-                            String val = (String)json.get("val");
-                            ObjectId id = new ObjectId(val);
-                            updates.add(Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, id));
-                        } else if(field.equals(TestingRunIssues.UNREAD)){
-                            boolean dVal = (boolean) json.get("val");
-                            UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
-                            updates.add(Updates.set(updatePayload.getField(), dVal));
-                        } else if (field.equals(TestingRunIssues.LAST_UPDATED) ||
-                                field.equals(TestingRunIssues.LAST_SEEN) ||
-                                field.equals(TestingRunIssues.CREATION_TIME)) {
-                            Double val = (double) json.get("val");
-                            int dVal = val.intValue();
-                            UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
-                            updates.add(Updates.set(updatePayload.getField(), dVal));
-                        } else if (field.equals(TestingRunIssues.KEY_SEVERITY)) {
-
-                            /*
-                             * Fixing severity temp. here,
-                             * cause the info. from mini-testing always contains HIGH.
-                             * To be fixed in mini-testing.
-                             */
-                            /*
-                             * Severity from info. fixed,
-                             * so taking for dynamic_severity,
-                             * since rest would be same and for old deployments.
-                             */
-                            String testSubCategory = idd.getTestSubCategory();
-                            YamlTemplate template = YamlTemplateDao.instance
-                                    .findOne(Filters.eq(Constants.ID, testSubCategory));
-                            String dVal = (String) json.get("val");
-
-                            if (template != null) {
-                                String severity = template.getInfo().getSeverity();
-                                if (severity != null && !"dynamic_severity".equals(severity)) {
-                                    dVal = severity;
-                                }
-                            }
-
-                            UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal,
-                                    (String) json.get("op"));
-                            updates.add(Updates.set(updatePayload.getField(), dVal));
-                        } else {
-                            String dVal = (String) json.get("val");
-                            UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
-                            updates.add(Updates.set(updatePayload.getField(), dVal));
-                        }
-                    }
-    
-                    writes.add(
-                            new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true))
-                    );
+                    writes.add(DbLayer.convertBulkUpdateToTestingRunIssuesWrite(bulkUpdate));
                 }
                 DbLayer.bulkWriteTestingRunIssues(writes);
             } catch (Exception e) {
@@ -2808,60 +2737,94 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String insertTestingRunResults() {
+    /**
+     * Converts a raw TestingRunResult payload (as received over HTTP) into a {@link TestingRunResult},
+     * handling the workflow node details remap, aiSummaryTraces placement, testResults normalization
+     * and hex-id -> ObjectId conversions. Shared by the single-insert and bulk-insert endpoints.
+     */
+    private TestingRunResult buildTestingRunResultFromPayload(BasicDBObject rawPayload) throws Exception {
+        Map<String, WorkflowNodeDetails> data = new HashMap<>();
         try {
-
-            Map<String, WorkflowNodeDetails> data = new HashMap<>();
-            try {
-                if (this.testingRunResult != null && this.testingRunResult.get("workflowTest") != null) {
-                    Map<String, BasicDBObject> x = (Map) (((Map) this.testingRunResult.get("workflowTest"))
-                            .get("mapNodeIdToWorkflowNodeDetails"));
-                    if (x != null) {
-                        for (String tmp : x.keySet()) {
-                            ((Map) x.get(tmp)).remove("authMechanism");
-                            ((Map) x.get(tmp)).remove("customAuthTypes");
-                            data.put(tmp, objectMapper.convertValue(x.get(tmp), YamlNodeDetails.class));
-                        }
+            if (rawPayload != null && rawPayload.get("workflowTest") != null) {
+                Map<String, BasicDBObject> x = (Map) (((Map) rawPayload.get("workflowTest"))
+                        .get("mapNodeIdToWorkflowNodeDetails"));
+                if (x != null) {
+                    for (String tmp : x.keySet()) {
+                        ((Map) x.get(tmp)).remove("authMechanism");
+                        ((Map) x.get(tmp)).remove("customAuthTypes");
+                        data.put(tmp, objectMapper.convertValue(x.get(tmp), YamlNodeDetails.class));
                     }
                 }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails" + e.toString());
-                e.printStackTrace();
             }
-            TestingRunResult testingRunResult = objectMapper.readValue(this.testingRunResult.toJson(), TestingRunResult.class);
-            applyAiSummaryTracesFromPayload(testingRunResult, this.testingRunResult);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails" + e.toString());
+            e.printStackTrace();
+        }
+        TestingRunResult testingRunResult = objectMapper.readValue(rawPayload.toJson(), TestingRunResult.class);
+        applyAiSummaryTracesFromPayload(testingRunResult, rawPayload);
 
-            try {
-                if (!data.isEmpty()) {
-                    testingRunResult.getWorkflowTest().setMapNodeIdToWorkflowNodeDetails(data);
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails2" + e.toString());
-                e.printStackTrace();
+        try {
+            if (!data.isEmpty()) {
+                testingRunResult.getWorkflowTest().setMapNodeIdToWorkflowNodeDetails(data);
             }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails2" + e.toString());
+            e.printStackTrace();
+        }
 
-            if(testingRunResult.getSingleTestResults()!=null){
-                testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getSingleTestResults()));
-            }else if(testingRunResult.getMultiExecTestResults() !=null){
-                testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getMultiExecTestResults()));
-            }
-            applyAiSummaryTracesFromPayload(testingRunResult, this.testingRunResult);
+        if(testingRunResult.getSingleTestResults()!=null){
+            testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getSingleTestResults()));
+        }else if(testingRunResult.getMultiExecTestResults() !=null){
+            testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getMultiExecTestResults()));
+        }
 
-            if (testingRunResult.getTestRunHexId() != null) {
-                ObjectId id = new ObjectId(testingRunResult.getTestRunHexId());
-                testingRunResult.setTestRunId(id);
-            }
+        if (testingRunResult.getTestRunHexId() != null) {
+            ObjectId id = new ObjectId(testingRunResult.getTestRunHexId());
+            testingRunResult.setTestRunId(id);
+        }
 
-            if (testingRunResult.getTestRunResultSummaryHexId() != null) {
-                ObjectId id = new ObjectId(testingRunResult.getTestRunResultSummaryHexId());
-                testingRunResult.setTestRunResultSummaryId(id);
-            }
+        if (testingRunResult.getTestRunResultSummaryHexId() != null) {
+            ObjectId id = new ObjectId(testingRunResult.getTestRunResultSummaryHexId());
+            testingRunResult.setTestRunResultSummaryId(id);
+        }
 
+        return testingRunResult;
+    }
+
+    public String insertTestingRunResults() {
+        try {
+            TestingRunResult testingRunResult = buildTestingRunResultFromPayload(this.testingRunResult);
             DbLayer.insertTestingRunResults(testingRunResult);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults " + e.toString());
             if (kafkaUtils.isWriteEnabled()) {
                 kafkaUtils.insertDataSecondary(testingRunResult, "insertTestingRunResults", Context.accountId.get());
+            }
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Consolidated bulk endpoint: does the work of insertTestingRunResults + deleteTestingRunResults[rerun] +
+     * updateTestResultsCountInTestSummary + the whole issue-creation flow (findTestSourceConfig +
+     * fetchIssuesByIds + bulkWriteTestingRunIssues + updateIssueCountInSummary, ported from apps/mini-testing's
+     * TestingIssuesHandler into DbLayer.recordIssuesForTestingRunResults) as ONE call, batched across N results.
+     * This is intentionally a brand-new endpoint - the existing insertTestingRunResults endpoint and its
+     * DbLayer/DataActor methods are untouched; only buildTestingRunResultFromPayload is reused (it already
+     * existed as a shared helper).
+     */
+    public String bulkRecordTestingRunResults() {
+        try {
+            List<TestingRunResult> results = new ArrayList<>();
+            for (BasicDBObject raw : testingRunResultsForRecord) {
+                results.add(buildTestingRunResultFromPayload(raw));
+            }
+            DbLayer.bulkRecordTestingRunResults(results, rerunDeleteIds, doNotMarkIssuesAsFixed);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in bulkRecordTestingRunResults " + e.toString());
+            if (kafkaUtils.isWriteEnabled()) {
+                kafkaUtils.insertDataSecondary(testingRunResultsForRecord, "bulkRecordTestingRunResults", Context.accountId.get());
             }
             return Action.ERROR.toUpperCase();
         }
