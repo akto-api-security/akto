@@ -304,17 +304,39 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             .sort((a, b) => a.key.localeCompare(b.key));
     }, [agenticUsers]);
 
-    // One dropdown option per device (not per username) — usernames can repeat across devices
-    // (or even across different people), so the device ID is the actual selectable/stored value.
-    // Devices with no ID (agenticUsers[].devices already excludes them, see ModuleInfoDao) are
-    // never in this list, so there's nothing un-targetable to show.
+    // One row per device, falling back to one row per user for a user with no device on record.
+    // fetchAgenticUsers returns the union of both identity sources, so it includes identities that
+    // are tagged but have nothing reporting; they belong in the list, and the username is the only
+    // value left to key them on. Device rows stay keyed on the device ID because that is what
+    // enforcement matches — a device-label prefix parsed out of mcpServerName, never a username
+    // (see ModuleInfoDao.fetchUsernameToDeviceIdsForEndpointShield). A username row consequently
+    // resolves to nothing at enforcement, which the label states rather than leaving silent.
     const availableDevices = useMemo(() => {
         const options = [];
         (agenticUsers || []).forEach(u => {
-            (u.devices || []).forEach(deviceId => {
-                if (!deviceId) return;
-                options.push({ label: `${u.userName || u.userEmail} · ${deviceIdSuffix(deviceId)}`, value: deviceId });
+            const name = u.userName || u.userEmail;
+            if (!name) return;
+            const devices = (u.devices || []).filter(Boolean);
+            if (devices.length === 0) {
+                // No device on record means no device suffix to show, so render the identity
+                // itself in the same two-part shape as a device row: "<email> · <username>".
+                // Falls back to the bare name when there is no email, or when the name already
+                // is the email, so the two halves are never a repeat of each other.
+                const label = u.userEmail && u.userEmail !== name ? `${u.userEmail} · ${name}` : name;
+                options.push({ label, value: name });
+                return;
+            }
+            devices.forEach(deviceId => {
+                options.push({ label: `${name} · ${deviceIdSuffix(deviceId)}`, value: deviceId });
             });
+        });
+        // Two different device IDs can render the same suffix — a "{host}-{first8}" label and a
+        // raw machine ID can share those 8 characters — which would show as two identical rows
+        // the user cannot tell apart. Spell out the full ID for any label that isn't unique.
+        const labelCounts = new Map();
+        options.forEach(o => labelCounts.set(o.label, (labelCounts.get(o.label) || 0) + 1));
+        options.forEach(o => {
+            if (labelCounts.get(o.label) > 1) o.label = `${o.label} (${o.value})`;
         });
         return options.sort((a, b) => a.label.localeCompare(b.label));
     }, [agenticUsers]);
