@@ -586,7 +586,9 @@ public class Utils {
     /*
      * this function is used primarily for non-automated traffic collection, like
      * postman, har and openAPI.
-     * Thus, we can skip advanced traffic filters for these cases.
+     * skipAdvancedFilters lets a caller opt out of advanced traffic filters for these cases.
+     * When they are applied, imported traffic is only enriched by them (see
+     * HttpCallParser.isImportedTraffic) and never dropped for not matching a filter.
      */
 
     public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka, boolean takeFromMsg, boolean skipAdvancedFilters) throws Exception {
