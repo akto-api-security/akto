@@ -13,7 +13,7 @@ import BarGraph from '../../components/charts/BarGraph';
 import InfoCard from '../dashboard/new_components/InfoCard';
 import api from './api';
 import { formatCategoryName, openThreatActivityPage } from './utils/threatDashboardUtils';
-import { getDashboardCategory, CATEGORY_AGENTIC_SECURITY, CATEGORY_ENDPOINT_SECURITY } from '../../../main/labelHelper';
+import { getDashboardCategory, isEndpointSecurityCategory, CATEGORY_AGENTIC_SECURITY, CATEGORY_ENDPOINT_SECURITY } from '../../../main/labelHelper';
 
 import ThreatDetectionOverTimeChart from './components/ThreatDetectionOverTimeChart';
 import ThreatTabbedSection from './components/ThreatTabbedSection';
@@ -74,7 +74,8 @@ function ThreatDashboardPage() {
             if (categoryResp?.categoryCounts) {
                 const subcategoryMap = {};
                 categoryResp.categoryCounts.forEach((item) => {
-                    const sub = item.subCategory || item.category || "Unknown";
+                    // prefer category (resolved guardrail policy / display name) over subCategory (raw rule id)
+                    const sub = item.category || item.subCategory || "Unknown";
                     if (!subcategoryMap[sub]) {
                         subcategoryMap[sub] = { rawName: sub, count: 0 };
                     }
@@ -136,7 +137,8 @@ function ThreatDashboardPage() {
                     <BarGraph
                         data={categoryData}
                         backgroundColor="transparent"
-                        yAxisTitle="# of APIs"
+                        // Endpoint Security violations aren't "APIs".
+                        yAxisTitle={isEndpointSecurityCategory() ? "" : "# of APIs"}
                         showYAxis={true}
                         showGridLines={true}
                         barGap={0.1}
