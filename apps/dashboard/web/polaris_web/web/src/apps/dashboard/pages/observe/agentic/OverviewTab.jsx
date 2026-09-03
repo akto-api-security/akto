@@ -180,10 +180,10 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
                                     const devices = assetDevices[asset.id] || [];
                                     const firstDevice = devices[0];
                                     handleClick = firstDevice
-                                        ? () => window.open(`/dashboard/observe/endpoints?device=${encodeURIComponent(firstDevice.deviceId)}`, "_blank")
-                                        : () => window.open("/dashboard/observe/endpoints", "_blank");
+                                        ? () => { window.location.href = `/dashboard/observe/endpoints?device=${encodeURIComponent(firstDevice.deviceId)}`; }
+                                        : () => { window.location.href = "/dashboard/observe/endpoints"; };
                                 } else if (f.type === "malicious_skill") {
-                                    handleClick = () => window.open(`/dashboard/observe/agentic-assets?asset=${encodeURIComponent(asset.name || asset.id)}`, "_blank");
+                                    handleClick = () => { window.location.href = `/dashboard/observe/agentic-assets?asset=${encodeURIComponent(asset.name || asset.id)}`; };
                                 } else {
                                     handleClick = undefined;
                                 }

@@ -244,6 +244,19 @@ export function aggregateViolationCountsByCollectionId(hostCounts = {}, collecti
     return byCollection;
 }
 
+// Same-tab deep-link into the new Guardrails Violations page (New Layout's AgenticAssetFlyout
+// only — ViolationsTab.jsx/AgentComponentsView.jsx). Legacy DeviceFlyout.jsx still uses
+// openViolationInThreatActivity below. ViolationsPage only supports filtering by policy/user
+// (not opening one specific row), so this is a best-effort pre-filter, not an exact deep link.
+export function openViolationInGuardrailViolations(row = {}) {
+    const { filterId, actor } = row;
+    const params = new URLSearchParams();
+    if (filterId) params.set("policy", filterId);
+    if (actor) params.set("user", actor);
+    const query = params.toString();
+    window.location.href = query ? `/dashboard/guardrails/violations?${query}` : "/dashboard/guardrails/violations";
+}
+
 // Deep-links to the one activity page that reads these params (ThreatDetectionPage). All 3 callers
 // live under pages/observe/agentic (Atlas-only) — hardcoded rather than dashboardCategory-gated
 // since these pages have no category check of their own and can load before it's set to ENDPOINT.
@@ -264,9 +277,9 @@ export function openViolationInThreatActivity(row = {}) {
         if (url) params.set("url", url);
         if (method) params.set("method", method);
         if (ruleViolated && ruleViolated !== "-") params.set("ruleViolated", ruleViolated);
-        window.open(`${base}?${params.toString()}#${hash}`, "_blank");
+        window.location.href = `${base}?${params.toString()}#${hash}`;
     } else {
-        window.open(`${base}#${hash}`, "_blank");
+        window.location.href = `${base}#${hash}`;
     }
 }
 
