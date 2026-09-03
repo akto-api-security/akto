@@ -1,8 +1,10 @@
 package com.akto.action;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.jobs.AccountJobConfigDao;
 import com.akto.dao.jobs.AccountJobDao;
 import com.akto.dto.jobs.AccountJob;
+import com.akto.dto.jobs.AccountJobConfig;
 import com.akto.dto.jobs.JobStatus;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -12,6 +14,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -36,6 +39,7 @@ public class AccountJobAction extends ActionSupport {
 
     private static final ObjectMapper mapper = new ObjectMapper()
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    private static final String ZERO_TIME = "0001-01-01T00:00:00Z";
 
     // Input/Output fields
     private Map<String, Object> accountJob;
@@ -46,6 +50,14 @@ public class AccountJobAction extends ActionSupport {
     private long now;
     private int heartbeatThreshold;
     private Map<String, Object> updates;
+
+    // Input/Output fields for fetchComplianceState / updateComplianceState.
+    // Flat, unwrapped to match the Cyborg cursor-sync wire format exactly — the JSON
+    // interceptor binds top-level request keys directly onto these action properties.
+    private Map<String, String> userCursors;
+    private String activityCursor;
+    private Map<String, Object> sessions;      // sessionId -> {last_message_id, last_message_at, boundary_ids, last_seen_at, updated_at}
+    private Map<String, Object> sessionWindow; // {last_run_started_at}
 
     /**
      * Fetch and claim a single AccountJob atomically.
@@ -254,5 +266,67 @@ public class AccountJobAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Fetch Cyborg's compliance cursor-sync state for this account.
+     * Returns the empty/never-written shape if nothing has been saved yet, so the
+     * caller can fall back to its own defaults.
+     */
+    public String fetchComplianceState() {
+        try {
+            AccountJobConfig cfg = AccountJobConfigDao.instance.findOne(AccountJobConfig.CONFIG_KEY, "ANTHROPIC_COMPLIANCE");
+            Map<String, Object> state = (cfg != null && cfg.getConfig() != null) ? cfg.getConfig() : null;
+
+            this.userCursors = state != null ? (Map<String, String>) state.get("userCursors") : new HashMap<>();
+            this.activityCursor = state != null ? (String) state.get("activityCursor") : "";
+            this.sessions = state != null ? (Map<String, Object>) state.get("sessions") : new HashMap<>();
+            this.sessionWindow = state != null ? (Map<String, Object>) state.get("sessionWindow") : defaultSessionWindow();
+
+            loggerMaker.debug("Fetched compliance state");
+
+        } catch (Exception e) {
+            loggerMaker.error("Error in fetchComplianceState", e);
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Persist Cyborg's compliance cursor-sync state for this account. Called once at
+     * the end of every run with the full snapshot; upserts so the first run creates
+     * the doc.
+     */
+    public String updateComplianceState() {
+        try {
+            Map<String, Object> state = new HashMap<>();
+            state.put("userCursors", userCursors != null ? userCursors : new HashMap<>());
+            state.put("activityCursor", activityCursor != null ? activityCursor : "");
+            state.put("sessions", sessions != null ? sessions : new HashMap<>());
+            state.put("sessionWindow", sessionWindow != null ? sessionWindow : defaultSessionWindow());
+
+            int nowSeconds = Context.now();
+            Bson filter = Filters.eq(AccountJobConfig.CONFIG_KEY, "ANTHROPIC_COMPLIANCE");
+            Bson update = Updates.combine(
+                Updates.set(AccountJobConfig.CONFIG_KEY, "ANTHROPIC_COMPLIANCE"),
+                Updates.set(AccountJobConfig.CONFIG, state),
+                Updates.set(AccountJobConfig.LAST_UPDATED_AT, nowSeconds),
+                Updates.setOnInsert(AccountJobConfig.CREATED_AT, nowSeconds)
+            );
+
+            AccountJobConfigDao.instance.getMCollection().updateOne(filter, update, new UpdateOptions().upsert(true));
+            loggerMaker.debug("Updated compliance state");
+
+        } catch (Exception e) {
+            loggerMaker.error("Error in updateComplianceState", e);
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    private static Map<String, Object> defaultSessionWindow() {
+        Map<String, Object> window = new HashMap<>();
+        window.put("last_run_started_at", ZERO_TIME);
+        return window;
     }
 }

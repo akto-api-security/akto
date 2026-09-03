@@ -2238,6 +2238,30 @@
             </result>
         </action>
 
+        <action name="api/fetchComplianceState" class="com.akto.action.AccountJobAction" method="fetchComplianceState">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">userCursors.*|activityCursor|sessions.*|sessionWindow.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/updateComplianceState" class="com.akto.action.AccountJobAction" method="updateComplianceState">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchCopilotStudioIntegration" class="com.akto.action.CopilotStudioIntegrationAction" method="fetchCopilotStudioIntegration">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
