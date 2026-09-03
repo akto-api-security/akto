@@ -2198,12 +2198,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 // fixed (see fetchAgenticAssetDetail, the lazy per-asset endpoint the Overview tab's
                 // full device list — topology graph, etc. — now comes from instead).
                 List<BasicDBObject> devices = buildDevicesForGroup(g, byId, traffic, risk, userAnalysis);
-                int aiInteractionsTotal = 0;
-                for (BasicDBObject d : devices) {
-                    Object v = d.get("aiInteractions");
-                    if (v instanceof Number) aiInteractionsTotal += ((Number) v).intValue();
+                if (!"skill".equals(g.rowType) && !"plugin".equals(g.rowType)) {
+                    int aiInteractionsTotal = 0;
+                    for (BasicDBObject d : devices) {
+                        Object v = d.get("aiInteractions");
+                        if (v instanceof Number) aiInteractionsTotal += ((Number) v).intValue();
+                    }
+                    if (aiInteractionsTotal > 0) row.put("aiInteractions", aiInteractionsTotal);
                 }
-                if (aiInteractionsTotal > 0) row.put("aiInteractions", aiInteractionsTotal);
                 // Precomputed here (server already has g.collectionIds in memory) instead of sending
                 // the raw collectionIds list to the browser just so it can do this same sum — see
                 // toSummaryResponse()'s comment for why collectionIds/hostNames/etc. no longer appear
@@ -2232,7 +2234,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     row.remove("baseRiskScore");
                     row.remove("baseRiskScoreReason");
                 }
-                if ("plugin".equals(g.rowType)) row.put("aiInteractions", null);
                 rowsOut.add(row);
             }
             loggerMaker.warnAndAddToDb("[fetchAgenticAssetsSummary-timing] TOTAL=" + (System.currentTimeMillis() - tStart)
@@ -2677,6 +2678,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
             List<BasicDBObject> topApps = new ArrayList<>();
             for (GroupSummary g : groups.values()) {
+                // Skill and Plugin rows deliberately excluded here — same reasoning as "Top Assets
+                // with Violations" above and the grid's per-row "aiInteractions" column (which already
+                // nulls this out for plugins below): UserAnalysisData is keyed only per agent-app-per-
+                // device.
+                if ("skill".equals(g.rowType) || "plugin".equals(g.rowType)) continue;
                 int groupTotal = 0;
                 Set<String> seenKeys = new HashSet<>();
                 for (String hostName : g.hostNames) {

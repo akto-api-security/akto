@@ -21,7 +21,7 @@ export default function AgenticFlyoutShell({ show, width = 800, header, footer, 
     }, [show]);
 
     return (
-        <Box className={"flyLayout " + (show ? "show" : "")} style={{ width }}>
+        <Box className={"flyLayout " + (show ? "show" : "")} style={{ width, pointerEvents: show ? "auto" : "none" }}>
             <Box
                 style={{
                     position: "fixed", right: 0, top: "3.5rem", zIndex: 1000,
