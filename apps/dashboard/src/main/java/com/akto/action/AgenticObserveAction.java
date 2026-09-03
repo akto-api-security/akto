@@ -1,6 +1,5 @@
 package com.akto.action;
 
-import com.akto.DaoInit;
 import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.ApiCollectionsDao;
@@ -28,9 +27,7 @@ import com.akto.util.AgenticObserveUtil;
 import com.akto.util.Constants;
 import com.akto.util.McpClientRegistry;
 import com.akto.util.enums.GlobalEnums;
-import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import lombok.Getter;
@@ -161,16 +158,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             this.misconfiguredCollectionIds = misconfiguredCollectionIds;
             this.builtAt = builtAt;
         }
-    }
-
-    public static void main(String[] args) {
-        Context.accountId.set(1785654409);
-        Context.contextSource.set(CONTEXT_SOURCE.ENDPOINT);
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
-
-        List<ApiCollection> colls = ApiCollectionsDao.instance.findAll(Filters.empty());
-        AgenticObserveAction ac = new AgenticObserveAction();
-        ac.fetchAgenticAssetsSummary();
     }
 
     private SkillDataCacheEntry getOrBuildSkillData() {
