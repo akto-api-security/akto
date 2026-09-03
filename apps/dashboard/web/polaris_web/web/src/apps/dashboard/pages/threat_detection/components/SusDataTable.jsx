@@ -916,14 +916,13 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       : ((isNeedsApproval || isSkillsEvaluations || isMisconfiguredSettings) ? 'ACTIVE' : currentTab.toUpperCase());
     const effectiveSkip = isClientSideView ? 0 : skip;
     const effectiveLimit = isClientSideView ? 200 : limit;
-    // Skills Evaluations / Misconfigured Settings partitions (Atlas only): "only" on their own tab,
-    // "exclude" on the Active tab so neither shows up there. Backend applies each independently
-    // (gated to contextSource=ENDPOINT); undefined elsewhere.
+    // Skills Evaluations / Misconfigured Settings: excluded on plain Active, not once severity/host/actor is filtered.
+    const hasAuxiliaryFilter = Boolean(filters?.severity?.length || filters?.host?.length || filters?.actor?.length);
     const skillEvaluationMode = isEndpointSecurityCategory()
-      ? (isSkillsEvaluations ? 'only' : (currentTab === 'active' ? 'exclude' : undefined))
+      ? (isSkillsEvaluations ? 'only' : (currentTab === 'active' && !hasAuxiliaryFilter ? 'exclude' : undefined))
       : undefined;
     const configEvaluationMode = isEndpointSecurityCategory()
-      ? (isMisconfiguredSettings ? 'only' : (currentTab === 'active' ? 'exclude' : undefined))
+      ? (isMisconfiguredSettings ? 'only' : (currentTab === 'active' && !hasAuxiliaryFilter ? 'exclude' : undefined))
       : undefined;
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
