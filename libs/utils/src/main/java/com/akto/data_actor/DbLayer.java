@@ -1335,6 +1335,23 @@ public class DbLayer {
         }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
+
+        syncAgentUserFromCollectionTags(tags);
+    }
+
+    private static void syncAgentUserFromCollectionTags(List<CollectionTags> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return;
+        }
+        try {
+            for (CollectionTags tag : tags) {
+                if (tag != null && Constants.AKTO_AGENT_EMAIL_TAG.equals(tag.getKeyName())) {
+                    AgentUsersDao.instance.upsertFromEmailTag(tag.getValue(), "host-vpc-tag");
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error syncing agent user from collection tags: " + e.getMessage(), LogDb.DB_ABS);
+        }
     }
 
     // Atomic operation to add hostname to service tag collection

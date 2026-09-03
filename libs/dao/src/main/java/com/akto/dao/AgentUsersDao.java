@@ -78,6 +78,26 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
     }
 
     /**
+     * Upserts an agent user identity sourced from an "x-agent-email" collection tag — the email
+     * itself doubles as this source's external id (there's no separate identity system to key
+     * off), and the username is derived the same way SSO identities are (see
+     * deriveUsernameFromEmail).
+     */
+    public void upsertFromEmailTag(String email, String lastUpdatedBy) {
+        if (email == null || email.trim().isEmpty()) return;
+        String trimmedEmail = email.trim();
+        String userName = deriveUsernameFromEmail(trimmedEmail);
+        if (userName == null) return;
+
+        AgenticUsers user = new AgenticUsers();
+        user.setUserId(trimmedEmail);
+        user.setUserEmail(trimmedEmail);
+        user.setUserName(userName);
+        user.setLastUpdatedBy(lastUpdatedBy);
+        bulkUpsertExternalIdentities(Collections.singletonList(user));
+    }
+
+    /**
      * Full replace of a source's tags with the given key→values set — deleting any key not
      * reported, so stale groups don't linger. Correct for SSO, which always reports the
      * identity's *complete* current group membership on every login. Wrong for a dashboard edit,
