@@ -97,11 +97,7 @@ public class ThreatUtils {
         return new Document("latestApiEndpoint", new Document("$not", SKILLS_ENDPOINT_PATTERN));
     }
 
-    // Collapse repeated config-scan re-detections (same host+actor+category+setting) down to one
-    // document, so counts that should agree with the category breakdown (ThreatApiService's
-    // getSubCategoryWiseCount) - e.g. "Total Violations" - use the same definition of "one violation"
-    // instead of the raw, un-deduped document count. ENDPOINT only; a no-op (pass-through) pipeline
-    // for other contexts. detectedAt sort makes the $first pick deterministic.
+    // Collapse repeated config-scan re-detections into one.
     public static List<Document> configScanDedupeStages(String contextSource) {
         if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
             return Collections.emptyList();

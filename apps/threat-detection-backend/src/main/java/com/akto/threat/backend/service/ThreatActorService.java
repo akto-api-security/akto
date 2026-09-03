@@ -687,9 +687,7 @@ public class ThreatActorService {
             }
         }
 
-        // Calculate summary counts using MaliciousEventDao. Collapsed through the same config-scan
-        // dedup as the category breakdown (ThreatApiService.getSubCategoryWiseCount) so "Total
-        // Violations" and that breakdown agree on what counts as one violation.
+        // Summary counts, deduped like the category breakdown.
         List<Document> dedupedEventsPipeline = new ArrayList<>();
         if (!matchConditions.isEmpty()) {
             dedupedEventsPipeline.add(new Document("$match", matchConditions));
@@ -705,7 +703,7 @@ public class ThreatActorService {
             }
         }
 
-        // Total attacks - count (deduped) documents with successfulExploit = true
+        // Total attacks
         List<Document> totalAttacksPipeline = new ArrayList<>(dedupedEventsPipeline);
         totalAttacksPipeline.add(new Document("$match", new Document("successfulExploit", true)));
         totalAttacksPipeline.add(new Document("$count", "total"));
@@ -720,7 +718,7 @@ public class ThreatActorService {
         for (DailyActorsCountResponse.ActorsCount ac : actors) {
             criticalActorsCount += ac.getCriticalActors();
         }
-        // Status aggregation for totalActive, totalIgnored, totalUnderReview - same deduped documents
+        // Status counts
         List<Document> statusPipeline = new ArrayList<>(dedupedEventsPipeline);
         statusPipeline.add(new Document("$group",
             new Document("_id", "$status").append("count", new Document("$sum", 1))));

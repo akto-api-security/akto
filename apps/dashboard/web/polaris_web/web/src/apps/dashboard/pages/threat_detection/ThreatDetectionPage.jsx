@@ -235,9 +235,10 @@ function ThreatDetectionPage() {
     // Consolidate query parameters into a single object
     const queryParams = useMemo(() => {
         const eventStatusFromQuery = searchParams.get("eventStatus");
-        // Support legacy 'filters' param for backward compatibility
+        // Legacy 'filters' is a status only when it's a bare token, not "key__value".
         const legacyFilters = searchParams.get("filters");
-        const statusValue = eventStatusFromQuery || (legacyFilters ? legacyFilters.replace(/#/g, "").toUpperCase() : "");
+        const legacyStatus = legacyFilters && !legacyFilters.includes("__") ? legacyFilters.replace(/#/g, "").toUpperCase() : "";
+        const statusValue = eventStatusFromQuery || legacyStatus;
         return {
             refId: searchParams.get("refId"),
             eventType: searchParams.get("eventType"),

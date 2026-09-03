@@ -172,9 +172,7 @@ public class ThreatApiService {
 
     pipeline.add(new Document("$match", match));
 
-    // 3. Collapse misconfiguration re-detections (same host+actor+category+setting) to one before
-    // counting - shared with ThreatActorService's total/status counts so "Total Violations" and this
-    // breakdown agree on what counts as one violation.
+    // 3. Collapse misconfiguration re-detections.
     pipeline.addAll(ThreatUtils.configScanDedupeStages(contextSource));
 
     // 4. Group by category and subCategory
