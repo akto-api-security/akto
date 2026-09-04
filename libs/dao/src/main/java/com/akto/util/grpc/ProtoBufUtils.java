@@ -34,12 +34,40 @@ public class ProtoBufUtils {
     }
 
     public Map<Object, Object> decodeProto(byte[] data) {
-        //Remove initial 5 bytes for unnecessary proto headers
-        byte[] truncatedByteArray = new byte[data.length - 5];
-        for (int index = 5; index < data.length; index++) {
-            truncatedByteArray[index - 5] = data[index];
+        return decodeProto(ByteString.copyFrom(stripGrpcFrameIfPresent(data)), 0);
+    }
+
+    /**
+     * gRPC frames every message as [1B compressed flag][4B big-endian length][message].
+     * Some sources hand us that framing (the testing path re-adds it in
+     * base64EncodedJsonToProtobuf), while others have already removed it -- the eBPF
+     * mirroring module strips it before producing to Kafka. Unconditionally chopping
+     * 5 bytes therefore corrupted already-unwrapped payloads, shifting the parse into
+     * the middle of a field and inventing bogus keys (e.g. param_12 from the letter
+     * 'c' of "grpcbin"), so detect the framing instead of assuming it.
+     *
+     * The check is unambiguous: a valid protobuf message's first byte is a tag whose
+     * field number must be >= 1, making the smallest legal first byte 0x08. A leading
+     * 0x00 or 0x01 can only be gRPC's compressed flag, never message data.
+     */
+    static byte[] stripGrpcFrameIfPresent(byte[] data) {
+        if (data == null || data.length < 5) {
+            return data;
         }
-        return decodeProto(ByteString.copyFrom(truncatedByteArray), 0);
+        int compressedFlag = data[0] & 0xFF;
+        if (compressedFlag != 0 && compressedFlag != 1) {
+            return data;
+        }
+        long declaredLength = ((long) (data[1] & 0xFF) << 24)
+                | ((long) (data[2] & 0xFF) << 16)
+                | ((long) (data[3] & 0xFF) << 8)
+                | (long) (data[4] & 0xFF);
+        if (declaredLength != data.length - 5) {
+            return data;
+        }
+        byte[] unframed = new byte[data.length - 5];
+        System.arraycopy(data, 5, unframed, 0, unframed.length);
+        return unframed;
     }
 
     public static Map<Object, Object> decodeProto(ByteString data, int depth) {
