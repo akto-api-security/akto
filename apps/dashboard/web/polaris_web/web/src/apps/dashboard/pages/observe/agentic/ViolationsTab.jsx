@@ -2,7 +2,7 @@ import React, { useCallback } from "react";
 import { Box, Text } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { SeverityBadge } from "./AgenticCellRenderers";
-import { fetchAgenticViolationsPage, openViolationInThreatActivity, deviceServiceKey } from "./agenticObserveApi";
+import { fetchAgenticViolationsPage, openViolationInGuardrailViolations, deviceServiceKey } from "./agenticObserveApi";
 import func from "@/util/func";
 
 function ViolSeverityCellRenderer({ data }) {
@@ -92,7 +92,7 @@ export default function ViolationsTab({ asset, startTimestamp, endTimestamp, onV
         if (onViolationClick) {
             onViolationClick(e.data);
         } else {
-            openViolationInThreatActivity(e.data);
+            openViolationInGuardrailViolations(e.data);
         }
     }, [onViolationClick]);
 

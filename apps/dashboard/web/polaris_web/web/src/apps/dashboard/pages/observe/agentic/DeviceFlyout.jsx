@@ -462,14 +462,14 @@ function OverviewTab({ device, agents, collections, onTabChange, startTimestamp,
                                 // Open endpoints page with this specific device's flyout pre-opened
                                 const deviceId = device.path?.[0] || device.deviceId;
                                 handleClick = deviceId
-                                    ? () => window.open(`/dashboard/observe/endpoints?device=${encodeURIComponent(deviceId)}`, "_blank")
+                                    ? () => { window.location.href = `/dashboard/observe/endpoints?device=${encodeURIComponent(deviceId)}`; }
                                     : undefined;
                             } else if (f.type === "malicious_skill") {
                                 const maliciousAgents = agents.filter(a => a.isMalicious);
                                 const firstSkill = maliciousAgents[0];
                                 handleClick = firstSkill
-                                    ? () => window.open(`/dashboard/observe/agentic-assets?asset=${encodeURIComponent(firstSkill.rawServiceName || firstSkill.endpoint)}`, "_blank")
-                                    : () => window.open("/dashboard/observe/agentic-assets", "_blank");
+                                    ? () => { window.location.href = `/dashboard/observe/agentic-assets?asset=${encodeURIComponent(firstSkill.rawServiceName || firstSkill.endpoint)}`; }
+                                    : () => { window.location.href = "/dashboard/observe/agentic-assets"; };
                             } else {
                                 handleClick = undefined;
                             }
@@ -528,7 +528,7 @@ function AgenticsTab({ deviceId }) {
         if (!isAgentNavigable(e.data)) return;
         const assetId = e.data.rawServiceName || e.data.endpoint;
         const params = new URLSearchParams({ asset: assetId, type: e.data.type });
-        window.open(`/dashboard/observe/agentic-assets?${params}`, "_blank");
+        window.location.href = `/dashboard/observe/agentic-assets?${params}`;
     }, []);
 
     return (

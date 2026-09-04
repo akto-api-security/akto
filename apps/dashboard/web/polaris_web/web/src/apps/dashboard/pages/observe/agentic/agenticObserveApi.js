@@ -1,4 +1,5 @@
 import request from "@/util/request";
+import LocalStore from "@/apps/main/LocalStorageStore";
 import observeApi from "../api";
 import { buildMcpComponentsFromStis, buildAgentBuiltinToolsFromStis, buildSkillsFlyoutData, normalizeSeverity } from "./agenticPageBuilders";
 import { deviceServiceKey } from "./constants";
@@ -244,6 +245,24 @@ export function aggregateViolationCountsByCollectionId(hostCounts = {}, collecti
     return byCollection;
 }
 
+// Same-tab deep-link into the new Guardrails Violations page (New Layout's AgenticAssetFlyout
+// only — ViolationsTab.jsx/AgentComponentsView.jsx). Legacy DeviceFlyout.jsx still uses
+// openViolationInThreatActivity below. ViolationsPage redirects back to the legacy activity page
+// unless guardrailViolationsNewLayout is set — mirrors ThreatDetectionPage's own toggle-on
+// handler so this deep link doesn't get bounced straight back. refId is passed through so
+// ViolationsPage can auto-open that exact row's flyout once its data loads (see its own
+// refId-handling effect), not just land on the filtered list.
+export function openViolationInGuardrailViolations(row = {}) {
+    LocalStore.getState().setGuardrailViolationsNewLayout(true);
+    const { filterId, actor, refId } = row;
+    const params = new URLSearchParams();
+    if (filterId) params.set("policy", filterId);
+    if (actor) params.set("user", actor);
+    if (refId) params.set("refId", refId);
+    const query = params.toString();
+    window.location.href = query ? `/dashboard/guardrails/violations?${query}` : "/dashboard/guardrails/violations";
+}
+
 // Deep-links to the one activity page that reads these params (ThreatDetectionPage). All 3 callers
 // live under pages/observe/agentic (Atlas-only) — hardcoded rather than dashboardCategory-gated
 // since these pages have no category check of their own and can load before it's set to ENDPOINT.
@@ -264,9 +283,9 @@ export function openViolationInThreatActivity(row = {}) {
         if (url) params.set("url", url);
         if (method) params.set("method", method);
         if (ruleViolated && ruleViolated !== "-") params.set("ruleViolated", ruleViolated);
-        window.open(`${base}?${params.toString()}#${hash}`, "_blank");
+        window.location.href = `${base}?${params.toString()}#${hash}`;
     } else {
-        window.open(`${base}#${hash}`, "_blank");
+        window.location.href = `${base}#${hash}`;
     }
 }
 

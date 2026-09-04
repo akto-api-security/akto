@@ -347,7 +347,7 @@ function TableSection({ onServerFetch, fetchDeviceChildren, collections, startTi
         }
         const assetId = data.rawServiceName || data.endpoint;
         const params = new URLSearchParams({ asset: assetId, type: data.type || "" });
-        window.open(`/dashboard/observe/agentic-assets?${params}`, "_blank");
+        window.location.href = `/dashboard/observe/agentic-assets?${params}`;
     }, [openDeviceFlyout]);
 
     const isServerSideGroup = useCallback((data) => (data.path || []).length === 1, []);
