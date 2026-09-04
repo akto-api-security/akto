@@ -66,6 +66,10 @@ public class Constants {
     // creation are not persisted) so the per-test cost/throughput of everything BUT that I/O can be isolated.
     public static final boolean SKIP_INSERT_TEST_RESULTS = (StringUtils.hasLength(System.getenv("SKIP_INSERT_TEST_RESULTS")) && System.getenv("SKIP_INSERT_TEST_RESULTS").equals("true"));
     public static final int MAX_REQUEST_TIMEOUT = StringUtils.hasLength(System.getenv("MAX_REQUEST_TIMEOUT")) ? Integer.parseInt(System.getenv("MAX_REQUEST_TIMEOUT")) : 15000;
+    // Read/call timeout (seconds) used only when replaying the target application request in agentic testing
+    // (utility-server ExecuteApiHandler). Scoped so slow chat/tool endpoints don't force a longer timeout on
+    // Akto's own control-plane calls, which keep the default 60s.
+    public static final int TESTING_TARGET_READ_TIMEOUT_SECONDS = StringUtils.hasLength(System.getenv("AKTO_TESTING_TARGET_READ_TIMEOUT_SECONDS")) ? Integer.parseInt(System.getenv("AKTO_TESTING_TARGET_READ_TIMEOUT_SECONDS")) : 180;
     public static final int LINGER_MS_KAFKA = StringUtils.hasLength(System.getenv("LINGER_MS_KAFKA")) ?  Integer.parseInt(System.getenv("LINGER_MS_KAFKA")) : 5000;
     public static final int MAX_POLL_INTERVAL_MS = StringUtils.hasLength(System.getenv("MAX_POLL_INTERVAL_MS")) ? Integer.parseInt(System.getenv("MAX_POLL_INTERVAL_MS")) : 300000;
     public static final int MAX_WAIT_FOR_SLEEP = StringUtils.hasLength(System.getenv("MAX_WAIT_FOR_SLEEP")) ? Integer.parseInt(System.getenv("MAX_WAIT_FOR_SLEEP")) : 60 ;
