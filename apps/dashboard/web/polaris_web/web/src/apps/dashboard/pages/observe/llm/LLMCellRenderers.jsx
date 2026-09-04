@@ -1,5 +1,6 @@
 import React from "react";
-import { Badge, HorizontalStack, Text, Link } from "@shopify/polaris";
+import { Badge, HorizontalStack, Icon, Text, Link } from "@shopify/polaris";
+import { LockMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import { formatDurationMs, latencyColor, truncate } from "./constants";
 import { OsIcon } from "../agentic/DeviceEndpoints";
@@ -43,6 +44,17 @@ export function ModelIcon({ model, size = 16 }) {
 // Title: prompt text in interactive blue so it reads as a clickable row label.
 export function TitleCell({ data }) {
     if (!data) return null;
+    // Prompt content is admin-only — everyone else identifies the row by its id instead.
+    if (!func.isUserAdmin()) {
+        return (
+            <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                <Icon source={LockMinor} color="subdued" />
+                <Text variant="bodySm" color="subdued" truncate>
+                    {data.sessionIdentifier || data.traceId || DASH}
+                </Text>
+            </HorizontalStack>
+        );
+    }
     const name = data._promptText ? truncate(data._promptText, 90) : DASH;
     return <Text variant="bodySm" color="interactive" truncate>{name}</Text>;
 }

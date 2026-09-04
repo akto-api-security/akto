@@ -149,6 +149,15 @@ export default {
         });
     },
 
+    // Audit entry for an admin opening prompt content; rejects if it could not be written.
+    logPromptContentAccess({ sessionId, traceId }) {
+        return request({
+            url: "/api/logPromptContentAccess",
+            method: "post",
+            data: { sessionId: sessionId || "", traceId: traceId || "" },
+        });
+    },
+
     // Spans for a single trace, ordered by timestamp asc.
     fetchTraceDetail(traceId) {
         return request({

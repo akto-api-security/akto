@@ -4,5 +4,6 @@ public enum Operation {
     NOT_SPECIFIED,
     CREATE,
     UPDATE,
-    DELETE
+    DELETE,
+    READ
 }
