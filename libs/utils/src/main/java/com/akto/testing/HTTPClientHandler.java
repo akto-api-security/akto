@@ -2,6 +2,7 @@ package com.akto.testing;
 
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 
@@ -25,6 +26,10 @@ public class HTTPClientHandler {
     private final OkHttpClient clientWithFollowRedirect;
     private final OkHttpClient http2httpsClientWithoutFollowRedirect;
     private final OkHttpClient http2httpsClientWithFollowRedirect;
+    // Built once, like the clients above, but with a longer read/call timeout. Used only for requests that
+    // legitimately take longer (agentic target replays) so the shared default clients stay at 60s.
+    private final OkHttpClient highTimeoutClientWithoutFollowRedirect;
+    private final OkHttpClient highTimeoutClientWithFollowRedirect;
 
     private static OkHttpClient.Builder builder(boolean followRedirects, int readTimeout) {
         return CoreHTTPClient.client.newBuilder()
@@ -50,6 +55,10 @@ public class HTTPClientHandler {
         // http2 , http1.1 => try http2 first, if not supported, fallback to http1.1
         http2httpsClientWithoutFollowRedirect = builder(false, readTimeout).protocols(Arrays.asList(Protocol.HTTP_2, Protocol.HTTP_1_1)).build();
         http2httpsClientWithFollowRedirect = builder(true, readTimeout).protocols(Arrays.asList(Protocol.HTTP_2, Protocol.HTTP_1_1)).build();
+
+        int highReadTimeout = Constants.TESTING_TARGET_READ_TIMEOUT_SECONDS;
+        highTimeoutClientWithoutFollowRedirect = builder(false, highReadTimeout).build();
+        highTimeoutClientWithFollowRedirect = builder(true, highReadTimeout).build();
     }
 
     public OkHttpClient getNewDebugClient(boolean isSaas, boolean followRedirects, List<TestingRunResult.TestLog> testLogs, String contentType, boolean isHttps) {
@@ -171,5 +180,15 @@ public class HTTPClientHandler {
             return clientWithFollowRedirect;
         }
         return clientWithoutFollowRedirect;
+    }
+
+    // Same selection as above, but returns a pre-built high-timeout client when highTimeout is true.
+    // gRPC is not expected on this path, so it falls back to the default client for gRPC content types.
+    public OkHttpClient getHTTPClient(boolean isHttps, boolean followRedirect, String contentType, boolean highTimeout) {
+        boolean isGrpc = contentType != null && contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE);
+        if (!highTimeout || isGrpc) {
+            return getHTTPClient(isHttps, followRedirect, contentType);
+        }
+        return followRedirect ? highTimeoutClientWithFollowRedirect : highTimeoutClientWithoutFollowRedirect;
     }
 }
