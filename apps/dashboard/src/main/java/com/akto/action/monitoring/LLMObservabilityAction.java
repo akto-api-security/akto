@@ -1,22 +1,35 @@
 package com.akto.action.monitoring;
 
 import com.akto.action.UserAction;
+import com.akto.audit_logs_util.AuditLogsUtil;
+import com.akto.dao.RBACDao;
+import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.RBAC.Role;
+import com.akto.dto.audit_logs.ApiAuditLogs;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.policies.UserAgentTypePolicy;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.utils.search.SearchClient;
 import com.akto.utils.search.SearchClientFactory;
+import com.mongodb.BasicDBObject;
 
 import lombok.Getter;
 import lombok.Setter;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.apache.struts2.ServletActionContext;
 
 /**
  * Thin orchestrator over {@link SearchClient}: resolves request-level filters/context, calls the
@@ -85,6 +98,8 @@ public class LLMObservabilityAction extends UserAction {
     @Getter private List<Long>                 aggTokenSpark      = new ArrayList<>();
     @Getter private List<Long>                 aggTraceSparkTs    = new ArrayList<>();
 
+    private Boolean callerAdmin;
+
     private long startMs() { return (long) startTime * 1000L; }
     private long endMs()   { return (long) endTime   * 1000L; }
 
@@ -104,6 +119,7 @@ public class LLMObservabilityAction extends UserAction {
             sessions      = result.sessions;
             nextAfterKey  = result.nextAfterKey;
             totalSessions = result.totalSessions;
+            if (!isCallerAdmin()) sessions = withoutPromptContent(sessions);
         } catch (Exception e) {
             logger.error("fetchSessions error: " + e.getMessage());
             sessions = new ArrayList<>();
@@ -119,6 +135,7 @@ public class LLMObservabilityAction extends UserAction {
 
             messages = client.fetchMessages(accountId, startMs(), endMs(),
                 buildMultiFilters(true), resolveContextAtlasFilter());
+            if (!isCallerAdmin()) messages = withoutPromptContent(messages);
         } catch (Exception e) {
             logger.error("fetchMessages error: " + e.getMessage());
             messages = new ArrayList<>();
@@ -176,6 +193,7 @@ public class LLMObservabilityAction extends UserAction {
             aggTraceSpark   = stats.traceSpark;
             aggTokenSpark   = stats.tokenSpark;
             aggTraceSparkTs = stats.traceSparkTs;
+            if (!isCallerAdmin()) aggTopTraces = withoutPromptContent(aggTopTraces);
         } catch (Exception e) {
             logger.error("fetchArgusStats error: " + e.getMessage());
         }
@@ -193,6 +211,7 @@ public class LLMObservabilityAction extends UserAction {
 
             Boolean atlasFilter = CONTEXT_SOURCE.ENDPOINT.equals(Context.contextSource.get()) ? Boolean.TRUE : null;
             spans = client.fetchTraceDetail(accountId, traceId, atlasFilter);
+            if (!isCallerAdmin()) spans = withoutPromptContent(spans);
         } catch (Exception e) {
             spans = new ArrayList<>();
         }
@@ -229,9 +248,70 @@ public class LLMObservabilityAction extends UserAction {
 
             prompts = result.hits;
             total   = result.total;
+            if (!isCallerAdmin()) prompts = withoutPromptContent(prompts);
         } catch (Exception e) {
             prompts = new ArrayList<>();
             total   = 0;
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    // ── Prompt content access ─────────────────────────────────────────────────
+    // Payloads are admin-only, enforced here so the UI check cannot be bypassed from the browser.
+
+    /** Fails closed: anything that stops us resolving the role counts as non-admin. */
+    private boolean isCallerAdmin() {
+        if (callerAdmin != null) return callerAdmin;
+        try {
+            callerAdmin = Role.ADMIN.equals(RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get()));
+        } catch (Exception e) {
+            logger.error("could not resolve role for prompt content check: " + e.getMessage());
+            callerAdmin = false;
+        }
+        return callerAdmin;
+    }
+
+    /** Copies rows without the payload fields; token/duration/topic fields are untouched. */
+    private List<Map<String, Object>> withoutPromptContent(List<Map<String, Object>> rows) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (rows == null) return out;
+        for (Map<String, Object> row : rows) {
+            if (row == null) continue;
+            Map<String, Object> copy = new LinkedHashMap<>(row);
+            copy.remove(AgentQueryRecord.F_QUERY_PAYLOAD);
+            copy.remove(AgentQueryRecord.F_RESPONSE_PAYLOAD);
+            out.add(copy);
+        }
+        return out;
+    }
+
+    // ── Prompt content reveal ─────────────────────────────────────────────────
+
+    /** Records an admin opening prompt content in Traces; ERROR keeps the content hidden. */
+    public String logPromptContentAccess() {
+        try {
+            HttpServletRequest request = ServletActionContext.getRequest();
+            String userAgent = request.getHeader("User-Agent") == null ? "Unknown User-Agent" : request.getHeader("User-Agent");
+            List<String> userProxyIpAddresses = AuditLogsUtil.getClientIpAddresses(request);
+
+            BasicDBObject metadata = new BasicDBObject();
+            if (sessionId != null && !sessionId.trim().isEmpty()) metadata.put("sessionId", sessionId.trim());
+            if (traceId != null && !traceId.trim().isEmpty()) metadata.put("traceId", traceId.trim());
+
+            ApiAuditLogsDao.instance.insertOne(new ApiAuditLogs(
+                Context.now(),
+                "api/logPromptContentAccess",
+                "User viewed prompt content in Traces",
+                getSUser().getLogin(),
+                UserAgentTypePolicy.findUserAgentType(userAgent).name(),
+                userProxyIpAddresses.get(0),
+                userProxyIpAddresses,
+                Resource.TRACES_PROMPT_CONTENT,
+                Operation.READ,
+                metadata));
+        } catch (Exception e) {
+            logger.error("logPromptContentAccess error: " + e.getMessage());
+            return ERROR.toUpperCase();
         }
         return SUCCESS.toUpperCase();
     }

@@ -13,4 +13,5 @@ public enum Resource {
     TEST_RESULTS,
     TEST_ROLE,
     TESTING_RUN,
+    TRACES_PROMPT_CONTENT,
 }
