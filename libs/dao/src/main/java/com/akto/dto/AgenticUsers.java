@@ -20,6 +20,7 @@ public class AgenticUsers {
     public static final String LAST_UPDATED_BY = "lastUpdatedBy";
 
     public static final String DEVICE_TAGS = "deviceTags";
+    public static final String DEVICES = "devices";
 
     private String userName;
     private String userEmail;

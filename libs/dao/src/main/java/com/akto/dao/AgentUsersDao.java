@@ -98,6 +98,31 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
     }
 
     /**
+     * Upserts a single agent user identity keyed on a caller-composed userId (e.g.
+     * {identifier}_{accountId}_{userId} for a specific agent/account/user triple). The reporting
+     * device is added via addToSet so devices accumulate across calls instead of being clobbered.
+     */
+    public void upsertAgentUserIdentity(String userId, String userName, String userEmail, String deviceId, String lastUpdatedBy) {
+        if (userId == null || userId.trim().isEmpty()) return;
+
+        List<Bson> fieldUpdates = new ArrayList<>();
+        fieldUpdates.add(Updates.set(AgenticUsers.USER_ID, userId));
+        if (userName != null && !userName.trim().isEmpty()) {
+            fieldUpdates.add(Updates.set(AgenticUsers.USER_NAME, userName));
+        }
+        if (userEmail != null && !userEmail.trim().isEmpty()) {
+            fieldUpdates.add(Updates.set(AgenticUsers.USER_EMAIL, userEmail));
+        }
+        if (deviceId != null && !deviceId.trim().isEmpty()) {
+            fieldUpdates.add(Updates.addToSet(AgenticUsers.DEVICES, deviceId.trim()));
+        }
+        fieldUpdates.add(Updates.set(AgenticUsers.LAST_UPDATED_AT, Context.now()));
+        fieldUpdates.add(Updates.set(AgenticUsers.LAST_UPDATED_BY, lastUpdatedBy));
+
+        instance.updateOne(Filters.eq(AgenticUsers.USER_ID, userId), Updates.combine(fieldUpdates));
+    }
+
+    /**
      * Full replace of a source's tags with the given key→values set — deleting any key not
      * reported, so stale groups don't linger. Correct for SSO, which always reports the
      * identity's *complete* current group membership on every login. Wrong for a dashboard edit,
