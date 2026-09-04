@@ -34,6 +34,7 @@ import com.akto.dto.type.URLTemplate;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.*;
+import com.akto.util.ApiCollectionMetaCache;
 import com.akto.util.JSONUtils;
 import com.alibaba.fastjson2.JSONObject;
 import com.mongodb.BasicDBList;
@@ -286,7 +287,7 @@ public final class FilterAction {
     }
 
     private boolean isAgenticCollection(int apiCollectionId) {
-        ApiCollection apiCollection = dataActor.fetchApiCollectionMeta(apiCollectionId);
+        ApiCollection apiCollection = ApiCollectionMetaCache.get(apiCollectionId);
         if (apiCollection == null) {
             return false;
         }

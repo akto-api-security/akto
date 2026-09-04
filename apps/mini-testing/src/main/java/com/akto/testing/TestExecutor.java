@@ -90,6 +90,8 @@ public class TestExecutor {
     private static final ClientLayer clientLayer = new ClientLayer();
     private static final AtomicInteger totalTestsCount = new AtomicInteger(0);
     private static final boolean shouldCallClientLayerForSampleData = System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty();
+    // rollout toggle for the consolidated bulkRecordTestingRunResults flow (cyborg); default keeps the old per-call flow.
+    private static final boolean USE_BULK_RECORD_TESTING_RUN_RESULTS = "true".equalsIgnoreCase(System.getenv("USE_BULK_RECORD_TESTING_RUN_RESULTS"));
     private static RSAPrivateKey privateKey = PayloadEncodeUtil.getPrivateKey();
     
     // Current execution fallback flag - used when Kafka fails during current test run
@@ -1022,13 +1024,17 @@ public class TestExecutor {
             TestingRunResult originalTestingRunResultForRerun = TestingConfigurations.getInstance().getTestingRunResultForApiKeyInfo(testingRunResults.get(0).getApiInfoKey(), testingRunResults.get(0).getTestSubType());
             if (originalTestingRunResultForRerun != null) {
                 loggerMaker.infoAndAddToDb("Deleting original testingRunResults for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
-                dataActor.deleteTestingRunResults(originalTestingRunResultForRerun.getHexId());
                 /*
                  * delete from vulnerableTestResults as well.
                  * assuming if original was vulnerable, entry will be in VulnerableTestingRunResultDao
                  * for API_INFO_KEY, TEST_RUN_RESULT_SUMMARY_ID, TEST_SUB_TYPE, VulnerableTestingRunResultDao will have
                  * single entry
                  * */
+                // Under the new bulk-record flow the delete is folded into rerunDeleteIds and happens
+                // server-side, atomically with the insert + issue write - see recordViaBulkApi.
+                if (!USE_BULK_RECORD_TESTING_RUN_RESULTS) {
+                    dataActor.deleteTestingRunResults(originalTestingRunResultForRerun.getHexId());
+                }
             }
             TestingRunResult trr = testingRunResults.get(0);
             trr.setTestRunHexId(trr.getTestRunHexId());
@@ -1050,22 +1056,42 @@ public class TestExecutor {
             }
             trr.setTestResults(null);
             trr.setTestLogs(null);
-            dataActor.insertTestingRunResults(trr);
-            loggerMaker.infoAndAddToDb("Inserted testing results");
-            dataActor.updateTestResultsCountInTestSummary(testRunResultSummaryId.toHexString(), resultSize);
-            loggerMaker.infoAndAddToDb("Updated count in summary");
 
-            TestingIssuesHandler handler = new TestingIssuesHandler();
-            boolean triggeredByTestEditor = false;
-            try{
-                List<GenericTestResult> list = new ArrayList<>();
-                list.add(testRes);
-                trr.setTestResults(list);
-                handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
-            } catch (Exception e){
-                loggerMaker.errorAndAddToDb(e, "Unable to create issues");
+            if (USE_BULK_RECORD_TESTING_RUN_RESULTS) {
+                recordViaBulkApi(trr, originalTestingRunResultForRerun);
+            } else {
+                recordViaLegacyFlow(trr, testRes, testingRunResults, testRunResultSummaryId, resultSize);
             }
         }
+    }
+
+    private void recordViaLegacyFlow(TestingRunResult trr, GenericTestResult testRes, List<TestingRunResult> testingRunResults,
+            ObjectId testRunResultSummaryId, int resultSize) {
+        dataActor.insertTestingRunResults(trr);
+        loggerMaker.infoAndAddToDb("Inserted testing results");
+        dataActor.updateTestResultsCountInTestSummary(testRunResultSummaryId.toHexString(), resultSize);
+        loggerMaker.infoAndAddToDb("Updated count in summary");
+
+        TestingIssuesHandler handler = new TestingIssuesHandler();
+        boolean triggeredByTestEditor = false;
+        try{
+            List<GenericTestResult> list = new ArrayList<>();
+            list.add(testRes);
+            trr.setTestResults(list);
+            handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
+        } catch (Exception e){
+            loggerMaker.errorAndAddToDb(e, "Unable to create issues");
+        }
+    }
+
+    private void recordViaBulkApi(TestingRunResult trr, TestingRunResult originalTestingRunResultForRerun) {
+        List<String> rerunDeleteIds = new ArrayList<>();
+        if (originalTestingRunResultForRerun != null) {
+            rerunDeleteIds.add(originalTestingRunResultForRerun.getHexId());
+        }
+        dataActor.bulkRecordTestingRunResults(Collections.singletonList(trr), rerunDeleteIds,
+                TestingConfigurations.getInstance().getDoNotMarkIssuesAsFixed());
+        loggerMaker.infoAndAddToDb("Recorded testing run result via bulk API");
     }
 
     private Void insertRecordInKafka(int accountId, String testSubCategory, ApiInfo.ApiInfoKey apiInfoKey,

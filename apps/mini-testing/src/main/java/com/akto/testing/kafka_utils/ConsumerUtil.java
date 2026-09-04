@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -65,7 +66,13 @@ public class ConsumerUtil {
     }
     private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null;
 
-    public static ExecutorService executor = Executors.newFixedThreadPool(150);
+    // Named so diagnose.sh's jstack-based worker classifier (which keys off "mini-test-worker") can
+    // actually find these threads - the default Executors thread factory names them "pool-N-thread-M".
+    private static final AtomicInteger workerThreadCounter = new AtomicInteger();
+    private static final ThreadFactory workerThreadFactory =
+            r -> new Thread(r, "mini-test-worker-" + workerThreadCounter.incrementAndGet());
+
+    public static ExecutorService executor = Executors.newFixedThreadPool(150, workerThreadFactory);
     private static final int maxRunTimeForTests = 5 * 60;
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
@@ -237,7 +244,7 @@ public class ConsumerUtil {
         TestingConfigurations instance = TestingConfigurations.getInstance();
         int concurrency = instance.getMaxConcurrentRequest();
         shutdownExecutorQuietly(5, true);
-        executor = Executors.newFixedThreadPool(concurrency);
+        executor = Executors.newFixedThreadPool(concurrency, workerThreadFactory);
 
         final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
         int startTime = Context.now();

@@ -16,7 +16,7 @@ REF="${1:?usage: run-bench.sh <git-ref> <label> [max-minutes]}"
 LABEL="${2:?label required (e.g. fast|slow)}"
 MAX_MIN="${3:-60}"
 
-REPO=/Users/mann/workspace/akto
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
 
 JAR_NAME="mini-testing-1.0-SNAPSHOT-jar-with-dependencies.jar"
@@ -84,13 +84,23 @@ JAR=apps/mini-testing/target/mini-testing-1.0-SNAPSHOT-jar-with-dependencies.jar
 TS=$(date +%Y%m%d-%H%M%S)
 LOG="local-bench/run-${LABEL}-${TS}.log"
 
-export NEW_TESTING_ENABLED=true
-export AKTO_LOG_LEVEL=WARN
-export RUNTIME_MODE=hybrid
+# All runtime env (NEW_TESTING_ENABLED, AKTO_LOG_LEVEL, RUNTIME_MODE, etc.) comes from bench.env,
+# sourced above - this script does not set/override any of it, so bench.env is the single source
+# of truth for what a run actually does. See bench.env.template if a var is missing here.
+
+# Opt-in JFR recording (ENABLE_JFR=true in bench.env) - attributes worker socket-wait time to
+# specific call sites (jdk.SocketRead events) without any code instrumentation. Off by default
+# since `settings=profile` has non-zero overhead and would skew normal throughput comparisons.
+JFR_OPTS=""
+if [[ "${ENABLE_JFR:-false}" == "true" ]]; then
+  JFR_FILE="local-bench/rec-${LABEL}-${TS}.jfr"
+  JFR_OPTS="-XX:StartFlightRecording=filename=${JFR_FILE},settings=profile"
+  echo ">> JFR recording -> $JFR_FILE"
+fi
 
 echo ">> RUN jvm: $("$JAVA_BIN" -version 2>&1 | head -1)"
 echo ">> running -> $LOG   (auto-stop on TESTRUN END or ${MAX_MIN}m)"
-"$JAVA_BIN" -Xmx"${XMX:-6g}" -Xms"${XMS:-2g}" -jar "$JAR" > "$LOG" 2>&1 &
+"$JAVA_BIN" -Xmx"${XMX:-6g}" -Xms"${XMS:-2g}" $JFR_OPTS -jar "$JAR" > "$LOG" 2>&1 &
 PID=$!
 
 # auto-start the live bottleneck sampler; stream it to the console AND a file (self-exits when JVM dies)
