@@ -1057,7 +1057,10 @@ public class ElasticSearchClient extends SearchClient {
             row.put(AgentQueryRecord.F_INPUT_TOKENS,  inTokens);
             row.put(AgentQueryRecord.F_OUTPUT_TOKENS, outTokens);
             row.put(KEY_TOTAL_TOKENS,                inTokens + outTokens);
-            row.put(KEY_MSG_COUNT,                   subAggLong(bucket, KEY_MSG_COUNT));
+            // No traceId on any doc -> fall back to raw doc count.
+            long msgCount = subAggLong(bucket, KEY_MSG_COUNT);
+            if (msgCount == 0 && bucket.has(KEY_MSG_COUNT)) msgCount = bucket.optLong("doc_count", 0);
+            row.put(KEY_MSG_COUNT,                   msgCount);
             row.put(KEY_HAS_ACTIVE_GUARDRAIL,         subAggLong(bucket, KEY_HAS_ACTIVE_GUARDRAIL) > 0);
             row.put(KEY_GUARDRAIL_POLICIES,           extractBucketKeyList(bucket.optJSONObject(AGG_GUARDRAIL_POLICIES)));
 
