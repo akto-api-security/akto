@@ -43,6 +43,7 @@
                     window.DASHBOARD_MODE = '${requestScope.dashboardMode}';
                     window.DASHBOARD_CATEGORY = '${requestScope.dashboardCategory}';
                     window.CLOUD_TYPE = '${requestScope.cloudType}';
+                    window.IS_METERED = '${requestScope.isMetered}' === 'true';
                     window.IS_SAAS = '${requestScope.isSaas}';
                     window.AIRGAPPED = '${requestScope.airgapped}' === 'true';
                     window.ACCESS_TOKEN = '${accessToken}';
