@@ -190,7 +190,7 @@ detect_connector() {
   if jq -e '(.hookEventName != null) or (.hook_event_name != null)' <<<"$input_json" >/dev/null 2>&1; then
     printf 'vscode'
   else
-    printf '%s' "${AKTO_CONNECTOR:-copilot_cli}"
+    printf '%s' "${AKTO_CONNECTOR:-copilot}"
   fi
 }
 

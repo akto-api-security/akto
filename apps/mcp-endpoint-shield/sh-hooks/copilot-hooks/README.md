@@ -131,7 +131,7 @@ picked up.
 
 `detect_connector()` (in `akto_common.sh`) inspects the incoming payload: if
 it carries `hookEventName` or `hook_event_name`, the call is treated as
-`vscode`; otherwise it falls back to `${AKTO_CONNECTOR:-copilot_cli}`. Both
+`vscode`; otherwise it falls back to `${AKTO_CONNECTOR:-copilot}`. Both
 resolved connectors report under the same `copilot` identity (ai-agent tag,
 atlas hostname suffix) — the only things that actually differ per connector
 are the mirrored `host` header (`x-vscode-hook` vs `x-copilot-hook`), the
@@ -254,7 +254,7 @@ plus a persistent agent id are cached in `LOG_DIR` (`last_heartbeat`,
 | `AKTO_TIMEOUT` | `5` | Timeout in seconds for the guardrails/ingestion HTTP call |
 | `MODE` | `atlas` | Operation mode: `argus` or `atlas` |
 | `DEVICE_ID` | (auto-generated) | Device id used in `atlas`-mode hostnames, MCP mirror hosts, and the heartbeat payload |
-| `AKTO_CONNECTOR` | (auto-detected) | Overrides the non-`vscode` fallback connector label (default `copilot_cli`); never used when the payload identifies itself as `vscode` |
+| `AKTO_CONNECTOR` | (auto-detected) | Overrides the non-`vscode` fallback connector label (default `copilot`); never used when the payload identifies itself as `vscode` |
 | `GITHUB_COPILOT_API_URL` | `https://api.github.com` | Mirrored host for non-MCP GitHub Copilot CLI traffic (`argus` mode) |
 | `VSCODE_API_URL` | `https://vscode.dev` | Mirrored host for non-MCP VS Code traffic (`argus` mode) |
 | `CONTEXT_SOURCE` | `ENDPOINT` | Tag/field describing where traffic originated |
