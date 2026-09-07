@@ -173,7 +173,7 @@ function RiskScoreCellRenderer({ value }) {
 }
 
 function ReasonCellRenderer({ value }) {
-    if (!value) return null;
+    if (!value) return <Text variant="bodySm" color="subdued">-</Text>;
     return (
         <div style={{ width: "100%", minWidth: 0, overflow: "hidden" }}>
             <Tooltip content={value} dismissOnMouseOut width="wide">
@@ -319,6 +319,17 @@ function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, 
             field: "reason",
             headerName: "Reason",
             width: 200,
+            minWidth: 120,
+            suppressAutoSize: true,
+            resizable: true,
+            sortable: false,
+            wrapText: false,
+            cellRenderer: ReasonCellRenderer,
+            cellStyle: { display: "flex", alignItems: "center", overflow: "hidden" },
+        }, {
+            field: "evidenceLine",
+            headerName: "Evidence",
+            width: 220,
             minWidth: 120,
             suppressAutoSize: true,
             resizable: true,
@@ -562,6 +573,7 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         // Request-derived only - never falls back to meta.reason (a response/guardrail
         // explanation), which would show up as if it were the captured request content.
         evidenceText: primaryValue || "-",
+        evidenceLine: event.evidenceLine || "",
         riskScore: parseStoredRiskScore(meta),
         reason: normalizeReasonPunctuation(meta.reason || meta.nreason) || "",
         actor: event.actor || "",
