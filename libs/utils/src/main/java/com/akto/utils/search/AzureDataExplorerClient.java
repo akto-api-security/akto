@@ -2,6 +2,7 @@ package com.akto.utils.search;
 
 import com.akto.dao.agentic_sessions.AgentQueryTopicMappingDao;
 import com.akto.dto.agentic_sessions.AgentQueryTopicMapping;
+import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
@@ -531,6 +532,13 @@ public class AzureDataExplorerClient extends SearchClient {
         }
         return new ArgusStats(aggTotalSpans, aggInputTokens, aggOutputTokens,
             aggTopApps, aggAppBreakdown, aggTopTraces, aggTraceSpark, aggTokenSpark, aggTraceSparkTs);
+    }
+
+    // Skipped for now on this backend — see ElasticSearchClient.fetchUserAnalysisTokenTotals for
+    // the intended shape when this gets picked back up.
+    @Override
+    public List<UserAnalysisData> fetchUserAnalysisTokenTotals(int accountId, long startMs, long endMs) {
+        return new ArrayList<>();
     }
 
     private long[] queryDataRange(String where, long fallbackMs) {

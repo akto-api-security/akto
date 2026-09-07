@@ -342,11 +342,11 @@ export function buildAgenticObserveChatMetadata(scope, data = {}) {
 }
 
 const agenticObserveApi = {
-    async listUserAnalysis() {
+    async listUserAnalysis(startTime, endTime) {
         const resp = await request({
             url: "/api/listUserAnalysis",
             method: "post",
-            data: {},
+            data: { startTime: startTime || 0, endTime: endTime || 0 },
         });
         if (Array.isArray(resp)) return resp;
         if (Array.isArray(resp?.userAnalysisList)) return resp.userAnalysisList;
