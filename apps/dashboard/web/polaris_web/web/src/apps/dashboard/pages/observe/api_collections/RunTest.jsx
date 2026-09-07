@@ -526,8 +526,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
         }
         return abc
     }, [])
-    runTimeHours.push({ label: "9 hours", value: `${9 * 60 * 60}` })
-    runTimeHours.push({ label: "12 hours", value: `${12 * 60 * 60}` })
 
     const testRunTimeOptions = [...runTimeMinutes, ...runTimeHours]
 
