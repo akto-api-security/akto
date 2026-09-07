@@ -31,7 +31,7 @@ function DevicesTab({ asset, enrichMaps = {} }) {
     const handleRowClick = useCallback((e) => {
         if (!e.data) return;
         const deviceId = e.data.deviceId || e.data.endpoint;
-        window.open(`/dashboard/observe/endpoints?device=${encodeURIComponent(deviceId)}`, "_blank");
+        window.location.href = `/dashboard/observe/endpoints?device=${encodeURIComponent(deviceId)}`;
     }, []);
 
     // Server-side paginated — scoped to this one asset's own apiCollectionIds (cheap), never the

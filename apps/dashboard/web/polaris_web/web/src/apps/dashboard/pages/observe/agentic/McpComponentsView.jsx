@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Box, Text, Badge, Divider, ActionList, Button, Spinner, VerticalStack, HorizontalStack, Tabs } from "@shopify/polaris";
+import { Box, Text, Badge, Divider, ActionList, Button, Spinner, VerticalStack, HorizontalStack, Tabs, Pagination } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { ParamNameCellRenderer, ParamTypeCellRenderer, ParamDescCellRenderer, SeverityBadge, RiskPill } from "./AgenticCellRenderers";
 import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges";
 import agenticObserveApi from "./agenticObserveApi";
 import { buildMcpComponentsFromStis } from "./agenticPageBuilders";
 import observeApi from "../api";
-import SampleDataList from "../../../components/shared/SampleDataList";
+import SampleData from "../../../components/shared/SampleData";
+import { parseAktoPayload } from "../../guardrails/violations/violationsData";
 import ApiIssuesTab from "../api_collections/ApiIssuesTab";
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
 import { fetchSkillMarkdownFromCollections, getOwningPluginNameForCollection } from "./SkillComponentsView";
@@ -24,21 +25,63 @@ const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 const TRAFFIC_LOADING = <Box padding="4"><Spinner accessibilityLabel="Loading traffic" size="small" /></Box>;
 const TRAFFIC_EMPTY  = <Box padding="8"><VerticalStack gap="1" inlineAlign="center"><Text variant="bodySm" fontWeight="semibold">No captured traffic</Text><Text variant="bodySm" color="subdued">No request/response samples recorded for this component.</Text></VerticalStack></Box>;
 
-// Renders captured samples as paginated request + response cards — reuses the legacy ApiDetails
-// "Values" tab component (SampleDataList) so padding, pagination and cards match the old flyout.
+// One captured sample's request/response, pretty-printed — same friendly presentation the
+// Guardrails Violations flyout's Values tab uses (PromptResponseSection), not the old flyout's
+// raw HTTP-with-headers viewer.
+function TrafficSample({ raw }) {
+    const { req, resp } = parseAktoPayload(raw);
+    return (
+        <VerticalStack gap="4">
+            <VerticalStack gap="2">
+                <Text variant="headingSm" color="subdued">Request</Text>
+                <SampleData
+                    data={{ message: req ? JSON.stringify(req, null, 2) : "No request captured" }}
+                    editorLanguage="json"
+                    minHeight="200px"
+                    readOnly
+                    wordWrap
+                />
+            </VerticalStack>
+            <VerticalStack gap="2">
+                <Text variant="headingSm" color="subdued">Response</Text>
+                <SampleData
+                    data={{ message: resp ? JSON.stringify(resp, null, 2) : "No response captured" }}
+                    editorLanguage="json"
+                    minHeight="200px"
+                    readOnly
+                    wordWrap
+                />
+            </VerticalStack>
+        </VerticalStack>
+    );
+}
+
 function TrafficView({ traffic, loading }) {
+    const [page, setPage] = useState(0);
+    useEffect(() => { setPage(0); }, [traffic]);
+
     if (loading) return TRAFFIC_LOADING;
     if (!traffic?.length) return TRAFFIC_EMPTY;
-    const sampleData = traffic.map((s) => ({ message: typeof s === "string" ? s : JSON.stringify(s) }));
+
+    const current = traffic[Math.min(page, traffic.length - 1)];
+    const raw = typeof current === "string" ? current : JSON.stringify(current);
+
     return (
         <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "16px" }}>
-            <SampleDataList
-                sampleData={sampleData}
-                heading="Sample values"
-                minHeight="35vh"
-                vertical={true}
-                isAPISampleData={true}
-            />
+            <VerticalStack gap="3">
+                {traffic.length > 1 && (
+                    <HorizontalStack align="end">
+                        <Pagination
+                            label={`${page + 1} of ${traffic.length}`}
+                            hasPrevious={page > 0}
+                            onPrevious={() => setPage(p => p - 1)}
+                            hasNext={page < traffic.length - 1}
+                            onNext={() => setPage(p => p + 1)}
+                        />
+                    </HorizontalStack>
+                )}
+                <TrafficSample raw={raw} />
+            </VerticalStack>
         </div>
     );
 }

@@ -2552,7 +2552,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, DeviceAcc> deviceAccs = accumulateDevices(g.collectionIds, byId, traffic, risk, userAnalysis);
             assetDeviceCount = deviceAccs.size();
             List<BasicDBObject> deviceSample = new ArrayList<>();
-            int deviceSampleCap = 6;
+            int deviceSampleCap = 25;
             for (DeviceAcc d : deviceAccs.values()) {
                 if (deviceSample.size() >= deviceSampleCap) break;
                 deviceSample.add(d.toResponse());

@@ -356,14 +356,41 @@ export default function AgGridTable({
     ) : null;
 
     // ── Grid node ───────────────────────────────────────────────────────────
+    // Same reasoning as effectiveSideBar above: also closes off the right-click context menu's
+    // "Group by"/"Pivot"/"Aggregate" options, which key off these column flags independently of
+    // whatever the side panel shows.
     const effectiveDefaultColDef = React.useMemo(() => ({
-        enableRowGroup: true,
-        enablePivot: true,
-        enableValue: true,
+        enableRowGroup: !isServerMode,
+        enablePivot: !isServerMode,
+        enableValue: !isServerMode,
         ...defaultColDef,
-    }), [defaultColDef]);
+    }), [defaultColDef, isServerMode]);
 
-    const effectiveSideBar = sideBar;
+    // Row Group / Values / Pivot Mode in the Columns tool panel only ever operate on whatever
+    // page happens to be loaded in the grid right now — meaningless (and misleading) on a
+    // server-paginated table, which never holds the full dataset client-side. Column show/hide
+    // and the Filters panel are unaffected; those already work correctly against the real query.
+    const effectiveSideBar = useMemo(() => {
+        if (!isServerMode || !sideBar || sideBar === true) return sideBar;
+        const toolPanels = (sideBar.toolPanels || []).map((panel) => {
+            const isColumnsPanel = panel === "columns" || panel?.toolPanel === "agColumnsToolPanel";
+            if (!isColumnsPanel) return panel;
+            const base = panel === "columns"
+                ? { id: "columns", labelDefault: "Columns", labelKey: "columns", iconKey: "columns", toolPanel: "agColumnsToolPanel" }
+                : panel;
+            return {
+                ...base,
+                toolPanelParams: {
+                    ...base.toolPanelParams,
+                    suppressRowGroups: true,
+                    suppressValues: true,
+                    suppressPivots: true,
+                    suppressPivotMode: true,
+                },
+            };
+        });
+        return { ...sideBar, toolPanels };
+    }, [sideBar, isServerMode]);
 
     const gridNode = (
         <AgGridReact

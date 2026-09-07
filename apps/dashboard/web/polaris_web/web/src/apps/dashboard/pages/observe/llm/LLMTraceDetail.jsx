@@ -219,7 +219,10 @@ export default function TraceDetailView({ trace, currDateRange, initialSpans }) 
 
                     {!loading && spans.length > 0 && (
                         <>
-                            <WaterfallGraph spans={spans} />
+                            <VerticalStack gap="3">
+                                <Text variant="headingXs" color="subdued">Context graph</Text>
+                                <WaterfallGraph spans={spans} />
+                            </VerticalStack>
                             <Divider />
                         </>
                     )}
