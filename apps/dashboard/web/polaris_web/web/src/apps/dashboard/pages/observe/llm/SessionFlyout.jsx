@@ -184,8 +184,9 @@ export default function SessionFlyout({ session, currDateRange, onClose }) {
                     setHasMessages(true);
                     setTraceLoading(false);
                 } else {
-                    // Old records with no traceId — load spans directly so both the
-                    // Overview count and the Traces tab have data without a second fetch.
+                    // fetchMessages already folds in traceId-less spans as individual rows, so
+                    // an empty result here means this session genuinely has nothing in range
+                    // (rather than "no traceId") — fall back to a flat span search as a last resort.
                     return api.searchPrompts({ startTime: since, endTime: until, sessionId: session.sessionIdentifier, limit: 100 })
                         .then(result => {
                             if (!cancelled) {
@@ -225,7 +226,16 @@ export default function SessionFlyout({ session, currDateRange, onClose }) {
                                    : 0;
 
     function renderContent() {
-        if (topNav) return <TraceDetailView trace={topNav.trace} currDateRange={currDateRange} />;
+        // Rows with no traceId (fetchMessages surfaces those as individual single-span
+        // "traces" instead of dropping them) can't be re-fetched by traceId — the row itself
+        // already *is* the only span, so hand it to TraceDetailView directly.
+        if (topNav) return (
+            <TraceDetailView
+                trace={topNav.trace}
+                currDateRange={currDateRange}
+                initialSpans={topNav.trace?.traceId ? undefined : [topNav.trace]}
+            />
+        );
         switch (activeTab) {
             case TAB_OVERVIEW: return (
                 <Scrollable style={{ flex: 1 }}>

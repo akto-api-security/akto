@@ -163,8 +163,13 @@ export default function TraceDetailView({ trace, currDateRange, initialSpans }) 
         const traceId   = trace?.traceId;
         const sessionId = trace?.sessionIdentifier;
         if (!traceId && !sessionId) { setSpans([]); return; }
-        // Spans pre-fetched by parent (session fallback) — nothing to do.
-        if (!traceId && sessionId && initialSpans?.length) return;
+        // Spans pre-fetched by parent (session fallback, or a single untraced row clicked
+        // straight from the Traces tab) — sync them in rather than re-fetching. Must actually
+        // set state here (not just skip the fetch): this effect can re-run with a *different*
+        // initialSpans for the same traceId-less trace/session pair (e.g. clicking between two
+        // untraced rows in the same session), and the initial useState(initialSpans) value only
+        // applies on first mount.
+        if (!traceId && sessionId && initialSpans?.length) { setSpans(initialSpans); return; }
         let cancelled = false;
         setLoading(true);
 
