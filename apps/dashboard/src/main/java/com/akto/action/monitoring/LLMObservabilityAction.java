@@ -5,6 +5,7 @@ import com.akto.audit_logs_util.Audit;
 import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.RBAC.Role;
+import com.akto.dto.audit_logs.Operation;
 import com.akto.dto.audit_logs.Resource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -246,6 +247,7 @@ public class LLMObservabilityAction extends UserAction {
 
     @Audit(description = "User viewed prompt content in Traces",
            resource = Resource.TRACES_CONTENT,
+           operation = Operation.READ,
            metadataGenerators = {"getSessionId", "getTraceId"})
     public String logPromptContentAccess() {
         return SUCCESS.toUpperCase();
