@@ -125,6 +125,8 @@ public class GuardrailPolicies {
     @BsonIgnore
     private List<String> applyToDeviceIds;
 
+    private List<AgenticUsers> userMetadata;
+
 
     // Blocked host/path list — block-only glob patterns matched against the request host+path.
     // Object-shaped so it can be extended later without a data migration.
