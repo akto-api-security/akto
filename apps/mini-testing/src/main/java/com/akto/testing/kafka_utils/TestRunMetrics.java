@@ -49,9 +49,14 @@ public class TestRunMetrics {
     /**
      * Pipeline stages timed per test. LOOKUP is config/sample resolution; RUN_TEST is the full
      * {@code runTestNew} wall; SEND_REQUEST is the slice of it spent hitting the API under test;
-     * INSERT_RESULTS is the ultron result-write round-trip.
+     * INSERT_RESULTS is the ultron result-write round-trip. FILTER/WORDLIST/VALIDATE are slices of
+     * RUN_TEST's previously-undivided OTHER bucket, timed at the exact call sites confirmed against
+     * captured flamegraphs: FILTER wraps TestPlugin.validateFilter (YamlTestTemplate.filter()),
+     * WORDLIST wraps VariableResolver.resolveDynamicWordList (Executor.execute(), once per call),
+     * VALIDATE wraps Executor.validate() (once per attack-payload iteration, right after SEND_REQUEST).
+     * Whatever's left of RUN_TEST after subtracting all of these is the real, now much smaller, OTHER.
      */
-    public enum Stage { LOOKUP, RUN_TEST, SEND_REQUEST, INSERT_RESULTS }
+    public enum Stage { LOOKUP, RUN_TEST, SEND_REQUEST, INSERT_RESULTS, FILTER, WORDLIST, VALIDATE }
 
     /** WARN-level progress + cost heartbeat cadence. */
     private static final long HEARTBEAT_INTERVAL_MS = 60_000L;
@@ -110,6 +115,11 @@ public class TestRunMetrics {
     private final EnumMap<Stage, AtomicLong> stageMaxNanos = newStageMax();
     /** CPU time (not wall) attributed to RUN_TEST, to separate compute from I/O wait. */
     private final LongAdder runTestCpuNanos = new LongAdder();
+
+    // Per-test payload size (the raw sample string's length, in bytes) - avg/max reported in KB.
+    private final LongAdder totalPayloadBytes = new LongAdder();
+    private final LongAdder payloadSamples = new LongAdder();
+    private final AtomicLong maxPayloadBytes = new AtomicLong(0);
 
     private static EnumMap<Stage, LongAdder> newStageAdders() {
         EnumMap<Stage, LongAdder> m = new EnumMap<>(Stage.class);
@@ -191,6 +201,15 @@ public class TestRunMetrics {
     /** Fold the CPU time (nanos) a single {@code runTestNew} burned, to split compute from I/O wait. */
     public void recordRunTestCpu(long nanos) {
         if (nanos > 0) runTestCpuNanos.add(nanos);
+    }
+
+    /** Fold one test's raw sample payload size (bytes) into the avg/max tracked for the run. */
+    public void recordPayloadSize(long bytes) {
+        if (bytes < 0) return;
+        totalPayloadBytes.add(bytes);
+        payloadSamples.increment();
+        long prev;
+        while (bytes > (prev = maxPayloadBytes.get()) && !maxPayloadBytes.compareAndSet(prev, bytes)) { /* retry */ }
     }
 
     // ----- lifecycle banners -----
@@ -313,6 +332,8 @@ public class TestRunMetrics {
                 + " oldestInflightMs=" + age[1]
                 + " avgTestMs=" + (durationSamples.get() > 0 ? (totalDurationMs.get() / durationSamples.get()) : -1)
                 + " maxTestMs=" + maxDurationMs.get()
+                + " avgPayloadKb=" + (payloadSamples.sum() > 0 ? String.format("%.1f", (totalPayloadBytes.sum() / (double) payloadSamples.sum()) / 1024.0) : "-1")
+                + " maxPayloadKb=" + String.format("%.1f", maxPayloadBytes.get() / 1024.0)
                 + " executor[" + executorStats() + "]";
     }
 
@@ -343,8 +364,12 @@ public class TestRunMetrics {
         long runTest  = stageNanos.get(Stage.RUN_TEST).sum();
         long sendReq  = stageNanos.get(Stage.SEND_REQUEST).sum();
         long insertRt = stageNanos.get(Stage.INSERT_RESULTS).sum();
+        long filter   = stageNanos.get(Stage.FILTER).sum();
+        long wordlist = stageNanos.get(Stage.WORDLIST).sum();
+        long validate = stageNanos.get(Stage.VALIDATE).sum();
         long runCpu   = runTestCpuNanos.sum();
-        long other    = Math.max(0, runTest - sendReq);   // RUN_TEST minus target-API send = compute/setup
+        // RUN_TEST minus everything now explicitly named = whatever's left unaccounted for.
+        long other    = Math.max(0, runTest - sendReq - filter - wordlist - validate);
         long billed   = lookup + runTest + insertRt;
 
         long avgWallMs = ms(runTest + lookup + insertRt) / n;
@@ -354,6 +379,9 @@ public class TestRunMetrics {
                 + " cpuPerTestMs=" + msPer(runCpu, n)
                 + " | RUN_TEST=" + msPer(runTest, n) + "ms (" + pctOf(runTest, billed) + " of billed)"
                 + " [SEND_REQUEST=" + msPer(sendReq, n) + "ms/" + pctOf(sendReq, runTest)
+                + " | FILTER=" + msPer(filter, n) + "ms/" + pctOf(filter, runTest)
+                + " | WORDLIST=" + msPer(wordlist, n) + "ms/" + pctOf(wordlist, runTest)
+                + " | VALIDATE=" + msPer(validate, n) + "ms/" + pctOf(validate, runTest)
                 + " | OTHER=" + msPer(other, n) + "ms/" + pctOf(other, runTest) + "]"
                 + " LOOKUP=" + msPer(lookup, n) + "ms"
                 + " INSERT_RESULTS=" + msPer(insertRt, n) + "ms/" + pctOf(insertRt, billed) + " of billed");

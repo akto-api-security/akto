@@ -100,7 +100,9 @@ public class Executor {
         ModifyExecutionOrderResp modifyExecutionOrderResp = executionListBuilder.modifyExecutionFlow(executorNodes, varMap);
 
         Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
+        long wordlistStart = System.nanoTime();
         Map<String, Object> resolvedWordList = VariableResolver.resolveDynamicWordList(varMap, apiInfoKey, newSampleDataMap);
+        TestPhaseTimer.addWordlist(System.nanoTime() - wordlistStart);
         varMap.clear();
         varMap.putAll(resolvedWordList);
 
@@ -183,7 +185,9 @@ public class Executor {
 
         if (!runAutomatedPentest && executionType.equals("passive") && !onlySmartTestingAllowed) {
             ExecutionResult attempt = new ExecutionResult(true, "", rawApi.getRequest(), rawApi.getResponse());
+            long validateStart = System.nanoTime();
             TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+            TestPhaseTimer.addValidate(System.nanoTime() - validateStart);
             if (res != null) {
                 /*
                  * Since the original message and test message are same, saving only one.
@@ -285,7 +289,9 @@ public class Executor {
                         TestPhaseTimer.addSendRequest(System.nanoTime() - sendStart);
                         requestSent = true;
                         ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
+                        long validateStart = System.nanoTime();
                         res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                        TestPhaseTimer.addValidate(System.nanoTime() - validateStart);
                     }
                     if (res != null && agenticResults == null) {
                         result.add(res);

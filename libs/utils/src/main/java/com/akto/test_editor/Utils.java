@@ -5,6 +5,7 @@ import com.akto.util.HttpRequestResponseUtils;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -75,8 +76,20 @@ public class Utils {
             .build();
     }
     
+    // Compile-once cache for checkIfContainsMatch's `keyword` regex. Confirmed (07sep diagnostic,
+    // real single-API run) this keyword is called ~4.8M times per API pass across only ~428 distinct
+    // patterns - ~11,000x average reuse, one pattern alone (a user-id-field alternation) accounting
+    // for 85.7% of all calls. Called from two independent hot paths that both funnel through here:
+    // VariableResolver's wordlist-matching chain (findAllValues -> checkIfMatches) and
+    // FilterAction/RegexFilter's api-selection/validation filter evaluation - this fix benefits both.
+    // Unbounded by design: the keyword set is test-template-defined config, not user input - bounded
+    // by however many distinct wordlist/filter regexes exist across all templates for the account,
+    // not by traffic volume. `Pattern` is immutable and thread-safe to share across threads once
+    // compiled, so no synchronization needed beyond what ConcurrentHashMap already provides.
+    private static final java.util.concurrent.ConcurrentHashMap<String, Pattern> PATTERN_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
     public static Boolean checkIfContainsMatch(String text, String keyword) {
-        Pattern pattern = Pattern.compile(keyword);
+        Pattern pattern = PATTERN_CACHE.computeIfAbsent(keyword, Pattern::compile);
         Matcher matcher = pattern.matcher(text);
         String match = null;
         if (matcher.find()) {
@@ -451,6 +464,52 @@ public class Utils {
             }
         }
 
+    }
+
+    // Flatten-once variant of findAllValuesForKey/findAllValues: parses the payload and walks it
+    // exactly the same way, but records EVERY (fieldName, value) pair unconditionally instead of
+    // matching a single pattern inline. Lets a caller parse+walk a payload once and check it against
+    // many patterns afterward (VariableResolver.resolveWordList checks the same cached sample against
+    // every wordlist across ~887 templates) instead of re-parsing/re-walking once per pattern.
+    public static List<Map.Entry<String, String>> flattenAllValues(String payload) {
+        List<Map.Entry<String, String>> entries = new ArrayList<>();
+        JsonParser jp = null;
+        JsonNode node;
+        try {
+            jp = factory.createParser(payload);
+            node = mapper.readTree(jp);
+        } catch (IOException e) {
+            return entries;
+        }
+        if (node == null) {
+            return entries;
+        }
+        flattenAllValues(node, entries);
+        return entries;
+    }
+
+    private static void flattenAllValues(JsonNode node, List<Map.Entry<String, String>> entries) {
+        if (node.isArray()) {
+            ArrayNode arrayNode = (ArrayNode) node;
+            for (int i = 0; i < arrayNode.size(); i++) {
+                flattenAllValues(arrayNode.get(i), entries);
+            }
+        } else {
+            Iterator<String> fieldNames = node.fieldNames();
+            while (fieldNames.hasNext()) {
+                String fieldName = fieldNames.next();
+                JsonNode fieldValue = node.get(fieldName);
+                String val;
+                try {
+                    TextNode n = (TextNode) fieldValue;
+                    val = n.asText();
+                } catch (Exception e) {
+                    val = fieldValue.toString();
+                }
+                entries.add(new AbstractMap.SimpleEntry<>(fieldName, val));
+                flattenAllValues(fieldValue, entries);
+            }
+        }
     }
 
     public static boolean checkIfMatches(String data, String query, boolean isRegex) {

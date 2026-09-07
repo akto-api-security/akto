@@ -11,6 +11,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.auth.AuthValidator;
 import com.akto.test_editor.execution.Executor;
+import com.akto.test_editor.execution.TestPhaseTimer;
 import com.akto.testing.StatusCodeAnalyser;
 
 import java.util.List;
@@ -50,7 +51,9 @@ public class YamlTestTemplate extends SecurityTestTemplate {
             return true;
         }
 
+        long filterStart = System.nanoTime();
         boolean isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap, this.logId);
+        TestPhaseTimer.addFilter(System.nanoTime() - filterStart);
         // loggerMaker.infoAndAddToDb("filter status " + isValid + " " + logId, LogDb.TESTING);
         return isValid;
     }
