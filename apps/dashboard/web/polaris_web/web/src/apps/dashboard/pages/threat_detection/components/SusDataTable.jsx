@@ -144,8 +144,6 @@ const getHeaders = () => {
       type: CellType.TEXT,
       tooltipKey: "reasonFull",
     });
-    // Reason is our explanation of the block; Evidence is the payload's own words that
-    // triggered it. Sits next to Reason so the two read together.
     baseHeaders.push({
       text: "Evidence",
       value: "evidenceLine",

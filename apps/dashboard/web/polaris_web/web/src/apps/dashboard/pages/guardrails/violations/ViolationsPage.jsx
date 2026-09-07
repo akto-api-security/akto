@@ -573,10 +573,6 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         // Request-derived only - never falls back to meta.reason (a response/guardrail
         // explanation), which would show up as if it were the captured request content.
         evidenceText: primaryValue || "-",
-        // The single attributed line, distinct from evidenceText above (the whole captured
-        // request body). Deliberately NOT falling back to evidenceText when absent: under an
-        // "Evidence" heading a 300-char prompt dump reads as "this is the bit that tripped
-        // it", which is exactly the claim the empty case can't make.
         evidenceLine: event.evidenceLine || "",
         riskScore: parseStoredRiskScore(meta),
         reason: normalizeReasonPunctuation(meta.reason || meta.nreason) || "",
