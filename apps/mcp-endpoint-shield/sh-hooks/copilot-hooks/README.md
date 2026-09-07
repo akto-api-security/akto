@@ -36,7 +36,7 @@ Files copied:
 - `akto-validate-post-tool-wrapper.sh`
 - `akto_common.sh` — shared helpers (logging, machine-id/username,
   session-state, HTTP POST, warn/resubmit state, MCP tool-name parsing,
-  connector detection, heartbeat) that every other script sources; keep it
+  connector detection) that every other script sources; keep it
   in the same directory as the rest
 
 ### 2. Configure environment
@@ -233,33 +233,21 @@ user prompt and the assistant's response, and ingests that pair instead of
 the raw payload; if no conversational content is found it falls back to
 ingesting the payload metadata only.
 
-### Heartbeat / device registration
-
-Every validating hook (prompt/pre-tool/post-tool) also sends a rate-limited
-heartbeat (at most once every 30 seconds) to
-`${DATABASE_ABSTRACTOR_SERVICE_URL:-https://cyborg.akto.io}/api/updateModuleInfoForHeartbeat`,
-registering this device/username under `moduleType: MCP_ENDPOINT_SHIELD` so
-it shows up as a known agent in Akto's dashboard. Heartbeat failures are
-swallowed — they never affect hook behaviour — and the last-sent timestamp
-plus a persistent agent id are cached in `LOG_DIR` (`last_heartbeat`,
-`agent_id`).
-
 ## Configuration options
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `AKTO_DATA_INGESTION_URL` | (required) | Akto data ingestion service URL |
-| `AKTO_API_TOKEN` | (empty) | Sent as the `Authorization` header to `AKTO_DATA_INGESTION_URL` and to the heartbeat endpoint |
+| `AKTO_API_TOKEN` | (empty) | Sent as the `Authorization` header to `AKTO_DATA_INGESTION_URL` |
 | `AKTO_SYNC_MODE` | `true` | Synchronous guardrails mode; when `false`, the validating hooks skip guardrails and ingestion entirely |
 | `AKTO_TIMEOUT` | `5` | Timeout in seconds for the guardrails/ingestion HTTP call |
 | `MODE` | `atlas` | Operation mode: `argus` or `atlas` |
-| `DEVICE_ID` | (auto-generated) | Device id used in `atlas`-mode hostnames, MCP mirror hosts, and the heartbeat payload |
+| `DEVICE_ID` | (auto-generated) | Device id used in `atlas`-mode hostnames and MCP mirror hosts |
 | `AKTO_CONNECTOR` | (auto-detected) | Overrides the non-`vscode` fallback connector label (default `copilot`); never used when the payload identifies itself as `vscode` |
 | `GITHUB_COPILOT_API_URL` | `https://api.github.com` | Mirrored host for non-MCP GitHub Copilot CLI traffic (`argus` mode) |
 | `VSCODE_API_URL` | `https://vscode.dev` | Mirrored host for non-MCP VS Code traffic (`argus` mode) |
 | `CONTEXT_SOURCE` | `ENDPOINT` | Tag/field describing where traffic originated |
 | `MCP_INGEST_PATH` | `/mcp` | Mirrored path for MCP `tools/call` traffic |
-| `DATABASE_ABSTRACTOR_SERVICE_URL` | `https://cyborg.akto.io` | Heartbeat/agent-registration endpoint (self-hosted only) |
 | `LOG_DIR` | `~/.copilot/akto/logs` | Directory for log files and state files — shared between both wrapper sets |
 | `LOG_LEVEL` | `INFO` | Accepted for compatibility; every hook call is currently logged regardless of level |
 | `LOG_PAYLOADS` | `false` | Log full prompt/response/tool-payload previews instead of truncated ones |
@@ -276,8 +264,7 @@ Default log directory: `~/.copilot/akto/logs/`
 Plus state files in the same directory: `akto_session_state.json` (session
 correlation), `akto_prompt_warn_pending.json` /
 `akto_pretool_warn_pending.json` / `akto_posttool_warn_pending.json`
-(warn-then-resubmit-to-bypass tracking, one per hook), and `agent_id` /
-`last_heartbeat` (heartbeat state).
+(warn-then-resubmit-to-bypass tracking, one per hook).
 
 Tail all logs:
 

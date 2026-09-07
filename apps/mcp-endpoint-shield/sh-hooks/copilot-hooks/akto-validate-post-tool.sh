@@ -37,7 +37,6 @@ export LOG_DIR
 mkdir -p "$LOG_DIR" 2>/dev/null
 SESSION_STATE_PATH="${LOG_DIR}/akto_session_state.json"
 
-send_heartbeat "$LOG_DIR" "$LOGFILE"
 warn_state_path="$LOG_DIR/akto_posttool_warn_pending.json"
 
 session_info=$(resolve_session_info "$input_data" "false")

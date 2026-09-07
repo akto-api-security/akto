@@ -37,7 +37,6 @@ mkdir -p "$LOG_DIR" 2>/dev/null
 SESSION_STATE_PATH="${LOG_DIR}/akto_session_state.json"
 
 warn_state_path="$LOG_DIR/akto_prompt_warn_pending.json"
-send_heartbeat "$LOG_DIR" "$LOGFILE"
 
 session_info=$(resolve_session_info "$input_data" "true")
 session_id=$(jq -r '.session_id // empty' <<<"$input_data")
