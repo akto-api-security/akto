@@ -1539,7 +1539,7 @@ public class StartTestAction extends UserAction {
                     List<Bson> updates = new ArrayList<>();
 
                     if (editableTestingRunConfig.getTestRunTime() > 0
-                            && editableTestingRunConfig.getTestRunTime() <= 6 * 60 * 60
+                            && editableTestingRunConfig.getTestRunTime() <= 12 * 60 * 60
                             && editableTestingRunConfig.getTestRunTime() != existingTestingRun.getTestRunTime()) {
                         updates.add(Updates.set(TestingRun.TEST_RUNTIME, editableTestingRunConfig.getTestRunTime()));
                     }
