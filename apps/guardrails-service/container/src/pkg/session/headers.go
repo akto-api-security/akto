@@ -27,6 +27,22 @@ func ExtractSessionID(headers map[string]string) string {
 	return ""
 }
 
+// ExtractInstallerUserEmail extracts the installer-supplied user email, used to resolve
+// which devices a request's user is associated with for device-targeted policies. Checked
+// both http.Header-canonicalized and raw lowercase (stdio custom-header maps) forms.
+func ExtractInstallerUserEmail(headers map[string]string) string {
+	candidates := []string{
+		"X-Akto-Installer-User_email", "x-akto-installer-user_email",
+	}
+
+	for _, key := range candidates {
+		if val, ok := headers[key]; ok && val != "" {
+			return val
+		}
+	}
+	return ""
+}
+
 // ExtractRequestID extracts request ID from various headers with fallback
 // Supports Kong (x-kong-request-id) and standard request ID headers
 func ExtractRequestID(headers map[string]string) string {

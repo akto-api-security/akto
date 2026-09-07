@@ -376,37 +376,105 @@ func hostSegmentMatch(nameLower, storedLower string) bool {
 	return false
 }
 
-// filterPoliciesByDeviceId filters policies by the device label embedded in the MCP server name.
-// The device label is the first dot-delimited segment of "{deviceLabel}.{clientType}.{host}".
-// ApplyToDeviceIds == nil means no team/role targeting is configured, so the policy applies to
-// all devices. A non-nil (possibly empty) ApplyToDeviceIds means targeting is configured, so the
-// policy applies only to the listed device labels — a non-nil empty list matches no device.
-// If mcpServerName is empty or has no device prefix, all policies are returned unchanged.
-func (s *Service) filterPoliciesByDeviceId(policies []types.Policy, mcpServerName string) []types.Policy {
-	if mcpServerName == "" {
-		return policies
-	}
-	deviceLabel := ""
+// deviceLabelFromMcpServerName extracts the device label from an MCP server name of the form
+// "{deviceLabel}.{clientType}.{host}" — the first dot-delimited segment. Returns "" if
+// mcpServerName is empty or has no dot.
+func deviceLabelFromMcpServerName(mcpServerName string) string {
 	if i := strings.IndexByte(mcpServerName, '.'); i > 0 {
-		deviceLabel = mcpServerName[:i]
+		return mcpServerName[:i]
 	}
-	if deviceLabel == "" {
-		return policies
+	return ""
+}
+
+// deviceIDsContain reports whether ids contains label (exact match — device labels embedded in
+// MCP server names are not user-supplied free text, unlike UserMetadata email/device matching).
+func deviceIDsContain(ids []string, label string) bool {
+	if label == "" {
+		return false
 	}
+	for _, id := range ids {
+		if id == label {
+			return true
+		}
+	}
+	return false
+}
+
+// filterPoliciesByDevice filters device-targeted policies, combining two independent ways a
+// request can be confirmed as belonging to a targeted device: the device label embedded in the
+// MCP server name ("{deviceLabel}.{clientType}.{host}"), or the installer-supplied user email
+// header (x-akto-installer-user_email) resolved against the policy's UserMetadata rows. A policy
+// is device-targeted when either ApplyToDeviceIds is non-nil or UserMetadata is non-empty; when
+// neither is configured, the policy applies to everyone. For a device-targeted policy, either
+// signal confirming membership is enough — they don't both need to agree — so a request missing
+// a device-labeled server name can still match via email, and vice versa.
+func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName string, headers map[string]string) []types.Policy {
+	deviceLabel := deviceLabelFromMcpServerName(mcpServerName)
+	email := ""
+	emailResolved := false
+
 	filtered := make([]types.Policy, 0, len(policies))
 	for _, p := range policies {
-		if p.ApplyToDeviceIds == nil {
+		targeted := p.ApplyToDeviceIds != nil || len(p.UserMetadata) > 0
+		if !targeted {
 			filtered = append(filtered, p)
 			continue
 		}
-		for _, id := range p.ApplyToDeviceIds {
-			if id == deviceLabel {
-				filtered = append(filtered, p)
-				break
+
+		labelMatched := deviceIDsContain(p.ApplyToDeviceIds, deviceLabel)
+
+		emailMatched := false
+		if len(p.UserMetadata) > 0 {
+			if !emailResolved {
+				email = session.ExtractInstallerUserEmail(headers)
+				emailResolved = true
 			}
+			if email != "" {
+				if row := findUserMetadataByEmail(p.UserMetadata, email); row != nil {
+					emailMatched = deviceListIntersects(row.Devices, p.ApplyToDeviceIds)
+				}
+			}
+		}
+
+		matched := labelMatched || emailMatched
+		s.logger.Debug("filterPoliciesByDevice - decision",
+			zap.String("policy", p.Info.Name),
+			zap.String("mcpServerName", mcpServerName),
+			zap.String("deviceLabel", deviceLabel),
+			zap.Strings("applyToDeviceIds", p.ApplyToDeviceIds),
+			zap.String("email", email),
+			zap.Bool("labelMatched", labelMatched),
+			zap.Bool("emailMatched", emailMatched),
+			zap.Bool("matched", matched))
+		if matched {
+			filtered = append(filtered, p)
 		}
 	}
 	return filtered
+}
+
+// findUserMetadataByEmail returns the first UserMetadata row whose UserEmail matches email
+// case-insensitively, or nil if none match.
+func findUserMetadataByEmail(rows []types.AgenticUsers, email string) *types.AgenticUsers {
+	for i := range rows {
+		if strings.EqualFold(rows[i].UserEmail, email) {
+			return &rows[i]
+		}
+	}
+	return nil
+}
+
+// deviceListIntersects reports whether any device in devices matches (case-insensitively) any
+// entry in applyToDeviceIds.
+func deviceListIntersects(devices, applyToDeviceIds []string) bool {
+	for _, d := range devices {
+		for _, id := range applyToDeviceIds {
+			if strings.EqualFold(d, id) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // filterApprovedServers drops "approval"-behaviour policies whose target server already has a
@@ -1770,7 +1838,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Filter policies by MCP server name so all subsequent checks only fire for
 	// rules that belong to policies applicable to this server.
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
-	policies = s.filterPoliciesByDeviceId(policies, valCtx.McpServerName)
+	policies = s.filterPoliciesByDevice(policies, valCtx.McpServerName, valCtx.RequestHeaders)
 	// Bypass "approval" policies whose server is already approved (allow, no threat).
 	policies = s.filterApprovedServers(policies, valCtx.McpServerName)
 
@@ -1981,7 +2049,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 
 	// Filter policies by MCP server name — policies with no server configured are skipped
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
-	policies = s.filterPoliciesByDeviceId(policies, valCtx.McpServerName)
+	policies = s.filterPoliciesByDevice(policies, valCtx.McpServerName, valCtx.RequestHeaders)
 	// Bypass "approval" policies whose server is already approved (allow, no threat).
 	policies = s.filterApprovedServers(policies, valCtx.McpServerName)
 
@@ -2329,7 +2397,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 		// Filter policies by MCP server name for this specific batch item
 		itemPolicies := s.filterPoliciesByMcpServer(policies, mcpServerName)
-		itemPolicies = s.filterPoliciesByDeviceId(itemPolicies, mcpServerName)
+		itemPolicies = s.filterPoliciesByDevice(itemPolicies, mcpServerName, reqHeaders)
 		// Bypass "approval" policies whose server is already approved (allow, no threat).
 		itemPolicies = s.filterApprovedServers(itemPolicies, mcpServerName)
 		s.logger.Debug("ValidateBatch - applicable policies for server",
