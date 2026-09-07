@@ -251,7 +251,8 @@ main() {
         jq -n -c --arg r "$block_reason" '{decision:"block", reason:$r}'
       else
         jq -n -c --arg sr "${gr_reason:-Policy violation}" --arg sm "$block_reason" '
-          {continue:false, stopReason:$sr, systemMessage:$sm}
+          {continue:false, stopReason:$sr, systemMessage:$sm,
+           hookSpecificOutput:{hookEventName:"Stop", additionalContext:$sr}}
         '
       fi
       log_warn "$LOGFILE" "BLOCKING Stop - Reason: $gr_reason"

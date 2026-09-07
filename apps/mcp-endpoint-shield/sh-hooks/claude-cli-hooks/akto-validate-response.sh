@@ -235,7 +235,10 @@ main() {
       else
         block_reason="Response blocked: ${gr_reason}"
       fi
-      jq -n -c --arg r "$block_reason" '{decision:"block", reason:$r}'
+      jq -n -c --arg r "$block_reason" --arg sr "${gr_reason:-Policy violation}" '
+        {decision:"block", reason:$r,
+         hookSpecificOutput:{hookEventName:"Stop", continue:false, stopReason:$sr, additionalContext:$r, systemMessage:$r}}
+      '
       log_warn "$LOGFILE" "BLOCKING Stop - Reason: $gr_reason"
       ingest_blocked_response "$user_prompt" "$response_text" "$gr_reason" "$session_info"
       exit 0

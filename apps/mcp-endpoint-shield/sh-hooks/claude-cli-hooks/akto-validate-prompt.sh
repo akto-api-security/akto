@@ -192,7 +192,10 @@ main() {
       else
         block_reason="Prompt blocked: ${gr_reason}"
       fi
-      jq -n -c --arg r "$block_reason" '{decision:"block", reason:$r}'
+      jq -n -c --arg r "$block_reason" '
+        {decision:"block", reason:$r,
+         hookSpecificOutput:{hookEventName:"UserPromptSubmit", continue:false, additionalContext:$r, systemMessage:$r}}
+      '
       log_warn "$LOGFILE" "BLOCKING prompt - Reason: $gr_reason"
       ingest_blocked_request "$prompt" "$gr_reason" "$session_info"
       exit 0

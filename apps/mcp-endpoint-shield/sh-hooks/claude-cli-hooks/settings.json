@@ -22,6 +22,17 @@
         ]
       }
     ],
+    "Setup": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh Setup",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "InstructionsLoaded": [
       {
         "hooks": [
@@ -39,6 +50,17 @@
           {
             "type": "command",
             "command": "bash ~/.claude/hooks/akto-validate-prompt-wrapper.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptExpansion": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh UserPromptExpansion",
             "timeout": 10
           }
         ]
@@ -94,6 +116,17 @@
           {
             "type": "command",
             "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh PostToolUseFailure",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolBatch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh PostToolBatch",
             "timeout": 10
           }
         ]
@@ -187,6 +220,17 @@
         ]
       }
     ],
+    "MessageDisplay": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh MessageDisplay",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "ConfigChange": [
       {
         "hooks": [
@@ -204,6 +248,17 @@
           {
             "type": "command",
             "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh CwdChanged",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "DirectoryAdded": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh DirectoryAdded",
             "timeout": 10
           }
         ]
@@ -242,6 +297,28 @@
         ]
       }
     ],
+    "PreModelSwitch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh PreModelSwitch",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostModelSwitch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh PostModelSwitch",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "Elicitation": [
       {
         "hooks": [
@@ -259,6 +336,17 @@
           {
             "type": "command",
             "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh ElicitationResult",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.sh WorktreeCreate",
             "timeout": 10
           }
         ]
