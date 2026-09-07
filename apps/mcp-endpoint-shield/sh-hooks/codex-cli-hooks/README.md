@@ -31,21 +31,19 @@ Back up `config.toml` first if you're doing this by hand instead — it's a
 shared file Codex also uses for models, MCP servers, plugins, and trusted
 project paths, so a mistake here isn't limited to hooks.
 
-Codex supports more hook events than these scripts wire up:
+`hooks.json` wires all 11 hook event names found in the installed Codex CLI
+binary's own hook-schema (`codex --version` 0.147.0):
 
-- **Turn-scoped**: `PreToolUse`, `PostToolUse`, `PreCompact`, `PostCompact`,
-  `UserPromptSubmit`, `PermissionRequest`, `SubagentStart`, `SubagentStop`,
-  `Stop`
-- **Session-scoped**: `SessionStart`, `SessionEnd`
-- **User action**: `Interrupt`
+- **Validating** (guardrails, can block): `UserPromptSubmit`, `PreToolUse`,
+  `PostToolUse`, `Stop`
+- **Observability-only** (fire-and-forget via `akto-hooks.sh`):
+  `SessionStart`, `SessionEnd`, `PermissionRequest`, `PreCompact`,
+  `PostCompact`, `SubagentStart`, `SubagentStop`
 
-This package only implements `UserPromptSubmit`, `PreToolUse`,
-`PostToolUse`, `Stop`, and `SessionStart` (the last purely for
-observability, via `akto-hooks.sh`). The rest (`PermissionRequest`,
-`SubagentStart`/`Stop`, `PreCompact`/`PostCompact`, `SessionEnd`,
-`Interrupt`) are not covered — add entries to `hooks.json` pointing at
-`akto-hooks.sh <hookName>` if you want them mirrored for observability too
-(they'll ingest but never block, since `akto-hooks.sh` is fire-and-forget).
+Only the 4 validating events go through the real guardrails/ingestion
+scripts; the other 8 are dispatched straight to `akto-hooks.sh <hookName>`
+for ingestion only — they never block, since `akto-hooks.sh` is
+fire-and-forget.
 
 ## Setup
 

@@ -70,7 +70,7 @@ build_validation_request() {
   jq -n -c \
     --arg mode "$MODE" --arg src "$CONTEXT_SOURCE" \
     --arg host "$host" --argjson inst "$installer_hdrs" --arg path "$CODEX_API_PATH" \
-    --arg q "$query" --arg ip "$(get_username)" --arg time "$now_ms" '
+    --arg q "$query" --arg ip "$(get_username)" --arg time "$now_ms" --arg akvx "$DEVICE_ID" '
     ($q | gsub("^\\s+|\\s+$";"")) as $qtrim
     | ({"gen-ai":"Gen AI"} + (if $mode=="atlas" then {"ai-agent":"codexcli","source":$src} else {} end)) as $tags
     | ({"host":$host,"x-codex-hook":"UserPromptSubmit","content-type":"application/json"} + $inst) as $reqh
@@ -83,7 +83,7 @@ build_validation_request() {
         responsePayload: ({}|tojson),
         ip: $ip, destIp: "127.0.0.1", time: $time,
         statusCode: "200", type: "HTTP/1.1", status: "200",
-        akto_account_id: "1000000", akto_vxlan_id: 0, is_pending: "false",
+        akto_account_id: "1000000", akto_vxlan_id: $akvx, is_pending: "false",
         source: "MIRRORING", direction: null, process_id: null, socket_id: null,
         daemonset_id: null, enabled_graph: null,
         tag: ($tags|tojson), metadata: ($tags|tojson), contextSource: $src

@@ -16,7 +16,6 @@ AKTO_DATA_INGESTION_URL="${AKTO_DATA_INGESTION_URL%/}"
 AKTO_TIMEOUT="${AKTO_TIMEOUT:-5}"
 AKTO_SYNC_MODE="$([[ "$(_akto_lower "${AKTO_SYNC_MODE:-true}")" == "true" ]] && echo true || echo false)"
 AKTO_API_TOKEN="${AKTO_API_TOKEN:-}"
-AKTO_ACCOUNT_ID="${AKTO_ACCOUNT_ID:-1000000}"
 CONTEXT_SOURCE="${CONTEXT_SOURCE:-ENDPOINT}"
 LOG_PAYLOADS="$(_akto_lower "${LOG_PAYLOADS:-false}")"
 MCP_INGEST_PATH="${MCP_INGEST_PATH:-/mcp}"
@@ -117,7 +116,7 @@ build_akto_request() {
     --arg path "$path" --argjson reqh "$req_headers" --argjson resph "$resp_headers" \
     --argjson reqp "$request_payload" --argjson resp "$response_payload" \
     --arg ip "$(get_username)" --arg ts "$timestamp" --arg status "$status_code" \
-    --arg akid "$AKTO_ACCOUNT_ID" --arg akvx "$device_id" --argjson tag "$tags" '
+    --arg akvx "$device_id" --argjson tag "$tags" '
     {
       path: $path,
       requestHeaders: ($reqh | tojson),
@@ -127,7 +126,7 @@ build_akto_request() {
       responsePayload: ($resp | tojson),
       ip: $ip, destIp: "127.0.0.1", time: $ts,
       statusCode: $status, type: "HTTP/1.1", status: $status,
-      akto_account_id: $akid, akto_vxlan_id: $akvx, is_pending: "false",
+      akto_account_id: "1000000", akto_vxlan_id: $akvx, is_pending: "false",
       source: "MIRRORING", direction: null, process_id: null, socket_id: null,
       daemonset_id: null, enabled_graph: null,
       tag: ($tag | tojson), metadata: ($tag | tojson), contextSource: "ENDPOINT"

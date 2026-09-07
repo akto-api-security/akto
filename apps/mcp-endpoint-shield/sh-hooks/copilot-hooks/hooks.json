@@ -96,6 +96,22 @@
         "comment": "Ingest transformed-prompt event to Akto for observability",
         "timeoutSec": 10
       }
+    ],
+    "postToolUseFailure": [
+      {
+        "type": "command",
+        "bash": "bash $HOME/.copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.sh postToolUseFailure",
+        "comment": "Ingest tool-execution-failure event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "permissionRequest": [
+      {
+        "type": "command",
+        "bash": "bash $HOME/.copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.sh permissionRequest",
+        "comment": "Ingest permission-request event to Akto for observability",
+        "timeoutSec": 10
+      }
     ]
   }
 }

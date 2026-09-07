@@ -72,7 +72,7 @@ build_ingestion_payload() {
     --arg mode "$MODE" --arg src "$CONTEXT_SOURCE" --arg path "$CODEX_API_PATH" \
     --arg host "$host" --argjson inst "$installer_hdrs" \
     --arg p "$user_prompt" --arg r "$response_text" \
-    --arg ip "$(get_username)" --arg time "$now_ms" '
+    --arg ip "$(get_username)" --arg time "$now_ms" --arg akvx "$DEVICE_ID" '
     ({"gen-ai":"Gen AI"} + (if $mode=="atlas" then {"ai-agent":"codexcli","source":$src} else {} end)) as $tags
     | ({"host":$host,"x-codex-hook":"Stop","content-type":"application/json"} + $inst) as $reqh
     | {
@@ -84,7 +84,7 @@ build_ingestion_payload() {
         responsePayload: ({body:$r}|tojson),
         ip: $ip, destIp: "127.0.0.1", time: $time,
         statusCode: "200", type: "HTTP/1.1", status: "200",
-        akto_account_id: "1000000", akto_vxlan_id: 0, is_pending: "false",
+        akto_account_id: "1000000", akto_vxlan_id: $akvx, is_pending: "false",
         source: "MIRRORING", direction: null, process_id: null, socket_id: null,
         daemonset_id: null, enabled_graph: null,
         tag: ($tags|tojson), metadata: ($tags|tojson), contextSource: $src

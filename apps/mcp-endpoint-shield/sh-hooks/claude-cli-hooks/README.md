@@ -226,6 +226,7 @@ hook invocations.
 | `MODE` | `atlas` | Operation mode: `argus` or `atlas` |
 | `DEVICE_ID` | (auto-generated) | Device id used in `atlas`-mode hostnames and in every MCP mirror host |
 | `CLAUDE_API_URL` | `https://api.anthropic.com` | Claude API URL used as the mirrored host (`argus` mode, non-MCP only) |
+| `AKTO_CONNECTOR` | `claude_code_cli` | Connector label used in the `akto_connector` query param |
 | `AKTO_CONNECTOR_VALUE` | `claudecli` | Short connector tag used in headers/tags/atlas hostnames |
 | `CONTEXT_SOURCE` | `ENDPOINT` | Tag/field describing where traffic originated |
 | `AKTO_INGEST_NON_MCP_TOOLS` | `false` | Also mirror blocked/allowed built-in (non-MCP) tool traffic |

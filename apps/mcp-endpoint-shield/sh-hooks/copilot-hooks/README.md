@@ -99,16 +99,17 @@ other Copilot hooks registered, merge rather than overwrite):
 }
 ```
 
-The full `hooks.json` in this directory wires all 12 documented GitHub
-Copilot CLI hook events — everything beyond the three validating hooks
-above (`sessionStart`, `sessionEnd`, `agentStop`, `subagentStart`,
-`subagentStop`, `errorOccurred`, `preCompact`, `notification`,
-`userPromptTransformed`) is dispatched to `akto-hooks.sh <hookName>` for
-fire-and-forget observability ingestion; none of those can block. VS Code
-Copilot Chat only supports 8 of the 12 (it has no `sessionEnd`,
-`errorOccurred`, `notification`, or `userPromptTransformed`) — it simply
-never fires the other 4, which is harmless since they're all registered
-against the same generic dispatcher.
+The full `hooks.json` in this directory wires all 14 hook events documented
+in [GitHub's Copilot CLI hooks reference](https://docs.github.com/en/copilot/reference/hooks-reference)
+— everything beyond the three validating hooks above (`sessionStart`,
+`sessionEnd`, `agentStop`, `subagentStart`, `subagentStop`,
+`errorOccurred`, `preCompact`, `notification`, `userPromptTransformed`,
+`postToolUseFailure`, `permissionRequest`) is dispatched to
+`akto-hooks.sh <hookName>` for fire-and-forget observability ingestion;
+none of those can block. VS Code Copilot Chat skips 4 of these
+(`sessionEnd`, `errorOccurred`, `notification`, `userPromptTransformed`) —
+it simply never fires them, which is harmless since every event here is
+registered against the same generic dispatcher.
 
 ### 4. Trust the hooks (GitHub Copilot CLI)
 

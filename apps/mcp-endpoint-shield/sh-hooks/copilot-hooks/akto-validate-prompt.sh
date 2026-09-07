@@ -16,7 +16,6 @@ AKTO_DATA_INGESTION_URL="${AKTO_DATA_INGESTION_URL%/}"
 AKTO_TIMEOUT="${AKTO_TIMEOUT:-5}"
 AKTO_SYNC_MODE="$([[ "$(_akto_lower "${AKTO_SYNC_MODE:-true}")" == "true" ]] && echo true || echo false)"
 AKTO_API_TOKEN="${AKTO_API_TOKEN:-}"
-AKTO_ACCOUNT_ID="${AKTO_ACCOUNT_ID:-1000000}"
 CONTEXT_SOURCE="${CONTEXT_SOURCE:-ENDPOINT}"
 LOG_PAYLOADS="$(_akto_lower "${LOG_PAYLOADS:-false}")"
 
@@ -79,7 +78,7 @@ build_akto_request() {
     --arg host "$host" --arg hh "$CFG_HOOK_HEADER" \
     --argjson sh "$cfg_session_headers" \
     --arg prompt "$prompt" --arg ts "$timestamp" \
-    --arg ip "$(get_username)" --arg akid "$AKTO_ACCOUNT_ID" --arg akvx "$device_id" \
+    --arg ip "$(get_username)" --arg akvx "$device_id" \
     --argjson tag "$tags" --arg ctxsrc "$CONTEXT_SOURCE" '
     {
       path: "/copilot/chat",
@@ -90,7 +89,7 @@ build_akto_request() {
       responsePayload: ({} | tojson),
       ip: $ip, destIp: "127.0.0.1", time: $ts,
       statusCode: "200", type: "HTTP/1.1", status: "200",
-      akto_account_id: $akid, akto_vxlan_id: $akvx, is_pending: "false",
+      akto_account_id: "1000000", akto_vxlan_id: $akvx, is_pending: "false",
       source: "MIRRORING", direction: null, process_id: null, socket_id: null,
       daemonset_id: null, enabled_graph: null,
       tag: ($tag | tojson), metadata: ($tag | tojson), contextSource: "ENDPOINT"

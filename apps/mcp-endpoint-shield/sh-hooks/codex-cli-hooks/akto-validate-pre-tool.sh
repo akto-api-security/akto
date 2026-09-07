@@ -151,7 +151,7 @@ build_validation_request() {
 
   jq -n -c \
     --arg path "$path" --argjson reqh "$req_headers" --argjson reqp "$request_payload" \
-    --arg ip "$(get_username)" --arg time "$now_ms" --argjson tag "$tags" --arg src "$CONTEXT_SOURCE" '
+    --arg ip "$(get_username)" --arg time "$now_ms" --argjson tag "$tags" --arg src "$CONTEXT_SOURCE" --arg akvx "$DEVICE_ID" '
     {
       path: $path,
       requestHeaders: ($reqh|tojson),
@@ -161,7 +161,7 @@ build_validation_request() {
       responsePayload: ({}|tojson),
       ip: $ip, destIp: "127.0.0.1", time: $time,
       statusCode: "200", type: "HTTP/1.1", status: "200",
-      akto_account_id: "1000000", akto_vxlan_id: 0, is_pending: "false",
+      akto_account_id: "1000000", akto_vxlan_id: $akvx, is_pending: "false",
       source: "MIRRORING", direction: null, process_id: null, socket_id: null,
       daemonset_id: null, enabled_graph: null,
       tag: ($tag|tojson), metadata: ($tag|tojson), contextSource: $src
