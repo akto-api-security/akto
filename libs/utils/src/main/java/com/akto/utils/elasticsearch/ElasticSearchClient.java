@@ -96,7 +96,7 @@ public class ElasticSearchClient extends SearchClient {
     @Override
     public SessionsResult fetchSessions(int accountId, long startMs, long endMs, String searchString,
                                          Map<String, List<String>> filters, Boolean atlasTrafficFilter,
-                                         int sessionsLimit, String sessionsAfterKey, boolean includePromptContent) {
+                                         int sessionsLimit, String sessionsAfterKey, boolean includeTracesContent) {
         List<Map<String, Object>> sessions = new ArrayList<>();
         String nextAfterKey = null;
         long totalSessions = 0;
@@ -107,7 +107,7 @@ public class ElasticSearchClient extends SearchClient {
                 .put(new JSONObject().put("exists", new JSONObject().put("field", AgentQueryRecord.F_SESSION_IDENTIFIER)));
 
             JSONArray sessionHitSource = new JSONArray();
-            if (includePromptContent) {
+            if (includeTracesContent) {
                 sessionHitSource.put(AgentQueryRecord.F_QUERY_PAYLOAD).put(AgentQueryRecord.F_RESPONSE_PAYLOAD);
             }
             sessionHitSource.put(AgentQueryRecord.F_SERVICE_ID).put(AgentQueryRecord.F_USER_NAME)
@@ -403,7 +403,7 @@ public class ElasticSearchClient extends SearchClient {
     // ── Argus aggregated stats (total spans + token sums + top apps/traces + sparklines) ──
 
     @Override
-    public ArgusStats fetchArgusStats(int accountId, long startMs, long endMs, Boolean atlasTrafficFilter, boolean includePromptContent) {
+    public ArgusStats fetchArgusStats(int accountId, long startMs, long endMs, Boolean atlasTrafficFilter, boolean includeTracesContent) {
         long aggTotalSpans = 0, aggInputTokens = 0, aggOutputTokens = 0;
         List<Map<String, Object>> aggTopApps = new ArrayList<>();
         List<Map<String, Object>> aggAppBreakdown = new ArrayList<>();
@@ -441,7 +441,7 @@ public class ElasticSearchClient extends SearchClient {
             String fixedInterval = argusIntervalMs + "ms";
 
             JSONArray traceHitSource = new JSONArray();
-            if (includePromptContent) {
+            if (includeTracesContent) {
                 traceHitSource.put(AgentQueryRecord.F_QUERY_PAYLOAD).put(AgentQueryRecord.F_RESPONSE_PAYLOAD);
             }
             traceHitSource.put(AgentQueryRecord.F_SERVICE_ID).put(AgentQueryRecord.F_TRACE_ID);
@@ -667,7 +667,7 @@ public class ElasticSearchClient extends SearchClient {
     public SearchResult searchPrompts(int accountId, long startMs, long endMs, int skip, int limit,
                                        String sortKey, boolean sortAsc, String searchAfterJson,
                                        Map<String, List<String>> filters, Boolean atlasTrafficFilter, String searchString,
-                                       boolean includePromptContent) {
+                                       boolean includeTracesContent) {
         if (!isConfigured()) return new SearchResult(new ArrayList<>(), 0);
         try {
             JSONArray searchAfter = null;
@@ -675,7 +675,7 @@ public class ElasticSearchClient extends SearchClient {
                 try { searchAfter = new JSONArray(searchAfterJson); } catch (Exception ignored) {}
             }
             JSONObject query = buildQuery(accountId, startMs, endMs, filters, searchString, atlasTrafficFilter);
-            return executeSearch(query, skip, Math.min(limit, 100), toEsField(sortKey), sortAsc, searchAfter, includePromptContent);
+            return executeSearch(query, skip, Math.min(limit, 100), toEsField(sortKey), sortAsc, searchAfter, includeTracesContent);
         } catch (Exception e) {
             logger.error("searchPrompts error for accountId=" + accountId + ": " + e.getMessage());
             return new SearchResult(new ArrayList<>(), 0);
@@ -683,7 +683,7 @@ public class ElasticSearchClient extends SearchClient {
     }
 
     private SearchResult executeSearch(JSONObject query, int skip, int limit, String sortField, boolean sortAsc,
-                                        JSONArray searchAfter, boolean includePromptContent) throws JSONException {
+                                        JSONArray searchAfter, boolean includeTracesContent) throws JSONException {
         String sortDir = sortAsc ? "asc" : "desc";
         String resolvedSort = (sortField != null && !sortField.isEmpty()) ? sortField : AgentQueryRecord.F_TIMESTAMP;
 
@@ -693,7 +693,7 @@ public class ElasticSearchClient extends SearchClient {
             .put("size", limit)
             .put("track_total_hits", true);
 
-        if (!includePromptContent) {
+        if (!includeTracesContent) {
             body.put("_source", new JSONObject().put("excludes", new JSONArray()
                 .put(AgentQueryRecord.F_QUERY_PAYLOAD).put(AgentQueryRecord.F_RESPONSE_PAYLOAD)));
         }

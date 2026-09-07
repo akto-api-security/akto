@@ -1,34 +1,26 @@
 package com.akto.action.monitoring;
 
 import com.akto.action.UserAction;
-import com.akto.audit_logs_util.AuditLogsUtil;
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.RBACDao;
-import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.RBAC.Role;
-import com.akto.dto.audit_logs.ApiAuditLogs;
-import com.akto.dto.audit_logs.Operation;
 import com.akto.dto.audit_logs.Resource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.runtime.policies.UserAgentTypePolicy;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.utils.search.SearchClient;
 import com.akto.utils.search.SearchClientFactory;
-import com.mongodb.BasicDBObject;
 
 import lombok.Getter;
 import lombok.Setter;
 
-import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.apache.struts2.ServletActionContext;
 
 /**
  * Thin orchestrator over {@link SearchClient}: resolves request-level filters/context, calls the
@@ -47,13 +39,13 @@ public class LLMObservabilityAction extends UserAction {
     @Setter private int          limit       = 20;
     @Setter private String       sortKey     = AgentQueryRecord.F_TIMESTAMP;
     @Setter private int          sortOrder   = 1;
-    @Setter private String       traceId;
+    @Getter @Setter private String       traceId;
     @Setter private String       searchAfterJson;
     @Setter private String       sessionsAfterKey;
     @Setter private int          sessionsLimit    = 20;
 
     // Single-value fields kept for backward-compat (session drill-down in SessionsView)
-    @Setter private String       sessionId;
+    @Getter @Setter private String       sessionId;
     @Setter private String       userName;
     @Setter private String       deviceId;
     @Setter private String       serviceId;
@@ -97,8 +89,6 @@ public class LLMObservabilityAction extends UserAction {
     @Getter private List<Long>                 aggTokenSpark      = new ArrayList<>();
     @Getter private List<Long>                 aggTraceSparkTs    = new ArrayList<>();
 
-    private Boolean callerAdmin;
-
     private long startMs() { return (long) startTime * 1000L; }
     private long endMs()   { return (long) endTime   * 1000L; }
 
@@ -113,7 +103,7 @@ public class LLMObservabilityAction extends UserAction {
             SearchClient.SessionsResult result = client.fetchSessions(
                 accountId, startMs(), endMs(), searchString,
                 buildMultiFilters(true), resolveContextAtlasFilter(),
-                sessionsLimit, sessionsAfterKey, isCallerAdmin());
+                sessionsLimit, sessionsAfterKey, isUserRoleAdmin());
 
             sessions      = result.sessions;
             nextAfterKey  = result.nextAfterKey;
@@ -179,7 +169,7 @@ public class LLMObservabilityAction extends UserAction {
             // Argus view always reports non-Atlas (agent) traffic so the total here matches
             // what the Argus paginated table reports; "false" also covers docs that predate
             // this field and were never Atlas-tagged.
-            SearchClient.ArgusStats stats = client.fetchArgusStats(accountId, startMs(), endMs(), Boolean.FALSE, isCallerAdmin());
+            SearchClient.ArgusStats stats = client.fetchArgusStats(accountId, startMs(), endMs(), Boolean.FALSE, isUserRoleAdmin());
 
             aggTotalSpans   = stats.totalSpans;
             aggInputTokens  = stats.inputTokens;
@@ -239,7 +229,7 @@ public class LLMObservabilityAction extends UserAction {
             SearchClient.SearchResult result = client.searchPrompts(
                 accountId, startMs(), endMs(), skip, Math.min(limit, 100),
                 sortKey, sortOrder == -1, searchAfterJson,
-                buildMultiFilters(true), resolveContextAtlasFilter(), searchString, isCallerAdmin());
+                buildMultiFilters(true), resolveContextAtlasFilter(), searchString, isUserRoleAdmin());
 
             prompts = result.hits;
             total   = result.total;
@@ -250,49 +240,14 @@ public class LLMObservabilityAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    // ── Prompt content access ─────────────────────────────────────────────────
-    // Payloads are admin-only; the flag is passed to the SearchClient so they are never queried.
-
-    /** Fails closed: anything that stops us resolving the role counts as non-admin. */
-    private boolean isCallerAdmin() {
-        if (callerAdmin != null) return callerAdmin;
-        try {
-            callerAdmin = Role.ADMIN.equals(RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get()));
-        } catch (Exception e) {
-            logger.error("could not resolve role for prompt content check: " + e.getMessage());
-            callerAdmin = false;
-        }
-        return callerAdmin;
+    private boolean isUserRoleAdmin() {
+        return RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get()) == Role.ADMIN;
     }
 
-    // ── Prompt content reveal ─────────────────────────────────────────────────
-
-    /** Records an admin opening prompt content in Traces; ERROR keeps the content hidden. */
+    @Audit(description = "User viewed prompt content in Traces",
+           resource = Resource.TRACES_CONTENT,
+           metadataGenerators = {"getSessionId", "getTraceId"})
     public String logPromptContentAccess() {
-        try {
-            HttpServletRequest request = ServletActionContext.getRequest();
-            String userAgent = request.getHeader("User-Agent") == null ? "Unknown User-Agent" : request.getHeader("User-Agent");
-            List<String> userProxyIpAddresses = AuditLogsUtil.getClientIpAddresses(request);
-
-            BasicDBObject metadata = new BasicDBObject();
-            if (sessionId != null && !sessionId.trim().isEmpty()) metadata.put("sessionId", sessionId.trim());
-            if (traceId != null && !traceId.trim().isEmpty()) metadata.put("traceId", traceId.trim());
-
-            ApiAuditLogsDao.instance.insertOne(new ApiAuditLogs(
-                Context.now(),
-                "api/logPromptContentAccess",
-                "User viewed prompt content in Traces",
-                getSUser().getLogin(),
-                UserAgentTypePolicy.findUserAgentType(userAgent).name(),
-                userProxyIpAddresses.get(0),
-                userProxyIpAddresses,
-                Resource.TRACES_PROMPT_CONTENT,
-                Operation.READ,
-                metadata));
-        } catch (Exception e) {
-            logger.error("logPromptContentAccess error: " + e.getMessage());
-            return ERROR.toUpperCase();
-        }
         return SUCCESS.toUpperCase();
     }
 
