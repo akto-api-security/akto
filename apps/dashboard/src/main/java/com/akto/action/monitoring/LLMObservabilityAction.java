@@ -116,6 +116,10 @@ public class LLMObservabilityAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User viewed prompt content in Traces",
+           resource = Resource.TRACES_CONTENT,
+           operation = Operation.READ,
+           metadataGenerators = {"getSessionId"})
     public String fetchMessages() {
         try {
             SearchClient client = SearchClientFactory.instance();
@@ -189,6 +193,10 @@ public class LLMObservabilityAction extends UserAction {
 
     // ── Spans for a single message/trace ──────────────────────────────────────
 
+    @Audit(description = "User viewed prompt content in Traces",
+           resource = Resource.TRACES_CONTENT,
+           operation = Operation.READ,
+           metadataGenerators = {"getTraceId"})
     public String fetchTraceDetail() {
         try {
             SearchClient client = SearchClientFactory.instance();
@@ -243,14 +251,6 @@ public class LLMObservabilityAction extends UserAction {
 
     private boolean isUserRoleAdmin() {
         return RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get()) == Role.ADMIN;
-    }
-
-    @Audit(description = "User viewed prompt content in Traces",
-           resource = Resource.TRACES_CONTENT,
-           operation = Operation.READ,
-           metadataGenerators = {"getSessionId", "getTraceId"})
-    public String logPromptContentAccess() {
-        return SUCCESS.toUpperCase();
     }
 
     // ── Shared helpers ────────────────────────────────────────────────────────

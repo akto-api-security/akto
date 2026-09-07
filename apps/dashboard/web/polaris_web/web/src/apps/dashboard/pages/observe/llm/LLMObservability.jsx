@@ -119,18 +119,11 @@ export default function LLMObservability() {
         setPendingReveal({ open: () => setSelectedTrace(row), traceId: row?.traceId, sessionId: row?.sessionIdentifier });
     }, [isAdmin]);
 
-    // Open only once the audit entry is written, so content is never shown unlogged.
+    // Opening the flyout fetches the content, and that fetch is what gets recorded in audit data.
     const confirmReveal = useCallback(() => {
         if (!pendingReveal) return;
-        api.logPromptContentAccess({ sessionId: pendingReveal.sessionId, traceId: pendingReveal.traceId })
-            .then(() => {
-                pendingReveal.open();
-                setPendingReveal(null);
-            })
-            .catch(() => {
-                func.setToast(true, true, "Could not record this access in audit data. Prompt content was not shown.");
-                setPendingReveal(null);
-            });
+        pendingReveal.open();
+        setPendingReveal(null);
     }, [pendingReveal]);
 
     // ─── Atlas graph data (sessions) ─────────────────────────────────────────
