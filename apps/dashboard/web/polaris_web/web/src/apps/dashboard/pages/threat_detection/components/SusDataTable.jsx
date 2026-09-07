@@ -1103,14 +1103,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
             const { preview, full } = truncateToWords(r, 30);
             return { reason: preview, reasonFull: full };
           })(),
-          // Verbatim span the gateway attributed the block to. Truncated by characters, not
-          // words: this is copied payload text, so a long unbroken token (a URL, base64, a
-          // minified line) has to be cut mid-token or it blows past the column width.
-          // Empty on every event recorded before evidenceLine shipped — left blank rather
-          // than "-", matching how Reason renders when metadata carries none.
           ...(() => {
             const { preview, full } = truncateToChars(x?.evidenceLine || "", 120);
-            return { evidenceLine: preview, evidenceLineFull: full };
+            return { evidenceLine: preview || "-", evidenceLineFull: full };
           })(),
         }),
         // Successful Exploit is only shown for API Security (not Argus/Agentic or Atlas/Endpoint)

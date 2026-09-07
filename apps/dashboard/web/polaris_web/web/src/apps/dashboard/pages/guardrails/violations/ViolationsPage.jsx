@@ -172,12 +172,8 @@ function RiskScoreCellRenderer({ value }) {
     return <Text variant="bodySm">{value}</Text>;
 }
 
-// Shared by the Reason and Evidence columns: one ellipsised line, full text on hover.
-// `mono` is passed by Evidence — that value is a span copied verbatim out of the payload,
-// and a monospace face both reads better for it and tells it apart at a glance from
-// Reason's prose in the neighbouring column.
-function ReasonCellRenderer({ value, mono }) {
-    if (!value) return null;
+function ReasonCellRenderer({ value }) {
+    if (!value) return <Text variant="bodySm" color="subdued">-</Text>;
     return (
         <div style={{ width: "100%", minWidth: 0, overflow: "hidden" }}>
             <Tooltip content={value} dismissOnMouseOut width="wide">
@@ -187,7 +183,6 @@ function ReasonCellRenderer({ value, mono }) {
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
-                        ...(mono ? { fontFamily: "var(--p-font-family-mono, monospace)" } : null),
                     }}
                 >
                     <Text variant="bodySm" as="span">{value}</Text>
@@ -332,10 +327,6 @@ function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, 
             cellRenderer: ReasonCellRenderer,
             cellStyle: { display: "flex", alignItems: "center", overflow: "hidden" },
         }, {
-            // The payload's own words that tripped the policy, as opposed to Reason, which is
-            // our explanation of why. Blank until the event carries one: the field only started
-            // being written on 2026-08-31, and even now the gateway leaves it empty when the
-            // violation can't be pinned to a specific line.
             field: "evidenceLine",
             headerName: "Evidence",
             width: 220,
@@ -345,7 +336,6 @@ function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, 
             sortable: false,
             wrapText: false,
             cellRenderer: ReasonCellRenderer,
-            cellRendererParams: { mono: true },
             cellStyle: { display: "flex", alignItems: "center", overflow: "hidden" },
         }, {
             field: "riskScore",
