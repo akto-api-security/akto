@@ -9,7 +9,7 @@ import func from "../../../../../util/func";
 import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, VerticalStack } from "@shopify/polaris";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
-import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap, parseStoredRiskScore, parseStoredReason, truncateToWords } from "../utils/formatUtils";
+import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap, parseStoredRiskScore, parseStoredReason, truncateToWords, truncateToChars } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory } from "../../../../main/labelHelper";
@@ -143,6 +143,16 @@ const getHeaders = () => {
       maxWidth: "240px",
       type: CellType.TEXT,
       tooltipKey: "reasonFull",
+    });
+    // Reason is our explanation of the block; Evidence is the payload's own words that
+    // triggered it. Sits next to Reason so the two read together.
+    baseHeaders.push({
+      text: "Evidence",
+      value: "evidenceLine",
+      title: "Evidence",
+      maxWidth: "240px",
+      type: CellType.TEXT,
+      tooltipKey: "evidenceLineFull",
     });
   }
 
@@ -1092,6 +1102,15 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
             if (!r) return { reason: "", reasonFull: "" };
             const { preview, full } = truncateToWords(r, 30);
             return { reason: preview, reasonFull: full };
+          })(),
+          // Verbatim span the gateway attributed the block to. Truncated by characters, not
+          // words: this is copied payload text, so a long unbroken token (a URL, base64, a
+          // minified line) has to be cut mid-token or it blows past the column width.
+          // Empty on every event recorded before evidenceLine shipped — left blank rather
+          // than "-", matching how Reason renders when metadata carries none.
+          ...(() => {
+            const { preview, full } = truncateToChars(x?.evidenceLine || "", 120);
+            return { evidenceLine: preview, evidenceLineFull: full };
           })(),
         }),
         // Successful Exploit is only shown for API Security (not Argus/Agentic or Atlas/Endpoint)
