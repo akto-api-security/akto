@@ -5,6 +5,7 @@ import com.akto.audit_logs_util.AuditLogsUtil;
 import com.akto.dao.RBACDao;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.akto.dto.audit_logs.ApiAuditLogs;
@@ -13,6 +14,7 @@ import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.rbac.RbacEnums;
 import com.akto.dto.rbac.RbacEnums.Feature;
 import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.filter.UserDetailsFilter;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -137,6 +139,23 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 String contextSourceStr = contextSource.toString();
                 logger.debug("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr);
                 loggerMaker.infoAndAddToDb("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr);
+                try {
+                    if (UsersCollectionsList.isRbacDebugAccount(sessionAccId)) {
+                        RBAC rbac = RBACDao.getCurrentRBACForUser(userId, sessionAccId);
+                        String storedRole = rbac == null ? "null" : rbac.getRole();
+                        String mapping = (rbac == null || rbac.getScopeRoleMapping() == null || rbac.getScopeRoleMapping().isEmpty())
+                                ? "none" : rbac.getScopeRoleMapping().toString();
+                        int pinnedSize = (rbac == null || rbac.getApiCollectionsId() == null) ? -1 : rbac.getApiCollectionsId().size();
+                        loggerMaker.infoAndAddToDb("Access denied details userId=" + userId + " accountId=" + sessionAccId
+                                + " context=" + contextSourceStr
+                                + " resolvedRole=" + userRole
+                                + " storedRole=" + storedRole
+                                + " mapping=" + mapping
+                                + " pinnedSize=" + pinnedSize
+                                + " uri=" + requestUri);
+                    }
+                } catch (Exception ignored) {
+                }
 
                 // Send Slack alert with caching to prevent duplicate alerts
 
