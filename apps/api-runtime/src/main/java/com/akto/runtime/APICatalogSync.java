@@ -776,6 +776,10 @@ public class APICatalogSync {
             return null; // Don't merge GraphQL endpoints
         }
 
+        if (isUrlMerged(newUrl.getUrl(), newUrl.getMethod().name())) {
+            return null; // URL was flagged demerge:true by an advanced traffic filter
+        }
+
         for(int i = start; i < tokens.length; i ++) {
             String tempToken = tokens[i];
             if(DictionaryFilter.isEnglishWord(tempToken)) continue;
@@ -836,6 +840,10 @@ public class APICatalogSync {
 
         if(HttpResponseParams.isGraphQLEndpoint(dbUrl.getUrl()) || HttpResponseParams.isGraphQLEndpoint(newUrl.getUrl())) {
             return null; // Don't merge GraphQL endpoints
+        }
+
+        if (isUrlMerged(dbUrl.getUrl(), dbUrl.getMethod().name()) || isUrlMerged(newUrl.getUrl(), newUrl.getMethod().name())) {
+            return null; // One of the URLs was flagged demerge:true by an advanced traffic filter
         }
 
         for(int i = 0; i < newTokens.length; i ++) {
@@ -902,6 +910,35 @@ public class APICatalogSync {
         }
 
         return urlTemplate;
+    }
+
+    public static boolean isUrlMerged(String url, String method) {
+        for (MergedUrls entry : mergedUrls) {
+            if (entry.getUrl().equals(url) && entry.getMethod().equals(method)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static void markUrlAsMerged(int apiCollectionId, String url, String method) {
+        if (isUrlMerged(url, method)) {
+            return;
+        }
+        try {
+            MergedUrlsDao.instance.updateOne(Filters.and(
+                    Filters.eq(MergedUrls.URL, url),
+                    Filters.eq(MergedUrls.METHOD, method),
+                    Filters.eq(MergedUrls.API_COLLECTION_ID, apiCollectionId)
+            ), Updates.combine(
+                    Updates.set(MergedUrls.URL, url),
+                    Updates.set(MergedUrls.METHOD, method),
+                    Updates.set(MergedUrls.API_COLLECTION_ID, apiCollectionId)
+            ));
+            mergedUrls.add(new MergedUrls(url, method, apiCollectionId));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while saving demerged url in DB: " + e.getMessage(), LogDb.RUNTIME);
+        }
     }
 
     public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb,boolean ignoreCaseInsensitiveApis, boolean mergeUrlsOnVersions, boolean skipMergingOnKnownStaticURLsForVersionedApis) {

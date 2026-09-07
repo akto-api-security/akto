@@ -266,7 +266,11 @@ public class HttpCallParser {
                     }else{
                         filterType = FILTER_TYPE.ALLOWED;
                     }
-                    
+
+                    if (apiFilter.getStrategy() != null && Boolean.TRUE.equals(apiFilter.getStrategy().getDemerge())) {
+                        APICatalogSync.markUrlAsMerged(apiCollectionId, responseParam.getRequestParams().getURL(),
+                                responseParam.getRequestParams().getMethod());
+                    }
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, String.format("Error in httpCallFilter %s", e.toString()));
