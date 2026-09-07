@@ -457,7 +457,7 @@ export default function AgenticAssetsPage() {
         Promise.allSettled([
           fetchAgenticViolationCountsByHost({ startTimestamp, endTimestamp }),
           fetchAgenticSkillViolationCounts({ startTimestamp, endTimestamp }),
-          agenticObserveApi.listUserAnalysis(),
+          agenticObserveApi.listUserAnalysis(startTimestamp, endTimestamp),
         ])
           .then(async ([hostCountsSettled, skillViolationsSettled, userAnalysisSettled]) => {
             if (!isMountedRef.current) return;
@@ -612,6 +612,7 @@ export default function AgenticAssetsPage() {
   const topAppsRows = useMemo(() =>
     (stats.topUsedApplications || []).map((row) => ({
       ...row,
+      assetTagValue: row.groupKey,
       onClick: (r) => openAssetByName(r.name, r.type),
       renderValue: (r) => (
         <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">

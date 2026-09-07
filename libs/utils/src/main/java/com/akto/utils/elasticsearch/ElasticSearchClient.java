@@ -1,5 +1,7 @@
 package com.akto.utils.elasticsearch;
 
+import com.akto.dto.agentic_sessions.UserAnalysisData;
+import com.akto.dto.agentic_sessions.UserAnalysisData.UserAnalysisDataKey;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -71,6 +73,11 @@ public class ElasticSearchClient extends SearchClient {
     // Distinct policy names hit by any span in the session — flat, no hierarchy to preserve.
     private static final String AGG_GUARDRAIL_POLICIES  = "guardrailPoliciesAgg";
     private static final int    GUARDRAIL_POLICIES_BREADTH = 10;
+    // Nested agg: terms on serviceId.keyword → sub-agg terms on deviceId.keyword, with token sums.
+    private static final String AGG_USER_ANALYSIS_SERVICE  = "userAnalysisByService";
+    private static final String AGG_USER_ANALYSIS_DEVICE   = "userAnalysisByDevice";
+    private static final int    USER_ANALYSIS_SERVICE_SIZE = 200;
+    private static final int    USER_ANALYSIS_DEVICE_SIZE  = 2000;
 
     private static final ElasticSearchClient INSTANCE = new ElasticSearchClient();
     public static ElasticSearchClient instance() { return INSTANCE; }
@@ -543,6 +550,78 @@ public class ElasticSearchClient extends SearchClient {
         }
         return new ArgusStats(aggTotalSpans, aggInputTokens, aggOutputTokens,
             aggTopApps, aggAppBreakdown, aggTopTraces, aggTraceSpark, aggTokenSpark, aggTraceSparkTs);
+    }
+
+    // ── Time-ranged token totals per (serviceId, deviceId) ─────────────────────
+    // On-the-fly, date-range-scoped replacement for UserAnalysisDataDao's lifetime counter.
+    // Atlas-only (atlasTrafficFilter=true) — the lifetime counter itself has no such split, so
+    // "All time" vs. a real range can disagree until that counter/cron gets the same scoping.
+    @Override
+    public List<UserAnalysisData> fetchUserAnalysisTokenTotals(int accountId, long startMs, long endMs) {
+        List<UserAnalysisData> rows = new ArrayList<>();
+        if (!isConfigured()) return rows;
+        try {
+            JSONObject filteredQuery = buildQuery(accountId, startMs, endMs, null, null, Boolean.TRUE);
+
+            JSONObject aggs = new JSONObject()
+                .put(AGG_USER_ANALYSIS_SERVICE, new JSONObject()
+                    .put("terms", new JSONObject()
+                        .put("field", AgentQueryRecord.F_SERVICE_ID_KW)
+                        .put("size", USER_ANALYSIS_SERVICE_SIZE))
+                    .put("aggs", new JSONObject()
+                        .put(AGG_USER_ANALYSIS_DEVICE, new JSONObject()
+                            .put("terms", new JSONObject()
+                                .put("field", AgentQueryRecord.F_DEVICE_ID_KW)
+                                .put("size", USER_ANALYSIS_DEVICE_SIZE))
+                            .put("aggs", tokenSubAggs()))));
+
+            JSONObject aggsResult = aggregate(filteredQuery, aggs);
+            if (aggsResult == null) return rows;
+
+            JSONObject serviceAgg = aggsResult.optJSONObject(AGG_USER_ANALYSIS_SERVICE);
+            JSONArray serviceBuckets = serviceAgg != null ? serviceAgg.optJSONArray("buckets") : null;
+            if (serviceBuckets == null) return rows;
+            // Unlike this file's "top N" aggs, this method must be exhaustive — warn if the
+            // service/device size caps truncated real data.
+            long otherServices = serviceAgg.optLong("sum_other_doc_count", 0);
+            if (otherServices > 0) {
+                logger.error("fetchUserAnalysisTokenTotals: accountId=" + accountId + " truncated "
+                    + otherServices + " docs beyond top " + USER_ANALYSIS_SERVICE_SIZE + " serviceIds");
+            }
+
+            for (int i = 0; i < serviceBuckets.length(); i++) {
+                JSONObject serviceBucket = serviceBuckets.optJSONObject(i);
+                if (serviceBucket == null) continue;
+                String serviceId = serviceBucket.optString("key", "");
+
+                JSONObject deviceAgg = serviceBucket.optJSONObject(AGG_USER_ANALYSIS_DEVICE);
+                JSONArray deviceBuckets = deviceAgg != null ? deviceAgg.optJSONArray("buckets") : null;
+                if (deviceBuckets == null) continue;
+                long otherDevices = deviceAgg.optLong("sum_other_doc_count", 0);
+                if (otherDevices > 0) {
+                    logger.error("fetchUserAnalysisTokenTotals: accountId=" + accountId + " serviceId=" + serviceId
+                        + " truncated " + otherDevices + " docs beyond top " + USER_ANALYSIS_DEVICE_SIZE + " deviceIds");
+                }
+
+                for (int j = 0; j < deviceBuckets.length(); j++) {
+                    JSONObject deviceBucket = deviceBuckets.optJSONObject(j);
+                    if (deviceBucket == null) continue;
+                    String deviceId = deviceBucket.optString("key", "");
+                    long in  = subAggLong(deviceBucket, AGG_IN_TOKENS);
+                    long out = subAggLong(deviceBucket, AGG_OUT_TOKENS);
+                    if (in == 0 && out == 0) continue;
+
+                    UserAnalysisData row = new UserAnalysisData();
+                    row.setId(new UserAnalysisDataKey(serviceId, deviceId));
+                    row.setTotalInputTokens(in);
+                    row.setTotalOutputTokens(out);
+                    rows.add(row);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("fetchUserAnalysisTokenTotals error for accountId=" + accountId + ": " + e.getMessage());
+        }
+        return rows;
     }
 
     // ── Spans for a single message/trace ──────────────────────────────────────

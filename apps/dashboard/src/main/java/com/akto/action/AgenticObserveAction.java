@@ -2270,7 +2270,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 // fixed (see fetchAgenticAssetDetail, the lazy per-asset endpoint the Overview tab's
                 // full device list — topology graph, etc. — now comes from instead).
                 List<BasicDBObject> devices = buildDevicesForGroup(g, byId, traffic, risk, userAnalysis);
-                if (!"skill".equals(g.rowType) && !"plugin".equals(g.rowType)) {
+                // Only "agent" rows have their own token identity — service/llm/skill/plugin rows
+                // would just redundantly echo whichever agent's tokens their hostname happens to embed.
+                if ("agent".equals(g.rowType)) {
                     int aiInteractionsTotal = 0;
                     for (BasicDBObject d : devices) {
                         Object v = d.get("aiInteractions");
@@ -2750,11 +2752,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
             List<BasicDBObject> topApps = new ArrayList<>();
             for (GroupSummary g : groups.values()) {
-                // Skill and Plugin rows deliberately excluded here — same reasoning as "Top Assets
-                // with Violations" above and the grid's per-row "aiInteractions" column (which already
-                // nulls this out for plugins below): UserAnalysisData is keyed only per agent-app-per-
-                // device.
-                if ("skill".equals(g.rowType) || "plugin".equals(g.rowType)) continue;
+                // Only "agent" rows get ranked here — same reasoning as the grid column above.
+                if (!"agent".equals(g.rowType)) continue;
                 int groupTotal = 0;
                 Set<String> seenKeys = new HashSet<>();
                 for (String hostName : g.hostNames) {
@@ -2775,6 +2774,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     row.put("id", g.rowType + "-" + g.groupKey);
                     row.put("name", g.name);
                     row.put("type", g.clientType);
+                    // Frontend maps this to assetTagValue to resolve a per-app icon (see shapeRow).
+                    row.put("groupKey", g.groupKey);
                     row.put("aiInteractions", groupTotal);
                     topApps.add(row);
                 }

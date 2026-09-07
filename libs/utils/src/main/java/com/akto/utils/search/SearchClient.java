@@ -1,5 +1,6 @@
 package com.akto.utils.search;
 
+import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -59,6 +60,14 @@ public abstract class SearchClient {
 
     public abstract ArgusStats fetchArgusStats(
         int accountId, long startMs, long endMs, Boolean atlasTrafficFilter);
+
+    /**
+     * Time-ranged replacement for UserAnalysisDataDao's lifetime-total read — sums input/output
+     * tokens per (serviceId, deviceId) within [startMs, endMs). Only id/totalInputTokens/
+     * totalOutputTokens are populated; topic/summary fields are cron-computed elsewhere.
+     */
+    public abstract List<UserAnalysisData> fetchUserAnalysisTokenTotals(
+        int accountId, long startMs, long endMs);
 
     public abstract List<Map<String, Object>> fetchTraceDetail(
         int accountId, String traceId, Boolean atlasTrafficFilter);
