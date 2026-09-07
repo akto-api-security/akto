@@ -25,7 +25,6 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -114,12 +113,11 @@ public class LLMObservabilityAction extends UserAction {
             SearchClient.SessionsResult result = client.fetchSessions(
                 accountId, startMs(), endMs(), searchString,
                 buildMultiFilters(true), resolveContextAtlasFilter(),
-                sessionsLimit, sessionsAfterKey);
+                sessionsLimit, sessionsAfterKey, isCallerAdmin());
 
             sessions      = result.sessions;
             nextAfterKey  = result.nextAfterKey;
             totalSessions = result.totalSessions;
-            if (!isCallerAdmin()) sessions = withoutPromptContent(sessions);
         } catch (Exception e) {
             logger.error("fetchSessions error: " + e.getMessage());
             sessions = new ArrayList<>();
@@ -135,7 +133,6 @@ public class LLMObservabilityAction extends UserAction {
 
             messages = client.fetchMessages(accountId, startMs(), endMs(),
                 buildMultiFilters(true), resolveContextAtlasFilter());
-            if (!isCallerAdmin()) messages = withoutPromptContent(messages);
         } catch (Exception e) {
             logger.error("fetchMessages error: " + e.getMessage());
             messages = new ArrayList<>();
@@ -182,7 +179,7 @@ public class LLMObservabilityAction extends UserAction {
             // Argus view always reports non-Atlas (agent) traffic so the total here matches
             // what the Argus paginated table reports; "false" also covers docs that predate
             // this field and were never Atlas-tagged.
-            SearchClient.ArgusStats stats = client.fetchArgusStats(accountId, startMs(), endMs(), Boolean.FALSE);
+            SearchClient.ArgusStats stats = client.fetchArgusStats(accountId, startMs(), endMs(), Boolean.FALSE, isCallerAdmin());
 
             aggTotalSpans   = stats.totalSpans;
             aggInputTokens  = stats.inputTokens;
@@ -193,7 +190,6 @@ public class LLMObservabilityAction extends UserAction {
             aggTraceSpark   = stats.traceSpark;
             aggTokenSpark   = stats.tokenSpark;
             aggTraceSparkTs = stats.traceSparkTs;
-            if (!isCallerAdmin()) aggTopTraces = withoutPromptContent(aggTopTraces);
         } catch (Exception e) {
             logger.error("fetchArgusStats error: " + e.getMessage());
         }
@@ -211,7 +207,6 @@ public class LLMObservabilityAction extends UserAction {
 
             Boolean atlasFilter = CONTEXT_SOURCE.ENDPOINT.equals(Context.contextSource.get()) ? Boolean.TRUE : null;
             spans = client.fetchTraceDetail(accountId, traceId, atlasFilter);
-            if (!isCallerAdmin()) spans = withoutPromptContent(spans);
         } catch (Exception e) {
             spans = new ArrayList<>();
         }
@@ -244,11 +239,10 @@ public class LLMObservabilityAction extends UserAction {
             SearchClient.SearchResult result = client.searchPrompts(
                 accountId, startMs(), endMs(), skip, Math.min(limit, 100),
                 sortKey, sortOrder == -1, searchAfterJson,
-                buildMultiFilters(true), resolveContextAtlasFilter(), searchString);
+                buildMultiFilters(true), resolveContextAtlasFilter(), searchString, isCallerAdmin());
 
             prompts = result.hits;
             total   = result.total;
-            if (!isCallerAdmin()) prompts = withoutPromptContent(prompts);
         } catch (Exception e) {
             prompts = new ArrayList<>();
             total   = 0;
@@ -257,7 +251,7 @@ public class LLMObservabilityAction extends UserAction {
     }
 
     // ── Prompt content access ─────────────────────────────────────────────────
-    // Payloads are admin-only, enforced here so the UI check cannot be bypassed from the browser.
+    // Payloads are admin-only; the flag is passed to the SearchClient so they are never queried.
 
     /** Fails closed: anything that stops us resolving the role counts as non-admin. */
     private boolean isCallerAdmin() {
@@ -269,20 +263,6 @@ public class LLMObservabilityAction extends UserAction {
             callerAdmin = false;
         }
         return callerAdmin;
-    }
-
-    /** Copies rows without the payload fields; token/duration/topic fields are untouched. */
-    private List<Map<String, Object>> withoutPromptContent(List<Map<String, Object>> rows) {
-        List<Map<String, Object>> out = new ArrayList<>();
-        if (rows == null) return out;
-        for (Map<String, Object> row : rows) {
-            if (row == null) continue;
-            Map<String, Object> copy = new LinkedHashMap<>(row);
-            copy.remove(AgentQueryRecord.F_QUERY_PAYLOAD);
-            copy.remove(AgentQueryRecord.F_RESPONSE_PAYLOAD);
-            out.add(copy);
-        }
-        return out;
     }
 
     // ── Prompt content reveal ─────────────────────────────────────────────────

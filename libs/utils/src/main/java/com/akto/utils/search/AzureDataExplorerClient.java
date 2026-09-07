@@ -105,7 +105,7 @@ public class AzureDataExplorerClient extends SearchClient {
     @Override
     public SessionsResult fetchSessions(int accountId, long startMs, long endMs, String searchString,
                                          Map<String, List<String>> filters, Boolean atlasTrafficFilter,
-                                         int sessionsLimit, String sessionsAfterKey) {
+                                         int sessionsLimit, String sessionsAfterKey, boolean includePromptContent) {
         List<Map<String, Object>> sessions = new ArrayList<>();
         String nextAfterKey = null;
         long totalSessions = 0;
@@ -146,7 +146,7 @@ public class AzureDataExplorerClient extends SearchClient {
                 }
             }
 
-            attachFilteredFirstHit(where, groupField, rows.keySet(), rows);
+            attachFilteredFirstHit(where, groupField, rows.keySet(), rows, includePromptContent);
             attachTopicHierarchy(where, groupField, rows.keySet(), rows);
 
             List<Map<String, Object>> allSessions = new ArrayList<>(rows.values());
@@ -266,7 +266,7 @@ public class AzureDataExplorerClient extends SearchClient {
      * share one summarize, so this runs as a second, id-scoped query (bounded by rows.keySet()).
      */
     private void attachFilteredFirstHit(String where, String groupField, java.util.Collection<String> groupKeys,
-                                         Map<String, Map<String, Object>> rows) {
+                                         Map<String, Map<String, Object>> rows, boolean includePromptContent) {
         if (groupKeys.isEmpty()) return;
         String llmShapedPredicate =
             "(" + AgentQueryRecord.F_RESPONSE_PAYLOAD + " contains 'model' or "
@@ -275,8 +275,9 @@ public class AzureDataExplorerClient extends SearchClient {
             + AgentQueryRecord.F_QUERY_PAYLOAD + " !contains 'tools/call'))";
         String kql = ADX_TABLE + " | where " + where + " and " + groupField + " in (" + quotedList(new ArrayList<>(groupKeys)) + ")"
             + " and " + llmShapedPredicate
-            + " | summarize arg_min(" + AgentQueryRecord.F_TIMESTAMP + ", " + AgentQueryRecord.F_QUERY_PAYLOAD + ", "
-            + AgentQueryRecord.F_RESPONSE_PAYLOAD + ", " + AgentQueryRecord.F_SERVICE_ID + ", "
+            + " | summarize arg_min(" + AgentQueryRecord.F_TIMESTAMP + ", "
+            + (includePromptContent ? AgentQueryRecord.F_QUERY_PAYLOAD + ", " + AgentQueryRecord.F_RESPONSE_PAYLOAD + ", " : "")
+            + AgentQueryRecord.F_SERVICE_ID + ", "
             + AgentQueryRecord.F_USER_NAME + ", " + AgentQueryRecord.F_DEVICE_ID + ") by " + groupField;
 
         KustoResultSetTable rs = query(kql);
@@ -285,8 +286,10 @@ public class AzureDataExplorerClient extends SearchClient {
             String key = rs.getString(groupField);
             Map<String, Object> row = rows.get(key);
             if (row == null) continue;
-            row.put(AgentQueryRecord.F_QUERY_PAYLOAD,    rs.getString(AgentQueryRecord.F_QUERY_PAYLOAD));
-            row.put(AgentQueryRecord.F_RESPONSE_PAYLOAD, rs.getString(AgentQueryRecord.F_RESPONSE_PAYLOAD));
+            if (includePromptContent) {
+                row.put(AgentQueryRecord.F_QUERY_PAYLOAD,    rs.getString(AgentQueryRecord.F_QUERY_PAYLOAD));
+                row.put(AgentQueryRecord.F_RESPONSE_PAYLOAD, rs.getString(AgentQueryRecord.F_RESPONSE_PAYLOAD));
+            }
             row.put(AgentQueryRecord.F_SERVICE_ID,       rs.getString(AgentQueryRecord.F_SERVICE_ID));
             row.put(AgentQueryRecord.F_USER_NAME,        rs.getString(AgentQueryRecord.F_USER_NAME));
             row.put(AgentQueryRecord.F_DEVICE_ID,        rs.getString(AgentQueryRecord.F_DEVICE_ID));
@@ -445,7 +448,7 @@ public class AzureDataExplorerClient extends SearchClient {
     // ── Argus aggregated stats ────────────────────────────────────────────────────
 
     @Override
-    public ArgusStats fetchArgusStats(int accountId, long startMs, long endMs, Boolean atlasTrafficFilter) {
+    public ArgusStats fetchArgusStats(int accountId, long startMs, long endMs, Boolean atlasTrafficFilter, boolean includePromptContent) {
         long aggTotalSpans = 0, aggInputTokens = 0, aggOutputTokens = 0;
         List<Map<String, Object>> aggTopApps = new ArrayList<>();
         List<Map<String, Object>> aggAppBreakdown = new ArrayList<>();
@@ -496,8 +499,9 @@ public class AzureDataExplorerClient extends SearchClient {
 
             String tracesKql = ADX_TABLE + " | where " + where + " and isnotempty(" + AgentQueryRecord.F_TRACE_ID + ")"
                 + " | summarize sumIn=sum(" + AgentQueryRecord.F_INPUT_TOKENS + "), sumOut=sum(" + AgentQueryRecord.F_OUTPUT_TOKENS + "),"
-                + " arg_min(" + AgentQueryRecord.F_TIMESTAMP + ", " + AgentQueryRecord.F_QUERY_PAYLOAD + ", "
-                + AgentQueryRecord.F_RESPONSE_PAYLOAD + ", " + AgentQueryRecord.F_SERVICE_ID + ") by " + AgentQueryRecord.F_TRACE_ID
+                + " arg_min(" + AgentQueryRecord.F_TIMESTAMP + ", "
+                + (includePromptContent ? AgentQueryRecord.F_QUERY_PAYLOAD + ", " + AgentQueryRecord.F_RESPONSE_PAYLOAD + ", " : "")
+                + AgentQueryRecord.F_SERVICE_ID + ") by " + AgentQueryRecord.F_TRACE_ID
                 + " | top " + TOP_N_APPS_TRACES + " by sumIn desc";
             KustoResultSetTable tracesRs = query(tracesKql);
             if (tracesRs != null) {
@@ -508,8 +512,10 @@ public class AzureDataExplorerClient extends SearchClient {
                     row.put(AgentQueryRecord.F_TRACE_ID, tid);
                     row.put(AgentQueryRecord.F_INPUT_TOKENS, tracesRs.getLong("sumIn"));
                     row.put(AgentQueryRecord.F_OUTPUT_TOKENS, tracesRs.getLong("sumOut"));
-                    row.put(AgentQueryRecord.F_QUERY_PAYLOAD,    tracesRs.getString(AgentQueryRecord.F_QUERY_PAYLOAD));
-                    row.put(AgentQueryRecord.F_RESPONSE_PAYLOAD, tracesRs.getString(AgentQueryRecord.F_RESPONSE_PAYLOAD));
+                    if (includePromptContent) {
+                        row.put(AgentQueryRecord.F_QUERY_PAYLOAD,    tracesRs.getString(AgentQueryRecord.F_QUERY_PAYLOAD));
+                        row.put(AgentQueryRecord.F_RESPONSE_PAYLOAD, tracesRs.getString(AgentQueryRecord.F_RESPONSE_PAYLOAD));
+                    }
                     row.put(AgentQueryRecord.F_SERVICE_ID,       tracesRs.getString(AgentQueryRecord.F_SERVICE_ID));
                     aggTopTraces.add(row);
                 }
@@ -674,7 +680,8 @@ public class AzureDataExplorerClient extends SearchClient {
     @Override
     public SearchResult searchPrompts(int accountId, long startMs, long endMs, int skip, int limit,
                                        String sortKey, boolean sortAsc, String searchAfterJson,
-                                       Map<String, List<String>> filters, Boolean atlasTrafficFilter, String searchString) {
+                                       Map<String, List<String>> filters, Boolean atlasTrafficFilter, String searchString,
+                                       boolean includePromptContent) {
         if (!isConfigured()) return new SearchResult(new ArrayList<>(), 0);
         try {
             String where = buildWhereConditions(accountId, startMs, endMs, filters, atlasTrafficFilter)
@@ -707,6 +714,10 @@ public class AzureDataExplorerClient extends SearchClient {
                 + " | order by " + sortField + (sortAsc ? " asc" : " desc"));
             if (skipAmount > 0) kql.append(" | serialize | extend rn_=row_number() | where rn_ > ").append(skipAmount);
             kql.append(" | take ").append(cappedLimit);
+            if (!includePromptContent) {
+                kql.append(" | project-away ").append(AgentQueryRecord.F_QUERY_PAYLOAD)
+                   .append(", ").append(AgentQueryRecord.F_RESPONSE_PAYLOAD);
+            }
 
             List<Map<String, Object>> hits = queryRows(kql.toString());
             return new SearchResult(hits, total);
