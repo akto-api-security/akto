@@ -1,7 +1,12 @@
 package com.akto.action.monitoring;
 
 import com.akto.action.UserAction;
+import com.akto.audit_logs_util.Audit;
+import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.RBAC.Role;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
@@ -35,13 +40,13 @@ public class LLMObservabilityAction extends UserAction {
     @Setter private int          limit       = 20;
     @Setter private String       sortKey     = AgentQueryRecord.F_TIMESTAMP;
     @Setter private int          sortOrder   = 1;
-    @Setter private String       traceId;
+    @Getter @Setter private String       traceId;
     @Setter private String       searchAfterJson;
     @Setter private String       sessionsAfterKey;
     @Setter private int          sessionsLimit    = 20;
 
     // Single-value fields kept for backward-compat (session drill-down in SessionsView)
-    @Setter private String       sessionId;
+    @Getter @Setter private String       sessionId;
     @Setter private String       userName;
     @Setter private String       deviceId;
     @Setter private String       serviceId;
@@ -99,7 +104,7 @@ public class LLMObservabilityAction extends UserAction {
             SearchClient.SessionsResult result = client.fetchSessions(
                 accountId, startMs(), endMs(), searchString,
                 buildMultiFilters(true), resolveContextAtlasFilter(),
-                sessionsLimit, sessionsAfterKey);
+                sessionsLimit, sessionsAfterKey, isUserRoleAdmin());
 
             sessions      = result.sessions;
             nextAfterKey  = result.nextAfterKey;
@@ -111,6 +116,10 @@ public class LLMObservabilityAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User viewed prompt content in Traces",
+           resource = Resource.TRACES_CONTENT,
+           operation = Operation.READ,
+           metadataGenerators = {"getSessionId"})
     public String fetchMessages() {
         try {
             SearchClient client = SearchClientFactory.instance();
@@ -165,7 +174,7 @@ public class LLMObservabilityAction extends UserAction {
             // Argus view always reports non-Atlas (agent) traffic so the total here matches
             // what the Argus paginated table reports; "false" also covers docs that predate
             // this field and were never Atlas-tagged.
-            SearchClient.ArgusStats stats = client.fetchArgusStats(accountId, startMs(), endMs(), Boolean.FALSE);
+            SearchClient.ArgusStats stats = client.fetchArgusStats(accountId, startMs(), endMs(), Boolean.FALSE, isUserRoleAdmin());
 
             aggTotalSpans   = stats.totalSpans;
             aggInputTokens  = stats.inputTokens;
@@ -184,6 +193,10 @@ public class LLMObservabilityAction extends UserAction {
 
     // ── Spans for a single message/trace ──────────────────────────────────────
 
+    @Audit(description = "User viewed prompt content in Traces",
+           resource = Resource.TRACES_CONTENT,
+           operation = Operation.READ,
+           metadataGenerators = {"getTraceId"})
     public String fetchTraceDetail() {
         try {
             SearchClient client = SearchClientFactory.instance();
@@ -225,7 +238,7 @@ public class LLMObservabilityAction extends UserAction {
             SearchClient.SearchResult result = client.searchPrompts(
                 accountId, startMs(), endMs(), skip, Math.min(limit, 100),
                 sortKey, sortOrder == -1, searchAfterJson,
-                buildMultiFilters(true), resolveContextAtlasFilter(), searchString);
+                buildMultiFilters(true), resolveContextAtlasFilter(), searchString, isUserRoleAdmin());
 
             prompts = result.hits;
             total   = result.total;
@@ -234,6 +247,10 @@ public class LLMObservabilityAction extends UserAction {
             total   = 0;
         }
         return SUCCESS.toUpperCase();
+    }
+
+    private boolean isUserRoleAdmin() {
+        return RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get()) == Role.ADMIN;
     }
 
     // ── Shared helpers ────────────────────────────────────────────────────────

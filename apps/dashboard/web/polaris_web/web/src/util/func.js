@@ -11,6 +11,7 @@ import { current } from 'immer';
 import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
+import { categoryToShortName, getDashboardCategory } from '../apps/main/labelHelper';
 
 import { circle_cancel, circle_tick_minor, car_icon } from "@/apps/dashboard/components/icons";
 import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
@@ -2306,6 +2307,10 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
 
   hasThreatAccess(){
     return !['MEMBER', 'DEVELOPER', 'GUEST', 'NO_ACCESS'].includes(window.USER_ROLE)
+  },
+  isUserAdmin(){
+    const scopeRole = window.SCOPE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]]
+    return (scopeRole || window.USER_ROLE) === 'ADMIN'
   },
   checkUserValidForIntegrations(){
     const rbacAccess = this.checkForRbacFeatureBasic();

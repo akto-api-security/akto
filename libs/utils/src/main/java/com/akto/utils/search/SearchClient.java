@@ -47,7 +47,7 @@ public abstract class SearchClient {
     public abstract SessionsResult fetchSessions(
         int accountId, long startMs, long endMs, String searchString,
         Map<String, List<String>> filters, Boolean atlasTrafficFilter,
-        int sessionsLimit, String sessionsAfterKey);
+        int sessionsLimit, String sessionsAfterKey, boolean includeTracesContent);
 
     public abstract List<Map<String, Object>> fetchMessages(
         int accountId, long startMs, long endMs,
@@ -58,7 +58,7 @@ public abstract class SearchClient {
         Map<String, List<String>> filters, Boolean atlasTrafficFilter);
 
     public abstract ArgusStats fetchArgusStats(
-        int accountId, long startMs, long endMs, Boolean atlasTrafficFilter);
+        int accountId, long startMs, long endMs, Boolean atlasTrafficFilter, boolean includeTracesContent);
 
     public abstract List<Map<String, Object>> fetchTraceDetail(
         int accountId, String traceId, Boolean atlasTrafficFilter);
@@ -69,7 +69,8 @@ public abstract class SearchClient {
     public abstract SearchResult searchPrompts(
         int accountId, long startMs, long endMs, int skip, int limit,
         String sortKey, boolean sortAsc, String searchAfterJson,
-        Map<String, List<String>> filters, Boolean atlasTrafficFilter, String searchString);
+        Map<String, List<String>> filters, Boolean atlasTrafficFilter, String searchString,
+        boolean includeTracesContent);
 
     /** Used by UserAnalysisCron to fetch not-yet-topic-classified records. */
     public abstract void scrollQueryData(int accountId, long startTsMs, long endTsMs,

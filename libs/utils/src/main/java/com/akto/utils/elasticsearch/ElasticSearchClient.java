@@ -96,7 +96,7 @@ public class ElasticSearchClient extends SearchClient {
     @Override
     public SessionsResult fetchSessions(int accountId, long startMs, long endMs, String searchString,
                                          Map<String, List<String>> filters, Boolean atlasTrafficFilter,
-                                         int sessionsLimit, String sessionsAfterKey) {
+                                         int sessionsLimit, String sessionsAfterKey, boolean includeTracesContent) {
         List<Map<String, Object>> sessions = new ArrayList<>();
         String nextAfterKey = null;
         long totalSessions = 0;
@@ -105,6 +105,13 @@ public class ElasticSearchClient extends SearchClient {
             JSONObject filteredQuery = buildQuery(accountId, startMs, endMs, filters, searchString, atlasTrafficFilter);
             filteredQuery.getJSONObject("bool").getJSONArray("must")
                 .put(new JSONObject().put("exists", new JSONObject().put("field", AgentQueryRecord.F_SESSION_IDENTIFIER)));
+
+            JSONArray sessionHitSource = new JSONArray();
+            if (includeTracesContent) {
+                sessionHitSource.put(AgentQueryRecord.F_QUERY_PAYLOAD).put(AgentQueryRecord.F_RESPONSE_PAYLOAD);
+            }
+            sessionHitSource.put(AgentQueryRecord.F_SERVICE_ID).put(AgentQueryRecord.F_USER_NAME)
+                .put(AgentQueryRecord.F_DEVICE_ID).put(AgentQueryRecord.F_SESSION_IDENTIFIER);
 
             JSONObject subAggs = new JSONObject()
                 .put(KEY_LATEST_TS,   new JSONObject().put("max", new JSONObject().put("field", AgentQueryRecord.F_TIMESTAMP)))
@@ -160,13 +167,7 @@ public class ElasticSearchClient extends SearchClient {
                     .put("aggs", new JSONObject().put("hit", new JSONObject().put("top_hits", new JSONObject()
                         .put("size", 1)
                         .put("sort", new JSONArray().put(new JSONObject().put(AgentQueryRecord.F_TIMESTAMP, new JSONObject().put("order", "asc"))))
-                        .put("_source", new JSONArray()
-                            .put(AgentQueryRecord.F_QUERY_PAYLOAD)
-                            .put(AgentQueryRecord.F_RESPONSE_PAYLOAD)
-                            .put(AgentQueryRecord.F_SERVICE_ID)
-                            .put(AgentQueryRecord.F_USER_NAME)
-                            .put(AgentQueryRecord.F_DEVICE_ID)
-                            .put(AgentQueryRecord.F_SESSION_IDENTIFIER))))));
+                        .put("_source", sessionHitSource)))));
 
             if (sessionsLimit > 0) {
                 // ── Paginated path: terms agg sorted by latest activity globally ──────
@@ -402,7 +403,7 @@ public class ElasticSearchClient extends SearchClient {
     // ── Argus aggregated stats (total spans + token sums + top apps/traces + sparklines) ──
 
     @Override
-    public ArgusStats fetchArgusStats(int accountId, long startMs, long endMs, Boolean atlasTrafficFilter) {
+    public ArgusStats fetchArgusStats(int accountId, long startMs, long endMs, Boolean atlasTrafficFilter, boolean includeTracesContent) {
         long aggTotalSpans = 0, aggInputTokens = 0, aggOutputTokens = 0;
         List<Map<String, Object>> aggTopApps = new ArrayList<>();
         List<Map<String, Object>> aggAppBreakdown = new ArrayList<>();
@@ -439,6 +440,12 @@ public class ElasticSearchClient extends SearchClient {
             long argusHistStart  = argusDataMaxMs - 12L * argusIntervalMs;
             String fixedInterval = argusIntervalMs + "ms";
 
+            JSONArray traceHitSource = new JSONArray();
+            if (includeTracesContent) {
+                traceHitSource.put(AgentQueryRecord.F_QUERY_PAYLOAD).put(AgentQueryRecord.F_RESPONSE_PAYLOAD);
+            }
+            traceHitSource.put(AgentQueryRecord.F_SERVICE_ID).put(AgentQueryRecord.F_TRACE_ID);
+
             JSONObject aggs = new JSONObject()
                 .put(AGG_TOTAL_SPANS,         new JSONObject().put("value_count", new JSONObject().put("field", AgentQueryRecord.F_TIMESTAMP)))
                 .put(AGG_TOTAL_INPUT_TOKENS,  sumAgg(AgentQueryRecord.F_INPUT_TOKENS))
@@ -458,11 +465,7 @@ public class ElasticSearchClient extends SearchClient {
                         .put(AGG_FIRST_HIT, new JSONObject().put("top_hits", new JSONObject()
                             .put("size", 1)
                             .put("sort", new JSONArray().put(new JSONObject().put(AgentQueryRecord.F_TIMESTAMP, new JSONObject().put("order", "asc"))))
-                            .put("_source", new JSONArray()
-                                .put(AgentQueryRecord.F_QUERY_PAYLOAD)
-                                .put(AgentQueryRecord.F_RESPONSE_PAYLOAD)
-                                .put(AgentQueryRecord.F_SERVICE_ID)
-                                .put(AgentQueryRecord.F_TRACE_ID))))))
+                            .put("_source", traceHitSource)))))
                 .put(AGG_TRACE_SPARK, new JSONObject()
                     .put("date_histogram", new JSONObject()
                         .put("field", AgentQueryRecord.F_TIMESTAMP)
@@ -663,7 +666,8 @@ public class ElasticSearchClient extends SearchClient {
     @Override
     public SearchResult searchPrompts(int accountId, long startMs, long endMs, int skip, int limit,
                                        String sortKey, boolean sortAsc, String searchAfterJson,
-                                       Map<String, List<String>> filters, Boolean atlasTrafficFilter, String searchString) {
+                                       Map<String, List<String>> filters, Boolean atlasTrafficFilter, String searchString,
+                                       boolean includeTracesContent) {
         if (!isConfigured()) return new SearchResult(new ArrayList<>(), 0);
         try {
             JSONArray searchAfter = null;
@@ -671,15 +675,15 @@ public class ElasticSearchClient extends SearchClient {
                 try { searchAfter = new JSONArray(searchAfterJson); } catch (Exception ignored) {}
             }
             JSONObject query = buildQuery(accountId, startMs, endMs, filters, searchString, atlasTrafficFilter);
-            return executeSearch(query, skip, Math.min(limit, 100), toEsField(sortKey), sortAsc, searchAfter);
+            return executeSearch(query, skip, Math.min(limit, 100), toEsField(sortKey), sortAsc, searchAfter, includeTracesContent);
         } catch (Exception e) {
             logger.error("searchPrompts error for accountId=" + accountId + ": " + e.getMessage());
             return new SearchResult(new ArrayList<>(), 0);
         }
     }
 
-    private SearchResult executeSearch(JSONObject query, int skip, int limit,
-                                        String sortField, boolean sortAsc, JSONArray searchAfter) throws JSONException {
+    private SearchResult executeSearch(JSONObject query, int skip, int limit, String sortField, boolean sortAsc,
+                                        JSONArray searchAfter, boolean includeTracesContent) throws JSONException {
         String sortDir = sortAsc ? "asc" : "desc";
         String resolvedSort = (sortField != null && !sortField.isEmpty()) ? sortField : AgentQueryRecord.F_TIMESTAMP;
 
@@ -688,6 +692,11 @@ public class ElasticSearchClient extends SearchClient {
             .put("sort", new JSONArray().put(new JSONObject().put(resolvedSort, new JSONObject().put("order", sortDir))))
             .put("size", limit)
             .put("track_total_hits", true);
+
+        if (!includeTracesContent) {
+            body.put("_source", new JSONObject().put("excludes", new JSONArray()
+                .put(AgentQueryRecord.F_QUERY_PAYLOAD).put(AgentQueryRecord.F_RESPONSE_PAYLOAD)));
+        }
 
         if (searchAfter != null && searchAfter.length() > 0) {
             body.put("search_after", searchAfter);
