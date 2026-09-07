@@ -341,6 +341,29 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         return options.sort((a, b) => a.label.localeCompare(b.label));
     }, [agenticUsers]);
 
+    // Maps each selectable value in availableDevices (a device id, or a username for a
+    // device-less row) back to the identity that owns it. fetchAgenticUsers already gives us each
+    // identity's userEmail/userId — building this here lets a save send the exact identity behind
+    // a selection instead of leaving the backend to re-derive it by guessing at a raw string.
+    const deviceValueToIdentity = useMemo(() => {
+        const map = new Map();
+        (agenticUsers || []).forEach(u => {
+            if (!u) return;
+            const identity = { userName: u.userName || null, userEmail: u.userEmail || null, userId: u.userId || null };
+            const devices = (u.devices || []).filter(Boolean);
+            if (devices.length === 0) {
+                const name = u.userName || u.userEmail;
+                if (name) map.set(name, identity);
+                return;
+            }
+            devices.forEach(deviceId => {
+                if (!deviceId) return;
+                map.set(deviceId, identity);
+            });
+        });
+        return map;
+    }, [agenticUsers]);
+
     // Flatten agenticUsers[].devices into per-device rows, then filter by the same
     // AND-across-type / OR-within-type semantics used server-side to resolve applyToDeviceIds —
     // this is what powers the live "applies to N devices" preview in the wizard.
@@ -1083,6 +1106,17 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     Object.entries(targetTags).filter(([, values]) => (values || []).length > 0)
                 ),
                 targetDeviceIds: applyToAllUsers ? [] : targetDeviceIds,
+                // Identities behind the selected targets, deduped by userId (falling back to
+                // userName when an identity has no userId) — resolved here since we already have
+                // the email/userId loaded, rather than making the backend guess it from raw values.
+                userMetadata: applyToAllUsers ? [] : Array.from(
+                    new Map(
+                        targetDeviceIds
+                            .map(value => deviceValueToIdentity.get(value))
+                            .filter(Boolean)
+                            .map(identity => [identity.userId || identity.userName, identity])
+                    ).values()
+                ),
                 enterpriseLicenseComplianceCategories,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };

@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -289,6 +290,31 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         // Both dimensions given — a device must satisfy the tag match AND be explicitly picked.
         tagDeviceIds.retainAll(new HashSet<>(deviceIds));
         return new ArrayList<>(tagDeviceIds);
+    }
+
+    /**
+     * Resolves guardrail target selections to their authoritative agent_users doc(s). The
+     * dashboard already knows each selected identity's userId/userName (from fetchAgenticUsers,
+     * round-tripped by CreateGuardrailPage), so matching happens on those exact identifiers rather
+     * than re-deriving identity from a raw device id/username string. A selection backed only by a
+     * synthetic, never-persisted row (module_info reporting a device with no agent_users doc)
+     * naturally resolves to nothing here.
+     */
+    public List<AgenticUsers> findByUserIdsOrUserNames(Collection<String> userIds, Collection<String> userNames) {
+        List<Bson> conditions = new ArrayList<>();
+        List<String> ids = filterBlank(userIds);
+        List<String> names = filterBlank(userNames);
+        if (!ids.isEmpty()) conditions.add(Filters.in(AgenticUsers.USER_ID, ids));
+        if (!names.isEmpty()) conditions.add(Filters.in(AgenticUsers.USER_NAME, names));
+        if (conditions.isEmpty()) return new ArrayList<>();
+
+        Bson filter = conditions.size() == 1 ? conditions.get(0) : Filters.or(conditions);
+        return instance.findAll(filter);
+    }
+
+    private static List<String> filterBlank(Collection<String> values) {
+        if (values == null) return Collections.emptyList();
+        return values.stream().filter(v -> v != null && !v.trim().isEmpty()).collect(Collectors.toList());
     }
 
     @Override

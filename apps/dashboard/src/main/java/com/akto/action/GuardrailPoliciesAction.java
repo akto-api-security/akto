@@ -2,6 +2,7 @@ package com.akto.action;
 
 import com.akto.dao.AgentUsersDao;
 import com.akto.dao.GuardrailPoliciesDao;
+import com.akto.dto.AgenticUsers;
 import com.akto.dto.EnterpriseLicenseComplianceCatalog;
 import com.akto.dao.context.Context;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
@@ -236,6 +237,25 @@ public class GuardrailPoliciesAction extends UserAction {
             
             EnterpriseLicenseComplianceCatalog.applyToPolicy(policy);
 
+            // The UI sends the identity (userId, falling back to userName) behind each selected
+            // target — it already has this from fetchAgenticUsers, so re-derive nothing from raw
+            // device id/username strings here. Re-fetch the authoritative doc(s) from AgentUsersDao
+            // fresh on every save; a client-asserted identity that isn't actually in agent_users
+            // (e.g. a synthetic, never-persisted row) resolves to nothing.
+            List<String> targetUserIds = new ArrayList<>();
+            List<String> targetUserNames = new ArrayList<>();
+            if (policy.getUserMetadata() != null) {
+                for (AgenticUsers identity : policy.getUserMetadata()) {
+                    if (identity == null) continue;
+                    if (StringUtils.isNotBlank(identity.getUserId())) {
+                        targetUserIds.add(identity.getUserId());
+                    } else if (StringUtils.isNotBlank(identity.getUserName())) {
+                        targetUserNames.add(identity.getUserName());
+                    }
+                }
+            }
+            policy.setUserMetadata(AgentUsersDao.instance.findByUserIdsOrUserNames(targetUserIds, targetUserNames));
+
             List<Bson> updates = buildPolicyUpdates(policy, contextSource);
 
             // Only set createdBy and createdTimestamp on insert
@@ -369,6 +389,9 @@ public class GuardrailPoliciesAction extends UserAction {
         if (p.getTargetTags() != null) {
             updates.add(Updates.set("targetTags", p.getTargetTags()));
         }
+        // Always set (never conditional): computed fresh from targetDeviceIds right before this
+        // call, so it must overwrite any stale snapshot from a previous save.
+        updates.add(Updates.set("userMetadata", p.getUserMetadata()));
         updates.add(Updates.set("blockPersonalAccounts", p.isBlockPersonalAccounts()));
         if (StringUtils.isNotBlank(p.getBehaviour())) {
             updates.add(Updates.set("behaviour", p.getBehaviour()));
