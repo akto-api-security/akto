@@ -11,6 +11,12 @@ export { OsIcon };
 
 const DASH = "-";
 
+export const NO_ACCESS_MESSAGE = "Please contact your administrator to get access.";
+
+export const lockedRowStyle = () => (func.isUserAdmin()
+    ? { cursor: "pointer" }
+    : { cursor: "default", color: "var(--p-color-text-subdued, #6D7175)" });
+
 function modelDomain(model) {
     if (!model) return null;
     const m = model.toLowerCase();

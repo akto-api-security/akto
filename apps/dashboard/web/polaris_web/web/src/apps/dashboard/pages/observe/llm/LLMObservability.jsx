@@ -20,6 +20,7 @@ import SessionsView from "./SessionsView";
 import SessionFlyout from "./SessionFlyout";
 import ArgusTraceFlyout from "./ArgusTraceFlyout";
 import MessagesView from "./MessagesView";
+import { NO_ACCESS_MESSAGE } from "./LLMCellRenderers";
 import { fetchGuardrailPolicyNamesCached } from "../../guardrails/topicGuardrailUtils";
 import { CATEGORY_ENDPOINT_SECURITY, CATEGORY_AGENTIC_SECURITY } from "../../../../main/labelHelper";
 
@@ -72,7 +73,7 @@ export default function LLMObservability() {
     useEffect(() => {
         if (!initialTraceId) return;
         setDashboardCategory(CATEGORY_AGENTIC_SECURITY);
-        if (!func.isUserAdmin()) return;
+        if (!func.isUserAdmin()) { func.setToast(true, true, NO_ACCESS_MESSAGE); return; }
         setPendingReveal({ open: () => setSelectedTrace({ traceId: initialTraceId }), traceId: initialTraceId });
     }, [initialTraceId, setDashboardCategory]);
 
@@ -109,12 +110,12 @@ export default function LLMObservability() {
     }, [epochs, isArgus]);
 
     const openSession = useCallback((row) => {
-        if (!isAdmin) return;
+        if (!isAdmin) { func.setToast(true, true, NO_ACCESS_MESSAGE); return; }
         setPendingReveal({ open: () => setSelectedSession(row), sessionId: row?.sessionIdentifier });
     }, [isAdmin]);
 
     const openTrace = useCallback((row) => {
-        if (!isAdmin) return;
+        if (!isAdmin) { func.setToast(true, true, NO_ACCESS_MESSAGE); return; }
         setPendingReveal({ open: () => setSelectedTrace(row), traceId: row?.traceId, sessionId: row?.sessionIdentifier });
     }, [isAdmin]);
 

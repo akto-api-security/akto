@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import api from "./api";
-import func from "@/util/func";
+import { lockedRowStyle } from "./LLMCellRenderers";
 import { MESSAGE_FLAT_COLUMN_DEFS } from "./columns";
 
 // Messages tab — flat span-level rows, server-paginated via searchPrompts.
@@ -50,9 +50,7 @@ export default function MessagesView({ currDateRange, traceFilter, onRowClicked,
                 isServerMode={true}
                 onServerFetch={onServerFetch}
                 filterStateUrl={window.location.pathname + "/llm-messages"}
-                getRowStyle={() => (func.isUserAdmin()
-                    ? { cursor: "pointer" }
-                    : { cursor: "default", color: "var(--p-color-text-subdued, #6D7175)" })}
+                getRowStyle={lockedRowStyle}
                 onRowClicked={onRowClicked}
             />
         </>

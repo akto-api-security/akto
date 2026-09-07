@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import { SESSION_COLUMN_DEFS } from "./columns";
 import api from "./api";
-import func from "@/util/func";
+import { lockedRowStyle } from "./LLMCellRenderers";
 
 const DEFAULT_COL_DEF = { sortable: true, resizable: true, filter: false };
 
@@ -81,11 +81,6 @@ export default function SessionsView({ currDateRange, onOpenSession, initialFilt
         [onOpenSession]
     );
 
-    // Rows only open for admins — everyone else gets a muted, non-clickable row.
-    const getRowStyle = useCallback(() => (func.isUserAdmin()
-        ? { cursor: "pointer" }
-        : { cursor: "default", color: "var(--p-color-text-subdued, #6D7175)" }), []);
-
     // Re-key on date range change so AgGridTable remounts, resets its page to 0,
     // and triggers a fresh fetch with the new time window.
     const tableKey = `${currDateRange.period.since}~${currDateRange.period.until}`;
@@ -106,7 +101,7 @@ export default function SessionsView({ currDateRange, onOpenSession, initialFilt
             paginationPageSize={20}
             animateRows
             suppressCellFocus
-            getRowStyle={getRowStyle}
+            getRowStyle={lockedRowStyle}
             onRowClicked={handleRowClick}
             sideBar={{ toolPanels: ["columns", "filters"] }}
             onServerFetch={onServerFetch}
