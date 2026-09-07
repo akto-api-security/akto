@@ -36,6 +36,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -233,10 +234,20 @@ class HttpCallParserAtlasArgusTest {
         assertFalse(getHostNameToIdMap(parser).containsKey(host + "-agentic"));
     }
 
-    // case4 (fresh mixed collection actually forks on an agentic match) lives on the
-    // nayan/fix-apicollection-cache-sync branch - it depends on a fix not present here yet
-    // (apiCollectionsMap isn't updated immediately when createApiCollectionId creates a new
-    // collection, only hostNameToIdMap is, so a same-session follow-up request can't see it).
+    @Test
+    void case4_plainCollection_agenticMatch_forks() throws Exception {
+        grantSecurityTypeAgentic();
+        HttpCallParser parser = newParser();
+        String host = "case4-forks.akto.internal";
+
+        int normalId = parser.createApiCollectionId(normalRequest(host, "/api/users/1"));
+        int mcpId = parser.createApiCollectionId(mcpRequest(host, "/mcp", null));
+
+        assertNotEquals(normalId, mcpId, "agentic match on a clean mixed collection must fork");
+        Map<String, Integer> map = getHostNameToIdMap(parser);
+        assertTrue(map.containsKey(host + "-agentic"));
+        assertEquals((Integer) mcpId, map.get(host + "-agentic"));
+    }
 
     @Test
     void case5_alreadyTaggedCollection_neverReForks() throws Exception {
