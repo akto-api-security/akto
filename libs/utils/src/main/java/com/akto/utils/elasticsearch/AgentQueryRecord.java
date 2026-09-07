@@ -145,6 +145,7 @@ public class AgentQueryRecord {
 
         // Browser traffic must not take this branch: it derives device/user from a host id it
         // doesn't have that shape for, and returns null when it can't.
+        userName = getFirstHeader(headers, HEADER_PREFIX + HEADER_USER_EMAIL);
         if (isAtlasTraffic && !isBrowserExtensionTraffic) {
             String host = getFirstHeader(headers, "host");
             String[] parts = host != null ? host.split("\\.", 3) : new String[0];
@@ -153,20 +154,14 @@ public class AgentQueryRecord {
             if(serviceId.equals("ai-agent") && parts.length >=3){
                 serviceId = parts[2];
             }
-            if (deviceId == null) {
-                return null;
-            }
-            if (deviceUserMap != null && deviceUserMap.containsKey(deviceId)) {
-                userName = deviceUserMap.get(deviceId);
-            } else {
-                // Atlas endpoint agents without MCP_ENDPOINT_SHIELD registration (e.g. Claude Cowork OTLP)
-                // still carry user identity via installer headers from otel-ingestion-service.
-                userName = getFirstHeader(headers, HEADER_PREFIX + HEADER_USER_EMAIL);
-                if (userName == null || userName.isEmpty()) {
+            if(userName.isEmpty()){
+                if (deviceId == null) {
                     return null;
                 }
+                if (deviceUserMap != null && deviceUserMap.containsKey(deviceId) ) {
+                    userName = deviceUserMap.get(deviceId);
+                }    
             }
-
         } else if (isBrowserExtensionTraffic) {
             // Host id is <heartbeat name>.<browser>.<site>, so its first label keys deviceUserMap.
             String host = getFirstHeader(headers, "host");
@@ -178,9 +173,6 @@ public class AgentQueryRecord {
             // device id while the host id already says the email — so match on the email itself.
             if (userName == null || !userName.contains("@")) {
                 userName = userByEmailPrefix(deviceUserMap, moduleName);
-            }
-            if (userName == null || !userName.contains("@")) {
-                userName = getFirstHeader(headers, HEADER_PREFIX + HEADER_USER_EMAIL);
             }
             if (userName == null || !userName.contains("@")) {
                 userName = moduleName;
@@ -199,7 +191,6 @@ public class AgentQueryRecord {
         } else {
             serviceId = getFirstHeader(headers, "host");
             deviceId  = getFirstHeader(headers, HEADER_PREFIX + HEADER_DEVICE_ID);
-            userName  = getFirstHeader(headers, HEADER_PREFIX + HEADER_USER_EMAIL);
         }
 
         String traceId           = getFirstHeader(headers, HEADER_PREFIX + HEADER_TRACE_ID);
