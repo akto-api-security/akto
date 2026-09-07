@@ -105,6 +105,15 @@ public class GuardrailPolicies {
     @BsonIgnore
     private List<String> applyToDeviceIds;
 
+    // Snapshot of the agent_users doc(s) behind the selected targets. Inbound (from the UI): each
+    // entry carries just the identity (userId/userName) the UI already resolved via
+    // fetchAgenticUsers for a selected target — not a full doc. Outbound (after save): replaced
+    // with the authoritative doc(s) fetched from AgentUsersDao by that identity (see
+    // GuardrailPoliciesAction#createGuardrailPolicy), so the policy can be differentiated by user
+    // email downstream, not only by device id. Always re-resolved on save; empty means no selected
+    // target's identity matched a real agent_users doc (or no targeting is configured).
+    private List<AgenticUsers> userMetadata;
+
     // Blocked host/path list — any traffic from a listed host is blocked outright.
     // Modeled as objects (not bare strings) so the entry schema can be extended later
     // (e.g. match type, per-entry behaviour) without a data migration.
