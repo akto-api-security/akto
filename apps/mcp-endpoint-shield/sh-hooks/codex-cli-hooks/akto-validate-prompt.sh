@@ -14,7 +14,7 @@ LOGFILE="validate-prompt.log"
 akto_check_deps "$LOGFILE" || exit 0
 LOG_PAYLOADS="$(_akto_lower "${LOG_PAYLOADS:-false}")"
 
-MODE="$(_akto_lower "${MODE:-argus}")"
+MODE="$(_akto_lower "${MODE:-atlas}")"
 AKTO_DATA_INGESTION_URL="${AKTO_DATA_INGESTION_URL:-}"
 AKTO_DATA_INGESTION_URL="${AKTO_DATA_INGESTION_URL%/}"
 AKTO_TIMEOUT="${AKTO_TIMEOUT:-5}"

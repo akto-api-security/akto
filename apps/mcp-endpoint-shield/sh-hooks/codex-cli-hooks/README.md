@@ -82,7 +82,7 @@ export AKTO_DATA_INGESTION_URL="ingestion-service-url"
 export AKTO_API_TOKEN=""             # optional: sent as the Authorization header
 export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
-export MODE="argus"                  # argus (default) or atlas
+export MODE="atlas"                  # atlas (default) or argus
 export DEVICE_ID=""                  # optional, atlas mode / MCP mirroring only
 
 export LOG_DIR="~/.codex/akto/logs"  # optional
@@ -287,7 +287,7 @@ persisted to `akto_session_state.json` between hook invocations.
 | `AKTO_API_TOKEN` | (empty) | Sent as the `Authorization` header to `AKTO_DATA_INGESTION_URL` |
 | `AKTO_SYNC_MODE` | `true` | Synchronous guardrails mode for blocking hooks |
 | `AKTO_TIMEOUT` | `5` | Timeout in seconds for the guardrails/ingestion HTTP call |
-| `MODE` | `argus` | Operation mode: `argus` or `atlas` |
+| `MODE` | `atlas` | Operation mode: `argus` or `atlas` |
 | `DEVICE_ID` | (auto-generated) | Device id used in `atlas`-mode hostnames and in every MCP mirror host |
 | `OPENAI_BASE_URL` | (unset) | If set, used to derive the mirrored Codex API host (`argus` mode, non-MCP only) |
 | `OPENAI_API_KEY` | (unset) | If set (and `OPENAI_BASE_URL` isn't), mirrored host becomes `api.openai.com` |

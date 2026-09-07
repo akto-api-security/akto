@@ -43,7 +43,7 @@ export AKTO_DATA_INGESTION_URL="ingestion-service-url"
 export AKTO_API_TOKEN=""             # optional: sent as the Authorization header
 export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
-export MODE="argus"                  # argus (default) or atlas
+export MODE="atlas"                  # atlas (default) or argus
 export DEVICE_ID=""                  # optional, atlas mode / MCP mirroring only
 
 export LOG_DIR="~/.claude/akto/logs" # optional
@@ -223,7 +223,7 @@ hook invocations.
 | `AKTO_API_TOKEN` | (empty) | Sent as the `Authorization` header to `AKTO_DATA_INGESTION_URL` |
 | `AKTO_SYNC_MODE` | `true` | Synchronous guardrails mode for blocking hooks |
 | `AKTO_TIMEOUT` | `5` | Timeout in seconds for the guardrails/ingestion HTTP call |
-| `MODE` | `argus` | Operation mode: `argus` or `atlas` |
+| `MODE` | `atlas` | Operation mode: `argus` or `atlas` |
 | `DEVICE_ID` | (auto-generated) | Device id used in `atlas`-mode hostnames and in every MCP mirror host |
 | `CLAUDE_API_URL` | `https://api.anthropic.com` | Claude API URL used as the mirrored host (`argus` mode, non-MCP only) |
 | `AKTO_CONNECTOR_VALUE` | `claudecli` | Short connector tag used in headers/tags/atlas hostnames |

@@ -12,7 +12,7 @@ mkdir -p "$LOG_DIR" 2>/dev/null
 
 source "$SCRIPT_DIR/akto_common.sh"
 
-MODE="$(_akto_lower "${MODE:-argus}")"
+MODE="$(_akto_lower "${MODE:-atlas}")"
 AKTO_DATA_INGESTION_URL="${AKTO_DATA_INGESTION_URL:-}"
 AKTO_API_TOKEN="${AKTO_API_TOKEN:-}"
 AKTO_TIMEOUT="${AKTO_TIMEOUT:-5}"
