@@ -182,7 +182,7 @@ function buildAgentCol3Items(agent, collections, agentIdx, builtinTools = []) {
         const cat = isLlm ? "ai-model" : "mcp";
         const type = isLlm ? "LLM" : "MCP Server";
         const edgeColor = isLlm ? "#ec4899" : "#4cbebb";
-        items.push({ id: `c3-${agentIdx}-${seen.size}`, cat, type, label: svc, agentIdx, edgeColor });
+        items.push({ id: `c3-${agentIdx}-${seen.size}`, cat, type, label: svc, agentIdx, edgeColor, collectionId: isLlm ? undefined : c.id });
     });
 
     // Also add skills from the agent's skillNames
@@ -239,7 +239,7 @@ function TopologyGraph({ device, agents, collections = [], agentTools = {} }) {
                 es.push({ id: `e-d-a${i}`, source: "device", target: `agent-${i}`, type: "smoothstep", style: { stroke: "#9ca3af", strokeWidth: 1.5 } });
             });
             col3Items.forEach((item, i) => {
-                ns.push({ id: item.id, type: "topoNode", draggable: false, position: { x: COL3_X, y: i * NODE_H }, data: { component: { category: item.cat, type: item.type, label: item.label } } });
+                ns.push({ id: item.id, type: "topoNode", draggable: false, position: { x: COL3_X, y: i * NODE_H }, data: { component: { category: item.cat, type: item.type, label: item.label, collectionId: item.collectionId } } });
                 es.push({ id: `e-a${item.agentIdx}-${item.id}`, source: `agent-${item.agentIdx}`, target: item.id, type: "smoothstep", style: { stroke: item.edgeColor, strokeWidth: 1.5 } });
             });
         } else {
@@ -251,7 +251,7 @@ function TopologyGraph({ device, agents, collections = [], agentTools = {} }) {
             direct.forEach((a, i) => {
                 const cat = a.type === "LLM" ? "ai-model" : "mcp";
                 const color = a.type === "LLM" ? "#ec4899" : "#9ca3af";
-                ns.push({ id: `svc-${i}`, type: "topoNode", draggable: false, position: { x: COL2_X, y: i * NODE_H }, data: { component: { category: cat, type: a.type, label: a.endpoint } } });
+                ns.push({ id: `svc-${i}`, type: "topoNode", draggable: false, position: { x: COL2_X, y: i * NODE_H }, data: { component: { category: cat, type: a.type, label: a.endpoint, collectionId: cat === "mcp" ? a.collectionIds?.[0] : undefined } } });
                 es.push({ id: `e-d-s${i}`, source: "device", target: `svc-${i}`, type: "smoothstep", style: { stroke: color, strokeWidth: 1.5 } });
             });
         }
