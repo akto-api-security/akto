@@ -52,10 +52,15 @@ public class YamlTestTemplate extends SecurityTestTemplate {
         }
 
         long filterStart = System.nanoTime();
-        boolean isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap, this.logId);
-        TestPhaseTimer.addFilter(System.nanoTime() - filterStart);
-        // loggerMaker.infoAndAddToDb("filter status " + isValid + " " + logId, LogDb.TESTING);
-        return isValid;
+        try {
+            boolean isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap, this.logId);
+            // loggerMaker.infoAndAddToDb("filter status " + isValid + " " + logId, LogDb.TESTING);
+            return isValid;
+        } finally {
+            // finally, not a bare statement after the call - a slow-then-throwing filter must still
+            // get its elapsed time credited here, or it silently misattributes to OTHER (08sep finding).
+            TestPhaseTimer.addFilter(System.nanoTime() - filterStart);
+        }
     }
 
 

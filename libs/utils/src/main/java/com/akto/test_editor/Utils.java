@@ -89,6 +89,14 @@ public class Utils {
     private static final java.util.concurrent.ConcurrentHashMap<String, Pattern> PATTERN_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
 
     public static Boolean checkIfContainsMatch(String text, String keyword) {
+        // Fast path: ".*" is a structural "match any" placeholder (the key-filter of a for_one/for_all
+        // loop whose real predicate is on value). Under find() it always matches - including empty text -
+        // so return true without compiling/scanning. Measured (08sep) to be 41.6% of ALL match calls,
+        // driven up by for_one evaluating it once per payload key. Only the exact literal ".*" is
+        // always-true; anything else (".+", "graphql.*", etc.) is NOT and must fall through to the engine.
+        if (".*".equals(keyword)) {
+            return true;
+        }
         Pattern pattern = PATTERN_CACHE.computeIfAbsent(keyword, Pattern::compile);
         Matcher matcher = pattern.matcher(text);
         String match = null;

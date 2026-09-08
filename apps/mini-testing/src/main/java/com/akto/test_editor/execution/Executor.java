@@ -101,8 +101,13 @@ public class Executor {
 
         Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
         long wordlistStart = System.nanoTime();
-        Map<String, Object> resolvedWordList = VariableResolver.resolveDynamicWordList(varMap, apiInfoKey, newSampleDataMap);
-        TestPhaseTimer.addWordlist(System.nanoTime() - wordlistStart);
+        Map<String, Object> resolvedWordList;
+        try {
+            resolvedWordList = VariableResolver.resolveDynamicWordList(varMap, apiInfoKey, newSampleDataMap);
+        } finally {
+            // finally, not a bare statement after the call - see YamlTestTemplate.filter()'s comment.
+            TestPhaseTimer.addWordlist(System.nanoTime() - wordlistStart);
+        }
         varMap.clear();
         varMap.putAll(resolvedWordList);
 
@@ -134,12 +139,11 @@ public class Executor {
                 }
                 if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
 
-                    synchronized(role) {
-                        loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
-                        if (modifyAuthTokenInRawApi(role, sampleRawApi) == null) {
-                            loggerMaker.infoAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
-                        }
-                    }                    
+                    // modifyAuthTokenInRawApi now locks internally, per role name - no need to wrap here.
+                    loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
+                    if (modifyAuthTokenInRawApi(role, sampleRawApi) == null) {
+                        loggerMaker.infoAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
+                    }
 
                 } else {
                     loggerMaker.infoAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole" + logId, LogDb.TESTING);
@@ -186,8 +190,13 @@ public class Executor {
         if (!runAutomatedPentest && executionType.equals("passive") && !onlySmartTestingAllowed) {
             ExecutionResult attempt = new ExecutionResult(true, "", rawApi.getRequest(), rawApi.getResponse());
             long validateStart = System.nanoTime();
-            TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
-            TestPhaseTimer.addValidate(System.nanoTime() - validateStart);
+            TestResult res;
+            try {
+                res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+            } finally {
+                // finally, not a bare statement after the call - see YamlTestTemplate.filter()'s comment.
+                TestPhaseTimer.addValidate(System.nanoTime() - validateStart);
+            }
             if (res != null) {
                 /*
                  * Since the original message and test message are same, saving only one.
@@ -285,13 +294,26 @@ public class Executor {
 
                         requestAttempted = true;
                         long sendStart = System.nanoTime();
-                        testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
-                        TestPhaseTimer.addSendRequest(System.nanoTime() - sendStart);
+                        try {
+                            testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                        } finally {
+                            // finally, not a bare statement after the call: a send that times out or
+                            // gets interrupted (e.g. by the 300s task-timeout's future.cancel(true))
+                            // throws from ApiExecutor.common(), which previously skipped this line
+                            // entirely and silently misattributed the whole blocked duration to OTHER
+                            // instead of SEND_REQUEST (08sep customer-run finding, confirmed via jattach:
+                            // 100/100 workers blocked in ApiExecutor.common->readResponseHeaders while
+                            // SEND_REQUEST's reported average stayed near-zero).
+                            TestPhaseTimer.addSendRequest(System.nanoTime() - sendStart);
+                        }
                         requestSent = true;
                         ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                         long validateStart = System.nanoTime();
-                        res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
-                        TestPhaseTimer.addValidate(System.nanoTime() - validateStart);
+                        try {
+                            res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                        } finally {
+                            TestPhaseTimer.addValidate(System.nanoTime() - validateStart);
+                        }
                     }
                     if (res != null && agenticResults == null) {
                         result.add(res);
@@ -770,7 +792,16 @@ public class Executor {
         return removed;
     }
 
-    public synchronized static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
+    // Per-role-name lock, not a class-wide `synchronized` - a slow login flow for role X must not
+    // block token application (or role lookup) for role Y. Keyed on name rather than the TestRoles
+    // instance itself since fetchOrFindTestRole can hand out a fresh instance for the same name after
+    // a definition refresh; locking on the instance would let two such instances race on the same
+    // underlying auth mechanism. Locking INSIDE the method (rather than at each call site) also covers
+    // the call site at line ~1220 that previously had no synchronized(role) wrapper at all.
+    private static final ConcurrentHashMap<String, Object> authLocks = new ConcurrentHashMap<>();
+
+    public static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
+        synchronized (authLocks.computeIfAbsent(testRole.getName(), k -> new Object())) {
         AuthMechanism authMechanismForRole = testRole.findMatchingAuthMechanism(rawApi);
 
         if (authMechanismForRole == null) {
@@ -811,37 +842,41 @@ public class Executor {
         }
 
         return ret;
+        }
     }
 
-    private static ConcurrentHashMap<String, TestRoles> roleCache = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, TestRoles> roleCache = new ConcurrentHashMap<>();
     private static final int ROLE_FETCH_THROTTLE_SECS = 1 * 60; // 1 minute
 
     public static TestRoles fetchOrFindAttackerRole() {
         return fetchOrFindTestRole("ATTACKER_TOKEN_ALL", false);
     }
 
-    public synchronized static TestRoles fetchOrFindTestRole(String name, boolean isId) {
-        if (roleCache == null) {
-            roleCache = new ConcurrentHashMap<>();
-        }
-        TestRoles cached = roleCache.get(name);
-        if (cached != null) {
-            int now = Context.now();
-            if (cached.getLastFetched() > 0 && (now - cached.getLastFetched()) < ROLE_FETCH_THROTTLE_SECS) {
-                return roleCache.get(name);
+    // Per-role-name single-flight via ConcurrentHashMap.compute(): concurrent calls for the SAME name
+    // serialize on just that map bin (not a class-wide lock), so a slow/refreshing role never blocks
+    // lookups for a different role. Correctness preserved exactly from the old synchronized version:
+    // - 60s throttle before refetching
+    // - serve the last-known value if a refetch fails (fresh == null)
+    // - if the refetched definition isn't newer (lastUpdatedTs), KEEP the old object rather than the
+    //   new one - the old object may carry a warm auth token (see modifyAuthTokenInRawApi) that a
+    //   same-definition refresh must not discard.
+    public static TestRoles fetchOrFindTestRole(String name, boolean isId) {
+        return roleCache.compute(name, (key, cached) -> {
+            if (cached != null && cached.getLastFetched() > 0
+                    && (Context.now() - cached.getLastFetched()) < ROLE_FETCH_THROTTLE_SECS) {
+                return cached;
             }
-        }
-        TestRoles fresh = isId ? dataActor.fetchTestRolesforId(name) : dataActor.fetchTestRole(name);
-        if (fresh == null) {
-            return roleCache.get(name);
-        }
-        if (cached != null && fresh.getLastUpdatedTs() <= cached.getLastUpdatedTs()) {
-            cached.setLastFetched(Context.now());
-            return roleCache.get(name);
-        }
-        fresh.setLastFetched(Context.now());
-        roleCache.put(name, fresh);
-        return roleCache.get(name);
+            TestRoles fresh = isId ? dataActor.fetchTestRolesforId(name) : dataActor.fetchTestRole(name);
+            if (fresh == null) {
+                return cached; // serve stale (or null) on fetch failure
+            }
+            if (cached != null && fresh.getLastUpdatedTs() <= cached.getLastUpdatedTs()) {
+                cached.setLastFetched(Context.now());
+                return cached; // keep old object - preserves any warm auth state attached to it
+            }
+            fresh.setLastFetched(Context.now());
+            return fresh;
+        });
     }
 
     public static void clearRoleCache() {
@@ -1102,10 +1137,8 @@ public class Executor {
                         return new ExecutorSingleOperationResp(false, "Test Role " + keyStr +  " Doesn't Exist ");
                     }
 
-                    ExecutorSingleOperationResp insertedAuthResp = new ExecutorSingleOperationResp(true, "");
-                    synchronized (testRole) {
-                        insertedAuthResp = modifyAuthTokenInRawApi(testRole, rawApi);
-                    }
+                    // modifyAuthTokenInRawApi now locks internally, per role name - no need to wrap here.
+                    ExecutorSingleOperationResp insertedAuthResp = modifyAuthTokenInRawApi(testRole, rawApi);
                     if (insertedAuthResp != null) {
                         return insertedAuthResp;
                     }
