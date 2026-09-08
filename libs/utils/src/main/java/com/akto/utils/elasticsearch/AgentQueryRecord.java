@@ -143,18 +143,19 @@ public class AgentQueryRecord {
 
         String serviceId, deviceId, userName;
 
+        userName = getFirstHeader(headers, HEADER_PREFIX + HEADER_USER_EMAIL);
+
         // Browser traffic must not take this branch: it derives device/user from a host id it
         // doesn't have that shape for, and returns null when it can't.
-        userName = getFirstHeader(headers, HEADER_PREFIX + HEADER_USER_EMAIL);
         if (isAtlasTraffic && !isBrowserExtensionTraffic) {
             String host = getFirstHeader(headers, "host");
             String[] parts = host != null ? host.split("\\.", 3) : new String[0];
             deviceId  = parts.length >= 1 ? parts[0] : null;
             serviceId = parts.length >= 2 ? parts[1] : host;
-            if(serviceId.equals("ai-agent") && parts.length >=3){
+            if ("ai-agent".equals(serviceId) && parts.length >= 3) {
                 serviceId = parts[2];
             }
-            if(userName.isEmpty()){
+            if (userName == null || userName.isEmpty()) {
                 if (deviceId == null) {
                     return null;
                 }
