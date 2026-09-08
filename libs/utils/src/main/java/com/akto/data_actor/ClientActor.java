@@ -1709,9 +1709,36 @@ public class ClientActor extends DataActor {
             case "LOGICAL_GROUP":
                 ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.LogicalGroupTestingEndpoint");
                 break;
+            case "REGEX":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.RegexTestingEndpoints");
+                break;
+            case "RISK_SCORE":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.RiskScoreTestingEndpoints");
+                break;
             default:
+                loggerMaker.errorAndAddToDb("unsupported testingEndpoints type " + type
+                        + ", testing run cannot be decoded by this module", LoggerMaker.LogDb.RUNTIME);
                 break;
         }
+    }
+
+    private void logTestingRunDecodeFailure(String apiName, Document testingRun, Exception e) {
+        String hexId = null;
+        String endpointsType = null;
+        Object dashboardContext = null;
+        if (testingRun != null) {
+            hexId = testingRun.getString("hexId");
+            dashboardContext = testingRun.get("dashboardContext");
+            Object endpoints = testingRun.get("testingEndpoints");
+            if (endpoints instanceof Document) {
+                endpointsType = ((Document) endpoints).getString("type");
+            }
+        }
+        loggerMaker.errorAndAddToDb("failed to decode testing run in " + apiName
+                + ", testingRunId: " + hexId
+                + ", testingEndpoints.type: " + endpointsType
+                + ", dashboardContext: " + dashboardContext
+                + ", error: " + e, LoggerMaker.LogDb.RUNTIME);
     }
 
     public TestingRun findPendingTestingRun(int delta, String miniTestingName) {
@@ -1727,9 +1754,14 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in findPendingTestingRun", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
+            Document testingRun = null;
             try {
                 Document doc = Document.parse(responsePayload);
-                Document testingRun = (Document) doc.get("testingRun");
+                testingRun = (Document) doc.get("testingRun");
+                if (testingRun == null) {
+                    // nothing pending, the common case for this once-per-second poll. stay quiet.
+                    return null;
+                }
                 Codec<TestingRun> apiInfoKeyCodec = codecRegistry.get(TestingRun.class);
                 String type = ((Document) testingRun.get("testingEndpoints")).getString("type");
                 fillTestingEndpointsType(type, testingRun);
@@ -1739,6 +1771,9 @@ public class ClientActor extends DataActor {
                 res.setId(new ObjectId(hexId));
                 return res;
             } catch(Exception e) {
+                // the run has already been marked RUNNING server side by the claim query, so a
+                // silent failure here leaves it stuck with nothing executing it.
+                logTestingRunDecodeFailure("findPendingTestingRun", testingRun, e);
                 return null;
             }
         } catch (Exception e) {
@@ -1821,9 +1856,10 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in findTestingRun", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
+            Document testingRun = null;
             try {
                 Document doc = Document.parse(responsePayload);
-                Document testingRun = (Document) doc.get("testingRun");
+                testingRun = (Document) doc.get("testingRun");
                 Codec<TestingRun> apiInfoKeyCodec = codecRegistry.get(TestingRun.class);
                 String type = ((Document) testingRun.get("testingEndpoints")).getString("type");
                 fillTestingEndpointsType(type, testingRun);
@@ -1833,6 +1869,7 @@ public class ClientActor extends DataActor {
                 res.setId(new ObjectId(hexId));
                 return res;
             } catch(Exception e) {
+                logTestingRunDecodeFailure("findTestingRun", testingRun, e);
                 return null;
             }
         } catch (Exception e) {
