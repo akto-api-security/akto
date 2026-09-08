@@ -431,7 +431,14 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 			}
 			if email != "" {
 				if row := findUserMetadataByEmail(p.UserMetadata, email); row != nil {
-					emailMatched = deviceListIntersects(row.Devices, p.ApplyToDeviceIds)
+					// Device intersection only narrows the match when both sides actually carry a
+					// device list — an empty Devices row (no device-level scoping recorded for this
+					// identity yet) or an empty ApplyToDeviceIds (device targeting isn't configured
+					// as a separate axis from the user pick) mean there's nothing to narrow by, so
+					// the email/identity match alone is enough; don't let missing device data on
+					// either side force a false negative.
+					emailMatched = len(row.Devices) == 0 || len(p.ApplyToDeviceIds) == 0 ||
+						deviceListIntersects(row.Devices, p.ApplyToDeviceIds)
 				}
 			}
 		}
