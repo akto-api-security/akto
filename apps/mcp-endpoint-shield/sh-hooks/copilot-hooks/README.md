@@ -222,7 +222,10 @@ stable per-turn message id on the hook payload itself, so the prompt hook
 synthesizes one as a per-session `<session_id>:<turn_number>` counter and
 the tool hooks read it back — the whole per-session row is persisted to
 `akto_session_state.json` between hook invocations, shared across both
-surfaces since they use the same `LOG_DIR`.
+surfaces since they use the same `LOG_DIR`. Every event also carries
+`x-akto-installer-user_email`, set to the OS account running the hook
+(`get_username()` — `$USER`/`whoami`, resolving `sudo` back to the invoking
+user); it's just a label, not a validated email address.
 
 ### Observability events (`akto-hooks.sh`)
 
@@ -247,6 +250,7 @@ ingesting the payload metadata only.
 | `AKTO_CONNECTOR` | (auto-detected) | Overrides the non-`vscode` fallback connector label (default `copilot`); never used when the payload identifies itself as `vscode` |
 | `GITHUB_COPILOT_API_URL` | `https://api.github.com` | Mirrored host for non-MCP GitHub Copilot CLI traffic (`argus` mode) |
 | `VSCODE_API_URL` | `https://vscode.dev` | Mirrored host for non-MCP VS Code traffic (`argus` mode) |
+| `AKTO_API_URL` | (empty) | Mirrored host used by `akto-hooks.sh`'s observability events in `argus` mode (ignored in `atlas` mode, where the device-id hostname is used instead) |
 | `CONTEXT_SOURCE` | `ENDPOINT` | Tag/field describing where traffic originated |
 | `MCP_INGEST_PATH` | `/mcp` | Mirrored path for MCP `tools/call` traffic |
 | `LOG_DIR` | `~/.copilot/akto/logs` | Directory for log files and state files — shared between both wrapper sets |
@@ -271,6 +275,30 @@ Tail all logs:
 
 ```bash
 tail -f ~/.copilot/akto/logs/*.log
+```
+
+## Uninstall
+
+**Disable (reversible)** — remove `~/.copilot/hooks/hooks.json`; both
+GitHub Copilot CLI and VS Code Copilot Chat only pick up hooks they can
+find at that path, so this switches every Akto hook off (both surfaces)
+without deleting anything:
+
+```bash
+mv ~/.copilot/hooks/hooks.json ~/.copilot/hooks/hooks.json.disabled
+```
+
+Restart both surfaces. Reverse it with
+`mv ~/.copilot/hooks/hooks.json.disabled ~/.copilot/hooks/hooks.json`. If
+`hooks.json` also carries non-Akto hooks (from merging per step 3 of
+Setup), remove only the Akto entries (the ones whose `bash` command points
+at `~/.copilot/hooks/akto/akto-*`) with `jq` instead of renaming the whole
+file.
+
+**Full removal** — also delete the copied scripts, logs, and state:
+
+```bash
+rm -rf ~/.copilot/hooks/akto ~/.copilot/hooks/hooks.json ~/.copilot/akto
 ```
 
 ## Troubleshooting

@@ -213,7 +213,10 @@ current message id, transcript path, cwd, etc.) so the backend can stitch a
 session's prompt → tool calls → response into one trace. The current
 message id is derived from the latest transcript entry's `uuid`, and the
 whole per-session row is persisted to `akto_session_state.json` between
-hook invocations.
+hook invocations. Every event also carries `x-akto-installer-user_email`,
+set to the OS account running the hook (`get_username()` — `$USER`/`whoami`,
+resolving `sudo` back to the invoking user); it's just a label, not a
+validated email address.
 
 ## Configuration options
 
@@ -226,6 +229,7 @@ hook invocations.
 | `MODE` | `atlas` | Operation mode: `argus` or `atlas` |
 | `DEVICE_ID` | (auto-generated) | Device id used in `atlas`-mode hostnames and in every MCP mirror host |
 | `CLAUDE_API_URL` | `https://api.anthropic.com` | Claude API URL used as the mirrored host (`argus` mode, non-MCP only) |
+| `AKTO_API_URL` | (empty) | Mirrored host used by `akto-hooks.sh`'s observability events in `argus` mode (ignored in `atlas` mode, where the device-id hostname is used instead) |
 | `AKTO_CONNECTOR` | `claude_code_cli` | Connector label used in the `akto_connector` query param |
 | `AKTO_CONNECTOR_VALUE` | `claudecli` | Short connector tag used in headers/tags/atlas hostnames |
 | `CONTEXT_SOURCE` | `ENDPOINT` | Tag/field describing where traffic originated |
@@ -257,6 +261,27 @@ Tail all logs:
 
 ```bash
 tail -f ~/.claude/akto/logs/*.log
+```
+
+## Uninstall
+
+**Disable (reversible)** — strip the `hooks` key from `~/.claude/settings.json`
+without touching the copied files, so you can re-merge `settings.json` from
+this directory later to turn it back on:
+
+```bash
+cp ~/.claude/settings.json ~/.claude/settings.json.bak
+jq 'del(.hooks)' ~/.claude/settings.json > /tmp/akto-settings.json && mv /tmp/akto-settings.json ~/.claude/settings.json
+```
+
+Restart Claude CLI. If your `settings.json` mixes Akto hooks with other,
+unrelated hooks, delete only the Akto entries (the ones whose `command`
+points at `~/.claude/hooks/akto-*`) instead of the whole `hooks` key.
+
+**Full removal** — also delete the copied scripts, logs, and state:
+
+```bash
+rm -rf ~/.claude/hooks ~/.claude/akto
 ```
 
 ## Troubleshooting

@@ -20,4 +20,4 @@ one-line install on any Linux package manager. Each script checks for them
 at startup and fails open (allows the request, logs a clear error) if either
 is missing, rather than breaking silently.
 
-See each directory's own README for setup instructions.
+See each directory's own README for setup and uninstall instructions.

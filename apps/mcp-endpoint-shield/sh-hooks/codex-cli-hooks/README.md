@@ -275,7 +275,11 @@ prompt → tool calls → response into one trace: `session_id` +
 `conversation_id` + `generation_id`, with the message id synthesized as a
 per-session `<session_id>:<turn_number>` counter, since Codex hooks don't
 expose a stable per-turn message id. The whole per-session row is
-persisted to `akto_session_state.json` between hook invocations.
+persisted to `akto_session_state.json` between hook invocations. Every
+event also carries `x-akto-installer-user_email`, set to the OS account
+running the hook (`get_username()` — `$USER`/`whoami`, resolving `sudo`
+back to the invoking user); it's just a label, not a validated email
+address.
 
 ## Configuration options
 
@@ -289,6 +293,7 @@ persisted to `akto_session_state.json` between hook invocations.
 | `DEVICE_ID` | (auto-generated) | Device id used in `atlas`-mode hostnames and in every MCP mirror host |
 | `OPENAI_BASE_URL` | (unset) | If set, used to derive the mirrored Codex API host (`argus` mode, non-MCP only) |
 | `OPENAI_API_KEY` | (unset) | If set (and `OPENAI_BASE_URL` isn't), mirrored host becomes `api.openai.com` |
+| `AKTO_API_URL` | (empty) | Mirrored host used by `akto-hooks.sh`'s observability events in `argus` mode (ignored in `atlas` mode, where the device-id hostname is used instead) |
 | `AKTO_CONNECTOR_VALUE` | `codexcli` | Short connector tag used in headers/tags/atlas hostnames |
 | `CONTEXT_SOURCE` | `ENDPOINT` | Tag/field describing where traffic originated |
 | `AKTO_INGEST_NON_MCP_TOOLS` | `false` | Also mirror blocked/allowed built-in (non-MCP) tool traffic |
@@ -319,6 +324,29 @@ Tail all logs:
 
 ```bash
 tail -f ~/.codex/akto/logs/*.log
+```
+
+## Uninstall
+
+**Disable (reversible)** — rename `hooks.json` out of the way; Codex CLI
+only discovers it by that exact filename, so this switches every Akto hook
+off without deleting anything:
+
+```bash
+mv ~/.codex/hooks.json ~/.codex/hooks.json.disabled
+```
+
+Restart Codex CLI. Reverse it with
+`mv ~/.codex/hooks.json.disabled ~/.codex/hooks.json`. If `hooks.json` also
+carries non-Akto hooks, remove only the Akto entries (the ones whose
+`command` points at `~/.codex/hooks/akto-*`) with `jq` instead of renaming
+the whole file. Don't use `[features] hooks = false` in `config.toml` for
+this — that disables *all* Codex hooks, not just Akto's.
+
+**Full removal** — also delete the copied scripts, logs, and state:
+
+```bash
+rm -rf ~/.codex/hooks ~/.codex/hooks.json ~/.codex/akto
 ```
 
 ## Troubleshooting
