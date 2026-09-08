@@ -374,9 +374,10 @@ function SampleDataComponent(props) {
                             />
                             <Tooltip content={simpleJson ? "Copy" : `Copy ${type}`}>
                             <Popover
-                                zIndexOverride={"600"}
+                                zIndexOverride={"1051"}
+                                fixed
                                 active={popoverActive[type]}
-                                activator={<Button icon={ClipboardMinor} plain onClick={() => 
+                                activator={<Button icon={ClipboardMinor} plain onClick={() =>
                                     setPopoverActive({ [type]: !popoverActive[type] })} />}
                                 onClose={() => setPopoverActive(false)}
                             >
