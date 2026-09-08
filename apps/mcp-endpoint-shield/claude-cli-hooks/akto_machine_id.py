@@ -3,6 +3,7 @@
 Machine ID generation utility for device identification.
 Mimics the Go implementation for generating unique device identifiers.
 """
+import json
 import os
 import platform
 import subprocess
@@ -18,6 +19,7 @@ except ImportError:
 
 
 _machine_id = None
+_user_email = None
 
 
 def _resolve_device_name_source() -> str:
@@ -219,6 +221,47 @@ def get_username() -> str:
 
     _username = "unknown"
     return _username
+
+
+def get_user_email() -> str:
+    """
+    Email of the account currently signed in to Claude CLI.
+
+    Source of truth is ~/.claude.json's oauthAccount.emailAddress - the same key
+    the agent reads in login_detector.go. The CLI rewrites that file on
+    login/logout and every hook runs as a fresh process, so this always reflects
+    the CURRENT account with no cache to invalidate.
+
+    Returns "" when signed out or unreadable. Callers must treat "" as "no user",
+    never as "unchanged", or a stale address survives a logout.
+    """
+    global _user_email
+    if _user_email is not None:
+        return _user_email
+
+    # MDM/demo pin, matching the AKTO_HOSTNAME / AKTO_DEVICE_ID override
+    # convention. Deliberately not exported by the installers: it masks every
+    # subsequent account switch.
+    _user_email = (os.environ.get("AKTO_USER_EMAIL") or "").strip()
+    if _user_email:
+        return _user_email
+
+    try:
+        home = os.path.expanduser("~")
+        # launchd/root context: ~ is /var/root, so resolve the console user's home.
+        if pwd is not None and hasattr(os, "getuid") and os.getuid() == 0:
+            home = pwd.getpwnam(get_username()).pw_dir
+        with open(os.path.join(home, ".claude.json"), encoding="utf-8") as f:
+            account = json.load(f).get("oauthAccount") or {}
+        email = str(account.get("emailAddress") or "").strip()
+        if "@" in email:
+            _user_email = email
+    except Exception:
+        # Fail open: identity resolution must never break the hook. No fallback to
+        # `claude auth status` here - a subprocess on the interactive prompt path is
+        # not worth it under the hook's 10s timeout.
+        pass
+    return _user_email
 
 
 if __name__ == "__main__":
