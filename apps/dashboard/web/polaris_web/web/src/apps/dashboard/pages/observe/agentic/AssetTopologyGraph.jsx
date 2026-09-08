@@ -1,11 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useMemo } from "react";
 import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-renderer";
 import { Box, HorizontalStack, VerticalStack, Text, Card, Icon, Avatar, Tooltip } from "@shopify/polaris";
 import { AutomationMajor, MagicMajor, CustomersMinor, ToolsMajor } from "@shopify/polaris-icons";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import PluginIcon from "@/assets/Plugin.svg";
-import { getAgentLinkedComponents, buildMcpComponentsFromStis } from "./agenticPageBuilders";
-import agenticObserveApi from "./agenticObserveApi";
+import { getAgentLinkedComponents } from "./agenticPageBuilders";
 
 export function topoColors(category) {
     switch (category) {
@@ -76,7 +75,6 @@ export function TopoNode({ data }) {
 export const TOPO_NODE_TYPES = { topoNode: TopoNode };
 
 const NODE_H = 84;
-const TOOL_H = 76;   // must clear the rendered node height, or stacked tools cover each other
 const GRAPH_H = 300;
 
 // Returns parent AI Agent flat rows for an MCP/Skill asset.
@@ -112,7 +110,7 @@ function buildDeviceItems(devices, deviceCount) {
 }
 
 export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], inlineComponents = [], nodes: externalNodes, edges: externalEdges, height: externalHeight }) {
-    const { nodes: baseNodes, edges: baseEdges, height } = useMemo(() => {
+    const { nodes, edges, height } = useMemo(() => {
         if (externalNodes && externalEdges) {
             // Callers that lay out their own nodes (DeviceFlyout.jsx) size the box to their content.
             return { nodes: externalNodes, edges: externalEdges, height: externalHeight || GRAPH_H };
@@ -143,7 +141,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
 
             // MCPs, LLMs, Skills, inline tools/LLM on agent host — same hierarchy level
             const col3Items = [
-                ...mcps.map((m, i) => ({ id: `mcp-${i}`, cat: "mcp",      type: "MCP Server", label: m.name, edgeColor: "#4cbebb", collectionId: m.collectionIds?.[0] })),
+                ...mcps.map((m, i) => ({ id: `mcp-${i}`, cat: "mcp",      type: "MCP Server", label: m.name, edgeColor: "#4cbebb" })),
                 ...llms.map((l, i) => ({ id: `llm-${i}`, cat: "ai-model", type: "LLM",        label: l.name, edgeColor: "#ec4899" })),
                 ...skillItems,
                 ...pluginItems,
@@ -160,7 +158,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
                 nodes: [
                     { id: "agent", type: "topoNode", draggable: false, position: { x: COL2, y: agentY }, data: { component: { category: "agent", type: "AI Agent", label: asset.name } } },
                     ...devices.map((d, i) => ({ id: d.id, type: "topoNode", draggable: false, position: { x: COL1, y: devOffset + i * NODE_H }, data: { component: { category: "external", type: d.type, label: d.label } } })),
-                    ...col3Items.map((item, i) => ({ id: item.id, type: "topoNode", draggable: false, position: { x: COL3, y: i * NODE_H }, data: { component: { category: item.cat, type: item.type, label: item.label, collectionId: item.collectionId } } })),
+                    ...col3Items.map((item, i) => ({ id: item.id, type: "topoNode", draggable: false, position: { x: COL3, y: i * NODE_H }, data: { component: { category: item.cat, type: item.type, label: item.label } } })),
                 ],
                 edges: [
                     ...devices.map(d => ({ id: `e-${d.id}-a`,   source: d.id, target: "agent",   type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } })),
@@ -213,47 +211,6 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
             edges: devices.map(d => ({ id: `e-${d.id}-a`, source: d.id, target: "asset", type: "smoothstep", style: { stroke: edgeCol, strokeWidth: 1.5 } })),
         };
     }, [asset, assetDevices, agenticTreeData, agenticFlatData, inlineComponents, externalNodes, externalEdges, externalHeight]);
-
-    // One extra hop: each MCP node's own tools, same data McpComponentsView shows. Skipped when the
-    // caller supplied its own nodes — appending rows to someone else's layout can only overlap it,
-    // so that caller (DeviceFlyout.jsx) reserves the rows and expands tools itself.
-    const [mcpTools, setMcpTools] = useState({});
-    const fetchedIds = useRef(new Set());
-    useEffect(() => {
-        if (externalNodes) return;
-        const mcpNodes = baseNodes.filter(n => n.data.component.category === "mcp" && n.data.component.collectionId && !fetchedIds.current.has(n.id));
-        if (!mcpNodes.length) return;
-        mcpNodes.forEach(n => fetchedIds.current.add(n.id));
-        let cancelled = false;
-        agenticObserveApi.fetchCollectionStiBundlesBatch(mcpNodes.map(n => n.data.component.collectionId)).then(bundles => {
-            if (cancelled) return;
-            const next = {};
-            mcpNodes.forEach(n => {
-                const b = bundles.get(n.data.component.collectionId);
-                if (!b) return;
-                const { tools } = buildMcpComponentsFromStis(b.stiEndpoints, b.apiInfoList, b.id, b.auditRows);
-                next[n.id] = (tools || []).map(t => t.name).filter(Boolean);
-            });
-            setMcpTools(prev => ({ ...prev, ...next }));
-        }).catch(() => {});
-        return () => { cancelled = true; };
-    }, [baseNodes, externalNodes]);
-
-    const { nodes, edges } = useMemo(() => {
-        const toolNodes = [], toolEdges = [];
-        baseNodes.forEach(n => {
-            const tools = mcpTools[n.id];
-            if (!tools?.length) return;
-            const shown = tools.slice(0, 4);
-            const labels = tools.length > shown.length ? [...shown, `+${tools.length - shown.length} more`] : shown;
-            labels.forEach((label, i) => {
-                const id = `${n.id}-tool-${i}`;
-                toolNodes.push({ id, type: "topoNode", draggable: false, position: { x: n.position.x + 190, y: n.position.y + i * TOOL_H }, data: { component: { category: "tool", type: "Tool", label } } });
-                toolEdges.push({ id: `e-${id}`, source: n.id, target: id, type: "smoothstep", style: { stroke: "#D97706", strokeWidth: 1.5 } });
-            });
-        });
-        return { nodes: [...baseNodes, ...toolNodes], edges: [...baseEdges, ...toolEdges] };
-    }, [baseNodes, baseEdges, mcpTools]);
 
     return (
         <Box style={{ height, borderRadius: 8, border: "1px solid #E1E5E9", overflow: "hidden", background: "#F8FAFC" }}>
