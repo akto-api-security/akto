@@ -5,7 +5,7 @@ import { AutomationMajor, MagicMajor, CustomersMinor, ToolsMajor } from "@shopif
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import PluginIcon from "@/assets/Plugin.svg";
 import { getAgentLinkedComponents } from "./agenticPageBuilders";
-import { capToolLabels, TOOL_EDGE_COLOR, useMcpTools, withToolRows } from "./topologyTools";
+import { capToolLabels, mcpToolsFor, serviceVisual, TOOL_EDGE_COLOR, useMcpTools, withToolRows } from "./topologyTools";
 
 export function topoColors(category) {
     switch (category) {
@@ -133,7 +133,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
         // An agent needs one id per linked MCP; an MCP asset opened on its own needs its own
         // collections, since the tools it exposes are spread across them.
         const ids = asset?.type === "AI Agent"
-            ? Object.values(asset.mcpServerCollectionIds || {}).map(a => a?.[0])
+            ? Object.values(asset.mcpServerCollectionIds || {}).flatMap(a => a || [])
             : asset?.type === "MCP Server" ? (asset.collectionIds || []) : [];
         return [...new Set(ids.filter(Boolean))];
     }, [asset, externalNodes]);
@@ -151,8 +151,6 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
 
         if (asset.type === "AI Agent") {
             const children = getAgentLinkedComponents(asset, agenticTreeData, agenticFlatData);
-            const mcps = children.filter(c => c.type === "MCP Server");
-            const llms = children.filter(c => c.type === "LLM");
             // Single summary node (not one per skill name) — the flyout's detail fetch only ships
             // skillCount now, not the full name list (Components tab re-derives the actual names
             // independently when opened; see AgenticObserveAction.fetchAgenticAssetDetail's comment).
@@ -170,9 +168,16 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
             }));
 
             // MCPs, LLMs, Skills, inline tools/LLM on agent host — same hierarchy level
+            // Each child's real type comes from the backend (serviceTypes) — an agent's linked
+            // services include its own LLM/agent traffic, not just MCP servers.
             const col3Items = [
-                ...mcps.map((m, i) => ({ id: `mcp-${i}`, cat: "mcp",      type: "MCP Server", label: m.name, edgeColor: "#4cbebb", collectionId: asset.mcpServerCollectionIds?.[m.name]?.[0] })),
-                ...llms.map((l, i) => ({ id: `llm-${i}`, cat: "ai-model", type: "LLM",        label: l.name, edgeColor: "#ec4899" })),
+                ...children.map((c, i) => {
+                    const v = serviceVisual(c.type);
+                    return {
+                        id: `svc-${i}`, cat: v.cat, type: v.type, label: c.name, edgeColor: v.edgeColor,
+                        collectionIds: v.cat === "mcp" ? (asset.mcpServerCollectionIds?.[c.name] || []) : [],
+                    };
+                }),
                 ...skillItems,
                 ...pluginItems,
                 ...inlineItems,
@@ -210,13 +215,15 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
         const parentAgents = asset.type === "Plugin" && asset.pluginParentAgent
             ? [{ name: asset.pluginParentAgent }]
             : findParentAgents(asset, agenticFlatData);
+        // Not serviceVisual: that defaults unknown types to MCP Server, whereas this branch must
+        // keep defaulting to ai-model (a SaaS Agent asset would otherwise render as an MCP server).
         const cat     = asset.type === "MCP Server" ? "mcp" : asset.type === "Skill" ? "skill" : asset.type === "Plugin" ? "plugin" : "ai-model";
         const edgeCol = asset.type === "MCP Server" ? "#4cbebb" : asset.type === "Skill" ? "#7C3AED" : asset.type === "Plugin" ? "#4F46E5" : "#ec4899";
 
         // An MCP asset's own tools, hanging off it the same way they hang off an agent's MCPs.
         // Unioned across the asset's collections, since one MCP group can span several.
         const assetToolLabels = asset.type === "MCP Server"
-            ? capToolLabels([...new Set((asset.collectionIds || []).flatMap(id => mcpTools[id] || []))])
+            ? capToolLabels(mcpToolsFor(asset.collectionIds, mcpTools))
             : [];
         const toolNodesAt = (x) => assetToolLabels.map((label, i) => ({
             id: `asset-tool-${i}`, type: "topoNode", draggable: false,

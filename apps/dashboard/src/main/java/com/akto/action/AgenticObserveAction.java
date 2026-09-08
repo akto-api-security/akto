@@ -627,7 +627,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
             if ("agent".equals(rowType) && !isConnectorIngested(envType)) {
                 String serviceName = extractServiceNameForGrouping(hostName);
-                if (serviceName != null && !serviceName.equalsIgnoreCase(groupKey)) {
+                if (serviceName != null && !isSameClient(serviceName, groupKey)) {
                     serviceNames.add(serviceName);
                     serviceCollectionIds.computeIfAbsent(serviceName, k -> new HashSet<>()).add(c.getId());
                 }
@@ -2370,6 +2370,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Getter private List<String> assetPluginAgents;
     @Getter private List<String> assetMcpServers;
     @Getter private Map<String, List<Integer>> assetMcpServerCollectionIds;
+    // Type per name in assetMcpServers — see serviceTypesFor. Without it the flyout graph labels
+    // every linked service "MCP Server", including the agent's own LLM/agent traffic.
+    @Getter private Map<String, String> assetServiceTypes;
     // Agent rows only — collectionIds of every plugin this agent owns (assetPluginNames' groups),
     // so the Components tab can search plugin-bundled skill content, not just the agent's own collection.
     @Getter private List<Integer> assetPluginCollectionIds;
@@ -2450,6 +2453,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 assetPluginAgents = Collections.emptyList();
                 assetMcpServers = Collections.emptyList();
                 assetMcpServerCollectionIds = Collections.emptyMap();
+                assetServiceTypes = Collections.emptyMap();
                 assetPluginCollectionIds = Collections.emptyList();
                 assetDeviceCount = 0;
                 assetDeviceSample = Collections.emptyList();
@@ -2476,6 +2480,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             for (Map.Entry<String, Set<Integer>> e : g.serviceCollectionIds.entrySet()) {
                 assetMcpServerCollectionIds.put(e.getKey(), new ArrayList<>(e.getValue()));
             }
+            Map<Integer, ApiCollection> byId = collectionsById(collections);
+            assetServiceTypes = serviceTypesFor(g, byId);
             assetTagKey = g.tagKey;
             assetRawTagValues = new ArrayList<>(g.rawTagValues);
             assetOwningPluginName = g.owningPluginName;
@@ -2501,9 +2507,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             assetPluginMcpServerCollectionIds = Collections.emptyMap();
             assetPluginSkills = Collections.emptyList();
             assetPluginAgents = Collections.emptyList();
-
-            Map<Integer, ApiCollection> byId = new HashMap<>();
-            for (ApiCollection c : collections) byId.put(c.getId(), c);
 
             if ("plugin".equals(rowType)) {
                 Set<Integer> ownCollectionIds = new HashSet<>(g.collectionIds);
@@ -2618,6 +2621,72 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     }
 
     /**
+     * Whether a hostname's service segment is the agent group itself. groupKey is already
+     * alias-folded ("codex-desktop" -> "codex2", "claude-cli-user" -> "claude2"), so comparing the
+     * raw segment left an agent's own hostnames in its own linked-service list and the flyout graph
+     * drew the agent as a child of itself.
+     */
+    private static boolean isSameClient(String serviceName, String groupKey) {
+        if (serviceName.equalsIgnoreCase(groupKey)) return true;
+        // Lowercased first: the alias table is keyed by lowercase literals and resolveClientKey is
+        // an exact-case lookup, while serviceName keeps the hostname's original casing.
+        String resolved = McpClientRegistry.resolveClientKey(serviceName.toLowerCase(Locale.ROOT));
+        return resolved != null && resolved.equalsIgnoreCase(groupKey);
+    }
+
+    /** Device-child row key for a service name — also how serviceCollections above is keyed. */
+    private static String servicePathKey(String serviceName) {
+        String key = serviceName.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
+        return StringUtils.isBlank(key) ? "unknown" : key;
+    }
+
+    /** Collections keyed by id, for the type lookups below. */
+    private static Map<Integer, ApiCollection> collectionsById(List<ApiCollection> collections) {
+        Map<Integer, ApiCollection> byId = new HashMap<>();
+        for (ApiCollection c : collections) byId.put(c.getId(), c);
+        return byId;
+    }
+
+    /**
+     * Type per linked service name for an agent group. GroupSummary.serviceNames is only "hostname
+     * service segment != this agent's groupKey" (see accumulateCheap) — it carries no type at all,
+     * so callers used to render every entry as an MCP Server, including the agent's own LLM/agent
+     * traffic. Resolves each name through the same classifier every other surface uses, with
+     * mcp-server outranking LLM outranking AI Agent when one name spans several collections.
+     */
+    private static Map<String, String> serviceTypesFor(GroupSummary g, Map<Integer, ApiCollection> byId) {
+        Map<String, String> out = new HashMap<>();
+        for (Map.Entry<String, Set<Integer>> e : g.serviceCollectionIds.entrySet()) {
+            String best = null;
+            for (Integer id : e.getValue()) {
+                ApiCollection c = byId.get(id);
+                if (c == null) continue;
+                String type = AgenticObserveUtil.getTypeFromCollection(c);
+                if (best == null || typeRank(type) < typeRank(best)) best = type;
+                if (typeRank(best) == 0) break;   // nothing outranks the top of the list
+            }
+            if (best != null) out.put(e.getKey(), best);
+        }
+        return out;
+    }
+
+    // Order decides the label when one service name spans collections of different types. MCP
+    // Server is last on purpose: getTypeFromCollection also returns it for a collection with no
+    // tags at all, so any positively-tagged type is better evidence than an untagged sibling.
+    private static final List<String> SERVICE_TYPE_PRECEDENCE = Arrays.asList(
+            AgenticObserveUtil.CLIENT_TYPE_LLM,
+            AgenticObserveUtil.CLIENT_TYPE_AI_AGENT,
+            AgenticObserveUtil.CLIENT_TYPE_SAAS_AGENT,
+            AgenticObserveUtil.CLIENT_TYPE_SKILL,
+            AgenticObserveUtil.CLIENT_TYPE_PLUGIN,
+            AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER);
+
+    private static int typeRank(String type) {
+        int i = SERVICE_TYPE_PRECEDENCE.indexOf(type);
+        return i < 0 ? SERVICE_TYPE_PRECEDENCE.size() : i;
+    }
+
+    /**
      * Batch form of fetchAgenticAssetDetail, scoped to just the fields the device flyout's
      * context graph needs per agent (mcpServers/mcpServerCollectionIds/skillCount/pluginNames) —
      * a device can show 10+ AI Agents, and firing fetchAgenticAssetDetail once per agent means
@@ -2638,8 +2707,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
             ClassificationCacheEntry cached = getOrBuildClassification(traffic, risk, Collections.emptyMap());
-            Map<Integer, ApiCollection> byId = new HashMap<>();
-            for (ApiCollection c : cached.collections) byId.put(c.getId(), c);
+            Map<Integer, ApiCollection> byId = collectionsById(cached.collections);
 
             for (String key : groupKeys) {
                 GroupSummary g = cached.groups.get(rowType + "|" + key);
@@ -2647,31 +2715,23 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 if (g == null) {
                     item.put("mcpServers", Collections.emptyList());
                     item.put("mcpServerCollectionIds", Collections.emptyMap());
-                    item.put("llmServers", Collections.emptyList());
+                    item.put("serviceTypes", Collections.emptyMap());
                     item.put("skillCount", 0);
                     item.put("pluginNames", Collections.emptyList());
                 } else {
                     item.put("mcpServers", new ArrayList<>(g.serviceNames));
+                    // Every collection of that MCP server, not just the ones this agent/device hit:
+                    // the graph answers "what does this MCP expose", and traffic is only captured on
+                    // some devices, so the per-agent slice is usually empty of tools.
                     Map<String, List<Integer>> serviceCollectionIdsOut = new HashMap<>();
-                    // serviceNames is one flat set of everything linked to this agent, so callers
-                    // can't tell an LLM from an MCP server on their own — split out the LLMs using
-                    // the same classifier every other surface uses (buildDeviceChildren's row
-                    // types, the flyout's own stat counts). Deliberately NOT a raw tag check: a
-                    // gen-ai tag means AI Agent, not LLM, and an mcp-server tag outranks both.
-                    List<String> llmServers = new ArrayList<>();
                     for (Map.Entry<String, Set<Integer>> e : g.serviceCollectionIds.entrySet()) {
-                        serviceCollectionIdsOut.put(e.getKey(), new ArrayList<>(e.getValue()));
-                        for (Integer id : e.getValue()) {
-                            ApiCollection c = byId.get(id);
-                            if (c == null) continue;
-                            if (AgenticObserveUtil.CLIENT_TYPE_LLM.equals(AgenticObserveUtil.getTypeFromCollection(c))) {
-                                llmServers.add(e.getKey());
-                                break;
-                            }
-                        }
+                        GroupSummary serviceGroup = cached.groups.get("service|" + e.getKey());
+                        serviceCollectionIdsOut.put(e.getKey(), serviceGroup != null
+                                ? new ArrayList<>(serviceGroup.collectionIds)
+                                : new ArrayList<>(e.getValue()));
                     }
                     item.put("mcpServerCollectionIds", serviceCollectionIdsOut);
-                    item.put("llmServers", llmServers);
+                    item.put("serviceTypes", serviceTypesFor(g, byId));
                     item.put("skillCount", g.skillNames.size());
                     item.put("pluginNames", new ArrayList<>(g.pluginNames));
                 }
@@ -3329,6 +3389,18 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         Map<String, double[]> childRisk = new HashMap<>(); // pathKey -> {riskScore, lastTraffic}
         Map<String, int[]> childViolations = new HashMap<>();
         Map<String, Integer> childSkillCount = new HashMap<>();
+        // Every collection per service, across all devices — not just this device's. The flyout
+        // graph hangs an MCP child's tools off this, and tools are only discovered on whichever
+        // device actually generated traffic, so scoping it to this device shows nothing.
+        Map<String, Set<Integer>> serviceCollections = new HashMap<>();
+        for (ApiCollection c : collections) {
+            if (c == null || c.isDeactivated()) continue;
+            String h = c.getHostName();
+            if (StringUtils.isBlank(h) || isConnectorIngested(c.getEnvType())) continue;
+            String sn = extractServiceNameForGrouping(h);
+            serviceCollections.computeIfAbsent(servicePathKey(StringUtils.isBlank(sn) ? h : sn),
+                    k -> new LinkedHashSet<>()).add(c.getId());
+        }
         // Plugins live in their own child row (own collection), not embedded in the agent's — so
         // "how many plugins does this agent have" is answered by matching sibling plugin children
         // under the same device to this agent's own owner tag (mcp-client/ai-agent value).
@@ -3345,8 +3417,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             String serviceName = extractServiceNameForGrouping(hostName);
             if (StringUtils.isBlank(serviceName)) serviceName = hostName;
-            String pathKey = serviceName.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
-            if (StringUtils.isBlank(pathKey)) pathKey = "unknown";
+            String pathKey = servicePathKey(serviceName);
 
             String idStr = String.valueOf(c.getId());
             Integer trafficVal = traffic.get(idStr);
@@ -3403,6 +3474,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             double[] rt = childRisk.get(pathKey);
             row.put("riskScore", Math.round(rt[0] * 10) / 10.0);
             row.put("lastTrafficEpoch", (int) rt[1]);
+            Set<Integer> svcIds = serviceCollections.get(pathKey);
+            if (svcIds != null && !svcIds.isEmpty()) row.put("serviceCollectionIds", new ArrayList<>(svcIds));
             int skillCount = childSkillCount.getOrDefault(pathKey, 0);
             if (skillCount > 0) row.put("skillCount", skillCount);
             String ownerTagValue = ownerTagByPathKey.get(pathKey);

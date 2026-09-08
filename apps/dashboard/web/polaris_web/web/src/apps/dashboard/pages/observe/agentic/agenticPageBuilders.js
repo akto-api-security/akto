@@ -64,7 +64,10 @@ export function getAgentLinkedComponents(asset, agenticTreeData = [], agenticFla
         if (seen.has(key)) return;
         seen.add(key);
         const flat = agenticFlatData.find((a) => a.name === name || a.id === name);
-        linked.push({ name: flat?.name || name, type: flat?.type || "MCP Server" });
+        // asset.mcpServers is really every service linked to this agent, so the type has to come
+        // from the backend's serviceTypes map — defaulting to "MCP Server" mislabelled the agent's
+        // own LLM/agent traffic as MCP servers.
+        linked.push({ name: flat?.name || name, type: asset.serviceTypes?.[name] || flat?.type || "MCP Server" });
     });
     return linked;
 }

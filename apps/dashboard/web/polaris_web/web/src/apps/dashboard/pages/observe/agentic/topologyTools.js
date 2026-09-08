@@ -9,6 +9,26 @@ import { buildMcpComponentsFromStis } from "./agenticPageBuilders";
 export const TOOL_CAP = 4;          // tools shown per MCP before collapsing to "+N more"
 export const TOOL_EDGE_COLOR = "#D97706";
 
+// An agent's linked services (detail.mcpServers / asset.mcpServers) are just "hostnames that
+// aren't the agent itself" — the backend's serviceTypes map says what each one really is. Falling
+// back to MCP Server is what the old code did unconditionally, and is why an agent's own LLM and
+// agent traffic showed up as MCP servers.
+export function serviceVisual(type) {
+    switch (type) {
+        case "LLM":      return { cat: "ai-model", type: "LLM",      edgeColor: "#ec4899" };
+        case "AI Agent": return { cat: "agent",    type: "AI Agent", edgeColor: "#f97316" };
+        case "SaaS Agent": return { cat: "agent",  type: "SaaS Agent", edgeColor: "#f97316" };
+        case "Skill":    return { cat: "skill",    type: "Skill",    edgeColor: "#7C3AED" };
+        case "Plugin":   return { cat: "plugin",   type: "Plugin",   edgeColor: "#4F46E5" };
+        default:         return { cat: "mcp",      type: "MCP Server", edgeColor: "#4cbebb" };
+    }
+}
+
+// Tool names across every collection an MCP row aggregates (one host can span several).
+export function mcpToolsFor(collectionIds, mcpTools) {
+    return [...new Set((collectionIds || []).flatMap(id => mcpTools[id] || []))];
+}
+
 // Tool names trimmed to TOOL_CAP, with the remainder collapsed into a trailing "+N more".
 export function capToolLabels(tools = []) {
     const shown = tools.slice(0, TOOL_CAP);
@@ -21,7 +41,8 @@ export function withToolRows(items, mcpTools) {
     const rows = [];
     items.forEach((item) => {
         rows.push({ item });
-        const tools = item.cat === "mcp" && item.collectionId ? (mcpTools[item.collectionId] || []) : [];
+        // collectionIds, not one id: an MCP row can aggregate several collections for one host.
+        const tools = item.cat === "mcp" ? mcpToolsFor(item.collectionIds, mcpTools) : [];
         capToolLabels(tools).forEach((label, i) => rows.push({ item, tool: { id: `${item.id}-tool-${i}`, label } }));
     });
     return rows;

@@ -301,6 +301,9 @@ export default {
             pluginAgents: resp?.assetPluginAgents || [],
             mcpServers: resp?.assetMcpServers || [],
             mcpServerCollectionIds: resp?.assetMcpServerCollectionIds || {},
+            // name -> "MCP Server" | "LLM" | "AI Agent". mcpServers is really "services linked to
+            // this agent", so without this the graph calls all of them MCP servers.
+            serviceTypes: resp?.assetServiceTypes || {},
             // Agent rows only — collectionIds of every plugin this agent owns, so the Components tab
             // can search plugin-bundled skill content, not just the agent's own collection.
             pluginCollectionIds: resp?.assetPluginCollectionIds || [],
@@ -344,9 +347,9 @@ export default {
             out.set(key, {
                 mcpServers: d?.mcpServers || [],
                 mcpServerCollectionIds: d?.mcpServerCollectionIds || {},
-                // Subset of mcpServers that are actually LLMs (gen-ai/browser-llm tagged), so the
-                // graph can label them "LLM" instead of lumping everything under "MCP Server".
-                llmServers: d?.llmServers || [],
+                // name -> real type, so the graph doesn't lump every linked service under
+                // "MCP Server" (an agent's own LLM/agent traffic lands in mcpServers too).
+                serviceTypes: d?.serviceTypes || {},
                 skillCount: d?.skillCount || 0,
                 pluginNames: d?.pluginNames || [],
             });

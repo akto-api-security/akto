@@ -12,7 +12,7 @@ import { RiskFactorRow } from "./RiskFactorRow";
 import DetailGrid from "./DetailGrid";
 import agenticObserveApi, { buildAgenticObserveChatMetadata, fetchAgenticViolationsPage, openViolationInThreatActivity, deviceServiceKey } from "./agenticObserveApi";
 import { buildAgentBuiltinToolsFromStis } from "./agenticPageBuilders";
-import { TOOL_EDGE_COLOR, useMcpTools, withToolRows } from "./topologyTools";
+import { serviceVisual, TOOL_EDGE_COLOR, useMcpTools, withToolRows } from "./topologyTools";
 import api from "../api";
 import { extractEndpointId } from "./constants";
 import func from "@/util/func";
@@ -166,13 +166,13 @@ const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 function buildAgentCol3Items(detail, agentIdx, builtinTools = []) {
     const items = [];
     if (detail) {
-        const llmNames = new Set(detail.llmServers || []);
         (detail.mcpServers || []).forEach((name, i) => {
-            const isLlm = llmNames.has(name);
-            const collectionId = detail.mcpServerCollectionIds?.[name]?.[0];
-            items.push(isLlm
-                ? { id: `c3-${agentIdx}-${i}`, cat: "ai-model", type: "LLM", label: name, agentIdx, edgeColor: "#ec4899" }
-                : { id: `c3-${agentIdx}-${i}`, cat: "mcp", type: "MCP Server", label: name, agentIdx, edgeColor: "#4cbebb", collectionId });
+            const v = serviceVisual(detail.serviceTypes?.[name]);
+            items.push({
+                id: `c3-${agentIdx}-${i}`, cat: v.cat, type: v.type, label: name, agentIdx, edgeColor: v.edgeColor,
+                // Only a real MCP server has tools to hang off it.
+                collectionIds: v.cat === "mcp" ? (detail.mcpServerCollectionIds?.[name] || []) : [],
+            });
         });
         if (detail.skillCount > 0) {
             items.push({ id: `skl-${agentIdx}`, cat: "skill", type: "Skill", label: detail.skillCount === 1 ? "1 Skill" : `${detail.skillCount} Skills`, agentIdx, edgeColor: "#7C3AED" });
@@ -198,6 +198,22 @@ function buildAgentCol3Items(detail, agentIdx, builtinTools = []) {
 const TOPO_ROW_H = 76;      // one component row
 const TOPO_BLOCK_GAP = 28;  // gap between two agents' blocks
 const TOPO_NODE_H = 64;     // rendered node height, for vertical centering
+
+// Emits one node+edge per row for a component column and its tool column — identical for the
+// per-agent blocks and the agent-less device rows, which only differ in origin node and offset.
+function pushRows(ns, es, rows, { sourceId, top, itemX, toolX }) {
+    rows.forEach((row, j) => {
+        const y = top + j * TOPO_ROW_H;
+        if (row.tool) {
+            ns.push({ id: row.tool.id, type: "topoNode", draggable: false, position: { x: toolX, y }, data: { component: { category: "tool", type: "Tool", label: row.tool.label } } });
+            es.push({ id: `e-${row.tool.id}`, source: row.item.id, target: row.tool.id, type: "smoothstep", style: { stroke: TOOL_EDGE_COLOR, strokeWidth: 1.5 } });
+            return;
+        }
+        const item = row.item;
+        ns.push({ id: item.id, type: "topoNode", draggable: false, position: { x: itemX, y }, data: { component: { category: item.cat, type: item.type, label: item.label } } });
+        es.push({ id: `e-${sourceId}-${item.id}`, source: sourceId, target: item.id, type: "smoothstep", style: { stroke: item.edgeColor, strokeWidth: 1.5 } });
+    });
+}
 
 function TopologyGraph({ device, agents, agentDetails = new Map(), agentTools = {}, mcpTools = {} }) {
     const { nodes, edges } = useMemo(() => {
@@ -231,31 +247,25 @@ function TopologyGraph({ device, agents, agentDetails = new Map(), agentTools = 
             blocks.forEach((b) => {
                 ns.push({ id: `agent-${b.idx}`, type: "topoNode", draggable: false, position: { x: COL2_X, y: centerIn(b.top, b.blockH) }, data: { component: { category: "agent", type: "AI Agent", label: b.label } } });
                 es.push({ id: `e-d-a${b.idx}`, source: "device", target: `agent-${b.idx}`, type: "smoothstep", style: { stroke: "#9ca3af", strokeWidth: 1.5 } });
-                b.rows.forEach((row, j) => {
-                    const y = b.top + j * TOPO_ROW_H;
-                    if (row.tool) {
-                        ns.push({ id: row.tool.id, type: "topoNode", draggable: false, position: { x: COL4_X, y }, data: { component: { category: "tool", type: "Tool", label: row.tool.label } } });
-                        es.push({ id: `e-${row.tool.id}`, source: row.item.id, target: row.tool.id, type: "smoothstep", style: { stroke: TOOL_EDGE_COLOR, strokeWidth: 1.5 } });
-                        return;
-                    }
-                    const item = row.item;
-                    ns.push({ id: item.id, type: "topoNode", draggable: false, position: { x: COL3_X, y }, data: { component: { category: item.cat, type: item.type, label: item.label, collectionId: item.collectionId } } });
-                    es.push({ id: `e-a${b.idx}-${item.id}`, source: `agent-${b.idx}`, target: item.id, type: "smoothstep", style: { stroke: item.edgeColor, strokeWidth: 1.5 } });
-                });
+                pushRows(ns, es, b.rows, { sourceId: `agent-${b.idx}`, top: b.top, itemX: COL3_X, toolX: COL4_X });
             });
             return { nodes: ns, edges: es };
         }
 
-        // No AI Agents — show device → direct service children (MCP/LLM)
-        const direct = agents.filter(a => a.type === "MCP Server" || a.type === "LLM");
-        const contentH = Math.max(direct.length, 1) * TOPO_ROW_H;
-        ns.push({ id: "device", type: "topoNode", draggable: false, position: { x: COL1_X, y: centerIn(0, contentH) }, data: { component: { category: "external", type: "User", label: deviceLabel } } });
-        direct.forEach((a, i) => {
-            const cat = a.type === "LLM" ? "ai-model" : "mcp";
-            const color = a.type === "LLM" ? "#ec4899" : "#9ca3af";
-            ns.push({ id: `svc-${i}`, type: "topoNode", draggable: false, position: { x: COL2_X, y: i * TOPO_ROW_H }, data: { component: { category: cat, type: a.type, label: a.endpoint, collectionId: cat === "mcp" ? a.collectionIds?.[0] : undefined } } });
-            es.push({ id: `e-d-s${i}`, source: "device", target: `svc-${i}`, type: "smoothstep", style: { stroke: color, strokeWidth: 1.5 } });
+        // No AI Agents — device → its own MCP/LLM children, with each MCP's tools one hop further
+        // out (same withToolRows reservation as the per-agent branch above; this branch used to
+        // skip tools entirely, so a device with no agents showed MCP servers and nothing under them).
+        const direct = agents.filter(a => a.type === "MCP Server" || a.type === "LLM").map((a, i) => {
+            const v = serviceVisual(a.type);
+            return {
+                id: `svc-${i}`, cat: v.cat, type: v.type, label: a.endpoint, edgeColor: v.edgeColor,
+                collectionIds: v.cat === "mcp" ? (a.serviceCollectionIds || []) : [],
+            };
         });
+        const directRows = withToolRows(direct, mcpTools);
+        const contentH = Math.max(directRows.length, 1) * TOPO_ROW_H;
+        ns.push({ id: "device", type: "topoNode", draggable: false, position: { x: COL1_X, y: centerIn(0, contentH) }, data: { component: { category: "external", type: "User", label: deviceLabel } } });
+        pushRows(ns, es, directRows, { sourceId: "device", top: 0, itemX: COL2_X, toolX: COL3_X });
         return { nodes: ns, edges: es };
     }, [agents, device.endpoint, device.username, agentDetails, agentTools, mcpTools]);
 
@@ -396,10 +406,15 @@ function OverviewTab({ device, agents, collections, onTabChange, startTimestamp,
     const mcpCollectionIds = useMemo(() => {
         const ids = new Set();
         agentDetails.forEach(d => Object.values(d?.mcpServerCollectionIds || {}).forEach(arr => {
-            if (arr?.[0]) ids.add(arr[0]);
+            (arr || []).forEach(id => ids.add(id));
         }));
+        // Device's own MCP children too — they're what the graph draws when there are no agents,
+        // and agentDetails is empty in that case.
+        agents.forEach(a => {
+            if (a.type === "MCP Server") (a.serviceCollectionIds || []).forEach(id => ids.add(id));
+        });
         return [...ids];
-    }, [agentDetails]);
+    }, [agentDetails, agents]);
 
     const mcpTools = useMcpTools(mcpCollectionIds);
 
@@ -652,6 +667,9 @@ function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp,
 // ─── Main DeviceFlyout ────────────────────────────────────────────────────────
 
 export default function DeviceFlyout({ device, agents, show, onClose, onAgentClick, deviceHostNames = [], collections = [], startTimestamp, endTimestamp }) {
+    // Stable identity: `agents || []` inline would hand a fresh array to every child on each
+    // render, re-running every memo/effect keyed on it.
+    const agentRows = useMemo(() => agents || [], [agents]);
     const [selectedTab, setSelectedTab] = useState(0);
     const deviceId = device?.path?.[0] || device?.deviceId;
     // See OverviewTab/ViolationsTab below - device.violations undercounts vs. the tab's own
@@ -706,7 +724,7 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
             }
         >
             <Box padding="2" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-                {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} collections={collections} onTabChange={setSelectedTab} startTimestamp={startTimestamp} endTimestamp={endTimestamp} violationsTotal={violationsTotal} />}
+                {selectedTab === 0 && <OverviewTab device={device} agents={agentRows} collections={collections} onTabChange={setSelectedTab} startTimestamp={startTimestamp} endTimestamp={endTimestamp} violationsTotal={violationsTotal} />}
                 {selectedTab === 1 && <AgenticsTab deviceId={deviceId} />}
                 {selectedTab === 2 && <ViolationsTab hostNames={deviceHostNames} deviceId={deviceId} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onTotalChange={setViolationsTotal} />}
             </Box>

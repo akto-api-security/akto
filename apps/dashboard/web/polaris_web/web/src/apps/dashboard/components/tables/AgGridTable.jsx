@@ -356,23 +356,28 @@ export default function AgGridTable({
     ) : null;
 
     // ── Grid node ───────────────────────────────────────────────────────────
-    // Same reasoning as effectiveSideBar above: also closes off the right-click context menu's
+    // Same reasoning as effectiveSideBar below: also closes off the right-click context menu's
     // "Group by"/"Pivot"/"Aggregate" options, which key off these column flags independently of
     // whatever the side panel shows.
     const effectiveDefaultColDef = React.useMemo(() => ({
-        enableRowGroup: !isServerMode,
-        enablePivot: !isServerMode,
-        enableValue: !isServerMode,
+        enableRowGroup: false,
+        enablePivot: false,
+        enableValue: false,
         ...defaultColDef,
-    }), [defaultColDef, isServerMode]);
+    }), [defaultColDef]);
 
-    // Row Group / Values / Pivot Mode in the Columns tool panel only ever operate on whatever
-    // page happens to be loaded in the grid right now — meaningless (and misleading) on a
-    // server-paginated table, which never holds the full dataset client-side. Column show/hide
-    // and the Filters panel are unaffected; those already work correctly against the real query.
+    // Row Group / Values / Pivot Mode are hidden on every table, not just server-paginated ones:
+    // on a server-paginated grid they silently operate on the loaded page rather than the real
+    // result set, and nowhere in the app do we actually use grouping or pivoting, so they were
+    // only ever dead controls. Column show/hide and the Filters panel are untouched. treeData
+    // grids (UrlTreeView) group via autoGroupColumnDef, which these flags don't affect.
     const effectiveSideBar = useMemo(() => {
-        if (!isServerMode || !sideBar || sideBar === true) return sideBar;
-        const toolPanels = (sideBar.toolPanels || []).map((panel) => {
+        if (!sideBar) return sideBar;
+        // `sideBar` (bare prop / true) means AG Grid's own default sidebar, which ships the full
+        // Columns panel — pivot and grouping controls included. Expand it to the explicit config
+        // so the suppression below actually applies.
+        const config = sideBar === true ? { toolPanels: ["columns", "filters"] } : sideBar;
+        const toolPanels = (config.toolPanels || []).map((panel) => {
             const isColumnsPanel = panel === "columns" || panel?.toolPanel === "agColumnsToolPanel";
             if (!isColumnsPanel) return panel;
             const base = panel === "columns"
@@ -389,8 +394,8 @@ export default function AgGridTable({
                 },
             };
         });
-        return { ...sideBar, toolPanels };
-    }, [sideBar, isServerMode]);
+        return { ...config, toolPanels };
+    }, [sideBar]);
 
     const gridNode = (
         <AgGridReact
