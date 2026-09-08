@@ -627,7 +627,12 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
             if ("agent".equals(rowType) && !isConnectorIngested(envType)) {
                 String serviceName = extractServiceNameForGrouping(hostName);
-                if (serviceName != null && !serviceName.equalsIgnoreCase(groupKey)) {
+                // groupKey is the canonical registry key (e.g. "claude2"), but serviceName is the raw
+                // hostname segment (e.g. "claudecli"/"claude-cli-project") — comparing them directly
+                // never matches for any agent whose raw tag value differs from its canonical key, so
+                // the agent's own identity collection was being added as if it were one of its own
+                // linked MCP servers. Canonicalize serviceName the same way groupKey was derived.
+                if (serviceName != null && !McpClientRegistry.resolveClientKey(serviceName).equalsIgnoreCase(groupKey)) {
                     serviceNames.add(serviceName);
                     serviceCollectionIds.computeIfAbsent(serviceName, k -> new HashSet<>()).add(c.getId());
                 }
@@ -3356,12 +3361,33 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             int skillCount = c.getSkills() != null ? c.getSkills().size() : 0;
 
             final String fServiceName = serviceName;
-            String childType = AgenticObserveUtil.getTypeFromCollection(c);
+            // getTypeFromCollection alone isn't enough here: it classifies purely off which type tags
+            // are present, and a known client like claude-cli/cursor commonly carries mcp-client (not
+            // ai-agent) plus its own mcp-server tag — which getTypeFromCollection resolves to MCP
+            // Server. classifyAllGroups avoids this by checking the asset-owner tag through
+            // McpClientRegistry FIRST for its "agent" rows; mirror that same precedence here so a
+            // known client is classified as AI Agent (or SaaS Agent) rather than falling through to
+            // the raw tag-based MCP Server default.
+            boolean isPlugin = AgenticObserveUtil.isPluginCollection(c);
+            CollectionTags assetTag = isPlugin ? null : AgenticObserveUtil.findAssetTag(c);
+            boolean ownedByAgent = assetTag != null && StringUtils.isNotBlank(assetTag.getValue())
+                    && !Constants.AKTO_BROWSER_LLM_AGENT_TAG.equals(assetTag.getKeyName());
+            String childType;
+            if (isPlugin) {
+                childType = AgenticObserveUtil.CLIENT_TYPE_PLUGIN;
+            } else if (ownedByAgent) {
+                String key = McpClientRegistry.resolveClientKey(assetTag.getValue());
+                childType = AgenticObserveUtil.hasSaasAgentTag(c)
+                        ? AgenticObserveUtil.CLIENT_TYPE_SAAS_AGENT
+                        : McpClientRegistry.getAgentTypeFromValue(key);
+            } else {
+                childType = AgenticObserveUtil.getTypeFromCollection(c);
+            }
             // Same key classifyAllGroups uses for "agent" GroupSummary rows (McpClientRegistry.
             // resolveClientKey off the asset tag, not this row's own rawServiceName/hostname
             // parsing) — lets the frontend look this agent up via fetchAgenticAssetDetailsBatch.
             final CollectionTags fAssetTag = AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(childType)
-                    ? AgenticObserveUtil.findAssetTag(c) : null;
+                    ? assetTag : null;
             BasicDBObject child = children.computeIfAbsent(pathKey, k -> {
                 BasicDBObject row = new BasicDBObject();
                 row.put("path", Arrays.asList(deviceId, k));
