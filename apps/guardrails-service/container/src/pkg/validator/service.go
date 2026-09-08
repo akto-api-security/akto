@@ -400,14 +400,13 @@ func deviceIDsContain(ids []string, label string) bool {
 	return false
 }
 
-// filterPoliciesByDevice filters device-targeted policies, combining two independent ways a
-// request can be confirmed as belonging to a targeted device: the device label embedded in the
-// MCP server name ("{deviceLabel}.{clientType}.{host}"), or the installer-supplied user email
-// header (x-akto-installer-user_email) resolved against the policy's UserMetadata rows. A policy
-// is device-targeted when either ApplyToDeviceIds is non-nil or UserMetadata is non-empty; when
-// neither is configured, the policy applies to everyone. For a device-targeted policy, either
-// signal confirming membership is enough — they don't both need to agree — so a request missing
-// a device-labeled server name can still match via email, and vice versa.
+// filterPoliciesByDevice filters device/user-targeted policies, combining two independent ways a
+// request can be confirmed as targeted: the device label embedded in the MCP server name
+// ("{deviceLabel}.{clientType}.{host}") matched against ApplyToDeviceIds, or the installer-supplied
+// user email header (x-akto-installer-user_email) matched against the policy's UserMetadata rows —
+// these are the two independent picks the dashboard offers ("Devices" vs. "Users"), so a match on
+// either is sufficient. A policy is targeted when either ApplyToDeviceIds is non-nil or UserMetadata
+// is non-empty; when neither is configured, the policy applies to everyone.
 func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName string, headers map[string]string) []types.Policy {
 	deviceLabel := deviceLabelFromMcpServerName(mcpServerName)
 	email := ""
@@ -430,9 +429,7 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 				emailResolved = true
 			}
 			if email != "" {
-				if row := findUserMetadataByEmail(p.UserMetadata, email); row != nil {
-					emailMatched = deviceListIntersects(row.Devices, p.ApplyToDeviceIds)
-				}
+				emailMatched = findUserMetadataByEmail(p.UserMetadata, email) != nil
 			}
 		}
 
@@ -462,19 +459,6 @@ func findUserMetadataByEmail(rows []types.AgenticUsers, email string) *types.Age
 		}
 	}
 	return nil
-}
-
-// deviceListIntersects reports whether any device in devices matches (case-insensitively) any
-// entry in applyToDeviceIds.
-func deviceListIntersects(devices, applyToDeviceIds []string) bool {
-	for _, d := range devices {
-		for _, id := range applyToDeviceIds {
-			if strings.EqualFold(d, id) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 // filterApprovedServers drops "approval"-behaviour policies whose target server already has a
