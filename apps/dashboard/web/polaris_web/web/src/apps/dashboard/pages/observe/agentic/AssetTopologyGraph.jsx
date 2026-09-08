@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-renderer";
 import { Box, HorizontalStack, VerticalStack, Text, Card, Icon, Avatar, Tooltip } from "@shopify/polaris";
 import { AutomationMajor, MagicMajor, CustomersMinor, ToolsMajor } from "@shopify/polaris-icons";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import PluginIcon from "@/assets/Plugin.svg";
-import { getAgentLinkedComponents } from "./agenticPageBuilders";
+import { getAgentLinkedComponents, buildMcpComponentsFromStis } from "./agenticPageBuilders";
+import agenticObserveApi from "./agenticObserveApi";
 
 export function topoColors(category) {
     switch (category) {
@@ -76,6 +77,31 @@ export const TOPO_NODE_TYPES = { topoNode: TopoNode };
 
 const NODE_H = 84;
 const GRAPH_H = 300;
+const NODE_W = 176;    // rendered node box, for centering on the focus node
+const FOCUS_ZOOM = 1;
+const TOOL_CAP = 4;
+
+// Opens centred on the asset the flyout is actually about (the device on Endpoints, the agent/MCP
+// on Agentic Assets) instead of a fitView that shrinks everything to fit the widest branch.
+function centerOnFocus(api, nodes, focusId) {
+    const target = nodes.find(n => n.id === focusId);
+    if (!target) { api.fitView({ padding: 0.2 }); return; }
+    api.setCenter(target.position.x + NODE_W / 2, target.position.y + 32, { zoom: FOCUS_ZOOM });
+}
+
+// One row per component, plus a reserved row per tool hanging off an MCP — the layout is a flat
+// NODE_H grid, so tools appended without their own row land on the next component.
+function withToolRows(items, mcpTools) {
+    const rows = [];
+    items.forEach((item) => {
+        rows.push({ item });
+        const tools = item.collectionId ? (mcpTools[item.collectionId] || []) : [];
+        const shown = tools.slice(0, TOOL_CAP);
+        const labels = tools.length > shown.length ? [...shown, `+${tools.length - shown.length} more`] : shown;
+        labels.forEach((label, i) => rows.push({ item, tool: { id: `${item.id}-tool-${i}`, label } }));
+    });
+    return rows;
+}
 
 // Returns parent AI Agent flat rows for an MCP/Skill asset.
 export function findParentAgents(asset, agenticFlatData = []) {
@@ -109,15 +135,41 @@ function buildDeviceItems(devices, deviceCount) {
     return items;
 }
 
-export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], inlineComponents = [], nodes: externalNodes, edges: externalEdges, height: externalHeight }) {
-    const { nodes, edges, height } = useMemo(() => {
+export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], inlineComponents = [], nodes: externalNodes, edges: externalEdges, height: externalHeight, focusNodeId }) {
+    // Each MCP's own tools, keyed by collection id — the extra hop the Endpoints graph shows.
+    // Only for our own layout; a caller that supplies nodes reserves its own tool rows.
+    const mcpCollectionIds = useMemo(() => {
+        if (externalNodes || asset?.type !== "AI Agent") return [];
+        const ids = Object.values(asset.mcpServerCollectionIds || {}).map(a => a?.[0]).filter(Boolean);
+        return [...new Set(ids)];
+    }, [asset, externalNodes]);
+
+    const [mcpTools, setMcpTools] = useState({});
+    useEffect(() => {
+        if (!mcpCollectionIds.length) { setMcpTools({}); return; }
+        let cancelled = false;
+        agenticObserveApi.fetchCollectionStiBundlesBatch(mcpCollectionIds)
+            .then(bundles => {
+                if (cancelled) return;
+                const next = {};
+                bundles.forEach((b, id) => {
+                    const { tools } = buildMcpComponentsFromStis(b.stiEndpoints, b.apiInfoList, b.id, b.auditRows);
+                    next[id] = (tools || []).map(t => t.name).filter(Boolean);
+                });
+                setMcpTools(next);
+            })
+            .catch(() => { if (!cancelled) setMcpTools({}); });
+        return () => { cancelled = true; };
+    }, [mcpCollectionIds]);
+
+    const { nodes, edges, height, focusId } = useMemo(() => {
         if (externalNodes && externalEdges) {
             // Callers that lay out their own nodes (DeviceFlyout.jsx) size the box to their content.
-            return { nodes: externalNodes, edges: externalEdges, height: externalHeight || GRAPH_H };
+            return { nodes: externalNodes, edges: externalEdges, height: externalHeight || GRAPH_H, focusId: focusNodeId };
         }
 
         const devices = buildDeviceItems(assetDevices[asset.id] || [], asset.deviceCount);
-        const COL1 = 40, COL2 = 230, COL3 = 420;
+        const COL1 = 40, COL2 = 230, COL3 = 420, COL4 = 610;
 
         if (asset.type === "AI Agent") {
             const children = getAgentLinkedComponents(asset, agenticTreeData, agenticFlatData);
@@ -141,28 +193,34 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
 
             // MCPs, LLMs, Skills, inline tools/LLM on agent host — same hierarchy level
             const col3Items = [
-                ...mcps.map((m, i) => ({ id: `mcp-${i}`, cat: "mcp",      type: "MCP Server", label: m.name, edgeColor: "#4cbebb" })),
+                ...mcps.map((m, i) => ({ id: `mcp-${i}`, cat: "mcp",      type: "MCP Server", label: m.name, edgeColor: "#4cbebb", collectionId: asset.mcpServerCollectionIds?.[m.name]?.[0] })),
                 ...llms.map((l, i) => ({ id: `llm-${i}`, cat: "ai-model", type: "LLM",        label: l.name, edgeColor: "#ec4899" })),
                 ...skillItems,
                 ...pluginItems,
                 ...inlineItems,
             ];
 
-            const maxRows   = Math.max(devices.length, col3Items.length, 1);
+            const rows      = withToolRows(col3Items, mcpTools);
+            const maxRows   = Math.max(devices.length, rows.length, 1);
             const totalH    = maxRows * NODE_H;
             const agentY    = (totalH - 44) / 2;
-            const devOffset = Math.max(0, (col3Items.length - devices.length) * NODE_H / 2);
+            const devOffset = Math.max(0, (rows.length - devices.length) * NODE_H / 2);
 
             return {
                 height: GRAPH_H,
+                focusId: "agent",
                 nodes: [
                     { id: "agent", type: "topoNode", draggable: false, position: { x: COL2, y: agentY }, data: { component: { category: "agent", type: "AI Agent", label: asset.name } } },
                     ...devices.map((d, i) => ({ id: d.id, type: "topoNode", draggable: false, position: { x: COL1, y: devOffset + i * NODE_H }, data: { component: { category: "external", type: d.type, label: d.label } } })),
-                    ...col3Items.map((item, i) => ({ id: item.id, type: "topoNode", draggable: false, position: { x: COL3, y: i * NODE_H }, data: { component: { category: item.cat, type: item.type, label: item.label } } })),
+                    ...rows.map((row, i) => (row.tool
+                        ? { id: row.tool.id, type: "topoNode", draggable: false, position: { x: COL4, y: i * NODE_H }, data: { component: { category: "tool", type: "Tool", label: row.tool.label } } }
+                        : { id: row.item.id, type: "topoNode", draggable: false, position: { x: COL3, y: i * NODE_H }, data: { component: { category: row.item.cat, type: row.item.type, label: row.item.label } } })),
                 ],
                 edges: [
                     ...devices.map(d => ({ id: `e-${d.id}-a`,   source: d.id, target: "agent",   type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } })),
-                    ...col3Items.map(item   => ({ id: `e-a-${item.id}`, source: "agent",    target: item.id,  type: "smoothstep", style: { stroke: item.edgeColor, strokeWidth: 1.5 } })),
+                    ...rows.map(row => (row.tool
+                        ? { id: `e-${row.tool.id}`, source: row.item.id, target: row.tool.id, type: "smoothstep", style: { stroke: "#D97706", strokeWidth: 1.5 } }
+                        : { id: `e-a-${row.item.id}`, source: "agent", target: row.item.id, type: "smoothstep", style: { stroke: row.item.edgeColor, strokeWidth: 1.5 } })),
                 ],
             };
         }
@@ -186,6 +244,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
 
             return {
                 height: GRAPH_H,
+                focusId: "asset",
                 nodes: [
                     { id: "asset", type: "topoNode", draggable: false, position: { x: COL3, y: assetY }, data: { component: { category: cat, type: asset.type, label: asset.name } } },
                     ...parentAgents.map((a, i) => ({ id: `agt-${i}`, type: "topoNode", draggable: false, position: { x: COL2, y: agOffset + i * NODE_H }, data: { component: { category: "agent", type: "AI Agent", label: a.name } } })),
@@ -204,21 +263,21 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
         const assetY  = (totalH - 44) / 2;
         return {
             height: GRAPH_H,
+            focusId: "asset",
             nodes: [
                 { id: "asset", type: "topoNode", draggable: false, position: { x: COL2, y: assetY }, data: { component: { category: cat, type: asset.type, label: asset.name } } },
                 ...devices.map((d, i) => ({ id: d.id, type: "topoNode", draggable: false, position: { x: COL1, y: i * NODE_H }, data: { component: { category: "external", type: d.type, label: d.label } } })),
             ],
             edges: devices.map(d => ({ id: `e-${d.id}-a`, source: d.id, target: "asset", type: "smoothstep", style: { stroke: edgeCol, strokeWidth: 1.5 } })),
         };
-    }, [asset, assetDevices, agenticTreeData, agenticFlatData, inlineComponents, externalNodes, externalEdges, externalHeight]);
+    }, [asset, assetDevices, agenticTreeData, agenticFlatData, inlineComponents, mcpTools, externalNodes, externalEdges, externalHeight, focusNodeId]);
 
-    // The fitView prop only fires on init, so nodes that arrive later (the flyouts' async detail
-    // and tool fetches) would sit outside a viewport fitted to whatever loaded first — refit
-    // whenever the graph changes.
+    // Re-centres on every graph change, not just init — the flyouts' detail and tool fetches land
+    // after the first render, and the view should still be on the focus node once they do.
     const flow = useRef(null);
     useEffect(() => {
-        flow.current?.fitView({ padding: 0.2 });
-    }, [nodes]);
+        if (flow.current) centerOnFocus(flow.current, nodes, focusId);
+    }, [nodes, focusId]);
 
     return (
         <Box style={{ height, borderRadius: 8, border: "1px solid #E1E5E9", overflow: "hidden", background: "#F8FAFC" }}>
@@ -226,9 +285,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
                 nodes={nodes}
                 edges={edges}
                 nodeTypes={TOPO_NODE_TYPES}
-                fitView
-                fitViewOptions={{ padding: 0.2 }}
-                onInit={api => { flow.current = api; api.fitView({ padding: 0.2 }); }}
+                onInit={api => { flow.current = api; centerOnFocus(api, nodes, focusId); }}
                 minZoom={0.2}
                 maxZoom={4}
                 nodesDraggable={true}

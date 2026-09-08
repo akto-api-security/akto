@@ -273,8 +273,9 @@ function TopologyGraph({ device, agents, agentDetails = new Map(), agentTools = 
         return { nodes: ns, edges: es };
     }, [agents, device.endpoint, device.username, agentDetails, agentTools, mcpTools]);
 
-    // No height passed — same fixed box the Agentic Assets page graph uses.
-    return <AssetTopologyGraph nodes={nodes} edges={edges} />;
+    // No height passed — same fixed box the Agentic Assets page graph uses. focusNodeId opens the
+    // view on the device this flyout is about, rather than fitting every agent branch at once.
+    return <AssetTopologyGraph nodes={nodes} edges={edges} focusNodeId="device" />;
 }
 
 // ─── User analysis section ─────────────────────────────────────────────────────
