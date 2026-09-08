@@ -703,6 +703,13 @@ function GuardrailPolicies() {
                     ...(guardrailData.targetRoles?.length ? { role: guardrailData.targetRoles } : {}),
                 },
                 targetDeviceIds: guardrailData.targetDeviceIds || [],
+                // Explicit "Users" picks (beta) — independent of targetDeviceIds; matched
+                // downstream by email via userMetadata (see GuardrailPoliciesAction#createGuardrailPolicy).
+                targetUserNames: guardrailData.targetUserNames || [],
+                // Identities behind the selected targets (both targetDeviceIds and
+                // targetUserNames) — CreateGuardrailPage already resolved these from
+                // fetchAgenticUsers; re-fetched authoritatively by the backend on save.
+                userMetadata: guardrailData.userMetadata || [],
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
                 behaviour: guardrailData.behaviour != null
