@@ -94,9 +94,24 @@ get_machine_id() {
   printf '%s' "$_AKTO_MACHINE_ID"
 }
 
+_akto_claude_account_email() {
+  command -v jq >/dev/null 2>&1 || return
+  local f="$HOME/.claude.json"
+  [[ -f "$f" ]] || return
+  jq -r '.oauthAccount.emailAddress // empty' "$f" 2>/dev/null
+}
+
 _AKTO_USERNAME=""
 get_username() {
   if [[ -n "$_AKTO_USERNAME" ]]; then
+    printf '%s' "$_AKTO_USERNAME"
+    return
+  fi
+
+  local account_email
+  account_email="$(_akto_claude_account_email)"
+  if [[ -n "$account_email" ]]; then
+    _AKTO_USERNAME="$account_email"
     printf '%s' "$_AKTO_USERNAME"
     return
   fi

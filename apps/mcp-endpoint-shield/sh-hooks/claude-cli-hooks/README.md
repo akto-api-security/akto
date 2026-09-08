@@ -214,9 +214,12 @@ session's prompt → tool calls → response into one trace. The current
 message id is derived from the latest transcript entry's `uuid`, and the
 whole per-session row is persisted to `akto_session_state.json` between
 hook invocations. Every event also carries `x-akto-installer-user_email`,
-set to the OS account running the hook (`get_username()` — `$USER`/`whoami`,
-resolving `sudo` back to the invoking user); it's just a label, not a
-validated email address.
+from `get_username()`: your actual Claude account email, read from
+`oauthAccount.emailAddress` in `~/.claude.json` (written there by Claude
+Code itself at login) when present, falling back to the OS account running
+the hook (`$USER`/`whoami`, resolving `sudo` back to the invoking user)
+otherwise. Not re-validated as an email either way — a manually-set OS
+username falls through as a plain string.
 
 ## Configuration options
 

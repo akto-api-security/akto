@@ -94,9 +94,41 @@ get_machine_id() {
   printf '%s' "$_AKTO_MACHINE_ID"
 }
 
+_akto_jwt_payload_field() {
+  local jwt="$1" field="$2" b64 payload
+  [[ "$jwt" == *.*.* ]] || return
+  b64="${jwt#*.}"; b64="${b64%.*}"
+  b64="${b64//-/+}"; b64="${b64//_//}"
+  case $(( ${#b64} % 4 )) in
+    2) b64="${b64}==" ;;
+    3) b64="${b64}=" ;;
+  esac
+  payload=$(printf '%s' "$b64" | base64 -d 2>/dev/null) || payload=$(printf '%s' "$b64" | base64 -D 2>/dev/null)
+  [[ -n "$payload" ]] || return
+  printf '%s' "$payload" | jq -r --arg f "$field" '.[$f] // empty' 2>/dev/null
+}
+
+_akto_codex_account_email() {
+  command -v jq >/dev/null 2>&1 || return
+  local f="$HOME/.codex/auth.json"
+  [[ -f "$f" ]] || return
+  local id_token
+  id_token=$(jq -r '.tokens.id_token // empty' "$f" 2>/dev/null)
+  [[ -n "$id_token" ]] || return
+  _akto_jwt_payload_field "$id_token" "email"
+}
+
 _AKTO_USERNAME=""
 get_username() {
   if [[ -n "$_AKTO_USERNAME" ]]; then
+    printf '%s' "$_AKTO_USERNAME"
+    return
+  fi
+
+  local account_email
+  account_email="$(_akto_codex_account_email)"
+  if [[ -n "$account_email" ]]; then
+    _AKTO_USERNAME="$account_email"
     printf '%s' "$_AKTO_USERNAME"
     return
   fi

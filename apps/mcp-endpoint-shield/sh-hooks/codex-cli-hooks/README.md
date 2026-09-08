@@ -276,10 +276,12 @@ prompt → tool calls → response into one trace: `session_id` +
 per-session `<session_id>:<turn_number>` counter, since Codex hooks don't
 expose a stable per-turn message id. The whole per-session row is
 persisted to `akto_session_state.json` between hook invocations. Every
-event also carries `x-akto-installer-user_email`, set to the OS account
-running the hook (`get_username()` — `$USER`/`whoami`, resolving `sudo`
-back to the invoking user); it's just a label, not a validated email
-address.
+event also carries `x-akto-installer-user_email`, from `get_username()`:
+your actual Codex account email, decoded from the `id_token` JWT cached in
+`~/.codex/auth.json` at login, when present, falling back to the OS
+account running the hook (`$USER`/`whoami`, resolving `sudo` back to the
+invoking user) otherwise. Not re-validated as an email either way — a
+manually-set OS username falls through as a plain string.
 
 ## Configuration options
 
