@@ -4,6 +4,8 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/akto_common.sh"
 
+get_username >/dev/null 2>&1
+
 LOGFILE="validate-post-tool.log"
 
 if ! akto_check_deps "$LOGFILE"; then

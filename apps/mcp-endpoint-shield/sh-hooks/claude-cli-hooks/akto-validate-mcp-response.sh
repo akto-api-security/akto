@@ -10,6 +10,8 @@ mkdir -p "$LOG_DIR" 2>/dev/null
 
 source "$SCRIPT_DIR/akto_common.sh"
 
+get_username >/dev/null 2>&1
+
 LOGFILE="validate-mcp-response.log"
 akto_check_deps "$LOGFILE" || exit 0
 LOG_PAYLOADS="$(_akto_lower "${LOG_PAYLOADS:-false}")"
