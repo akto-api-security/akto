@@ -65,6 +65,10 @@ public class AzureDataExplorerClient extends SearchClient {
     private static final int SESSIONS_SUMMARY_SIZE      = 500;
     private static final int SESSIONS_PAGINATED_CAP     = 10_000;
     private static final int MESSAGES_SIZE              = 500;
+    // fetchMessages must pull every raw doc in scope (not just ones with a traceId) to carry
+    // forward trace membership onto untagged spans — capped as a defense-in-depth bound; a
+    // session/window with more docs than this loses grouping accuracy for its oldest spans.
+    private static final int RAW_FETCH_CAP              = 5_000;
     private static final int TOP_N_USERS                = 10;
     private static final int TOP_N_MODELS                = 5;
     private static final int USER_BREAKDOWN_SIZE         = 3;
@@ -168,6 +172,11 @@ public class AzureDataExplorerClient extends SearchClient {
         return new SessionsResult(sessions, nextAfterKey, totalSessions);
     }
 
+    /**
+     * Raw per-doc fetch, so that spans with no traceId can be related to the trace they actually
+     * belong to (see {@link #groupByEffectiveTraceId}) — this can't be done with a summarize-by-
+     * traceId, since grouping simply drops docs where the column is empty.
+     */
     @Override
     public List<Map<String, Object>> fetchMessages(int accountId, long startMs, long endMs,
                                                      Map<String, List<String>> filters, Boolean atlasTrafficFilter) {
@@ -175,47 +184,186 @@ public class AzureDataExplorerClient extends SearchClient {
         if (!isConfigured()) return messages;
         try {
             String where = buildWhereConditions(accountId, startMs, endMs, filters, atlasTrafficFilter);
-            String groupField = AgentQueryRecord.F_TRACE_ID;
+            String kql = ADX_TABLE + " | where " + where
+                + " | order by " + AgentQueryRecord.F_TIMESTAMP + " desc | take " + RAW_FETCH_CAP;
 
-            // Unlike fetchSessions, ES's original firstHit for messages carries no filter
-            // predicate, so arg_min composes directly into the primary summarize — no second
-            // query needed here.
-            String kql = ADX_TABLE + " | where " + where + " and isnotempty(" + groupField + ")"
-                + " | summarize maxTs=max(" + AgentQueryRecord.F_TIMESTAMP + "), minTs=min(" + AgentQueryRecord.F_TIMESTAMP + "),"
-                + " sumIn=sum(" + AgentQueryRecord.F_INPUT_TOKENS + "), sumOut=sum(" + AgentQueryRecord.F_OUTPUT_TOKENS + "), docCount=count(),"
-                + " arg_min(" + AgentQueryRecord.F_TIMESTAMP + ", " + AgentQueryRecord.F_QUERY_PAYLOAD + ", "
-                + AgentQueryRecord.F_RESPONSE_PAYLOAD + ", " + AgentQueryRecord.F_SERVICE_ID + ", "
-                + AgentQueryRecord.F_USER_NAME + ", " + AgentQueryRecord.F_DEVICE_ID + ", "
-                + AgentQueryRecord.F_SESSION_IDENTIFIER + ") by " + groupField
-                + " | extend maxTsMs=datetime_diff('millisecond', maxTs, datetime(1970-01-01)),"
-                + " minTsMs=datetime_diff('millisecond', minTs, datetime(1970-01-01))"
-                + " | top " + MESSAGES_SIZE + " by maxTsMs desc";
-
-            LinkedHashMap<String, Map<String, Object>> rows = new LinkedHashMap<>();
-            KustoResultSetTable rs = query(kql);
-            if (rs != null) {
-                while (rs.next()) {
-                    String key = rs.getString(groupField);
-                    if (key == null || key.isEmpty()) continue;
-                    Map<String, Object> row = baseGroupRow(groupField, key, rs.getLong("maxTsMs"), rs.getLong("minTsMs"),
-                        rs.getLong("sumIn"), rs.getLong("sumOut"), rs.getLong("docCount"), 0L);
-                    row.put(AgentQueryRecord.F_QUERY_PAYLOAD,      rs.getString(AgentQueryRecord.F_QUERY_PAYLOAD));
-                    row.put(AgentQueryRecord.F_RESPONSE_PAYLOAD,   rs.getString(AgentQueryRecord.F_RESPONSE_PAYLOAD));
-                    row.put(AgentQueryRecord.F_SERVICE_ID,         rs.getString(AgentQueryRecord.F_SERVICE_ID));
-                    row.put(AgentQueryRecord.F_USER_NAME,          rs.getString(AgentQueryRecord.F_USER_NAME));
-                    row.put(AgentQueryRecord.F_DEVICE_ID,          rs.getString(AgentQueryRecord.F_DEVICE_ID));
-                    row.put(AgentQueryRecord.F_SESSION_IDENTIFIER, rs.getString(AgentQueryRecord.F_SESSION_IDENTIFIER));
-                    rows.put(key, row);
-                }
+            List<Map<String, Object>> docs = fetchRawDocsForGrouping(kql);
+            if (docs.size() >= RAW_FETCH_CAP) {
+                logger.error("fetchMessages raw fetch hit its cap (" + RAW_FETCH_CAP + ") for accountId=" + accountId
+                    + " — trace grouping may be incomplete for the oldest spans in range; narrow the time range or session.");
             }
+            Collections.reverse(docs); // ascending by timestamp — carry-forward needs chronological order
 
-            attachTopicHierarchy(where, groupField, rows.keySet(), rows);
-            messages = new ArrayList<>(rows.values());
+            messages = groupByEffectiveTraceId(docs);
         } catch (Exception e) {
             logger.error("fetchMessages error for accountId=" + accountId + ": " + e.getMessage());
             messages = new ArrayList<>();
         }
         return messages;
+    }
+
+    private List<Map<String, Object>> fetchRawDocsForGrouping(String kql) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        KustoResultSetTable rs = query(kql);
+        if (rs == null) return out;
+        while (rs.next()) {
+            Map<String, Object> row = new HashMap<>();
+            row.put(AgentQueryRecord.F_TIMESTAMP,          datetimeColToMs(rs, AgentQueryRecord.F_TIMESTAMP));
+            row.put(AgentQueryRecord.F_INPUT_TOKENS,       rs.getLong(AgentQueryRecord.F_INPUT_TOKENS));
+            row.put(AgentQueryRecord.F_OUTPUT_TOKENS,      rs.getLong(AgentQueryRecord.F_OUTPUT_TOKENS));
+            row.put(AgentQueryRecord.F_QUERY_PAYLOAD,      rs.getString(AgentQueryRecord.F_QUERY_PAYLOAD));
+            row.put(AgentQueryRecord.F_RESPONSE_PAYLOAD,   rs.getString(AgentQueryRecord.F_RESPONSE_PAYLOAD));
+            row.put(AgentQueryRecord.F_SERVICE_ID,         rs.getString(AgentQueryRecord.F_SERVICE_ID));
+            row.put(AgentQueryRecord.F_USER_NAME,          rs.getString(AgentQueryRecord.F_USER_NAME));
+            row.put(AgentQueryRecord.F_DEVICE_ID,          rs.getString(AgentQueryRecord.F_DEVICE_ID));
+            row.put(AgentQueryRecord.F_SESSION_IDENTIFIER, rs.getString(AgentQueryRecord.F_SESSION_IDENTIFIER));
+            row.put(AgentQueryRecord.F_TRACE_ID,           rs.getString(AgentQueryRecord.F_TRACE_ID));
+            row.put(AgentQueryRecord.F_GUARDRAIL_VIOLATED, rs.getBoolean(AgentQueryRecord.F_GUARDRAIL_VIOLATED));
+            row.put(AgentQueryRecord.F_GUARDRAIL_POLICY,   rs.getString(AgentQueryRecord.F_GUARDRAIL_POLICY));
+            row.put("spanId",                               rs.getString("spanId"));
+            row.put("id",                                   rs.getString(COL_DOC_ID));
+            out.add(row);
+        }
+        return out;
+    }
+
+    /**
+     * Only a fraction of docs in a session actually carry a traceId — e.g. a real agent turn —
+     * while everything else the integration logs around it (hook events, tool-call telemetry,
+     * etc.) never gets tagged. Verified against production data (account 1787207677): every
+     * untagged doc's timestamp falls between one traced doc and the next *in the same session*,
+     * so the correct trace for an untagged doc is simply the most recent traced doc at or before
+     * it — a classic carry-forward/LOCF join. Docs before a session's first-ever traced doc (or
+     * in a session with no traced doc at all) have nothing to carry forward from, so each becomes
+     * its own single-span "trace" instead of being merged with unrelated spans.
+     *
+     * One wrinkle also found in that data: setup events (e.g. "SessionStart", "InstructionsLoaded")
+     * can land in the *exact same millisecond* as the real request they precede — sort order for
+     * same-timestamp docs is not guaranteed to put them before it, so a naive single pass can
+     * wrongly treat some of a trace's own lead-in events as pre-trace orphans. Docs are therefore
+     * resolved one (session, timestamp) instant at a time: when an instant contains exactly one
+     * distinct traceId, every doc in that instant — regardless of array order — resolves to it.
+     *
+     * @param docsAscByTime raw docs, already sorted ascending by timestamp (carry-forward is
+     *                       order-dependent — do not pass docs in any other order).
+     */
+    private List<Map<String, Object>> groupByEffectiveTraceId(List<Map<String, Object>> docsAscByTime) {
+        Map<String, String> effectiveTraceIdByGroup = new HashMap<>();
+        LinkedHashMap<String, List<Map<String, Object>>> groups = resolveGroups(docsAscByTime, effectiveTraceIdByGroup);
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map.Entry<String, List<Map<String, Object>>> e : groups.entrySet()) {
+            result.add(buildTraceRowFromGroup(e.getValue(), effectiveTraceIdByGroup.get(e.getKey())));
+        }
+        result.sort((a, b) -> Long.compare(asLong(b.get(KEY_LATEST_TS)), asLong(a.get(KEY_LATEST_TS))));
+        return result.size() > MESSAGES_SIZE ? new ArrayList<>(result.subList(0, MESSAGES_SIZE)) : result;
+    }
+
+    /**
+     * The carry-forward resolution itself, factored out so fetchTraceDetail can look up a single
+     * trace's actual member docs (a plain traceId filter only finds the one tagged doc — see
+     * fetchTraceDetail) without duplicating this logic.
+     *
+     * Returns groups keyed "trace:&lt;sessionId&gt;:&lt;effectiveTraceId&gt;" (real or carried-
+     * forward trace membership) or "orphan:&lt;n&gt;" (no trace anywhere to relate the doc to) —
+     * populates effectiveTraceIdByGroupOut with the resolved traceId for every "trace:" key.
+     */
+    private LinkedHashMap<String, List<Map<String, Object>>> resolveGroups(
+            List<Map<String, Object>> docsAscByTime, Map<String, String> effectiveTraceIdByGroupOut) {
+        LinkedHashMap<String, List<Map<String, Object>>> instants = new LinkedHashMap<>();
+        for (Map<String, Object> doc : docsAscByTime) {
+            String instantKey = strVal(doc.get(AgentQueryRecord.F_SESSION_IDENTIFIER)) + "@" + asLong(doc.get(AgentQueryRecord.F_TIMESTAMP));
+            instants.computeIfAbsent(instantKey, k -> new ArrayList<>()).add(doc);
+        }
+
+        Map<String, String> lastTraceIdBySession = new HashMap<>();
+        LinkedHashMap<String, List<Map<String, Object>>> groups = new LinkedHashMap<>();
+        int[] orphanCounter = {0};
+
+        for (List<Map<String, Object>> instant : instants.values()) {
+            String sessionId = strVal(instant.get(0).get(AgentQueryRecord.F_SESSION_IDENTIFIER));
+            java.util.LinkedHashSet<String> tracesInInstant = new java.util.LinkedHashSet<>();
+            for (Map<String, Object> d : instant) {
+                String t = strVal(d.get(AgentQueryRecord.F_TRACE_ID));
+                if (!t.isEmpty()) tracesInInstant.add(t);
+            }
+
+            if (tracesInInstant.size() == 1) {
+                // Unambiguous: the whole instant (tagged doc + any same-millisecond siblings,
+                // whichever side of it they landed on) belongs to this one trace.
+                String eff = tracesInInstant.iterator().next();
+                lastTraceIdBySession.put(sessionId, eff);
+                String groupKey = "trace:" + sessionId + ":" + eff;
+                effectiveTraceIdByGroupOut.put(groupKey, eff);
+                groups.computeIfAbsent(groupKey, k -> new ArrayList<>()).addAll(instant);
+            } else {
+                // Zero traceIds (ordinary carry-forward), or — rarely — more than one distinct
+                // traceId tied at the same millisecond, which is genuinely ambiguous: resolve
+                // each doc by its own traceId if it has one, otherwise fall back to whatever was
+                // last resolved *before* this instant rather than guessing between the ties.
+                for (Map<String, Object> d : instant) {
+                    String own = strVal(d.get(AgentQueryRecord.F_TRACE_ID));
+                    String eff = !own.isEmpty() ? own : lastTraceIdBySession.get(sessionId);
+                    if (!own.isEmpty()) lastTraceIdBySession.put(sessionId, own);
+
+                    String groupKey = (eff != null && !eff.isEmpty())
+                        ? "trace:" + sessionId + ":" + eff
+                        : "orphan:" + (orphanCounter[0]++);
+                    groups.computeIfAbsent(groupKey, k -> new ArrayList<>()).add(d);
+                    if (eff != null && !eff.isEmpty()) effectiveTraceIdByGroupOut.put(groupKey, eff);
+                }
+            }
+        }
+        return groups;
+    }
+
+    /** groupDocs must already be in ascending-timestamp order (the first/last entries are the trace's first/latest hit). */
+    private Map<String, Object> buildTraceRowFromGroup(List<Map<String, Object>> groupDocs, String effectiveTraceId) {
+        Map<String, Object> first = groupDocs.get(0);
+        Map<String, Object> last  = groupDocs.get(groupDocs.size() - 1);
+        long firstTs  = asLong(first.get(AgentQueryRecord.F_TIMESTAMP));
+        long latestTs = asLong(last.get(AgentQueryRecord.F_TIMESTAMP));
+
+        long sumIn = 0, sumOut = 0;
+        boolean hasGuardrail = false;
+        java.util.LinkedHashSet<String> guardrailPolicies = new java.util.LinkedHashSet<>();
+        for (Map<String, Object> d : groupDocs) {
+            sumIn  += asLong(d.get(AgentQueryRecord.F_INPUT_TOKENS));
+            sumOut += asLong(d.get(AgentQueryRecord.F_OUTPUT_TOKENS));
+            if (Boolean.TRUE.equals(d.get(AgentQueryRecord.F_GUARDRAIL_VIOLATED))) hasGuardrail = true;
+            String policy = strVal(d.get(AgentQueryRecord.F_GUARDRAIL_POLICY));
+            if (!policy.isEmpty()) guardrailPolicies.add(policy);
+        }
+
+        Map<String, Object> row = new HashMap<>();
+        if (effectiveTraceId != null && !effectiveTraceId.isEmpty()) row.put(AgentQueryRecord.F_TRACE_ID, effectiveTraceId);
+        row.put(KEY_SPAN_COUNT,   (long) groupDocs.size());
+        row.put(KEY_LATEST_TS,    latestTs);
+        row.put(KEY_FIRST_TS,     firstTs);
+        row.put(KEY_DURATION_MS,  latestTs > firstTs ? latestTs - firstTs : 0);
+        row.put(AgentQueryRecord.F_INPUT_TOKENS,  sumIn);
+        row.put(AgentQueryRecord.F_OUTPUT_TOKENS, sumOut);
+        row.put(KEY_TOTAL_TOKENS, sumIn + sumOut);
+        row.put(KEY_HAS_ACTIVE_GUARDRAIL, hasGuardrail);
+        row.put(KEY_GUARDRAIL_POLICIES, new ArrayList<>(guardrailPolicies));
+        row.put(AgentQueryRecord.F_QUERY_PAYLOAD,      first.get(AgentQueryRecord.F_QUERY_PAYLOAD));
+        row.put(AgentQueryRecord.F_RESPONSE_PAYLOAD,   first.get(AgentQueryRecord.F_RESPONSE_PAYLOAD));
+        row.put(AgentQueryRecord.F_SERVICE_ID,         first.get(AgentQueryRecord.F_SERVICE_ID));
+        row.put(AgentQueryRecord.F_USER_NAME,          first.get(AgentQueryRecord.F_USER_NAME));
+        row.put(AgentQueryRecord.F_DEVICE_ID,          first.get(AgentQueryRecord.F_DEVICE_ID));
+        row.put(AgentQueryRecord.F_SESSION_IDENTIFIER, first.get(AgentQueryRecord.F_SESSION_IDENTIFIER));
+        // ADX has no topic/subTopic columns at all under this backend (see class javadoc) — no
+        // per-doc topicHierarchy to attach here, unlike the grouped fetchSessions/fetchTraceDetail
+        // paths, which join it in separately from the Mongo mapping.
+        return row;
+    }
+
+    private static String strVal(Object v) {
+        return v != null ? v.toString() : "";
+    }
+
+    private static long asLong(Object v) {
+        return v instanceof Number ? ((Number) v).longValue() : 0L;
     }
 
     private Map<String, Object> baseGroupRow(String groupField, String key, long maxTsMs, long minTsMs,
@@ -597,23 +745,72 @@ public class AzureDataExplorerClient extends SearchClient {
 
     // ── Spans for a single message/trace ──────────────────────────────────────────
 
+    /**
+     * A traceId only ever tags one doc per trace (see fetchMessages/resolveGroups) — everything
+     * else the integration logs around it carries no traceId of its own and only belongs to this
+     * trace via carry-forward. So a plain traceId filter here would return just that one tagged
+     * doc instead of the whole trace: resolve which session the traceId belongs to first, then
+     * re-run the same carry-forward grouping over that session and pick the matching group.
+     */
     @Override
     public List<Map<String, Object>> fetchTraceDetail(int accountId, String traceId, Boolean atlasTrafficFilter) {
         List<Map<String, Object>> spans = new ArrayList<>();
         if (!isConfigured() || traceId == null || traceId.trim().isEmpty()) return spans;
+        String tid = traceId.trim();
         try {
-            Map<String, List<String>> filters = new HashMap<>();
-            filters.put(AgentQueryRecord.F_TRACE_ID_KW, Collections.singletonList(traceId.trim()));
-            String where = buildWhereConditions(accountId, 0L, Long.MAX_VALUE, filters, atlasTrafficFilter);
+            String sessionId = resolveSessionForTraceId(accountId, tid, atlasTrafficFilter);
+            if (sessionId == null || sessionId.isEmpty()) return spans;
 
+            Map<String, List<String>> sessionFilter = new HashMap<>();
+            sessionFilter.put(AgentQueryRecord.F_SESSION_IDENTIFIER_KW, Collections.singletonList(sessionId));
+            String where = buildWhereConditions(accountId, 0L, Long.MAX_VALUE, sessionFilter, atlasTrafficFilter);
             String kql = ADX_TABLE + " | where " + where
-                + " | order by " + AgentQueryRecord.F_TIMESTAMP + " asc | take " + TRACE_DETAIL_SIZE;
-            spans = queryRows(kql);
+                + " | order by " + AgentQueryRecord.F_TIMESTAMP + " desc | take " + RAW_FETCH_CAP;
+            List<Map<String, Object>> docs = fetchRawDocsForGrouping(kql);
+            Collections.reverse(docs); // ascending — carry-forward needs chronological order
+
+            Map<String, String> effectiveTraceIdByGroup = new HashMap<>();
+            LinkedHashMap<String, List<Map<String, Object>>> groups = resolveGroups(docs, effectiveTraceIdByGroup);
+            List<Map<String, Object>> matched = groups.get("trace:" + sessionId + ":" + tid);
+            spans = matched != null ? matched : new ArrayList<>();
+            if (spans.size() > TRACE_DETAIL_SIZE) spans = capPreservingGuardrailHits(spans, TRACE_DETAIL_SIZE);
         } catch (Exception e) {
             logger.error("fetchTraceDetail error for accountId=" + accountId + ": " + e.getMessage());
             return new ArrayList<>();
         }
         return spans;
+    }
+
+    /**
+     * Truncating a huge trace to the display cap by just keeping the earliest N can silently drop
+     * the very spans a reviewer opened the trace to look at: a session's guardrail hits can land
+     * anywhere in a 1000+-span trace (verified against production data — 8 hits in one trace, all
+     * past position 500), so every guardrail-violated span is kept regardless of position, and the
+     * cap is only spent on the rest. Re-sorts back to ascending order afterward since the waterfall
+     * graph and span list both assume chronological order.
+     */
+    private static List<Map<String, Object>> capPreservingGuardrailHits(List<Map<String, Object>> spansAsc, int cap) {
+        List<Map<String, Object>> violated = new ArrayList<>();
+        List<Map<String, Object>> rest = new ArrayList<>();
+        for (Map<String, Object> s : spansAsc) {
+            (Boolean.TRUE.equals(s.get(AgentQueryRecord.F_GUARDRAIL_VIOLATED)) ? violated : rest).add(s);
+        }
+        List<Map<String, Object>> kept = new ArrayList<>(violated.size() > cap ? violated.subList(0, cap) : violated);
+        int remaining = cap - kept.size();
+        if (remaining > 0) kept.addAll(rest.subList(0, Math.min(remaining, rest.size())));
+        kept.sort((a, b) -> Long.compare(asLong(a.get(AgentQueryRecord.F_TIMESTAMP)), asLong(b.get(AgentQueryRecord.F_TIMESTAMP))));
+        return kept;
+    }
+
+    /** Which session a traceId's one tagged doc belongs to, or null if no doc carries it. */
+    private String resolveSessionForTraceId(int accountId, String traceId, Boolean atlasTrafficFilter) {
+        Map<String, List<String>> filters = new HashMap<>();
+        filters.put(AgentQueryRecord.F_TRACE_ID_KW, Collections.singletonList(traceId));
+        String where = buildWhereConditions(accountId, 0L, Long.MAX_VALUE, filters, atlasTrafficFilter);
+        String kql = ADX_TABLE + " | where " + where + " | take 1 | project " + AgentQueryRecord.F_SESSION_IDENTIFIER;
+        KustoResultSetTable rs = query(kql);
+        if (rs == null || !rs.next()) return null;
+        return rs.getString(AgentQueryRecord.F_SESSION_IDENTIFIER);
     }
 
     // ── Real-invocation check for known-malicious tool/skill names ─────────────────
