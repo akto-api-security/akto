@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-renderer";
 import { Box, HorizontalStack, VerticalStack, Text, Card, Icon, Avatar, Tooltip } from "@shopify/polaris";
 import { AutomationMajor, MagicMajor, CustomersMinor, ToolsMajor } from "@shopify/polaris-icons";
@@ -212,6 +212,14 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
         };
     }, [asset, assetDevices, agenticTreeData, agenticFlatData, inlineComponents, externalNodes, externalEdges, externalHeight]);
 
+    // The fitView prop only fires on init, so nodes that arrive later (the flyouts' async detail
+    // and tool fetches) would sit outside a viewport fitted to whatever loaded first — refit
+    // whenever the graph changes.
+    const flow = useRef(null);
+    useEffect(() => {
+        flow.current?.fitView({ padding: 0.2 });
+    }, [nodes]);
+
     return (
         <Box style={{ height, borderRadius: 8, border: "1px solid #E1E5E9", overflow: "hidden", background: "#F8FAFC" }}>
             <ReactFlow
@@ -220,7 +228,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
                 nodeTypes={TOPO_NODE_TYPES}
                 fitView
                 fitViewOptions={{ padding: 0.2 }}
-                onInit={api => api.fitView({ padding: 0.2 })}
+                onInit={api => { flow.current = api; api.fitView({ padding: 0.2 }); }}
                 minZoom={0.2}
                 maxZoom={4}
                 nodesDraggable={true}
