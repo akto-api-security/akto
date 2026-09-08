@@ -198,11 +198,6 @@ const TOPO_ROW_H = 76;      // one component row
 const TOPO_BLOCK_GAP = 28;  // gap between two agents' blocks
 const TOPO_NODE_H = 64;     // rendered node height, for vertical centering
 
-// Container grows with the content so a device with several agents isn't crammed into a fixed
-// 300px box (ReactFlow's fitView then shrinks everything to unreadable), but stays bounded so
-// the graph never takes over the flyout — pan/zoom covers anything past the cap.
-const graphHeight = (contentH) => Math.min(Math.max(contentH + 48, 320), 600);
-
 const TOOL_CAP = 4;
 
 // One row per component, plus a row per tool hanging off an MCP — so nothing ever shares a row.
@@ -219,7 +214,7 @@ function buildAgentRows(items, mcpTools) {
 }
 
 function TopologyGraph({ device, agents, agentDetails = new Map(), agentTools = {}, mcpTools = {} }) {
-    const { nodes, edges, height } = useMemo(() => {
+    const { nodes, edges } = useMemo(() => {
         const aiAgents = agents.filter(a => a.type === "AI Agent");
         const hasAgents = aiAgents.length > 0;
 
@@ -262,7 +257,7 @@ function TopologyGraph({ device, agents, agentDetails = new Map(), agentTools = 
                     es.push({ id: `e-a${b.idx}-${item.id}`, source: `agent-${b.idx}`, target: item.id, type: "smoothstep", style: { stroke: item.edgeColor, strokeWidth: 1.5 } });
                 });
             });
-            return { nodes: ns, edges: es, height: graphHeight(contentH) };
+            return { nodes: ns, edges: es };
         }
 
         // No AI Agents — show device → direct service children (MCP/LLM)
@@ -275,10 +270,11 @@ function TopologyGraph({ device, agents, agentDetails = new Map(), agentTools = 
             ns.push({ id: `svc-${i}`, type: "topoNode", draggable: false, position: { x: COL2_X, y: i * TOPO_ROW_H }, data: { component: { category: cat, type: a.type, label: a.endpoint, collectionId: cat === "mcp" ? a.collectionIds?.[0] : undefined } } });
             es.push({ id: `e-d-s${i}`, source: "device", target: `svc-${i}`, type: "smoothstep", style: { stroke: color, strokeWidth: 1.5 } });
         });
-        return { nodes: ns, edges: es, height: graphHeight(contentH) };
+        return { nodes: ns, edges: es };
     }, [agents, device.endpoint, device.username, agentDetails, agentTools, mcpTools]);
 
-    return <AssetTopologyGraph nodes={nodes} edges={edges} height={height} />;
+    // No height passed — same fixed box the Agentic Assets page graph uses.
+    return <AssetTopologyGraph nodes={nodes} edges={edges} />;
 }
 
 // ─── User analysis section ─────────────────────────────────────────────────────
