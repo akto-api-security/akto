@@ -14,62 +14,80 @@ import {
   buildVSCodeGraph,
 } from './agentGraphUtils';
 
-// Hover panel for MCP and Agent Tool nodes
-const McpHoverPanel = ({ metadata }) => {
-  const tools = metadata?.toolsList || [];
-  const lastTool = metadata?.lastToolInvoked;
-  const endpointUrl = metadata?.endpointUrl;
+// Fields rendered in the node hover panel, in display order. Every field is read straight off
+// serviceGraphEdges.<nodeName>.metadata, so adding a row here is all it takes to surface a new
+// metadata key. `list: true` fields accept either an array or a comma-separated string.
+const HOVER_FIELDS = [
+  { key: 'endpointUrl',     label: 'Endpoint URL' },
+  { key: 'toolName',        label: 'Tool Name',          color: 'success' },
+  { key: 'description',     label: 'Description' },
+  { key: 'role',            label: 'IAM Role',           color: 'success' },
+  { key: 'policies',        label: 'IAM Policies',       list: true, showCount: true },
+  { key: 'totalToolCalls',  label: 'Total Tool Calls' },
+  { key: 'lastToolInvoked', label: 'Last Tool Invoked',  color: 'success' },
+  { key: 'toolsList',       label: 'Tools List',         list: true, showCount: true },
+];
+
+// Tolerates both ["a","b"] and "a, b" so the panel doesn't care how the producer wrote the value.
+const toList = (value) => {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value === 'string') return value.split(',').map(item => item.trim()).filter(Boolean);
+  return [];
+};
+
+// Counts arrive as numbers, so an emptiness check has to keep 0 rather than treat it as absent.
+const hasValue = (value) => value !== undefined && value !== null && value !== '';
+
+// A node should only open a hover panel if it has something to put in it.
+export const hasHoverContent = (metadata) => {
+  if (!metadata) return false;
+  if (metadata.edgeParam?.data) return true;
+  return HOVER_FIELDS.some(({ key, list }) => (
+    list ? toList(metadata[key]).length > 0 : hasValue(metadata[key])
+  ));
+};
+
+// Hover panel for any node whose metadata carries at least one HOVER_FIELDS entry
+const NodeHoverPanel = ({ metadata }) => {
   const responseData = metadata?.edgeParam?.data;
-  const toolName = metadata?.toolName;
-  const description = metadata?.description;
 
   return (
-
     <Card>
       <Box maxWidth='400px'>
         <VerticalStack gap="3">
-          {endpointUrl && (
-            <HorizontalStack gap="2">
-              <Text variant="bodySm" fontWeight="semibold" color="subdued">Endpoint URL:</Text>
-              <Text variant="bodySm" breakWord>{endpointUrl}</Text>
-            </HorizontalStack>
-          )}
-          {toolName && (
-            <HorizontalStack gap="2">
-              <Text variant="bodySm" fontWeight="semibold" color="subdued">Tool Name:</Text>
-              <Text variant="bodySm" color="success">{toolName}</Text>
-            </HorizontalStack>
-          )}
-          {description && (
-            <HorizontalStack gap="2">
-              <Text variant="bodySm" fontWeight="semibold" color="subdued">Description:</Text>
-              <Text variant="bodySm">{description}</Text>
-            </HorizontalStack>
-          )}
-          {lastTool && (
-            <HorizontalStack gap="2">
-              <Text variant="bodySm" fontWeight="semibold" color="subdued">Last Tool Invoked:</Text>
-              <Text variant='bodySm' color="success">{lastTool}</Text>
-            </HorizontalStack>
-          )}
+          {HOVER_FIELDS.map(({ key, label, color, list, showCount }) => {
+            if (list) {
+              const items = toList(metadata?.[key]);
+              if (items.length === 0) return null;
+              return (
+                <VerticalStack key={key} gap="1">
+                  <Text variant="bodySm" fontWeight="semibold" color="subdued">
+                    {showCount ? `${label} (${items.length}):` : `${label}:`}
+                  </Text>
+                  <VerticalStack gap="1">
+                    {items.map((item) => (
+                      <Text key={item} variant="bodySm" breakWord>{item}</Text>
+                    ))}
+                  </VerticalStack>
+                </VerticalStack>
+              );
+            }
+
+            const value = metadata?.[key];
+            if (!hasValue(value)) return null;
+            return (
+              <HorizontalStack key={key} gap="2">
+                <Text variant="bodySm" fontWeight="semibold" color="subdued">{label}:</Text>
+                <Text variant="bodySm" color={color} breakWord>{String(value)}</Text>
+              </HorizontalStack>
+            );
+          })}
           {responseData && (
             <VerticalStack gap="1">
               <Text variant="bodySm" fontWeight="semibold" color="subdued">Response From server:</Text>
               <Box background="bg-subdued" padding="1" borderRadius='1' overflowY="scroll" maxHeight="10rem">
                 <Text variant="bodySm" breakWord>{responseData}</Text>
               </Box>
-            </VerticalStack>
-          )}
-          {tools.length > 0 && (
-            <VerticalStack gap="1">
-              <Text variant="bodySm" fontWeight="semibold" color="subdued">
-                Tools List({tools.length}):
-              </Text>
-              <HorizontalStack gap="1">
-                {tools.map((tool) => (
-                  <Text key={tool} variant="bodySm">{tool}, </Text>
-                ))}
-              </HorizontalStack>
             </VerticalStack>
           )}
         </VerticalStack>
@@ -87,10 +105,11 @@ export const AgentNode = memo(function AgentNode({ data }) {
   const colors = getComponentColors(component.category);
   const IconComponent = getComponentIcon(component.category);
   const isArcadeMcp = component.category === 'arcade-mcp';
-  const isMcp = (component.category === 'mcp' || component.category === 'ai-tool') && component.metadata;
+  // Gate on whether there is anything to show rather than on category. cd
+  const showHoverPanel = useMemo(() => hasHoverContent(component.metadata), [component.metadata]);
 
   const handleMouseEnter = useCallback(() => {
-    if (!isMcp || !nodeRef.current) return;
+    if (!showHoverPanel || !nodeRef.current) return;
     const rect = nodeRef.current.getBoundingClientRect();
     const panelWidth = 420;
     const panelHeight = 300;
@@ -113,7 +132,7 @@ export const AgentNode = memo(function AgentNode({ data }) {
     }
 
     setPanelPos({ top, left });
-  }, [isMcp]);
+  }, [showHoverPanel]);
 
   const handleMouseLeave = useCallback(() => {
     setPanelPos(null);
@@ -126,7 +145,7 @@ export const AgentNode = memo(function AgentNode({ data }) {
       <div style={{ position: 'relative' }}>
         <div
           onClick={() => onNodeClick && onNodeClick(component)}
-          style={{ cursor: isMcp ? "pointer" : "default" }}
+          style={{ cursor: showHoverPanel ? "pointer" : "default" }}
         >
           <VerticalStack gap={2}>
             <Card padding={0}>
@@ -180,7 +199,7 @@ export const AgentNode = memo(function AgentNode({ data }) {
           </VerticalStack>
         </div>
 
-        {isMcp && panelPos && createPortal(
+        {showHoverPanel && panelPos && createPortal(
           <div
             style={{
               position: 'fixed',
@@ -190,7 +209,7 @@ export const AgentNode = memo(function AgentNode({ data }) {
               maxWidth: '420px',
             }}
           >
-            <McpHoverPanel metadata={component.metadata} />
+            <NodeHoverPanel metadata={component.metadata} />
           </div>,
           document.body
         )}
