@@ -155,7 +155,7 @@ fi
 
 gr_allowed=true; gr_reason=""; behaviour=""
 request_body=$(build_akto_request "200")
-if result=$(akto_post_json "$(build_http_proxy_url true false)" "$request_body" "$LOGFILE" 2>/dev/null); then
+if result=$(akto_post_json "$(build_http_proxy_url true true)" "$request_body" "$LOGFILE" 2>/dev/null); then
   gr_allowed=$(jq -r '(.data.guardrailsResult.Allowed | if . == null then true else . end)' <<<"$result" 2>/dev/null)
   [[ "$gr_allowed" == "null" || -z "$gr_allowed" ]] && gr_allowed=true
   gr_reason=$(jq -r '.data.guardrailsResult.Reason // ""' <<<"$result" 2>/dev/null)
@@ -196,9 +196,4 @@ if [[ "$allowed" != "true" ]]; then
 fi
 
 log_info "$LOGFILE" "Tool use PASSED guardrails for $tool_name"
-if [[ -n "$AKTO_DATA_INGESTION_URL" ]]; then
-  allowed_body=$(build_akto_request "200")
-  akto_post_json "$(build_http_proxy_url false true)" "$allowed_body" "$LOGFILE" >/dev/null
-  log_info "$LOGFILE" "Allowed tool use ingested successfully"
-fi
 exit 0

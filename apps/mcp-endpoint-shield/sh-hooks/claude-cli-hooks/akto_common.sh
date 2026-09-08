@@ -303,7 +303,8 @@ _akto_installer_headers() {
     --argjson input "$input_json" \
     --arg sidf "$SESSION_ID_FIELD" \
     --arg convf "$CONVERSATION_FIELD" \
-    --arg msgf "$MESSAGE_ID_FIELD" '
+    --arg msgf "$MESSAGE_ID_FIELD" \
+    --arg username "$(get_username)" '
     def hdrval: if (type=="object" or type=="array") then tojson else tostring end;
     ( $session_info
       | with_entries(select(.key != "turn_seq" and .value != null))
@@ -322,6 +323,7 @@ _akto_installer_headers() {
       + ( ( $src.current_message_id // (if $msgf != "" then $src[$msgf] else null end) ) as $mid
           | if $mid != null then {("x-akto-installer-akto_message_id"): ($mid | hdrval)} else {} end
         )
+      + (if $username != "" then {("x-akto-installer-user_email"): $username} else {} end)
   '
 }
 

@@ -131,7 +131,7 @@ if [[ "$AKTO_SYNC_MODE" == "true" && -n "$AKTO_DATA_INGESTION_URL" ]]; then
 
   gr_allowed=true; gr_reason=""; behaviour=""
   request_body=$(build_akto_request "$prompt" "$timestamp")
-  if result=$(akto_post_json "$(build_http_proxy_url true false)" "$request_body" "$LOGFILE" 2>/dev/null); then
+  if result=$(akto_post_json "$(build_http_proxy_url true true)" "$request_body" "$LOGFILE" 2>/dev/null); then
     gr_allowed=$(jq -r '(.data.guardrailsResult.Allowed | if . == null then true else . end)' <<<"$result" 2>/dev/null)
     [[ "$gr_allowed" == "null" || -z "$gr_allowed" ]] && gr_allowed=true
     gr_reason=$(jq -r '.data.guardrailsResult.Reason // ""' <<<"$result" 2>/dev/null)
@@ -161,7 +161,7 @@ if [[ "$AKTO_SYNC_MODE" == "true" && -n "$AKTO_DATA_INGESTION_URL" ]]; then
     exit "$CFG_BLOCKED_EXIT_CODE"
   fi
 
-  ingest_request "$prompt" "$timestamp" "" "false"
+  log_info "$LOGFILE" "Prompt allowed"
 fi
 
 log_info "$LOGFILE" "Hook completed"

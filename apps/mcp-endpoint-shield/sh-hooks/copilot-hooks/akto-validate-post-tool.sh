@@ -182,7 +182,7 @@ else
       log_info "$LOGFILE" "Validating tool result against guardrails: $tool_name"
     fi
     request_body=$(build_akto_request "200")
-    if result=$(akto_post_json "$(build_http_proxy_url true false)" "$request_body" "$LOGFILE" 2>/dev/null); then
+    if result=$(akto_post_json "$(build_http_proxy_url true true)" "$request_body" "$LOGFILE" 2>/dev/null); then
       gr_allowed=$(jq -r '(.data.guardrailsResult.Allowed | if . == null then true else . end)' <<<"$result" 2>/dev/null)
       [[ "$gr_allowed" == "null" || -z "$gr_allowed" ]] && gr_allowed=true
       gr_reason=$(jq -r '.data.guardrailsResult.Reason // ""' <<<"$result" 2>/dev/null)

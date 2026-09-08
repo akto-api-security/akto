@@ -61,7 +61,7 @@
           {
             "type": "command",
             "command": "bash ~/.codex/hooks/akto-hook-wrapper.sh akto-hooks.sh SessionEnd",
-            "timeout": 10
+            "timeout": 3
           }
         ]
       }

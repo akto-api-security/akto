@@ -203,15 +203,14 @@ get_connector_config() {
     CFG_IS_VSCODE="true"
     CFG_API_URL="${VSCODE_API_URL:-https://vscode.dev}"
     CFG_HOOK_HEADER="x-vscode-hook"
-    CFG_LOG_DIR_DEFAULT="$HOME/.github/akto/vscode/logs"
     CFG_BLOCKED_EXIT_CODE=2
   else
     CFG_IS_VSCODE="false"
     CFG_API_URL="${GITHUB_COPILOT_API_URL:-https://api.github.com}"
     CFG_HOOK_HEADER="x-copilot-hook"
-    CFG_LOG_DIR_DEFAULT="$HOME/.github/akto/copilot/logs"
     CFG_BLOCKED_EXIT_CODE=0
   fi
+  CFG_LOG_DIR_DEFAULT="$HOME/.copilot/akto/logs"
   if [[ "$(_akto_lower "${MODE:-atlas}")" == "atlas" ]]; then
     local device_id="${DEVICE_ID:-$(get_machine_id)}"
     [[ -n "$device_id" ]] && CFG_API_URL="https://${device_id}.${CFG_ATLAS_DOMAIN}"
@@ -290,7 +289,7 @@ _akto_state_key() {
   printf '%s' "$val"
 }
 
-SESSION_STATE_PATH="${LOG_DIR}/akto_session_state.json"
+SESSION_STATE_PATH="${LOG_DIR:-}/akto_session_state.json"
 
 _akto_load_session_state() {
   local key="$1"
@@ -385,7 +384,8 @@ _akto_installer_headers() {
     --argjson input "$input_json" \
     --arg sidf "$SESSION_ID_FIELD" \
     --arg convf "$CONVERSATION_FIELD" \
-    --arg msgf "$MESSAGE_ID_FIELD" '
+    --arg msgf "$MESSAGE_ID_FIELD" \
+    --arg username "$(get_username)" '
     def hdrval: if (type=="object" or type=="array") then tojson else tostring end;
     ( $session_info
       | with_entries(select(.key != "turn_seq" and .value != null))
@@ -404,6 +404,7 @@ _akto_installer_headers() {
       + ( ( $src.current_message_id // (if $msgf != "" then $src[$msgf] else null end) ) as $mid
           | if $mid != null then {("x-akto-installer-akto_message_id"): ($mid | hdrval)} else {} end
         )
+      + (if $username != "" then {("x-akto-installer-user_email"): $username} else {} end)
   '
 }
 
@@ -417,10 +418,11 @@ current_message_turn() {
 
 session_headers() {
   local session_id="$1" message_id="$2"
-  jq -n -c --arg sid "$session_id" --arg mid "$message_id" '
+  jq -n -c --arg sid "$session_id" --arg mid "$message_id" --arg username "$(get_username)" '
     {}
     + (if $sid != "" then {("x-akto-installer-akto_session_id"): $sid} else {} end)
     + (if $mid != "" then {("x-akto-installer-akto_message_id"): $mid} else {} end)
+    + (if $username != "" then {("x-akto-installer-user_email"): $username} else {} end)
   '
 }
 
