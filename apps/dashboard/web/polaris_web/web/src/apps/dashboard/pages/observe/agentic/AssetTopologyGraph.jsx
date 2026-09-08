@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-renderer";
 import { Box, HorizontalStack, VerticalStack, Text, Card, Icon, Avatar, Tooltip } from "@shopify/polaris";
-import { AutomationMajor, MagicMajor, CustomersMinor } from "@shopify/polaris-icons";
+import { AutomationMajor, MagicMajor, CustomersMinor, ToolsMajor } from "@shopify/polaris-icons";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import PluginIcon from "@/assets/Plugin.svg";
 import { getAgentLinkedComponents, buildMcpComponentsFromStis } from "./agenticPageBuilders";
@@ -12,6 +12,9 @@ export function topoColors(category) {
         case "external": return { borderColor: "#3b82f6", backgroundColor: "#eff6ff" };
         case "agent":    return { borderColor: "#f97316", backgroundColor: "#fff7ed" };
         case "mcp":      return { borderColor: "#4cbebb", backgroundColor: "#ecfdf5" };
+        // Tools hang off MCP nodes, so they deliberately don't reuse mcp's teal — amber keeps a
+        // tool readable as its own thing rather than looking like another MCP Server.
+        case "tool":     return { borderColor: "#D97706", backgroundColor: "#FFFBEB" };
         case "ai-model": return { borderColor: "#ec4899", backgroundColor: "#fdf2f8" };
         case "skill":    return { borderColor: "#7C3AED", backgroundColor: "#F3E8FF" };
         case "plugin":   return { borderColor: "#4F46E5", backgroundColor: "#EEF2FF" };
@@ -24,6 +27,7 @@ export function topoIcon(category) {
         case "external": return CustomersMinor;
         case "agent":    return AutomationMajor;
         case "mcp":      return MCPIcon;
+        case "tool":     return ToolsMajor;
         case "ai-model": return MagicMajor;
         case "skill":    return AutomationMajor;
         case "plugin":   return PluginIcon;
@@ -72,7 +76,7 @@ export function TopoNode({ data }) {
 export const TOPO_NODE_TYPES = { topoNode: TopoNode };
 
 const NODE_H = 84;
-const TOOL_H = 40;
+const TOOL_H = 76;   // must clear the rendered node height, or stacked tools cover each other
 const GRAPH_H = 300;
 
 // Returns parent AI Agent flat rows for an MCP/Skill asset.
@@ -107,10 +111,11 @@ function buildDeviceItems(devices, deviceCount) {
     return items;
 }
 
-export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], inlineComponents = [], nodes: externalNodes, edges: externalEdges }) {
+export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], inlineComponents = [], nodes: externalNodes, edges: externalEdges, height: externalHeight }) {
     const { nodes: baseNodes, edges: baseEdges, height } = useMemo(() => {
         if (externalNodes && externalEdges) {
-            return { nodes: externalNodes, edges: externalEdges, height: GRAPH_H };
+            // Callers that lay out their own nodes (DeviceFlyout.jsx) size the box to their content.
+            return { nodes: externalNodes, edges: externalEdges, height: externalHeight || GRAPH_H };
         }
 
         const devices = buildDeviceItems(assetDevices[asset.id] || [], asset.deviceCount);
@@ -207,12 +212,15 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
             ],
             edges: devices.map(d => ({ id: `e-${d.id}-a`, source: d.id, target: "asset", type: "smoothstep", style: { stroke: edgeCol, strokeWidth: 1.5 } })),
         };
-    }, [asset, assetDevices, agenticTreeData, agenticFlatData, inlineComponents, externalNodes, externalEdges]);
+    }, [asset, assetDevices, agenticTreeData, agenticFlatData, inlineComponents, externalNodes, externalEdges, externalHeight]);
 
-    // One extra hop: each MCP node's own tools, same data McpComponentsView shows.
+    // One extra hop: each MCP node's own tools, same data McpComponentsView shows. Skipped when the
+    // caller supplied its own nodes — appending rows to someone else's layout can only overlap it,
+    // so that caller (DeviceFlyout.jsx) reserves the rows and expands tools itself.
     const [mcpTools, setMcpTools] = useState({});
     const fetchedIds = useRef(new Set());
     useEffect(() => {
+        if (externalNodes) return;
         const mcpNodes = baseNodes.filter(n => n.data.component.category === "mcp" && n.data.component.collectionId && !fetchedIds.current.has(n.id));
         if (!mcpNodes.length) return;
         mcpNodes.forEach(n => fetchedIds.current.add(n.id));
@@ -229,7 +237,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
             setMcpTools(prev => ({ ...prev, ...next }));
         }).catch(() => {});
         return () => { cancelled = true; };
-    }, [baseNodes]);
+    }, [baseNodes, externalNodes]);
 
     const { nodes, edges } = useMemo(() => {
         const toolNodes = [], toolEdges = [];
@@ -240,8 +248,8 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
             const labels = tools.length > shown.length ? [...shown, `+${tools.length - shown.length} more`] : shown;
             labels.forEach((label, i) => {
                 const id = `${n.id}-tool-${i}`;
-                toolNodes.push({ id, type: "topoNode", draggable: false, position: { x: n.position.x + 190, y: n.position.y + i * TOOL_H }, data: { component: { category: "mcp", type: "Tool", label } } });
-                toolEdges.push({ id: `e-${id}`, source: n.id, target: id, type: "smoothstep", style: { stroke: "#4cbebb", strokeWidth: 1.5 } });
+                toolNodes.push({ id, type: "topoNode", draggable: false, position: { x: n.position.x + 190, y: n.position.y + i * TOOL_H }, data: { component: { category: "tool", type: "Tool", label } } });
+                toolEdges.push({ id: `e-${id}`, source: n.id, target: id, type: "smoothstep", style: { stroke: "#D97706", strokeWidth: 1.5 } });
             });
         });
         return { nodes: [...baseNodes, ...toolNodes], edges: [...baseEdges, ...toolEdges] };

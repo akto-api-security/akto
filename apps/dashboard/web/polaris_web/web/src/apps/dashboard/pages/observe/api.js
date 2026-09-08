@@ -326,6 +326,33 @@ export default {
             mcpComponentCount: resp?.assetMcpComponentCount || 0,
         }
     },
+    // Batch form of fetchAgenticAssetDetail, scoped to just mcpServers/mcpServerCollectionIds/
+    // skillCount/pluginNames — the device flyout's context graph needs this for every AI Agent
+    // shown on a device (can be 10+), and firing fetchAgenticAssetDetail once per agent would mean
+    // that many concurrent requests just to draw one graph (see AgenticObserveAction.
+    // fetchAgenticAssetDetailsBatch's own comment). Returns a Map<groupKey, detail>.
+    async fetchAgenticAssetDetailsBatch({ groupKeys, rowType, trafficMap, riskScoreMap } = {}) {
+        if (!groupKeys?.length) return new Map();
+        const resp = await request({
+            url: '/api/fetchAgenticAssetDetailsBatch',
+            method: 'post',
+            data: { groupKeys, rowType, trafficMap, riskScoreMap },
+        })
+        const byGroupKey = resp?.detailsByGroupKey || {};
+        const out = new Map();
+        Object.entries(byGroupKey).forEach(([key, d]) => {
+            out.set(key, {
+                mcpServers: d?.mcpServers || [],
+                mcpServerCollectionIds: d?.mcpServerCollectionIds || {},
+                // Subset of mcpServers that are actually LLMs (gen-ai/browser-llm tagged), so the
+                // graph can label them "LLM" instead of lumping everything under "MCP Server".
+                llmServers: d?.llmServers || [],
+                skillCount: d?.skillCount || 0,
+                pluginNames: d?.pluginNames || [],
+            });
+        });
+        return out;
+    },
     // Server-side paginated device list for ONE asset's flyout Devices tab — scoped to just
     // that asset's own apiCollectionIds (cheap), not the whole account. usernameMap is the
     // same Endpoint Shield map already fetched once for the main grid (fetchEndpointShieldUserMetadata),
