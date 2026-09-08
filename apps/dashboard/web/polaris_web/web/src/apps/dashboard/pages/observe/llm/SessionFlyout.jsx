@@ -16,6 +16,9 @@ import { enrichRow } from "./utils";
 import { getTraceColumnDefs } from "./columns";
 import { formatCompact, formatDurationMs, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
 
+// Ask Akto chat is temporarily hidden here; flip to re-enable.
+const SHOW_ASK_AKTO_CHAT = false;
+
 const TAB_OVERVIEW = 0;
 const TAB_TRACES   = 1;
 const TABS = [
@@ -283,12 +286,14 @@ export default function SessionFlyout({ session, currDateRange, onClose }) {
                 </>
             }
             footer={
-                <AiChatSection
-                    placeholder="Ask anything about this session..."
-                    resetKey={session?.sessionIdentifier}
-                    conversationType="AGENTIC_OBSERVE"
-                    chatMetadata={chatMetadata}
-                />
+                SHOW_ASK_AKTO_CHAT ? (
+                    <AiChatSection
+                        placeholder="Ask anything about this session..."
+                        resetKey={session?.sessionIdentifier}
+                        conversationType="AGENTIC_OBSERVE"
+                        chatMetadata={chatMetadata}
+                    />
+                ) : null
             }
         >
             {renderContent()}
