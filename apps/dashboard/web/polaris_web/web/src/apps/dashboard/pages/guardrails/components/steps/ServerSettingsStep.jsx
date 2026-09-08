@@ -23,7 +23,7 @@ export const ServerSettingsConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, negatedAgentServers, negatedMcpServers, negatedLlmServers, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTags, targetDeviceIds }) => {
+    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, negatedAgentServers, negatedMcpServers, negatedLlmServers, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTags, targetDeviceIds, targetUserNames }) => {
         const appSettings = (applyOnRequest || applyOnResponse) ?
             ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
         const behaviourSuffix = policyBehaviour ? `Rule behaviour: ${policyBehaviour}` : '';
@@ -55,7 +55,8 @@ export const ServerSettingsConfig = {
                     userParts.push(`${values.length} ${label}${values.length !== 1 ? 's' : ''}`);
                 }
             });
-            if (targetDeviceIds?.length > 0) userParts.push(`${targetDeviceIds.length} User${targetDeviceIds.length !== 1 ? 's' : ''}`);
+            if (targetDeviceIds?.length > 0) userParts.push(`${targetDeviceIds.length} Device${targetDeviceIds.length !== 1 ? 's' : ''}`);
+            if (targetUserNames?.length > 0) userParts.push(`${targetUserNames.length} User${targetUserNames.length !== 1 ? 's' : ''}`);
             if (userParts.length > 0) summary += ` | ${userParts.join(', ')}`;
         }
         summary += `${appSettings} ${behaviourSuffix}`;
@@ -64,6 +65,8 @@ export const ServerSettingsConfig = {
 };
 
 const conditionsReducer = produce((draft, action) => func.conditionsReducer(draft, action));
+
+const USER_BETA_BANNER_TEXT = "User targeting is in beta and currently supported only for Browser extensions and the Claude Desktop app.";
 
 // deviceId is the agent's device label, "{hostname}-{first8ofMachineID}" — the unique,
 // stable part is the segment after the LAST hyphen (the hostname itself may contain hyphens).
@@ -184,8 +187,11 @@ const ServerSettingsStep = ({
     setTargetTags,
     targetDeviceIds,
     setTargetDeviceIds,
+    targetUserNames,
+    setTargetUserNames,
     availableTagKeyValues = [],
     availableDevices,
+    availableUsers = [],
     matchingDeviceRows = [],
     usersLoading,
     applyToAllUsers,
@@ -211,6 +217,7 @@ const ServerSettingsStep = ({
             .filter(([, values]) => (values || []).length > 0)
             .map(([key, values]) => ({ type: key, values }));
         if ((targetDeviceIds || []).length > 0) conds.push({ type: 'DEVICE', values: targetDeviceIds });
+        if ((targetUserNames || []).length > 0) conds.push({ type: 'USER', values: targetUserNames });
         return conds;
     });
 
@@ -224,12 +231,17 @@ const ServerSettingsStep = ({
     useEffect(() => {
         if (isAtlas) {
             const tagMap = {};
-            userConditions.filter(c => c.type !== 'DEVICE').forEach(c => {
+            userConditions.filter(c => c.type !== 'DEVICE' && c.type !== 'USER').forEach(c => {
                 const values = (c.values || []).filter(Boolean);
                 if (values.length) tagMap[c.type] = values;
             });
             setTargetTags(tagMap);
+            // Devices and Users are two fully independent dropdown pools (see
+            // availableDevices/availableUsers) AND two independent backend fields — a Users pick
+            // must never land in targetDeviceIds, which is device-id-only and drives
+            // applyToDeviceIds resolution server-side.
             setTargetDeviceIds(userConditions.filter(c => c.type === 'DEVICE').flatMap(c => c.values).filter(Boolean));
+            setTargetUserNames(userConditions.filter(c => c.type === 'USER').flatMap(c => c.values).filter(Boolean));
         }
     }, [userConditions]);
 
@@ -252,6 +264,7 @@ const ServerSettingsStep = ({
             case 'MCP_SERVER': return enrichOptions(mcpOptions, 'MCP Server');
             case 'LLM': return enrichOptions(llmOptions, 'LLM');
             case 'DEVICE': return (availableDevices || []).slice().sort((a, b) => a.label.localeCompare(b.label));
+            case 'USER': return (availableUsers || []).slice().sort((a, b) => a.label.localeCompare(b.label));
             default: {
                 const entry = (availableTagKeyValues || []).find(k => k.key === type);
                 return (entry?.values || []).map(v => ({ label: v, value: v })).sort((a, b) => a.label.localeCompare(b.label));
@@ -318,13 +331,16 @@ const ServerSettingsStep = ({
         }
     );
 
-    // Device Tags & Users: DEVICE plus any dynamic tag key (team, role, department, ...).
+    // Device Tags & Users: DEVICE and USER (two independent pools) plus any dynamic tag key (team, role, department, ...).
+    const deviceValueSet = new Set((availableDevices || []).map(o => o.value));
+    const userValueSet = new Set((availableUsers || []).map(o => o.value));
     usePruneStaleConditionValues(
         isAtlas,
-        (availableDevices || []).length + (availableTagKeyValues || []).reduce((acc, k) => acc + (k.values || []).length, 0) > 0,
+        deviceValueSet.size + userValueSet.size + (availableTagKeyValues || []).reduce((acc, k) => acc + (k.values || []).length, 0) > 0,
         userConditions, userDispatch,
         {
-            DEVICE: new Set((availableDevices || []).map(o => o.value)),
+            DEVICE: deviceValueSet,
+            USER: userValueSet,
             ...Object.fromEntries((availableTagKeyValues || []).map(({ key, values }) => [key, new Set(values || [])])),
         }
     );
@@ -336,14 +352,19 @@ const ServerSettingsStep = ({
     ];
 
     const deviceCount = (availableDevices || []).length;
+    const userCount = (availableUsers || []).length;
     const tagTypeOptions = (availableTagKeyValues || []).map(({ key, values }) => {
         const label = key.charAt(0).toUpperCase() + key.slice(1);
         const count = (values || []).length;
         return { label: `${count > 1 ? `${label}s` : label} [${count}]`, value: key, disabled: count === 0 };
     });
+    // Users and Devices are kept as two distinct, unambiguous options rather than one merged
+    // "Users" pool — selecting one makes explicit whether the row targets a person (by identity,
+    // beta) or a physical device (by device id, the mature/GA path).
     const userTypeOptions = [
         ...tagTypeOptions,
-        { label: `${deviceCount > 1 ? 'Users' : 'User'} [${deviceCount}]`, value: 'DEVICE', disabled: deviceCount === 0 },
+        { label: `${userCount > 1 ? 'Users' : 'User'} [${userCount}] (Beta)`, value: 'USER', disabled: userCount === 0 },
+        { label: `${deviceCount > 1 ? 'Devices' : 'Device'} [${deviceCount}]`, value: 'DEVICE', disabled: deviceCount === 0 },
     ];
 
     // Include/Exclude is independent per row (see negatedAgentServers/negatedMcpServers/negatedLlmServers on GuardrailPolicies); an empty Exclude row is the one case it can't stay type-scoped
@@ -404,57 +425,62 @@ const ServerSettingsStep = ({
                     const negationProps = getNegationProps?.(condition.type);
                     const negated = !!negationProps?.negated;
                     return (
-                        <HorizontalStack key={index} gap="2" blockAlign="center">
-                            <div style={{ minWidth: 64, textAlign: 'right' }}>
-                                {index === 0
-                                    ? <Text variant="bodyMd" tone="subdued" fontWeight="medium">Where my</Text>
-                                    : <Text variant="bodyMd" tone="subdued" fontWeight="medium">{operator.charAt(0).toUpperCase() + operator.slice(1).toLowerCase()}</Text>
-                                }
-                            </div>
-                            <div style={{ flex: '1', minWidth: 0 }}>
-                                <Dropdown
-                                    id={`cond-type-${condition.type}-${index}`}
-                                    menuItems={rowTypeOptions}
-                                    disabledOptions={rowTypeOptions.filter(o => o.disabled).map(o => o.value)}
-                                    initial={rowTypeOptions.find(o => o.value === condition.type)?.label || rowTypeOptions[0]?.label}
-                                    selected={(val) => {
-                                        dispatch({ type: 'updateKey', index, key: 'type', obj: val });
-                                        dispatch({ type: 'updateKey', index, key: 'values', obj: [] });
-                                        // Row's type changed — reset the old type's toggle so Exclude can't linger with no row showing it
-                                        negationProps?.onToggle(false);
-                                    }}
-                                />
-                            </div>
-                            <Text variant="bodyMd" tone="subdued" fontWeight="medium">{getOptionsForType(condition.type).length > 1 ? 'are' : 'is'}</Text>
-                            <div style={{ flex: '2', minWidth: 0 }}>
-                                <DropdownSearch
-                                    id={`cond-val-${condition.type}-${index}`}
-                                    placeholder="Select value"
-                                    headerContent={negationProps ? negationHeader(negated, (val) => {
-                                        // Switching tabs starts fresh — carrying over values would silently reinterpret them (included <-> excluded).
-                                        negationProps.onToggle(val);
-                                        dispatch({ type: 'updateKey', index, key: 'values', obj: [] });
-                                    }) : undefined}
-                                    optionsList={sortSelectedFirst(getOptionsForType(condition.type), condition.values || [])}
-                                    setSelected={(vals) => dispatch({ type: 'updateKey', index, key: 'values', obj: vals })}
-                                    preSelected={condition.values || []}
-                                    allowMultiple={true}
-                                    negated={negated}
-                                    onToggleNegated={negationProps?.onToggle}
-                                    disabled={getOptionsForType(condition.type).length === 0}
-                                    value={negated
-                                        ? ((condition.values || []).length > 0 ? `All except ${condition.values.length}` : 'All selected')
-                                        : ((condition.values || []).length === 1 && condition.values[0] === ALL_VALUES_SENTINEL ? 'All selected'
-                                            : (condition.values || []).length > 0 ? `${condition.values.length} selected` : undefined)}
-                                    sliceMaxVal={getOptionsForType(condition.type).length || 20}
-                                />
-                            </div>
-                            <Button icon={DeleteMinor} onClick={() => {
-                                dispatch({ type: 'delete', index });
-                                // Reset the toggle too, so "Exclude" can't linger with no row left to undo it
-                                negationProps?.onToggle(false);
-                            }} />
-                        </HorizontalStack>
+                        <VerticalStack key={index} gap="2">
+                            <HorizontalStack gap="2" blockAlign="center">
+                                <div style={{ minWidth: 64, textAlign: 'right' }}>
+                                    {index === 0
+                                        ? <Text variant="bodyMd" tone="subdued" fontWeight="medium">Where my</Text>
+                                        : <Text variant="bodyMd" tone="subdued" fontWeight="medium">{operator.charAt(0).toUpperCase() + operator.slice(1).toLowerCase()}</Text>
+                                    }
+                                </div>
+                                <div style={{ flex: '1', minWidth: 0 }}>
+                                    <Dropdown
+                                        id={`cond-type-${condition.type}-${index}`}
+                                        menuItems={rowTypeOptions}
+                                        disabledOptions={rowTypeOptions.filter(o => o.disabled).map(o => o.value)}
+                                        initial={rowTypeOptions.find(o => o.value === condition.type)?.label || rowTypeOptions[0]?.label}
+                                        selected={(val) => {
+                                            dispatch({ type: 'updateKey', index, key: 'type', obj: val });
+                                            dispatch({ type: 'updateKey', index, key: 'values', obj: [] });
+                                            // Row's type changed — reset the old type's toggle so Exclude can't linger with no row showing it
+                                            negationProps?.onToggle(false);
+                                        }}
+                                    />
+                                </div>
+                                <Text variant="bodyMd" tone="subdued" fontWeight="medium">{getOptionsForType(condition.type).length > 1 ? 'are' : 'is'}</Text>
+                                <div style={{ flex: '2', minWidth: 0 }}>
+                                    <DropdownSearch
+                                        id={`cond-val-${condition.type}-${index}`}
+                                        placeholder="Select value"
+                                        headerContent={negationProps ? negationHeader(negated, (val) => {
+                                            // Switching tabs starts fresh — carrying over values would silently reinterpret them (included <-> excluded).
+                                            negationProps.onToggle(val);
+                                            dispatch({ type: 'updateKey', index, key: 'values', obj: [] });
+                                        }) : undefined}
+                                        optionsList={sortSelectedFirst(getOptionsForType(condition.type), condition.values || [])}
+                                        setSelected={(vals) => dispatch({ type: 'updateKey', index, key: 'values', obj: vals })}
+                                        preSelected={condition.values || []}
+                                        allowMultiple={true}
+                                        negated={negated}
+                                        onToggleNegated={negationProps?.onToggle}
+                                        disabled={getOptionsForType(condition.type).length === 0}
+                                        value={negated
+                                            ? ((condition.values || []).length > 0 ? `All except ${condition.values.length}` : 'All selected')
+                                            : ((condition.values || []).length === 1 && condition.values[0] === ALL_VALUES_SENTINEL ? 'All selected'
+                                                : (condition.values || []).length > 0 ? `${condition.values.length} selected` : undefined)}
+                                        sliceMaxVal={getOptionsForType(condition.type).length || 20}
+                                    />
+                                </div>
+                                <Button icon={DeleteMinor} onClick={() => {
+                                    dispatch({ type: 'delete', index });
+                                    // Reset the toggle too, so "Exclude" can't linger with no row left to undo it
+                                    negationProps?.onToggle(false);
+                                }} />
+                            </HorizontalStack>
+                            {condition.type === 'USER' && (
+                                <Banner tone="info">{USER_BETA_BANNER_TEXT}</Banner>
+                            )}
+                        </VerticalStack>
                     );
                 })}
                 <HorizontalStack gap="4" blockAlign="center">
@@ -600,29 +626,38 @@ const ServerSettingsStep = ({
                                         id="select_users_teams"
                                         name="userTargeting"
                                         onChange={() => setApplyToAllUsers(false)}
-                                        disabled={(availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0}
+                                        disabled={(availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0 && (availableUsers || []).length === 0}
                                         helpText={(() => {
-                                            const noOptions = (availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0;
+                                            const noOptions = (availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0 && (availableUsers || []).length === 0;
                                             if (noOptions) {
                                                 return "No device tags or users found. Devices must report in before you can target them here.";
                                             }
                                             if (userConditions.length === 0) {
                                                 return "Choose specific device tags or Users.";
                                             }
-                                            if (matchingDeviceRows.length === 0) {
-                                                return "Applies to 0 users with the current selection.";
+                                            // Devices and Users are two independent pools (see targetDeviceIds/targetUserNames) —
+                                            // shown as two separate counts rather than one merged "N users" figure, which would
+                                            // hide which half of the selection actually contributed the count.
+                                            const matchedUserItems = (targetUserNames || []).map(name => {
+                                                const option = (availableUsers || []).find(o => o.value === name);
+                                                return { value: name, label: option?.label || name };
+                                            });
+                                            const nonZeroItems = [
+                                                matchingDeviceRows.length > 0 && { count: matchingDeviceRows.length, label: "Devices", items: matchingDeviceRows.map(r => ({ value: r.deviceId, label: `${r.username} · ${deviceIdSuffix(r.deviceId)}` })) },
+                                                matchedUserItems.length > 0 && { count: matchedUserItems.length, label: "Users", items: matchedUserItems },
+                                            ].filter(Boolean);
+                                            if (nonZeroItems.length === 0) {
+                                                return "Applies to 0 devices or users with the current selection.";
                                             }
                                             return (
                                                 <HorizontalStack gap="1" blockAlign="center" wrap>
                                                     <Text variant="bodyMd" tone="subdued">Applies to</Text>
-                                                    <CountPopover
-                                                        count={matchingDeviceRows.length}
-                                                        label={`user${matchingDeviceRows.length !== 1 ? 's' : ''}`}
-                                                        items={matchingDeviceRows.map(r => ({
-                                                            value: r.deviceId,
-                                                            label: `${r.username} · ${deviceIdSuffix(r.deviceId)}`,
-                                                        }))}
-                                                    />
+                                                    {nonZeroItems.flatMap((item, i) => [
+                                                        <CountPopover key={item.label} count={item.count} label={item.label} items={item.items} />,
+                                                        i < nonZeroItems.length - 1 && (
+                                                            <Text key={`sep-${i}`} variant="bodyMd" tone="subdued">and</Text>
+                                                        )
+                                                    ]).filter(Boolean)}
                                                     <Text variant="bodyMd" tone="subdued">with the current selection.</Text>
                                                 </HorizontalStack>
                                             );

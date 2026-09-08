@@ -61,4 +61,25 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
         }
         return result;
     }
+
+    // Companion to fetchUsernameToDeviceIdsForEndpointShield: username -> email. Some agentic
+    // identities only ever exist via module_info reporting (e.g. a browser extension or the
+    // Claude Desktop app, which reports additionalData.email but never gets an agent_users doc
+    // created for it) — for those, this is the only place their email lives, so GuardrailPolicies
+    // targeting-by-user (see GuardrailPoliciesAction#createGuardrailPolicy) re-verifies against
+    // this live source instead of trusting a client-supplied email.
+    public Map<String, String> fetchUsernameToEmailForEndpointShield() {
+        List<ModuleInfo> modules = findAll(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD),
+            Projections.include(ModuleInfo.ADDITIONAL_DATA));
+        Map<String, String> result = new HashMap<>();
+        for (ModuleInfo m : modules) {
+            Map<String, Object> ad = m.getAdditionalData();
+            if (ad == null || ad.get("username") == null || ad.get("email") == null) continue;
+            String username = String.valueOf(ad.get("username")).trim();
+            String email = String.valueOf(ad.get("email")).trim();
+            if (username.isEmpty() || email.isEmpty()) continue;
+            result.putIfAbsent(username, email);
+        }
+        return result;
+    }
 }

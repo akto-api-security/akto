@@ -89,10 +89,18 @@ public class GuardrailPolicies {
     private boolean negatedLlmServers;
 
     // Tag/Device targeting — controls which agentic users/devices this policy applies to.
-    // targetDeviceIds holds explicitly-picked device IDs (dropdown shows them labeled by username,
-    // but the stored value is the device ID itself — usernames aren't a reliable unique identity).
+    // targetDeviceIds holds explicitly-picked device IDs ONLY (dropdown shows them labeled by
+    // username, but the stored value is the device ID itself — usernames aren't a reliable unique
+    // identity). Never holds a bare username — see targetUserNames for identity-only targeting.
     // applyToDeviceIds is resolved at fetch time (not stored) by the dashboard before serving to the enforcement layer.
     private List<String> targetDeviceIds;
+    // Explicitly-picked identities (agent_users/module_info username), independent of any device —
+    // the "Users" targeting pool (beta; currently only reliably populated for Browser extensions
+    // and the Claude Desktop app — see CreateGuardrailPage). Deliberately kept separate from
+    // targetDeviceIds/applyToDeviceIds, which is resolved purely at the device level; a Users
+    // selection is instead matched downstream by email via userMetadata (see
+    // GuardrailPoliciesAction#createGuardrailPolicy for how it's resolved on save).
+    private List<String> targetUserNames;
     // Arbitrary device-tag key → values — AND across keys, OR within one key's values. See
     // scripts/migrate_guardrail_target_teams_roles_to_tags.js for converting pre-existing
     // policies that used the old fixed targetTeams/targetRoles fields.

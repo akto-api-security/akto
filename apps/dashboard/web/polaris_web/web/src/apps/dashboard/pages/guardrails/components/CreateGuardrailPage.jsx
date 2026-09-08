@@ -274,6 +274,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // AgenticUsers (group, role, team, department, ...) is targetable, not just a fixed set.
     const [targetTags, setTargetTags] = useState({});
     const [targetDeviceIds, setTargetDeviceIds] = useState([]);
+    // Explicitly-picked identities ("Users" targeting, beta) — kept fully independent of
+    // targetDeviceIds, which is device-id-only and drives applyToDeviceIds resolution server-side.
+    // A Users pick is never written into targetDeviceIds; it's matched downstream by email via
+    // userMetadata instead (see GuardrailPoliciesAction#createGuardrailPolicy).
+    const [targetUserNames, setTargetUserNames] = useState([]);
     const [enterpriseLicenseComplianceCategories, setEnterpriseLicenseComplianceCategories] = useState([]);
 
     const [agenticUsers, setAgenticUsers] = useState([]);
@@ -304,29 +309,32 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             .sort((a, b) => a.key.localeCompare(b.key));
     }, [agenticUsers]);
 
-    // One row per device, falling back to one row per user for a user with no device on record.
-    // fetchAgenticUsers returns the union of both identity sources, so it includes identities that
-    // are tagged but have nothing reporting; they belong in the list, and the username is the only
-    // value left to key them on. Device rows stay keyed on the device ID because that is what
-    // enforcement matches — a device-label prefix parsed out of mcpServerName, never a username
-    // (see ModuleInfoDao.fetchUsernameToDeviceIdsForEndpointShield). A username row consequently
-    // resolves to nothing at enforcement, which the label states rather than leaving silent.
+    // One row per identity (userName/userEmail), regardless of whether it has any device on
+    // record — this is the "Users" targeting pool: pick a person directly rather than one of
+    // their devices. Kept as its own dropdown option (see ServerSettingsStep) so a selection is
+    // never ambiguous about whether it names a person or a device.
+    const availableUsers = useMemo(() => {
+        const options = [];
+        (agenticUsers || []).forEach(u => {
+            const name = u.userName || u.userEmail;
+            if (!name) return;
+            const label = u.userEmail && u.userEmail !== name ? `${u.userEmail} · ${name}` : name;
+            options.push({ label, value: name });
+        });
+        return options.sort((a, b) => a.label.localeCompare(b.label));
+    }, [agenticUsers]);
+
+    // One row per device — the "Devices" targeting pool. Device rows stay keyed on the device ID
+    // because that is what enforcement matches — a device-label prefix parsed out of
+    // mcpServerName, never a username (see ModuleInfoDao.fetchUsernameToDeviceIdsForEndpointShield).
+    // Identities with no device on record don't appear here; they're only selectable via the
+    // separate "Users" pool above.
     const availableDevices = useMemo(() => {
         const options = [];
         (agenticUsers || []).forEach(u => {
             const name = u.userName || u.userEmail;
             if (!name) return;
-            const devices = (u.devices || []).filter(Boolean);
-            if (devices.length === 0) {
-                // No device on record means no device suffix to show, so render the identity
-                // itself in the same two-part shape as a device row: "<email> · <username>".
-                // Falls back to the bare name when there is no email, or when the name already
-                // is the email, so the two halves are never a repeat of each other.
-                const label = u.userEmail && u.userEmail !== name ? `${u.userEmail} · ${name}` : name;
-                options.push({ label, value: name });
-                return;
-            }
-            devices.forEach(deviceId => {
+            (u.devices || []).filter(Boolean).forEach(deviceId => {
                 options.push({ label: `${name} · ${deviceIdSuffix(deviceId)}`, value: deviceId });
             });
         });
@@ -341,32 +349,29 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         return options.sort((a, b) => a.label.localeCompare(b.label));
     }, [agenticUsers]);
 
-    // Maps each selectable value in availableDevices (a device id, or a username for a
-    // device-less row) back to the identity that owns it. fetchAgenticUsers already gives us each
+    // Maps each selectable value — from either availableUsers (a username) or availableDevices (a
+    // device id) — back to the identity that owns it. fetchAgenticUsers already gives us each
     // identity's userEmail/userId — building this here lets a save send the exact identity behind
-    // a selection instead of leaving the backend to re-derive it by guessing at a raw string.
+    // a selection instead of leaving the backend to re-derive it by guessing at a raw string. Used
+    // to build userMetadata (identity snapshots) for BOTH targetDeviceIds and targetUserNames
+    // selections; it never feeds into targetDeviceIds itself.
     const deviceValueToIdentity = useMemo(() => {
         const map = new Map();
         (agenticUsers || []).forEach(u => {
             if (!u) return;
             const identity = { userName: u.userName || null, userEmail: u.userEmail || null, userId: u.userId || null };
-            const devices = (u.devices || []).filter(Boolean);
-            if (devices.length === 0) {
-                const name = u.userName || u.userEmail;
-                if (name) map.set(name, identity);
-                return;
-            }
-            devices.forEach(deviceId => {
-                if (!deviceId) return;
-                map.set(deviceId, identity);
-            });
+            const name = u.userName || u.userEmail;
+            if (name) map.set(name, identity);
+            (u.devices || []).filter(Boolean).forEach(deviceId => map.set(deviceId, identity));
         });
         return map;
     }, [agenticUsers]);
 
-    // Flatten agenticUsers[].devices into per-device rows, then filter by the same
-    // AND-across-type / OR-within-type semantics used server-side to resolve applyToDeviceIds —
-    // this is what powers the live "applies to N devices" preview in the wizard.
+    // Rows behind the live "applies to N devices" preview — device-only, matched by device tags
+    // and/or explicitly-picked targetDeviceIds, exactly as before the Users pool existed. Users
+    // (targetUserNames) are a separate, direct selection with no tag-expansion — ServerSettingsStep
+    // shows their count on its own (just targetUserNames.length) — so they're deliberately not
+    // folded into this list.
     const matchingDeviceRows = useMemo(() => {
         const rows = [];
         (agenticUsers || []).forEach(u => {
@@ -465,6 +470,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         applyToAllUsers,
         targetTags,
         targetDeviceIds,
+        targetUserNames,
         enterpriseLicenseComplianceCategories,
         // A negated row with zero values is a deliberate "apply to everything" scope, not an unfinished one
         serverScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllServers &&
@@ -474,7 +480,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             (selectedBrowserLlms || []).length === 0,
         userScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllUsers &&
             Object.values(targetTags || {}).every(values => !(values || []).length) &&
-            (targetDeviceIds || []).length === 0,
+            (targetDeviceIds || []).length === 0 &&
+            (targetUserNames || []).length === 0,
     });
 
     const getStepsWithSummary = () => {
@@ -961,9 +968,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
         const loadedTargetTags = policy.targetTags || {};
         const hasAnyTag = Object.values(loadedTargetTags).some(values => (values || []).length > 0);
-        setApplyToAllUsers(!hasAnyTag && !policy.targetDeviceIds?.length);
+        setApplyToAllUsers(!hasAnyTag && !policy.targetDeviceIds?.length && !policy.targetUserNames?.length);
         setTargetTags(loadedTargetTags);
         setTargetDeviceIds(policy.targetDeviceIds || []);
+        setTargetUserNames(policy.targetUserNames || []);
         setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
     };
 
@@ -1106,12 +1114,18 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     Object.entries(targetTags).filter(([, values]) => (values || []).length > 0)
                 ),
                 targetDeviceIds: applyToAllUsers ? [] : targetDeviceIds,
-                // Identities behind the selected targets, deduped by userId (falling back to
-                // userName when an identity has no userId) — resolved here since we already have
-                // the email/userId loaded, rather than making the backend guess it from raw values.
+                // Explicit "Users" picks (beta) — kept fully separate from targetDeviceIds; never
+                // resolved into applyToDeviceIds, only into userMetadata below (matched downstream
+                // by email).
+                targetUserNames: applyToAllUsers ? [] : targetUserNames,
+                // Identities behind the selected targets — both the devices picked via
+                // targetDeviceIds and the identities picked directly via targetUserNames — deduped
+                // by userId (falling back to userName when an identity has no userId). Resolved
+                // here since we already have the email/userId loaded, rather than making the
+                // backend guess it from raw values.
                 userMetadata: applyToAllUsers ? [] : Array.from(
                     new Map(
-                        targetDeviceIds
+                        [...targetDeviceIds, ...targetUserNames]
                             .map(value => deviceValueToIdentity.get(value))
                             .filter(Boolean)
                             .map(identity => [identity.userId || identity.userName, identity])
@@ -1319,13 +1333,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setTargetTags={setTargetTags}
                         targetDeviceIds={targetDeviceIds}
                         setTargetDeviceIds={setTargetDeviceIds}
+                        targetUserNames={targetUserNames}
+                        setTargetUserNames={setTargetUserNames}
                         availableTagKeyValues={availableTagKeyValues}
                         availableDevices={availableDevices}
+                        availableUsers={availableUsers}
                         matchingDeviceRows={matchingDeviceRows}
                         usersLoading={usersLoading}
                         applyToAllUsers={applyToAllUsers}
                         setApplyToAllUsers={setApplyToAllUsers}
-                        deviceList={availableDevices}
+                        deviceList={availableUsers}
                         showConditionError={leftSteps.has(ServerSettingsConfig.number)}
                         showUserConditionError={leftSteps.has(ServerSettingsConfig.number)}
                     />

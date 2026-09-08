@@ -592,6 +592,11 @@ public class ModuleInfoAction extends UserAction {
         }
 
         Map<String, Set<String>> reportedDevicesByUsername = ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield();
+        // module_info is the only place an email exists for an identity that has no agent_users
+        // doc (e.g. a browser extension or the Claude Desktop app, which reports
+        // additionalData.email but is never explicitly tagged) — without this, such an identity
+        // would show up in the Users picker with no email at all.
+        Map<String, String> reportedEmailByUsername = ModuleInfoDao.instance.fetchUsernameToEmailForEndpointShield();
         for (Map.Entry<String, Set<String>> entry : reportedDevicesByUsername.entrySet()) {
             AgenticUsers existing = byUsername.get(entry.getKey());
             if (existing == null) {
@@ -600,9 +605,13 @@ public class ModuleInfoAction extends UserAction {
                 AgenticUsers synthetic = new AgenticUsers();
                 synthetic.setUserName(entry.getKey());
                 synthetic.setDevices(new ArrayList<>(entry.getValue()));
+                synthetic.setUserEmail(reportedEmailByUsername.get(entry.getKey()));
                 byUsername.put(entry.getKey(), synthetic);
             } else {
                 addDevices(existing, entry.getValue());
+                if (existing.getUserEmail() == null) {
+                    existing.setUserEmail(reportedEmailByUsername.get(entry.getKey()));
+                }
             }
         }
 
