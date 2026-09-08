@@ -114,6 +114,7 @@ public class Constants {
     public static final String AI_AGENT_TAG_BOT_NAME = "bot-name";
     public static final String AI_AGENT_TAG_BOT_SCHEMA_NAME = "bot-schemaname";
     public static final String AI_AGENT_TAG_SOURCE = "source";
+    public static final String AI_AGENT_TAG_HARNESS_ROLE_POLICIES = "harness-role-policies";
     public static final String AI_AGENT_TAG_CONNECTOR = "connector";
     public static final String AI_AGENT_CONNECTOR_MICROSOFT_DEFENDER = "MICROSOFT_DEFENDER";
     public static final String AI_AGENT_CONNECTOR_SENTINEL = "SENTINELONE";

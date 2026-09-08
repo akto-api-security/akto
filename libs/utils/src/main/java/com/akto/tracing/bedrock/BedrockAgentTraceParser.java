@@ -25,6 +25,8 @@ public class BedrockAgentTraceParser implements TraceParser {
     private static final String FIELD_HARNESS_ROLE = "harness-execution-role";
     private static final String FIELD_RUNTIME_ROLE = "runtime-execution-role";
     private static final String FIELD_BEDROCK_ROLE = "bedrock-execution-role";
+    private static final String FIELD_BEDROCK_POLICIES = "bedrock-role-policies";
+    private static final String FIELD_HARNESS_POLICIES = "harness-role-policies";
 
     // CloudWatch's trace data has no structured success/failure field for a tool
     // result — only free-text. These are the phrasings actually observed across real
@@ -81,12 +83,26 @@ public class BedrockAgentTraceParser implements TraceParser {
         return AGENT_TYPE_BEDROCK;
     }
 
+    // AWS sends all three keys and blanks the ones that don't apply, so presence alone
+    // isn't enough — take the first field that actually carries a value.
     private String extractExecutionRoleValue(JsonNode awsMetadata) {
-        String field = awsMetadata.has(FIELD_HARNESS_ROLE) ? FIELD_HARNESS_ROLE
-            : awsMetadata.has(FIELD_RUNTIME_ROLE) ? FIELD_RUNTIME_ROLE
-            : FIELD_BEDROCK_ROLE;
-        String value = awsMetadata.path(field).asText("");
-        return value.isEmpty() ? "unknown" : value;
+        for (String field : new String[]{FIELD_HARNESS_ROLE, FIELD_RUNTIME_ROLE, FIELD_BEDROCK_ROLE}) {
+            String value = awsMetadata.path(field).asText("").trim();
+            if (!value.isEmpty()) {
+                return value;
+            }
+        }
+        return "unknown";
+    }
+
+    private String extractRolePoliciesValue(JsonNode awsMetadata) {
+        for (String field : new String[]{FIELD_HARNESS_POLICIES, FIELD_BEDROCK_POLICIES}) {
+            String value = awsMetadata.path(field).asText("").trim();
+            if (!value.isEmpty()) {
+                return value;
+            }
+        }
+        return "unknown";
     }
 
     @Override
@@ -185,7 +201,6 @@ public class BedrockAgentTraceParser implements TraceParser {
         return extractServiceGraph(input, null);
     }
 
-    /** @param botName see {@link #parse(Object, String)}. */
     public Map<String, ServiceGraphEdgeInfo> extractServiceGraph(Object input, String botName) throws Exception {
         try {
             JsonNode awsMetadata = parseToJsonNode(input);
@@ -201,8 +216,12 @@ public class BedrockAgentTraceParser implements TraceParser {
             // Extract model edge
             String model = awsMetadata.path("model").asText("unknown");
             String executionRole = extractExecutionRoleValue(awsMetadata);
+            String rolePolicies = extractRolePoliciesValue(awsMetadata);
 
-            String sourceService = extractBotName(botName);
+            // The role and its policies are part of the node's identity (the same agent name
+            // can run under different roles), so they go into the node label itself — not just
+            // the metadata. Resolved once here so every edge below points at the same node.
+            String sourceService = buildAgentNodeName(extractBotName(botName), executionRole, rolePolicies);
 
             // The agent node is only ever a source below, never a target — without an
             // edge that targets it, the UI has no "type" for it and defaults to
@@ -212,7 +231,10 @@ public class BedrockAgentTraceParser implements TraceParser {
             agentMetadata.put("type", TracingConstants.SpanKind.AGENT);
             agentMetadata.put("edgeParam", "AI Agent");
             agentMetadata.put("role", executionRole);
-            edges.put(sourceService, new ServiceGraphEdgeInfo("User", sourceService, agentMetadata));
+            if (hasValue(rolePolicies)) {
+                agentMetadata.put("rolePolicies", rolePolicies.trim());
+            }
+            edges.put(sourceService, new ServiceGraphEdgeInfo("User", sourceService + " Entitlements", agentMetadata));
 
             // LLM Call edge
             Map<String, Object> llmMetadata = new HashMap<>();
@@ -276,6 +298,31 @@ public class BedrockAgentTraceParser implements TraceParser {
     // Converse call), so it's not a reliable source to derive a name from.
     private String extractBotName(String botName) {
         return (botName != null && !botName.isEmpty()) ? botName : "Bedrock Agent";
+    }
+
+    /**
+     * Agent node label, one value per line so the three read as distinct rows on the
+     * node rather than one crowded string:
+     * <pre>
+     * my-harness
+     * AmazonBedrockAgentCoreHarnessDefaultServiceRole-7oktr
+     * AmazonBedrockAgentCoreRuntimePolicy, AmazonS3ReadOnlyAccess
+     * </pre>
+     * Role and policies are used verbatim; a missing one just drops its line.
+     */
+    private String buildAgentNodeName(String botName, String executionRole, String rolePolicies) {
+        StringBuilder label = new StringBuilder(botName);
+        if (hasValue(executionRole)) {
+            label.append("\n").append(executionRole.trim());
+        }
+        if (hasValue(rolePolicies)) {
+            label.append("\n").append(rolePolicies.trim());
+        }
+        return label.toString();
+    }
+
+    private boolean hasValue(String value) {
+        return value != null && !value.trim().isEmpty() && !value.trim().equals("unknown");
     }
 
     private List<Span> buildSpansFromExecutionFlow(String traceId, String rootSpanId, JsonNode executionFlow) {
