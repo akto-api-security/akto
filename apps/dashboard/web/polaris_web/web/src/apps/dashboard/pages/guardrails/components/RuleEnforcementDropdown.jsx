@@ -22,8 +22,7 @@ export default function RuleEnforcementDropdown({
         return true;
     });
     const showLabelRow = typeof label === "string" && label.trim().length > 0;
-    const showEndpointOnlyNote = isAtlas
-        && (initial === GUARDRAIL_BEHAVIOUR.ALERT || initial === GUARDRAIL_BEHAVIOUR.APPROVAL);
+    const showEndpointOnlyNote = isAtlas && initial === GUARDRAIL_BEHAVIOUR.APPROVAL;
 
     return (
         <VerticalStack gap="2">
@@ -47,7 +46,7 @@ export default function RuleEnforcementDropdown({
             {showEndpointOnlyNote && (
                 <Banner tone="info">
                     <Text variant="bodyMd">
-                        In the browser extension, <Text as="span" fontWeight="bold">Alert</Text> and <Text as="span" fontWeight="bold">Human Approval</Text> behave the same as <Text as="span" fontWeight="bold">Block</Text>.
+                        In the browser extension, <Text as="span" fontWeight="bold">{menuItems.find((o) => o.value === initial)?.label}</Text> behaves the same as <Text as="span" fontWeight="bold">Block</Text>.
                     </Text>
                 </Banner>
             )}
