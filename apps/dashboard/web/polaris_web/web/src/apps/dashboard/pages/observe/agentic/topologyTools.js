@@ -9,6 +9,12 @@ import { buildMcpComponentsFromStis } from "./agenticPageBuilders";
 export const TOOL_CAP = 4;          // tools shown per MCP before collapsing to "+N more"
 export const TOOL_EDGE_COLOR = "#D97706";
 
+// Tool names trimmed to TOOL_CAP, with the remainder collapsed into a trailing "+N more".
+export function capToolLabels(tools = []) {
+    const shown = tools.slice(0, TOOL_CAP);
+    return tools.length > shown.length ? [...shown, `+${tools.length - shown.length} more`] : shown;
+}
+
 // One row per component, plus a reserved row per tool hanging off an MCP. Both layouts place a
 // row at a fixed pitch, so a tool without its own row lands on top of the next component.
 export function withToolRows(items, mcpTools) {
@@ -16,9 +22,7 @@ export function withToolRows(items, mcpTools) {
     items.forEach((item) => {
         rows.push({ item });
         const tools = item.cat === "mcp" && item.collectionId ? (mcpTools[item.collectionId] || []) : [];
-        const shown = tools.slice(0, TOOL_CAP);
-        const labels = tools.length > shown.length ? [...shown, `+${tools.length - shown.length} more`] : shown;
-        labels.forEach((label, i) => rows.push({ item, tool: { id: `${item.id}-tool-${i}`, label } }));
+        capToolLabels(tools).forEach((label, i) => rows.push({ item, tool: { id: `${item.id}-tool-${i}`, label } }));
     });
     return rows;
 }

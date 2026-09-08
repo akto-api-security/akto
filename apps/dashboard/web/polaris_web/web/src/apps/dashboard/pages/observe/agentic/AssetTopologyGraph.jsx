@@ -5,7 +5,7 @@ import { AutomationMajor, MagicMajor, CustomersMinor, ToolsMajor } from "@shopif
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import PluginIcon from "@/assets/Plugin.svg";
 import { getAgentLinkedComponents } from "./agenticPageBuilders";
-import { TOOL_EDGE_COLOR, useMcpTools, withToolRows } from "./topologyTools";
+import { capToolLabels, TOOL_EDGE_COLOR, useMcpTools, withToolRows } from "./topologyTools";
 
 export function topoColors(category) {
     switch (category) {
@@ -129,9 +129,13 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
     // Each MCP's own tools, keyed by collection id — the extra hop the Endpoints graph shows.
     // Only for our own layout; a caller that supplies nodes reserves its own tool rows.
     const mcpCollectionIds = useMemo(() => {
-        if (externalNodes || asset?.type !== "AI Agent") return [];
-        const ids = Object.values(asset.mcpServerCollectionIds || {}).map(a => a?.[0]).filter(Boolean);
-        return [...new Set(ids)];
+        if (externalNodes) return [];
+        // An agent needs one id per linked MCP; an MCP asset opened on its own needs its own
+        // collections, since the tools it exposes are spread across them.
+        const ids = asset?.type === "AI Agent"
+            ? Object.values(asset.mcpServerCollectionIds || {}).map(a => a?.[0])
+            : asset?.type === "MCP Server" ? (asset.collectionIds || []) : [];
+        return [...new Set(ids.filter(Boolean))];
     }, [asset, externalNodes]);
 
     const mcpTools = useMcpTools(mcpCollectionIds);
@@ -209,8 +213,23 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
         const cat     = asset.type === "MCP Server" ? "mcp" : asset.type === "Skill" ? "skill" : asset.type === "Plugin" ? "plugin" : "ai-model";
         const edgeCol = asset.type === "MCP Server" ? "#4cbebb" : asset.type === "Skill" ? "#7C3AED" : asset.type === "Plugin" ? "#4F46E5" : "#ec4899";
 
+        // An MCP asset's own tools, hanging off it the same way they hang off an agent's MCPs.
+        // Unioned across the asset's collections, since one MCP group can span several.
+        const assetToolLabels = asset.type === "MCP Server"
+            ? capToolLabels([...new Set((asset.collectionIds || []).flatMap(id => mcpTools[id] || []))])
+            : [];
+        const toolNodesAt = (x) => assetToolLabels.map((label, i) => ({
+            id: `asset-tool-${i}`, type: "topoNode", draggable: false,
+            position: { x, y: i * NODE_H },
+            data: { component: { category: "tool", type: "Tool", label } },
+        }));
+        const toolEdges = assetToolLabels.map((_, i) => ({
+            id: `e-as-tool-${i}`, source: "asset", target: `asset-tool-${i}`,
+            type: "smoothstep", style: { stroke: TOOL_EDGE_COLOR, strokeWidth: 1.5 },
+        }));
+
         if (parentAgents.length > 0) {
-            const maxRows   = Math.max(devices.length, parentAgents.length, 1);
+            const maxRows   = Math.max(devices.length, parentAgents.length, assetToolLabels.length, 1);
             const totalH    = maxRows * NODE_H;
             const assetY    = (totalH - 44) / 2;
             const devOffset = Math.max(0, (parentAgents.length - devices.length) * NODE_H / 2);
@@ -223,16 +242,18 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
                     { id: "asset", type: "topoNode", draggable: false, position: { x: COL3, y: assetY }, data: { component: { category: cat, type: asset.type, label: asset.name } } },
                     ...parentAgents.map((a, i) => ({ id: `agt-${i}`, type: "topoNode", draggable: false, position: { x: COL2, y: agOffset + i * NODE_H }, data: { component: { category: "agent", type: "AI Agent", label: a.name } } })),
                     ...devices.map((d, i) => ({ id: d.id, type: "topoNode", draggable: false, position: { x: COL1, y: devOffset + i * NODE_H }, data: { component: { category: "external", type: d.type, label: d.label } } })),
+                    ...toolNodesAt(COL4),
                 ],
                 edges: [
                     ...devices.map(d => ({ id: `e-${d.id}-a0`, source: d.id, target: "agt-0", type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } })),
                     ...parentAgents.map((_, i) => ({ id: `e-a${i}-as`, source: `agt-${i}`, target: "asset", type: "smoothstep", style: { stroke: edgeCol, strokeWidth: 1.5 } })),
+                    ...toolEdges,
                 ],
             };
         }
 
         // Fallback: Device → Asset
-        const maxRows = Math.max(devices.length, 1);
+        const maxRows = Math.max(devices.length, assetToolLabels.length, 1);
         const totalH  = maxRows * NODE_H;
         const assetY  = (totalH - 44) / 2;
         return {
@@ -241,8 +262,12 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
             nodes: [
                 { id: "asset", type: "topoNode", draggable: false, position: { x: COL2, y: assetY }, data: { component: { category: cat, type: asset.type, label: asset.name } } },
                 ...devices.map((d, i) => ({ id: d.id, type: "topoNode", draggable: false, position: { x: COL1, y: i * NODE_H }, data: { component: { category: "external", type: d.type, label: d.label } } })),
+                ...toolNodesAt(COL3),
             ],
-            edges: devices.map(d => ({ id: `e-${d.id}-a`, source: d.id, target: "asset", type: "smoothstep", style: { stroke: edgeCol, strokeWidth: 1.5 } })),
+            edges: [
+                ...devices.map(d => ({ id: `e-${d.id}-a`, source: d.id, target: "asset", type: "smoothstep", style: { stroke: edgeCol, strokeWidth: 1.5 } })),
+                ...toolEdges,
+            ],
         };
     }, [asset, assetDevices, agenticTreeData, agenticFlatData, inlineComponents, mcpTools, externalNodes, externalEdges, externalHeight, focusNodeId]);
 
