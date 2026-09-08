@@ -4,6 +4,7 @@ public class Strategy {
     
     private String runOnce;
     private boolean insertVulnApi;
+    private Boolean demerge;
 
     public Strategy(String runOnce, boolean insertVulnApi) {
         this.runOnce = runOnce;
@@ -28,5 +29,13 @@ public class Strategy {
     public void setInsertVulnApi(boolean insertVulnApi) {
         this.insertVulnApi = insertVulnApi;
     }
-    
+
+    public Boolean getDemerge() {
+        return demerge;
+    }
+
+    public void setDemerge(Boolean demerge) {
+        this.demerge = demerge;
+    }
+
 }

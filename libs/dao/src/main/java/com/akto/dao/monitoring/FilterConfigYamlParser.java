@@ -7,11 +7,13 @@ import java.util.Map;
 import com.akto.dao.api_protection_parse_layer.AggregationLayerParser;
 import com.akto.dao.test_editor.filter.ConfigParser;
 import com.akto.dao.test_editor.info.InfoParser;
+import com.akto.dao.test_editor.strategy.StrategyParser;
 import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ExecutorConfigParserResult;
 import com.akto.dto.test_editor.Info;
+import com.akto.dto.test_editor.Strategy;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
@@ -124,6 +126,13 @@ public class FilterConfigYamlParser {
                     filterConfig.setFailureFilter(failureResult);
                 }
             }
+        }
+
+        // Parse strategy (e.g. demerge) if present
+        if (filterConfig != null && config.containsKey(FilterConfig.STRATEGY)) {
+            StrategyParser strategyParser = new StrategyParser();
+            Strategy strategy = strategyParser.parse(config.get(FilterConfig.STRATEGY));
+            filterConfig.setStrategy(strategy);
         }
 
         return filterConfig;
