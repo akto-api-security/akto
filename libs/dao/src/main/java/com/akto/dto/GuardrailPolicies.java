@@ -91,15 +91,19 @@ public class GuardrailPolicies {
     // Tag/Device targeting — controls which agentic users/devices this policy applies to.
     // targetDeviceIds holds explicitly-picked device IDs ONLY (dropdown shows them labeled by
     // username, but the stored value is the device ID itself — usernames aren't a reliable unique
-    // identity). Never holds a bare username — see targetUserNames for identity-only targeting.
-    // applyToDeviceIds is resolved at fetch time (not stored) by the dashboard before serving to the enforcement layer.
+    // identity).
     private List<String> targetDeviceIds;
     // Explicitly-picked identities (agent_users/module_info username), independent of any device —
     // the "Users" targeting pool (beta; currently only reliably populated for Browser extensions
     // and the Claude Desktop app — see CreateGuardrailPage). Deliberately kept separate from
     // targetDeviceIds/applyToDeviceIds, which is resolved purely at the device level; a Users
-    // selection is instead matched downstream by email via userMetadata (see
-    // GuardrailPoliciesAction#createGuardrailPolicy for how it's resolved on save).
+    // selection is instead matched downstream by email via userMetadata.
+    // Inbound-only: never persisted (see GuardrailPoliciesAction#buildPolicyUpdates). userMetadata
+    // is derived solely from this field on save (GuardrailPoliciesAction#createGuardrailPolicy) —
+    // never combined with the identities behind targetDeviceIds — so userMetadata alone is the
+    // durable record of what was picked here; the UI reconstructs this field on edit from
+    // userMetadata's userNames rather than reading it back off the fetched policy.
+    @BsonIgnore
     private List<String> targetUserNames;
     // Arbitrary device-tag key → values — AND across keys, OR within one key's values. See
     // scripts/migrate_guardrail_target_teams_roles_to_tags.js for converting pre-existing

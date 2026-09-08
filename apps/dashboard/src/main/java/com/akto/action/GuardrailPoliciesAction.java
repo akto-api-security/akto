@@ -238,44 +238,38 @@ public class GuardrailPoliciesAction extends UserAction {
             
             EnterpriseLicenseComplianceCatalog.applyToPolicy(policy);
 
-            // The UI sends the identity (userId, falling back to userName) behind each selected
-            // device/tag target — it already has this from fetchAgenticUsers, so re-derive nothing
-            // from raw device id/username strings here. Re-fetch the authoritative doc(s) from
-            // AgentUsersDao fresh on every save rather than trust the client's copy.
-            List<String> targetUserIds = new ArrayList<>();
-            List<String> identityUserNames = new ArrayList<>();
-            if (policy.getUserMetadata() != null) {
-                for (AgenticUsers identity : policy.getUserMetadata()) {
-                    if (identity == null) continue;
-                    if (StringUtils.isNotBlank(identity.getUserId())) {
-                        targetUserIds.add(identity.getUserId());
-                    } else if (StringUtils.isNotBlank(identity.getUserName())) {
-                        identityUserNames.add(identity.getUserName());
-                    }
+            // userMetadata is derived solely from policy.targetUserNames — the explicit "Users"
+            // picks — never combined with the identities behind targetDeviceIds (device targeting
+            // stays purely device-level, resolved separately via applyToDeviceIds). targetUserNames
+            // itself is never persisted (see GuardrailPolicies#targetUserNames, @BsonIgnore);
+            // userMetadata is the durable record of which identities were picked, so it's always
+            // re-resolved fresh from live sources here rather than trusting whatever the client sent.
+            List<String> pickedUserNames = new ArrayList<>();
+            if (policy.getTargetUserNames() != null) {
+                for (String userName : policy.getTargetUserNames()) {
+                    if (StringUtils.isNotBlank(userName)) pickedUserNames.add(userName.trim());
                 }
             }
-            List<AgenticUsers> resolvedUserMetadata = AgentUsersDao.instance.findByUserIdsOrUserNames(targetUserIds, identityUserNames);
+            List<AgenticUsers> resolvedUserMetadata = new ArrayList<>();
+            if (!pickedUserNames.isEmpty()) {
+                resolvedUserMetadata.addAll(AgentUsersDao.instance.findByUserIdsOrUserNames(new ArrayList<>(), pickedUserNames));
 
-            // policy.targetUserNames (see GuardrailPolicies) is the authoritative record of what
-            // was explicitly picked via the "Users" dropdown. An identity picked there can have no
-            // agent_users doc at all (e.g. a browser extension / Claude Desktop app identity that
-            // was never separately tagged) — the lookup above can't find those, so without this
-            // they'd silently vanish from the saved policy despite being explicitly selected.
-            // Re-verify against module_info directly (never trust a client-supplied email) and
-            // always keep the username, attaching an email when module_info actually has one.
-            if (policy.getTargetUserNames() != null && !policy.getTargetUserNames().isEmpty()) {
-                List<String> alreadyResolved = new ArrayList<>();
+                // A pick whose only source is module_info reporting (browser extension / Claude
+                // Desktop app) has no agent_users doc at all, so the lookup above can't find it —
+                // re-verify against module_info directly (never trust a client-supplied email) and
+                // always keep the username, attaching an email when module_info actually has one.
+                List<String> resolvedNames = new ArrayList<>();
                 for (AgenticUsers u : resolvedUserMetadata) {
-                    if (u.getUserName() != null) alreadyResolved.add(u.getUserName());
+                    if (u.getUserName() != null) resolvedNames.add(u.getUserName());
                 }
                 Map<String, String> moduleInfoEmailsByUsername = ModuleInfoDao.instance.fetchUsernameToEmailForEndpointShield();
-                for (String userName : policy.getTargetUserNames()) {
-                    if (StringUtils.isBlank(userName) || alreadyResolved.contains(userName)) continue;
+                for (String userName : pickedUserNames) {
+                    if (resolvedNames.contains(userName)) continue;
                     AgenticUsers snapshot = new AgenticUsers();
                     snapshot.setUserName(userName);
                     snapshot.setUserEmail(moduleInfoEmailsByUsername.get(userName));
                     resolvedUserMetadata.add(snapshot);
-                    alreadyResolved.add(userName);
+                    resolvedNames.add(userName);
                 }
             }
             policy.setUserMetadata(resolvedUserMetadata);
@@ -410,9 +404,8 @@ public class GuardrailPoliciesAction extends UserAction {
         if (p.getTargetDeviceIds() != null) {
             updates.add(Updates.set("targetDeviceIds", p.getTargetDeviceIds()));
         }
-        if (p.getTargetUserNames() != null) {
-            updates.add(Updates.set("targetUserNames", p.getTargetUserNames()));
-        }
+        // targetUserNames is intentionally never persisted (@BsonIgnore) — it's an inbound-only
+        // request field; userMetadata (set unconditionally below) is the durable record instead.
         if (p.getTargetTags() != null) {
             updates.add(Updates.set("targetTags", p.getTargetTags()));
         }

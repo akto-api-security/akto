@@ -968,10 +968,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
         const loadedTargetTags = policy.targetTags || {};
         const hasAnyTag = Object.values(loadedTargetTags).some(values => (values || []).length > 0);
-        setApplyToAllUsers(!hasAnyTag && !policy.targetDeviceIds?.length && !policy.targetUserNames?.length);
+        // targetUserNames is never persisted (backend derives userMetadata from it on save, then
+        // discards it) — userMetadata is the durable record instead, so reconstruct the "Users"
+        // selection from its userNames rather than reading targetUserNames back off the policy.
+        const loadedTargetUserNames = (policy.userMetadata || []).map(u => u.userName).filter(Boolean);
+        setApplyToAllUsers(!hasAnyTag && !policy.targetDeviceIds?.length && !loadedTargetUserNames.length);
         setTargetTags(loadedTargetTags);
         setTargetDeviceIds(policy.targetDeviceIds || []);
-        setTargetUserNames(policy.targetUserNames || []);
+        setTargetUserNames(loadedTargetUserNames);
         setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
     };
 
