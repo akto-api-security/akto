@@ -11,7 +11,8 @@ import AssetTopologyGraph from "./AssetTopologyGraph";
 import { RiskFactorRow } from "./RiskFactorRow";
 import DetailGrid from "./DetailGrid";
 import agenticObserveApi, { buildAgenticObserveChatMetadata, fetchAgenticViolationsPage, openViolationInThreatActivity, deviceServiceKey } from "./agenticObserveApi";
-import { buildMcpComponentsFromStis } from "./agenticPageBuilders";
+import { buildAgentBuiltinToolsFromStis } from "./agenticPageBuilders";
+import { TOOL_EDGE_COLOR, useMcpTools, withToolRows } from "./topologyTools";
 import api from "../api";
 import { extractEndpointId } from "./constants";
 import func from "@/util/func";
@@ -188,7 +189,7 @@ function buildAgentCol3Items(detail, agentIdx, builtinTools = []) {
         const name = tool?.name;
         if (!name || seenTools.has(name)) return;
         seenTools.add(name);
-        items.push({ id: `inline-tool-${agentIdx}-${ti}`, cat: "tool", type: "Tool", label: name, agentIdx, edgeColor: "#D97706" });
+        items.push({ id: `inline-tool-${agentIdx}-${ti}`, cat: "tool", type: "Tool", label: name, agentIdx, edgeColor: TOOL_EDGE_COLOR });
     });
 
     return items;
@@ -197,21 +198,6 @@ function buildAgentCol3Items(detail, agentIdx, builtinTools = []) {
 const TOPO_ROW_H = 76;      // one component row
 const TOPO_BLOCK_GAP = 28;  // gap between two agents' blocks
 const TOPO_NODE_H = 64;     // rendered node height, for vertical centering
-
-const TOOL_CAP = 4;
-
-// One row per component, plus a row per tool hanging off an MCP — so nothing ever shares a row.
-function buildAgentRows(items, mcpTools) {
-    const rows = [];
-    items.forEach((item) => {
-        rows.push({ item });
-        const tools = item.cat === "mcp" && item.collectionId ? (mcpTools[item.collectionId] || []) : [];
-        const shown = tools.slice(0, TOOL_CAP);
-        const labels = tools.length > shown.length ? [...shown, `+${tools.length - shown.length} more`] : shown;
-        labels.forEach((label, i) => rows.push({ item, tool: { id: `${item.id}-tool-${i}`, label } }));
-    });
-    return rows;
-}
 
 function TopologyGraph({ device, agents, agentDetails = new Map(), agentTools = {}, mcpTools = {} }) {
     const { nodes, edges } = useMemo(() => {
@@ -233,7 +219,7 @@ function TopologyGraph({ device, agents, agentDetails = new Map(), agentTools = 
             let cursor = 0;
             const blocks = aiAgents.map((a, i) => {
                 const items = buildAgentCol3Items(agentDetails.get(a.groupKey), i, agentTools[i] || []);
-                const rows = buildAgentRows(items, mcpTools);
+                const rows = withToolRows(items, mcpTools);
                 const blockH = Math.max(1, rows.length) * TOPO_ROW_H;
                 const block = { idx: i, label: a.endpoint, rows, top: cursor, blockH };
                 cursor += blockH + TOPO_BLOCK_GAP;
@@ -249,7 +235,7 @@ function TopologyGraph({ device, agents, agentDetails = new Map(), agentTools = 
                     const y = b.top + j * TOPO_ROW_H;
                     if (row.tool) {
                         ns.push({ id: row.tool.id, type: "topoNode", draggable: false, position: { x: COL4_X, y }, data: { component: { category: "tool", type: "Tool", label: row.tool.label } } });
-                        es.push({ id: `e-${row.tool.id}`, source: row.item.id, target: row.tool.id, type: "smoothstep", style: { stroke: "#D97706", strokeWidth: 1.5 } });
+                        es.push({ id: `e-${row.tool.id}`, source: row.item.id, target: row.tool.id, type: "smoothstep", style: { stroke: TOOL_EDGE_COLOR, strokeWidth: 1.5 } });
                         return;
                     }
                     const item = row.item;
@@ -361,33 +347,33 @@ function OverviewTab({ device, agents, collections, onTabChange, startTimestamp,
 
     useEffect(() => {
         if (!aiAgents.length) { setAgentTools({}); return; }
+        // One batch over every agent's collections (3 requests total) rather than
+        // fetchAgentBuiltinToolsData per collection per agent, which was 3 requests each — a
+        // device with 10 agents across 3 collections apiece fired 90.
+        const allIds = [...new Set(aiAgents.flatMap(a => a.collectionIds || []))];
+        if (!allIds.length) { setAgentTools({}); return; }
         let cancelled = false;
-        (async () => {
-            try {
-                // allSettled at both levels — one failing collection used to blank the tools list for
-                // every agent in the flyout, not just its own.
-                const settled = await Promise.allSettled(aiAgents.map(async (agent, idx) => {
-                    const ids = agent.collectionIds || [];
-                    if (!ids.length) return [idx, []];
-                    const bundles = await Promise.allSettled(ids.map(id => agenticObserveApi.fetchAgentBuiltinToolsData(id)));
+        agenticObserveApi.fetchCollectionStiBundlesBatch(allIds)
+            .then(bundles => {
+                if (cancelled) return;
+                const next = {};
+                aiAgents.forEach((agent, idx) => {
                     const seen = new Set();
                     const tools = [];
-                    bundles.forEach((b) => {
-                        if (b.status !== "fulfilled") return;
-                        (b.value || []).forEach((tool) => {
+                    (agent.collectionIds || []).forEach((id) => {
+                        const b = bundles.get(typeof id === "string" ? parseInt(id, 10) : id);
+                        if (!b) return;
+                        buildAgentBuiltinToolsFromStis(b.stiEndpoints, b.apiInfoList, b.id, b.auditRows).forEach((tool) => {
                             if (!tool?.name || seen.has(tool.name)) return;
                             seen.add(tool.name);
                             tools.push(tool);
                         });
                     });
-                    return [idx, tools];
-                }));
-                const entries = settled.filter((s) => s.status === "fulfilled").map((s) => s.value);
-                if (!cancelled) setAgentTools(Object.fromEntries(entries));
-            } catch {
-                if (!cancelled) setAgentTools({});
-            }
-        })();
+                    next[idx] = tools;
+                });
+                setAgentTools(next);
+            })
+            .catch(() => { if (!cancelled) setAgentTools({}); });
         return () => { cancelled = true; };
     }, [aiAgents]);
 
@@ -415,23 +401,7 @@ function OverviewTab({ device, agents, collections, onTabChange, startTimestamp,
         return [...ids];
     }, [agentDetails]);
 
-    const [mcpTools, setMcpTools] = useState({});
-    useEffect(() => {
-        if (!mcpCollectionIds.length) { setMcpTools({}); return; }
-        let cancelled = false;
-        agenticObserveApi.fetchCollectionStiBundlesBatch(mcpCollectionIds)
-            .then(bundles => {
-                if (cancelled) return;
-                const next = {};
-                bundles.forEach((b, id) => {
-                    const { tools } = buildMcpComponentsFromStis(b.stiEndpoints, b.apiInfoList, b.id, b.auditRows);
-                    next[id] = (tools || []).map(t => t.name).filter(Boolean);
-                });
-                setMcpTools(next);
-            })
-            .catch(() => { if (!cancelled) setMcpTools({}); });
-        return () => { cancelled = true; };
-    }, [mcpCollectionIds]);
+    const mcpTools = useMcpTools(mcpCollectionIds);
 
     const inlineToolCount = useMemo(
         () => Object.values(agentTools).reduce((n, tools) => n + (tools?.length || 0), 0),

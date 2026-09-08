@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-renderer";
 import { Box, HorizontalStack, VerticalStack, Text, Card, Icon, Avatar, Tooltip } from "@shopify/polaris";
 import { AutomationMajor, MagicMajor, CustomersMinor, ToolsMajor } from "@shopify/polaris-icons";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import PluginIcon from "@/assets/Plugin.svg";
-import { getAgentLinkedComponents, buildMcpComponentsFromStis } from "./agenticPageBuilders";
-import agenticObserveApi from "./agenticObserveApi";
+import { getAgentLinkedComponents } from "./agenticPageBuilders";
+import { TOOL_EDGE_COLOR, useMcpTools, withToolRows } from "./topologyTools";
 
 export function topoColors(category) {
     switch (category) {
@@ -14,7 +14,7 @@ export function topoColors(category) {
         case "mcp":      return { borderColor: "#4cbebb", backgroundColor: "#ecfdf5" };
         // Tools hang off MCP nodes, so they deliberately don't reuse mcp's teal — amber keeps a
         // tool readable as its own thing rather than looking like another MCP Server.
-        case "tool":     return { borderColor: "#D97706", backgroundColor: "#FFFBEB" };
+        case "tool":     return { borderColor: TOOL_EDGE_COLOR, backgroundColor: "#FFFBEB" };
         case "ai-model": return { borderColor: "#ec4899", backgroundColor: "#fdf2f8" };
         case "skill":    return { borderColor: "#7C3AED", backgroundColor: "#F3E8FF" };
         case "plugin":   return { borderColor: "#4F46E5", backgroundColor: "#EEF2FF" };
@@ -79,28 +79,18 @@ const NODE_H = 84;
 const GRAPH_H = 300;
 const NODE_W = 176;    // rendered node box, for centering on the focus node
 const FOCUS_ZOOM = 1;
-const TOOL_CAP = 4;
 
 // Opens centred on the asset the flyout is actually about (the device on Endpoints, the agent/MCP
 // on Agentic Assets) instead of a fitView that shrinks everything to fit the widest branch.
 function centerOnFocus(api, nodes, focusId) {
     const target = nodes.find(n => n.id === focusId);
     if (!target) { api.fitView({ padding: 0.2 }); return; }
-    api.setCenter(target.position.x + NODE_W / 2, target.position.y + 32, { zoom: FOCUS_ZOOM });
-}
-
-// One row per component, plus a reserved row per tool hanging off an MCP — the layout is a flat
-// NODE_H grid, so tools appended without their own row land on the next component.
-function withToolRows(items, mcpTools) {
-    const rows = [];
-    items.forEach((item) => {
-        rows.push({ item });
-        const tools = item.collectionId ? (mcpTools[item.collectionId] || []) : [];
-        const shown = tools.slice(0, TOOL_CAP);
-        const labels = tools.length > shown.length ? [...shown, `+${tools.length - shown.length} more`] : shown;
-        labels.forEach((label, i) => rows.push({ item, tool: { id: `${item.id}-tool-${i}`, label } }));
-    });
-    return rows;
+    // getNode returns the store's copy, which carries the *measured* box — the node's width comes
+    // from TopoNode's label widths, so hardcoding it here would drift the moment those change.
+    const measured = api.getNode?.(focusId);
+    const w = measured?.width || NODE_W;
+    const h = measured?.height || NODE_H;
+    api.setCenter(target.position.x + w / 2, target.position.y + h / 2, { zoom: FOCUS_ZOOM });
 }
 
 // Returns parent AI Agent flat rows for an MCP/Skill asset.
@@ -144,23 +134,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
         return [...new Set(ids)];
     }, [asset, externalNodes]);
 
-    const [mcpTools, setMcpTools] = useState({});
-    useEffect(() => {
-        if (!mcpCollectionIds.length) { setMcpTools({}); return; }
-        let cancelled = false;
-        agenticObserveApi.fetchCollectionStiBundlesBatch(mcpCollectionIds)
-            .then(bundles => {
-                if (cancelled) return;
-                const next = {};
-                bundles.forEach((b, id) => {
-                    const { tools } = buildMcpComponentsFromStis(b.stiEndpoints, b.apiInfoList, b.id, b.auditRows);
-                    next[id] = (tools || []).map(t => t.name).filter(Boolean);
-                });
-                setMcpTools(next);
-            })
-            .catch(() => { if (!cancelled) setMcpTools({}); });
-        return () => { cancelled = true; };
-    }, [mcpCollectionIds]);
+    const mcpTools = useMcpTools(mcpCollectionIds);
 
     const { nodes, edges, height, focusId } = useMemo(() => {
         if (externalNodes && externalEdges) {
@@ -219,7 +193,7 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
                 edges: [
                     ...devices.map(d => ({ id: `e-${d.id}-a`,   source: d.id, target: "agent",   type: "smoothstep", style: { stroke: "#9CA3AF", strokeWidth: 1.5 } })),
                     ...rows.map(row => (row.tool
-                        ? { id: `e-${row.tool.id}`, source: row.item.id, target: row.tool.id, type: "smoothstep", style: { stroke: "#D97706", strokeWidth: 1.5 } }
+                        ? { id: `e-${row.tool.id}`, source: row.item.id, target: row.tool.id, type: "smoothstep", style: { stroke: TOOL_EDGE_COLOR, strokeWidth: 1.5 } }
                         : { id: `e-a-${row.item.id}`, source: "agent", target: row.item.id, type: "smoothstep", style: { stroke: row.item.edgeColor, strokeWidth: 1.5 } })),
                 ],
             };
