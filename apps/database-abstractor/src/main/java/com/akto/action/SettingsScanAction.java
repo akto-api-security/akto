@@ -89,8 +89,9 @@ public class SettingsScanAction extends ActionSupport {
         "reason about: projects (including trust_level — a folder's own name/path is never evidence of\n" +
         "anything), mcp_servers, apps, plugins, marketplaces, model_providers, otel, mcp_oauth_*,\n" +
         "cli_auth_credentials_store, notify, developer_instructions, model_instructions_file, compact_prompt,\n" +
-        "experimental_compact_prompt_file, skills, notice, windows, tui, desktop, history, memories, hooks,\n" +
-        "shell_environment_policy, allow_login_shell.\n" +
+        "experimental_compact_prompt_file, skills, notice, windows, tui, desktop, history, memories,\n" +
+        "shell_environment_policy, allow_login_shell, and — never a finding under ANY name — hooks,\n" +
+        "features.hooks, or any hooks.* / features.hooks.* sub-field.\n" +
         "\n" +
         "Within scope, judge each field the same way as above: does its actual value skip approval, weaken\n" +
         "the sandbox, or let the agent read/write outside its workspace (credential paths, /etc, .., ~, /) or\n" +
@@ -109,10 +110,10 @@ public class SettingsScanAction extends ActionSupport {
         "SCOPE — permissions.* and sandbox.* fields, plus the single field disableAllHooks: permissions.\n" +
         "defaultMode, permissions.allow / .ask / .deny entries, permissions.additionalDirectories,\n" +
         "sandbox.enabled, sandbox.network.*, sandbox.filesystem.*, sandbox.credentials, sandbox.\n" +
-        "autoAllowBashIfSandboxed, sandbox.excludedCommands, disableAllHooks. Skip the  MCP fields as their audit trails\n" +
+        "autoAllowBashIfSandboxed, sandbox.excludedCommands, disableAllHooks. OUT OF SCOPE, never a finding: MCP fields\n" +
         "(allowAllMcpServers, enabledMcpjsonServers, disabledMcpjsonServers, enableAllProjectMcpServers,\n" +
-        "mcpServers entries), statusLine, credentialHelper,enabledPlugins, and every other hooks field lives elsewhere and\n" +
-        "is already covered by that pass.\n" +
+        "mcpServers entries), statusLine, credentialHelper, enabledPlugins, and any \"hooks\" field or sub-field —\n" +
+        "the only hooks-related field you may ever report is the exact field name disableAllHooks.\n" +
         "\n" +
         "Within scope, judge each field the same way as above: does its actual value skip approval, turn\n" +
         "off or weaken the sandbox, or grant a bare state-changing tool (\"Write\", \"Edit\", \"Bash\",\n" +
@@ -223,6 +224,11 @@ public class SettingsScanAction extends ActionSupport {
                 logger.debug("[SettingsScan] Dropping disableAllHooks finding — settingsJson has disableAllHooks: false", LogDb.DB_ABS);
                 continue;
             }
+            if (isDeniedHooksField(tool, finding.get("fieldPath"))) {
+                logger.debug("[SettingsScan] Dropping hooks finding (hard denylist) tool=" + tool
+                        + " fieldPath=" + finding.get("fieldPath"), LogDb.DB_ABS);
+                continue;
+            }
             if (!fieldPresentInConfig(finding.get("fieldPath"))) {
                 logger.info("[SettingsScan] Dropping finding — fieldPath not present in settingsJson: "
                         + finding.get("fieldPath"), LogDb.DB_ABS);
@@ -271,6 +277,23 @@ public class SettingsScanAction extends ActionSupport {
         Object content = message.get("content");
         if (content == null) throw new RuntimeException("No content in LLM message");
         return content.toString();
+    }
+
+    // Tools for which "hooks" fields are always out of scope. codex_requirements is deliberately
+    // excluded — a third-party hook injected there IS a legitimate finding per its prompt.
+    private static final Set<String> TOOLS_HOOKS_OUT_OF_SCOPE = new HashSet<>(
+            java.util.Arrays.asList(TOOL_CLAUDE, TOOL_CODEX, TOOL_COPILOT));
+
+    // Hard denylist, independent of the LLM's own output: every prompt above already tells the
+    // model hooks are out of scope, but that is a soft instruction it does not always follow
+    // (hooks.Stop / features.hooks findings kept leaking through). This guarantees they never
+    // surface regardless of what the LLM returns.
+    private boolean isDeniedHooksField(String toolName, Object fieldPathObj) {
+        if (!TOOLS_HOOKS_OUT_OF_SCOPE.contains(toolName) || fieldPathObj == null) return false;
+        String path = fieldPathObj.toString().toLowerCase();
+        if ("disableAllHooks".equals(path)) return false;
+        return path.equals("hooks") || path.startsWith("hooks.") || path.startsWith("hooks[")
+                || path.equals("features.hooks") || path.startsWith("features.hooks.") || path.startsWith("features.hooks[");
     }
 
     private boolean fieldPresentInConfig(Object fieldPath) {
