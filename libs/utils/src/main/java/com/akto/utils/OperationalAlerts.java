@@ -1,6 +1,7 @@
 package com.akto.utils;
 
 import com.akto.log.LoggerMaker;
+import com.akto.data_actor.ClientActor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.*;
 import java.util.LinkedHashMap;
@@ -13,6 +14,8 @@ import java.util.function.LongSupplier;
 public final class OperationalAlerts {
     private static final LoggerMaker LOG = new LoggerMaker(OperationalAlerts.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final String WEBHOOK = System.getenv("AKTO_SLACK_ALERT_WEBHOOK");
+    // Deployment identity comes from the configured abstractor token, never request data.
+    private static final String DEPLOYMENT_ACCOUNT_ID = label(ClientActor.getAbstractorAccountIdFromEnvOrNull());
     private static final OkHttpClient HTTP = new OkHttpClient.Builder()
             .connectTimeout(3, TimeUnit.SECONDS).readTimeout(3, TimeUnit.SECONDS)
             .writeTimeout(3, TimeUnit.SECONDS).callTimeout(5, TimeUnit.SECONDS).build();
@@ -45,6 +48,11 @@ public final class OperationalAlerts {
     public static void send(String key, String message) {
         if (WEBHOOK == null || WEBHOOK.trim().isEmpty()) return;
         INSTANCE.submit(key, "[data-ingestion] host=" + label(System.getenv("HOSTNAME")) + "\n" + message);
+    }
+
+    /** accountId from DATABASE_ABSTRACTOR_SERVICE_TOKEN; unknown if missing/invalid. */
+    public static String deploymentAccountId() {
+        return DEPLOYMENT_ACCOUNT_ID;
     }
 
     synchronized void submit(String key, String message) {

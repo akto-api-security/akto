@@ -1,6 +1,7 @@
 package com.akto.gateway;
 
 import okhttp3.*;
+import com.akto.utils.OperationalAlerts;
 import org.junit.Test;
 import java.net.SocketTimeoutException;
 import java.util.*;
@@ -16,7 +17,7 @@ public class GuardrailsFailOpenAlertTest {
         GuardrailsClient client = new GuardrailsClient("http://guardrails.test", http,
                 (key, message) -> alerts.add(key + "\n" + message));
         Map<String, Object> request = new HashMap<>();
-        request.put("akto_account_id", "1726615470");
+        request.put("akto_account_id", "untrusted-request-account");
         request.put("requestPayload", "SECRET_PAYLOAD");
         return client.callValidateRequest(request);
     }
@@ -30,7 +31,8 @@ public class GuardrailsFailOpenAlertTest {
             assertEquals(Boolean.TRUE, result.get("Allowed"));
             assertEquals(Boolean.TRUE, result.get("failOpen"));
             assertEquals(1, alerts.size());
-            assertTrue(alerts.get(0).contains("1726615470"));
+            assertTrue(alerts.get(0).contains("Account: " + OperationalAlerts.deploymentAccountId()));
+            assertFalse(alerts.get(0).contains("untrusted-request-account"));
             assertFalse(alerts.get(0).contains("SECRET_PAYLOAD"));
         }
     }

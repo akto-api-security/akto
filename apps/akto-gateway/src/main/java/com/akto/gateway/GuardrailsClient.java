@@ -169,7 +169,7 @@ public class GuardrailsClient {
     }
 
     private void alertFailOpen(Map<String, Object> request, String endpoint, String category) {
-        String account = OperationalAlerts.label(request == null ? null : request.get("akto_account_id"));
+        String account = OperationalAlerts.deploymentAccountId();
         try {
             alerts.accept("guardrails:" + account + ":" + endpoint,
                     "Guardrails failed open; traffic was allowed without a reliable verdict"

@@ -17,22 +17,17 @@ public class TopicPublisher implements TrafficPublisher {
         this.config = config;
     }
 
-    public void publish(String message, String primaryTopic, boolean publishToGuardrails) {
-        publish(message, primaryTopic, publishToGuardrails, null);
-    }
-
     @Override
-    public void publish(String message, String primaryTopic, boolean publishToGuardrails, String accountId) {
-        send(message, primaryTopic, accountId);
+    public void publish(String message, String primaryTopic, boolean publishToGuardrails) {
+        send(message, primaryTopic);
 
         if (publishToGuardrails && config.isEnabled()) {
-            send(message, config.getTopicName(), accountId);
+            send(message, config.getTopicName());
         }
     }
 
-    private void send(String message, String topic, String accountId) {
-        // Capture account on the caller thread; Kafka callbacks do not inherit its context.
-        final String account = OperationalAlerts.label(accountId);
+    private void send(String message, String topic) {
+        final String account = OperationalAlerts.deploymentAccountId();
         kafkaProducer.send(message, topic, (metadata, error) -> {
             if (error != null) {
                 OperationalAlerts.send("kafka:" + account + ":" + topic,
