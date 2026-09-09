@@ -199,10 +199,26 @@ const TOPO_ROW_H = 76;      // one component row
 const TOPO_BLOCK_GAP = 28;  // gap between two agents' blocks
 const TOPO_NODE_H = 64;     // rendered node height, for vertical centering
 
+// A device-child row's own edgeColor/cat, for a "direct" node — one that hangs straight off the
+// device rather than behind an AI Agent. Only "MCP Server" carries a collectionId (buildDeviceChildren
+// — only agent rows get a groupKey instead, for the detail batch fetch), so it's the only direct
+// type with tools of its own; LLM/Skill/Plugin render as plain leaves.
+function directNodeStyle(type) {
+    switch (type) {
+        case "LLM":    return { cat: "ai-model", edgeColor: "#ec4899" };
+        case "Skill":  return { cat: "skill",    edgeColor: "#7C3AED" };
+        case "Plugin": return { cat: "plugin",   edgeColor: "#4F46E5" };
+        default:       return { cat: "mcp",      edgeColor: "#4cbebb" }; // MCP Server
+    }
+}
+
 function TopologyGraph({ device, agents, agentDetails = new Map(), agentTools = {}, mcpTools = {} }) {
     const { nodes, edges } = useMemo(() => {
         const aiAgents = agents.filter(a => a.type === "AI Agent");
-        const hasAgents = aiAgents.length > 0;
+        // Anything the device talks to directly, not behind a recognized AI Agent — its own
+        // sibling branch off the device, same as an agent's, instead of being dropped just because
+        // this device also happens to have agents.
+        const directChildren = agents.filter(a => ["MCP Server", "LLM", "Skill", "Plugin"].includes(a.type));
 
         const COL1_X = 40, COL2_X = 250, COL3_X = 470, COL4_X = 690;
         const centerIn = (top, blockH) => top + (blockH - TOPO_NODE_H) / 2;
@@ -211,51 +227,61 @@ function TopologyGraph({ device, agents, agentDetails = new Map(), agentTools = 
         const ns = [];
         const es = [];
 
-        if (hasAgents) {
-            // Each agent owns a vertical block sized to its own components, so a component always
-            // sits directly across from the agent it belongs to. Laying every agent's components
-            // out as one flat list instead (the old approach) left them lined up against
-            // whichever agent happened to share that row.
-            let cursor = 0;
-            const blocks = aiAgents.map((a, i) => {
-                const items = buildAgentCol3Items(agentDetails.get(a.groupKey), i, agentTools[i] || []);
-                const rows = withToolRows(items, mcpTools);
-                const blockH = Math.max(1, rows.length) * TOPO_ROW_H;
-                const block = { idx: i, label: a.endpoint, rows, top: cursor, blockH };
-                cursor += blockH + TOPO_BLOCK_GAP;
-                return block;
-            });
-            const contentH = Math.max(cursor - TOPO_BLOCK_GAP, TOPO_ROW_H);
-
-            ns.push({ id: "device", type: "topoNode", draggable: false, position: { x: COL1_X, y: centerIn(0, contentH) }, data: { component: { category: "external", type: "User", label: deviceLabel } } });
-            blocks.forEach((b) => {
-                ns.push({ id: `agent-${b.idx}`, type: "topoNode", draggable: false, position: { x: COL2_X, y: centerIn(b.top, b.blockH) }, data: { component: { category: "agent", type: "AI Agent", label: b.label } } });
-                es.push({ id: `e-d-a${b.idx}`, source: "device", target: `agent-${b.idx}`, type: "smoothstep", style: { stroke: "#9ca3af", strokeWidth: 1.5 } });
-                b.rows.forEach((row, j) => {
-                    const y = b.top + j * TOPO_ROW_H;
-                    if (row.tool) {
-                        ns.push({ id: row.tool.id, type: "topoNode", draggable: false, position: { x: COL4_X, y }, data: { component: { category: "tool", type: "Tool", label: row.tool.label } } });
-                        es.push({ id: `e-${row.tool.id}`, source: row.item.id, target: row.tool.id, type: "smoothstep", style: { stroke: TOOL_EDGE_COLOR, strokeWidth: 1.5 } });
-                        return;
-                    }
-                    const item = row.item;
-                    ns.push({ id: item.id, type: "topoNode", draggable: false, position: { x: COL3_X, y }, data: { component: { category: item.cat, type: item.type, label: item.label, collectionId: item.collectionId } } });
-                    es.push({ id: `e-a${b.idx}-${item.id}`, source: `agent-${b.idx}`, target: item.id, type: "smoothstep", style: { stroke: item.edgeColor, strokeWidth: 1.5 } });
-                });
-            });
-            return { nodes: ns, edges: es };
-        }
-
-        // No AI Agents — show device → direct service children (MCP/LLM)
-        const direct = agents.filter(a => a.type === "MCP Server" || a.type === "LLM");
-        const contentH = Math.max(direct.length, 1) * TOPO_ROW_H;
-        ns.push({ id: "device", type: "topoNode", draggable: false, position: { x: COL1_X, y: centerIn(0, contentH) }, data: { component: { category: "external", type: "User", label: deviceLabel } } });
-        direct.forEach((a, i) => {
-            const cat = a.type === "LLM" ? "ai-model" : "mcp";
-            const color = a.type === "LLM" ? "#ec4899" : "#9ca3af";
-            ns.push({ id: `svc-${i}`, type: "topoNode", draggable: false, position: { x: COL2_X, y: i * TOPO_ROW_H }, data: { component: { category: cat, type: a.type, label: a.endpoint, collectionId: cat === "mcp" ? a.collectionIds?.[0] : undefined } } });
-            es.push({ id: `e-d-s${i}`, source: "device", target: `svc-${i}`, type: "smoothstep", style: { stroke: color, strokeWidth: 1.5 } });
+        // Each agent (and each direct child) owns a vertical block sized to its own components, so
+        // a component always sits directly across from the thing it belongs to. Laying every
+        // agent's components out as one flat list instead (the old approach) left them lined up
+        // against whichever agent happened to share that row.
+        let cursor = 0;
+        const agentBlocks = aiAgents.map((a, i) => {
+            const items = buildAgentCol3Items(agentDetails.get(a.groupKey), i, agentTools[i] || []);
+            const rows = withToolRows(items, mcpTools);
+            const blockH = Math.max(1, rows.length) * TOPO_ROW_H;
+            const block = { idx: i, label: a.endpoint, rows, top: cursor, blockH };
+            cursor += blockH + TOPO_BLOCK_GAP;
+            return block;
         });
+        const directBlocks = directChildren.map((a, i) => {
+            const style = directNodeStyle(a.type);
+            const collectionId = a.type === "MCP Server" ? a.collectionIds?.[0] : undefined;
+            const item = { id: `direct-${i}`, type: a.type, label: a.endpoint, cat: style.cat, edgeColor: style.edgeColor, collectionId };
+            // Row 0 (the item itself) is reserved implicitly — only the tool rows behind it, if any,
+            // need laying out here.
+            const toolRows = withToolRows([item], mcpTools).slice(1);
+            const blockH = Math.max(1, toolRows.length + 1) * TOPO_ROW_H;
+            const block = { idx: i, item, toolRows, top: cursor, blockH };
+            cursor += blockH + TOPO_BLOCK_GAP;
+            return block;
+        });
+        const contentH = Math.max(cursor - TOPO_BLOCK_GAP, TOPO_ROW_H);
+
+        ns.push({ id: "device", type: "topoNode", draggable: false, position: { x: COL1_X, y: centerIn(0, contentH) }, data: { component: { category: "external", type: "User", label: deviceLabel } } });
+
+        agentBlocks.forEach((b) => {
+            ns.push({ id: `agent-${b.idx}`, type: "topoNode", draggable: false, position: { x: COL2_X, y: centerIn(b.top, b.blockH) }, data: { component: { category: "agent", type: "AI Agent", label: b.label } } });
+            es.push({ id: `e-d-a${b.idx}`, source: "device", target: `agent-${b.idx}`, type: "smoothstep", style: { stroke: "#9ca3af", strokeWidth: 1.5 } });
+            b.rows.forEach((row, j) => {
+                const y = b.top + j * TOPO_ROW_H;
+                if (row.tool) {
+                    ns.push({ id: row.tool.id, type: "topoNode", draggable: false, position: { x: COL4_X, y }, data: { component: { category: "tool", type: "Tool", label: row.tool.label } } });
+                    es.push({ id: `e-${row.tool.id}`, source: row.item.id, target: row.tool.id, type: "smoothstep", style: { stroke: TOOL_EDGE_COLOR, strokeWidth: 1.5 } });
+                    return;
+                }
+                const item = row.item;
+                ns.push({ id: item.id, type: "topoNode", draggable: false, position: { x: COL3_X, y }, data: { component: { category: item.cat, type: item.type, label: item.label, collectionId: item.collectionId } } });
+                es.push({ id: `e-a${b.idx}-${item.id}`, source: `agent-${b.idx}`, target: item.id, type: "smoothstep", style: { stroke: item.edgeColor, strokeWidth: 1.5 } });
+            });
+        });
+
+        directBlocks.forEach((b) => {
+            ns.push({ id: b.item.id, type: "topoNode", draggable: false, position: { x: COL2_X, y: centerIn(b.top, b.blockH) }, data: { component: { category: b.item.cat, type: b.item.type, label: b.item.label } } });
+            es.push({ id: `e-d-${b.item.id}`, source: "device", target: b.item.id, type: "smoothstep", style: { stroke: b.item.edgeColor, strokeWidth: 1.5 } });
+            b.toolRows.forEach((row, j) => {
+                const y = b.top + (j + 1) * TOPO_ROW_H; // row 0 is the item itself
+                ns.push({ id: row.tool.id, type: "topoNode", draggable: false, position: { x: COL3_X, y }, data: { component: { category: "tool", type: "Tool", label: row.tool.label } } });
+                es.push({ id: `e-${row.tool.id}`, source: b.item.id, target: row.tool.id, type: "smoothstep", style: { stroke: TOOL_EDGE_COLOR, strokeWidth: 1.5 } });
+            });
+        });
+
         return { nodes: ns, edges: es };
     }, [agents, device.endpoint, device.username, agentDetails, agentTools, mcpTools]);
 
@@ -392,14 +418,16 @@ function OverviewTab({ device, agents, collections, onTabChange, startTimestamp,
 
     // Each MCP server's own tools, keyed by collection id. Fetched here rather than inside
     // AssetTopologyGraph because the graph rows are laid out here — tools need reserved rows or
-    // they land on top of the next MCP's row.
+    // they land on top of the next MCP's row. Covers both an agent-linked MCP (via agentDetails)
+    // and a direct one hanging straight off the device (buildDeviceChildren's own collectionIds).
     const mcpCollectionIds = useMemo(() => {
         const ids = new Set();
         agentDetails.forEach(d => Object.values(d?.mcpServerCollectionIds || {}).forEach(arr => {
             if (arr?.[0]) ids.add(arr[0]);
         }));
+        agents.forEach(a => { if (a.type === "MCP Server" && a.collectionIds?.[0]) ids.add(a.collectionIds[0]); });
         return [...ids];
-    }, [agentDetails]);
+    }, [agentDetails, agents]);
 
     const mcpTools = useMcpTools(mcpCollectionIds);
 

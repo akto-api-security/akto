@@ -3334,6 +3334,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         Map<String, double[]> childRisk = new HashMap<>(); // pathKey -> {riskScore, lastTraffic}
         Map<String, int[]> childViolations = new HashMap<>();
         Map<String, Integer> childSkillCount = new HashMap<>();
+        // Only ever read for a direct (non-agent) MCP Server row's own tools — an agent's linked
+        // MCP servers get their collection ids from fetchAgenticAssetDetailsBatch instead.
+        Map<String, Set<Integer>> childCollectionIds = new HashMap<>();
         // Plugins live in their own child row (own collection), not embedded in the agent's — so
         // "how many plugins does this agent have" is answered by matching sibling plugin children
         // under the same device to this agent's own owner tag (mcp-client/ai-agent value).
@@ -3405,6 +3408,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (collRisk > rt[0]) rt[0] = collRisk;
             if (collTraffic > rt[1]) rt[1] = collTraffic;
             childSkillCount.merge(pathKey, skillCount, Math::max);
+            childCollectionIds.computeIfAbsent(pathKey, k -> new HashSet<>()).add(c.getId());
             if (AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(childType)) {
                 CollectionTags ownerTag = AgenticObserveUtil.findAssetTag(c);
                 if (ownerTag != null) ownerTagByPathKey.put(pathKey, ownerTag.getValue());
@@ -3431,6 +3435,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             row.put("lastTrafficEpoch", (int) rt[1]);
             int skillCount = childSkillCount.getOrDefault(pathKey, 0);
             if (skillCount > 0) row.put("skillCount", skillCount);
+            if ("MCP Server".equals(row.getString("type"))) {
+                Set<Integer> ids = childCollectionIds.get(pathKey);
+                if (ids != null && !ids.isEmpty()) row.put("collectionIds", new ArrayList<>(ids));
+            }
             String ownerTagValue = ownerTagByPathKey.get(pathKey);
             int pluginCount = ownerTagValue != null ? pluginCountByOwnerTag.getOrDefault(ownerTagValue, 0) : 0;
             if (pluginCount > 0) row.put("pluginCount", pluginCount);
