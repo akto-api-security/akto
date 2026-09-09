@@ -1,7 +1,7 @@
 package com.akto.gateway;
 
 import com.akto.log.LoggerMaker;
-import com.akto.utils.SlackUtils;
+import com.akto.utils.OperationalAlerts;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.ConnectionPool;
@@ -18,6 +18,7 @@ import java.net.SocketTimeoutException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 
 public class GuardrailsClient {
 
@@ -33,14 +34,22 @@ public class GuardrailsClient {
     private static final OkHttpClient HTTP_CLIENT = buildHttpClient(TIMEOUT_MS);
 
     private final String guardrailsServiceUrl;
+    private final OkHttpClient httpClient;
+    private final BiConsumer<String, String> alerts;
 
     public GuardrailsClient() {
-        this.guardrailsServiceUrl = loadServiceUrlFromEnv();
+        this(loadServiceUrlFromEnv(), HTTP_CLIENT, OperationalAlerts::send);
         loggerMaker.infoAndAddToDb("GuardrailsClient initialized - URL: {}", guardrailsServiceUrl);
     }
 
     public GuardrailsClient(String serviceUrl, int timeout) {
+        this(serviceUrl, HTTP_CLIENT, OperationalAlerts::send);
+    }
+
+    GuardrailsClient(String serviceUrl, OkHttpClient httpClient, BiConsumer<String, String> alerts) {
         this.guardrailsServiceUrl = serviceUrl;
+        this.httpClient = httpClient;
+        this.alerts = alerts;
     }
 
     private static int resolveTimeoutMs() {
@@ -115,43 +124,59 @@ public class GuardrailsClient {
 
             Request httpRequest = requestBuilder.build();
 
-            try (Response response = HTTP_CLIENT.newCall(httpRequest).execute()) {
+            try (Response response = httpClient.newCall(httpRequest).execute()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
 
                 loggerMaker.infoAndAddToDb("Guardrails response (status {}): {}", response.code(), responseBody);
 
                 if (response.isSuccessful()) {
                     try {
-                        return objectMapper.readValue(responseBody, Map.class);
+                        Map<String, Object> verdict = objectMapper.readValue(responseBody, Map.class);
+                        if (verdict != null && Boolean.TRUE.equals(verdict.get("failOpen"))) {
+                            alertFailOpen(request, endpoint, "upstream_fail_open");
+                        }
+                        return verdict;
                     } catch (Exception parseEx) {
                         loggerMaker.warnAndAddToDb(
                             "Guardrails response not parseable, failing open - path: {}, error: {}",
                             request.get("path"), parseEx.getMessage());
-                        return buildFailOpenResponse("invalid guardrails response: " + parseEx.getMessage());
+                        return failOpen(request, endpoint, "invalid guardrails response: " + parseEx.getMessage(), "invalid_response");
                     }
                 }
                 loggerMaker.warnAndAddToDb(
                     "Guardrails service returned error status {}, failing open - path: {}",
                     response.code(), request.get("path"));
-                return buildFailOpenResponse("Guardrails service error: HTTP " + response.code());
+                return failOpen(request, endpoint, "Guardrails service error: HTTP " + response.code(), "HTTP_" + response.code());
             }
 
         } catch (Exception e) {
             if (isFailOpenTransportError(e)) {
-                // Expected under load: return the same allow verdict shape as success; do not
-                // treat as a client-facing failure or spam Slack on every timeout.
+                // Preserve fail-open behavior; notifications are asynchronous and rate limited.
                 loggerMaker.warnAndAddToDb(
                     "Guardrails unavailable ({}), failing open - path: {}, method: {}, account: {}",
                     e.getMessage(), request.get("path"), request.get("method"), request.get("akto_account_id"));
-                return buildFailOpenResponse(e.getMessage());
+                return failOpen(request, endpoint, e.getMessage(), e.getClass().getSimpleName());
             }
             loggerMaker.errorAndAddToDb(e, "Unexpected error calling guardrails service: {}", e.getMessage());
-            String alertMsg = "[guardrails] Service call failed - path: " + request.get("path")
-                + ", method: " + request.get("method")
-                + ", account: " + request.get("akto_account_id")
-                + ", error: " + e.getMessage();
-            SlackUtils.sendAlert(alertMsg);
-            return buildFailOpenResponse(e.getMessage());
+            return failOpen(request, endpoint, e.getMessage(), e.getClass().getSimpleName());
+        }
+    }
+
+    private Map<String, Object> failOpen(Map<String, Object> request, String endpoint,
+                                         String error, String category) {
+        alertFailOpen(request, endpoint, category);
+        return buildFailOpenResponse(error);
+    }
+
+    private void alertFailOpen(Map<String, Object> request, String endpoint, String category) {
+        String account = OperationalAlerts.deploymentAccountId();
+        try {
+            alerts.accept("guardrails:" + account + ":" + endpoint,
+                    "Guardrails failed open; traffic was allowed without a reliable verdict"
+                    + "\nAccount: " + account + "\nEndpoint: " + OperationalAlerts.label(endpoint)
+                    + "\nFailure: " + category);
+        } catch (Exception alertError) {
+            loggerMaker.warn("Could not enqueue guardrails fail-open alert");
         }
     }
 
