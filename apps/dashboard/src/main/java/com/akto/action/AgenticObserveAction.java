@@ -3365,16 +3365,22 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             final String fServiceName = serviceName;
             // getTypeFromCollection alone isn't enough here: it classifies purely off which type tags
-            // are present, and a known client like claude-cli/cursor commonly carries mcp-client (not
-            // ai-agent) plus its own mcp-server tag — which getTypeFromCollection resolves to MCP
-            // Server. classifyAllGroups avoids this by checking the asset-owner tag through
-            // McpClientRegistry FIRST for its "agent" rows; mirror that same precedence here so a
-            // known client is classified as AI Agent (or SaaS Agent) rather than falling through to
-            // the raw tag-based MCP Server default.
+            // are present, and a known client like claude-cli/cursor commonly carries ONLY an
+            // mcp-client tag (no ai-agent/mcp-server/gen-ai tag of its own) — which getTypeFromCollection
+            // falls through to its raw MCP Server default. Mirror classifyAllGroups' precedent of
+            // checking the asset-owner tag through McpClientRegistry so a known client still resolves
+            // to AI Agent (or SaaS Agent) instead.
+            // But when the collection DOES carry its own definitive type tag (mcp-server/gen-ai/
+            // browser-llm) — e.g. an Atlassian-hosted MCP server tagged mcp-client=kiroide to record
+            // who it belongs to, or a client's own locally-hosted MCP sub-server (mcp-client=
+            // claude-desktop + mcp-server=MCP Server) — that own tag wins instead, same as
+            // findTypeTag's "mcp-server wins regardless of tag insertion order" rule. Otherwise this
+            // row would show up mislabeled with the SERVER's name but the OWNER's agent type.
             boolean isPlugin = AgenticObserveUtil.isPluginCollection(c);
             CollectionTags assetTag = isPlugin ? null : AgenticObserveUtil.findAssetTag(c);
             boolean ownedByAgent = assetTag != null && StringUtils.isNotBlank(assetTag.getValue())
-                    && !Constants.AKTO_BROWSER_LLM_AGENT_TAG.equals(assetTag.getKeyName());
+                    && !Constants.AKTO_BROWSER_LLM_AGENT_TAG.equals(assetTag.getKeyName())
+                    && AgenticObserveUtil.findTypeTag(c) == null;
             String childType;
             if (isPlugin) {
                 childType = AgenticObserveUtil.CLIENT_TYPE_PLUGIN;
