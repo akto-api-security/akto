@@ -9,11 +9,14 @@ import java.util.Map;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /** Bounded, best-effort notifications: never perform network I/O on a request/Kafka thread. */
 public final class OperationalAlerts {
     private static final LoggerMaker LOG = new LoggerMaker(OperationalAlerts.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final String WEBHOOK = System.getenv("AKTO_SLACK_ALERT_WEBHOOK");
+    private static final String CONFIG_PROBLEM = configurationProblem(WEBHOOK);
+    private static final AtomicBoolean CONFIG_LOGGED = new AtomicBoolean();
     // Deployment identity comes from the configured abstractor token, never request data.
     private static final String DEPLOYMENT_ACCOUNT_ID = label(ClientActor.getAbstractorAccountIdFromEnvOrNull());
     private static final OkHttpClient HTTP = new OkHttpClient.Builder()
@@ -46,8 +49,29 @@ public final class OperationalAlerts {
     }
 
     public static void send(String key, String message) {
-        if (WEBHOOK == null || WEBHOOK.trim().isEmpty()) return;
+        logConfiguration();
+        if (CONFIG_PROBLEM != null) return;
         INSTANCE.submit(key, "[data-ingestion] host=" + label(System.getenv("HOSTNAME")) + "\n" + message);
+    }
+
+    public static void logConfiguration() {
+        if (!CONFIG_LOGGED.compareAndSet(false, true)) return;
+        if (CONFIG_PROBLEM != null) {
+            LOG.warn("Operational Slack alerts disabled: " + CONFIG_PROBLEM);
+        } else {
+            LOG.info("Operational Slack alerts configured; account=" + DEPLOYMENT_ACCOUNT_ID
+                    + ", cooldownSeconds=" + cooldownMillis() / 1000);
+        }
+    }
+
+    static String configurationProblem(String webhook) {
+        if (webhook == null || webhook.trim().isEmpty()) {
+            return "AKTO_SLACK_ALERT_WEBHOOK is not set in the data-ingestion process environment";
+        }
+        if (HttpUrl.parse(webhook.trim()) == null) {
+            return "AKTO_SLACK_ALERT_WEBHOOK is not a valid HTTP(S) URL";
+        }
+        return null;
     }
 
     /** accountId from DATABASE_ABSTRACTOR_SERVICE_TOKEN; unknown if missing/invalid. */
@@ -66,12 +90,36 @@ public final class OperationalAlerts {
                     sender.accept(message);
                 } catch (Exception e) {
                     // Do not log webhook URLs, response bodies, or request data.
-                    LOG.warn("Operational Slack delivery failed: " + e.getClass().getSimpleName());
+                    LOG.warn("Operational Slack delivery failed: " + failureDescription(e)
+                            + "; another failure after the cooldown will retry");
                 }
             });
         } catch (RejectedExecutionException e) {
             // Keep cooldown even when saturated; avoid hot-loop logging during an outage.
             LOG.warn("Operational Slack queue full; notification skipped");
+        }
+    }
+
+    static String failureDescription(Throwable error) {
+        if (error instanceof SlackDeliveryException) return error.getMessage();
+        Throwable cause = error;
+        // Only exception type names are safe: network exception messages may contain URLs.
+        for (int i = 0; i < 10 && cause.getCause() != null && cause.getCause() != cause; i++) {
+            cause = cause.getCause();
+        }
+        return cause.getClass().getSimpleName();
+    }
+
+    private static final class SlackDeliveryException extends RuntimeException {
+        SlackDeliveryException(String safeMessage) { super(safeMessage); }
+    }
+
+    static void checkResponse(Response response) throws java.io.IOException {
+        if (!response.isSuccessful()) {
+            throw new SlackDeliveryException("Slack returned HTTP " + response.code());
+        }
+        if (response.body() == null || !"ok".equals(response.body().string().trim())) {
+            throw new SlackDeliveryException("Slack returned HTTP " + response.code() + " without an ok acknowledgement");
         }
     }
 
@@ -95,13 +143,14 @@ public final class OperationalAlerts {
             Map<String, Object> payload = new java.util.HashMap<>();
             payload.put("text", message);
             payload.put("mrkdwn", false);
-            Request request = new Request.Builder().url(WEBHOOK).post(RequestBody.create(
+            Request request = new Request.Builder().url(WEBHOOK.trim()).post(RequestBody.create(
                     new ObjectMapper().writeValueAsString(payload), MediaType.get("application/json"))).build();
             try (Response response = HTTP.newCall(request).execute()) {
-                if (!response.isSuccessful() || response.body() == null || !"ok".equals(response.body().string().trim())) {
-                    throw new IllegalStateException("Slack rejected alert");
-                }
+                checkResponse(response);
+                LOG.info("Operational Slack notification delivered");
             }
+        } catch (SlackDeliveryException e) {
+            throw e;
         } catch (Exception e) {
             throw new IllegalStateException("Slack delivery failed", e);
         }
