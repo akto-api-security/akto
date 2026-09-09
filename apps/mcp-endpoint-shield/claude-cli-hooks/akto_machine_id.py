@@ -246,11 +246,22 @@ def get_user_email() -> str:
     if _user_email:
         return _user_email
 
+    home = os.path.expanduser("~")
+    # launchd/root context: ~ is /var/root, so resolve the console user's home.
+    # Best effort only: get_username() falls back to the literal "unknown" when the
+    # console user cannot be determined, and getpwnam() raises KeyError for it — a
+    # failure here must degrade to ~ rather than abandon the whole resolution, since
+    # the caller cannot tell an exception from "signed out" (both mean no header).
+    if pwd is not None and hasattr(os, "getuid"):
+        try:
+            if os.getuid() == 0:
+                user = get_username()
+                if user and user not in ("unknown", "root"):
+                    home = pwd.getpwnam(user).pw_dir
+        except Exception:
+            pass
+
     try:
-        home = os.path.expanduser("~")
-        # launchd/root context: ~ is /var/root, so resolve the console user's home.
-        if pwd is not None and hasattr(os, "getuid") and os.getuid() == 0:
-            home = pwd.getpwnam(get_username()).pw_dir
         with open(os.path.join(home, ".claude.json"), encoding="utf-8") as f:
             account = json.load(f).get("oauthAccount") or {}
         email = str(account.get("emailAddress") or "").strip()

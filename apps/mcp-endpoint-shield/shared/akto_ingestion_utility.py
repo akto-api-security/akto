@@ -293,18 +293,32 @@ def _alias_camel_keys(input_data: Dict[str, Any]) -> Dict[str, Any]:
 def _profile_home(subdir: str, env_override: str = "") -> str:
     """Path to an agent's profile dir: $<env_override> if set, else ~/<subdir>.
 
-    Resolves the console user's home under root/launchd, where ~ is /var/root.
+    The override is expanded rather than used verbatim: os.open() performs no
+    tilde expansion, and these vars reach us unexpanded from quoted assignments
+    ("~/.codex"), launchd plists and MDM-provisioned environments — which would
+    otherwise resolve nothing at all. abspath() keeps a relative override from
+    resolving against the hook's cwd, which is whatever project the user is in.
+
+    Under root/launchd ~ is /var/root, so the console user's home is used instead.
+    That lookup is best effort: get_username() falls back to the literal "unknown"
+    when the console user cannot be determined and getpwnam() raises KeyError for
+    it, so any failure degrades to ~ instead of abandoning the resolution (the
+    caller cannot tell an exception from "signed out" — both yield no header).
     """
     override = (os.environ.get(env_override) or "").strip() if env_override else ""
     if override:
-        return override
+        return os.path.abspath(os.path.expanduser(os.path.expandvars(override)))
+
     home = os.path.expanduser("~")
-    try:
-        import pwd  # Unix-only; absent on Windows
-        if hasattr(os, "getuid") and os.getuid() == 0:
-            home = pwd.getpwnam(get_username()).pw_dir
-    except ImportError:
-        pass
+    if hasattr(os, "getuid"):  # absent on Windows
+        try:
+            if os.getuid() == 0:
+                user = get_username()
+                if user and user not in ("unknown", "root"):
+                    import pwd  # Unix-only
+                    home = pwd.getpwnam(user).pw_dir
+        except Exception:
+            pass  # ImportError, KeyError (no such user), anything else — keep ~
     return os.path.join(home, subdir)
 
 
