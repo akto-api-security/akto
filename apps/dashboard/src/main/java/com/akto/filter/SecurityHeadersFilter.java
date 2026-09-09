@@ -30,9 +30,10 @@ public class SecurityHeadersFilter implements Filter {
                 "cdn.mxpnl.com *.mixpanel.com *.clarity.ms " +  // Analytics
                 "cdn.jsdelivr.net d1hvi6xs55woen.cloudfront.net *.highcharts.com " + // CDNs
                 "*.getbeamer.com *.stigg.io *.api.stigg.io; " + // Third-party
-            "frame-src js.stripe.com *.getbeamer.com; " +        // Stripe + Beamer iframes
+            "frame-src js.stripe.com *.getbeamer.com *.intercom.io intercom-sheets.com *.intercom-reporting.com; " + // Stripe + Beamer + Intercom iframes
             "img-src 'self' data: blob: *.clarity.ms *.gstatic.com www.google.com *.youtube.com *.getbeamer.com *.intercomcdn.com *.intercomassets.com d1hvi6xs55woen.cloudfront.net; " +
             "font-src 'self' data: fonts.googleapis.com fonts.gstatic.com cdn.jsdelivr.net *.intercomcdn.com d1hvi6xs55woen.cloudfront.net; " +
+            "media-src 'self' *.intercomcdn.com; " +             // Intercom notification sounds
             "frame-ancestors 'self'; " +
             "base-uri 'self'";
 
