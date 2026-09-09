@@ -81,6 +81,14 @@ public class Constants {
     public final static String _AKTO = "AKTO";
     public static final String AKTO_MCP_SERVER_TAG = "mcp-server";
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
+    /**
+     * Marks a collection whose service was seen CALLING an AI agent / LLM endpoint.
+     * The value is the agent host that was called.
+     *
+     * Deliberately not AI_AGENT_APP_NAME ("ai-agent"): that key carries a collector-supplied
+     * app name for the agent itself, which is the opposite side of the call.
+     */
+    public static final String AKTO_AI_AGENT_CALLER_TAG = "ai-agent-caller";
     public static final String AKTO_BROWSER_LLM_TAG = "browser-llm";
     public static final String AKTO_GUARD_RAIL_TAG = "guard-rail";
     public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";
