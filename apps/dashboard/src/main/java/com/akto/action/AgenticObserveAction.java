@@ -627,7 +627,12 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
             if ("agent".equals(rowType) && !isConnectorIngested(envType)) {
                 String serviceName = extractServiceNameForGrouping(hostName);
-                if (serviceName != null && !serviceName.equalsIgnoreCase(groupKey)) {
+                // groupKey is the canonical registry key (e.g. "claude2"), but serviceName is the raw
+                // hostname segment (e.g. "claudecli"/"claude-cli-project") — comparing them directly
+                // never matches for any agent whose raw tag value differs from its canonical key, so
+                // the agent's own identity collection was being added as if it were one of its own
+                // linked MCP servers. Canonicalize serviceName the same way groupKey was derived.
+                if (serviceName != null && !McpClientRegistry.resolveClientKey(serviceName).equalsIgnoreCase(groupKey)) {
                     serviceNames.add(serviceName);
                     serviceCollectionIds.computeIfAbsent(serviceName, k -> new HashSet<>()).add(c.getId());
                 }
@@ -2338,6 +2343,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     @Setter private String groupKey;
     @Setter private String rowType;
+    @Setter private List<String> groupKeys;
 
     @Getter private List<String> assetHostNames;
     @Getter private List<Integer> assetCollectionIds;
@@ -2612,6 +2618,76 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching agentic asset detail: " + e.getMessage());
             addActionError("Error fetching agentic asset detail: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Batch form of fetchAgenticAssetDetail, scoped to just the fields the device flyout's
+     * context graph needs per agent (mcpServers/mcpServerCollectionIds/skillCount/pluginNames) —
+     * a device can show 10+ AI Agents, and firing fetchAgenticAssetDetail once per agent means
+     * that many concurrent requests just to draw one graph. getOrBuildClassification is called
+     * once for the whole batch (not once per groupKey); every other rowType-specific branch in
+     * fetchAgenticAssetDetail (plugin reverse-lookup, device sampling, inline topology) is left
+     * out here since the device flyout graph doesn't use them.
+     */
+    public String fetchAgenticAssetDetailsBatch() {
+        response = new BasicDBObject();
+        Map<String, BasicDBObject> byGroupKey = new HashMap<>();
+        try {
+            if (groupKeys == null || groupKeys.isEmpty() || StringUtils.isBlank(rowType)) {
+                response.put("detailsByGroupKey", byGroupKey);
+                return SUCCESS.toUpperCase();
+            }
+
+            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
+            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
+            ClassificationCacheEntry cached = getOrBuildClassification(traffic, risk, Collections.emptyMap());
+            Map<Integer, ApiCollection> byId = new HashMap<>();
+            for (ApiCollection c : cached.collections) byId.put(c.getId(), c);
+
+            for (String key : groupKeys) {
+                GroupSummary g = cached.groups.get(rowType + "|" + key);
+                BasicDBObject item = new BasicDBObject();
+                if (g == null) {
+                    item.put("mcpServers", Collections.emptyList());
+                    item.put("mcpServerCollectionIds", Collections.emptyMap());
+                    item.put("llmServers", Collections.emptyList());
+                    item.put("skillCount", 0);
+                    item.put("pluginNames", Collections.emptyList());
+                } else {
+                    item.put("mcpServers", new ArrayList<>(g.serviceNames));
+                    Map<String, List<Integer>> serviceCollectionIdsOut = new HashMap<>();
+                    // serviceNames is one flat set of everything linked to this agent, so callers
+                    // can't tell an LLM from an MCP server on their own — split out the LLMs using
+                    // the same classifier every other surface uses (buildDeviceChildren's row
+                    // types, the flyout's own stat counts). Deliberately NOT a raw tag check: a
+                    // gen-ai tag means AI Agent, not LLM, and an mcp-server tag outranks both.
+                    List<String> llmServers = new ArrayList<>();
+                    for (Map.Entry<String, Set<Integer>> e : g.serviceCollectionIds.entrySet()) {
+                        serviceCollectionIdsOut.put(e.getKey(), new ArrayList<>(e.getValue()));
+                        for (Integer id : e.getValue()) {
+                            ApiCollection c = byId.get(id);
+                            if (c == null) continue;
+                            if (AgenticObserveUtil.CLIENT_TYPE_LLM.equals(AgenticObserveUtil.getTypeFromCollection(c))) {
+                                llmServers.add(e.getKey());
+                                break;
+                            }
+                        }
+                    }
+                    item.put("mcpServerCollectionIds", serviceCollectionIdsOut);
+                    item.put("llmServers", llmServers);
+                    item.put("skillCount", g.skillNames.size());
+                    item.put("pluginNames", new ArrayList<>(g.pluginNames));
+                }
+                byGroupKey.put(key, item);
+            }
+
+            response.put("detailsByGroupKey", byGroupKey);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching agentic asset details batch: " + e.getMessage());
+            addActionError("Error fetching agentic asset details batch: " + e.getMessage());
             return ERROR.toUpperCase();
         }
     }
@@ -3285,7 +3361,33 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             int skillCount = c.getSkills() != null ? c.getSkills().size() : 0;
 
             final String fServiceName = serviceName;
-            String childType = AgenticObserveUtil.getTypeFromCollection(c);
+            // getTypeFromCollection alone isn't enough here: it classifies purely off which type tags
+            // are present, and a known client like claude-cli/cursor commonly carries mcp-client (not
+            // ai-agent) plus its own mcp-server tag — which getTypeFromCollection resolves to MCP
+            // Server. classifyAllGroups avoids this by checking the asset-owner tag through
+            // McpClientRegistry FIRST for its "agent" rows; mirror that same precedence here so a
+            // known client is classified as AI Agent (or SaaS Agent) rather than falling through to
+            // the raw tag-based MCP Server default.
+            boolean isPlugin = AgenticObserveUtil.isPluginCollection(c);
+            CollectionTags assetTag = isPlugin ? null : AgenticObserveUtil.findAssetTag(c);
+            boolean ownedByAgent = assetTag != null && StringUtils.isNotBlank(assetTag.getValue())
+                    && !Constants.AKTO_BROWSER_LLM_AGENT_TAG.equals(assetTag.getKeyName());
+            String childType;
+            if (isPlugin) {
+                childType = AgenticObserveUtil.CLIENT_TYPE_PLUGIN;
+            } else if (ownedByAgent) {
+                String key = McpClientRegistry.resolveClientKey(assetTag.getValue());
+                childType = AgenticObserveUtil.hasSaasAgentTag(c)
+                        ? AgenticObserveUtil.CLIENT_TYPE_SAAS_AGENT
+                        : McpClientRegistry.getAgentTypeFromValue(key);
+            } else {
+                childType = AgenticObserveUtil.getTypeFromCollection(c);
+            }
+            // Same key classifyAllGroups uses for "agent" GroupSummary rows (McpClientRegistry.
+            // resolveClientKey off the asset tag, not this row's own rawServiceName/hostname
+            // parsing) — lets the frontend look this agent up via fetchAgenticAssetDetailsBatch.
+            final CollectionTags fAssetTag = AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(childType)
+                    ? assetTag : null;
             BasicDBObject child = children.computeIfAbsent(pathKey, k -> {
                 BasicDBObject row = new BasicDBObject();
                 row.put("path", Arrays.asList(deviceId, k));
@@ -3293,6 +3395,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 row.put("endpoint", McpClientRegistry.formatDisplayName(fServiceName));
                 row.put("rawServiceName", fServiceName);
                 row.put("type", childType);
+                if (fAssetTag != null && StringUtils.isNotBlank(fAssetTag.getValue())) {
+                    row.put("groupKey", McpClientRegistry.resolveClientKey(fAssetTag.getValue()));
+                    row.put("rowType", "agent");
+                }
                 return row;
             });
             double[] rt = childRisk.computeIfAbsent(pathKey, k -> new double[2]);
