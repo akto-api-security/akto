@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "hooks": {
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "bash $HOME/.copilot/hooks/akto/akto-validate-prompt-wrapper.sh",
+        "comment": "Validate prompts against Akto Guardrails",
+        "timeoutSec": 30
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "bash $HOME/.copilot/hooks/akto/akto-validate-pre-tool-wrapper.sh",
+        "comment": "Validate and block tool execution based on Akto Guardrails policies",
+        "timeoutSec": 30
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "bash $HOME/.copilot/hooks/akto/akto-validate-post-tool-wrapper.sh",
+        "comment": "Validate tool results against Akto Guardrails and ingest for monitoring",
+        "timeoutSec": 30
+      }
+    ],
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "bash $HOME/.copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.sh sessionStart",
+        "comment": "Ingest session start event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": "bash $HOME/.copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.sh sessionEnd",
+        "comment": "Ingest session end event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "agentStop": [
+      {
+        "type": "command",
+        "bash": "bash $HOME/.copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.sh agentStop",
+        "comment": "Ingest turn-completion event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "subagentStart": [
+      {
+        "type": "command",
+        "bash": "bash $HOME/.copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.sh subagentStart",
+        "comment": "Ingest subagent-start event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "subagentStop": [
+      {
+        "type": "command",
+        "bash": "bash $HOME/.copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.sh subagentStop",
+        "comment": "Ingest subagent-completion event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "errorOccurred": [
+      {
+        "type": "command",
+        "bash": "bash $HOME/.copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.sh errorOccurred",
+        "comment": "Ingest agent error event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "preCompact": [
+      {
+        "type": "command",
+        "bash": "bash $HOME/.copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.sh preCompact",
+        "comment": "Ingest pre-compact event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "notification": [
+      {
+        "type": "command",
+        "bash": "bash $HOME/.copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.sh notification",
+        "comment": "Ingest CLI notification event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "userPromptTransformed": [
+      {
+        "type": "command",
+        "bash": "bash $HOME/.copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.sh userPromptTransformed",
+        "comment": "Ingest transformed-prompt event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "type": "command",
+        "bash": "bash $HOME/.copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.sh postToolUseFailure",
+        "comment": "Ingest tool-execution-failure event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "permissionRequest": [
+      {
+        "type": "command",
+        "bash": "bash $HOME/.copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.sh permissionRequest",
+        "comment": "Ingest permission-request event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ]
+  }
+}
