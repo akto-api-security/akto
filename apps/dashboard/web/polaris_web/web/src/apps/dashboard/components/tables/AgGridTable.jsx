@@ -356,32 +356,34 @@ export default function AgGridTable({
     ) : null;
 
     // ── Grid node ───────────────────────────────────────────────────────────
-    // Same reasoning as effectiveSideBar above: also closes off the right-click context menu's
-    // "Group by"/"Pivot"/"Aggregate" options, which key off these column flags independently of
-    // whatever the side panel shows.
+    // Row Group / Values / Pivot Mode never make sense in this app's tables (asset/entity lists,
+    // not analytics grids) — unconditionally off, not just on a server-paginated table where they'd
+    // also be misleading (operating on whatever page happens to be loaded client-side).
     const effectiveDefaultColDef = React.useMemo(() => ({
-        enableRowGroup: !isServerMode,
-        enablePivot: !isServerMode,
-        enableValue: !isServerMode,
+        enableRowGroup: false,
+        enablePivot: false,
+        enableValue: false,
         ...defaultColDef,
-    }), [defaultColDef, isServerMode]);
+    }), [defaultColDef]);
 
-    // Row Group / Values / Pivot Mode in the Columns tool panel only ever operate on whatever
-    // page happens to be loaded in the grid right now — meaningless (and misleading) on a
-    // server-paginated table, which never holds the full dataset client-side. Column show/hide
-    // and the Filters panel are unaffected; those already work correctly against the real query.
+    // Mirrors effectiveDefaultColDef above: also closes the Columns tool panel's own Row
+    // Group/Values/Pivot Mode UI, and the right-click context menu's "Group by"/"Pivot"/
+    // "Aggregate" options (which key off the columnDef flags above independently of this panel).
+    // Column show/hide and the Filters panel are unaffected. `sideBar` shorthand `true` (AG Grid's
+    // own default) is expanded to the same panel set first so it gets the same treatment.
     const effectiveSideBar = useMemo(() => {
-        if (!isServerMode || !sideBar || sideBar === true) return sideBar;
-        const toolPanels = (sideBar.toolPanels || []).map((panel) => {
+        if (!sideBar) return sideBar;
+        const base = sideBar === true ? { toolPanels: ["columns", "filters"] } : sideBar;
+        const toolPanels = (base.toolPanels || []).map((panel) => {
             const isColumnsPanel = panel === "columns" || panel?.toolPanel === "agColumnsToolPanel";
             if (!isColumnsPanel) return panel;
-            const base = panel === "columns"
+            const basePanel = panel === "columns"
                 ? { id: "columns", labelDefault: "Columns", labelKey: "columns", iconKey: "columns", toolPanel: "agColumnsToolPanel" }
                 : panel;
             return {
-                ...base,
+                ...basePanel,
                 toolPanelParams: {
-                    ...base.toolPanelParams,
+                    ...basePanel.toolPanelParams,
                     suppressRowGroups: true,
                     suppressValues: true,
                     suppressPivots: true,
@@ -389,8 +391,8 @@ export default function AgGridTable({
                 },
             };
         });
-        return { ...sideBar, toolPanels };
-    }, [sideBar, isServerMode]);
+        return { ...base, toolPanels };
+    }, [sideBar]);
 
     const gridNode = (
         <AgGridReact
