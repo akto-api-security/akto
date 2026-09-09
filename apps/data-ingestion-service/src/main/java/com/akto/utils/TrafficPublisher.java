@@ -6,4 +6,8 @@ package com.akto.utils;
  */
 public interface TrafficPublisher {
     void publish(String message, String primaryTopic, boolean publishToGuardrails);
+
+    default void publish(String message, String primaryTopic, boolean publishToGuardrails, String accountId) {
+        publish(message, primaryTopic, publishToGuardrails);
+    }
 }

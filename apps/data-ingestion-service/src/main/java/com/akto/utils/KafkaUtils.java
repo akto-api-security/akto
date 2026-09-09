@@ -39,7 +39,7 @@ public class KafkaUtils {
         // Rewrite before publish so guardrail activity Actor is the identity, not the placeholder.
         BedrockIdentityActor.apply(payload);
         BasicDBObject obj = buildMessageObject(payload);
-        topicPublisher.publish(obj.toString(), API_LOGS_TOPIC, publishToGuardrails);
+        topicPublisher.publish(obj.toString(), API_LOGS_TOPIC, publishToGuardrails, payload.getAkto_account_id());
     }
 
     /**
