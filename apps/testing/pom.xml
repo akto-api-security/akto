@@ -16,11 +16,13 @@
 
     <dependencyManagement>
         <dependencies>
-            <!-- Pin all transitive io.netty:* to a single patched version (multiple Critical/High). -->
+            <!-- Pin all transitive io.netty:* to a single patched version (multiple Critical/High).
+                 4.1.136 fixes netty-codec / netty-codec-http Highs (GHSA-558v-64gr-wgg4,
+                 GHSA-jppx-w49h-x2qq, GHSA-6jqx-86gh-f27w, GHSA-mvh2-crg5-v77c). -->
             <dependency>
                 <groupId>io.netty</groupId>
                 <artifactId>netty-bom</artifactId>
-                <version>4.1.135.Final</version>
+                <version>4.1.136.Final</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

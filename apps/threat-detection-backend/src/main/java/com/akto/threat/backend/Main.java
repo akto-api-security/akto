@@ -8,6 +8,7 @@ import com.akto.kafka.KafkaConfig;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.dao.ThreatDetectionDaoInit;
 import com.akto.threat.backend.service.ApiDistributionDataService;
@@ -21,6 +22,7 @@ import com.akto.threat.backend.cron.ArchiveOldMaliciousEventsCron;
 import com.akto.threat.backend.cron.RiskScoreSyncCron;
 import com.akto.threat.backend.cron.ConfigRiskSyncCron;
 import com.akto.threat.backend.cron.SkillsRiskScoreSyncCron;
+import com.akto.threat.backend.cron.AtlasRiskScoreSyncCron;
 import com.akto.threat.backend.cron.CloudflareWafSyncCron;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
@@ -92,15 +94,15 @@ public class Main {
     ThreatActorService threatActorService = new ThreatActorService(threatProtectionMongo, MaliciousEventDao.instance);
     ThreatApiService threatApiService = new ThreatApiService(MaliciousEventDao.instance);
     ApiDistributionDataService apiDistributionDataService = new ApiDistributionDataService(ApiDistributionDataDao.instance);
-    com.akto.log.LoggerMaker logger = new com.akto.log.LoggerMaker(Main.class);
+    com.akto.log.LoggerMaker logger = new com.akto.log.LoggerMaker(Main.class, LogDb.THREAT_DETECTION);
 
      // Start PercentilesCron (single scheduler for all accounts, runs every 2 hours)
     try {
       PercentilesCron percentilesCron = new PercentilesCron(threatProtectionMongo);
       percentilesCron.startCron();
-      logger.infoAndAddToDb("Started PercentilesCron scheduler (runs every 2 hours for all accounts)", com.akto.log.LoggerMaker.LogDb.RUNTIME);
+      logger.infoAndAddToDb("Started PercentilesCron scheduler (runs every 2 hours for all accounts)");
     } catch (Exception e) {
-      logger.errorAndAddToDb("Error starting PercentilesCron: " + e.getMessage(), com.akto.log.LoggerMaker.LogDb.RUNTIME);
+      logger.errorAndAddToDb("Error starting PercentilesCron: " + e.getMessage());
     }
 
     new BackendVerticle(maliciousEventService, threatActorService, threatApiService, apiDistributionDataService).start();
@@ -113,6 +115,9 @@ public class Main {
 
     SkillsRiskScoreSyncCron skillsRiskScoreSyncCron = new SkillsRiskScoreSyncCron();
     skillsRiskScoreSyncCron.setUp();
+
+    AtlasRiskScoreSyncCron atlasRiskScoreSyncCron = new AtlasRiskScoreSyncCron();
+    atlasRiskScoreSyncCron.setUp();
 
     // ConfigRiskSyncCron configRiskSyncCron = new ConfigRiskSyncCron();
     // configRiskSyncCron.setUp();

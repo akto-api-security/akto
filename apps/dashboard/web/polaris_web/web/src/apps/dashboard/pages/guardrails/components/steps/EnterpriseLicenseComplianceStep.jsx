@@ -43,6 +43,9 @@ const EnterpriseLicenseComplianceStep = ({ onTryPrompt, enterpriseLicenseComplia
                                         description={c.helpText}
                                         examples={ENTERPRISE_CATEGORY_EXAMPLES[c.key]}
                                         onTryPrompt={onTryPrompt}
+                                        onEnable={() => {
+                                            if (!enterpriseLicenseComplianceCategories.includes(c.key)) toggle(c.key, true);
+                                        }}
                                     />
                                 </HorizontalStack>
                             }

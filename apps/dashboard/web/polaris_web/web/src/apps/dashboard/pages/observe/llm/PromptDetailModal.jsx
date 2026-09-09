@@ -2,6 +2,7 @@ import { Badge, Box, HorizontalStack, Modal, Text, VerticalStack } from "@shopif
 import { ClockMinor, HashtagMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import { truncate } from "./constants";
+import GuardrailVerdict, { GuardrailVerdictBadge } from "./GuardrailVerdict";
 import ChatMessage from "../../testing/TestRunResultPage/components/ChatMessage";
 
 export default function PromptDetailModal({ prompt, onClose }) {
@@ -39,7 +40,11 @@ export default function PromptDetailModal({ prompt, onClose }) {
                         <Badge tone="info">
                             {(prompt._inputTokens || 0) + " in / " + (prompt._outputTokens || 0) + " out"}
                         </Badge>
+                        <GuardrailVerdictBadge span={prompt} />
                     </HorizontalStack>
+
+                    {/* Guardrail result: policy, rule, action and block reason */}
+                    <GuardrailVerdict span={prompt} />
 
                     {/* Prompt */}
                     {prompt._promptText && (

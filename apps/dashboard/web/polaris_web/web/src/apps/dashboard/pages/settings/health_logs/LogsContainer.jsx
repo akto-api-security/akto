@@ -15,8 +15,12 @@ const logLineStyle = {
     maxWidth: "100%",
 }
 
-const formatLogLine = (entry) => {
+/** DAST writes the module name into `key`, where other groups put the log level. */
+const formatLogLine = (entry, logGroup) => {
     const message = entry.log ?? ""
+    if (logGroup === "DAST") {
+        return entry.key ? `[${entry.key}] ${message}` : message
+    }
     const activityId = entry.activityId
     if (activityId && !message.includes("trrs:")) {
         return `trrs: ${activityId}, ${message}`
@@ -57,7 +61,7 @@ const LogsContainer = ({ logs, displayedLogData, runSummaryHexId }) => {
                         <VerticalStack gap="1">
                             {displayedLogData.map((entry, idx) => (
                                 <Box key={idx} width="100%" minWidth="0" style={logLineStyle}>
-                                    [{func.epochToDateTime(entry.timestamp)}] {formatLogLine(entry)}
+                                    [{func.epochToDateTime(entry.timestamp)}] {formatLogLine(entry, logs.logGroup)}
                                 </Box>
                             ))}
                         </VerticalStack>

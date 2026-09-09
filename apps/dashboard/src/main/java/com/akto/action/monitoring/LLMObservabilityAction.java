@@ -1,14 +1,18 @@
 package com.akto.action.monitoring;
 
 import com.akto.action.UserAction;
+import com.akto.audit_logs_util.Audit;
+import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.RBAC.Role;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.utils.search.SearchClient;
 import com.akto.utils.search.SearchClientFactory;
-import com.opensymphony.xwork2.Action;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -36,13 +40,13 @@ public class LLMObservabilityAction extends UserAction {
     @Setter private int          limit       = 20;
     @Setter private String       sortKey     = AgentQueryRecord.F_TIMESTAMP;
     @Setter private int          sortOrder   = 1;
-    @Setter private String       traceId;
+    @Getter @Setter private String       traceId;
     @Setter private String       searchAfterJson;
     @Setter private String       sessionsAfterKey;
     @Setter private int          sessionsLimit    = 20;
 
     // Single-value fields kept for backward-compat (session drill-down in SessionsView)
-    @Setter private String       sessionId;
+    @Getter @Setter private String       sessionId;
     @Setter private String       userName;
     @Setter private String       deviceId;
     @Setter private String       serviceId;
@@ -53,6 +57,8 @@ public class LLMObservabilityAction extends UserAction {
     @Setter private List<String> sessionIds     = new ArrayList<>();
     @Setter private List<String> topicFilters    = new ArrayList<>();
     @Setter private List<String> subTopicFilters = new ArrayList<>();
+    @Setter private List<String> guardrailFilters = new ArrayList<>();
+    @Setter private List<String> guardrailPolicyFilters = new ArrayList<>();
 
     @Getter private String       nextAfterKey;
     @Getter private long         totalSessions    = 0;
@@ -69,6 +75,7 @@ public class LLMObservabilityAction extends UserAction {
     @Getter private long                       aggInputTokens     = 0;
     @Getter private long                       aggOutputTokens    = 0;
     @Getter private List<Map<String, Object>>  aggTopUsers        = new ArrayList<>();
+    @Getter private List<Map<String, Object>>  aggTopModels       = new ArrayList<>();
     @Getter private List<Map<String, Object>>  aggUserBreakdown   = new ArrayList<>();
     @Getter private List<Long>                 aggSessionSpark      = new ArrayList<>();
     @Getter private List<Long>                 aggSessionSparkTs    = new ArrayList<>();
@@ -91,13 +98,13 @@ public class LLMObservabilityAction extends UserAction {
     public String fetchSessions() {
         try {
             SearchClient client = SearchClientFactory.instance();
-            if (!client.isConfigured()) return Action.SUCCESS.toUpperCase();
+            if (!client.isConfigured()) return SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
             SearchClient.SessionsResult result = client.fetchSessions(
                 accountId, startMs(), endMs(), searchString,
                 buildMultiFilters(true), resolveContextAtlasFilter(),
-                sessionsLimit, sessionsAfterKey);
+                sessionsLimit, sessionsAfterKey, isUserRoleAdmin());
 
             sessions      = result.sessions;
             nextAfterKey  = result.nextAfterKey;
@@ -106,13 +113,17 @@ public class LLMObservabilityAction extends UserAction {
             logger.error("fetchSessions error: " + e.getMessage());
             sessions = new ArrayList<>();
         }
-        return Action.SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User viewed prompt content in Traces",
+           resource = Resource.TRACES_CONTENT,
+           operation = Operation.READ,
+           metadataGenerators = {"getSessionId"})
     public String fetchMessages() {
         try {
             SearchClient client = SearchClientFactory.instance();
-            if (!client.isConfigured()) return Action.SUCCESS.toUpperCase();
+            if (!client.isConfigured()) return SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
             messages = client.fetchMessages(accountId, startMs(), endMs(),
@@ -121,7 +132,7 @@ public class LLMObservabilityAction extends UserAction {
             logger.error("fetchMessages error: " + e.getMessage());
             messages = new ArrayList<>();
         }
-        return Action.SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
     }
 
     // ── Session-level aggregated stats (accurate cardinality + token sums) ──────
@@ -129,7 +140,7 @@ public class LLMObservabilityAction extends UserAction {
     public String fetchSessionAggStats() {
         try {
             SearchClient client = SearchClientFactory.instance();
-            if (!client.isConfigured()) return Action.SUCCESS.toUpperCase();
+            if (!client.isConfigured()) return SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
             // Sessions view always reports Atlas (endpoint) traffic, independent of the
@@ -141,6 +152,7 @@ public class LLMObservabilityAction extends UserAction {
             aggInputTokens       = stats.inputTokens;
             aggOutputTokens      = stats.outputTokens;
             aggTopUsers          = stats.topUsers;
+            aggTopModels         = stats.topModels;
             aggUserBreakdown     = stats.userBreakdown;
             aggSessionSpark      = stats.sessionSpark;
             aggSessionSparkTs    = stats.sessionSparkTs;
@@ -148,7 +160,7 @@ public class LLMObservabilityAction extends UserAction {
         } catch (Exception e) {
             logger.error("fetchSessionAggStats error: " + e.getMessage());
         }
-        return Action.SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
     }
 
     // ── Argus aggregated stats (total spans + token sums + top apps/traces + sparklines) ──
@@ -156,13 +168,13 @@ public class LLMObservabilityAction extends UserAction {
     public String fetchArgusStats() {
         try {
             SearchClient client = SearchClientFactory.instance();
-            if (!client.isConfigured()) return Action.SUCCESS.toUpperCase();
+            if (!client.isConfigured()) return SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
             // Argus view always reports non-Atlas (agent) traffic so the total here matches
             // what the Argus paginated table reports; "false" also covers docs that predate
             // this field and were never Atlas-tagged.
-            SearchClient.ArgusStats stats = client.fetchArgusStats(accountId, startMs(), endMs(), Boolean.FALSE);
+            SearchClient.ArgusStats stats = client.fetchArgusStats(accountId, startMs(), endMs(), Boolean.FALSE, isUserRoleAdmin());
 
             aggTotalSpans   = stats.totalSpans;
             aggInputTokens  = stats.inputTokens;
@@ -176,16 +188,20 @@ public class LLMObservabilityAction extends UserAction {
         } catch (Exception e) {
             logger.error("fetchArgusStats error: " + e.getMessage());
         }
-        return Action.SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
     }
 
     // ── Spans for a single message/trace ──────────────────────────────────────
 
+    @Audit(description = "User viewed prompt content in Traces",
+           resource = Resource.TRACES_CONTENT,
+           operation = Operation.READ,
+           metadataGenerators = {"getTraceId"})
     public String fetchTraceDetail() {
         try {
             SearchClient client = SearchClientFactory.instance();
             if (!client.isConfigured() || traceId == null || traceId.trim().isEmpty())
-                return Action.SUCCESS.toUpperCase();
+                return SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
             Boolean atlasFilter = CONTEXT_SOURCE.ENDPOINT.equals(Context.contextSource.get()) ? Boolean.TRUE : null;
@@ -193,7 +209,7 @@ public class LLMObservabilityAction extends UserAction {
         } catch (Exception e) {
             spans = new ArrayList<>();
         }
-        return Action.SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
     }
 
     // ── Filter choices (distinct values for column filters) ───────────────────
@@ -201,14 +217,14 @@ public class LLMObservabilityAction extends UserAction {
     public String fetchPromptFilters() {
         try {
             SearchClient client = SearchClientFactory.instance();
-            if (!client.isConfigured()) return Action.SUCCESS.toUpperCase();
+            if (!client.isConfigured()) return SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
             filterChoices = client.fetchPromptFilters(accountId, startMs(), endMs());
         } catch (Exception e) {
             filterChoices = new HashMap<>();
         }
-        return Action.SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
     }
 
     // ── Paginated flat prompt search ───────────────────────────────────────────
@@ -216,13 +232,13 @@ public class LLMObservabilityAction extends UserAction {
     public String searchPrompts() {
         try {
             SearchClient client = SearchClientFactory.instance();
-            if (!client.isConfigured()) return Action.SUCCESS.toUpperCase();
+            if (!client.isConfigured()) return SUCCESS.toUpperCase();
             int accountId = Context.accountId.get();
 
             SearchClient.SearchResult result = client.searchPrompts(
                 accountId, startMs(), endMs(), skip, Math.min(limit, 100),
                 sortKey, sortOrder == -1, searchAfterJson,
-                buildMultiFilters(true), resolveContextAtlasFilter(), searchString);
+                buildMultiFilters(true), resolveContextAtlasFilter(), searchString, isUserRoleAdmin());
 
             prompts = result.hits;
             total   = result.total;
@@ -230,7 +246,11 @@ public class LLMObservabilityAction extends UserAction {
             prompts = new ArrayList<>();
             total   = 0;
         }
-        return Action.SUCCESS.toUpperCase();
+        return SUCCESS.toUpperCase();
+    }
+
+    private boolean isUserRoleAdmin() {
+        return RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get()) == Role.ADMIN;
     }
 
     // ── Shared helpers ────────────────────────────────────────────────────────
@@ -271,6 +291,12 @@ public class LLMObservabilityAction extends UserAction {
         if (!topics.isEmpty()) f.put(AgentQueryRecord.F_TOPIC_KW, topics);
         List<String> subTopics = nonEmpty(subTopicFilters);
         if (!subTopics.isEmpty()) f.put(AgentQueryRecord.F_SUB_TOPIC_KW, subTopics);
+        // hasActiveGuardrail: "true"/"false" values selected on the Guardrail column's set filter
+        List<String> guardrails = nonEmpty(guardrailFilters);
+        if (!guardrails.isEmpty()) f.put(AgentQueryRecord.F_GUARDRAIL_VIOLATED, guardrails);
+        // Guardrail Policy: which policy name(s) were triggered
+        List<String> guardrailPolicies = nonEmpty(guardrailPolicyFilters);
+        if (!guardrailPolicies.isEmpty()) f.put(AgentQueryRecord.F_GUARDRAIL_POLICY_KW, guardrailPolicies);
         return f;
     }
 

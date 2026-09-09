@@ -87,16 +87,18 @@ public class ProfileAction extends UserAction {
         Account currAccount = AccountsDao.instance.findOne(Filters.eq(Constants.ID, sessionAccId),Projections.include("name", "timezone"));
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-        boolean showOnboarding = accountSettings == null ? true : accountSettings.isShowOnboarding();
+        // boolean showOnboarding = accountSettings == null ? true : accountSettings.isShowOnboarding();
 
-        if (showOnboarding && request.getRequestURI().startsWith("/dashboard") && !request.getRequestURI().equals("/dashboard/onboarding")) {
-            try {
-                response.sendRedirect("/dashboard/onboarding"); 
-            }  catch (Exception e) {
-                e.printStackTrace();
-            }
-            return;
-        }
+        // Onboarding flow disabled - this used to bounce every /dashboard request of a
+        // fresh account into /dashboard/onboarding, which is what put that hop in the URL.
+        // if (showOnboarding && request.getRequestURI().startsWith("/dashboard") && !request.getRequestURI().equals("/dashboard/onboarding")) {
+        //     try {
+        //         response.sendRedirect("/dashboard/onboarding"); 
+        //     }  catch (Exception e) {
+        //         e.printStackTrace();
+        //     }
+        //     return;
+        // }
         String username = user.getLogin();
 
         EmailAccountName emailAccountName = new EmailAccountName(username); // username is the email id of the current user
@@ -218,8 +220,7 @@ public class ProfileAction extends UserAction {
                 .append("organizationName", orgName)
                 .append("isAwsWafIntegrated", awsWafCount != 0)
                 .append("isCloudflareWafIntegrated", cloudflareWafCount != 0)
-                .append("scopeRoleMapping", scopeRoleMapping)
-                .append("AG_GRID_LICENSE_KEY", System.getenv("AG_GRID_LICENSE_KEY"));
+                .append("scopeRoleMapping", scopeRoleMapping);
 
         boolean inviteDisabledForSSO = com.akto.utils.Utils.allowNewUserInviteViaDashboard(sessionAccId, user);
         userDetails.append("inviteDisabledForSSO", inviteDisabledForSSO);

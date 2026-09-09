@@ -49,7 +49,7 @@ public class CrowdStrikeIntegrationAction extends UserAction {
 
     private static final String JOB_TYPE = "CROWDSTRIKE_AH";
     private static final String JOB_SUB_TYPE = "FALCON_DISCOVER";
-    private static final int DEFAULT_INTERVAL = 3600;
+    private static final int DEFAULT_INTERVAL = 21600;
     private static final int CONNECT_TIMEOUT_MS = 30_000;
     private static final int SOCKET_TIMEOUT_MS  = 60_000;
     private static final long GUARDRAIL_RTR_MAX_WAIT_MS = 60_000;
@@ -69,6 +69,10 @@ public class CrowdStrikeIntegrationAction extends UserAction {
     private List<String> guardrailDeviceIds;
     private List<Map<String, Object>> guardrailTypes;
     private Map<String, Object> guardrailExecution;
+
+    // Discovery job targeting fields
+    private String discoveryTargetMode;
+    private List<String> discoveryDeviceIds;
 
     // In-memory dedup for script uploads within one request
     private static final Set<String> uploadedGuardrailScripts = ConcurrentHashMap.newKeySet();
@@ -139,7 +143,34 @@ public class CrowdStrikeIntegrationAction extends UserAction {
         );
         CrowdStrikeIntegrationDao.instance.updateOne(new BasicDBObject(), updates);
 
-        // Create or update AccountJob
+        loggerMaker.info("CrowdStrike integration saved successfully", LogDb.DASHBOARD);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Schedules (or reschedules) the CrowdStrike discovery AccountJob, scoped to the selected
+     * devices. This is the explicit trigger for discovery — saving credentials no longer does this.
+     */
+    public String scheduleCrowdStrikeDiscovery() {
+        CrowdStrikeIntegration integration = CrowdStrikeIntegrationDao.instance.findOne(new BasicDBObject());
+        if (integration == null) {
+            addActionError("CrowdStrike integration not configured.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        String targetMode = ("select".equals(discoveryTargetMode)) ? "select" : "all";
+        List<String> deviceIds = "select".equals(targetMode) && discoveryDeviceIds != null
+            ? discoveryDeviceIds : new ArrayList<>();
+
+        if ("select".equals(targetMode) && deviceIds.isEmpty()) {
+            addActionError("Please select at least one device.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        int now = Context.now();
+        int interval = integration.getRecurringIntervalSeconds() > 0
+            ? integration.getRecurringIntervalSeconds() : DEFAULT_INTERVAL;
+
         AccountJob existingJob = AccountJobDao.instance.findOne(
             Filters.and(
                 Filters.eq(AccountJob.JOB_TYPE, JOB_TYPE),
@@ -149,10 +180,12 @@ public class CrowdStrikeIntegrationAction extends UserAction {
 
         if (existingJob == null) {
             Map<String, Object> jobConfig = new HashMap<>();
-            jobConfig.put(CrowdStrikeIntegration.CLIENT_ID, clientId);
-            jobConfig.put(CrowdStrikeIntegration.CLIENT_SECRET, resolvedClientSecret);
-            jobConfig.put(CrowdStrikeIntegration.BASE_URL, resolvedBaseUrl);
-            jobConfig.put(CrowdStrikeIntegration.DATA_INGESTION_URL, normalizedIngestUrl);
+            jobConfig.put(CrowdStrikeIntegration.CLIENT_ID, integration.getClientId());
+            jobConfig.put(CrowdStrikeIntegration.CLIENT_SECRET, integration.getClientSecret());
+            jobConfig.put(CrowdStrikeIntegration.BASE_URL, integration.getBaseUrl());
+            jobConfig.put(CrowdStrikeIntegration.DATA_INGESTION_URL, integration.getDataIngestionUrl());
+            jobConfig.put("targetMode", targetMode);
+            jobConfig.put("deviceIds", deviceIds);
 
             AccountJob accountJob = new AccountJob(
                 Context.accountId.get(), JOB_TYPE, JOB_SUB_TYPE,
@@ -165,23 +198,24 @@ public class CrowdStrikeIntegrationAction extends UserAction {
             accountJob.setStartedAt(0);
             accountJob.setFinishedAt(0);
             AccountJobDao.instance.insertOne(accountJob);
-            loggerMaker.info("Created CrowdStrike account job", LogDb.DASHBOARD);
+            loggerMaker.info("Created CrowdStrike discovery account job", LogDb.DASHBOARD);
         } else {
             org.bson.conversions.Bson jobUpdates = Updates.combine(
-                Updates.set("config." + CrowdStrikeIntegration.CLIENT_ID, clientId),
-                Updates.set("config." + CrowdStrikeIntegration.CLIENT_SECRET, resolvedClientSecret),
-                Updates.set("config." + CrowdStrikeIntegration.BASE_URL, resolvedBaseUrl),
-                Updates.set("config." + CrowdStrikeIntegration.DATA_INGESTION_URL, normalizedIngestUrl),
+                Updates.set("config." + CrowdStrikeIntegration.CLIENT_ID, integration.getClientId()),
+                Updates.set("config." + CrowdStrikeIntegration.CLIENT_SECRET, integration.getClientSecret()),
+                Updates.set("config." + CrowdStrikeIntegration.BASE_URL, integration.getBaseUrl()),
+                Updates.set("config." + CrowdStrikeIntegration.DATA_INGESTION_URL, integration.getDataIngestionUrl()),
+                Updates.set("config.targetMode", targetMode),
+                Updates.set("config.deviceIds", deviceIds),
                 Updates.set(AccountJob.RECURRING_INTERVAL_SECONDS, interval),
                 Updates.set(AccountJob.LAST_UPDATED_AT, now),
                 Updates.set(AccountJob.JOB_STATUS, JobStatus.SCHEDULED.name()),
                 Updates.set(AccountJob.SCHEDULED_AT, now)
             );
             AccountJobDao.instance.updateOneNoUpsert(Filters.eq(AccountJob.ID, existingJob.getId()), jobUpdates);
-            loggerMaker.info("Updated CrowdStrike account job", LogDb.DASHBOARD);
+            loggerMaker.info("Updated CrowdStrike discovery account job", LogDb.DASHBOARD);
         }
 
-        loggerMaker.info("CrowdStrike integration saved successfully", LogDb.DASHBOARD);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -291,6 +325,7 @@ public class CrowdStrikeIntegrationAction extends UserAction {
                             device.put("platform", node.path("platform_name").asText(""));
                             device.put("osVersion", node.path("os_version").asText(""));
                             device.put("lastSeen", node.path("last_seen").asText(""));
+                            device.put("username", node.path("last_login_user").asText(""));
                             result.add(device);
                         }
                     }
@@ -499,34 +534,43 @@ public class CrowdStrikeIntegrationAction extends UserAction {
             }
 
             int totalSuccess = 0;
+            int totalDispatched = 0;
             int totalFail = 0;
 
             for (Map.Entry<String, String> entry : scriptBaseNames.entrySet()) {
                 String scriptBaseName = entry.getValue();
-                Map<String, Boolean> shResults = unixDeviceIds.isEmpty()
+                Map<String, GuardrailOutcome> shResults = unixDeviceIds.isEmpty()
                     ? new HashMap<>()
                     : batchAdminCommand(accessToken, resolvedBase, batchId, unixDeviceIds,
                         scriptBaseName + ".sh", inputParams);
-                Map<String, Boolean> ps1Results = windowsDeviceIds.isEmpty()
+                Map<String, GuardrailOutcome> ps1Results = windowsDeviceIds.isEmpty()
                     ? new HashMap<>()
                     : batchAdminCommand(accessToken, resolvedBase, batchId, windowsDeviceIds,
                         scriptBaseName + ".ps1", inputParams);
 
                 for (String deviceId : unixDeviceIds) {
-                    if (Boolean.TRUE.equals(shResults.get(deviceId))) totalSuccess++; else totalFail++;
+                    GuardrailOutcome outcome = shResults.get(deviceId);
+                    if (outcome == GuardrailOutcome.SUCCESS) totalSuccess++;
+                    else if (outcome == GuardrailOutcome.DISPATCHED) totalDispatched++;
+                    else totalFail++;
                 }
                 for (String deviceId : windowsDeviceIds) {
-                    if (Boolean.TRUE.equals(ps1Results.get(deviceId))) totalSuccess++; else totalFail++;
+                    GuardrailOutcome outcome = ps1Results.get(deviceId);
+                    if (outcome == GuardrailOutcome.SUCCESS) totalSuccess++;
+                    else if (outcome == GuardrailOutcome.DISPATCHED) totalDispatched++;
+                    else totalFail++;
                 }
             }
 
             String finalStatus = totalFail == 0 ? "completed" : "partial";
             guardrailExecution = new HashMap<>();
             guardrailExecution.put("successCount", totalSuccess);
+            guardrailExecution.put("dispatchedCount", totalDispatched);
             guardrailExecution.put("failCount", totalFail);
             guardrailExecution.put("totalCount", targetDeviceIds.size() * scriptBaseNames.size());
             guardrailExecution.put("status", finalStatus);
-            loggerMaker.info("CrowdStrike guardrails: " + totalSuccess + " success, " + totalFail + " failed", LogDb.DASHBOARD);
+            loggerMaker.info("CrowdStrike guardrails: " + totalSuccess + " confirmed, " + totalDispatched
+                + " dispatched (still installing), " + totalFail + " failed", LogDb.DASHBOARD);
             return Action.SUCCESS.toUpperCase();
 
         } catch (IOException e) {
@@ -566,18 +610,23 @@ public class CrowdStrikeIntegrationAction extends UserAction {
         }
     }
 
+  
+    private static final int RTR_READ_TIMEOUT_ERROR_CODE = 50401;
+
+    private enum GuardrailOutcome { SUCCESS, DISPATCHED, FAILED }
+
     /**
      * Dispatches a runscript command for the given script to every device in the batch,
      * in one API call — this is what lets a fleet-wide guardrail install stay inside a
      * single synchronous dashboard request instead of one RTR session per device.
-     * Returns a map of deviceId -> whether that device's command completed without error.
-     * Devices that are still incomplete in the initial response are polled via
-     * BatchGetCmdStatus until done or the timeout elapses.
+     * Returns a map of deviceId -> outcome: SUCCESS (confirmed complete, no stderr), DISPATCHED
+     * (command was accepted but we didn't wait for completion — e.g. hit the RTR read-timeout, or
+     * queued offline), or FAILED (a real error, or completed with stderr output).
      */
-    private Map<String, Boolean> batchAdminCommand(String accessToken, String baseUrl, String batchId,
+    private Map<String, GuardrailOutcome> batchAdminCommand(String accessToken, String baseUrl, String batchId,
             List<String> optionalHostIds,
             String scriptName, String inputParams) throws IOException {
-        Map<String, Boolean> results = new HashMap<>();
+        Map<String, GuardrailOutcome> results = new HashMap<>();
         RequestConfig cfg = buildRequestConfig();
 
         // CrowdStrike's RTR command parser rejects single-quoted args — use double quotes.
@@ -614,32 +663,43 @@ public class CrowdStrikeIntegrationAction extends UserAction {
                     JsonNode errors = deviceResult.path("errors");
                     boolean hasErrors = errors.isArray() && errors.size() > 0;
                     boolean complete = deviceResult.path("complete").asBoolean(false);
-                    if (hasErrors) {
+                    boolean isOnlyReadTimeout = hasErrors && errors.size() == 1
+                        && errors.get(0).path("code").asInt(0) == RTR_READ_TIMEOUT_ERROR_CODE;
+
+                    if (isOnlyReadTimeout) {
+                        loggerMaker.info("Guardrail " + scriptName + " on device " + deviceId
+                            + " dispatched — still running past the RTR read-timeout window", LogDb.DASHBOARD);
+                        results.put(deviceId, GuardrailOutcome.DISPATCHED);
+                    } else if (hasErrors) {
                         loggerMaker.error("Guardrail " + scriptName + " on device " + deviceId
                             + " error: " + errors.toString(), LogDb.DASHBOARD);
-                        results.put(deviceId, false);
+                        results.put(deviceId, GuardrailOutcome.FAILED);
                     } else if (complete) {
                         String stderr = deviceResult.path("stderr").asText("");
-                        results.put(deviceId, stderr.isEmpty());
+                        results.put(deviceId, stderr.isEmpty() ? GuardrailOutcome.SUCCESS : GuardrailOutcome.FAILED);
                         if (!stderr.isEmpty()) {
                             loggerMaker.error("Guardrail " + scriptName + " on device " + deviceId + " stderr=" + stderr, LogDb.DASHBOARD);
                         }
                     } else {
-                        // Not finished yet — poll for this specific device below.
+                        // Not finished yet (e.g. queued offline) — poll for this specific device below.
                         results.put(deviceId, null);
                     }
                 }
             }
         }
 
-        // Poll any devices still pending (e.g. queued offline, or slow to complete).
+        // Poll any devices still pending (e.g. queued offline) — but NOT devices that already hit
+        // the read-timeout above, since those were already dispatched successfully and a same-command
+        // retry would just restart the script from scratch on an already-running device.
         List<String> pendingDeviceIds = new ArrayList<>();
-        for (Map.Entry<String, Boolean> e : results.entrySet()) {
+        for (Map.Entry<String, GuardrailOutcome> e : results.entrySet()) {
             if (e.getValue() == null) pendingDeviceIds.add(e.getKey());
         }
         if (!pendingDeviceIds.isEmpty()) {
             Map<String, Boolean> polled = batchPollPendingDevices(accessToken, baseUrl, batchId, pendingDeviceIds, command);
-            results.putAll(polled);
+            for (Map.Entry<String, Boolean> e : polled.entrySet()) {
+                results.put(e.getKey(), Boolean.TRUE.equals(e.getValue()) ? GuardrailOutcome.SUCCESS : GuardrailOutcome.FAILED);
+            }
         }
 
         return results;

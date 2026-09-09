@@ -1,5 +1,6 @@
 import {create} from "zustand"
 import {devtools} from "zustand/middleware"
+import { devtoolsOptions } from "@/apps/main/devtoolsConfig"
 
 let testEditorStore = (set)=>({
     testsObj : null,
@@ -33,7 +34,7 @@ let testEditorStore = (set)=>({
     },
 })
 
-testEditorStore = devtools(testEditorStore)
+testEditorStore = devtools(testEditorStore, devtoolsOptions("TestEditorStore"))
 const TestEditorStore = create(testEditorStore)
 
 export default TestEditorStore

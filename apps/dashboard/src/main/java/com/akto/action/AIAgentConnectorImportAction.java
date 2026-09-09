@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.action.quick_start.QuickStartAction;
 import com.akto.dao.context.Context;
 import com.akto.dao.jobs.AccountJobDao;
 import com.akto.dto.jobs.AccountJob;
@@ -11,7 +12,9 @@ import com.opensymphony.xwork2.Action;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static com.akto.jobs.executors.AIAgentConnectorConstants.*;
@@ -165,6 +168,12 @@ public class AIAgentConnectorImportAction extends UserAction {
         
         Map<String, String> config = new HashMap<>();
         config.put(CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
+
+        // create token here
+        List<String> scopes = new ArrayList<>(List.of("GUARDRAIL"));
+        String apiToken = QuickStartAction.createTokenForAuth(6, scopes);
+
+        config.put(CONFIG_JWT_TOKEN, apiToken);
 
         switch (connectorType) {
             case CONNECTOR_TYPE_N8N:

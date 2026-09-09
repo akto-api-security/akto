@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <!DOCTYPE struts PUBLIC
-        "-//Apache Software Foundation//DTD Struts Configuration 2.3//EN"
-        "http://struts.apache.org/dtds/struts-2.3.dtd">
+        "-//Apache Software Foundation//DTD Struts Configuration 6.0//EN"
+        "https://struts.apache.org/dtds/struts-6.0.dtd">
 <struts>
     <constant name="struts.devMode" value="false"></constant>
     <constant name="struts.enable.SlashesInActionNames" value="true"/>
@@ -17,7 +17,10 @@
         <default-action-ref name="healthCheck" />
 
         <action name="api/ingestData" class="com.akto.action.IngestionAction" method="ingestData">
-            <interceptor-ref name="json"/>
+            <interceptor-ref name="json">
+                <param name="maxStringLength">5242880</param>
+                <param name="maxLength">10485760</param>
+            </interceptor-ref>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <param name="includeProperties">^success.*</param>
@@ -52,7 +55,10 @@
         </action>
 
         <action name="api/http-proxy" class="com.akto.action.HttpProxyAction" method="httpProxy">
-            <interceptor-ref name="json"/>
+            <interceptor-ref name="json">
+                <param name="maxStringLength">5242880</param>
+                <param name="maxLength">10485760</param>
+            </interceptor-ref>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <param name="includeProperties">^success,^message,^data.*</param>
@@ -61,6 +67,21 @@
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^success,^message,^data.*</param>
+            </result>
+        </action>
+
+        <!-- Generic AI-provider guardrail webhook: provider is the {1} path variable.
+             Parses that provider's format (adapter registry), always runs guardrails
+             + ingests. Adding a provider = one new adapter, no struts change. -->
+        <action name="api/v1/webhooks/{provider}/guardrail/?" class="com.akto.action.ProviderGuardrailAction" method="guardrail">
+            <param name="provider">{1}</param>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">404</param>
+                <param name="root">response</param>
             </result>
         </action>
 
@@ -82,6 +103,20 @@
             </result>
             <result name="ERROR" type="json">
                 <param name="includeProperties">^code,^error_message</param>
+            </result>
+        </action>
+
+        <action name="copilot/threat-detection/validate" class="com.akto.action.CopilotStudioWebhookAction" method="checkReady">
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^isSuccessful,^status</param>
+            </result>
+        </action>
+
+        <action name="copilot/threat-detection/analyze-tool-execution" class="com.akto.action.CopilotStudioWebhookAction" method="analyzeToolExecution">
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^blockAction,^reason,^diagnostics</param>
             </result>
         </action>
 
@@ -114,6 +149,32 @@
             </result>
         </action>
 
+        <!-- Proxy to database-abstractor -->
+        <action name="api/updateModuleInfoForHeartbeat" class="com.akto.action.AbstractorProxyAction" method="proxy">
+            <param name="subpath">updateModuleInfoForHeartbeat</param>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^success,^message,^data.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^success,^message</param>
+            </result>
+        </action>
+
+        <action name="api/updateModuleInfoForHeartbeatV2" class="com.akto.action.AbstractorProxyAction" method="proxy">
+            <param name="subpath">updateModuleInfoForHeartbeatV2</param>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^success,^message,^data.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^success,^message</param>
+            </result>
+        </action>
 
     </package>
 

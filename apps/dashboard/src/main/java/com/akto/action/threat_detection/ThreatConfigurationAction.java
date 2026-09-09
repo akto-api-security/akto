@@ -9,8 +9,8 @@ import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
 
+import com.akto.action.threat_detection.utils.ThreatsUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,7 +57,7 @@ public void setEnabled(Boolean enabled) {
     get.addHeader("Content-Type", "application/json");
 
     try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
       this.threatConfiguration = objectMapper.readValue(responseBody, ThreatConfiguration.class);
 
     } catch (Exception e) {
@@ -84,7 +84,7 @@ public void setEnabled(Boolean enabled) {
       return ERROR.toUpperCase();
     }
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
       this.threatConfiguration = objectMapper.readValue(responseBody, ThreatConfiguration.class);
 
       return SUCCESS.toUpperCase();
@@ -110,7 +110,7 @@ public void setEnabled(Boolean enabled) {
       return ERROR.toUpperCase();
     }
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
       java.util.Map<String, Object> response = objectMapper.readValue(responseBody, java.util.Map.class);
       this.enabled = (Boolean) response.get("enabled");
       return SUCCESS.toUpperCase();

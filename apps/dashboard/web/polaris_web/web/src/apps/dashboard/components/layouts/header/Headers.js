@@ -1,5 +1,5 @@
-import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
-import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PhoneMajor, ChatMajor, SettingsMajor } from '@shopify/polaris-icons';
+import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable, Popover, Spinner } from '@shopify/polaris';
+import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PhoneMajor, ChatMajor, SettingsMajor, MagicMinor } from '@shopify/polaris-icons';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
@@ -15,7 +15,12 @@ import SessionStore from '../../../../main/SessionStore';
 import IssuesStore from '../../../pages/issues/issuesStore';
 import Dropdown from '../Dropdown';
 import Wrapped2025 from './Wrapped2025';
-import { categoryToShortName, shortNameToCategory } from '../../../../main/labelHelper';
+import { shortNameToCategory } from '../../../../main/labelHelper';
+import insightsApi from '@/apps/dashboard/pages/observe/agentic/insights/insightsApi';
+import { INSIGHT_GROUP, INSIGHT_GROUP_LABEL, INSIGHT_GROUP_ROUTE, INSIGHT_DEEP_LINK_PARAM } from '@/apps/dashboard/pages/observe/agentic/insights/insightsHelpers';
+
+const INSIGHT_POPOVER_GROUPS = [INSIGHT_GROUP.ATLAS_DISCOVERY, INSIGHT_GROUP.GUARDRAIL_VIOLATIONS];
+const INSIGHT_POPOVER_TOP_N = 2;
 
 function ContentWithIcon({ icon, text, isAvatar = false }) {
     return (
@@ -48,7 +53,6 @@ export default function Header() {
     const setDashboardCategory = PersistStore((state) => state.setDashboardCategory);
 
     useEffect(() => {
-        console.log("hey", dashboardCategory)
         if (window.beamer_config) {
             const isOnPrem = window.DASHBOARD_MODE === 'ON_PREM';
             const isAgentic = dashboardCategory === 'Agentic Security';
@@ -92,9 +96,115 @@ export default function Header() {
         }
     }, []);
 
+    /* Pinned insights entry point — a small popover previewing the top actionable insights from
+       both surfaces (Atlas Discovery + guardrail/violations), which never mix in one list (see
+       InsightId.Group). There's no dedicated insights page here — clicking an insight or "Show
+       more" navigates to whichever page actually owns that group's InsightsFlyout
+       (AgenticAssetsPage / ViolationsPage), which auto-opens it via the `?insight=` deep link. */
+    const [insightsPopoverActive, setInsightsPopoverActive] = useState(false);
+    const [topInsightsByGroup, setTopInsightsByGroup] = useState({});
+    const [topInsightsLoaded, setTopInsightsLoaded] = useState(false);
+    const [topInsightsLoading, setTopInsightsLoading] = useState(false);
+    const [topInsightsError, setTopInsightsError] = useState(false);
+
+    const { insightsStartTimestamp, insightsEndTimestamp } = useMemo(() => {
+        const end = Math.floor(Date.now() / 1000);
+        return { insightsStartTimestamp: end - 30 * 24 * 60 * 60, insightsEndTimestamp: end };
+    }, []);
+
+    const handleToggleInsightsPopover = useCallback(() => {
+        setInsightsPopoverActive((active) => {
+            const next = !active;
+            if (next && !topInsightsLoaded) {
+                setTopInsightsLoading(true);
+                setTopInsightsError(false);
+                Promise.all(INSIGHT_POPOVER_GROUPS.map((group) =>
+                    insightsApi.fetchInsightsList({ startTimestamp: insightsStartTimestamp, endTimestamp: insightsEndTimestamp, group })
+                ))
+                    .then((resultsByGroup) => {
+                        const byGroup = {};
+                        INSIGHT_POPOVER_GROUPS.forEach((group, i) => {
+                            byGroup[group] = resultsByGroup[i].filter((insight) => insight.category === "ACTIONABLE");
+                        });
+                        setTopInsightsByGroup(byGroup);
+                        setTopInsightsLoaded(true);
+                    })
+                    .catch(() => setTopInsightsError(true))
+                    .finally(() => setTopInsightsLoading(false));
+            }
+            return next;
+        });
+    }, [topInsightsLoaded, insightsStartTimestamp, insightsEndTimestamp]);
+
+    const handleCloseInsightsPopover = useCallback(() => setInsightsPopoverActive(false), []);
+
+    // Empty insightId opens straight to the list (used by "Show more").
+    const goToInsight = useCallback((group, insightId) => {
+        setInsightsPopoverActive(false);
+        const query = new URLSearchParams({ [INSIGHT_DEEP_LINK_PARAM]: insightId || "" });
+        navigate(`${INSIGHT_GROUP_ROUTE[group]}?${query.toString()}`);
+    }, [navigate]);
+
+    const hasAnyTopInsights = INSIGHT_POPOVER_GROUPS.some((group) => (topInsightsByGroup[group] || []).length > 0);
+
+    const topInsightsMarkup = (
+        <Box width="360px">
+            <Box padding="4" borderBlockEndWidth="1" borderColor="border-subdued">
+                <Text variant="headingSm" as="h3">Insights</Text>
+            </Box>
+            {topInsightsLoading ? (
+                <Box padding="5">
+                    <HorizontalStack align="center"><Spinner size="small" accessibilityLabel="Loading insights" /></HorizontalStack>
+                </Box>
+            ) : topInsightsError ? (
+                <Box padding="5"><Text color="subdued" variant="bodySm">Couldn't load insights.</Text></Box>
+            ) : !hasAnyTopInsights ? (
+                <Box padding="5"><Text color="subdued" variant="bodySm">No actionable insights available.</Text></Box>
+            ) : (
+                <Scrollable style={{ maxHeight: '480px' }}>
+                    {INSIGHT_POPOVER_GROUPS.map((group) => {
+                        const groupInsights = (topInsightsByGroup[group] || []).slice(0, INSIGHT_POPOVER_TOP_N);
+                        if (groupInsights.length === 0) return null;
+                        return (
+                            <Box key={group} padding="3">
+                                <VerticalStack gap={"2"}>
+                                    <Text variant="headingSm" color="subdued">{INSIGHT_GROUP_LABEL[group]}</Text>
+                                    {groupInsights.map((insight) => (
+                                        <Box
+                                            key={insight.insightId}
+                                            padding="3"
+                                            borderBlockEndWidth="1"
+                                            borderColor="border-subdued"
+                                            onClick={() => goToInsight(group, insight.insightId)}
+                                            style={{ cursor: 'pointer' }}
+                                        >
+                                            <VerticalStack gap="2">
+                                                <Text variant="bodyMd" fontWeight="semibold">{insight.title}</Text>
+                                                {(insight.headline || insight.metrics?.[0]?.formatted) ? (
+                                                    <Text variant="bodySm" color="subdued">{insight.headline || insight.metrics[0].formatted}</Text>
+                                                ) : null}
+                                            </VerticalStack>
+                                            
+                                        </Box>
+                                    ))}
+                                </VerticalStack>
+                                <Box padding="2">
+                                    <Button plain fullWidth onClick={() => goToInsight(group, null)}>
+                                        {`Show more in ${INSIGHT_GROUP_LABEL[group]}`}
+                                    </Button>
+                                </Box>
+                            </Box>
+                        );
+                    })}
+                </Scrollable>
+            )}
+        </Box>
+    );
+
 
     const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
     const { agenticSecurityGranted, endpointSecurityGranted, dastGranted, mcpSecurityGranted } = func.getStiggFeatureGrants();
+    const dashboardInsightsGranted = func.checkForFeatureSaas("DASHBOARD_INSIGHTS");
 
     const disabledDashboardCategories = useMemo(() => {
         const disabled = [];
@@ -116,28 +226,51 @@ export default function Header() {
         return disabled;
     }, [mcpSecurityGranted, agenticSecurityGranted, dastGranted, endpointSecurityGranted]);
 
-    const dropdownInitial = disabledDashboardCategories.includes(dashboardCategory)
-        ? "API Security"
+    // Only hide API Security / DAST for Argus/Atlas-only users.
+    // API users still see DAST (Stigg may disable it), and always see Argus/Atlas.
+    const hiddenDashboardCategories = useMemo(() => {
+        const mapping = window.SCOPE_ROLE_MAPPING;
+        if (func.checkLocal() || !mapping || Object.keys(mapping).length === 0) {
+            return [];
+        }
+        const hasAccess = (scope) => {
+            const role = mapping[scope];
+            return role && role !== "NO_ACCESS" && role !== "NO ACCESS";
+        };
+        const hasApiOrDast = hasAccess("API") || hasAccess("DAST");
+        const hasArgusOrAtlas = hasAccess("AGENTIC") || hasAccess("ENDPOINT");
+        if (!hasApiOrDast && hasArgusOrAtlas) {
+            return ["API Security", "DAST"];
+        }
+        return [];
+    }, []);
+
+    const firstAccessibleCategory = useMemo(() => {
+        const mapping = window.SCOPE_ROLE_MAPPING || {};
+        const scope = Object.keys(mapping).find(key => {
+            const role = mapping[key];
+            return role && role !== "NO_ACCESS" && role !== "NO ACCESS";
+        });
+        return shortNameToCategory[scope] || "API Security";
+    }, []);
+
+    const dropdownInitial = disabledDashboardCategories.includes(dashboardCategory) || hiddenDashboardCategories.includes(dashboardCategory)
+        ? firstAccessibleCategory
         : (dashboardCategory || "API Security");
     
     useEffect(() => {
-        if(window.SCOPE_ROLE_MAPPING && Object.keys(window.SCOPE_ROLE_MAPPING).length > 0 && window.location.pathname !== "/dashboard/onboarding"){
-            if(!window.SCOPE_ROLE_MAPPING[categoryToShortName[dashboardCategory]]){
-                let scope = "";
-                Object.keys(window.SCOPE_ROLE_MAPPING).forEach(key => {
-                    const value = window.SCOPE_ROLE_MAPPING[key];
-                    if(value !== "NO ACCESS" && value !== "NO_ACCESS"){
-                        scope = key;
-                        return;
-                    }
-                });
-                const category = shortNameToCategory[scope];
-                setDashboardCategory(category);
+        // Onboarding flow disabled - the `pathname !== "/dashboard/onboarding"` guard that
+        // used to be part of this condition is dead, nothing routes there any more.
+        // if(window.SCOPE_ROLE_MAPPING && Object.keys(window.SCOPE_ROLE_MAPPING).length > 0 && window.location.pathname !== "/dashboard/onboarding"){
+        if(window.SCOPE_ROLE_MAPPING && Object.keys(window.SCOPE_ROLE_MAPPING).length > 0){
+            // Only leave categories hidden by scope (API users may use Argus/Atlas without those scopes)
+            if(hiddenDashboardCategories.includes(dashboardCategory)){
+                setDashboardCategory(firstAccessibleCategory);
             }
         }else if (disabledDashboardCategories.includes(dashboardCategory) && dashboardCategory !== "API Security") {
             setDashboardCategory("API Security");
         }
-    }, [dashboardCategory, disabledDashboardCategories, setDashboardCategory]);
+    }, [dashboardCategory, disabledDashboardCategories, hiddenDashboardCategories, firstAccessibleCategory, setDashboardCategory]);
 
     /* Search bar */
     //const allRoutes = Store((state) => state.allRoutes)
@@ -158,6 +291,12 @@ export default function Header() {
             setFilteredItemsArr(resultArr);
         }
     }, 500), [searchItemsArr]);
+
+    useEffect(() => {
+        return () => {
+            debouncedSearch.cancel();
+        };
+    }, [debouncedSearch]);
 
     const handleSearchChange = useCallback((value) => {
         setSearchValue(value);
@@ -239,7 +378,9 @@ export default function Header() {
             setNewAccount('')
             resetAll();
             resetStore();
-            window.location.href = "/dashboard/onboarding"
+            // Onboarding flow disabled — see SignUp.jsx.
+            // window.location.href = "/dashboard/onboarding"
+            window.location.href = "/dashboard/observe/inventory"
         })
     }
 
@@ -324,6 +465,21 @@ export default function Header() {
                 </div>
             </div> */}
 
+            {dashboardInsightsGranted && (
+                <Popover
+                    active={insightsPopoverActive}
+                    onClose={handleCloseInsightsPopover}
+                    preferredAlignment="right"
+                    activator={
+                        <Button id="insights-btn" plain monochrome onClick={handleToggleInsightsPopover} accessibilityLabel="Insights">
+                            <Icon source={MagicMinor} />
+                        </Button>
+                    }
+                >
+                    {topInsightsMarkup}
+                </Popover>
+            )}
+
             <Button id="beamer-btn" plain monochrome onClick={handleBeamerClick}>
                 <span className={getColorForIcon()}>
                     <Icon source={NotificationMajor} />
@@ -354,6 +510,7 @@ export default function Header() {
 
                             <Box minWidth='170px'>
                                 <Dropdown
+                                    id="dashboard-category-dropdown"
                                     menuItems={[
                                         {
                                             value: "API Security",
@@ -379,7 +536,7 @@ export default function Header() {
                                             id: "dast",
                                             helpText: "Scan Your Apps for Vulnerabilities"
                                         },
-                                    ]}
+                                    ].filter(item => !hiddenDashboardCategories.includes(item.value))}
                                     initial={dropdownInitial}
                                     selected={(val) => handleDashboardChange(val)}
                                     disabledOptions={disabledDashboardCategories}

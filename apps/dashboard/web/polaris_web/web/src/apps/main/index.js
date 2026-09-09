@@ -1,4 +1,12 @@
 
+// AG Grid license/module registration must be the first thing evaluated in the
+// app's module graph, ahead of any component that renders a grid, otherwise
+// grids can mount before the license key is set and briefly show the
+// "invalid license" watermark.
+import { ModuleRegistry, AllCommunityModule } from "ag-grid-community";
+import { LicenseManager, AllEnterpriseModule } from "ag-grid-enterprise";
+
+
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
@@ -40,6 +48,9 @@ if(isWhitelisted || isSignupPage) {
     free = true; // No valid plan = Block user
   }
 }
+
+ModuleRegistry.registerModules([AllCommunityModule, AllEnterpriseModule]);
+LicenseManager.setLicenseKey(window.AG_GRID_LICENSE_KEY);
 
 
 if (expired) {

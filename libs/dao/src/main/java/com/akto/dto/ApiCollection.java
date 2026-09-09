@@ -77,6 +77,15 @@ public class ApiCollection {
     int mcpMaliciousnessLastCheck;
     public static final String MCP_MALICIOUSNESS_LAST_CHECK = "mcpMaliciousnessLastCheck";
 
+    Double baseRiskScore;
+    public static final String BASE_RISK_SCORE = "baseRiskScore";
+
+    String baseRiskScoreReason;
+    public static final String BASE_RISK_SCORE_REASON = "baseRiskScoreReason";
+
+    Integer baseRiskScoreCalculatedAt;
+    public static final String BASE_RISK_SCORE_CALCULATED_AT = "baseRiskScoreCalculatedAt";
+
 
     String accessType;
     public static final String ACCESS_TYPE = "accessType";
@@ -639,6 +648,30 @@ public class ApiCollection {
 
     public void setMcpMaliciousnessLastCheck(int mcpMaliciousnessLastCheck) {
         this.mcpMaliciousnessLastCheck = mcpMaliciousnessLastCheck;
+    }
+
+    public Double getBaseRiskScore() {
+        return baseRiskScore;
+    }
+
+    public void setBaseRiskScore(Double baseRiskScore) {
+        this.baseRiskScore = baseRiskScore;
+    }
+
+    public String getBaseRiskScoreReason() {
+        return baseRiskScoreReason;
+    }
+
+    public void setBaseRiskScoreReason(String baseRiskScoreReason) {
+        this.baseRiskScoreReason = baseRiskScoreReason;
+    }
+
+    public Integer getBaseRiskScoreCalculatedAt() {
+        return baseRiskScoreCalculatedAt;
+    }
+
+    public void setBaseRiskScoreCalculatedAt(Integer baseRiskScoreCalculatedAt) {
+        this.baseRiskScoreCalculatedAt = baseRiskScoreCalculatedAt;
     }
 
     public String getServiceTag() {

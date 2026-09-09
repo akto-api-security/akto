@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Collection + unique multikey index for CommonOrganisationMappingDao
+        (collName: common_organisation_mappings, DB: common).
+
+        Each document is a sibling-domain group: { "domains": [ ... ] }. The unique
+        index on the "domains" array enforces that a domain belongs to at most one
+        group (one domain -> one org). Index name "domains_1" matches
+        MCollection.generateIndexName({"domains"}, true) so the DAO's
+        createIndexIfAbsent treats it as already present.
+    -->
+
+    <changeSet id="002-common-create-common-organisation-mappings" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="common_organisation_mappings"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="common_organisation_mappings"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="common_organisation_mappings"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="002-common-organisation-mappings-domains-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="common_organisation_mappings"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="common_organisation_mappings">
+            <mongodb:keys>{ "domains": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "domains_1", "unique": true }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="common_organisation_mappings">
+                <mongodb:keys>{ "domains": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

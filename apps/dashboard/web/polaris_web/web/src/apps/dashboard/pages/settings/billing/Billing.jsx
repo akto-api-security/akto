@@ -160,7 +160,7 @@ function Billing() {
             </LegacyCard.Section>
         </LegacyCard>
 
-        {window.IS_SAAS === 'true'  && <LegacyCard title={planTitle}>
+        {window.IS_SAAS === 'false'  && <LegacyCard title={planTitle}>
             <Divider />
             <LegacyCard.Section  >
                 {planInfo}

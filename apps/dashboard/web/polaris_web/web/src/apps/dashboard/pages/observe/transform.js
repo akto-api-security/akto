@@ -433,6 +433,23 @@ const transform = {
         }
     },
 
+    // Suppressed when either score is 0/falsy — a "0" risk-score badge showing a non-zero base
+    // score (or vice versa) in its tooltip reads as contradictory, so both have to be meaningfully
+    // non-zero before the extra context is worth surfacing.
+    wrapRiskScoreTooltip(badge, riskScore, baseRiskScore, baseRiskScoreReason){
+        if(!baseRiskScoreReason || !riskScore || !baseRiskScore) return badge;
+        return (
+            <Tooltip dismissOnMouseOut content={
+                <Box>
+                    {/* <Text>Base score: {baseRiskScore}</Text> */}
+                    <Text>{baseRiskScoreReason}</Text>
+                </Box>
+            }>
+                {badge}
+            </Tooltip>
+        );
+    },
+
     getIssuesList(severityInfo){
         const sortedSeverityInfo = func.sortObjectBySeverity(severityInfo)
         return (
@@ -456,11 +473,15 @@ const transform = {
             return <></>
         }
 
-        // Sort tags to prioritize 'privatecloud.agoda.com/service' first
+        const aiAgentEmailKey = 'ai-agent-email'
+
+        // Sort tags to prioritize 'ai-agent-email', then 'privatecloud.agoda.com/service'
         const sortedEnvType = [...envType].sort((a, b) => {
             const aKey = a.split('=')[0];
             const bKey = b.split('=')[0];
 
+            if (aKey === aiAgentEmailKey) return -1;
+            if (bKey === aiAgentEmailKey) return 1;
             if (aKey === 'privatecloud.agoda.com/service') return -1;
             if (bKey === 'privatecloud.agoda.com/service') return 1;
             return 0;
@@ -474,6 +495,7 @@ const transform = {
                 useTooltip={true}
                 wrap={wrap}
                 allowFullWidth={true}
+                getItemStatus={(item) => item.split('=')[0] === aiAgentEmailKey ? 'success' : 'info'}
             />
         )
     },
@@ -584,9 +606,10 @@ const transform = {
             const outOfTestingScopeComp = c.outOfTestingScopeComp || (c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>));
 
             // Risk score component - for untracked tab, show blank
+            const riskScoreBadge = <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>;
             const riskScoreComp = isUntrackedTab
                 ? <Text></Text>
-                : (isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>);
+                : (isLoading ? loadingComp : this.wrapRiskScoreTooltip(riskScoreBadge, c.riskScore, c.baseRiskScore, c.baseRiskScoreReason));
 
             // Create iconComp for collections if not already present
             const showIcon = isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory() || ((isApiSecurityCategory() || isDastCategory()) && c.hostName);

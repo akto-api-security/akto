@@ -27,6 +27,8 @@ REDACTION_PLACEHOLDER = "[REDACTED]"
 # Noisy spaCy/keyword recognizers (no format validation) that misfire on ordinary text.
 EXCLUDED_ENTITY_TYPES = {"DATE_TIME", "NRP", "LOCATION"}
 
+SCORE_THRESHOLD = 0.4
+
 
 def _build_analyzer() -> AnalyzerEngine:
     if not spacy.util.is_package(SPACY_MODEL):
@@ -107,6 +109,7 @@ def anonymize(req: AnonymizeRequest, request: Request):
         text=req.text,
         language=req.language,
         entities=req.entities,
+        score_threshold=SCORE_THRESHOLD,
     )
     # Drop noisy types unless the caller explicitly asked for specific entities.
     if not req.entities:

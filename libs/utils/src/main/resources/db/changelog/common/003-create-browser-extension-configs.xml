@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Shared list of supported browser extension configs for
+        BrowserExtensionConfigCommonDao (collName: browser_extension_configs, DB: common).
+
+        The collection is schema-loose - only "host" is mandatory - so no unique/schema
+        constraint is enforced here; documents are mapped in
+        BrowserExtensionConfigCommon.fromDocument. This is the common-DB counterpart of the
+        account-scoped browser_extension_configs collection created in baseline-account.xml.
+    -->
+
+    <changeSet id="003-common-create-browser-extension-configs" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="browser_extension_configs"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="browser_extension_configs"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="browser_extension_configs"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

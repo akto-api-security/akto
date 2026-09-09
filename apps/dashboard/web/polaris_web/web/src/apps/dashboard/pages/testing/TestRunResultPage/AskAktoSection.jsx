@@ -14,8 +14,16 @@ function AskAktoSection({ aiSummary, aiSummaryLoading, aiMessages, aiLoading, on
     useEffect(() => {
         const el = chatScrollRef.current;
         if (!el) return;
+        // Stick to bottom only if the reader was already there before this mutation (e.g. a
+        // streaming response, or the "thinking" indicator, appending content) — otherwise every
+        // mutation yanks the view back down, making it impossible to scroll up and read earlier
+        // messages while a response is still streaming in.
+        const NEAR_BOTTOM_THRESHOLD_PX = 80;
         const observer = new MutationObserver(() => {
-            el.scrollTop = el.scrollHeight;
+            const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+            if (distanceFromBottom <= NEAR_BOTTOM_THRESHOLD_PX) {
+                el.scrollTop = el.scrollHeight;
+            }
         });
         observer.observe(el, { childList: true, subtree: true, characterData: true });
         return () => observer.disconnect();

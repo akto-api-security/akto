@@ -1,0 +1,20 @@
+{
+  "$comment": [
+    "Example Amp settings at ~/.config/amp/settings.json (or <repo>/.amp/settings.json).",
+    "The Akto plugin itself needs NO entry here - Amp auto-discovers plugins from",
+    "~/.config/amp/plugins/ and .amp/plugins/. This file only shows how to register",
+    "MCP servers; the plugin guards every server configured below automatically.",
+    "Amp exposes their tools to the model as mcp__<server>__<tool>, which is how the",
+    "validators route MCP traffic to Akto's /mcp endpoint as JSON-RPC tools/call."
+  ],
+  "amp.mcpServers": {
+    "calculator": {
+      "command": "node",
+      "args": ["/path/to/calculator-mcp-server.js"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    }
+  }
+}

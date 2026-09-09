@@ -146,13 +146,13 @@ const flaggedData = [
     }
 ]
 
-const ChartComponent = ({ subCategoryCount, severityCountMap, onThreatTypeClick, onSeverityClick }) => {
+const ChartComponent = ({ categoryCount, severityCountMap, onThreatTypeClick, onSeverityClick }) => {
     return (
       <VerticalStack gap={4} columns={2}>
         <HorizontalGrid gap={4} columns={2}>
           <TopThreatTypeChart
             key={"top-threat-types"}
-            data={subCategoryCount}
+            data={categoryCount}
             onBarClick={onThreatTypeClick}
           />
           <InfoCard
@@ -223,7 +223,8 @@ const initialEventState = {
     moreInfoData: {},
     currentEventId: '',
     currentEventStatus: '',
-    currentJiraTicketUrl: ''
+    currentJiraTicketUrl: '',
+    currentHumanResponse: ''
 };
 
 function ThreatDetectionPage() {
@@ -234,9 +235,10 @@ function ThreatDetectionPage() {
     // Consolidate query parameters into a single object
     const queryParams = useMemo(() => {
         const eventStatusFromQuery = searchParams.get("eventStatus");
-        // Support legacy 'filters' param for backward compatibility
+        // Legacy 'filters' is a status only when it's a bare token, not "key__value".
         const legacyFilters = searchParams.get("filters");
-        const statusValue = eventStatusFromQuery || (legacyFilters ? legacyFilters.replace(/#/g, "").toUpperCase() : "");
+        const legacyStatus = legacyFilters && !legacyFilters.includes("__") ? legacyFilters.replace(/#/g, "").toUpperCase() : "";
+        const statusValue = eventStatusFromQuery || legacyStatus;
         return {
             refId: searchParams.get("refId"),
             eventType: searchParams.get("eventType"),
@@ -325,7 +327,8 @@ function ThreatDetectionPage() {
             }
         }
         const specialAccounts = [1776384040, 1776625569, 1776626846];
-        return specialAccounts.includes(Number(window.ACTIVE_ACCOUNT)) ? values.ranges[4] : values.ranges[2];
+        if (specialAccounts.includes(Number(window.ACTIVE_ACCOUNT))) return values.ranges[4];
+        return func.getLast30DaysRange();
     }, [location.state, searchParams]);
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
 
@@ -341,25 +344,28 @@ function ThreatDetectionPage() {
         }
     }, [searchParams]);
     const [showDetails, setShowDetails] = useState(false);
+    const applyPayloadSearchRef = useRef(() => {});
     const [sampleData, setSampleData] = useState([])
     const [showNewTab, setShowNewTab] = useState(false)
-    const [subCategoryCount, setSubCategoryCount] = useState([]);
+    const [categoryCount, setCategoryCount] = useState([]);
     const [severityCountMap, setSeverityCountMap] = useState([]);
     const [moreActions, setMoreActions] = useState(false);
     const [webhookIntegrationModalOpen, setWebhookIntegrationModalOpen] = useState(false);
     const [webhookIntegrationData, setWebhookIntegrationData] = useState(null);
-    const [latencyData, setLatencyData] = useState([]);
+    const [latencyData, setLatencyData] = useState(null);
     const [detailsLoading, setDetailsLoading] = useState(false);
     const pollingIntervalRef = useRef(null);
     const [pendingRowContext, setPendingRowContext] = useState(null);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
-    const showNewLayoutToggle = (func.isDemoAccount() || window.ACTIVE_ACCOUNT === 1726615470) && isEndpointSecurityCategory();
+    const showNewLayoutToggle = isEndpointSecurityCategory() || isAgenticSecurityCategory();
     const newLayout = LocalStore((state) => state.guardrailViolationsNewLayout);
     const setGuardrailViolationsNewLayout = LocalStore((state) => state.setGuardrailViolationsNewLayout);
 
+    // Captured once at mount so a later URL cleanup (clearEventState) can't flip this.
+    const hadDashboardFilterLinkRef = useRef(Boolean(searchParams.get("filters") || searchParams.get("eventStatus")));
     useEffect(() => {
-        if (showNewLayoutToggle && newLayout) {
+        if (showNewLayoutToggle && newLayout && !hadDashboardFilterLinkRef.current) {
             navigate("/dashboard/guardrails/violations", { replace: true });
         }
     }, [navigate, showNewLayoutToggle, newLayout]);
@@ -455,7 +461,9 @@ function ThreatDetectionPage() {
             complianceMapData: data.complianceMapData || {},
             metadata: data.metadata || '',
             behaviourRaw: data.behaviourRaw || extractBehaviour(data.metadata) || '',
-            host: data.host || ''
+            host: data.host || '',
+            remediation: data.remediation || '',
+            humanResponse: data.humanResponse || '',
         });
 
         setShowDetails(true);
@@ -475,11 +483,13 @@ function ThreatDetectionPage() {
                 complianceMap: data.complianceMapData || {},
                 metadata: data.metadata || '',
                 behaviour: data.behaviourRaw || extractBehaviour(data.metadata) || '',
-                host: data.host || ''
+                host: data.host || '',
+                remediation: data.remediation || ''
             },
             currentEventId: data.id || '',
             currentEventStatus: data.status || '',
-            currentJiraTicketUrl: data.jiraTicketUrl || ''
+            currentJiraTicketUrl: data.jiraTicketUrl || '',
+            currentHumanResponse: data.humanResponse || ''
         });
         if (data.nextUrl) {
             navigate(data.nextUrl, { replace: eventState.currentRefId === data.refId });
@@ -506,7 +516,10 @@ function ThreatDetectionPage() {
         const fetchThreatCategoryCount = async () => {
             const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
             const finalObj = threatDetectionFunc.getGraphsData(res);
-            setSubCategoryCount(finalObj.subCategoryCount);
+            // categoryCountRes groups by policy name (category), not the generic rule-type
+            // subCategory (e.g. "UserDefinedLLMRule" shared by many distinct policies) — same
+            // source ThreatApiPage.jsx already uses for this same chart.
+            setCategoryCount(finalObj.categoryCountRes);
           };
 
           const fetchCountBySeverity = async () => {
@@ -665,6 +678,7 @@ function ThreatDetectionPage() {
               metadata: rowContext?.metadata || '',
               behaviour: rowContext?.behaviourRaw || extractBehaviour(rowContext?.metadata) || '',
               host: rowContext?.host || '',
+              remediation: rowContext?.remediation || '',
               complianceMap: rowContext?.complianceMapData || (() => {
                 if (!queryParams.filterId) return {};
                 const { threatFiltersMap, guardrailComplianceMap } = SessionStore.getState();
@@ -678,7 +692,8 @@ function ThreatDetectionPage() {
             },
             currentEventId: rowContext?.eventId || '',
             currentEventStatus: queryParams.status || rowContext?.status || '',
-            currentJiraTicketUrl: rowContext?.jiraTicketUrl || ''
+            currentJiraTicketUrl: rowContext?.jiraTicketUrl || '',
+            currentHumanResponse: rowContext?.humanResponse || ''
           });
         } catch (error) {
           console.error('Error fetching event:', error);
@@ -720,7 +735,7 @@ function ThreatDetectionPage() {
     // Normal mode - show table, charts, and sidebar
     const components = [
         <ChartComponent
-            subCategoryCount={subCategoryCount}
+            categoryCount={categoryCount}
             severityCountMap={severityCountMap}
             onThreatTypeClick={handleThreatTypeClick}
             onSeverityClick={handleSeverityClick}
@@ -736,12 +751,14 @@ function ThreatDetectionPage() {
                 latencyData={latencyData}
             />
         ] : []),
-        <SusDataTable key={`sus-data-table-${triggerTableRefresh}`}
+        <SusDataTable
             currDateRange={currDateRange}
             rowClicked={rowClicked}
             triggerRefresh={() => setTriggerTableRefresh(prev => prev + 1)}
+            refreshNonce={triggerTableRefresh}
             initialTab={queryParams.status ? queryParams.status.toLowerCase() : undefined}
             label={LABELS.THREAT}
+            onRegisterPayloadSearch={(fn) => { applyPayloadSearchRef.current = fn; }}
         />,
         !showNewTab ? <NormalSampleDetails
             title={"Attacker payload"}
@@ -761,7 +778,9 @@ function ThreatDetectionPage() {
                 eventStatus={eventState.currentEventStatus}
                 onStatusUpdate={handleStatusUpdate}
                 jiraTicketUrl={eventState.currentJiraTicketUrl}
+                humanResponse={eventState.currentHumanResponse}
                 loading={detailsLoading}
+                onAddAsSearchFilter={(text, side, line) => applyPayloadSearchRef.current?.(text, side, line)}
             />
             
 

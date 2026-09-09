@@ -4,6 +4,7 @@ import com.akto.dao.context.Context;
 import com.akto.data_actor.ClientActor;
 import com.akto.dto.IngestDataBatch;
 import com.akto.log.LoggerMaker;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -12,6 +13,12 @@ import java.util.Map;
 public class Gateway {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Gateway.class, LoggerMaker.LogDb.DATA_INGESTION);
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    // The guardrail result travels with the traffic as its own field on the Kafka message, the same
+    // way _traces already does. Keeping it out of requestHeaders matters: a recorded header becomes
+    // part of the API's schema and its stored sample, and would be replayed during tests.
+    private static final String GUARDRAIL_FIELD = "_guardrail";
     private static Gateway instance;
     private final GuardrailsClient guardrailsClient;
     private DataPublisher dataPublisher;
@@ -29,12 +36,18 @@ public class Gateway {
 
     public Map<String, Object> processHttpProxy(Map<String, Object> requestData) {
         loggerMaker.infoAndAddToDb(
-            "Processing HTTP proxy request - path: {}, method: {}, guardrails: {}, response_guardrails: {}, ingest_data: {}",
+            "Processing HTTP proxy request - path: {}, method: {}, guardrails: {}, response_guardrails: {}, ingest_data: {}, activityId: {}",
             requestData.get("path"),
             requestData.get("method"),
             requestData.get("guardrails"),
             requestData.get("response_guardrails"),
-            requestData.get("ingest_data"));
+            requestData.get("ingest_data"),
+            requestData.get("activityId"));
+
+        String activityId = getStringField(requestData, "activityId");
+        if (activityId != null && !activityId.isEmpty()) {
+            return checkHumanApprovalStatus(activityId);
+        }
 
         long start = System.currentTimeMillis();
         try {
@@ -73,6 +86,10 @@ public class Gateway {
                 loggerMaker.infoAndAddToDb("Guardrails call(s) completed - path: {}, latencyMs: {}",
                     requestData.get("path"), System.currentTimeMillis() - guardrailsStart);
                 result.put("guardrailsResult", guardrailsResult);
+                // Must run before ingestData below. Otherwise the result only goes back to the
+                // caller, and the trace shows the prompt with no sign of whether it was an attack,
+                // which policy was hit, or why it was blocked.
+                recordGuardrailVerdict(requestData, guardrailsResult);
             }
 
             String ingestData = getStringField(requestData, "ingest_data");
@@ -100,6 +117,19 @@ public class Gateway {
         }
     }
 
+    /** Checks a pending Human Approval activity's status via the same /api/http-proxy path. */
+    private Map<String, Object> checkHumanApprovalStatus(String activityId) {
+        Map<String, Object> validateRequest = new HashMap<>();
+        validateRequest.put("activityId", activityId);
+        Map<String, Object> guardrailsResponse = guardrailsClient.callValidateRequest(validateRequest);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("message", "Approval status checked");
+        result.put("guardrailsResult", guardrailsResponse);
+        return result;
+    }
+
     private static boolean shouldForceGuardrailsForAccount(Integer accountId) {
         return accountId != null && (accountId == 1710118493 || accountId == 1000000);
     }
@@ -125,6 +155,70 @@ public class Gateway {
         if (val instanceof Boolean) return (Boolean) val;
         if (val != null) return Boolean.parseBoolean(val.toString());
         return false;
+    }
+
+    /**
+     * Records the guardrail result on the traffic we ingest, so the trace record mini-runtime builds
+     * from it saves whether the prompt was an attack, which policy and rule were hit, what was done
+     * about it, and why it was blocked.
+     *
+     * The violated flag is always written, even for clean traffic, so we can tell a checked prompt
+     * apart from one that was never checked. The key names are the wire contract with mini-runtime.
+     * Errors are only logged: a bad verdict must never stop traffic from being ingested.
+     */
+    private void recordGuardrailVerdict(Map<String, Object> requestData, Map<String, Object> guardrailsResult) {
+        if (requestData == null || guardrailsResult == null) return;
+        try {
+            Map<String, Object> verdict = effectiveVerdict(guardrailsResult);
+            Map<String, Object> out = new HashMap<>();
+
+            out.put("guardrailViolated", !isAllowed(guardrailsResult));
+            putIfNotBlank(out, "guardrailAction", firstNonBlank(verdict, "behaviour", "Behaviour"));
+            putIfNotBlank(out, "guardrailReason", firstNonBlank(verdict, "reason", "Reason"));
+            putIfNotBlank(out, "guardrailSeverity", firstNonBlank(verdict, "severity", "Severity"));
+
+            Object metaObj = verdict.get("Metadata") != null ? verdict.get("Metadata") : verdict.get("metadata");
+            if (metaObj instanceof Map) {
+                Map<?, ?> meta = (Map<?, ?>) metaObj;
+                putIfNotBlank(out, "guardrailPolicy", asString(meta.get("policyName")));
+                putIfNotBlank(out, "guardrailRule", asString(meta.get("ruleViolated")));
+            }
+
+            requestData.put(GUARDRAIL_FIELD, objectMapper.writeValueAsString(out));
+        } catch (Exception e) {
+            loggerMaker.warnAndAddToDb("Could not record guardrail result on traffic: " + e.getMessage());
+        }
+    }
+
+    /**
+     * When the request and response results are merged, the merged map only keeps the combined
+     * Allowed flag, so the policy, rule and reason have to come from whichever side was violated.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> effectiveVerdict(Map<String, Object> guardrailsResult) {
+        for (String key : new String[] { "requestResult", "responseResult" }) {
+            Object side = guardrailsResult.get(key);
+            if (side instanceof Map && !isAllowed((Map<String, Object>) side)) {
+                return (Map<String, Object>) side;
+            }
+        }
+        return guardrailsResult;
+    }
+
+    private String firstNonBlank(Map<String, Object> source, String... keys) {
+        for (String key : keys) {
+            String val = asString(source.get(key));
+            if (!val.isEmpty()) return val;
+        }
+        return "";
+    }
+
+    private String asString(Object val) {
+        return val == null ? "" : val.toString().trim();
+    }
+
+    private void putIfNotBlank(Map<String, Object> target, String key, String value) {
+        if (value != null && !value.isEmpty()) target.put(key, value);
     }
 
     private Map<String, Object> callGuardrails(Map<String, Object> requestData, boolean isResponse) {
@@ -189,6 +283,7 @@ public class Gateway {
         batch.setDaemonset_id(getStringField(requestData, "daemonset_id"));
         batch.setEnabled_graph(getStringField(requestData, "enabled_graph"));
         batch.setTag(getStringField(requestData, "tag"));
+        batch.set_guardrail(getStringField(requestData, GUARDRAIL_FIELD));
 
         if (dataPublisher != null) {
             try {

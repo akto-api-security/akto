@@ -3,6 +3,7 @@ import { Box, Card, HorizontalStack, Text, VerticalStack } from "@shopify/polari
 import { HighchartsReact } from "highcharts-react-official";
 import Highcharts from "highcharts";
 import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
+import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import dayjs from 'dayjs';
 
 const COLORMAP = {
@@ -121,7 +122,13 @@ const P95LatencyGraph = ({ title, subtitle, dataType = 'mcp-security', startTime
                     <Text variant="headingMd">{title || "P95 Latency Metrics"}</Text>
                     <InfoTooltipIcon content={subtitle || "95th percentile latency measurements over time"} />
                 </HorizontalStack>
-                {hasData ? (
+                {latencyData === null ? (
+                    // null = fetch still in flight. Without this the empty state flashes first
+                    // and reads as "no data" while the request is pending.
+                    <Box padding="8" minHeight={`${height}px`}>
+                        <SpinnerCentered />
+                    </Box>
+                ) : hasData ? (
                     <HighchartsReact highcharts={Highcharts} options={chartOptions} />
                 ) : (
                     <Box padding="8" minHeight={`${height}px`}>

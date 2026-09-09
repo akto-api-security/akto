@@ -1,26 +1,54 @@
-FROM jetty:9.4-jre8
-USER root
-RUN apt-get update -y
-RUN apt-get install -y --no-install-recommends libpcap-dev procps
-# Upgrade OpenSSL/libssl to the patched build (CVE-2026-45447).
-RUN apt-get install -y --only-upgrade openssl libssl3t64
-# Swap the JRE 8 for JRE 17 in place. The jetty:9.4-jre8 image is built on
-# eclipse-temurin:8-jre with java at /opt/java/openjdk, so overlaying the temurin:17
-# runtime there keeps Jetty's existing JAVA_HOME/PATH working with no other changes.
-COPY --from=eclipse-temurin:17-jre /opt/java/openjdk /opt/java/openjdk
-# Java 17 removed the extension mechanism; the leftover jre8 lib/ext dir makes the JVM
-# refuse to start ("extension mechanism no longer supported"), so drop it.
-RUN rm -rf /opt/java/openjdk/lib/ext
-ADD ./target/dashboard.war /var/lib/jetty/webapps/root.war
-RUN echo "--module=http-forwarded" > /var/lib/jetty/start.d/http-forwarded.ini
-RUN echo "jetty.httpConfig.sendServerVersion=false" > /var/lib/jetty/start.d/server.ini
-RUN echo "org.slf4j.simpleLogger.log.org.eclipse.jetty.annotations.AnnotationParser=ERROR" >> /var/lib/jetty/start.d/server.ini
+FROM eclipse-temurin:17-jre-noble
 
-COPY set_xmx.sh /var/lib/jetty/set_xmx.sh
-RUN chmod +x /var/lib/jetty/set_xmx.sh
+# NOTE: Not yet tested on Red Hat (RHEL/Podman/OpenShift). Verified only under Docker on a
+# cgroup-v2 host (a faithful proxy for RHEL 9's runtime constraints), not on an actual Red Hat
+# host. The image ships its own Ubuntu userspace so host distro shouldn't matter, but a real
+# RHEL/Podman (and especially OpenShift arbitrary-UID + SELinux volume) run is still unverified.
 
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Ubuntu 24.04 LTS base (supported to 2029, ships NO python -> no python 2.7/3.9 EOL findings).
+# Replaces the old jetty:9.4-jre8 image + JRE-17 overlay hack. The base already provides
+# curl/tar/gzip/free/useradd and scans grype-clean (0 crit/high), so no apt install/upgrade is
+# needed (also avoids the flaky arm64 ports.ubuntu.com mirror).
 
-ENTRYPOINT ["/entrypoint.sh"]
+# Jetty 12, EE8 (javax.servlet) environment. 12.0.37 >= 12.0.33 fixes the jetty-http
+# request-smuggling CVE (GHSA-355h-qmc2-wpwf) that has no fix in the Jetty 9.4 line.
+ENV JETTY_VERSION=12.0.37
+ENV JETTY_HOME=/opt/jetty-home
+ENV JETTY_BASE=/opt/jetty
+
+RUN curl -sSL -o /tmp/jetty-home.tar.gz https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-home/${JETTY_VERSION}/jetty-home-${JETTY_VERSION}.tar.gz \
+    && mkdir -p ${JETTY_HOME} \
+    && tar -xzf /tmp/jetty-home.tar.gz -C ${JETTY_HOME} --strip-components=1 \
+    && rm -f /tmp/jetty-home.tar.gz
+
+# Provision a jetty.base with only the EE8 (javax.servlet) modules the Struts 6 webapp needs.
+# Only ee8-deploy is enabled (no ee9/ee10), so webapps/*.war deploy under the ee8 environment.
+#   ee8-deploy(+ee8-webapp/ee8-servlet) : deploy + servlet container for javax webapps
+#   ee8-annotations                     : @WebServlet/@WebFilter + SCI scanning (Struts)
+#   ee8-jsp                             : JSP support (web.xml error page /pages/error.jsp; uses bundled ecj, no javac needed)
+#   gzip                                : server-side response compression (replaces removed GzipFilter)
+#   forwarded                           : honour X-Forwarded-* from the reverse proxy
+RUN mkdir -p ${JETTY_BASE} && cd ${JETTY_BASE} \
+    && java -jar ${JETTY_HOME}/start.jar --approve-all-licenses \
+         --add-modules=server,http,forwarded,ee8-deploy,ee8-annotations,ee8-jsp,gzip
+
+# Deploy the dashboard war at the root context (root.war -> "/").
+ADD ./target/dashboard.war ${JETTY_BASE}/webapps/root.war
+
+# Do not leak the Jetty version in the Server response header.
+RUN echo "jetty.httpConfig.sendServerVersion=false" >> ${JETTY_BASE}/start.d/server.ini
+
+# gzip control knobs (response mime types + methods), restored from the old web.xml GzipFilter
+# + jetty-web.xml GzipHandler. Overwrites the module's default gzip.ini.
+COPY gzip.ini ${JETTY_BASE}/start.d/gzip.ini
+
+RUN useradd jetty && chown -R jetty:jetty ${JETTY_HOME} ${JETTY_BASE}
+
+ENV JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError"
+WORKDIR ${JETTY_BASE}
 EXPOSE 8080
+
+COPY set_xmx.sh /app/set_xmx.sh
+RUN chmod +x /app/set_xmx.sh
+USER jetty
+CMD ["/app/set_xmx.sh"]

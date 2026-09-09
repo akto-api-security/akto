@@ -294,4 +294,19 @@ public class DbActor extends DataActor {
         return Collections.emptyList();
     }
 
+    @Override
+    public List<CopilotStudioIntegration> fetchCopilotStudioIntegrations() {
+        return DbLayer.fetchCopilotStudioIntegrations();
+    }
+
+    @Override
+    public List<AgenticUsers> fetchAllAgentUsers() {
+        return DbLayer.fetchAllAgentUsers();
+    }
+
+    @Override
+    public void bulkUpsertAgentUserExternalIdentities(List<AgenticUsers> updates) {
+        DbLayer.bulkUpsertAgentUserExternalIdentities(updates);
+    }
+
 }

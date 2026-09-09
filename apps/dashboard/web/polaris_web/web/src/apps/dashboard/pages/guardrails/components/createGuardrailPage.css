@@ -189,3 +189,13 @@ body.guardrail-page-open .Polaris-PositionedOverlay {
         width: 350px;
     }
 }
+
+/* The editor renders as a full-page overlay at z-index 1000/1001, which is above Polaris'
+   modal layer (~519) — so a Modal opened from inside it lands behind the page and cannot be
+   clicked. Polaris portals modals into a [data-portal-id] div on body, so target that. */
+[data-portal-id] .Polaris-Backdrop {
+    z-index: 1002;
+}
+[data-portal-id] .Polaris-Modal-Dialog__Container {
+    z-index: 1003;
+}

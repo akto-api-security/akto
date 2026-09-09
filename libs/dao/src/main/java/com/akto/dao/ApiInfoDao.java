@@ -223,7 +223,57 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         }
         return result;
     }
-    
+
+    // Scoped sibling of getLastTrafficSeen/getLastTrafficSeenNew — those two are unscoped (whole
+    // account) because their callers feed a list/grid rendering every collection at once. A caller
+    // that only needs a handful of collectionIds (e.g. one asset's own devices) shouldn't have to
+    // pull the whole account's map just to read a few entries out of it.
+    public Map<Integer, Integer> getLastTrafficSeenForCollections(List<Integer> collectionIds) {
+        Map<Integer, Integer> result = new HashMap<>();
+        if (collectionIds == null || collectionIds.isEmpty()) return result;
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(Filters.in(ApiInfo.ID_API_COLLECTION_ID, collectionIds)));
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$" + ApiInfo.ID_API_COLLECTION_ID);
+        pipeline.add(Aggregates.group(groupedId, Accumulators.max(ApiInfo.LAST_SEEN, "$" + ApiInfo.LAST_SEEN)));
+
+        MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while (cursor.hasNext()) {
+            try {
+                BasicDBObject doc = cursor.next();
+                BasicDBObject id = (BasicDBObject) doc.get("_id");
+                int lastSeen = doc.get(ApiInfo.LAST_SEEN) != null ? doc.getInt(ApiInfo.LAST_SEEN) : 0;
+                result.put(id.getInt("apiCollectionId"), lastSeen);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return result;
+    }
+
+    // Scoped sibling of ApiCollectionsAction.buildRiskScoreMapNew — same rationale as
+    // getLastTrafficSeenForCollections above.
+    public Map<Integer, Double> getRiskScoreForCollections(List<Integer> collectionIds) {
+        Map<Integer, Double> result = new HashMap<>();
+        if (collectionIds == null || collectionIds.isEmpty()) return result;
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(Filters.in(ApiInfo.ID_API_COLLECTION_ID, collectionIds)));
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$" + ApiInfo.ID_API_COLLECTION_ID);
+        pipeline.add(Aggregates.group(groupedId, Accumulators.max(ApiInfo.RISK_SCORE, "$" + ApiInfo.RISK_SCORE)));
+
+        MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while (cursor.hasNext()) {
+            try {
+                BasicDBObject doc = cursor.next();
+                BasicDBObject id = (BasicDBObject) doc.get("_id");
+                double riskScore = doc.get(ApiInfo.RISK_SCORE) != null ? doc.getDouble(ApiInfo.RISK_SCORE) : 0;
+                result.put(id.getInt("apiCollectionId"), riskScore);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return result;
+    }
+
     public static Float getRiskScore(ApiInfo apiInfo, boolean isSensitive, float riskScoreFromSeverityScore){
         return getRiskScore(apiInfo, isSensitive, riskScoreFromSeverityScore, apiInfo.getThreatScore() > 0);
     }

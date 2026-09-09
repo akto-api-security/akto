@@ -21,13 +21,13 @@ export default function AgenticFlyoutShell({ show, width = 800, header, footer, 
     }, [show]);
 
     return (
-        <Box className={"flyLayout " + (show ? "show" : "")} style={{ width }}>
+        <Box className={"flyLayout " + (show ? "show" : "")} style={{ width, pointerEvents: show ? "auto" : "none" }}>
             <Box
                 style={{
                     position: "fixed", right: 0, top: "3.5rem", zIndex: 1000,
                     width,
                     height: "calc(100vh - 3.5rem)",
-                    display: "flex", flexDirection: "column",
+                    display: show ? "flex" : "none", flexDirection: "column",
                     background: "white",
                     borderLeft: "1px solid #E1E3E5",
                     fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",

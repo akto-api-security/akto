@@ -141,7 +141,9 @@ function SignUp() {
           if (resp && resp.indexOf("<")== -1) {
             func.setToast(true, true, "Signup error " + resp)
           }else{
-            navigate('/dashboard/onboarding')
+            // Onboarding flow disabled — new users land straight on the dashboard.
+            // navigate('/dashboard/onboarding')
+            navigate('/dashboard/observe/inventory')
           }
         })
       } catch (error) {

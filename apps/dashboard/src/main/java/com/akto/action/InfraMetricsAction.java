@@ -34,7 +34,8 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
 
     @Override
     public String execute() throws Exception {
-        InfraMetricsListener.registry.scrape(servletResponse.getWriter());
+        // todo: move this once we have proper way to scrape metrics
+        // InfraMetricsListener.registry.scrape(servletResponse.getWriter());
         return null;
     }
 

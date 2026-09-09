@@ -121,15 +121,43 @@ public abstract class AzureOpenAIPromptHandler {
         return null;
     }
 
+    /** Reasoning-model-only knob ("minimal" | "low" | "medium" | "high") controlling how many
+     *  invisible reasoning tokens the model spends before writing the visible answer — confirmed
+     *  directly against the real Azure endpoint: a pure-rendering prompt (no real judgment calls)
+     *  burned an entire 4000-token budget on reasoning and returned empty content at the default
+     *  effort. "low" is a sane default for handlers that don't override this; a handler doing real
+     *  analysis/classification may want "medium"/"high" instead. Ignored for non-reasoning models. */
+    protected String getReasoningEffort() {
+        return "low";
+    }
+
+    // GPT-5 / o-series ("reasoning") deployments reject the classic sampling knobs outright —
+    // confirmed directly against the real Azure endpoint: max_tokens -> "unsupported_parameter",
+    // any non-default temperature/top_p -> "unsupported_value"/"unsupported_parameter", same for
+    // frequency_penalty/presence_penalty. They also spend part of that token budget on invisible
+    // reasoning tokens before writing the visible answer, so a small budget can silently return
+    // empty content (finish_reason "length") rather than an error — getMaxTokens() should stay
+    // generous for these deployments.
+    private static boolean isReasoningModelDeployment() {
+        if (AZURE_OPENAI_DEPLOYMENT == null) return false;
+        String d = AZURE_OPENAI_DEPLOYMENT.toLowerCase(java.util.Locale.US);
+        return d.startsWith("gpt-5") || d.startsWith("o1") || d.startsWith("o3") || d.startsWith("o4");
+    }
+
     private String extractRawContent(String prompt) throws Exception {
         MediaType mediaType = MediaType.parse("application/json");
         JSONObject payload = new JSONObject();
 
-        payload.put("temperature", getTemperature());
-        payload.put("top_p", 0.9);
-        payload.put("max_tokens", getMaxTokens());
-        payload.put("frequency_penalty", 0);
-        payload.put("presence_penalty", 0.6);
+        if (isReasoningModelDeployment()) {
+            payload.put("max_completion_tokens", getMaxTokens());
+            payload.put("reasoning_effort", getReasoningEffort());
+        } else {
+            payload.put("temperature", getTemperature());
+            payload.put("top_p", 0.9);
+            payload.put("max_tokens", getMaxTokens());
+            payload.put("frequency_penalty", 0);
+            payload.put("presence_penalty", 0.6);
+        }
         JSONObject responseFormat = getResponseFormat();
         if (responseFormat != null) {
             payload.put("response_format", responseFormat);
@@ -156,7 +184,9 @@ public abstract class AzureOpenAIPromptHandler {
         logger.warn("Calling ai with payload: " + payload.toString());
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
-                logger.error("Unexpected response code: " + response.code());
+                ResponseBody errorBody = response.body();
+                logger.error("Unexpected response code: " + response.code()
+                        + (errorBody != null ? " body: " + errorBody.string() : ""));
                 return null;
             }
             ResponseBody responseBody = response.body();

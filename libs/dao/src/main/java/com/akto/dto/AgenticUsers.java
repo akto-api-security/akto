@@ -15,30 +15,22 @@ public class AgenticUsers {
 
     public static final String USER_NAME = "userName";
     public static final String USER_EMAIL = "userEmail";
-    public static final String USER_ROLE = "userRole";
-    public static final String TEAM_NAME = "teamName";
+    public static final String USER_ID = "userId";
     public static final String LAST_UPDATED_AT = "lastUpdatedAt";
     public static final String LAST_UPDATED_BY = "lastUpdatedBy";
-    public static final String TEAM_SOURCE = "teamSource";
-    public static final String ROLE_SOURCE = "roleSource";
-    public static final String SSO_TEAM_NAME = "ssoTeamName";
-    public static final String SSO_USER_ROLE = "ssoUserRole";
 
-    public static final String SOURCE_SSO = "sso";
-    public static final String SOURCE_MANUAL = "manual";
+    public static final String DEVICE_TAGS = "deviceTags";
 
     private String userName;
     private String userEmail;
-    private String userRole;
-    private String teamName;
+    // Raw id from whatever external identity source populated this row (e.g. the Microsoft
+    // Graph AAD object id for Copilot Studio users) — generic and connector-agnostic, not
+    // specific to any one ai-agent source.
+    private String userId;
     private int lastUpdatedAt;
     private String lastUpdatedBy;
     private List<String> devices;
-    // "sso" or "manual" — SSO writes are skipped when source is "manual".
-    private String teamSource;
-    private String roleSource;
-    // Last values provided by SSO — always kept up-to-date regardless of manual pin.
-    // Used to restore the effective value immediately when an admin clears a manual override.
-    private String ssoTeamName;
-    private String ssoUserRole;
+
+    // Generic key-value tags (team, role, department, arbitrary Okta groups, ...).
+    private List<DeviceTag> deviceTags;
 }

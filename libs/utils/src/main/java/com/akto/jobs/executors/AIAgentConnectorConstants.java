@@ -33,6 +33,8 @@ public final class AIAgentConnectorConstants {
     // Job Types (for AccountJob.jobType)
     public static final String JOB_TYPE_AI_AGENT_CONNECTOR = "AI_AGENT_CONNECTOR";
     public static final String JOB_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL_CONNECTOR = "VERTEX_AI_CUSTOM_DEPLOYED_MODEL_CONNECTOR";
+    // Wraps AIAgentConnectorExecutor's copilot-shield binary execution, once per discovered environment.
+    public static final String JOB_TYPE_COPILOT_STUDIO_MULTI_ENV_CONNECTOR = "COPILOT_STUDIO_MULTI_ENV_CONNECTOR";
 
     // Connector Types
     public static final String CONNECTOR_TYPE_N8N = "N8N";
@@ -44,6 +46,7 @@ public final class AIAgentConnectorConstants {
     public static final String CONNECTOR_TYPE_SALESFORCE = "SALESFORCE";
     public static final String CONNECTOR_TYPE_ANTHROPIC = "ANTHROPIC";
     public static final String CONNECTOR_TYPE_OPENAI = "OPENAI";
+    public static final String CONNECTOR_TYPE_COPILOT_STUDIO_MULTI_ENV = "COPILOT_STUDIO_MULTI_ENV";
 
     // Binary Names
     public static final String BINARY_NAME_N8N = "n8n-shield";
@@ -101,6 +104,18 @@ public final class AIAgentConnectorConstants {
     public static final String CONFIG_VERTEX_AI_BIGQUERY_DATASET = "VERTEX_AI_BIGQUERY_DATASET";
     public static final String CONFIG_VERTEX_AI_BIGQUERY_TABLE = "VERTEX_AI_BIGQUERY_TABLE";
     public static final String CONFIG_VERTEX_AI_JSON_AUTH_FILE_PATH = "VERTEX_AI_JSON_AUTH_FILE_PATH";
+
+    // Configuration Keys - Copilot Studio (Multi Environment)
+    // Job config only references the CopilotStudioIntegration doc; the executor fetches/updates
+    // it via CyborgApiClient (new endpoints to be added server-side in database-abstractor).
+    public static final String CONFIG_COPILOT_STUDIO_MULTI_ENV_INTEGRATION_ID = "COPILOT_STUDIO_MULTI_ENV_INTEGRATION_ID";
+
+    // Copilot Studio agent_users sync (CopilotStudioAgentUsersCron)
+    public static final int COPILOT_STUDIO_AGENT_USERS_SYNC_INTERVAL_HOURS = 3;
+    // Shared with CopilotStudioInventoryPublisher — both build the same {userId}.ai-agent.{name} host shape.
+    public static final String AI_AGENT_HOST_INFIX = ".ai-agent.";
+    // Host-segment sentinel for CopilotStudioWebhookAction when the conversation's AAD user id can't be resolved.
+    public static final String UNRESOLVED_AGENT_USER_ID = "orphan";
 
     // Configuration Keys - Salesforce
     public static final String CONFIG_SALESFORCE_URL = "SALESFORCE_URL";
@@ -175,4 +190,5 @@ public final class AIAgentConnectorConstants {
 
     // Default Job Settings
     public static final int DEFAULT_RECURRING_INTERVAL_SECONDS = 5; // 5 seconds
+    public static final int RECURRING_JOB_INTERVAL_30_MINUTES = 1800; // 30 minutes
 }

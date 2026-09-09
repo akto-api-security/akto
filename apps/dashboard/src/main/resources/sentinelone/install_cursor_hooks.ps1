@@ -19,12 +19,12 @@ $GITHUB_SHARED_BASE = "https://raw.githubusercontent.com/akto-api-security/akto/
 
 function Write-Log {
     param([string]$Message)
-    Write-Host "[Cursor Hooks] $Message" -ForegroundColor Green
+    Write-Output "[Cursor Hooks] $Message"
 }
 
 function Write-LogError {
     param([string]$Message)
-    Write-Host "[Cursor Hooks] ERROR: $Message" -ForegroundColor Red
+    Write-Output "[Cursor Hooks] ERROR: $Message"
 }
 
 function Test-CursorInstalled {
@@ -352,7 +352,10 @@ function Install-ForUser {
         Write-Log "Created hooks directory: $hooksDir"
 
         $cursorDir = Join-Path $UserHome ".cursor"
-        icacls "$cursorDir" /grant "Users:(OI)(CI)RX" /T /C /Q | Out-Null
+        $prevEap = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        icacls "$cursorDir" /grant "Users:(OI)(CI)RX" /T /C /Q 2>&1 | Out-Null
+        $ErrorActionPreference = $prevEap
         Write-Log "Set permissions on $cursorDir"
 
         Write-Log "Downloading hook scripts from GitHub..."

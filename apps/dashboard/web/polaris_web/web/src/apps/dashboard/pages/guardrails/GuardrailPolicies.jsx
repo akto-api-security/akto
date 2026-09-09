@@ -1,8 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList, Scrollable, Avatar, Box } from '@shopify/polaris';
+import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList, Scrollable, Avatar, Box, Banner } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
+import InsightsFlyout from "@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout";
+import InsightsEntryButton from "@/apps/dashboard/pages/observe/agentic/insights/InsightsEntryButton";
+import useInsightsEntryPoint from "@/apps/dashboard/pages/observe/agentic/insights/useInsightsEntryPoint";
+import { INSIGHT_GROUP } from "@/apps/dashboard/pages/observe/agentic/insights/insightsHelpers";
 import SpinnerCentered from "../../components/progress/SpinnerCentered";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func";
@@ -16,6 +20,7 @@ import { transformPolicyForBackend, SEVERITY, normalizeBehaviourValue } from "./
 import GUARDRAIL_PRESETS from "./guardrailPresets";
 import { addCreatedGuardrailPolicyName, clearGuardrailPolicyNamesCache } from "./topicGuardrailUtils";
 import PersistStore from '../../../main/PersistStore';
+import { ALL_VALUES_SENTINEL } from "../../components/shared/DropdownSearch";
 import {
     buildAgentFilterOptions,
     getApplicableAgentKeys,
@@ -166,6 +171,13 @@ function GuardrailPolicies() {
     const [presetsPopoverActive, setPresetsPopoverActive] = useState(false);
     const [pendingPolicyName, setPendingPolicyName] = useState(null);
     const [openedViaDeepLink, setOpenedViaDeepLink] = useState(false);
+    const insights = useInsightsEntryPoint();
+    // No date-range filter on this page today — insights default to the last 30 days,
+    // same window AgenticAssetsPage's own DateRangeFilter opens on.
+    const { insightsStartTimestamp, insightsEndTimestamp } = useMemo(() => {
+        const end = Math.floor(Date.now() / 1000);
+        return { insightsStartTimestamp: end - 30 * 24 * 60 * 60, insightsEndTimestamp: end };
+    }, []);
 
     const allCollections = PersistStore(state => state.allCollections);
 
@@ -173,13 +185,6 @@ function GuardrailPolicies() {
         () => buildAgentFilterOptions(allCollections),
         [allCollections]
     );
-
-    const tablePolicyData = useMemo(() => (
-        policyData.map(row => ({
-            ...row,
-            agent: getApplicableAgentKeys(row.originalData, allCollections, agentFilterOptions),
-        }))
-    ), [policyData, allCollections, agentFilterOptions]);
 
     const location = useLocation();
     const navigate = useNavigate();
@@ -191,6 +196,35 @@ function GuardrailPolicies() {
         : [...headings, agentFilterHeader];
 
     const policyName = searchParams.get("policy");
+    // Deep link from an Insight CTA (e.g. "Retire dead policies") — pre-checks the exact offending
+    // policies for the bulk-action bar below, and scopes the table to just them (see
+    // tablePolicyData). State (not a frozen useMemo) so "View all policies" below can clear it.
+    const [initialSelectedResourceIds, setInitialSelectedResourceIds] = useState(() => {
+        const raw = new URLSearchParams(window.location.search).get("policyIds");
+        if (!raw) return undefined;
+        return raw.split(",").map(s => s.trim()).filter(Boolean);
+    });
+
+    const clearInsightScopedView = useCallback(() => {
+        setInitialSelectedResourceIds(undefined);
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            next.delete("policyIds");
+            return next;
+        }, { replace: true });
+    }, [setSearchParams]);
+
+    const tablePolicyData = useMemo(() => {
+        // Same deep link — show ONLY the offending policies, not the full table with a few rows
+        // checked among everything else.
+        const scoped = initialSelectedResourceIds?.length > 0
+            ? policyData.filter(row => initialSelectedResourceIds.includes(row.id))
+            : policyData;
+        return scoped.map(row => ({
+            ...row,
+            agent: getApplicableAgentKeys(row.originalData, allCollections, agentFilterOptions),
+        }));
+    }, [policyData, allCollections, agentFilterOptions, initialSelectedResourceIds]);
 
     useEffect(() => {
         const prefill = location.state?.topicGuardrailPrefill;
@@ -273,6 +307,18 @@ function GuardrailPolicies() {
             setLoading(false);
         }
     };
+
+    // GithubSimpleTable keys its inner table on data.length and only fetches rows on mount,
+    // so a status toggle (same row count) never re-rendered - the row kept showing the old
+    // "Active" until a manual refresh. Key on content instead of count.
+    const tableRefreshKey = useMemo(() => {
+        const activeCount = tablePolicyData.filter((row) => row.status === "Active").length;
+        const lastUpdated = tablePolicyData.reduce((max, row) => Math.max(
+            max,
+            row.originalData?.updatedTimestamp ?? row.originalData?.createdTimestamp ?? 0,
+        ), 0);
+        return `${tablePolicyData.length}-${activeCount}-${lastUpdated}`;
+    }, [tablePolicyData]);
 
     const modifyData = useCallback((filters, dataSortKey, sortOrder) => {
         const filteredRows = applyAgentFilterToRows(tablePolicyData, filters);
@@ -426,10 +472,20 @@ function GuardrailPolicies() {
             details.push({ label: "Target Servers", value: "All servers" });
         } else {
             const { mcp, agents, llms } = getEffectiveServers(policy);
-            const serverDetails = [];
-            if (mcp.length > 0) serverDetails.push(`${mcp.length} MCP Server${mcp.length > 1 ? 's' : ''}`);
-            if (agents.length > 0) serverDetails.push(`${agents.length} Agent${agents.length > 1 ? 's' : ''}`);
-            if (llms.length > 0) serverDetails.push(`${llms.length} LLM${llms.length > 1 ? 's' : ''}`);
+            // Include-mode "select all" wildcard: sole entry is either the raw sentinel (deduped agents) or {name: sentinel} (mcp/llm objects).
+            const isWildcardOnly = (arr) => arr.length === 1 && (arr[0] === ALL_VALUES_SENTINEL || arr[0]?.name === ALL_VALUES_SENTINEL);
+            // Exclude-with-zero (negated, count 0) still needs a line — it means "all", not "unconfigured".
+            const part = (negated, arr, singular, plural) => {
+                const count = arr.length;
+                if (negated) return count > 0 ? `All ${plural} except ${count}` : `All ${plural}`;
+                if (isWildcardOnly(arr)) return `All ${plural}`;
+                return count > 0 ? `${count} ${count > 1 ? plural : singular}` : null;
+            };
+            const serverDetails = [
+                part(policy.negatedMcpServers, mcp, 'MCP Server', 'MCP Servers'),
+                part(policy.negatedAgentServers, agents, 'Agent', 'Agents'),
+                part(policy.negatedLlmServers, llms, 'LLM', 'LLMs'),
+            ].filter(Boolean);
             if (serverDetails.length > 0) {
                 details.push({ label: "Target Servers", value: serverDetails.join(", ") });
             }
@@ -437,14 +493,16 @@ function GuardrailPolicies() {
 
         // User targeting (Atlas only)
         if (isEndpointSecurityCategory()) {
-            const targetTeams = policy.targetTeams || [];
-            const targetRoles = policy.targetRoles || [];
-            if (targetTeams.length === 0 && targetRoles.length === 0) {
+            const targetTags = policy.targetTags || {};
+            const targetDeviceIds = policy.targetDeviceIds || [];
+            const tagKeyCount = Object.keys(targetTags).filter(k => (targetTags[k] || []).length > 0).length;
+            if (tagKeyCount === 0 && targetDeviceIds.length === 0) {
                 details.push({ label: "Target Users", value: "All users" });
             } else {
-                const userParts = [];
-                if (targetTeams.length > 0) userParts.push(`${targetTeams.length} Team${targetTeams.length !== 1 ? 's' : ''}`);
-                if (targetRoles.length > 0) userParts.push(`${targetRoles.length} Role${targetRoles.length !== 1 ? 's' : ''}`);
+                const userParts = Object.entries(targetTags)
+                    .filter(([, values]) => (values || []).length > 0)
+                    .map(([key, values]) => `${values.length} ${key.charAt(0).toUpperCase()}${key.slice(1)}${values.length !== 1 ? 's' : ''}`);
+                if (targetDeviceIds.length > 0) userParts.push(`${targetDeviceIds.length} User${targetDeviceIds.length !== 1 ? 's' : ''}`);
                 details.push({ label: "Target Users", value: userParts.join(", ") });
             }
         }
@@ -608,6 +666,10 @@ function GuardrailPolicies() {
                 // Add V2 fields for enhanced server data
                 selectedMcpServersV2: guardrailData.selectedMcpServersV2 || [],
                 selectedAgentServersV2: guardrailData.selectedAgentServersV2 || [],
+                selectedLlmServersV2: guardrailData.selectedLlmServersV2 || [],
+                negatedAgentServers: guardrailData.negatedAgentServers || false,
+                negatedMcpServers: guardrailData.negatedMcpServers || false,
+                negatedLlmServers: guardrailData.negatedLlmServers || false,
                 // Block-only host blocklist
                 blockedHosts: guardrailData.blockedHosts || [],
                 blockPersonalAccounts: guardrailData.blockPersonalAccounts || false,
@@ -622,6 +684,7 @@ function GuardrailPolicies() {
                 contentFiltering: guardrailData.contentFiltering,
                 // Add LLM policy if present
                 ...(guardrailData.llmRule ? { llmRule: guardrailData.llmRule } : {}),
+                ...(guardrailData.redactionRules ? { redactionRules: guardrailData.redactionRules } : {}),
                 // Add Base Prompt Rule if present
                 ...(guardrailData.basePromptRule ? { basePromptRule: guardrailData.basePromptRule } : {}),
                 // Add Gibberish Detection if present (same pattern as llmRule)
@@ -634,8 +697,19 @@ function GuardrailPolicies() {
                 ...(guardrailData.tokenLimitDetection ? { tokenLimitDetection: guardrailData.tokenLimitDetection } : {}),
                 ...(guardrailData.anomalyDetection ? { anomalyDetection: guardrailData.anomalyDetection } : {}),
                 applyToAllServers: guardrailData.applyToAllServers ?? true,
-                targetTeams: guardrailData.targetTeams || [],
-                targetRoles: guardrailData.targetRoles || [],
+                // Prefer targetTags; fall back to converting a legacy export's targetTeams/targetRoles.
+                targetTags: guardrailData.targetTags || {
+                    ...(guardrailData.targetTeams?.length ? { team: guardrailData.targetTeams } : {}),
+                    ...(guardrailData.targetRoles?.length ? { role: guardrailData.targetRoles } : {}),
+                },
+                targetDeviceIds: guardrailData.targetDeviceIds || [],
+                // Explicit "Users" picks (beta) — independent of targetDeviceIds; matched
+                // downstream by email via userMetadata (see GuardrailPoliciesAction#createGuardrailPolicy).
+                targetUserNames: guardrailData.targetUserNames || [],
+                // Identities behind the selected targets (both targetDeviceIds and
+                // targetUserNames) — CreateGuardrailPage already resolved these from
+                // fetchAgenticUsers; re-fetched authoritatively by the backend on save.
+                userMetadata: guardrailData.userMetadata || [],
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
                 behaviour: guardrailData.behaviour != null
@@ -711,8 +785,18 @@ function GuardrailPolicies() {
     }
 
     const components = [
+        ...(initialSelectedResourceIds?.length > 0 ? [
+            <Banner
+                key="insight-scoped-view-banner"
+                status="info"
+                onDismiss={clearInsightScopedView}
+                action={{ content: "View all policies", onAction: clearInsightScopedView }}
+            >
+                {`Showing ${initialSelectedResourceIds.length} polic${initialSelectedResourceIds.length === 1 ? "y" : "ies"} from an insight.`}
+            </Banner>
+        ] : []),
         <GithubSimpleTable
-            key={`policies-table-${tablePolicyData.length}-${agentFilterOptions.length}`}
+            key={`policies-table-${tableRefreshKey}-${agentFilterOptions.length}`}
             resourceName={resourceName}
             useNewRow={true}
             headers={tableHeaders}
@@ -734,13 +818,15 @@ function GuardrailPolicies() {
             loading={loading || Boolean(pendingPolicyName)}
             loadingText={"Loading guardrail policies..."}
             selectable={true}
+            initialSelectedResourceIds={initialSelectedResourceIds}
             promotedBulkActions={promotedBulkActions}
             {...(func.isDemoAccount() && { customFilters: true, modifyData })}
         />
     ];
 
 
-    return <PageWithMultipleCards
+    return <>
+        <PageWithMultipleCards
             title={
                 <TitleWithInfo
                     titleText={mapLabel("Guardrail Policies", getDashboardCategory())}
@@ -748,6 +834,7 @@ function GuardrailPolicies() {
                 />
             }
             isFirstPage={true}
+            secondaryActions={<InsightsEntryButton granted={insights.granted} onClick={insights.handleOpen} label="Atlas Insights" />}
             primaryAction={
                 <HorizontalStack gap="2">
                     <Popover
@@ -785,6 +872,17 @@ function GuardrailPolicies() {
             }
             components={components}
         />
+        {insights.granted && (
+            <InsightsFlyout
+                show={insights.open}
+                onClose={insights.handleClose}
+                startTimestamp={insightsStartTimestamp}
+                endTimestamp={insightsEndTimestamp}
+                initialInsightId={insights.initialInsightId}
+                group={INSIGHT_GROUP.ATLAS_DISCOVERY}
+            />
+        )}
+    </>
 }
 
 export default GuardrailPolicies;

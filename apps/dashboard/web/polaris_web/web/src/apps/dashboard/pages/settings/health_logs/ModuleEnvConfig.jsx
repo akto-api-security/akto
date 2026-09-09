@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import func from "@/util/func"
 import { LegacyCard, VerticalStack, Divider, Text, Box, TextField, HorizontalGrid, ButtonGroup, Button } from "@shopify/polaris";
 
-const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields, onSaveEnv }) => {
+const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields, onSaveEnv, readOnly = false }) => {
     const [envData, setEnvData] = useState({});
     const [initialEnvData, setInitialEnvData] = useState({});
     const [isSaveDisabled, setIsSaveDisabled] = useState(true);
@@ -39,7 +39,13 @@ const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields
 
     const handleSave = async () => {
         try {
-            await onSaveEnv(module.id, module.name, envData);
+            const changedEnvData = {};
+            for (const key of Object.keys(envData)) {
+                if (envData[key] !== initialEnvData[key]) {
+                    changedEnvData[key] = envData[key];
+                }
+            }
+            await onSaveEnv(module.id, module.name, changedEnvData);
             setInitialEnvData({ ...envData });
         } catch (error) {
             func.setToast(true, true, "Error saving environment config");
@@ -60,12 +66,14 @@ const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields
     return (
         <LegacyCard
             title={<TitleComponent title={title} description={description} />}
-            primaryFooterAction={{
-                content: 'Save',
-                onAction: handleSave,
-                loading: false,
-                disabled: isSaveDisabled
-            }}
+            {...(readOnly ? {} : {
+                primaryFooterAction: {
+                    content: 'Save',
+                    onAction: handleSave,
+                    loading: false,
+                    disabled: isSaveDisabled
+                }
+            })}
         >
             <Divider />
             <LegacyCard.Section>
@@ -94,6 +102,7 @@ const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields
                                     <ButtonGroup segmented>
                                         <Button
                                             size="slim"
+                                            disabled={readOnly}
                                             onClick={() => handleInputChange(field.key, "true")}
                                             pressed={fieldValue === "true" || fieldValue === true}
                                         >
@@ -101,6 +110,7 @@ const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields
                                         </Button>
                                         <Button
                                             size="slim"
+                                            disabled={readOnly}
                                             onClick={() => handleInputChange(field.key, "false")}
                                             pressed={fieldValue === "false" || fieldValue === false || !fieldValue}
                                         >
@@ -113,6 +123,7 @@ const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields
                                         value={fieldValue}
                                         onChange={(value) => handleInputChange(field.key, value)}
                                         placeholder={isSecret ? "Enter new value to update" : `Enter ${field.label}`}
+                                        readOnly={readOnly}
                                     />
                                 )}
                             </HorizontalGrid>

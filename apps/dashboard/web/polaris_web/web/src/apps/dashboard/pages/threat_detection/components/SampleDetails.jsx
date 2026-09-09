@@ -1,6 +1,8 @@
 import { Badge, Box, Button, ChoiceList, Divider, HorizontalStack, Modal, Text, TextField, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
+import SampleData from "../../../components/shared/SampleData";
+import { EvidenceBlock, HumanApprovalActions, isHumanApprovalPending as isPendingHumanResponse } from "@/apps/dashboard/pages/guardrails/violations/ViolationFlyoutSections";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import func from "@/util/func";
 import { useEffect, useState } from "react";
@@ -17,13 +19,58 @@ import settingFunctions from "../../settings/module";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal";
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
-import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN, SETTINGS_RISK_CONFIGS } from "../constants/guardrailDescriptions";
-import { extractOverviewAndRemediation, extractBehaviour } from "../utils/formatUtils";
+import { GUARDRAIL_REMEDIATION_MARKDOWN, SETTINGS_RISK_CONFIGS } from "../constants/guardrailDescriptions";
+import { extractOverviewAndRemediation, extractBehaviour, storedRemediationMarkdown } from "../utils/formatUtils";
 import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import OwaspTag from "../../guardrails/components/OwaspTag";
 import ComplianceTags from "../../guardrails/components/ComplianceTags";
+import { parseConfigEvidence } from "../../guardrails/violations/violationsData";
+
+// For config-scan events: pull evidence/message/config_content out of the sample's raw orig.
+// requestPayload is normally valid JSON (repaired server-side if PII redaction corrupted it);
+// the regex fallback below only matters for older, unrepaired data. Returns null for non-config samples.
+function _configFromOrig(orig, ruleViolated) {
+    if (typeof orig !== "string") return null;
+    let outer; try { outer = JSON.parse(orig); } catch (e) { return null; }
+    const rp = outer && outer.requestPayload;
+    if (typeof rp !== "string" || rp.indexOf('"config_content"') === -1) return null;
+
+    let wrapper;
+    try {
+        wrapper = JSON.parse(rp);
+    } catch (e) {
+        const grab = (key) => {
+            const m = rp.match(new RegExp('"' + key + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"'));
+            if (!m) return null;
+            try { return JSON.parse('"' + m[1] + '"'); } catch (e2) { return m[1]; }
+        };
+        const ccMatch = rp.match(/"config_content"\s*:\s*"([\s\S]*)"\s*}\s*$/);
+        let cc = null;
+        if (ccMatch) { try { cc = JSON.parse('"' + ccMatch[1] + '"'); } catch (e2) { cc = ccMatch[1]; } }
+        wrapper = { evidence: grab("evidence"), message: grab("message"), config_content: cc };
+    }
+
+    const evidence = wrapper.evidence != null ? String(wrapper.evidence) : null;
+    const message = wrapper.message != null ? String(wrapper.message) : null;
+    const cc = wrapper.config_content;
+
+    let configContent;
+    if (cc != null && typeof cc === "object") configContent = JSON.stringify(cc, null, 2);
+    else { configContent = String(cc == null ? "" : cc); try { configContent = JSON.stringify(JSON.parse(configContent), null, 2); } catch (e) { } }
+
+    // The flagged field's leaf key, its value, and the 1-based line where the field appears
+    // in configContent (JSON "key" or TOML key =), for the label + highlight.
+    const { field, value } = parseConfigEvidence(evidence, ruleViolated);
+    let fieldLine = 0;
+    if (field) {
+        const re = new RegExp('(^|[^A-Za-z0-9_])' + field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^A-Za-z0-9_]|$)');
+        const idx = configContent.split("\n").findIndex(l => re.test(l));
+        fieldLine = idx === -1 ? 0 : idx + 1;
+    }
+    return { evidence, message, configContent, field, value, fieldLine };
+}
 
 // Self-contained approve button + modal. Kept as its own component so typing the duration
 // re-renders only this small tree, not the whole SampleDetails flyout (which caused a flash).
@@ -114,7 +161,7 @@ function ApproveServerButton({ policyName, serverId, alreadyApproved }) {
 }
 
 function SampleDetails(props) {
-    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
+    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate, onAddAsSearchFilter, humanResponse: humanResponseProp } = props
     const resolvedThreatFiltersMap = threatFiltersMap || {};
 
     // Determine if we should use hardcoded guardrail descriptions
@@ -132,10 +179,14 @@ function SampleDetails(props) {
         ? getGuardrailRuleInfo(moreInfoData?.ruleViolated, moreInfoData?.templateId)
         : null;
 
-    // Build guardrail sections: use matched rule's overview if found, else fall back to all generic sections
+    // Build guardrail sections from the matched rule's overview. If no rule matched, show NO
+    // sections - we deliberately do NOT fall back to a generic guardrail catalogue, which isn't
+    // specific to the event that fired (e.g. a block_host_test event showing "Content Filters /
+    // Denied Topics" filler). The Overview tab itself is hidden below when there's nothing
+    // meaningful left to show.
     const guardrailSectionsToShow = guardrailRuleInfo
         ? [{ heading: guardrailRuleInfo.heading, description: null, subSections: guardrailRuleInfo.overview.map(o => ({ subHeading: o.heading, description: o.body })) }]
-        : GUARDRAIL_SECTIONS;
+        : [];
 
     // Resolve the specific settings-risk entry (used for both overview and remediation tabs)
     const getSettingsRiskKey = (urlPrefix) => {
@@ -199,6 +250,11 @@ function SampleDetails(props) {
     const [showModal, setShowModal] = useState(false);
     const [triageLoading, setTriageLoading] = useState(false);
     const [actionPopoverActive, setActionPopoverActive] = useState(false);
+    const [humanResponse, setHumanResponse] = useState((humanResponseProp || "PENDING").toUpperCase());
+
+    useEffect(() => {
+        setHumanResponse((humanResponseProp || "PENDING").toUpperCase());
+    }, [eventId, humanResponseProp]);
 
     // Approve-server: modal/mode/days state lives in the small ApproveServerButton component
     // (not here) so typing the duration re-renders only that button, not the whole flyout.
@@ -350,7 +406,13 @@ function SampleDetails(props) {
     // guardrailRuleDefinitions.js template adds no extra context, so hide the tab instead.
     const isSkillEvent = (moreInfoData?.url || '').includes('skills/');
 
-    const overviewTab = (isSkillEvent && !hasLiveOverview) ? false : {
+    // Guardrail event with no matched rule and no per-event live overview: there are no
+    // event-specific sections to show (we no longer fall back to a generic catalogue), so hide the
+    // Overview tab entirely rather than render an empty/filler tab. Settings-risk and live-overview
+    // events have their own content and are excluded.
+    const isGenericGuardrailFallback = useGuardrailDescription && !isSettingsRisk && !guardrailRuleInfo && !hasLiveOverview;
+
+    const overviewTab = ((isSkillEvent && !hasLiveOverview) || isGenericGuardrailFallback) ? false : {
         id: "overview",
         content: 'Overview',
         component: currentTemplateObj && overviewComp
@@ -381,10 +443,53 @@ function SampleDetails(props) {
         component: <ActivityTracker latestActivity={latestActivity} />
     }
 
+    const configValues = data.length > 0 ? _configFromOrig(data[0]?.orig, moreInfoData?.ruleViolated) : null;
+
     const ValuesTab = data.length > 0 && {
         id: 'values',
         content: "Values",
-        component: (
+        component: configValues ? (
+            <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
+                <VerticalStack gap="4">
+                    <Box padding="4" background="bg-critical-subdued" borderRadius="2">
+                        <VerticalStack gap="3">
+                            <EvidenceBlock evidence={{ title: "Guardrail Violation", text: configValues.evidence || configValues.message, mono: true }} />
+                            {configValues.message && configValues.evidence && (
+                                <Text variant="bodyMd">
+                                    {`Triggered by the "${moreInfoData?.templateId || "guardrail"}" policy. ${configValues.message}`}
+                                </Text>
+                            )}
+                        </VerticalStack>
+                    </Box>
+                    <VerticalStack gap="2">
+                        <HorizontalStack gap="2" blockAlign="center">
+                            <Text variant="headingSm">Config content</Text>
+                            {configValues.fieldLine > 0 && (
+                                <Badge status="critical" size="small">{`Line ${configValues.fieldLine}`}</Badge>
+                            )}
+                        </HorizontalStack>
+                        <SampleData
+                            data={{
+                                message: configValues.configContent,
+                                vulnerabilitySegments: configValues.value
+                                    ? [configValues.field
+                                        ? { field: configValues.field, phrase: configValues.value, includeKeyInHighlight: true }
+                                        : { phrase: configValues.value }]
+                                    : [],
+                            }}
+                            editorLanguage="json"
+                            minHeight="300px"
+                            useDynamicHeight
+                            currLine={configValues.fieldLine || undefined}
+                            readOnly
+                            wordWrap
+                            onAddAsSearchFilter={onAddAsSearchFilter}
+                            searchSide="any"
+                        />
+                    </VerticalStack>
+                </VerticalStack>
+            </Box>
+        ) : (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
                 <SampleDataList
                     key={`Sample values-${eventId || 'default'}`}
@@ -396,11 +501,20 @@ function SampleDetails(props) {
                         return { message: result.orig, highlightPaths: [], metadata: result.metadata }
                     }) : []}
                     redactHeaders={window.ACTIVE_ACCOUNT === 1758787662 ? ['authorization'] : []}
+                    onAddAsSearchFilter={onAddAsSearchFilter}
                 />
             </Box>)
     }
 
     const remediationTab = (() => {
+        const storedMarkdown = storedRemediationMarkdown(moreInfoData?.remediation);
+        if (storedMarkdown) {
+            return {
+                id: "remediation",
+                content: "Remediation",
+                component: (<MarkdownViewer markdown={storedMarkdown} />)
+            };
+        }
         // Live per-event remediation (settings-scanner, skill detector) takes priority
         // over any static template, for any event type.
         if (liveMetadata.remediation) {
@@ -438,36 +552,42 @@ function SampleDetails(props) {
 
     // Session Context Tab - shows prompts involved in session-based detection
     const SessionContextComponent = () => {
-        // Determine if this is session-based by checking if sessionId is present and not empty
+
         const sessionId = moreInfoData?.sessionId;
-        const isSessionBased = sessionId && sessionId !== '';
+
+        const hasSessionId = !!(sessionId && sessionId !== '');
 
         const [sessionData, setSessionData] = useState(null);
         const [sessionLoading, setSessionLoading] = useState(false);
-        const [sessionError, setSessionError] = useState(null);
+        const [isSessionBased, setIsSessionBased] = useState(hasSessionId);
 
         // Fetch session data from agentic_session_context table API using sessionId
         useEffect(() => {
-            if (isSessionBased) {
+            if (hasSessionId) {
                 setSessionLoading(true);
-                setSessionError(null);
 
                 threatDetectionApi.fetchSessionContext(sessionId)
                     .then((resp) => {
                         if (resp && resp.sessionData) {
                             setSessionData(resp.sessionData);
+                            setIsSessionBased(true);
                         } else {
-                            setSessionError(resp?.errorMessage || "Session data not found");
+                            // No session data found for this id - fall back to single prompt
+                            setIsSessionBased(false);
                         }
                     })
                     .catch((err) => {
-                        setSessionError("Failed to fetch session data");
+                        // Backend couldn't resolve this session (404/422/etc) - fall back to
+                        // single prompt instead of showing an error state.
+                        setIsSessionBased(false);
                     })
                     .finally(() => {
                         setSessionLoading(false);
                     });
+            } else {
+                setIsSessionBased(false);
             }
-        }, [sessionId, isSessionBased]);
+        }, [sessionId, hasSessionId]);
 
         // Parse conversation info from session data
         let sessionPrompts = [];
@@ -536,7 +656,7 @@ function SampleDetails(props) {
                             <Badge status={isSessionBased ? 'info' : 'default'}>
                                 {isSessionBased ? 'Session-based' : 'Single Prompt'}
                             </Badge>
-                            {sessionId && (
+                            {isSessionBased && sessionId && (
                                 <Text variant="bodySm" color="subdued">Session ID: {sessionId}</Text>
                             )}
                         </HorizontalStack>
@@ -556,18 +676,7 @@ function SampleDetails(props) {
                                 </>
                             )}
 
-                            {sessionError && !sessionLoading && (
-                                <>
-                                    <Divider />
-                                    <Box padding={"3"} background="bg-surface-critical" borderRadius="200">
-                                        <Text variant="bodyMd" color="critical">
-                                            {sessionError}
-                                        </Text>
-                                    </Box>
-                                </>
-                            )}
-
-                            {!sessionLoading && !sessionError && sessionSummary && (
+                            {!sessionLoading && sessionSummary && (
                                 <>
                                     <Divider />
                                     <VerticalStack gap={"2"}>
@@ -581,7 +690,7 @@ function SampleDetails(props) {
                                 </>
                             )}
 
-                            {!sessionLoading && !sessionError && blockedReason && (
+                            {!sessionLoading && blockedReason && (
                                 <>
                                     <Divider />
                                     <VerticalStack gap={"2"}>
@@ -596,7 +705,7 @@ function SampleDetails(props) {
                             )}
 
                             {/* Detection Reason - show all reasons from blocked prompts */}
-                            {!sessionLoading && !sessionError && sessionPrompts.some(p => p.detectionReason) && (
+                            {!sessionLoading && sessionPrompts.some(p => p.detectionReason) && (
                                 <>
                                     <Divider />
                                     <VerticalStack gap={"2"}>
@@ -620,7 +729,7 @@ function SampleDetails(props) {
                                 </>
                             )}
 
-                            {!sessionLoading && !sessionError && sessionPrompts.length > 0 && (
+                            {!sessionLoading && sessionPrompts.length > 0 && (
                                 <>
                                     <Divider />
                                     <VerticalStack gap={"4"}>
@@ -777,6 +886,28 @@ function SampleDetails(props) {
                 func.setToast(true, true, 'Failed to update event status');
             }
         } catch (error) {
+        } finally {
+            setTriageLoading(false);
+        }
+    }
+
+    const isHumanApprovalEvent = String(eventStatus || "").toUpperCase() === "HUMAN_APPROVAL";
+    const isHumanApprovalPending = isHumanApprovalEvent && isPendingHumanResponse(humanResponse);
+
+    const handleHumanApproval = async (response) => {
+        if (!eventId) return;
+        setTriageLoading(true);
+        try {
+            const result = await threatDetectionApi.updateMaliciousEventStatus({ eventIds: [eventId], humanResponse: response });
+            if (result?.updateSuccess) {
+                setHumanResponse(response);
+                onStatusUpdate?.(eventStatus);
+                func.setToast(true, false, `Event ${response === "APPROVED" ? "approved" : "blocked"}`);
+            } else {
+                func.setToast(true, true, "Failed to update human approval");
+            }
+        } catch {
+            func.setToast(true, true, "Failed to update human approval");
         } finally {
             setTriageLoading(false);
         }
@@ -1052,6 +1183,7 @@ Reference URL: ${window.location.href}`.trim();
                         </HorizontalStack>
                     </Box>
                     <HorizontalStack gap={"2"} wrap={false}>
+                        {!isHumanApprovalEvent && (
                         <Popover
                             active={actionPopoverActive}
                             activator={
@@ -1086,6 +1218,17 @@ Reference URL: ${window.location.href}`.trim();
                                 ].filter(item => item)}
                             />
                         </Popover>
+                        )}
+                        {isHumanApprovalEvent ? (
+                            <HumanApprovalActions
+                                pending={isHumanApprovalPending}
+                                response={humanResponse}
+                                loading={triageLoading}
+                                onApprove={() => handleHumanApproval("APPROVED")}
+                                onBlock={() => handleHumanApproval("BLOCKED")}
+                            />
+                        ) : (
+                        <>
                         {isApprovalEvent && (
                             <ApproveServerButton
                                 policyName={approvePolicyName}
@@ -1165,6 +1308,8 @@ Reference URL: ${window.location.href}`.trim();
                                 isAzureModal={true}
                             />
                         )}
+                        </>
+                        )}
                     </HorizontalStack>
                 </HorizontalStack>
                 <HorizontalStack gap={"1"} wrap={false} align="start">
@@ -1195,7 +1340,9 @@ Reference URL: ${window.location.href}`.trim();
     const tabsComponent = (
         <LayoutWithTabs
             key={`tabs-comp-${eventId || 'default'}`}
-            tabs={ window.location.href.indexOf("guardrails") > -1
+            tabs={ isHumanApprovalEvent
+                ? [overviewTab, ValuesTab].filter(Boolean)
+                : window.location.href.indexOf("guardrails") > -1
                 ? (showSessionContext ? [overviewTab, ValuesTab, sessionContextTab] : [overviewTab, ValuesTab]).filter(Boolean)
                 : (showSessionContext ? [overviewTab, timelineTab, ValuesTab, sessionContextTab, remediationTab] : [overviewTab, timelineTab, ValuesTab, remediationTab]).filter(Boolean)}
             currTab = {() => {}}

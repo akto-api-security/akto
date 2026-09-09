@@ -1,0 +1,232 @@
+package com.akto.jobs.executors.copilotstudio;
+
+import com.akto.dao.context.Context;
+import com.akto.dto.CopilotStudioIntegration.Environment;
+import com.akto.log.LoggerMaker;
+import com.akto.util.http_util.CoreHTTPClient;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Getter;
+import okhttp3.FormBody;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Shared client for the Microsoft Entra / Power Platform Admin / Dataverse calls used by the
+ * Copilot Studio (Multi Environment) connector. Used by both apps/dashboard (setup + OAuth
+ * callback) and apps/account-job-executor (recurring sync) so the HTTP/URL-building logic
+ * lives in exactly one place.
+ */
+public class CopilotStudioMultiEnvApiClient {
+
+    private static final LoggerMaker logger = new LoggerMaker(CopilotStudioMultiEnvApiClient.class);
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .build();
+
+    private static final String TOKEN_ENDPOINT_TEMPLATE = "https://login.microsoftonline.com/%s/oauth2/v2.0/token";
+    private static final String REGISTRATION_ENDPOINT_TEMPLATE =
+        "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/adminApplications/%s?api-version=2020-10-01";
+    private static final String ENVIRONMENTS_ENDPOINT =
+        "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments"
+        + "?api-version=2020-10-01&$select=name,properties.displayName,properties.linkedEnvironmentMetadata.instanceUrl";
+    private static final String ADD_APP_USER_ENDPOINT_TEMPLATE =
+        "https://api.bap.microsoft.com/providers/Microsoft.BusinessAppPlatform/scopes/admin/environments/%s/addAppUser?api-version=2020-10-01";
+    private static final String APP_ONLY_SCOPE = "https://service.powerapps.com/.default";
+    private static final int EXPIRY_BUFFER_SECONDS = 60;
+
+    /** Access token + expiry; refreshToken is set only for delegated tokens, never client_credentials. */
+    public static class AccessToken {
+        @Getter
+        private final String token;
+        private final int expiresAt;
+        @Getter
+        private final String refreshToken;
+
+        public AccessToken(String token, int expiresAt) {
+            this(token, expiresAt, null);
+        }
+
+        public AccessToken(String token, int expiresAt, String refreshToken) {
+            this.token = token;
+            this.expiresAt = expiresAt;
+            this.refreshToken = refreshToken;
+        }
+
+        public boolean isExpired() {
+            return Context.now() >= expiresAt - EXPIRY_BUFFER_SECONDS;
+        }
+    }
+
+    /** App-only token via client_credentials — used for env listing, app-user creation, and every recurring run. */
+    public String getClientCredentialsToken(String tenantId, String clientId, String clientSecret) throws Exception {
+        return getClientCredentialsTokenWithExpiry(tenantId, clientId, clientSecret).getToken();
+    }
+
+    /** Same as {@link #getClientCredentialsToken}, but also returns when the token expires so callers can avoid re-fetching on every use. */
+    public AccessToken getClientCredentialsTokenWithExpiry(String tenantId, String clientId, String clientSecret) throws Exception {
+        return getClientCredentialsTokenForScope(tenantId, clientId, clientSecret, APP_ONLY_SCOPE);
+    }
+
+    /** App-only token for an arbitrary resource scope — inventory needs a different one than env listing. */
+    public AccessToken getClientCredentialsTokenForScope(String tenantId, String clientId, String clientSecret,
+                                                          String scope) throws Exception {
+        FormBody formBody = new FormBody.Builder()
+            .add("grant_type", "client_credentials")
+            .add("client_id", clientId)
+            .add("client_secret", clientSecret)
+            .add("scope", scope)
+            .build();
+        return requestAccessToken(tenantId, formBody, "client_credentials token for " + scope);
+    }
+
+    /** Delegated token from the one-time Connect sign-in; persist its refreshToken for silent renewal later. */
+    public AccessToken getDelegatedToken(String tenantId, String clientId, String clientSecret, String code,
+                                          String redirectUri, String scope) throws Exception {
+        FormBody formBody = new FormBody.Builder()
+            .add("grant_type", "authorization_code")
+            .add("client_id", clientId)
+            .add("client_secret", clientSecret)
+            .add("code", code)
+            .add("redirect_uri", redirectUri)
+            .add("scope", scope)
+            .build();
+        return requestAccessToken(tenantId, formBody, "authorization_code token");
+    }
+
+    /** Refresh-token grant for the recurring job's silent renewal; scope must name exactly one resource. */
+    public AccessToken getDelegatedTokenFromRefreshToken(String tenantId, String clientId, String clientSecret,
+                                                          String refreshToken, String scope) throws Exception {
+        FormBody formBody = new FormBody.Builder()
+            .add("grant_type", "refresh_token")
+            .add("client_id", clientId)
+            .add("client_secret", clientSecret)
+            .add("refresh_token", refreshToken)
+            .add("scope", scope)
+            .build();
+        return requestAccessToken(tenantId, formBody, "refresh_token grant for " + scope);
+    }
+
+    private AccessToken requestAccessToken(String tenantId, FormBody formBody, String description) throws Exception {
+        Request request = new Request.Builder()
+            .url(String.format(TOKEN_ENDPOINT_TEMPLATE, tenantId))
+            .post(formBody)
+            .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            String body = response.body() != null ? response.body().string() : "";
+            if (!response.isSuccessful()) {
+                throw new Exception("Failed to obtain " + description + ": status=" + response.code() + " body=" + body);
+            }
+            JsonNode json = objectMapper.readTree(body);
+            String accessToken = json.has("access_token") ? json.get("access_token").asText() : null;
+            if (accessToken == null || accessToken.isEmpty()) {
+                throw new Exception("Token response missing access_token for " + description);
+            }
+            int expiresInSeconds = json.has("expires_in") ? json.get("expires_in").asInt() : 0;
+            String refreshToken = json.has("refresh_token") ? json.get("refresh_token").asText() : null;
+            return new AccessToken(accessToken, Context.now() + expiresInSeconds, refreshToken);
+        }
+    }
+
+    /**
+     * Registers the app registration as an admin application with Power Platform.
+     * Path/params per Microsoft's adminApplications API — verify against current docs before relying on this in production.
+     */
+    public void registerApplication(String delegatedAccessToken, String clientId) throws Exception {
+        Request request = new Request.Builder()
+            .url(String.format(REGISTRATION_ENDPOINT_TEMPLATE, clientId))
+            .header("Authorization", "Bearer " + delegatedAccessToken)
+            .put(RequestBody.create(new byte[0], null))
+            .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                String body = response.body() != null ? response.body().string() : "";
+                throw new Exception("Power Platform app registration rejected: status=" + response.code() + " body=" + body);
+            }
+        }
+    }
+
+    /**
+     * Lists every environment in the tenant.
+     * Response shape per Microsoft's scopes/admin/environments API — verify against current docs before relying on this in production.
+     */
+    public List<Environment> listEnvironments(String accessToken) throws Exception {
+        List<Environment> environments = new ArrayList<>();
+        String nextUrl = ENVIRONMENTS_ENDPOINT;
+
+        while (nextUrl != null) {
+            Request request = new Request.Builder()
+                .url(nextUrl)
+                .header("Authorization", "Bearer " + accessToken)
+                .get()
+                .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                String body = response.body() != null ? response.body().string() : "";
+                if (!response.isSuccessful()) {
+                    throw new Exception("Failed to list Power Platform environments: status=" + response.code() + " body=" + body);
+                }
+
+                JsonNode root = objectMapper.readTree(body);
+                JsonNode values = root.get("value");
+                if (values != null && values.isArray()) {
+                    for (JsonNode env : values) {
+                        String id = env.has("name") ? env.get("name").asText() : null;
+                        JsonNode properties = env.get("properties");
+                        String displayName = properties != null && properties.has("displayName")
+                            ? properties.get("displayName").asText() : id;
+                        String instanceUrl = null;
+                        if (properties != null && properties.has("linkedEnvironmentMetadata")) {
+                            JsonNode linked = properties.get("linkedEnvironmentMetadata");
+                            if (linked.has("instanceUrl")) {
+                                instanceUrl = linked.get("instanceUrl").asText();
+                            }
+                        }
+                        if (id != null && instanceUrl != null) {
+                            environments.add(new Environment(id, instanceUrl, displayName));
+                        }
+                    }
+                }
+
+                nextUrl = root.has("nextLink") ? root.get("nextLink").asText() : null;
+            }
+        }
+
+        logger.info("listEnvironments: discovered {} environments", environments.size());
+        return environments;
+    }
+
+    /**
+     * Adds the app registration as an application user in the given environment, via the
+     * Power Platform Admin API.
+     */
+    public void createApplicationUser(String accessToken, String environmentId, String appClientId) throws Exception {
+        String requestBody = objectMapper.writeValueAsString(Collections.singletonMap("servicePrincipalAppId", appClientId));
+
+        Request request = new Request.Builder()
+            .url(String.format(ADD_APP_USER_ENDPOINT_TEMPLATE, environmentId))
+            .header("Authorization", "Bearer " + accessToken)
+            .post(RequestBody.create(requestBody, MediaType.parse("application/json")))
+            .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                String body = response.body() != null ? response.body().string() : "";
+                throw new Exception("Failed to add application user to environment: status=" + response.code() + " body=" + body);
+            }
+        }
+    }
+}

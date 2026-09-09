@@ -96,7 +96,14 @@ start_java() {
         source /app/.env
     fi
 
-    java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/threat-detection-1.0-SNAPSHOT-jar-with-dependencies.jar 2>&1 | tee -a "$LOG_FILE" &
+    # --add-opens: Java 17 strong-encapsulation opens needed by reflective libraries
+    # (MongoDB POJO codec, etc.). Single-token "=" form.
+    java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m \
+        --add-opens=java.base/java.lang=ALL-UNNAMED \
+        --add-opens=java.base/java.util=ALL-UNNAMED \
+        --add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
+        --add-opens=java.base/java.time=ALL-UNNAMED \
+        -jar /app/threat-detection-1.0-SNAPSHOT-jar-with-dependencies.jar 2>&1 | tee -a "$LOG_FILE" &
 
     JAVA_PID=$!
     echo "Started Java with PID: $JAVA_PID" | tee -a "$LOG_FILE"

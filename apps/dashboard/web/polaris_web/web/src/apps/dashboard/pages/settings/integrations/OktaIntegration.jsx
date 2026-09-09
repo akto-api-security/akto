@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import CopyCommand from '../../../components/shared/CopyCommand';
 import IntegrationsLayout from './IntegrationsLayout';
-import { Autocomplete, Badge, Box, Button, Divider, Form, FormLayout, HorizontalStack, LegacyCard, Link, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Autocomplete, Badge, Box, Button, Checkbox, Divider, Form, FormLayout, HorizontalStack, LegacyCard, Link, Text, TextField, VerticalStack } from '@shopify/polaris';
 import { DeleteMinor, EditMinor, PlusMinor } from '@shopify/polaris-icons';
 import func from "@/util/func"
 import settingRequests from '../api';
@@ -52,6 +52,10 @@ function OktaIntegration() {
     /** Text shown in Akto role Autocomplete (matches Okta group name field UX). */
     const [aktoRoleText, setAktoRoleText] = useState('')
     const [savedOktaGroupToAktoUserRoleMap, setSavedOktaGroupToAktoUserRoleMap] = useState({})
+
+    /** Master on/off switch for the background sync that writes Okta groups into device tags for
+     * every org user. Disabled until a Management API token exists, since the sync needs one. */
+    const [syncGroupsToUserTags, setSyncGroupsToUserTags] = useState(false)
     /** Fetched from Okta Management API (all groups) when Edit + API token; used to autosuggest group name. */
     const [oktaGroupNames, setOktaGroupNames] = useState([])
     const [loadingOktaGroups, setLoadingOktaGroups] = useState(false)
@@ -137,6 +141,7 @@ function OktaIntegration() {
                 const grpMap = resp.oktaGroupToAktoUserRoleMap || {}
                 setOktaGroupToAktoUserRoleMap(grpMap)
                 setSavedOktaGroupToAktoUserRoleMap(grpMap)
+                setSyncGroupsToUserTags(resp.syncGroupsToUserTags === true)
                 setComponentType(2)
             }
         } catch {
@@ -183,20 +188,21 @@ function OktaIntegration() {
         try {
             let toastMsg = 'Group mappings saved successfully!'
             let resp
+            const baseOpts = { syncGroupsToUserTags }
             if (!hasSavedManagementToken) {
                 const t = editApiToken.trim()
                 resp = await settingRequests.saveOktaGroupRoleMapping(
                     oktaGroupToAktoUserRoleMap,
-                    t ? { managementApiToken: t } : {}
+                    t ? { ...baseOpts, managementApiToken: t } : baseOpts
                 )
                 if (t) toastMsg = 'Group mappings and API token saved.'
             } else {
                 const trimmed = editApiToken.trim()
                 if (trimmed === '') {
-                    resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, { managementApiToken: null })
+                    resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, { ...baseOpts, managementApiToken: null })
                     toastMsg = 'Group mappings saved. Management API token removed.'
                 } else {
-                    resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, { managementApiToken: trimmed })
+                    resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, { ...baseOpts, managementApiToken: trimmed })
                     const unchangedMask = managementApiTokenMasked != null && trimmed === String(managementApiTokenMasked).trim()
                     toastMsg = unchangedMask
                         ? 'Group mappings saved successfully!'
@@ -270,7 +276,15 @@ function OktaIntegration() {
 
     useEffect(() => { fetchData() }, [])
 
+    // Clearing the API token mid-edit must turn group sync back off — it cannot run without one.
+    useEffect(() => {
+        if (editApiToken.trim() === '' && syncGroupsToUserTags) {
+            setSyncGroupsToUserTags(false)
+        }
+    }, [editApiToken])
+
     const hasGroupMappings = Object.keys(oktaGroupToAktoUserRoleMap).length > 0
+    const tokenWillBePresentInEdit = editApiToken.trim() !== ''
 
     const mappingRows = Object.entries(oktaGroupToAktoUserRoleMap).map(([name, role], index) => (
         <React.Fragment key={name}>
@@ -321,8 +335,25 @@ function OktaIntegration() {
                 <Badge status={hasSavedManagementToken ? 'success' : 'info'}>
                     {hasSavedManagementToken ? 'Configured' : 'Not set'}
                 </Badge>
-                <Text variant="bodySm" color="subdued">Used only when the access token has no groups claim.</Text>
+                <Text variant="bodySm" color="subdued">
+                    {hasSavedManagementToken
+                        ? 'Required for the group sync setting below.'
+                        : 'Set a token to unlock the group sync setting below.'}
+                </Text>
             </HorizontalStack>
+            {hasSavedManagementToken && (
+                <HorizontalStack gap="2" blockAlign="center" wrap>
+                    <Text variant="bodySm" fontWeight="semibold" color="subdued">Sync Okta groups to device tags</Text>
+                    <Badge status={syncGroupsToUserTags ? 'success' : 'info'}>
+                        {syncGroupsToUserTags ? 'On' : 'Off'}
+                    </Badge>
+                    <Text variant="bodySm" color="subdued">
+                        {syncGroupsToUserTags
+                            ? 'Every Okta group is kept in sync as a "group" tag for every user in the background.'
+                            : 'Off — no group tags are written.'}
+                    </Text>
+                </HorizontalStack>
+            )}
         </VerticalStack>
     )
 
@@ -418,9 +449,9 @@ function OktaIntegration() {
                 <Box paddingBlockStart="6"><Button onClick={handleAddMapping}>Add</Button></Box>
             </HorizontalStack>
             <Divider />
-            <Text fontWeight="semibold" variant="headingXs">Management API token (optional)</Text>
+            <Text fontWeight="semibold" variant="headingXs">Management API token</Text>
             <Text variant="bodySm" color="subdued">
-                Akto uses groups from the access token first. If that claim is empty, a saved SSWS token loads group membership at login (Okta: Security → API → Tokens).
+                Optional (Okta: Security → API → Tokens). Required to enable group sync below.
             </Text>
             <TextField
                 label="API token"
@@ -430,7 +461,16 @@ function OktaIntegration() {
                 autoComplete="new-password"
                 name="okta-sso-management-api-token-edit"
                 placeholder={hasSavedManagementToken ? undefined : 'Paste SSWS token if needed'}
-                helpText={hasSavedManagementToken ? undefined : 'Optional. Paste SSWS token from Okta if users access tokens do not include a groups claim.'}
+                helpText={hasSavedManagementToken ? undefined : 'Paste an SSWS token from Okta to unlock group sync below.'}
+            />
+            <Checkbox
+                label="Sync Okta groups to device tags"
+                checked={syncGroupsToUserTags}
+                onChange={setSyncGroupsToUserTags}
+                disabled={!tokenWillBePresentInEdit}
+                helpText={tokenWillBePresentInEdit
+                    ? 'Every Okta group is kept in sync as a "group" tag for every user in the background.'
+                    : 'Set a Management API token above to enable this.'}
             />
             <HorizontalStack align="end" gap="2">
                 <Button onClick={handleCancelEdit}>Cancel</Button>
@@ -447,7 +487,7 @@ function OktaIntegration() {
                         <VerticalStack gap="1">
                             <Text fontWeight="semibold" variant="headingSm">Group mapping &amp; API access</Text>
                             <Text variant="bodyMd" color="subdued">
-                                Map Okta groups to Akto roles and optionally set a Management API token. Edit updates everything in one place.
+                                Map Okta groups to Akto roles and device tags, and optionally set a Management API token. Edit updates everything in one place.
                             </Text>
                         </VerticalStack>
                         {!editMode && (

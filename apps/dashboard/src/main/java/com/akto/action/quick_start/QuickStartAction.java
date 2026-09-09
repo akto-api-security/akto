@@ -296,28 +296,34 @@ public class QuickStartAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public static String createTokenForAuth(int expiryTimeInMonth, List<String> scope){
+        Map<String,Object> claims = new HashMap<>();
+        claims.put("accountId", Context.accountId.get());
+        if (scope != null && !scope.isEmpty()) {
+            claims.put("scope", scope);
+        }
+        String apiTokenVal = null;
+        try {
+            apiTokenVal = JwtAuthenticator.createJWT(
+                claims,
+                "Akto",
+                "invite_user",
+                Calendar.MONTH,
+                expiryTimeInMonth
+            );
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
+        return apiTokenVal;
+    }
+
     public String fetchRuntimeHelmCommand() {
         if(this.expiryTimeInMonth == 0 || this.expiryTimeInMonth > 24 || this.expiryTimeInMonth < -1) {
             addActionError("Expiry time must be between 1 and 24 months");
             return Action.ERROR.toUpperCase();
         }
-        try {
-            Map<String,Object> claims = new HashMap<>();
-            claims.put("accountId", Context.accountId.get());
-            if (this.scope != null && !this.scope.isEmpty()) {
-                claims.put("scope", this.scope);
-            }
-            apiToken = JwtAuthenticator.createJWT(
-                claims,
-                "Akto",
-                "invite_user",
-                Calendar.MONTH,
-                this.expiryTimeInMonth
-            );
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
+        this.apiToken = createTokenForAuth(this.expiryTimeInMonth, this.scope);
         return Action.SUCCESS.toUpperCase();
     }
 

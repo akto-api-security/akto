@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Box, Divider, HorizontalStack, Scrollable, Spinner, Text, VerticalStack } from "@shopify/polaris";
+import { Box, Divider, HorizontalStack, Scrollable, Spinner, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 import DetailGrid from "../agentic/DetailGrid";
 import SpanSection from "./LLMSpanSection";
 import api from "./api";
 import { enrichRow } from "./utils";
 import { formatDurationMs, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
+
+// Shared with the SpanSection list below the waterfall — a bar and its detail card for the
+// same span must resolve to the same id so a bar click can scroll straight to it.
+function spanSectionId(span, index) {
+    return `span-detail-${span.spanId || index}`;
+}
 
 // ─── Waterfall ────────────────────────────────────────────────────────────────
 
@@ -22,9 +28,10 @@ function spanWaterfallLabel(span, index) {
     if (span.responsePayload) {
         try {
             const resp = JSON.parse(span.responsePayload);
-            const toolCalls = resp.choices?.[0]?.message?.tool_calls;
+            // OpenAI nests tool calls under choices[0].message; agent/MCP spans put them at the root.
+            const toolCalls = resp.choices?.[0]?.message?.tool_calls || resp.tool_calls;
             if (toolCalls?.length) {
-                const names = toolCalls.map(tc => tc.function?.name).filter(Boolean);
+                const names = toolCalls.map(tc => tc.function?.name || tc.name).filter(Boolean);
                 if (names.length) return names.join(", ");
             }
         } catch (_) {}
@@ -81,14 +88,29 @@ function WaterfallGraph({ spans }) {
                     const color       = spanBarColor(span.durationMs, totalDuration);
                     const hasDuration = span.durationMs > 0;
                     const isLast      = i === resolved.length - 1;
+                    const violated    = !!span.guardrailViolated;
                     return (
-                        <Box key={span.spanId || i}>
-                            <Box paddingBlockStart="2" paddingBlockEnd="2" paddingInlineStart="3" paddingInlineEnd="3">
+                        <Box key={span.spanId || i} style={{cursor: "pointer"}}>
+                            <Box
+                                paddingBlockStart="2" paddingBlockEnd="2" paddingInlineStart="3" paddingInlineEnd="3"
+                                onClick={() => document.getElementById(spanSectionId(span, i))
+                                    ?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                            >
                                 <HorizontalStack gap="3" blockAlign="center" wrap={false}>
                                     <Box width="180px" minWidth="0">
-                                        <Text variant="bodySm" color="subdued" truncate>
-                                            {truncate(spanWaterfallLabel(span, i), 32)}
-                                        </Text>
+                                        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+                                            {violated && (
+                                                <Tooltip content={span.guardrailPolicy ? `Guardrail hit: ${span.guardrailPolicy}` : "Guardrail hit"} dismissOnMouseOut>
+                                                    <div style={{
+                                                        flexShrink: 0, width: 8, height: 8, borderRadius: "50%",
+                                                        background: WATERFALL_COLORS.red,
+                                                    }} />
+                                                </Tooltip>
+                                            )}
+                                            <Text variant="bodySm" color="subdued" truncate>
+                                                {truncate(spanWaterfallLabel(span, i), 32)}
+                                            </Text>
+                                        </HorizontalStack>
                                     </Box>
                                     {/* flex:1 + position:absolute bar — inexpressible via Box props */}
                                     <div style={{ flex: 1, position: "relative", height: 12, background: "#F3F4F6", borderRadius: 4 }}>
@@ -141,8 +163,13 @@ export default function TraceDetailView({ trace, currDateRange, initialSpans }) 
         const traceId   = trace?.traceId;
         const sessionId = trace?.sessionIdentifier;
         if (!traceId && !sessionId) { setSpans([]); return; }
-        // Spans pre-fetched by parent (session fallback) — nothing to do.
-        if (!traceId && sessionId && initialSpans?.length) return;
+        // Spans pre-fetched by parent (session fallback, or a single untraced row clicked
+        // straight from the Traces tab) — sync them in rather than re-fetching. Must actually
+        // set state here (not just skip the fetch): this effect can re-run with a *different*
+        // initialSpans for the same traceId-less trace/session pair (e.g. clicking between two
+        // untraced rows in the same session), and the initial useState(initialSpans) value only
+        // applies on first mount.
+        if (!traceId && sessionId && initialSpans?.length) { setSpans(initialSpans); return; }
         let cancelled = false;
         setLoading(true);
 
@@ -197,7 +224,10 @@ export default function TraceDetailView({ trace, currDateRange, initialSpans }) 
 
                     {!loading && spans.length > 0 && (
                         <>
-                            <WaterfallGraph spans={spans} />
+                            <VerticalStack gap="3">
+                                <Text variant="headingXs" color="subdued">Context graph</Text>
+                                <WaterfallGraph spans={spans} />
+                            </VerticalStack>
                             <Divider />
                         </>
                     )}
@@ -207,7 +237,7 @@ export default function TraceDetailView({ trace, currDateRange, initialSpans }) 
                     ) : spans.length ? (
                         <VerticalStack gap="3">
                             {spans.map((span, i) => (
-                                <SpanSection key={span.spanId || i} span={span} index={i} />
+                                <SpanSection key={span.spanId || i} span={span} index={i} id={spanSectionId(span, i)} />
                             ))}
                         </VerticalStack>
                     ) : (

@@ -7,6 +7,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.CustomRole;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
+import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
@@ -46,6 +47,60 @@ public class RBACDao extends CommonContextDao<RBAC> {
 
     public void deleteUserEntryFromCache(Pair<Integer, Integer> key) {
         rbacEntryCache.remove(key);
+    }
+
+    /*
+     * Base roles whose threat access is decided by the role itself. Admin and the threat
+     * roles always keep it, guest never gets it, and a custom role built on any of them
+     * cannot override that either way.
+     */
+    private static final Set<Role> FIXED_THREAT_ACCESS_ROLES = new HashSet<>(java.util.Arrays.asList(
+            Role.ADMIN, Role.GUEST, Role.THREAT_ENGINEER, Role.THREAT_VIEWER));
+
+    /*
+     * A custom role on any other base role may be granted threat protection by its toggle.
+     * The toggle can only ever add access, never remove what the base role already gives.
+     * Callers should invoke this only for Feature.THREAT_PROTECTION, since it costs a
+     * custom role lookup.
+     */
+    public static ReadWriteAccess resolveThreatAccess(int userId, int accountId, ReadWriteAccess baseRoleAccess) {
+        try {
+            RBAC rbac = getCurrentRBACForUser(userId, accountId);
+            if (rbac == null) {
+                return baseRoleAccess;
+            }
+
+            String currentRole = instance.fetchRole(rbac);
+            if (currentRole == null || currentRole.isEmpty()) {
+                return baseRoleAccess;
+            }
+
+            /*
+             * Custom role names cannot collide with built-in ones (RoleAction rejects
+             * reserved keywords), so a built-in role can skip the lookup entirely.
+             */
+            try {
+                Role.valueOf(currentRole);
+                return baseRoleAccess;
+            } catch (IllegalArgumentException builtInRoleNotFound) {
+                // not a built-in role, so it may be a custom one
+            }
+
+            CustomRole customRole = CustomRoleDao.instance.findRoleByName(currentRole);
+            if (customRole == null || customRole.getBaseRole() == null) {
+                return baseRoleAccess;
+            }
+
+            // the base role decides on its own; the toggle is not consulted
+            if (FIXED_THREAT_ACCESS_ROLES.contains(Role.valueOf(customRole.getBaseRole()))) {
+                return baseRoleAccess;
+            }
+
+            return Boolean.TRUE.equals(customRole.getThreatProtectionEnabled())
+                    ? ReadWriteAccess.READ_WRITE : baseRoleAccess;
+        } catch (Exception e) {
+            return baseRoleAccess;
+        }
     }
 
     public static Role getCurrentRoleForUser(int userId, int accountId){

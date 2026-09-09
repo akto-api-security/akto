@@ -16,6 +16,17 @@ public class MergedUrls {
     public static final String API_COLLECTION_ID = "apiCollectionId";
     private int apiCollectionId;
 
+    /*
+     * True for a url an advanced traffic filter's demerge:true strategy flagged as
+     * "never merge into a template" - false/absent for a url that was genuinely
+     * absorbed into a template. Kept out of equals()/hashCode() on purpose so lookups
+     * by (url, method, apiCollectionId) are unaffected; callers that care about the
+     * distinction query by this field instead (see MergedUrlsDao#getMergedUrls vs
+     * #getDemergedUrls).
+     */
+    public static final String DEMERGE = "demerge";
+    private boolean demerge;
+
     public MergedUrls() {}
 
     public MergedUrls(String url, String method, int apiCollectionId) {
@@ -67,5 +78,13 @@ public class MergedUrls {
 
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
+    }
+
+    public boolean isDemerge() {
+        return demerge;
+    }
+
+    public void setDemerge(boolean demerge) {
+        this.demerge = demerge;
     }
 }

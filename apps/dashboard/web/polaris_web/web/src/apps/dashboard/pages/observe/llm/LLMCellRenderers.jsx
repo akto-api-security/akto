@@ -1,5 +1,6 @@
 import React from "react";
-import { HorizontalStack, Text, Link } from "@shopify/polaris";
+import { Badge, HorizontalStack, Icon, Text, Link } from "@shopify/polaris";
+import { LockMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import { formatDurationMs, latencyColor, truncate } from "./constants";
 import { OsIcon } from "../agentic/DeviceEndpoints";
@@ -9,6 +10,12 @@ import ShowListInBadge from "../../../components/shared/ShowListInBadge";
 export { OsIcon };
 
 const DASH = "-";
+
+export const NO_ACCESS_MESSAGE = "Please contact your administrator to get access.";
+
+export const lockedRowStyle = () => (func.isUserAdmin()
+    ? { cursor: "pointer" }
+    : { cursor: "default", color: "var(--p-color-text-subdued, #6D7175)" });
 
 function modelDomain(model) {
     if (!model) return null;
@@ -43,6 +50,17 @@ export function ModelIcon({ model, size = 16 }) {
 // Title: prompt text in interactive blue so it reads as a clickable row label.
 export function TitleCell({ data }) {
     if (!data) return null;
+    // Prompt content is admin-only — everyone else identifies the row by its id instead.
+    if (!func.isUserAdmin()) {
+        return (
+            <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                <Icon source={LockMinor} color="subdued" />
+                <Text variant="bodySm" color="subdued" truncate>
+                    {data.sessionIdentifier || data.traceId || DASH}
+                </Text>
+            </HorizontalStack>
+        );
+    }
     const name = data._promptText ? truncate(data._promptText, 90) : DASH;
     return <Text variant="bodySm" color="interactive" truncate>{name}</Text>;
 }
@@ -149,10 +167,26 @@ export function TopicCell({ data, isTopic = true }) {
        <ShowListInBadge
             itemsArr={isTopic ? finalTopics : [...subTopics]}
             maxItems={isTopic ? 3 : 4}
-            maxWidth={"80px"}
             useTooltip={true}
         />
     );
+}
+
+// Whether any span in this session/trace tripped a guardrail (see AgentQueryRecord.guardrailViolated).
+// Only the hit case gets a badge — a session with no guardrail-evaluated spans at all (predates the
+// feature, or guardrails weren't configured) reads the same as a clean one, so a "Clean" label here
+// would overclaim, same reasoning as GuardrailVerdict.hasGuardrailVerdict on the span level.
+export function GuardrailStatusCell({ value }) {
+    if (!value) return <Text variant="bodySm" color="subdued">{DASH}</Text>;
+    return <Badge status="critical" size="small">Guardrail hit</Badge>;
+}
+
+// Policy name(s) that tripped on this session/trace (AgentQueryRecord.guardrailPolicy). A session
+// can hit more than one policy across its spans, so this mirrors TopicCell's list-of-badges shape.
+export function GuardrailPolicyCell({ data }) {
+    const policies = (data?.guardrailPolicies || []).filter(Boolean);
+    if (!policies.length) return <Text variant="bodySm" color="subdued">{DASH}</Text>;
+    return <ShowListInBadge itemsArr={policies} maxItems={2} useTooltip={true} />;
 }
 
 // Clickable session id (used in unscoped Traces table).

@@ -81,6 +81,10 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
         credits:{
             enabled: false,
         },
+        // Callers render their own legend; Highcharts' default one throws the pie off-center.
+        legend: {
+            enabled: false,
+        },
         title: subtitle ? { text: null } : {
             text: title,
             y: size*0.4,

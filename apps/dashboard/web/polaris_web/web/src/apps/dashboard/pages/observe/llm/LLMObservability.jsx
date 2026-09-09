@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import { Box, Card, Divider, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
+import { Box, Card, Divider, HorizontalGrid, HorizontalStack, Modal, Text } from "@shopify/polaris";
 import { produce } from "immer";
 
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
@@ -13,13 +13,14 @@ import PersistStore from "@/apps/main/PersistStore";
 import "../../../components/layouts/style.css";
 
 import api from "./api";
-import { formatSparklineLabels, enrichRow } from "./utils";
+import { formatSparklineLabels } from "./utils";
 import { formatCompact, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
 import { ARGUS_TRACE_COL_DEFS } from "./columns";
 import SessionsView from "./SessionsView";
 import SessionFlyout from "./SessionFlyout";
 import ArgusTraceFlyout from "./ArgusTraceFlyout";
 import MessagesView from "./MessagesView";
+import { NO_ACCESS_MESSAGE } from "./LLMCellRenderers";
 import { fetchGuardrailPolicyNamesCached } from "../../guardrails/topicGuardrailUtils";
 import { CATEGORY_ENDPOINT_SECURITY, CATEGORY_AGENTIC_SECURITY } from "../../../../main/labelHelper";
 
@@ -56,11 +57,25 @@ export default function LLMObservability() {
     );
     const [selectedSession, setSelectedSession] = useState(null);
     const [selectedTrace, setSelectedTrace]     = useState(null);
-    const [sessions, setSessions]     = useState([]);
+    // Prompt content is admin-only; admins confirm per row that opening it is recorded in audit data.
+    const isAdmin = func.isUserAdmin();
+    const [pendingReveal, setPendingReveal] = useState(null);
     const [argusStats, setArgusStats] = useState(null);
     // Aggregated stats from the dedicated endpoint (accurate, not 500-capped)
     const [sessionStats, setSessionStats] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    // Read traceId once on mount — deep-links a real-invocation trace (e.g. an insight CTA)
+    // straight into the Argus trace flyout. ArgusTraceFlyout only renders in the isArgus branch,
+    // so opening one from anywhere else must force the category over, same technique urlFilters
+    // above uses for the Atlas/username-topic-subTopic case, just pointed the other way.
+    const [initialTraceId] = useState(() => new URLSearchParams(window.location.search).get("traceId"));
+    useEffect(() => {
+        if (!initialTraceId) return;
+        setDashboardCategory(CATEGORY_AGENTIC_SECURITY);
+        if (!func.isUserAdmin()) { func.setToast(true, true, NO_ACCESS_MESSAGE); return; }
+        setPendingReveal({ open: () => setSelectedTrace({ traceId: initialTraceId }), traceId: initialTraceId });
+    }, [initialTraceId, setDashboardCategory]);
 
     useEffect(() => {
         fetchGuardrailPolicyNamesCached();
@@ -75,19 +90,13 @@ export default function LLMObservability() {
         let cancelled = false;
         setLoading(true);
         if (!isArgus) {
-            Promise.allSettled([
-                api.fetchSessions(epochs.since, epochs.until, {}),
-                api.fetchSessionStats(epochs.since, epochs.until),
-            ]).then(([sessionResult, statsResult]) => {
-                if (cancelled) return;
-                if (sessionResult.status === "fulfilled") {
-                    setSessions((sessionResult.value || []).map(enrichRow));
-                }
-                if (statsResult.status === "fulfilled") {
-                    setSessionStats(statsResult.value);
-                }
-                setLoading(false);
-            });
+            api.fetchSessionStats(epochs.since, epochs.until)
+                .then(stats => {
+                    if (cancelled) return;
+                    setSessionStats(stats);
+                    setLoading(false);
+                })
+                .catch(() => { if (!cancelled) setLoading(false); });
         } else {
             api.fetchArgusStats(epochs.since, epochs.until)
                 .then(stats => {
@@ -101,8 +110,21 @@ export default function LLMObservability() {
     }, [epochs, isArgus]);
 
     const openSession = useCallback((row) => {
-        setSelectedSession(row);
-    }, []);
+        if (!isAdmin) { func.setToast(true, true, NO_ACCESS_MESSAGE); return; }
+        setPendingReveal({ open: () => setSelectedSession(row), sessionId: row?.sessionIdentifier });
+    }, [isAdmin]);
+
+    const openTrace = useCallback((row) => {
+        if (!isAdmin) { func.setToast(true, true, NO_ACCESS_MESSAGE); return; }
+        setPendingReveal({ open: () => setSelectedTrace(row), traceId: row?.traceId, sessionId: row?.sessionIdentifier });
+    }, [isAdmin]);
+
+    // Opening the flyout fetches the content, and that fetch is what gets recorded in audit data.
+    const confirmReveal = useCallback(() => {
+        if (!pendingReveal) return;
+        pendingReveal.open();
+        setPendingReveal(null);
+    }, [pendingReveal]);
 
     // ─── Atlas graph data (sessions) ─────────────────────────────────────────
 
@@ -132,22 +154,7 @@ export default function LLMObservability() {
         return entries;
     }, [sessionStats]);
 
-    // Token totals from accurate aggregated stats; fall back to sessions array while loading.
-    const totalInputTokens = useMemo(
-        () => sessionStats != null
-            ? sessionStats.totalInputTokens
-            : sessions.reduce((s, r) => s + (Number(r._inputTokens) || 0), 0),
-        [sessionStats, sessions]
-    );
-
-    const totalOutputTokens = useMemo(
-        () => sessionStats != null
-            ? sessionStats.totalOutputTokens
-            : sessions.reduce((s, r) => s + (Number(r._outputTokens) || 0), 0),
-        [sessionStats, sessions]
-    );
-
-    const totalTokens = totalInputTokens + totalOutputTokens;
+    const totalTokens = (sessionStats?.totalInputTokens || 0) + (sessionStats?.totalOutputTokens || 0);
 
     // Top users by token usage — from aggregated backend stats.
     const topUserRows = useMemo(() => {
@@ -169,33 +176,20 @@ export default function LLMObservability() {
         }));
     }, [sessionStats]);
 
-    // Top models by session count — model is parsed from responsePayload, not a native ES field,
-    // so we compute from the sessions terms-agg data (inherits the 500-session cap).
-    const topModelRows = useMemo(() => {
-        const byModel = {};
-        sessions.forEach(r => {
-            const m = r._model;
-            if (!m) return;
-            if (!byModel[m]) byModel[m] = { count: 0 };
-            byModel[m].count++;
-        });
-        return Object.entries(byModel)
-            .sort((a, b) => b[1].count - a[1].count)
-            .slice(0, 3)
-            .map(([model, { count }]) => ({
-                id: model,
-                name: model,
-                type: "LLM",
-                assetTagValue: model,
-                renderValue: () => (
-                    <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
-                        <Box minHeight="28px">
-                            <Text variant="bodyMd" alignment="end">{count}</Text>
-                        </Box>
-                    </HorizontalStack>
-                ),
-            }));
-    }, [sessions]);
+    // Top models by session count — from aggregated backend stats.
+    const topModelRows = useMemo(() => (sessionStats?.topModels || []).map(({ model, count }) => ({
+        id: model,
+        name: model,
+        type: "LLM",
+        assetTagValue: model,
+        renderValue: () => (
+            <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
+                <Box minHeight="28px">
+                    <Text variant="bodyMd" alignment="end">{count}</Text>
+                </Box>
+            </HorizontalStack>
+        ),
+    })), [sessionStats]);
 
     // ─── Argus graph data (from fetchArgusStats — accurate, not table-page-capped) ──
 
@@ -237,10 +231,10 @@ export default function LLMObservability() {
             const tokens = (Number(r._inputTokens) || 0) + (Number(r._outputTokens) || 0);
             return {
                 id: r.traceId || i,
-                name: truncate(r._promptText || r.traceId || `Trace ${i + 1}`, 40),
+                name: truncate((isAdmin ? r._promptText : "") || r.traceId || `Trace ${i + 1}`, 40),
                 type: "LLM",
                 assetTagValue: r._model,
-                onClick: () => setSelectedTrace(r),
+                onClick: () => openTrace(r),
                 renderValue: () => (
                     <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
                         <Box minHeight="28px">
@@ -250,9 +244,9 @@ export default function LLMObservability() {
                 ),
             };
         });
-    }, [argusStats, setSelectedTrace]);
+    }, [argusStats, openTrace, isAdmin]);
 
-    const totalDisplaySessions = sessionStats?.totalSessions != null ? sessionStats.totalSessions : sessions.length;
+    const totalDisplaySessions = sessionStats?.totalSessions || 0;
 
     const topCards = useMemo(() => isArgus ? (
         <HorizontalGrid key="top-row-argus" columns={3} gap="4">
@@ -325,8 +319,8 @@ export default function LLMObservability() {
                             sparklineColor="#4285F4"
                             sparklineLabels={tokenSparkLabels}
                             breakdown={[
-                                { label: `In: ${formatCompact(totalInputTokens)}`, count: totalInputTokens, color: "#4285F4" },
-                                { label: `Out: ${formatCompact(totalOutputTokens)}`, count: totalOutputTokens, color: "#10A37F" },
+                                { label: `In: ${formatCompact(sessionStats?.totalInputTokens || 0)}`, count: sessionStats?.totalInputTokens || 0, color: "#4285F4" },
+                                { label: `Out: ${formatCompact(sessionStats?.totalOutputTokens || 0)}`, count: sessionStats?.totalOutputTokens || 0, color: "#10A37F" },
                             ]}
                             noCard
                         />
@@ -346,7 +340,7 @@ export default function LLMObservability() {
                 emptyStateText="No model data in this range."
             />
         </HorizontalGrid>
-    ), [isArgus, argusStats, argusTraceSpark, argusTraceBreakdown, argusTokenSpark, argusTraceSparkLabels, argusTotalTokens, argusInputTokens, argusOutputTokens, argusTopAppByInputTokens, argusTopTraceByTokens, totalDisplaySessions, sessionSpark, sessionSparkLabels, sessionBreakdown, totalTokens, totalInputTokens, totalOutputTokens, tokenSpark, tokenSparkLabels, topUserRows, topModelRows]);
+    ), [isArgus, argusStats, argusTraceSpark, argusTraceBreakdown, argusTokenSpark, argusTraceSparkLabels, argusTotalTokens, argusInputTokens, argusOutputTokens, argusTopAppByInputTokens, argusTopTraceByTokens, totalDisplaySessions, sessionSpark, sessionSparkLabels, sessionBreakdown, totalTokens,sessionStats, tokenSpark, tokenSparkLabels, topUserRows, topModelRows]);
 
     return (
         <>
@@ -368,7 +362,7 @@ export default function LLMObservability() {
                         </Box>
                     ) : topCards,
                     isArgus ? (
-                        <MessagesView key="traces-table" currDateRange={currDateRange} columnDefs={ARGUS_TRACE_COL_DEFS} onRowClicked={p => p.data && setSelectedTrace(p.data)} />
+                        <MessagesView key="traces-table" currDateRange={currDateRange} columnDefs={ARGUS_TRACE_COL_DEFS} onRowClicked={p => p.data && openTrace(p.data)} />
                     ) : (
                         <SessionsView key="sessions-table" currDateRange={currDateRange} onOpenSession={openSession} initialFilters={urlFilters} />
                     ),
@@ -386,6 +380,20 @@ export default function LLMObservability() {
                     onClose={() => setSelectedSession(null)}
                 />
             )}
+            <Modal
+                open={!!pendingReveal}
+                onClose={() => setPendingReveal(null)}
+                title="Show prompt content?"
+                primaryAction={{ content: "Show content", onAction: confirmReveal }}
+                secondaryActions={[{ content: "Cancel", onAction: () => setPendingReveal(null) }]}
+            >
+                <Modal.Section>
+                    <Text variant="bodyMd">
+                        Prompts and responses can contain sensitive data. Your email, IP address and the time of
+                        this access will be recorded in audit data.
+                    </Text>
+                </Modal.Section>
+            </Modal>
         </>
     );
 }

@@ -63,6 +63,7 @@ public class ThreatApiService {
     if (!contextFilter.isEmpty()) {
       match.putAll(contextFilter);
     }
+    match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
     if (!match.isEmpty()) {
       base.add(new Document("$match", match));
@@ -167,17 +168,21 @@ public class ThreatApiService {
     if (!contextFilter.isEmpty()) {
       match.putAll(contextFilter);
     }
+    match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
     pipeline.add(new Document("$match", match));
 
-    // 3. Group by category and subCategory
+    // 3. Collapse misconfiguration re-detections.
+    pipeline.addAll(ThreatUtils.configScanDedupeStages(contextSource));
+
+    // 4. Group by category and subCategory
     pipeline.add(new Document("$group",
         new Document("_id",
             new Document("category", "$category")
             .append("subCategory", "$subCategory"))
             .append("count", new Document("$sum", 1))));
 
-    // 4. Sort by count descending
+    // 5. Sort by count descending
     pipeline.add(new Document("$sort", new Document("count", -1)));
 
     List<ThreatCategoryWiseCountResponse.SubCategoryCount> categoryWiseCounts = new ArrayList<>();
@@ -228,6 +233,7 @@ public class ThreatApiService {
       if (!contextFilter.isEmpty()) {
           match.putAll(contextFilter);
       }
+      match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
       List<Document> pipeline = new ArrayList<>();
       pipeline.add(new Document("$match", match));

@@ -9,6 +9,10 @@ public class CardTextBlock {
         return createTextBlock(text, wrap, weight, "default");
     }
 
+    /*
+     * Returns one card element, without a trailing comma. Callers must join
+     * elements with "," themselves.
+     */
     public static String createTextBlock(String text, boolean wrap, String weight, String color) {
         String body = "        {\n" +
                 "            \"type\":\"TextBlock\",\n" +
@@ -16,7 +20,7 @@ public class CardTextBlock {
                 "            \"weight\": \"" + weight + "\",\n" +
                 "            \"color\": \"" + color + "\",\n" +
                 "            \"wrap\": " + wrap + "\n" +
-                "        },";
+                "        }";
         return body;
     }
 

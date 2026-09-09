@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
+import { devtoolsOptions } from '@/apps/main/devtoolsConfig'
 
 const initialState = {
     promptsObj: {},
@@ -25,7 +26,7 @@ const PromptHardeningStore = create(
         setTemperature: (temperature) => set({ temperature }),
         setMaxTokens: (maxTokens) => set({ maxTokens }),
         setTriggerTest: (triggerTest) => set({ triggerTest })
-    }), { name: 'PromptHardeningStore' })
+    }), devtoolsOptions('PromptHardeningStore'))
 )
 
 export default PromptHardeningStore

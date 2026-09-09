@@ -14,19 +14,28 @@ function Dropdown(props) {
 
         return props.menuItems.map(option => {
             const hasHelpText = option.helpText && option.helpText.trim() !== '';
-
+            if (!hasHelpText) {
+                return {
+                    ...option,
+                    disabled: props?.disabledOptions?.includes?.(option.value) || false,
+                };
+            }
+            const optionLabel = (
+                <VerticalStack gap="1">
+                    <Text variant="bodyMd" fontWeight="medium">{option.label}</Text>
+                    <Text variant="bodySm" color="subdued">{option.helpText}</Text>
+                </VerticalStack>
+            );
             return {
                 ...option,
                 disabled: props?.disabledOptions?.includes?.(option.value) || false,
-                label: hasHelpText ? (
-                    <VerticalStack gap="1">
-                        <Text variant="bodyMd" fontWeight="medium">{option.label}</Text>
-                        <Text variant="bodySm" color="subdued">{option.helpText}</Text>
-                    </VerticalStack>
-                ) : option.label
+                // Class used only by header product switcher CSS (Headers.css)
+                label: id === 'dashboard-category-dropdown'
+                    ? <div className="dashboard-category-option">{optionLabel}</div>
+                    : optionLabel
             };
         });
-    }, [props.menuItems, props.disabledOptions]);
+    }, [props.menuItems, props.disabledOptions, id]);
 
 
     const [selectedOptions, setSelectedOptions] = useState(props.preSelected || []);
@@ -77,7 +86,7 @@ function Dropdown(props) {
                 props.selected(filteredSelected[0]);
             }
         },
-        [options, props.menuItems, props.disabledOptions, props.showSelectedItemLabels, props.itemName, props.allowMultiple],
+        [options, props.menuItems, props.disabledOptions, props.showSelectedItemLabels, props.itemName, props.allowMultiple, props.selected],
     );
 
     const getLabel = (id) => {

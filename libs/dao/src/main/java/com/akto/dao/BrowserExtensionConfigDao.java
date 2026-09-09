@@ -20,9 +20,7 @@ public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensi
         return BrowserExtensionConfig.class;
     }
 
-    public List<BrowserExtensionConfig> findAllSortedByCreatedTimestamp(int skip, int limit) {
-        BasicDBObject sort = new BasicDBObject();
-        sort.put(BrowserExtensionConfig.CREATED_TIMESTAMP, -1);
-        return instance.findAll(new BasicDBObject(), skip, limit, sort);
+    public List<BrowserExtensionConfig> findAllConfigs() {
+        return instance.findAll(new BasicDBObject());
     }
 }

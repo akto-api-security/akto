@@ -24,6 +24,46 @@
         "comment": "Validate tool results against Akto Guardrails and ingest for monitoring",
         "timeoutSec": 30
       }
+    ],
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "$HOME/.vscode/copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.py sessionStart",
+        "comment": "Ingest session start event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "agentStop": [
+      {
+        "type": "command",
+        "bash": "$HOME/.vscode/copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.py agentStop",
+        "comment": "Ingest turn-completion event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "subagentStart": [
+      {
+        "type": "command",
+        "bash": "$HOME/.vscode/copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.py subagentStart",
+        "comment": "Ingest subagent-start event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "subagentStop": [
+      {
+        "type": "command",
+        "bash": "$HOME/.vscode/copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.py subagentStop",
+        "comment": "Ingest subagent-completion event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "preCompact": [
+      {
+        "type": "command",
+        "bash": "$HOME/.vscode/copilot/hooks/akto/akto-hook-wrapper.sh akto-hooks.py preCompact",
+        "comment": "Ingest pre-compact event to Akto for observability",
+        "timeoutSec": 10
+      }
     ]
   }
 }

@@ -56,6 +56,8 @@ public class HttpProxyAction extends ActionSupport {
     private String daemonset_id;
     private String enabled_graph;
     private String contextSource;
+    // When set, checks a pending Human Approval activity's status instead of validating.
+    private String activityId;
 
     private Map<String, Object> data;
     private boolean success;
@@ -208,6 +210,7 @@ public class HttpProxyAction extends ActionSupport {
         requestData.put("enabled_graph", enabled_graph);
         requestData.put("contextSource", contextSource);
         requestData.put("client_hook", client_hook);
+        requestData.put("activityId", activityId);
 
         return requestData;
     }

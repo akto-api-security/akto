@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        InstalledAppVulnerabilityDao (CommonContextDao) — cache of known-vulnerability verdicts for
+        installed-app {name, version} pairs, keyed by "_id": "{name}#{version}". Queried only by _id
+        (Mongo's default unique index), so no secondary index is needed here.
+    -->
+    <changeSet id="005-common-create-installed-app-vulnerabilities" author="akto">
+        <mongodb:createCollection collectionName="installed_app_vulnerabilities"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="installed_app_vulnerabilities"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

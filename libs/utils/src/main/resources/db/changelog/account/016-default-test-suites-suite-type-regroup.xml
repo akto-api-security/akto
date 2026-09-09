@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        DefaultTestSuites dropped the AI_AGENT_SECURITY suite type and regrouped ATTACK_STRATEGY /
+        ATTACK_BASE_TECHNIQUE around the agentic OWASP top 10 (2026) categories, so every
+        default_test_suites document written by an earlier build under a suite type that no longer
+        exists is now unreadable: suiteType maps onto the DefaultSuitesType enum, and the POJO
+        codec throws on a value missing from it. TestSuiteAction reads the whole collection
+        (Filters.empty()), so a single stale document breaks the Test Suites page for the account.
+
+        Deletes only documents whose suiteType is not a current DefaultSuitesType — documents for
+        the suite types that survived are left in place, so test configurations referencing their
+        _ids keep resolving. A document with no suiteType at all is also stale (nothing in the
+        current code writes one) and is removed by the same $nin.
+
+        Idempotent: a second run finds nothing left to delete. Not reversible — the deleted
+        documents are Akto-generated (user-created suites live in test_suite) and
+        DefaultTestSuitesDao.insertDefaultTestSuites rebuilds the current set on the next login.
+    -->
+
+    <changeSet id="016-account-default-test-suites-drop-removed-suite-types" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="default_test_suites"/>
+        </preConditions>
+        <mongodb:runCommand>
+            <mongodb:command>{
+                "delete": "default_test_suites",
+                "deletes": [
+                    {
+                        "q": {
+                            "suiteType": {
+                                "$nin": [
+                                    "OWASP",
+                                    "TESTING_METHODS",
+                                    "SEVERITY",
+                                    "DURATION",
+                                    "MCP_SECURITY",
+                                    "ATTACK_BASE_TECHNIQUE",
+                                    "ATTACK_STRATEGY"
+                                ]
+                            }
+                        },
+                        "limit": 0
+                    }
+                ]
+            }</mongodb:command>
+        </mongodb:runCommand>
+        <rollback/>
+    </changeSet>
+
+    <!--
+        AccountSettings gained defaultSuitesLastUpdatedAt, the timestamp
+        DefaultTestSuitesDao.insertDefaultTestSuites uses to decide how much work to do: it skips
+        entirely within a day of the last build, rebuilds from scratch when the value is 0, and
+        otherwise only folds in yaml templates created since. Because it merges
+        ($addToSet), an incremental run can never move a template out of a suite it no longer
+        belongs to — so the regrouping in this release only lands via the from-scratch path.
+
+        Resetting the field to 0 forces that full rebuild on the next login. On an environment
+        upgrading from a build that predates the field this is already the effective value (a
+        missing int reads as 0) and the $set is a no-op in behaviour; it matters for environments
+        that ran a build carrying the old groupings and a non-zero timestamp, which would
+        otherwise keep serving the stale suites for good.
+
+        This is the migration to repeat whenever the suite definitions in DefaultTestSuites change
+        again: reset the timestamp so accounts pick up the new grouping.
+
+        Idempotent, and reversible only in the sense that re-running the DAO rewrites the field.
+    -->
+
+    <changeSet id="016-account-settings-reset-default-suites-last-updated-at" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="accounts_settings"/>
+        </preConditions>
+        <mongodb:runCommand>
+            <mongodb:command>{
+                "update": "accounts_settings",
+                "updates": [
+                    {
+                        "q": { "defaultSuitesLastUpdatedAt": { "$ne": 0 } },
+                        "u": { "$set": { "defaultSuitesLastUpdatedAt": 0 } },
+                        "multi": true
+                    }
+                ]
+            }</mongodb:command>
+        </mongodb:runCommand>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

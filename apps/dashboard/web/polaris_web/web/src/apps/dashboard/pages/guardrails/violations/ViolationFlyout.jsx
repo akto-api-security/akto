@@ -18,6 +18,7 @@ import { MobileCancelMajor } from "@shopify/polaris-icons";
 
 import AgenticFlyoutShell from "@/apps/dashboard/pages/observe/agentic/AgenticFlyoutShell";
 import AiChatSection from "@/apps/dashboard/pages/observe/agentic/AiChatSection";
+import { buildAgenticObserveChatMetadata } from "@/apps/dashboard/pages/observe/agentic/agenticObserveApi";
 import { SeverityBadge } from "@/apps/dashboard/pages/observe/agentic/AgenticCellRenderers";
 import ActivityTracker from "@/apps/dashboard/pages/dashboard/components/ActivityTracker";
 import JiraTicketCreationModal from "@/apps/dashboard/components/shared/JiraTicketCreationModal";
@@ -25,6 +26,7 @@ import SampleDataList from "@/apps/dashboard/components/shared/SampleDataList";
 import func from "@/util/func";
 import guardrailsApi from "../api";
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
+import { redactSampleDataByKeywords } from "@/apps/dashboard/pages/threat_detection/utils/redactSampleData";
 import issuesApi from "@/apps/dashboard/pages/issues/api";
 import settingFunctions from "@/apps/dashboard/pages/settings/module";
 import issuesFunctions from "@/apps/dashboard/pages/issues/module";
@@ -32,10 +34,14 @@ import issuesFunctions from "@/apps/dashboard/pages/issues/module";
 import {
     ChatSessionSection,
     FileSection,
+    HumanApprovalActions,
+    HumanResponseBadge,
     OverviewSection,
+    PromptResponseSection,
     RemediationSection,
+    isHumanApprovalPending,
 } from "./ViolationFlyoutSections";
-import { buildFallbackDetail } from "./violationsData";
+import { buildFallbackDetail, buildViolationChatContext } from "./violationsData";
 import "../../../components/layouts/style.css";
 
 // ─── Event Actions dropdown ───────────────────────────────────────────────────
@@ -339,7 +345,11 @@ function ApproveServerButton({ row }) {
 
 // ─── Header ─────────────────────────────────────────────────────────────────────
 
-function FlyoutHeader({ row, onClose, onStatusUpdate }) {
+function FlyoutHeader({ row, onClose, onStatusUpdate, onHumanApproval }) {
+    const isHumanApprovalEvent = String(row?._status || "").toUpperCase() === "HUMAN_APPROVAL";
+    const humanResponse = String(row?.humanResponse || "PENDING").toUpperCase();
+    const pending = isHumanApprovalEvent && isHumanApprovalPending(humanResponse);
+
     return (
         <>
             <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="3" paddingBlockEnd="3">
@@ -354,13 +364,27 @@ function FlyoutHeader({ row, onClose, onStatusUpdate }) {
                         )}
                     </HorizontalStack>
                     <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                        <EventActionsDropdown
-                            violationId={row.id}
-                            eventStatus={row._status}
-                            onStatusUpdate={onStatusUpdate}
-                            row={row}
-                        />
-                        {row.behaviour === "approval" && <ApproveServerButton row={row} />}
+                        {!isHumanApprovalEvent && (
+                            <>
+                                <EventActionsDropdown
+                                    violationId={row.id}
+                                    eventStatus={row._status}
+                                    onStatusUpdate={onStatusUpdate}
+                                    row={row}
+                                />
+                                {row.behaviour === "approval" && <ApproveServerButton row={row} />}
+                            </>
+                        )}
+                        {isHumanApprovalEvent && pending && (
+                            <HumanApprovalActions
+                                pending
+                                onApprove={() => onHumanApproval?.("APPROVED")}
+                                onBlock={() => onHumanApproval?.("BLOCKED")}
+                            />
+                        )}
+                        {isHumanApprovalEvent && !pending && (
+                            <HumanResponseBadge response={humanResponse} />
+                        )}
                         <Button plain icon={MobileCancelMajor} onClick={onClose} accessibilityLabel="Close" />
                     </HorizontalStack>
                 </HorizontalStack>
@@ -372,15 +396,39 @@ function FlyoutHeader({ row, onClose, onStatusUpdate }) {
 
 // ─── Flyout ─────────────────────────────────────────────────────────────────────
 
-export default function ViolationFlyout({ violation, show, onClose, onStatusUpdate }) {
+export default function ViolationFlyout({ violation, show, onClose, onStatusUpdate, onHumanApproval }) {
     const [selectedTab, setSelectedTab] = useState(0);
+    const [enrichedPayload, setEnrichedPayload] = useState(null);
 
     useEffect(() => { setSelectedTab(0); }, [violation?.id]);
 
+    // The list endpoint's row doesn't always carry the full captured request/response
+    // (row.payload can be empty even though the event has one) - the same gap the old
+    // Threat Activity flyout covers by fetching it on open via refId/eventType/filterId.
+    // Do the same here, only when the row itself has nothing to show.
+    useEffect(() => {
+        setEnrichedPayload(null);
+        if (violation?.payload || !violation?.refId || !violation?.eventType || !violation?.filterId) return;
+        let cancelled = false;
+        threatDetectionApi.fetchMaliciousRequest(violation.refId, violation.eventType, violation.actor || "", violation.filterId)
+            .then(res => {
+                if (cancelled) return;
+                const orig = res?.maliciousPayloadsResponses?.[0]?.orig;
+                if (orig) setEnrichedPayload(redactSampleDataByKeywords(orig));
+            })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, [violation?.id, violation?.refId, violation?.eventType, violation?.filterId, violation?.actor, violation?.payload]);
+
     const detail = useMemo(() => {
         if (!violation) return null;
-        return buildFallbackDetail(violation);
-    }, [violation]);
+        return buildFallbackDetail(enrichedPayload ? { ...violation, payload: enrichedPayload } : violation);
+    }, [violation, enrichedPayload]);
+
+    const chatMetadata = useMemo(() => {
+        if (!violation || !detail) return null;
+        return buildAgenticObserveChatMetadata("violation", buildViolationChatContext(violation, detail));
+    }, [violation, detail]);
 
     // Timeline for the selected violation — shows just this event.
     // Previously iterated allRows (the entire dataset) client-side; now the flyout
@@ -393,18 +441,22 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
         }];
     }, [violation]);
 
-    // Tabs: Overview · (type-specific middle tab) · Remediation · Timeline.
+    const isHumanApprovalEvent = String(violation?._status || "").toUpperCase() === "HUMAN_APPROVAL";
+
+    // Tabs: Overview · Values · (type-specific middle tab) · Remediation · Timeline.
+    // Human Approval only needs Overview and Values.
     const tabModel = useMemo(() => {
-        const tabs = [{ id: "overview", content: "Overview" }];
+        const tabs = [
+            { id: "overview", content: "Overview" },
+            { id: "promptResponse", content: "Values" },
+        ];
         let middle = null;
-        if (detail?.chatSession?.length) middle = "chat";
-        else if (detail?.fileContent && violation?.type !== "Skill") middle = "file";
-        if (middle === "chat") tabs.push({ id: "chat", content: "Chat Session" });
-        if (middle === "file") tabs.push({ id: "file", content: detail.fileTabLabel || "File" });
-        tabs.push({ id: "remediation", content: "Remediation" });
-        tabs.push({ id: "timeline", content: "Timeline" });
+        if (!isHumanApprovalEvent) {
+            if (detail?.remediation) tabs.push({ id: "remediation", content: "Remediation" });
+            tabs.push({ id: "timeline", content: "Timeline" });
+        }
         return { tabs, middle };
-    }, [detail, violation]);
+    }, [detail, violation, isHumanApprovalEvent]);
 
     const handleTabSelect = useCallback((idx) => setSelectedTab(idx), []);
 
@@ -414,7 +466,8 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
 
     function renderTabContent(id) {
         switch (id) {
-            case "overview":    return <OverviewSection row={violation} detail={detail} />;
+            case "overview":        return <OverviewSection row={violation} detail={detail} />;
+            case "promptResponse":  return <PromptResponseSection detail={detail} />;
             case "chat":        return <ChatSessionSection messages={detail?.chatSession} highlights={detail?.evidence?.highlights || []} />;
             case "file":
                 if (violation.type === "Tool") {
@@ -442,7 +495,7 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
             width={840}
             header={
                 <>
-                    <FlyoutHeader row={violation} onClose={onClose} onStatusUpdate={onStatusUpdate} />
+                    <FlyoutHeader row={violation} onClose={onClose} onStatusUpdate={onStatusUpdate} onHumanApproval={onHumanApproval} />
                     <Box paddingInlineStart="1" paddingInlineEnd="1">
                         <Tabs tabs={tabModel.tabs} selected={selectedTab} onSelect={handleTabSelect} />
                     </Box>
@@ -454,6 +507,7 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
                     placeholder="Ask anything related to your endpoints..."
                     resetKey={violation.id}
                     conversationType="AGENTIC_OBSERVE"
+                    chatMetadata={chatMetadata}
                 />
             }
         >

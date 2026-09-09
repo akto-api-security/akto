@@ -35,6 +35,9 @@ public class KafkaUtils {
     }
 
     public static void insertData(IngestDataBatch payload, boolean publishToGuardrails) {
+        // Older Bedrock processors send ip=0.0.0.0; the caller is in bedrock-identity-arn.
+        // Rewrite before publish so guardrail activity Actor is the identity, not the placeholder.
+        BedrockIdentityActor.apply(payload);
         BasicDBObject obj = buildMessageObject(payload);
         topicPublisher.publish(obj.toString(), API_LOGS_TOPIC, publishToGuardrails);
     }
@@ -69,6 +72,8 @@ public class KafkaUtils {
         obj.put("daemonset_id", payload.getDaemonset_id());
         obj.put("enabled_graph", payload.getEnabled_graph());
         obj.put("tag", payload.getTag());
+        obj.put("_traces", payload.get_traces());
+        obj.put("_guardrail", payload.get_guardrail());
         return obj;
     }
 

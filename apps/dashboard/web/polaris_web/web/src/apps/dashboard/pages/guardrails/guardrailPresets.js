@@ -33,6 +33,7 @@ const GUARDRAIL_PRESETS = [
             sentimentDetection: { enabled: false, confidenceScore: 0.7 },
             tokenLimitDetection: { enabled: false, confidenceScore: 0.7 },
             llmRule: { enabled: false, confidenceScore: 0.5, userPrompt: "" },
+            redactionRules: [],
             contentFiltering: {
                 promptAttacks: { level: "HIGH" },
                 code: null,
@@ -97,6 +98,7 @@ const GUARDRAIL_PRESETS = [
             sentimentDetection: { enabled: false, confidenceScore: 0.7 },
             tokenLimitDetection: { enabled: false, confidenceScore: 0.7 },
             llmRule: { enabled: false, confidenceScore: 0.5, userPrompt: "" },
+            redactionRules: [],
             contentFiltering: {
                 promptAttacks: { level: "HIGH" },
                 code: null,
@@ -167,6 +169,7 @@ const GUARDRAIL_PRESETS = [
             sentimentDetection: { enabled: false, confidenceScore: 0.7 },
             tokenLimitDetection: { enabled: false, confidenceScore: 0.7 },
             llmRule: { enabled: false, confidenceScore: 0.5, userPrompt: "" },
+            redactionRules: [],
             contentFiltering: {
                 promptAttacks: { level: "HIGH" },
                 code: null,
@@ -229,6 +232,7 @@ const GUARDRAIL_PRESETS = [
             sentimentDetection: { enabled: false, confidenceScore: 0.7 },
             tokenLimitDetection: { enabled: false, confidenceScore: 0.7 },
             llmRule: { enabled: false, confidenceScore: 0.5, userPrompt: "" },
+            redactionRules: [],
             contentFiltering: {
                 promptAttacks: { level: "HIGH" },
                 code: null,
@@ -329,6 +333,7 @@ const GUARDRAIL_PRESETS = [
             sentimentDetection: { enabled: false, confidenceScore: 0.7 },
             tokenLimitDetection: { enabled: true, confidenceScore: 0.7 },
             llmRule: { enabled: false, confidenceScore: 0.5, userPrompt: "" },
+            redactionRules: [],
             contentFiltering: {
                 promptAttacks: { level: "HIGH" },
                 code: { level: "HIGH" },
@@ -429,6 +434,7 @@ const GUARDRAIL_PRESETS = [
             sentimentDetection: { enabled: false, confidenceScore: 0.7 },
             tokenLimitDetection: { enabled: true, confidenceScore: 0.7 },
             llmRule: { enabled: false, confidenceScore: 0.5, userPrompt: "" },
+            redactionRules: [],
             contentFiltering: {
                 promptAttacks: { level: "HIGH" },
                 code: null,
@@ -495,6 +501,7 @@ const GUARDRAIL_PRESETS = [
             sentimentDetection: { enabled: false, confidenceScore: 0.7 },
             tokenLimitDetection: { enabled: false, confidenceScore: 0.7 },
             llmRule: { enabled: false, confidenceScore: 0.5, userPrompt: "" },
+            redactionRules: [],
             contentFiltering: {
                 promptAttacks: { level: "HIGH" },
                 code: { level: "HIGH" },
@@ -554,6 +561,7 @@ const GUARDRAIL_PRESETS = [
             sentimentDetection: { enabled: false, confidenceScore: 0.7 },
             tokenLimitDetection: { enabled: false, confidenceScore: 0.7 },
             llmRule: { enabled: false, confidenceScore: 0.5, userPrompt: "" },
+            redactionRules: [],
             contentFiltering: {
                 promptAttacks: { level: "HIGH" },
                 code: { level: "HIGH" },
@@ -613,6 +621,7 @@ const GUARDRAIL_PRESETS = [
             sentimentDetection: { enabled: false, confidenceScore: 0.7 },
             tokenLimitDetection: { enabled: false, confidenceScore: 0.7 },
             llmRule: { enabled: false, confidenceScore: 0.5, userPrompt: "" },
+            redactionRules: [],
             contentFiltering: {
                 promptAttacks: { level: "HIGH" },
                 code: null,
@@ -672,6 +681,7 @@ const GUARDRAIL_PRESETS = [
             sentimentDetection: { enabled: false, confidenceScore: 0.7 },
             tokenLimitDetection: { enabled: false, confidenceScore: 0.7 },
             llmRule: { enabled: false, confidenceScore: 0.5, userPrompt: "" },
+            redactionRules: [],
             contentFiltering: {
                 promptAttacks: { level: "HIGH" },
                 code: { level: "HIGH" },
@@ -731,6 +741,7 @@ const GUARDRAIL_PRESETS = [
             sentimentDetection: { enabled: false, confidenceScore: 0.7 },
             tokenLimitDetection: { enabled: true, confidenceScore: 0.7 },
             llmRule: { enabled: false, confidenceScore: 0.5, userPrompt: "" },
+            redactionRules: [],
             contentFiltering: {
                 promptAttacks: { level: "HIGH" },
                 code: { level: "HIGH" },
@@ -790,6 +801,7 @@ const GUARDRAIL_PRESETS = [
             sentimentDetection: { enabled: false, confidenceScore: 0.7 },
             tokenLimitDetection: { enabled: false, confidenceScore: 0.7 },
             llmRule: { enabled: false, confidenceScore: 0.5, userPrompt: "" },
+            redactionRules: [],
             contentFiltering: {
                 promptAttacks: { level: "HIGH" },
                 code: null,
@@ -849,6 +861,7 @@ const GUARDRAIL_PRESETS = [
             sentimentDetection: { enabled: false, confidenceScore: 0.7 },
             tokenLimitDetection: { enabled: false, confidenceScore: 0.7 },
             llmRule: { enabled: false, confidenceScore: 0.5, userPrompt: "" },
+            redactionRules: [],
             contentFiltering: {
                 promptAttacks: { level: "HIGH" },
                 code: { level: "HIGH" },
@@ -908,6 +921,7 @@ const GUARDRAIL_PRESETS = [
             sentimentDetection: { enabled: false, confidenceScore: 0.7 },
             tokenLimitDetection: { enabled: true, confidenceScore: 0.7 },
             llmRule: { enabled: false, confidenceScore: 0.5, userPrompt: "" },
+            redactionRules: [],
             contentFiltering: {
                 promptAttacks: { level: "HIGH" },
                 code: { level: "HIGH" },
@@ -977,6 +991,7 @@ const GUARDRAIL_PRESETS = [
             sentimentDetection: { enabled: false, confidenceScore: 0.7 },
             tokenLimitDetection: { enabled: true, confidenceScore: 0.7 },
             llmRule: { enabled: false, confidenceScore: 0.5, userPrompt: "" },
+            redactionRules: [],
             contentFiltering: {
                 promptAttacks: { level: "HIGH" },
                 code: { level: "HIGH" },
@@ -1037,6 +1052,7 @@ const GUARDRAIL_PRESETS = [
             sentimentDetection: { enabled: false, confidenceScore: 0.7 },
             tokenLimitDetection: { enabled: true, confidenceScore: 0.7 },
             llmRule: { enabled: false, confidenceScore: 0.5, userPrompt: "" },
+            redactionRules: [],
             contentFiltering: {
                 promptAttacks: { level: "HIGH" },
                 code: { level: "HIGH" },

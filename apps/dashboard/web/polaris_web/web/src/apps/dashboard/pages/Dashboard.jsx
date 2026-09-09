@@ -81,12 +81,13 @@ function Dashboard() {
     }
 
     // Monitor NO_ACCESS alert flag
-    // Skip alert monitoring during onboarding since APIs may return 403 during setup
+    // Onboarding flow disabled - alert monitoring used to be skipped on /onboarding
+    // because its APIs could 403 during setup. Nothing routes there any more.
     useEffect(() => {
         selectItems([])
-        if (location.pathname.includes('/onboarding')) {
-            return;
-        }
+        // if (location.pathname.includes('/onboarding')) {
+        //     return;
+        // }
 
         const checkInterval = setInterval(() => {
             if (window.SHOW_NO_ACCESS_ALERT) {
@@ -109,10 +110,17 @@ function Dashboard() {
                 return dashboardFunc.sortAndFilterAlerts(trafficAlerts)
             })
         }
-    },[trafficAlerts.length])
+    },[trafficAlerts?.length])
 
     useEffect(() => {
-        if(((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)) && location.pathname !== "/dashboard/observe/inventory"){
+        // Agentic Assets (legacy) doesn't read allCollections/collectionsMap/hostNameMap/
+        // tagCollectionsMap at all (it fetches its own slim, paginated data) — same reasoning as
+        // the pre-existing Inventory exclusion below. Landing here first (direct URL/refresh) would
+        // otherwise fire this mount-once effect's full, unpaginated getAllCollections() (tens of MB
+        // on large accounts) purely to populate maps this page never reads.
+        const skipsAllCollectionsFetch = location.pathname === "/dashboard/observe/inventory"
+            || location.pathname === "/dashboard/observe/agentic-assets-legacy";
+        if(((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)) && !skipsAllCollectionsFetch){
             fetchAllCollections()
         }
         // Report pages (testing/summary/:reportId, issues/summary/:reportId, threat-detection/report/:reportId)
@@ -181,7 +189,7 @@ function Dashboard() {
     const handleOnDismiss = async(index) => {
         let alert = displayItems[index];
         let newTrafficFilters = []
-        trafficAlerts.forEach((a) => {
+        ;(Array.isArray(trafficAlerts) ? trafficAlerts : []).forEach((a) => {
             if(func.deepComparison(a, alert)){
                 a.lastDismissed = func.timeNow()
             }
@@ -196,7 +204,9 @@ function Dashboard() {
     const shouldShowWelcomeBackModal = window.IS_SAAS === "true" && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
 
     const isAskAiRoute = location.pathname.includes('/ask-ai')
-    const isOnboardingRoute = location.pathname.includes('/onboarding')
+    // Onboarding flow disabled - kept false so the no-access banner logic below is unchanged.
+    // const isOnboardingRoute = location.pathname.includes('/onboarding')
+    const isOnboardingRoute = false
 
     return (
         <div className={`dashboard ${isAskAiRoute ? 'ask-ai-route' : ''}`}>
@@ -257,7 +267,7 @@ function Dashboard() {
                         })}
                     </VerticalStack>
             </div> : null}
-            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary") || location.pathname.includes("report")) ?<div className="call-banner" style={{marginBottom: "1rem"}}>
+            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || /* onboarding disabled */ location.pathname.includes("summary") || location.pathname.includes("report")) ?<div className="call-banner" style={{marginBottom: "1rem"}}>
                 <Banner hideIcon={true}>
                     <Text variant="headingMd">Need a 1:1 experience?</Text>
                     <Button plain monochrome onClick={() => {
@@ -265,7 +275,7 @@ function Dashboard() {
                     }}><Text variant="bodyMd">Book a call</Text></Button>
                 </Banner>
             </div> : null}
-            {window.TRIAL_MSG && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner">
+            {window.TRIAL_MSG && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || /* onboarding disabled */ location.pathname.includes("summary")) ?<div className="call-banner">
                 <Banner hideIcon={true}>
                     <Text variant="bodyMd">{window.TRIAL_MSG}</Text>
                 </Banner>

@@ -1,4 +1,4 @@
-import { parsePromptText, parseResponseText, parseTokens, parseModel } from "./constants";
+import { parsePromptText, parseResponseText, parseTokens, parseModel, parseDuration } from "./constants";
 
 // Bucket items into numBuckets time slots.
 // Returns { counts, timestamps } where timestamps are the bucket midpoints in epoch seconds.
@@ -67,8 +67,9 @@ export function enrichRow(row) {
     const promptText   = parsePromptText(row.queryPayload)   || row._promptText   || "";
     const responseText = parseResponseText(row.responsePayload) || row._responseText || "";
 
-    // Normalize duration — backend may return duration / latency / duration_ms
-    const durationMs = Number(row.durationMs || row.duration || row.latency || row.duration_ms || 0);
+    // Normalize duration — backend may return duration / latency / duration_ms, else parse the payload
+    const durationMs = Number(row.durationMs || row.duration || row.latency || row.duration_ms || 0)
+        || parseDuration(row);
 
     // Normalize latestTimestamp — some sources (e.g. flat prompt rows) only have timestamp
     const latestTimestamp = row.latestTimestamp || row.timestamp || 0;

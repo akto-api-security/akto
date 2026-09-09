@@ -28,8 +28,10 @@ import com.akto.dto.APIConfig;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.AktoDataType;
+import com.akto.dto.AgenticUsers;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.CopilotStudioIntegration;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.Log;
@@ -591,5 +593,18 @@ public class DbLayer {
 
     public static List<ApiSequences> fetchApiSequences(int skip) {
         return ApiSequencesDao.instance.findAll(new BasicDBObject(), skip, API_SEQUENCES_BATCH_SIZE, null);
+    }
+
+    // Copilot Studio agent_users sync (CopilotStudioAgentUsersCron)
+    public static List<CopilotStudioIntegration> fetchCopilotStudioIntegrations() {
+        return CopilotStudioIntegrationDao.instance.findAll(new BasicDBObject());
+    }
+
+    public static List<AgenticUsers> fetchAllAgentUsers() {
+        return AgentUsersDao.instance.findAll(new BasicDBObject());
+    }
+
+    public static void bulkUpsertAgentUserExternalIdentities(List<AgenticUsers> updates) {
+        AgentUsersDao.instance.bulkUpsertExternalIdentities(updates);
     }
 }

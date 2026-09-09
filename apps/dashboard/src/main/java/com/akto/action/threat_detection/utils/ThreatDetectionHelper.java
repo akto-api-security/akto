@@ -12,7 +12,6 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.util.EntityUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -78,6 +77,19 @@ public class ThreatDetectionHelper {
             Filter.Builder filter,
             String status,
             String jiraTicketUrl) {
+        return updateMaliciousEvent(httpClient, backendUrl, apiToken, eventId, eventIds, filter, status, jiraTicketUrl, null);
+    }
+
+    public static UpdateResult updateMaliciousEvent(
+            CloseableHttpClient httpClient,
+            String backendUrl,
+            String apiToken,
+            String eventId,
+            List<String> eventIds,
+            Filter.Builder filter,
+            String status,
+            String jiraTicketUrl,
+            String humanResponse) {
 
         try {
             HttpPost post = new HttpPost(
@@ -111,6 +123,10 @@ public class ThreatDetectionHelper {
                 requestBuilder.setJiraTicketUrl(jiraTicketUrl);
             }
 
+            if (!StringUtils.isEmpty(humanResponse)) {
+                requestBuilder.setHumanResponse(humanResponse);
+            }
+
             UpdateMaliciousEventStatusRequest request = requestBuilder.build();
 
             String msg = ProtoMessageUtils.toString(request).orElse("{}");
@@ -118,7 +134,7 @@ public class ThreatDetectionHelper {
             post.setEntity(requestEntity);
 
             try (CloseableHttpResponse resp = httpClient.execute(post)) {
-                String responseBody = EntityUtils.toString(resp.getEntity());
+                String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
                 if (resp.getStatusLine().getStatusCode() != 200) {
                     String errorMsg = "Failed to update malicious event: " + responseBody;

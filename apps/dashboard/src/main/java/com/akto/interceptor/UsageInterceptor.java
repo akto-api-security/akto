@@ -80,24 +80,24 @@ public class UsageInterceptor extends AbstractInterceptor {
                 FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(feature, FeatureAccess.noAccess);
                 featureAccess.setGracePeriod(gracePeriod);
 
-                if (UsageInterceptorUtil.checkContextSpecificFeatureAccess(invocation, feature)) {
+                // if (UsageInterceptorUtil.checkContextSpecificFeatureAccess(invocation, feature)) {
 
-                    /*
-                     * if the feature doesn't exist in the entitlements map,
-                     * then the user is unauthorized to access the feature
-                     */
-                    if (!featureAccess.getIsGranted()) {
-                        ((ActionSupport) invocation.getAction())
-                                .addActionError("This feature is not available in your plan.");
-                        return UNAUTHORIZED;
-                    }
-                    if (featureAccess.checkInvalidAccess()) {
-                        ((ActionSupport) invocation.getAction())
-                                .addActionError("You have exceeded the limit of this feature.");
-                        return UNAUTHORIZED;
-                    }
+                //     /*
+                //      * if the feature doesn't exist in the entitlements map,
+                //      * then the user is unauthorized to access the feature
+                //      */
+                //     if (!featureAccess.getIsGranted()) {
+                //         ((ActionSupport) invocation.getAction())
+                //                 .addActionError("This feature is not available in your plan.");
+                //         return UNAUTHORIZED;
+                //     }
+                //     if (featureAccess.checkInvalidAccess()) {
+                //         ((ActionSupport) invocation.getAction())
+                //                 .addActionError("You have exceeded the limit of this feature.");
+                //         return UNAUTHORIZED;
+                //     }
 
-                }
+                // }
             }
 
 

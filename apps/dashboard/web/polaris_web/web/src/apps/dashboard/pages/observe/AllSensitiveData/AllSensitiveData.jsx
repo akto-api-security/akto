@@ -158,6 +158,9 @@ function AllSensitiveData() {
     // const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const navigate = useNavigate()
     const collectionsMap = PersistStore((state) => state.collectionsMap)
+    const filtersMap = PersistStore((state) => state.filtersMap)
+    const setFiltersMap = PersistStore((state) => state.setFiltersMap)
+    const [tableKey, setTableKey] = useState(0)
     const [summaryInfo, setSummaryInfo] = useState({
         totalAPIs: 0,
         sensitiveMarked: 0,
@@ -208,10 +211,27 @@ function AllSensitiveData() {
             let text = func.toSentenceCase(x)
             const value =  severityMap[x]
             dataArr.push({
-                text, value, color
+                text, value, color, filterKey: x
             })
         })
         return dataArr
+    }
+
+    // Clicking a severity bar applies the table's own Priority filter, so it shows up as a
+    // removable filter chip. The table reads filtersMap only on mount, hence the remount key.
+    const handleSeverityClick = (_label, custom) => {
+        const severity = custom?.filterKey
+        if (!severity) return
+        const pageKey = window.location.pathname + "/" + window.location.hash
+        const prevFilters = (filtersMap[pageKey]?.filters || []).filter((f) => f.key !== "priorityText")
+        setFiltersMap({
+            ...filtersMap,
+            [pageKey]: {
+                filters: [...prevFilters, { key: "priorityText", value: [severity] }],
+                sort: filtersMap[pageKey]?.sort || [],
+            },
+        })
+        setTableKey((k) => k + 1)
     }
 
     const fetchData = async() => {
@@ -356,6 +376,7 @@ function AllSensitiveData() {
                         barWidth={100}
                         barGap={12}
                         showGridLines={true}
+                        onBarClick={handleSeverityClick}
                     />
                 }
             />
@@ -372,6 +393,7 @@ function AllSensitiveData() {
                             dataTableWidth="270px" 
                             boxPadding={0}
                             pieInnerSize="50%"
+                            navUrl={"/dashboard/observe/sensitive/"}
                         />
                     </Box>
                 }
@@ -386,7 +408,7 @@ function AllSensitiveData() {
          />,
          graphComponents,
         <GithubSimpleTable
-            key="table"
+            key={`table-${tableKey}`}
             data={data[selectedTab]} 
             sortOptions={sortOptions} 
             resourceName={resourceName} 

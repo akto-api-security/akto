@@ -36,6 +36,8 @@ export default {
                 serviceIds:       filters?.serviceId || [],
                 topicFilters:     filters?.topic     || [],
                 subTopicFilters:  filters?.subTopic  || [],
+                guardrailFilters:       (filters?.hasActiveGuardrail  || []).map(String),
+                guardrailPolicyFilters: filters?.guardrailPolicy || [],
                 searchString:     searchString.length >= 3 ? searchString : "",
             },
         }).then(r => ({
@@ -100,6 +102,7 @@ export default {
             totalInputTokens:  r?.aggInputTokens      || 0,
             totalOutputTokens: r?.aggOutputTokens     || 0,
             topUsers:          r?.aggTopUsers         || [],
+            topModels:         r?.aggTopModels        || [],
             userBreakdown:     r?.aggUserBreakdown    || [],
             sessionSpark:      r?.aggSessionSpark?.length      ? r.aggSessionSpark      : [0],
             sessionSparkTs:    r?.aggSessionSparkTs            || [],
@@ -136,11 +139,12 @@ export default {
         }).then(r => {
             const fc = r?.filterChoices ?? r ?? {};
             return {
-                userName:  fc?.userName  || [],
-                deviceId:  fc?.deviceId  || [],
-                serviceId: fc?.serviceId || [],
-                topic:     fc?.topic     || [],
-                subTopic:  fc?.subTopic  || [],
+                userName:        fc?.userName        || [],
+                deviceId:        fc?.deviceId        || [],
+                serviceId:       fc?.serviceId       || [],
+                topic:           fc?.topic           || [],
+                subTopic:        fc?.subTopic        || [],
+                guardrailPolicy: fc?.guardrailPolicy || [],
             };
         });
     },

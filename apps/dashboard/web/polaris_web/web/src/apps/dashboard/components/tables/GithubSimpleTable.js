@@ -5,7 +5,7 @@ import tableFunc from "./transform";
 function GithubSimpleTable(props) {
 
     const [filters, setFilters] = useState([])
-    const tableKey = props.hardCodedKey ? "hardCodedKey" : `table_${props.selected ?? ''}_${props.data?.length || 0}`;
+    const tableKey = props.hardCodedKey ? "hardCodedKey" : `table_${props.data?.length || 0}`;
     
     const fetchFunction = props.prettifyPageData
         ? (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) =>
@@ -16,6 +16,8 @@ function GithubSimpleTable(props) {
     return <GithubServerTable
         key={tableKey}
         pageLimit={props.pageLimit}
+        pageSizeOptions={props.pageSizeOptions}
+        hidePageSizeSelector={props.hidePageSizeSelector}
         fetchData={fetchFunction}
         sortOptions={props.sortOptions}
         resourceName={props.resourceName}
@@ -28,6 +30,8 @@ function GithubSimpleTable(props) {
         loading={props.loading}
         loadingText={props.loadingText}
         selectable = {props.selectable}
+        initialSelectedResourceIds={props.initialSelectedResourceIds}
+        callFromOutside={props.callFromOutside}
         rowClickable={props.rowClickable}
         promotedBulkActions = {props.promotedBulkActions}
         hideQueryField={props.hideQueryField}

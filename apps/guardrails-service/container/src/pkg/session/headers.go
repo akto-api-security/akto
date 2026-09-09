@@ -16,13 +16,28 @@ func ExtractSessionID(headers map[string]string) string {
 		"X-Akto-Installer-Akto_session_id", "x-akto-installer-akto_session_id", // Akto CLI hooks
 		"x-session-id", "X-Session-Id",
 		"x-conversation-id", "X-Conversation-Id",
-		"authorization", "Authorization",
 		"x-user-id", "X-User-Id",
 	}
 
 	for _, key := range candidates {
 		if val, ok := headers[key]; ok && val != "" {
-			return sanitizeSessionID(key, val)
+			return sanitizeSessionID(val)
+		}
+	}
+	return ""
+}
+
+// ExtractInstallerUserEmail extracts the installer-supplied user email, used to resolve
+// which devices a request's user is associated with for device-targeted policies. Checked
+// both http.Header-canonicalized and raw lowercase (stdio custom-header maps) forms.
+func ExtractInstallerUserEmail(headers map[string]string) string {
+	candidates := []string{
+		"X-Akto-Installer-User_email", "x-akto-installer-user_email",
+	}
+
+	for _, key := range candidates {
+		if val, ok := headers[key]; ok && val != "" {
+			return val
 		}
 	}
 	return ""
@@ -46,13 +61,7 @@ func ExtractRequestID(headers map[string]string) string {
 	return ""
 }
 
-func sanitizeSessionID(headerName, value string) string {
-	// Remove "Bearer " prefix from authorization header
-	if strings.ToLower(headerName) == "authorization" {
-		value = strings.TrimPrefix(value, "Bearer ")
-		value = strings.TrimPrefix(value, "bearer ")
-	}
-
+func sanitizeSessionID(value string) string {
 	// Hash if too long (>100 chars)
 	if len(value) > 100 {
 		hash := sha256.Sum256([]byte(value))

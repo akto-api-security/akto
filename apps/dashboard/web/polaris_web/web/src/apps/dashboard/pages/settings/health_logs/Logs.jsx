@@ -18,6 +18,7 @@ import LogsContainer from "./LogsContainer";
 import Dropdown from "../../../components/layouts/Dropdown"
 import { saveAs } from 'file-saver'
 import { ALL_STORED_LOG_KEYS, STORED_LOG_KEY_OPTIONS } from "./logKeysConstants"
+import { isDastCategory } from "@/apps/main/labelHelper"
 
 const Logs = () => {
     const fiveMins = 1000 * 60 * 5
@@ -52,6 +53,8 @@ const Logs = () => {
         { label: "AWS API Gateway", value: "AWS_API_GATEWAY" },
         { label: "Guardrails Service", value: "GUARDRAILS_SERVICE" },
         {label: "Smart Testing", value: "SMART_TESTING"},
+        // dast_logs is only populated for DAST deployments, so hide the option elsewhere.
+        ...(isDastCategory() ? [{ label: "DAST", value: "DAST" }] : []),
     ];
   
     const handleSelectLogGroup = (logGroup) => {
@@ -62,12 +65,12 @@ const Logs = () => {
     const displayedLogData = useMemo(() => {
         const q = logSearchQuery.trim().toLowerCase()
         if (!q) {
-            return logs.logData
+            return [...logs.logData].reverse()
         }
         return logs.logData.filter((entry) => {
             const line = `${func.epochToDateTime(entry.timestamp)} ${entry.log ?? ''}`.toLowerCase()
             return line.includes(q)
-        })
+        }).reverse()
     }, [logs.logData, logSearchQuery])
 
     const fetchLogsFromDb = useCallback(async (startTime, endTime, refresh = false) => {

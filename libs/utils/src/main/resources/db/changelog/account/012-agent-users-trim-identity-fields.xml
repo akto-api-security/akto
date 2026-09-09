@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        AgentUsersDao now trims userEmail/teamName/userRole on every read and write (identity
+        matching in upsertTagFromSso compares these values verbatim), so a stray leading/trailing
+        space on an existing document would silently fail to match and create a duplicate
+        fragment instead of updating in place. Backfill existing agent_users documents so their
+        stored values are already trimmed.
+
+        Uses a pipeline-style update ($trim only applied when the field is actually a string) so
+        missing/null fields are left untouched instead of being coerced to null. Idempotent: a
+        second run trims already-trimmed strings to themselves.
+
+        Not reversible — the original untrimmed whitespace isn't recoverable, and trimming loses
+        no information the application treats as significant.
+    -->
+
+    <changeSet id="012-account-agent-users-trim-identity-fields" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="agent_users"/>
+        </preConditions>
+        <mongodb:runCommand>
+            <mongodb:command>{
+                "update": "agent_users",
+                "updates": [
+                    {
+                        "q": {},
+                        "u": [
+                            {
+                                "$set": {
+                                    "userEmail": { "$cond": [ { "$eq": [ { "$type": "$userEmail" }, "string" ] }, { "$trim": { "input": "$userEmail" } }, "$userEmail" ] },
+                                    "teamName": { "$cond": [ { "$eq": [ { "$type": "$teamName" }, "string" ] }, { "$trim": { "input": "$teamName" } }, "$teamName" ] },
+                                    "userRole": { "$cond": [ { "$eq": [ { "$type": "$userRole" }, "string" ] }, { "$trim": { "input": "$userRole" } }, "$userRole" ] },
+                                    "ssoTeamName": { "$cond": [ { "$eq": [ { "$type": "$ssoTeamName" }, "string" ] }, { "$trim": { "input": "$ssoTeamName" } }, "$ssoTeamName" ] },
+                                    "ssoUserRole": { "$cond": [ { "$eq": [ { "$type": "$ssoUserRole" }, "string" ] }, { "$trim": { "input": "$ssoUserRole" } }, "$ssoUserRole" ] }
+                                }
+                            }
+                        ],
+                        "multi": true
+                    }
+                ]
+            }</mongodb:command>
+        </mongodb:runCommand>
+        <rollback/>
+    </changeSet>
+
+</databaseChangeLog>

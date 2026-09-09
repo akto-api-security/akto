@@ -25,18 +25,18 @@ const api = {
         })
     },
 
-    importDataFromPostmanFile(postmanCollectionFile, allowReplay, miniTestingName) {
+    importDataFromPostmanFile(postmanCollectionFile, allowReplay, miniTestingName, forceCreateCollection) {
         return request({
             url: '/api/importDataFromPostmanFile',
             method: 'post',
-            data: {postmanCollectionFile, allowReplay, miniTestingName}
+            data: {postmanCollectionFile, allowReplay, miniTestingName, forceCreateCollection}
         })
     },
-    importPostmanWorkspace(workspace_id, allowReplay, api_key, miniTestingName) {
+    importPostmanWorkspace(workspace_id, allowReplay, api_key, miniTestingName, forceCreateCollection) {
         return request({
             url: '/api/importPostmanWorkspace',
             method: 'post',
-            data: {workspace_id, allowReplay, api_key, miniTestingName}
+            data: {workspace_id, allowReplay, api_key, miniTestingName, forceCreateCollection}
         })
     },
 
@@ -499,6 +499,62 @@ const api = {
             url: '/api/executeCrowdStrikeGuardrails',
             method: 'post',
             data: { guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailDeviceIds }
+        })
+    },
+
+    scheduleCrowdStrikeDiscovery(discoveryTargetMode, discoveryDeviceIds) {
+        return request({
+            url: '/api/scheduleCrowdStrikeDiscovery',
+            method: 'post',
+            data: { discoveryTargetMode, discoveryDeviceIds }
+        })
+    },
+
+    initiateCopilotStudioMultiEnvSetup(tenantId, clientId, clientSecret, dataIngestionUrl) {
+        return request({
+            url: '/api/copilotStudio/multiEnv/initiate',
+            method: 'post',
+            data: { tenantId, clientId, clientSecret, dataIngestionUrl }
+        })
+    },
+
+    fetchCopilotStudioMultiEnvIntegration(integrationId) {
+        return request({
+            url: '/api/copilotStudio/fetchMultiEnvIntegration',
+            method: 'post',
+            data: { integrationId }
+        })
+    },
+
+    confirmCopilotStudioMultiEnvIntegration(integrationId) {
+        return request({
+            url: '/api/copilotStudio/multiEnv/confirm',
+            method: 'post',
+            data: { integrationId }
+        })
+    },
+
+    removeCopilotStudioMultiEnvIntegration() {
+        return request({
+            url: '/api/copilotStudio/multiEnv/remove',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    reconnectCopilotStudioMultiEnvIntegration() {
+        return request({
+            url: '/api/copilotStudio/multiEnv/reconnect',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    enableCopilotStudioMultiEnvAgentGraph() {
+        return request({
+            url: '/api/copilotStudio/multiEnv/enableAgentGraph',
+            method: 'post',
+            data: {}
         })
     },
 

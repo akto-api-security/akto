@@ -30,13 +30,16 @@ import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.audit_logs.Operation;
 import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dao.RBACDao;
+import com.akto.dao.CustomRoleDao;
+import com.akto.dto.RBAC;
+import com.akto.dto.CustomRole;
 import com.mongodb.MongoCommandException;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.RuntimeListener;
@@ -72,8 +75,6 @@ import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.type.URLMethods;
 import com.akto.utils.scripts.AcesssTypeCollectionLevel;
-import com.akto.dao.ApiCollectionIconsDao;
-import com.akto.dto.ApiCollectionIcon;
 import com.akto.gpt.handlers.gpt_prompts.AgentGuardSystemPromptClassifier;
 import com.akto.gpt.handlers.gpt_prompts.AzureOpenAIPromptHandler;
 import com.mongodb.client.model.Projections;
@@ -407,6 +408,8 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchAllCollectionsBasic() throws Exception {
         long start = System.currentTimeMillis();
+        User user = getSUser();
+        String loggedInUser = (user != null && user.getLogin() != null) ? user.getLogin() : "system";
 
         // For account 1736798101, serve from cache if available and fresh
         if (Context.accountId.get() == CACHED_ACCOUNT_ID) {
@@ -417,7 +420,7 @@ public class ApiCollectionsAction extends UserAction {
                 httpResponse.setContentType("application/json");
                 httpResponse.setCharacterEncoding("UTF-8");
                 httpResponse.getOutputStream().write(cached);
-                loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] served from cache in " + (System.currentTimeMillis() - start) + "ms, bytes=" + cached.length);
+                loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] served from cache in " + (System.currentTimeMillis() - start) + "ms, bytes=" + cached.length+ ", loggedInUser=" + loggedInUser);
                 return Action.NONE;
             }
         }
@@ -434,7 +437,7 @@ public class ApiCollectionsAction extends UserAction {
                 "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
                 "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType"
         ));
-        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] findAll took " + (System.currentTimeMillis() - stepStart) + "ms, size=" + this.apiCollections.size());
+        loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] findAll took " + (System.currentTimeMillis() - stepStart) + "ms, size=" + this.apiCollections.size()+ ", loggedInUser=" + loggedInUser);
         stepStart = System.currentTimeMillis();
 
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
@@ -482,6 +485,62 @@ public class ApiCollectionsAction extends UserAction {
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] Jackson serialization took " + (System.currentTimeMillis() - stepStart) + "ms");
 
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] TOTAL took " + (System.currentTimeMillis() - start) + "ms");
+        return Action.NONE;
+    }
+
+    // Deliberately NOT named "hostNames"/"hostnames" — this class already has an unrelated
+    // "hostnames" field (line ~2348, on-demand icon fetching) and Struts binds request params by
+    // exact property name, so a near-identical name here would be a silent footgun.
+    @Setter
+    private List<String> deviceHostNames;
+
+    // Same response shape as fetchAllCollectionsBasic (reuses ApiCollectionBasicMixin so the
+    // frontend's existing transformRawCollectionData/categorizeCollections pipeline needs no
+    // changes), but scoped to a specific hostName list via a real DB-level $in filter instead of
+    // findAll(Filters.empty()) — for callers that only need a handful of collections (e.g. one
+    // device's endpoint tree in ApiCollections.jsx/AgentEndpointTreeTable.jsx) and shouldn't pay
+    // for loading the whole account, which doesn't scale to accounts with thousands of collections.
+    public String fetchCollectionsBasicForHostNames() throws Exception {
+        long start = System.currentTimeMillis();
+        if (deviceHostNames == null || deviceHostNames.isEmpty()) {
+            HttpServletResponse httpResponse = ServletActionContext.getResponse();
+            httpResponse.setContentType("application/json");
+            httpResponse.setCharacterEncoding("UTF-8");
+            new ObjectMapper().writeValue(httpResponse.getOutputStream(), Collections.singletonMap("apiCollections", Collections.emptyList()));
+            return Action.NONE;
+        }
+
+        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(ApiCollection.HOST_NAME, deviceHostNames), Projections.exclude(
+                "urls", "conditions", "serviceGraphEdges", "hostNames", "serviceTag",
+                "sampleCollectionsDropped", "redact", "runDependencyAnalyser",
+                "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
+                "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType"
+        ));
+
+        this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+
+        for (ApiCollection c : this.apiCollections) {
+            List<CollectionTags> tags = c.getTagsList();
+            if (tags != null) {
+                for (CollectionTags tag : tags) {
+                    tag.setLastUpdatedTs(0);
+                    tag.setSource(null);
+                }
+            }
+        }
+
+        com.akto.util.IconUtils.processIconsForCollections(this.apiCollections);
+
+        HttpServletResponse httpResponse = ServletActionContext.getResponse();
+        httpResponse.setContentType("application/json");
+        httpResponse.setCharacterEncoding("UTF-8");
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.addMixIn(ApiCollection.class, ApiCollectionBasicMixin.class);
+        Map<String, Object> responseBody = new HashMap<>();
+        responseBody.put("apiCollections", this.apiCollections);
+        mapper.writeValue(httpResponse.getOutputStream(), responseBody);
+
+        loggerMaker.infoAndAddToDb("[fetchCollectionsBasicForHostNames] TOTAL took " + (System.currentTimeMillis() - start) + "ms, hostNames=" + deviceHostNames.size() + ", found=" + this.apiCollections.size());
         return Action.NONE;
     }
 
@@ -664,6 +723,34 @@ public class ApiCollectionsAction extends UserAction {
         SensitiveParamInfoDao.instance.updateMany(filter, update);
 
         /*
+         * Access grants reference collections by id. Without pulling the deleted ids out
+         * here they stay in the role/user documents forever, inflating the collection
+         * counts shown in settings and leaving stale grants behind.
+         * rbac is a common (cross-account) collection, so it must be scoped by accountId.
+         */
+        int accountIdForRbac = Context.accountId.get();
+        List<Integer> affectedUserIds = new ArrayList<>();
+        try {
+            for (RBAC rbac : RBACDao.instance.findAll(Filters.and(
+                    Filters.eq(RBAC.ACCOUNT_ID, accountIdForRbac),
+                    Filters.in(RBAC.API_COLLECTIONS_ID, apiCollectionIds)))) {
+                affectedUserIds.add(rbac.getUserId());
+            }
+
+            CustomRoleDao.instance.updateMany(
+                    Filters.in(CustomRole.API_COLLECTIONS_ID, apiCollectionIds),
+                    Updates.pullAll(CustomRole.API_COLLECTIONS_ID, apiCollectionIds));
+
+            RBACDao.instance.updateMany(
+                    Filters.and(
+                            Filters.eq(RBAC.ACCOUNT_ID, accountIdForRbac),
+                            Filters.in(RBAC.API_COLLECTIONS_ID, apiCollectionIds)),
+                    Updates.pullAll(RBAC.API_COLLECTIONS_ID, apiCollectionIds));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error pruning deleted collections from access grants");
+        }
+
+        /*
          * This delta might not be accurate, since it may also include deletions from
          * deactivated/demo collections or old collections, which were not being used
          * for usage calculation
@@ -693,6 +780,12 @@ public class ApiCollectionsAction extends UserAction {
             int userId = Context.userId.get();
             int accountId = Context.accountId.get();
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
+
+            // grants changed above for these users, so their cached lists are stale too
+            for (int affectedUserId : affectedUserIds) {
+                UsersCollectionsList.deleteCollectionIdsFromCache(affectedUserId, accountIdForRbac);
+                RBACDao.instance.deleteUserEntryFromCache(new Pair<>(affectedUserId, accountIdForRbac));
+            }
 
             // remove the cache of context collections for account
             UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
@@ -1552,6 +1645,12 @@ public class ApiCollectionsAction extends UserAction {
 
             RBACDao.updateApiCollectionAccess(userId, accountId, apiCollections);
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
+            /*
+             * The collection list is read back through getCurrentRBACForUser, which caches
+             * the whole RBAC document. Without this the caller keeps seeing the pre-save
+             * list until that cache expires.
+             */
+            RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userId, accountId));
         }
 
         return SUCCESS.toUpperCase();

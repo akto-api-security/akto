@@ -2,6 +2,10 @@ package com.akto;
 
 import com.akto.dao.*;
 import com.akto.dao.agentic_sessions.UserAnalysisDataDao;
+import com.akto.dao.insights.InsightNarrativeCacheDao;
+import com.akto.dao.insights.InsightClassificationCacheDao;
+import com.akto.dto.insights.InsightNarrativeCache;
+import com.akto.dto.insights.InsightClassificationCache;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.nhi_governance.NhiIdentityDao;
 import com.akto.dao.nhi_governance.NhiPolicyDao;
@@ -340,6 +344,8 @@ public class DaoInit {
         ClassModel<ApiSequences> apiSequencesClassModel = ClassModel.builder(ApiSequences.class).enableDiscriminator(true).build();
         ClassModel<EndpointShieldLog> endpointShieldLogClassModel = ClassModel.builder(EndpointShieldLog.class).enableDiscriminator(true).build();
         ClassModel<GuardrailPolicies> guardrailPoliciesClassModel = ClassModel.builder(GuardrailPolicies.class).enableDiscriminator(true).build();
+        ClassModel<InsightNarrativeCache> insightNarrativeCacheClassModel = ClassModel.builder(InsightNarrativeCache.class).enableDiscriminator(true).build();
+        ClassModel<InsightClassificationCache> insightClassificationCacheClassModel = ClassModel.builder(InsightClassificationCache.class).enableDiscriminator(true).build();
         ClassModel<McpAllowlist> mcpAllowlistClassModel = ClassModel.builder(McpAllowlist.class).enableDiscriminator(true).build();
         ClassModel<McpRegistryConfig> mcpRegistryConfigClassModel = ClassModel.builder(McpRegistryConfig.class).enableDiscriminator(true).build();
         ClassModel<IpReputationScore> ipReputationScoreClassModel = ClassModel.builder(IpReputationScore.class).enableDiscriminator(true).build();
@@ -360,6 +366,7 @@ public class DaoInit {
         ClassModel<NewRelicIntegration> newRelicIntegrationClassModel = ClassModel.builder(NewRelicIntegration.class).enableDiscriminator(true).build();
         ClassModel<OpenTelemetryIntegration> openTelemetryIntegrationClassModel = ClassModel.builder(OpenTelemetryIntegration.class).enableDiscriminator(true).build();
         ClassModel<ModelConfig> modelConfigClassModel = ClassModel.builder(ModelConfig.class).enableDiscriminator(true).build();
+        ClassModel<CopilotStudioIntegration> copilotStudioIntegrationClassModel = ClassModel.builder(CopilotStudioIntegration.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -405,7 +412,8 @@ public class DaoInit {
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
                 traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
                 wizIntegrationClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel, wizApiEndpointsImportJobParamsClassModel,
-                mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel, newRelicIntegrationClassModel, modelConfigClassModel, openTelemetryIntegrationClassModel)
+                mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel, newRelicIntegrationClassModel, modelConfigClassModel,
+                openTelemetryIntegrationClassModel, copilotStudioIntegrationClassModel, insightNarrativeCacheClassModel, insightClassificationCacheClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -468,7 +476,8 @@ public class DaoInit {
                 new EnumCodec<>(McpRegistryConfig.RegistryType.class),
                 new EnumCodec<>(McpAllowlist.Source.class),
                 new EnumCodec<>(GuardrailPolicies.ModelRole.class),
-                new EnumCodec<>(Log.ActivityType.class)
+                new EnumCodec<>(Log.ActivityType.class),
+                new EnumCodec<>(CopilotStudioIntegration.Status.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
@@ -504,6 +513,7 @@ public class DaoInit {
         }
 
         OrganizationsDao.createIndexIfAbsent();
+        CommonOrganisationMappingDao.instance.createIndexIfAbsent();
         UsageMetricsDao.createIndexIfAbsent();
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         TrafficMetricsDao.instance.createIndicesIfAbsent();
@@ -568,8 +578,11 @@ public class DaoInit {
         IpReputationScoreDao.instance.createIndicesIfAbsent();
         ApiCollectionIconsDao.instance.createIndicesIfAbsent();
         UserAnalysisDataDao.instance.createIndicesIfAbsent();
+        InsightNarrativeCacheDao.instance.createIndicesIfAbsent();
+        InsightClassificationCacheDao.instance.createIndicesIfAbsent();
         AgentUsersDao.instance.createIndicesIfAbsent();
         OAuthStatesDao.instance.createIndicesIfAbsent();
+        CopilotStudioIntegrationDao.instance.createIndicesIfAbsent();
         AgentGuardCorpusDao.instance.createIndicesIfAbsent();
         AgentGuardCorpusQueueDao.instance.createIndicesIfAbsent();
     }

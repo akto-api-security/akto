@@ -5,6 +5,7 @@ import com.akto.dao.RBACDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.RBAC;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.Constants;
@@ -16,6 +17,8 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -29,10 +32,16 @@ import org.slf4j.LoggerFactory;
 public class UsersCollectionsList {
     private static final ConcurrentHashMap<Pair<Integer, Integer>, Pair<List<Integer>, Integer>> usersCollectionMap = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<Pair<Integer, CONTEXT_SOURCE>, Pair<Set<Integer>, Integer>> contextCollectionsMap = new ConcurrentHashMap<>();
+    private static final Set<Integer> RBAC_DEBUG_ACCOUNT_IDS = Collections.unmodifiableSet(
+            new HashSet<>(Arrays.asList(1737014476, 1726615470, 1000000)));
     private static final int EXPIRY_TIME = 15 * 60;
     private static final int CONTEXT_EXPIRY_TIME = 120;
 
     private static final Logger logger = LoggerFactory.getLogger(UsersCollectionsList.class);
+
+    public static boolean isRbacDebugAccount(int accountId) {
+        return RBAC_DEBUG_ACCOUNT_IDS.contains(accountId);
+    }
 
     public static void deleteCollectionIdsFromCache(int userId, int accountId) {
         Pair<Integer, Integer> key = new Pair<>(userId, accountId);
@@ -54,8 +63,10 @@ public class UsersCollectionsList {
         Pair<Integer, Integer> key = new Pair<>(userId, accountId);
         Pair<List<Integer>, Integer> collectionIdEntry = usersCollectionMap.get(key);
         List<Integer> collectionList = new ArrayList<>();
+        boolean fromCache = true;
         
         if(collectionIdEntry == null || (Context.now() - collectionIdEntry.getSecond() > EXPIRY_TIME)) {
+            fromCache = false;
             Organization organization = OrganizationsDao.instance.findOne(
                 Filters.in(Organization.ACCOUNTS, accountId));
 
@@ -83,25 +94,63 @@ public class UsersCollectionsList {
             collectionList = collectionIdEntry.getFirst();
         }
 
+        Integer rbacResolvedSize = collectionList == null ? null : collectionList.size();
+
         // since this function is used everywhere for the queries, taking context collections into account here
         Set<Integer> contextCollections = getContextCollectionsForUser(accountId, Context.contextSource.get());
+        int contextSize = contextCollections == null ? 0 : contextCollections.size();
+        String branch;
         if(collectionList == null) {
             // ADMIN role - see all collections in the current scope
+            branch = "admin_all_in_scope";
             collectionList = contextCollections != null ? contextCollections.stream()
                     .collect(Collectors.toList()) : new ArrayList<>();
         } else if (collectionList.isEmpty()) {
             // Non-admin with NO explicit collections - see all collections in their product scope
+            branch = "empty_list_all_in_scope";
             collectionList = contextCollections != null ? new ArrayList<>(contextCollections) : new ArrayList<>();
         } else if (contextCollections != null && !contextCollections.isEmpty()) {
             // Non-admin with explicit collections - see intersection of their collections AND their product scope
+            branch = "intersection";
             collectionList = collectionList.stream()
                     .filter(contextCollections::contains)
                     .collect(Collectors.toList());
         } else {
             // contextCollections is null or empty - no collections for this scope
+            branch = "no_context_collections";
             collectionList = new ArrayList<>();
         }
+        try {
+            logCollectionAccess(userId, accountId, fromCache, rbacResolvedSize, contextSize, collectionList.size(), branch);
+        } catch (Exception ignored) {
+        }
         return collectionList;
+    }
+
+    private static void logCollectionAccess(int userId, int accountId, boolean fromCache,
+            Integer rbacResolvedSize, int contextSize, int finalSize, String branch) {
+        if (!isRbacDebugAccount(accountId) || finalSize > 0) {
+            return;
+        }
+        CONTEXT_SOURCE source = Context.contextSource.get();
+        String sourceName = source == null ? "API" : source.name();
+
+        RBAC rbac = RBACDao.getCurrentRBACForUser(userId, accountId);
+        String storedRole = rbac == null ? "null" : rbac.getRole();
+        String fetchRole = rbac == null ? "null" : RBACDao.instance.fetchRole(rbac);
+        String mapping = "none";
+        int pinnedSize = -1;
+        if (rbac != null) {
+            if (rbac.getScopeRoleMapping() != null && !rbac.getScopeRoleMapping().isEmpty()) {
+                mapping = rbac.getScopeRoleMapping().toString();
+            }
+            if (rbac.getApiCollectionsId() != null) {
+                pinnedSize = rbac.getApiCollectionsId().size();
+            }
+        }
+        String rbacResolved = rbacResolvedSize == null ? "unrestricted" : String.valueOf(rbacResolvedSize);
+        logger.info("RBAC collection access userId={} accountId={} context={} fromCache={} storedRole={} fetchRole={} mapping={} pinnedSize={} rbacResolved={} branch={} contextSize={} finalSize={}",
+                userId, accountId, sourceName, fromCache, storedRole, fetchRole, mapping, pinnedSize, rbacResolved, branch, contextSize, finalSize);
     }
 
     public static void deleteContextCollectionsForUser(int accountId, CONTEXT_SOURCE source) {

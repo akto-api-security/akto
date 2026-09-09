@@ -178,32 +178,4 @@ public class WizApiGatewayFilter {
         return null;
     }
 
-    /**
-     * Builds the Wiz tags JSON string for an Akto message.
-     * Always includes source=wiz; appends api-gateway=<name> when the message host
-     * is found in hostToGatewayName.
-     */
-    public static String buildWizTagsJson(String requestHeadersStr, Map<String, String> hostToGatewayName) {
-        BasicDBObject tagsMap = new BasicDBObject();
-        tagsMap.put("source", "wiz");
-        if (requestHeadersStr != null && hostToGatewayName != null) {
-            try {
-                BasicDBObject requestHeaders = BasicDBObject.parse(requestHeadersStr);
-                String msgHost = null;
-                for (String key : requestHeaders.keySet()) {
-                    if ("host".equalsIgnoreCase(key)) {
-                        msgHost = requestHeaders.getString(key);
-                        break;
-                    }
-                }
-                if (msgHost != null) {
-                    String gatewayName = hostToGatewayName.get(msgHost);
-                    if (gatewayName != null) {
-                        tagsMap.put("api-gateway", gatewayName);
-                    }
-                }
-            } catch (Exception ignored) {}
-        }
-        return tagsMap.toJson();
-    }
 }

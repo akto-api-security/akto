@@ -24,6 +24,7 @@ public class ModelAction extends UserAction {
     String azureOpenAIEndpoint;
     String ollamaAIEndpoint;
     String databricksEndpoint;
+    String cloudflareAccountId;
     ModelType type;
 
     public String saveAgentModel() {
@@ -77,6 +78,11 @@ public class ModelAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
+        if (type == ModelType.CLOUDFLARE && (cloudflareAccountId == null || cloudflareAccountId.isEmpty())) {
+            addActionError("Please add Cloudflare account ID");
+            return Action.ERROR.toUpperCase();
+        }
+
         Map<String, String> params = new HashMap<>();
         params.put(Model.PARAM_MODEL, this.model);
         params.put(Model.PARAM_API_KEY, this.apiKey);
@@ -88,6 +94,9 @@ public class ModelAction extends UserAction {
         }
         if (type == ModelType.DATABRICKS) {
             params.put(Model.PARAM_DATABRICKS_ENDPOINT, this.databricksEndpoint);
+        }
+        if (type == ModelType.CLOUDFLARE) {
+            params.put(Model.PARAM_CLOUDFLARE_ACCOUNT_ID, this.cloudflareAccountId);
         }
 
         Model model = new Model(name, type, params);
@@ -162,6 +171,14 @@ public class ModelAction extends UserAction {
 
     public void setDatabricksEndpoint(String databricksEndpoint) {
         this.databricksEndpoint = databricksEndpoint;
+    }
+
+    public String getCloudflareAccountId() {
+        return cloudflareAccountId;
+    }
+
+    public void setCloudflareAccountId(String cloudflareAccountId) {
+        this.cloudflareAccountId = cloudflareAccountId;
     }
 
     public ModelType getType() {

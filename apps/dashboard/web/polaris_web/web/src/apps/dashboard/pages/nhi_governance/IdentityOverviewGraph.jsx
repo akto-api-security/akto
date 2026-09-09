@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Box } from "@shopify/polaris";
+import { Box, Text } from "@shopify/polaris";
 import ReactFlow, { Background } from "react-flow-renderer";
 import { AgentNode, AgentEdge } from "../observe/api_collections/AgentDiscoverGraph";
 import { getAgentType } from "./nhiViolationsData";
@@ -12,7 +12,7 @@ const IDENT_SEP = 90;   // vertical gap between identity nodes
 const H_GAP     = 80;   // horizontal gap between agent and its identities
 const GROUP_GAP = 60;   // horizontal gap between groups
 
-export default function IdentityOverviewGraph({ tableData, onIdentityClick }) {
+export default function IdentityOverviewGraph({ tableData, totalCount, onIdentityClick }) {
     const { nodes, edges } = useMemo(() => {
         // Group ALL identities by agent, preserving insertion order
         const agentOrder = [];
@@ -94,7 +94,20 @@ export default function IdentityOverviewGraph({ tableData, onIdentityClick }) {
         return { nodes, edges };
     }, [tableData, onIdentityClick]);
 
+    const shownCount = tableData.length;
+    const isCapped = totalCount > shownCount;
+
     return (
+        <Box>
+        {isCapped && (
+            <Box paddingBlockEnd="2">
+                <Text variant="bodySm" color="subdued">
+                    Showing the {shownCount.toLocaleString()} most recently discovered identities of{" "}
+                    {totalCount.toLocaleString()} total. Use the table below to search or page through
+                    the rest.
+                </Text>
+            </Box>
+        )}
         <Box
             style={{
                 height: 480,
@@ -125,6 +138,7 @@ export default function IdentityOverviewGraph({ tableData, onIdentityClick }) {
             >
                 <Background variant="dots" gap={24} size={1} color="#D1D5DB" />
             </ReactFlow>
+        </Box>
         </Box>
     );
 }

@@ -240,23 +240,13 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
                  // update default test suites list on login instead of initializing
                 try {
-                    // need this loop for default insertion of test suites upon login
-                    Map<Integer, Boolean> accountToIsFirstTimeMap = new HashMap<>();
-                    for(String accountIdStr : user.getAccounts().keySet()) {
-                        int accountId = Integer.parseInt(accountIdStr);
-                        Context.accountId.set(accountId);
-                        int count = (int) DefaultTestSuitesDao.instance.estimatedDocumentCount();
-                        if (count == 0) {
-                            accountToIsFirstTimeMap.put(accountId, true);
-                        }
-                    }
-                    if(!accountToIsFirstTimeMap.isEmpty() || (tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()){
+                    if((tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()){
                         service.submit(() -> {
                             try {
                                 for(String accountIdStr : user.getAccounts().keySet()) {
                                     int accountId = Integer.parseInt(accountIdStr);
                                     Context.accountId.set(accountId);
-                                    DefaultTestSuitesDao.insertDefaultTestSuites(accountToIsFirstTimeMap.getOrDefault(accountId, false));
+                                    DefaultTestSuitesDao.insertDefaultTestSuites();
                                     AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                                     InitializerListener.insertStateInAccountSettings(accountSettings);
                                 }

@@ -2,7 +2,11 @@ package com.akto.action.threat_detection.utils;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import org.apache.http.HttpEntity;
+import org.apache.http.util.EntityUtils;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -19,5 +23,9 @@ public class ThreatsUtils {
 
 
         return latestAttack.stream().filter(contextTemplatesForAccount::contains).collect(Collectors.toList());
+    }
+
+    public static String readResponseBody(HttpEntity entity) throws IOException {
+        return EntityUtils.toString(entity, StandardCharsets.UTF_8);
     }
 }

@@ -355,7 +355,12 @@ public class AccountAction extends UserAction {
                     backwardCompatibility = new BackwardCompatibility();
                     BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
                 }
-                InitializerListener.setBackwardCompatibilities(backwardCompatibility);
+                try {
+                    InitializerListener.setBackwardCompatibilities(backwardCompatibility);
+                    loggerMaker.debugAndAddToDb("Backward compatibilities set for " + newAccountId);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error occurred while setting backward compatibilities");
+                }
                 loggerMaker.debugAndAddToDb("start create indices", LogDb.DASHBOARD);
                 DaoInit.createIndices();
 
@@ -419,6 +424,26 @@ public class AccountAction extends UserAction {
         }
 
         return ERROR.toUpperCase();
+    }
+
+    private boolean initialised;
+
+    public boolean getInitialised() {
+        return initialised;
+    }
+
+    public String initialiseDemoCollections() {
+        try {
+            RuntimeListener.initialiseDemoCollections();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error while initialising demo collections: " + e.getMessage());
+            addActionError(e.getMessage());
+            initialised = false;
+            return ERROR.toUpperCase();
+        }
+
+        initialised = true;
+        return SUCCESS.toUpperCase();
     }
 
     public String getNewAccountName() {

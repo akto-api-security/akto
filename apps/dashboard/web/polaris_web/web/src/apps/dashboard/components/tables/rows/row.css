@@ -1,3 +1,10 @@
+/* clip long values instead of overflowing into the next cell (inline Link ignores boxWidth) */
+.linkClass {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .linkClass > .Polaris-Link--removeUnderline:hover {
     text-decoration: none !important;
 }

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        AgenticSessionContextDao was added to read the agentic_session_context collection
+        (already created by baseline-account.xml) via findBySessionIdentifier. No new/changed/
+        removed field, index, or collection. This changeset exists only to satisfy prod.yml's
+        DAO-migration-required check for the DAO file added by that change.
+    -->
+
+    <changeSet id="017-account-agentic-session-context-dao" author="akto">
+        <empty/>
+    </changeSet>
+
+</databaseChangeLog>

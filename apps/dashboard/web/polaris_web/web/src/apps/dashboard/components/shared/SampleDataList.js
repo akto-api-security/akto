@@ -128,7 +128,7 @@ function VulnerabilityEvidence({ segments }) {
 
 function SampleDataList(props) {
 
-    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp} = props;
+    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter} = props;
 
     const [page, setPage] = useState(0);
 
@@ -232,6 +232,7 @@ function SampleDataList(props) {
                       readOnly={true}
                       redactHeaders={redactHeaders}
                       isWebSocket={isWebSocket}
+                      onAddAsSearchFilter={onAddAsSearchFilter}
                     />
                   </LegacyCard>
                 </Box>

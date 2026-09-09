@@ -315,6 +315,17 @@ public class StartTestAction extends UserAction {
         }
     }
 
+    private void resolveTestRoleId() {
+        if (StringUtils.isBlank(this.testRoleId) || ObjectId.isValid(this.testRoleId)) {
+            return;
+        }
+
+        TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(TestRoles.NAME, this.testRoleId));
+        if (testRole != null && testRole.getId() != null) {
+            this.testRoleId = testRole.getHexId();
+        }
+    }
+
     private static final Slack SLACK_INSTANCE = Slack.getInstance();
 
     public String startTest() {
@@ -327,6 +338,8 @@ public class StartTestAction extends UserAction {
         if (!validateAutoTicketingDetails(this.autoTicketingDetails)) {
             return Action.ERROR.toUpperCase();
         }
+
+        resolveTestRoleId();
 
         int scheduleTimestamp = this.startTimestamp == 0 ? Context.now() : this.startTimestamp;
         handleCallFromAktoGpt();
@@ -574,6 +587,11 @@ public class StartTestAction extends UserAction {
         List<String> sortFields = new ArrayList<>();
         if (sortKey == null || "".equals(sortKey)) {
             sortKey = TestingRun.SCHEDULE_TIMESTAMP;
+        }
+        // A CI/CD test reuses the same testing run for every trigger, so its scheduleTimestamp stays at
+        // creation time while endTimestamp moves with the latest run, which is what the run time column shows.
+        if (testingRunType == TestingRunType.CI_CD && TestingRun.SCHEDULE_TIMESTAMP.equals(sortKey)) {
+            sortKey = TestingRun.END_TIMESTAMP;
         }
         sortFields.add(sortKey);
 

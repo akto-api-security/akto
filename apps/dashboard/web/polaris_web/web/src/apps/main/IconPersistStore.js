@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { devtools, persist } from "zustand/middleware";
 import { createGzipStorage } from "./PersistStore";
+import { devtoolsOptions } from "./devtoolsConfig";
 
 /**
  * Simple Icon Cache Store
@@ -120,7 +121,10 @@ const IconPersistStore = create(
                 }
             }
         }),
-        { name: "IconStore" }
+        devtoolsOptions("IconStore", (state) => ({
+            ...state,
+            iconCache: `<<${Object.keys(state.iconCache || {}).length} entries>>`,
+        }))
     )
 );
 

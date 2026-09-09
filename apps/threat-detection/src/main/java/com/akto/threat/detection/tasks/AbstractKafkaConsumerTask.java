@@ -50,7 +50,7 @@ public abstract class AbstractKafkaConsumerTask<V> implements Task {
               logRecordsPerMin(records.count());
               processRecords(records);
 
-              if (!records.isEmpty()) {
+              if (!records.isEmpty() && shouldCommitAfterProcessing()) {
                 kafkaConsumer.commitSync();
               }
             } catch (Exception ex) {
@@ -78,6 +78,25 @@ public abstract class AbstractKafkaConsumerTask<V> implements Task {
   }
 
   protected void beforePollLoop() {}
+
+  /**
+   * Whether run() should commit the batch it just handed to processRecords().
+   *
+   * <p>Default true: commit whatever was polled, which is correct for tasks that
+   * cannot meaningfully retry — losing a record costs a detection, and blocking
+   * the loop would cost every later one.
+   *
+   * <p>A task whose downstream can be temporarily unavailable overrides this to
+   * false and takes ownership of committing: it commits the offsets it actually
+   * delivered and seeks back to the first it did not, so an outage delays
+   * records instead of dropping them.
+   *
+   * <p>Called on the polling thread immediately after processRecords() returns,
+   * so an implementation may base its answer on what that call just did.
+   */
+  protected boolean shouldCommitAfterProcessing() {
+    return true;
+  }
 
   abstract void processRecords(ConsumerRecords<String, V> records);
 

@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -164,12 +165,25 @@ public class AuditDataAction extends UserAction {
         }
     }
 
+    @Getter
+    @Setter
+    private List<Integer> apiCollectionIds;
+
+    @Getter
+    private Map<String, List<McpAuditInfo>> mcpAuditInfoListByCollection;
+
+    private static final int MCP_AUDIT_BATCH_CAP = 300;
+
     public String fetchMcpAuditInfoByCollection() {
         mcpAuditInfoList = new ArrayList<>();
 
         if (Context.contextSource.get() != null && Context.contextSource.get() != CONTEXT_SOURCE.ENDPOINT)  {
             mcpAuditInfoList = Collections.emptyList();
             return SUCCESS.toUpperCase();
+        }
+
+        if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
+            return fetchMcpAuditInfoByCollectionBatch();
         }
 
         try {
@@ -199,6 +213,82 @@ public class AuditDataAction extends UserAction {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching McpAuditInfo by collection: " + e.getMessage(), LogDb.DASHBOARD);
             mcpAuditInfoList = Collections.emptyList();
+            return ERROR.toUpperCase();
+        }
+    }
+
+    // Batch variant for the Agentic Assets flyout (AgenticAssetFlyout.jsx), which previously fired
+    // one fetchMcpAuditInfoByCollection request PER collection id in an asset group — a group can
+    // span thousands of collections, so opening one flyout could fire thousands of concurrent
+    // browser requests. Two queries total regardless of N: one to resolve hostName -> mcpName for
+    // every requested collection, one $in query across all resulting mcpNames — then partitioned
+    // back per collection id in Java.
+    private String fetchMcpAuditInfoByCollectionBatch() {
+        mcpAuditInfoListByCollection = new HashMap<>();
+        List<Integer> ids = apiCollectionIds.size() > MCP_AUDIT_BATCH_CAP
+                ? apiCollectionIds.subList(0, MCP_AUDIT_BATCH_CAP) : apiCollectionIds;
+        try {
+            List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
+                    Filters.in(Constants.ID, ids),
+                    Projections.include(Constants.ID, ApiCollection.HOST_NAME)
+            );
+            Map<Integer, String> mcpNameByCollectionId = new HashMap<>();
+            Set<String> mcpNames = new HashSet<>();
+            for (ApiCollection c : collections) {
+                String mcpName = McpRequestResponseUtils.extractServiceNameFromHost(c.getHostName());
+                if (StringUtils.isNotBlank(mcpName)) {
+                    mcpNameByCollectionId.put(c.getId(), mcpName);
+                    mcpNames.add(mcpName);
+                }
+            }
+            Map<String, List<McpAuditInfo>> rowsByMcpName = new HashMap<>();
+            if (!mcpNames.isEmpty()) {
+                Bson filter = Filters.and(
+                        Filters.in(McpAuditInfo.MCP_HOST, mcpNames),
+                        Filters.ne(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL)
+                );
+                List<McpAuditInfo> rows = McpAuditInfoDao.instance.findAll(filter, 0, 1_000 * mcpNames.size(), null);
+                for (McpAuditInfo row : rows) {
+                    rowsByMcpName.computeIfAbsent(row.getMcpHost(), k -> new ArrayList<>()).add(row);
+                }
+            }
+            for (Integer id : ids) {
+                String mcpName = mcpNameByCollectionId.get(id);
+                mcpAuditInfoListByCollection.put(String.valueOf(id),
+                        mcpName != null ? rowsByMcpName.getOrDefault(mcpName, Collections.emptyList()) : Collections.emptyList());
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching McpAuditInfo batch: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    @Getter
+    private BasicDBObject auditFilterOptions;
+
+    /**
+     * Distinct filter-dropdown values for the Audit Data page (currently markedBy). Replaces the old
+     * fillFilters approach that pulled up to 1000 full audit rows just to derive the distinct set.
+     */
+    public String fetchAuditDataFilterOptions() {
+        try {
+            Bson base = Filters.and(
+                    Filters.ne(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL),
+                    Filters.or(
+                            Filters.eq(McpAuditInfo.CONTEXT_SOURCE, Context.contextSource.get().name()),
+                            Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false)
+                    )
+            );
+            List<String> markedByUsers = new ArrayList<>();
+            for (String m : McpAuditInfoDao.instance.getMCollection().distinct(McpAuditInfo.MARKED_BY, base, String.class)) {
+                if (m != null && !m.isEmpty()) markedByUsers.add(m);
+            }
+            Collections.sort(markedByUsers);
+            auditFilterOptions = new BasicDBObject();
+            auditFilterOptions.put("markedBy", markedByUsers);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching audit filter options: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
     }

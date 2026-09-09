@@ -304,7 +304,7 @@ public class Utils {
         return sb.toString();
     }
 
-    public static Pair<Map<String, String>, List<FileUploadError>> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId, boolean allowReplay, Map<String, String> authMap, String miniTestingName) {
+    public static Pair<Map<String, String>, List<FileUploadError>> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId, boolean allowReplay, Map<String, String> authMap, String miniTestingName, boolean forceCreateCollection) {
         Pair<Map<String, String>, List<String>> resp;
         List<FileUploadError> errors = new ArrayList<>();
         try {
@@ -415,6 +415,22 @@ public class Utils {
 
                 JsonNode statusNode = response.get("status");
                 status = statusNode != null ? statusNode.asText() : "";
+
+                if (forceCreateCollection) {
+                    int statusCodeInt;
+                    try {
+                        statusCodeInt = Integer.parseInt(statusCode);
+                    } catch (NumberFormatException e) {
+                        statusCodeInt = 0;
+                    }
+
+                    if (!HttpResponseParams.validHttpResponseCode(statusCodeInt)) {
+                        statusCode = "200";
+                        status = "OK";
+                        responsePayload = "";
+                        responseHeadersString = "{}";
+                    }
+                }
             }
 
             result.put("responseHeaders", responseHeadersString);
@@ -570,7 +586,9 @@ public class Utils {
     /*
      * this function is used primarily for non-automated traffic collection, like
      * postman, har and openAPI.
-     * Thus, we can skip advanced traffic filters for these cases.
+     * skipAdvancedFilters lets a caller opt out of advanced traffic filters for these cases.
+     * When they are applied, imported traffic is only enriched by them (see
+     * HttpCallParser.isImportedTraffic) and never dropped for not matching a filter.
      */
 
     public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka, boolean takeFromMsg, boolean skipAdvancedFilters) throws Exception {
@@ -640,13 +658,13 @@ public class Utils {
 //                info.getResourceAnalyser().analyse(responseParams);
 //            }
 //            info.getResourceAnalyser().syncWithDb();
-            try {
-                DependencyFlow dependencyFlow = new DependencyFlow();
-                dependencyFlow.run(apiCollectionId + "");
-                dependencyFlow.syncWithDb();
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);
-            }
+            // try {
+            //     DependencyFlow dependencyFlow = new DependencyFlow();
+            //     dependencyFlow.run(apiCollectionId + "");
+            //     dependencyFlow.syncWithDb();
+            // } catch (Exception e) {
+            //     loggerMaker.errorAndAddToDb(e, "Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);
+            // }
         }
     }
 

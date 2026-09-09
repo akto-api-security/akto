@@ -24,38 +24,11 @@ public class IngestionAction extends ActionSupport {
 
     private static final int ACCOUNT_ID_TO_ADD_DEFAULT_DATA = getAccountId();
 
-    private boolean sendLogsToCustomAccount(List<IngestDataBatch> batchData){
-        if (batchData == null || batchData.isEmpty()) {
-            return false;
-        }
-
-
-        // for (IngestDataBatch batch : batchData) {
-        //     String requestHeaders = batch.getRequestHeaders();
-        //     if (requestHeaders != null) {
-        //         String lowerHeaders = requestHeaders.toLowerCase();
-        //         if (lowerHeaders.contains("\"host\":") || lowerHeaders.contains("\"host \":")) {
-        //             if (lowerHeaders.contains("hollywoodbets") ||
-        //                 lowerHeaders.contains("betsolutions") ||
-        //                 lowerHeaders.contains("betnix") ||
-        //                 lowerHeaders.contains("betsoft")) {
-        //                 return true;
-        //             }
-        //         }
-        //     }
-        // }
-
-        return true;
-    }
-
     public String ingestData() {
         try {
-            if(sendLogsToCustomAccount(batchData)){
-                System.setProperty("DATABASE_ABSTRACTOR_SERVICE_TOKEN", "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoiaW52aXRlX3VzZXIiLCJhY2NvdW50SWQiOjE2NjI2ODA0NjMsImlhdCI6MTc2MDU5NzM0OCwiZXhwIjoxNzc2MzIyMTQ4fQ.b-aqZEiTinzE1tavKDe6t7Ec7TsnsGoVRdxCiMmeOM20JcJ7aEgOZaJxD7O9zyoD6AEXmpEghd04wGhGCECBOKWivDS8Y_fdatLw8R7hH0Y-pu8QEMC1whbXXJrNhsRGXihLIiQ80nDKbrv6ObbyDwy4NPYoCFK8Mpu2i4W8qZHBJXnxmVkCp8Cp_LyeDLotXvc8DAp9huHASil0BSOxiUwHsw3Efk4BkRlHADfAwGFz4j-ozdbiK0SHHvOZNicl1wgpvDk0nHRLhIg3Ynx-Fk4Pp0agb0MCpS55-CRMBbx3zy9xRdkhIGdOydEzZKK5p311hwPnxxeL6Dp1C2f89g");
-            }
-
             printLogs("ingestData batch size " + batchData.size());
             for (IngestDataBatch payload: batchData) {
+                logPayloadSize(payload);
                 printLogs("Inserting data to kafka...");
 
                 // Adding this if we are getting empty method from traffic connector
@@ -85,6 +58,25 @@ public class IngestionAction extends ActionSupport {
         } catch (Exception e) {
             return tag;
         }
+    }
+
+    /**
+     * One line per received payload, so real traffic sizes are visible without
+     * guessing. Sums only the fields that actually carry bulk — the conversation and
+     * the trace — since those are what push a record past the ingest and Kafka
+     * limits; the rest of the record is a few hundred bytes of metadata.
+     */
+    private static void logPayloadSize(IngestDataBatch payload) {
+        long bytes = len(payload.getRequestPayload()) + len(payload.getResponsePayload())
+                + len(payload.getRequestHeaders()) + len(payload.getResponseHeaders())
+                + len(payload.getTag()) + len(payload.getPath());
+        printLogs(String.format("payload received: %,d bytes / %.3f MB (request %,d, response %,d)",
+                bytes, bytes / (1024.0 * 1024.0),
+                len(payload.getRequestPayload()), len(payload.getResponsePayload())));
+    }
+
+    private static long len(String s) {
+        return s == null ? 0 : s.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
     }
 
     public static void printLogs(String msg) {
@@ -120,5 +112,5 @@ public class IngestionAction extends ActionSupport {
         success = true;
         return Action.SUCCESS.toUpperCase();
     }
-    
+
 }

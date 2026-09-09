@@ -132,19 +132,25 @@ export default function PoliciesPage() {
     const [isEditMode, setIsEditMode]             = useState(false);
     const [editingPolicy, setEditingPolicy]       = useState(null);
 
+    // Policies paint as soon as they arrive; the (already-cheap) violation-count aggregate fills in the
+    // bubbles/tile async right after, instead of blocking first paint on both calls together.
     const fetchPolicies = async () => {
         try {
             setLoading(true);
-            const [policiesResp, violationsResp] = await Promise.all([
-                observeRequests.fetchNhiPolicies(),
-                observeRequests.fetchAllNhiViolations(),
-            ]);
+            const policiesResp = await observeRequests.fetchNhiPolicies();
             setRawPolicies(Array.isArray(policiesResp) ? policiesResp : []);
-            setRawViolations(Array.isArray(violationsResp) ? violationsResp : []);
+            setLoading(false);
+
+            try {
+                const violationsResp = await observeRequests.fetchViolationCountsByPolicy();
+                setRawViolations(Array.isArray(violationsResp) ? violationsResp : []);
+            } catch (violErr) {
+                console.error("Error fetching violation counts by policy:", violErr);
+                setRawViolations([]);
+            }
         } catch (err) {
             console.error("Error fetching NHI policies:", err);
             setRawPolicies([]);
-            setRawViolations([]);
         } finally {
             setLoading(false);
         }
@@ -152,18 +158,21 @@ export default function PoliciesPage() {
 
     useEffect(() => { fetchPolicies(); }, []);
 
+    // Build per-policy counts from the server-grouped rows (one row per policyId x severity,
+    // not one row per violation document).
     const violCountByPolicy = useMemo(() => {
         const map = {};
-        rawViolations.forEach((v) => {
-            (v.policyIds || []).forEach((pId) => {
-                if (!map[pId]) map[pId] = { total: 0, critical: 0, high: 0, medium: 0, low: 0 };
-                map[pId].total++;
-                const sev = (v.severity || "").toLowerCase();
-                if (sev === "critical") map[pId].critical++;
-                else if (sev === "high") map[pId].high++;
-                else if (sev === "medium") map[pId].medium++;
-                else map[pId].low++;
-            });
+        rawViolations.forEach((row) => {
+            const pId = row.policyId;
+            const count = row.count || 0;
+            if (!pId) return;
+            if (!map[pId]) map[pId] = { total: 0, critical: 0, high: 0, medium: 0, low: 0 };
+            map[pId].total += count;
+            const sev = (row.severity || "").toLowerCase();
+            if (sev === "critical") map[pId].critical += count;
+            else if (sev === "high") map[pId].high += count;
+            else if (sev === "medium") map[pId].medium += count;
+            else map[pId].low += count;
         });
         return map;
     }, [rawViolations]);

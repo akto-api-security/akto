@@ -2,6 +2,8 @@ package com.akto.action;
 
 import com.akto.dao.AgentUsersDao;
 import com.akto.dao.GuardrailPoliciesDao;
+import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dto.AgenticUsers;
 import com.akto.dto.EnterpriseLicenseComplianceCatalog;
 import com.akto.dao.context.Context;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
@@ -95,6 +97,11 @@ public class GuardrailPoliciesAction extends UserAction {
     private static final int DEFAULT_FETCH_LIMIT = 20;
     private static final int MAX_FETCH_LIMIT = 100;
 
+    // Some accounts have no <accountId>-guardrails.akto.io machine; for those, fall back to a
+    // nginx guardrails machine.
+    private static final int FALLBACK_GUARDRAIL_ACCOUNT_ID = 1726615470;
+    private static final String FALLBACK_GUARDRAIL_SERVICE_URL = "https://" + FALLBACK_GUARDRAIL_ACCOUNT_ID + "-guardrails.akto.io";
+
     public String fetchGuardrailPolicies() {
         try {
             // Mongo treats limit <= 0 as "unlimited", so clamp instead of passing it through as-is.
@@ -103,17 +110,18 @@ public class GuardrailPoliciesAction extends UserAction {
             this.guardrailPolicies = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(skip, limit);
             this.total = GuardrailPoliciesDao.instance.getTotalCount();
 
-            // Resolve targetTeams/targetRoles → device IDs fresh on every fetch.
+            // Resolve targetTags/targetDeviceIds → device IDs fresh on every fetch.
             // applyToDeviceIds left null (never set below) = no targeting configured → apply to all devices.
             // applyToDeviceIds set to a List (possibly empty, when targeting matches zero devices)
             // = targeting configured → apply only to the listed device labels; empty means apply to none.
             // null vs. an empty List must stay distinguishable on the wire — do not collapse them.
             for (GuardrailPolicies p : this.guardrailPolicies) {
-                boolean hasTargeting = (p.getTargetTeams() != null && !p.getTargetTeams().isEmpty())
-                        || (p.getTargetRoles() != null && !p.getTargetRoles().isEmpty());
+                boolean hasTagTargeting = p.getTargetTags() != null && !p.getTargetTags().isEmpty();
+                boolean hasTargeting = hasTagTargeting
+                        || (p.getTargetDeviceIds() != null && !p.getTargetDeviceIds().isEmpty());
                 if (hasTargeting) {
-                    p.setApplyToDeviceIds(AgentUsersDao.instance.findDeviceIdsByTeamsAndRoles(
-                            p.getTargetTeams(), p.getTargetRoles()));
+                    p.setApplyToDeviceIds(AgentUsersDao.instance.findDeviceIdsByTags(
+                            p.getTargetTags(), p.getTargetDeviceIds()));
                 }
                 EnterpriseLicenseComplianceCatalog.applyToPolicy(p);
             }
@@ -230,6 +238,42 @@ public class GuardrailPoliciesAction extends UserAction {
             
             EnterpriseLicenseComplianceCatalog.applyToPolicy(policy);
 
+            // userMetadata is derived solely from policy.targetUserNames — the explicit "Users"
+            // picks — never combined with the identities behind targetDeviceIds (device targeting
+            // stays purely device-level, resolved separately via applyToDeviceIds). targetUserNames
+            // itself is never persisted (see GuardrailPolicies#targetUserNames, @BsonIgnore);
+            // userMetadata is the durable record of which identities were picked, so it's always
+            // re-resolved fresh from live sources here rather than trusting whatever the client sent.
+            List<String> pickedUserNames = new ArrayList<>();
+            if (policy.getTargetUserNames() != null) {
+                for (String userName : policy.getTargetUserNames()) {
+                    if (StringUtils.isNotBlank(userName)) pickedUserNames.add(userName.trim());
+                }
+            }
+            List<AgenticUsers> resolvedUserMetadata = new ArrayList<>();
+            if (!pickedUserNames.isEmpty()) {
+                resolvedUserMetadata.addAll(AgentUsersDao.instance.findByUserIdsOrUserNames(new ArrayList<>(), pickedUserNames));
+
+                // A pick whose only source is module_info reporting (browser extension / Claude
+                // Desktop app) has no agent_users doc at all, so the lookup above can't find it —
+                // re-verify against module_info directly (never trust a client-supplied email) and
+                // always keep the username, attaching an email when module_info actually has one.
+                List<String> resolvedNames = new ArrayList<>();
+                for (AgenticUsers u : resolvedUserMetadata) {
+                    if (u.getUserName() != null) resolvedNames.add(u.getUserName());
+                }
+                Map<String, String> moduleInfoEmailsByUsername = ModuleInfoDao.instance.fetchUsernameToEmailForEndpointShield();
+                for (String userName : pickedUserNames) {
+                    if (resolvedNames.contains(userName)) continue;
+                    AgenticUsers snapshot = new AgenticUsers();
+                    snapshot.setUserName(userName);
+                    snapshot.setUserEmail(moduleInfoEmailsByUsername.get(userName));
+                    resolvedUserMetadata.add(snapshot);
+                    resolvedNames.add(userName);
+                }
+            }
+            policy.setUserMetadata(resolvedUserMetadata);
+
             List<Bson> updates = buildPolicyUpdates(policy, contextSource);
 
             // Only set createdBy and createdTimestamp on insert
@@ -272,6 +316,9 @@ public class GuardrailPoliciesAction extends UserAction {
         updates.add(Updates.set("applyOnRequest", p.isApplyOnRequest()));
         updates.add(Updates.set("applyToAllServers", p.isApplyToAllServers()));
         updates.add(Updates.set("active", p.isActive()));
+        updates.add(Updates.set("negatedAgentServers", p.isNegatedAgentServers()));
+        updates.add(Updates.set("negatedMcpServers", p.isNegatedMcpServers()));
+        updates.add(Updates.set("negatedLlmServers", p.isNegatedLlmServers()));
 
         if (StringUtils.isNotBlank(p.getDescription())) {
             updates.add(Updates.set("description", p.getDescription()));
@@ -305,6 +352,9 @@ public class GuardrailPoliciesAction extends UserAction {
         }
         if (p.getLlmRule() != null) {
             updates.add(Updates.set("llmRule", p.getLlmRule()));
+        }
+        if (p.getRedactionRules() != null) {
+            updates.add(Updates.set("redactionRules", p.getRedactionRules()));
         }
         if (p.getBasePromptRule() != null) {
             updates.add(Updates.set("basePromptRule", p.getBasePromptRule()));
@@ -342,18 +392,26 @@ public class GuardrailPoliciesAction extends UserAction {
         if (p.getSelectedAgentServersV2() != null) {
             updates.add(Updates.set("selectedAgentServersV2", p.getSelectedAgentServersV2()));
         }
+        if (p.getSelectedLlmServersV2() != null) {
+            updates.add(Updates.set("selectedLlmServersV2", p.getSelectedLlmServersV2()));
+        }
         if (p.getBlockedHosts() != null) {
             updates.add(Updates.set("blockedHosts", p.getBlockedHosts()));
         }
         if (p.getIgnorePhrases() != null) {
             updates.add(Updates.set("ignorePhrases", p.getIgnorePhrases()));
         }
-        if (p.getTargetTeams() != null) {
-            updates.add(Updates.set("targetTeams", p.getTargetTeams()));
+        if (p.getTargetDeviceIds() != null) {
+            updates.add(Updates.set("targetDeviceIds", p.getTargetDeviceIds()));
         }
-        if (p.getTargetRoles() != null) {
-            updates.add(Updates.set("targetRoles", p.getTargetRoles()));
+        // targetUserNames is intentionally never persisted (@BsonIgnore) — it's an inbound-only
+        // request field; userMetadata (set unconditionally below) is the durable record instead.
+        if (p.getTargetTags() != null) {
+            updates.add(Updates.set("targetTags", p.getTargetTags()));
         }
+        // Always set (never conditional): computed fresh from targetDeviceIds/targetUserNames
+        // right before this call, so it must overwrite any stale snapshot from a previous save.
+        updates.add(Updates.set("userMetadata", p.getUserMetadata()));
         updates.add(Updates.set("blockPersonalAccounts", p.isBlockPersonalAccounts()));
         if (StringUtils.isNotBlank(p.getBehaviour())) {
             updates.add(Updates.set("behaviour", p.getBehaviour()));
@@ -528,12 +586,7 @@ public class GuardrailPoliciesAction extends UserAction {
             int currentTime = Context.now();
 
             int accountId = Context.accountId.get();
-            String guardrailServiceUrl = "https://" + accountId + "-guardrails.akto.io";
-            
-            if (accountId == 1768175789) {
-                guardrailServiceUrl = "https://ingest.akto.io";
-            }
-
+            String guardrailServiceUrl = "http://localhost:9091"; // This should ideally come from configuration
             String validateUrl = guardrailServiceUrl + "/api/validate/requestWithPolicy";
 
             // Prepare request payload - wrap testInput in JSON with "prompt" key
@@ -594,9 +647,7 @@ public class GuardrailPoliciesAction extends UserAction {
             // Generate short-lived JWT for authenticating with the guardrail service
             String authToken;
             try {
-                Map<String, Object> claims = new HashMap<>();
-                claims.put("accountId", accountId);
-                authToken = JwtAuthenticator.createJWT(claims, "Akto", "invite_user", Calendar.MINUTE, 120);
+                authToken = generateGuardrailAuthToken(accountId);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Failed to generate auth token for guardrail service: " + e.getMessage(), LogDb.DASHBOARD);
                 return ERROR.toUpperCase();
@@ -605,15 +656,33 @@ public class GuardrailPoliciesAction extends UserAction {
             // Call guardrail service using shared HTTP client
             MediaType mediaType = MediaType.parse("application/json");
             RequestBody body = RequestBody.create(requestPayload.toJson(), mediaType);
-            Request request = new Request.Builder()
-                    .url(validateUrl)
-                    .method("POST", body)
-                    .addHeader("Content-Type", "application/json")
-                    .addHeader("Authorization", authToken)
-                    .build();
 
-            // Call guardrail service using shared HTTP client
-            try (Response response = httpClient.newCall(request).execute()) {
+            Response response = null;
+            try {
+                response = executeGuardrailRequest(validateUrl, body, authToken);
+                if (!response.isSuccessful()) {
+                    loggerMaker.info("Guardrail service at " + validateUrl + " returned status " + response.code() + ", falling back");
+                    response.close();
+                    response = null;
+                }
+            } catch (IOException e) {
+                loggerMaker.info("Error calling guardrail service at " + validateUrl + ": " + e.getMessage() + ", falling back");
+            }
+
+            // Any failure to reach/get a successful response from the account's own machine
+            // (unknown host, connection error, gateway error, etc.) falls back to a shared machine.
+            if (response == null) {
+                String fallbackUrl = FALLBACK_GUARDRAIL_SERVICE_URL + "/api/validate/requestWithPolicy";
+                try {
+                    String fallbackAuthToken = generateGuardrailAuthToken(FALLBACK_GUARDRAIL_ACCOUNT_ID);
+                    response = executeGuardrailRequest(fallbackUrl, body, fallbackAuthToken);
+                } catch (Exception fallbackException) {
+                    loggerMaker.errorAndAddToDb("Error calling fallback guardrail service at " + fallbackUrl + ": " + fallbackException.getMessage(), LogDb.DASHBOARD);
+                    return ERROR.toUpperCase();
+                }
+            }
+
+            try {
                 ResponseBody responseBodyObj = response.body();
                 String responseBody = (responseBodyObj != null) ? responseBodyObj.string() : "";
 
@@ -638,14 +707,31 @@ public class GuardrailPoliciesAction extends UserAction {
                     return ERROR.toUpperCase();
                 }
             } catch (IOException e) {
-                loggerMaker.errorAndAddToDb("IO error calling guardrail service at " + validateUrl + ": " + e.getMessage(), LogDb.DASHBOARD);
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("IO error reading guardrail service response: " + e.getMessage(), LogDb.DASHBOARD);
                 return ERROR.toUpperCase();
+            } finally {
+                response.close();
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error in guardrail playground test: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
+    }
+
+    private String generateGuardrailAuthToken(int accountId) throws Exception {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("accountId", accountId);
+        return JwtAuthenticator.createJWT(claims, "Akto", "invite_user", Calendar.MINUTE, 120);
+    }
+
+    private Response executeGuardrailRequest(String url, RequestBody body, String authToken) throws IOException {
+        Request request = new Request.Builder()
+                .url(url)
+                .method("POST", body)
+                .addHeader("Content-Type", "application/json")
+                .addHeader("Authorization", authToken)
+                .build();
+        return httpClient.newCall(request).execute();
     }
 
     /**

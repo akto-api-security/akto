@@ -9,7 +9,7 @@ import ssl
 import sys
 import time
 import urllib.request
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 try:
     from akto_machine_id import get_machine_id, get_username
@@ -37,9 +37,10 @@ CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 _CONNECTOR_TAG: Dict[str, str] = {
     "claude_code_cli": "claudecli",
     "cursor": "cursor",
-    "vscode": "vscode",
+    "vscode": "copilot",
     "gemini_cli": "geminicli",
     "github": "github",
+    "github_cli": "copilot",
     "codex_cli": "codexcli",
     "kiro_cli": "kirocli"
 }
@@ -64,6 +65,7 @@ _CONNECTOR_LOG_DIR: Dict[str, str] = {
     "github":           "~/akto/.github/akto/vscode/logs",
     "opencode":         "~/.config/opencode/akto/logs",
     "kiro_cli":         "~/.kiro/akto/logs",
+    "amp":              "~/.config/amp/akto/logs",
 }
 _default_log_dir = _CONNECTOR_LOG_DIR.get(AKTO_CONNECTOR, f"~/akto/{AKTO_CONNECTOR}-hooks/logs")
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", _default_log_dir))
@@ -185,7 +187,11 @@ _SESSION_FIELD_MAP: Dict[str, Dict[str, Any]] = {
         "message_id_field": None,
         "message_id_strategy": "transcript_uuid",
         "state_key": "session_id",
-        "extra_fields": ("transcript_path", "cwd", "permission_mode", "hook_event_name"),
+        # user_email never arrives on Claude's stdin — it is resolved locally from
+        # ~/.claude.json (see _LOCAL_IDENTITY_CONNECTORS). Declared here so it is
+        # also picked up should the CLI ever start sending it.
+        "extra_fields": ("transcript_path", "cwd", "permission_mode",
+                         "hook_event_name", "user_email"),
     },
     "gemini_cli": {
         "session_id_field": "session_id",
@@ -210,6 +216,16 @@ _SESSION_FIELD_MAP: Dict[str, Dict[str, Any]] = {
         "conversation_field": None,
         "message_id_field": None,
         "message_id_strategy": "turn_counter",
+        "state_key": "session_id",
+        "extra_fields": ("cwd", "hook_event_name"),
+    },
+    # amp: the plugin forwards the thread id as both session and conversation, and
+    # agent.start carries a real message id, so the prompt hook can pass it through.
+    "amp": {
+        "session_id_field": "session_id",
+        "conversation_field": "conversation_id",
+        "message_id_field": "message_id",
+        "message_id_strategy": "passthrough",
         "state_key": "session_id",
         "extra_fields": ("cwd", "hook_event_name"),
     },
@@ -244,6 +260,35 @@ def _id_fields(fm: Dict[str, Any]) -> List[str]:
         if key not in fields:
             fields.append(key)
     return fields
+
+
+# Terminal `copilot` CLI sends camelCase; VS Code's Copilot Chat sends snake_case.
+INPUT_FIELD_TRANSFORMATIONS = {"sessionId": "session_id", "transcriptPath": "transcript_path"}
+
+
+def _alias_camel_keys(input_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Fill in the snake_case key from its camelCase alias when only the latter is present."""
+    for camel, snake in INPUT_FIELD_TRANSFORMATIONS.items():
+        if snake not in input_data and camel in input_data:
+            input_data[snake] = input_data[camel]
+    return input_data
+
+
+# Connectors whose hook stdin carries no user identity, so it is resolved from the
+# agent's own profile file instead. For these the locally resolved value is
+# AUTHORITATIVE: it must overwrite — and when empty, delete — whatever the session
+# state row holds, because the row may have been written before a login or logout.
+# (cursor/github pass user_email through on stdin; they must not be touched here.)
+_LOCAL_IDENTITY_CONNECTORS = {"claude_code_cli"}
+
+
+def _local_user_email() -> str:
+    """Current account email for connectors that resolve identity locally ('' if none)."""
+    try:
+        from akto_machine_id import get_user_email
+        return get_user_email()
+    except Exception:
+        return ""
 
 
 def extract_session_info(input_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -282,8 +327,17 @@ def load_session_state(key: str, logger: logging.Logger) -> Dict[str, Any]:
         return {}
 
 
-def save_session_state(key: str, session_info: Dict[str, Any], logger: logging.Logger) -> None:
-    """Upsert-merge session_info into the keyed row (atomic write)."""
+def save_session_state(
+    key: str,
+    session_info: Dict[str, Any],
+    logger: logging.Logger,
+    drop_keys: Iterable[str] = (),
+) -> None:
+    """Upsert-merge session_info into the keyed row (atomic write).
+
+    drop_keys are removed from the row afterwards. Needed for locally resolved
+    identity fields that must be cleared on sign-out, since a merge can only ever
+    add or overwrite — never delete."""
     try:
         data: Dict[str, Any] = {}
         if os.path.exists(SESSION_STATE_PATH):
@@ -293,6 +347,8 @@ def save_session_state(key: str, session_info: Dict[str, Any], logger: logging.L
                     data = loaded
         row = data.get(key, {}) if isinstance(data.get(key), dict) else {}
         row.update({k: v for k, v in session_info.items() if v is not None})
+        for drop in drop_keys:
+            row.pop(drop, None)
         data[key] = row
         os.makedirs(os.path.dirname(SESSION_STATE_PATH), exist_ok=True)
         tmp_path = SESSION_STATE_PATH + ".tmp"
@@ -373,10 +429,24 @@ def resolve_session_info(
         state_key = _state_key(input_data, session_info)
         row = load_session_state(state_key, logger)
 
+        # Resolve identity on EVERY event (not just prompt hooks), so an account
+        # switch mid-session propagates on the next hook of any kind.
+        drop_keys: Tuple[str, ...] = ()
+        if AKTO_CONNECTOR in _LOCAL_IDENTITY_CONNECTORS and not session_info.get("user_email"):
+            email = _local_user_email()
+            if email:
+                session_info["user_email"] = email  # switch: overwrites the row below
+            else:
+                # Signed out: neither backfill the old address into this event's
+                # headers nor leave it on disk for the next one. Never write "" —
+                # installer_headers skips only None, so "" ships as an empty header.
+                row.pop("user_email", None)
+                drop_keys = ("user_email",)
+
         if is_prompt_hook:
             session_info.update(open_message_turn(input_data, session_info, state_key, row, logger))
 
-        save_session_state(state_key, session_info, logger)
+        save_session_state(state_key, session_info, logger, drop_keys=drop_keys)
 
         # Backfill any id/extra fields and the current message id from the stored row.
         merged = dict(row)
@@ -539,7 +609,7 @@ def run_observability_hook(hook_name: str) -> None:
     logger = setup_logger("hook-executions.log")
     logger.info(f"=== {hook_name} hook started ===")
     try:
-        input_data = json.load(sys.stdin)
+        input_data = _alias_camel_keys(json.load(sys.stdin))
         logger.info(f"{hook_name} input:\n%s", json.dumps(input_data, indent=2))
         session_info = resolve_session_info(input_data, logger)
         send_ingestion_data(

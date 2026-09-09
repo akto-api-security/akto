@@ -71,6 +71,13 @@ public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
         );
     }
 
+    public void updateRuntimeEnvOverrides(Map<String, String> envOverrides) {
+        instance.updateOne(
+            AccountSettingsDao.generateFilter(),
+            Updates.set(AccountSettings.RUNTIME_ENV_OVERRIDES, envOverrides)
+        );
+    }
+
     public String getInitStackType() {
         return instance.findOne(AccountSettingsDao.generateFilter()).getInitStackType();
     }

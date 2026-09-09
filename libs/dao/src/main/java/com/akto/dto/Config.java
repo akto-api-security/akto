@@ -409,6 +409,9 @@ public abstract class Config {
         private String redirectUri;
         public static final String ORGANIZATION_DOMAIN = "organizationDomain";
         private String organizationDomain;
+        /** Extra email domains allowed alongside {@link #organizationDomain}, for orgs with more than one mail domain. */
+        public static final String ADDITIONAL_ORGANIZATION_DOMAINS = "additionalOrganizationDomains";
+        private List<String> additionalOrganizationDomains;
         public static final String ACCOUNT_ID = "accountId";
         private int accountId;
         /** BSON key for the Okta Management API (SSWS) token. */
@@ -417,6 +420,15 @@ public abstract class Config {
         private String managementApiToken;
         /** Okta group name → Akto user role. Stored in Mongo as {@code oktaGroupToAktoUserRoleMap}. */
         private Map<String, String> oktaGroupToAktoUserRoleMap;
+        /**
+         * Master on/off switch for the periodic org-wide cron that syncs Okta groups into
+         * AgenticUsers as a "group" device tag for every org user, not just people who log in.
+         * Requires {@link #managementApiToken} — the cron has no login session to read a JWT
+         * groups claim from, so the Management API is the only way it can enumerate users/groups.
+         * Defaults to false; the dashboard UI keeps this disabled until a token is saved.
+         */
+        public static final String SYNC_GROUPS_TO_USER_TAGS = "syncGroupsToUserTags";
+        private boolean syncGroupsToUserTags = false;
 
         public static final String CONFIG_ID = ConfigType.OKTA.name() + CONFIG_SALT;
 
@@ -485,6 +497,33 @@ public abstract class Config {
             this.organizationDomain = organizationDomain;
         }
 
+        public List<String> getAdditionalOrganizationDomains() {
+            return additionalOrganizationDomains;
+        }
+        public void setAdditionalOrganizationDomains(List<String> additionalOrganizationDomains) {
+            this.additionalOrganizationDomains = additionalOrganizationDomains;
+        }
+
+        /** True if domain matches organizationDomain or any entry in additionalOrganizationDomains. */
+        public boolean isDomainAllowed(String domain) {
+            if (domain == null) return false;
+            if (organizationDomain != null && organizationDomain.equalsIgnoreCase(domain)) return true;
+            if (additionalOrganizationDomains != null) {
+                for (String allowed : additionalOrganizationDomains) {
+                    if (allowed != null && allowed.equalsIgnoreCase(domain)) return true;
+                }
+            }
+            return false;
+        }
+
+        /** organizationDomain plus additionalOrganizationDomains. Not a bean getter, so it is never persisted. */
+        public List<String> allowedDomainsForLog() {
+            List<String> domains = new ArrayList<>();
+            if (organizationDomain != null) domains.add(organizationDomain);
+            if (additionalOrganizationDomains != null) domains.addAll(additionalOrganizationDomains);
+            return domains;
+        }
+
         public int getAccountId() {
             return accountId;
         }
@@ -505,6 +544,13 @@ public abstract class Config {
         }
         public void setOktaGroupToAktoUserRoleMap(Map<String, String> oktaGroupToAktoUserRoleMap) {
             this.oktaGroupToAktoUserRoleMap = oktaGroupToAktoUserRoleMap;
+        }
+
+        public boolean isSyncGroupsToUserTags() {
+            return syncGroupsToUserTags;
+        }
+        public void setSyncGroupsToUserTags(boolean syncGroupsToUserTags) {
+            this.syncGroupsToUserTags = syncGroupsToUserTags;
         }
     }
 
@@ -1184,7 +1230,10 @@ public abstract class Config {
 
         String domain = companyKeyArr[1];
         OktaConfig config = (OktaConfig) ConfigsDao.instance.findOne(
-                Filters.eq(OktaConfig.ORGANIZATION_DOMAIN, domain)
+                Filters.or(
+                    Filters.eq(OktaConfig.ORGANIZATION_DOMAIN, domain),
+                    Filters.eq(OktaConfig.ADDITIONAL_ORGANIZATION_DOMAINS, domain)
+                )
         );
         return config;
     }

@@ -5,6 +5,7 @@ import com.akto.action.ApiTokenAction;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
@@ -177,6 +178,53 @@ public class TestStartTestAction extends MongoBasedTest {
         assertEquals(State.SCHEDULED, testingRun.getState());
         assertEquals(startTimestamp, testingRun.getScheduleTimestamp());
 
+    }
+
+    private TestingRunConfig startExistingTestRunWithRole(String testRoleId) {
+        TestingRunConfigDao.instance.getMCollection().drop();
+        TestingRunDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+
+        TestingRun testingRun = new TestingRun(Context.now(), "",
+                new CollectionWiseTestingEndpoints(1000), 0, State.COMPLETED, 0, "test", "", false);
+        TestingRunDao.instance.insertOne(testingRun);
+
+        StartTestAction startTestAction = new StartTestAction();
+        startTestAction.setSession(new HashMap<>());
+        startTestAction.setTestingRunHexId(testingRun.getHexId());
+        startTestAction.setSelectedTests(Collections.emptyList());
+        startTestAction.setTestSuiteIds(Collections.emptyList());
+        startTestAction.setTestRoleId(testRoleId);
+
+        assertEquals(Action.SUCCESS.toUpperCase(), startTestAction.startTest());
+
+        List<TestingRunConfig> testingRunConfigs = TestingRunConfigDao.instance.findAll(Filters.empty());
+        assertEquals(1, testingRunConfigs.size());
+        return testingRunConfigs.get(0);
+    }
+
+    @Test
+    public void testStartTestResolvesTestRoleName() {
+        TestRolesDao.instance.getMCollection().drop();
+
+        ObjectId testRoleObjectId = new ObjectId();
+        String testRoleName = "payments-admin";
+        TestRoles testRole = new TestRoles(testRoleObjectId, testRoleName, new ObjectId(),
+                Collections.emptyList(), "test@akto.io", Context.now(), Context.now(), null, "test@akto.io");
+        TestRolesDao.instance.insertOne(testRole);
+
+        TestingRunConfig testingRunConfig = startExistingTestRunWithRole(testRoleName);
+
+        assertEquals(testRoleObjectId.toHexString(), testingRunConfig.getTestRoleId());
+    }
+
+    @Test
+    public void testStartTestKeepsTestRoleId() {
+        String testRoleId = new ObjectId().toHexString();
+
+        TestingRunConfig testingRunConfig = startExistingTestRunWithRole(testRoleId);
+
+        assertEquals(testRoleId, testingRunConfig.getTestRoleId());
     }
 
     @Test

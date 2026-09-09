@@ -2,8 +2,6 @@ package kafka
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"io"
@@ -18,7 +16,6 @@ import (
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/segmentio/kafka-go"
-	"github.com/segmentio/kafka-go/sasl/plain"
 	"go.uber.org/zap"
 )
 
@@ -121,29 +118,7 @@ func (c *Consumer) parseFilterConfig(logger *zap.Logger) {
 
 // createKafkaReader creates and configures a Kafka reader
 func createKafkaReader(cfg *config.Config, logger *zap.Logger) *kafka.Reader {
-	dialer := &kafka.Dialer{
-		Timeout:   10 * time.Second,
-		DualStack: true,
-	}
-
-	// Configure TLS if enabled
-	if cfg.KafkaUseTLS {
-		tlsConfig, err := newTLSConfig()
-		if err != nil {
-			logger.Warn("Failed to create TLS config, continuing without TLS", zap.Error(err))
-		} else {
-			dialer.TLS = tlsConfig
-		}
-	}
-
-	// Configure SASL authentication if credentials provided
-	if cfg.KafkaUsername != "" && cfg.KafkaPassword != "" {
-		dialer.SASLMechanism = plain.Mechanism{
-			Username: cfg.KafkaUsername,
-			Password: cfg.KafkaPassword,
-		}
-		logger.Info("Kafka SASL authentication configured", zap.String("username", cfg.KafkaUsername))
-	}
+	dialer := newDialer(cfg.KafkaUseTLS, cfg.KafkaUsername, cfg.KafkaPassword, logger)
 
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:        []string{cfg.KafkaBrokerURL},
@@ -164,36 +139,6 @@ func createKafkaReader(cfg *config.Config, logger *zap.Logger) *kafka.Reader {
 		zap.Int("maxWaitSec", cfg.KafkaMaxWaitSec))
 
 	return reader
-}
-
-// newTLSConfig creates a TLS configuration for Kafka
-func newTLSConfig() (*tls.Config, error) {
-	tlsCACertPath := os.Getenv("KAFKA_TLS_CA_CERT_PATH")
-	if tlsCACertPath == "" {
-		tlsCACertPath = "./ca.crt"
-	}
-
-	// Check if CA cert file exists
-	if _, err := os.Stat(tlsCACertPath); os.IsNotExist(err) {
-		// Return basic TLS config without custom CA
-		return &tls.Config{
-			InsecureSkipVerify: os.Getenv("KAFKA_INSECURE_SKIP_VERIFY") == "true",
-			MinVersion:         tls.VersionTLS12,
-		}, nil
-	}
-	caCert, err := os.ReadFile(tlsCACertPath)
-	if err != nil {
-		return nil, err
-	}
-
-	caCertPool := x509.NewCertPool()
-	caCertPool.AppendCertsFromPEM(caCert)
-
-	return &tls.Config{
-		RootCAs:            caCertPool,
-		InsecureSkipVerify: os.Getenv("KAFKA_INSECURE_SKIP_VERIFY") == "true",
-		MinVersion:         tls.VersionTLS12,
-	}, nil
 }
 
 // Start starts consuming messages from Kafka

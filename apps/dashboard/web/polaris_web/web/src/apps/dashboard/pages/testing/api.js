@@ -499,6 +499,15 @@ export default {
             }
         })
     },
+    updateGlobalRateLimitAgentic(globalRateLimitAgentic) {
+        return request({
+            url: '/api/updateGlobalRateLimitAgentic',
+            method: 'post',
+            data: {
+                globalRateLimitAgentic
+            }
+        })
+    },
     fetchAccessMatrixUrlToRoles(){
         return request({
             url: '/api/fetchAccessMatrixUrlToRoles',

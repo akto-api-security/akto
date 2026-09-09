@@ -6,8 +6,10 @@ function RowCard(props) {
 
     const {cardObj, onButtonClick, buttonText} = props ;
     const dashboardCategory = getDashboardCategory();
+    const docsUrl = quickStartFunc.getDocsUrl(cardObj, dashboardCategory);
+    // Not shipped yet: nothing to connect to and no docs page, so both actions are inert.
+    const comingSoon = cardObj.label?.includes("(Coming Soon)");
     const goToDocs = () => {
-        const docsUrl = quickStartFunc.getDocsUrl(cardObj, dashboardCategory);
         if (docsUrl) {
             window.open(docsUrl);
         }
@@ -35,8 +37,8 @@ function RowCard(props) {
                     </Box>
                 </VerticalStack>
                 <HorizontalStack gap={"4"} align='start'>
-                    <Button onClick={handleAction}>{buttonText}</Button>
-                    <Button plain onClick={goToDocs} size='medium'>See Docs</Button>
+                    <Button disabled={comingSoon} onClick={handleAction}>{buttonText}</Button>
+                    <Button plain disabled={comingSoon || !docsUrl} onClick={goToDocs} size='medium'>See Docs</Button>
                 </HorizontalStack>
             </VerticalStack>
         </Card>

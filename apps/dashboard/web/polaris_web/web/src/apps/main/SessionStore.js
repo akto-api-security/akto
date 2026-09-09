@@ -1,5 +1,6 @@
 import {create} from "zustand"
 import { devtools, persist, createJSONStorage } from "zustand/middleware"
+import { devtoolsOptions } from "./devtoolsConfig"
 
 const initialState = {
     threatFiltersMap: {},
@@ -65,7 +66,10 @@ let sessionStore = (set) => ({
     },
 });
 
-sessionStore = devtools(sessionStore)
+sessionStore = devtools(sessionStore, devtoolsOptions("SessionStore", (state) => ({
+    ...state,
+    accessToken: state.accessToken ? "<<redacted>>" : null,
+})))
 sessionStore = persist(sessionStore,{name: 'Akto-session-store',storage: createJSONStorage(() => sessionStorage)})
 
 const SessionStore = create(sessionStore);

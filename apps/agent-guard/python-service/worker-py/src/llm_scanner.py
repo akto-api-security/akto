@@ -64,6 +64,11 @@ def parse_llm_result(scanner_name: str, raw: str) -> dict[str, Any]:
         if matched:
             details["matchedTopic"] = matched
 
+    if scanner_name == "Toxicity":
+        matched = parsed.get("matchedCategory", "")
+        if matched:
+            details["matchedCategory"] = matched
+
     if scanner_name == "Password":
         # Exact secret substrings for the caller to redact.
         values = parsed.get("values") or []

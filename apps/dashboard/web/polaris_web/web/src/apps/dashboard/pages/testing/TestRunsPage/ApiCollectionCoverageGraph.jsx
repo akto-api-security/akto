@@ -26,7 +26,7 @@ const ApiCollectionCoverageGraph = ({ apiCollectionIds }) => {
     try {
       const coverageInfo = await api.getCoverageInfoForCollections(apiCollectionIds)
 
-      let baseCollections = allCollections.filter(col => col?.type !== "API_GROUP")
+      let baseCollections = allCollections.filter(col => col?.type !== "API_GROUP" && !col?.isOutOfTestingScope)
       if (apiCollectionIds?.length) {
         const idSet = new Set(apiCollectionIds)
         baseCollections = baseCollections.filter((col) => idSet.has(col.id))

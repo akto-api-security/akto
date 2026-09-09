@@ -75,7 +75,7 @@ export const STEP_CONFIG = [
  *
  * Step 2 Content & Policy: prompt injection → ASI01; context poisoning → ASI06; denied topics → ASI09;
  *   harmful categories → ASI09; intent verification → ASI01, ASI09.
- * Step 3 Language Safety: gibberish, sentiment, profanity/custom words → ASI09.
+ * Step 3 Language Safety: gibberish, sentiment → ASI09.
  * Step 4 Sensitive Info: PII, regex, secrets, anonymize → ASI03.
  * Step 5 Code Detection: code filter, ban code → ASI05.
  * Step 6 Custom: LLM prompt rule, external model → ASI02.

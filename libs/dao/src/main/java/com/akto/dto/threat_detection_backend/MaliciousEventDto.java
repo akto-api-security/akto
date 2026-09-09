@@ -1,6 +1,7 @@
 package com.akto.dto.threat_detection_backend;
 
 import com.akto.dto.type.URLMethods;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 import java.util.UUID;
@@ -33,6 +34,17 @@ public class MaliciousEventDto {
   private String contextSource;
   private String sessionId;
   private List<OwaspCategory> owaspCategories;
+  private String remediation;
+  private String evidenceLine;
+  public static final String HUMAN_RESPONSE = "humanResponse";
+  @JsonProperty("humanResponse")
+  private String humanResponse;
+
+  public enum HumanResponse {
+    PENDING,
+    APPROVED,
+    BLOCKED
+  }
 
   public enum EventType {
     SINGLE,
@@ -43,7 +55,8 @@ public class MaliciousEventDto {
     ACTIVE,
     UNDER_REVIEW,
     IGNORED,
-    TRAINING
+    TRAINING,
+    HUMAN_APPROVAL
   }
 
   public enum Label {
@@ -105,6 +118,9 @@ public class MaliciousEventDto {
     this.contextSource = builder.contextSource;
     this.sessionId = builder.sessionId;
     this.owaspCategories = builder.owaspCategories;
+    this.remediation = builder.remediation;
+    this.humanResponse = builder.humanResponse;
+    this.evidenceLine = builder.evidenceLine;
   }
 
   public static class Builder {
@@ -133,6 +149,10 @@ public class MaliciousEventDto {
     private String contextSource;
     private String sessionId;
     private List<OwaspCategory> owaspCategories;
+    private String remediation;
+    private String humanResponse;
+    private String evidenceLine;
+
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
       return this;
@@ -253,8 +273,23 @@ public class MaliciousEventDto {
       return this;
     }
 
+    public Builder setRemediation(String remediation) {
+      this.remediation = remediation;
+      return this;
+    }
+
+    public Builder setEvidenceLine(String evidenceLine) {
+      this.evidenceLine = evidenceLine;
+      return this;
+    }
+
     public Builder setOwaspCategories(List<OwaspCategory> owaspCategories) {
       this.owaspCategories = owaspCategories;
+      return this;
+    }
+
+    public Builder setHumanResponse(String humanResponse) {
+      this.humanResponse = humanResponse;
       return this;
     }
 
@@ -467,12 +502,36 @@ public class MaliciousEventDto {
     this.sessionId = sessionId;
   }
 
+  public String getRemediation() {
+    return remediation;
+  }
+
+  public void setRemediation(String remediation) {
+    this.remediation = remediation;
+  }
+
+  public String getEvidenceLine() {
+    return evidenceLine;
+  }
+
+  public void setEvidenceLine(String evidenceLine) {
+    this.evidenceLine = evidenceLine;
+  }
+
   public List<OwaspCategory> getOwaspCategories() {
     return owaspCategories;
   }
 
   public void setOwaspCategories(List<OwaspCategory> owaspCategories) {
     this.owaspCategories = owaspCategories;
+  }
+
+  public String getHumanResponse() {
+    return humanResponse;
+  }
+
+  public void setHumanResponse(String humanResponse) {
+    this.humanResponse = humanResponse;
   }
 
 }

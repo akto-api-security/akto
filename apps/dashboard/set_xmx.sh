@@ -37,3 +37,5 @@ export JAVA_OPTIONS="-XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m --add-opens=jav
 
 # Log the final JAVA_OPTIONS value
 echo "JAVA_OPTIONS set to: $JAVA_OPTIONS"
+
+exec java $JAVA_OPTIONS -jar /opt/jetty-home/start.jar jetty.base=/opt/jetty
