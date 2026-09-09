@@ -2157,15 +2157,22 @@ public class HttpCallParser {
      */
     private void markAiAgentCaller(HttpResponseParams httpResponseParams, Map<String, String> tagsMap,
             String direction, String calleeHost) {
+        // Every early return below logs, so a missing tag can be traced to one branch. The
+        // silent version of this method made a live failure impossible to diagnose.
         if (!AI_AGENT_CALLER_TAGGING_ACCOUNTS.contains(Context.getActualAccountId())) {
+            loggerMaker.debug("ai-agent-caller: account not enabled, skipping");
             return;
         }
         // Inbound labels describe the callee, so there is no caller to attribute.
         if (!DIRECTION_OUTBOUND.equals(direction)) {
+            loggerMaker.debug("ai-agent-caller: not outbound (direction=" + direction
+                    + "), no caller to attribute");
             return;
         }
         String callerService = tagsMap == null ? null : tagsMap.get(SERVICE_TAG_KEY);
         if (callerService == null || callerService.isEmpty()) {
+            loggerMaker.debug("ai-agent-caller: outbound request carries no " + SERVICE_TAG_KEY
+                    + " tag, cannot identify caller. callee=" + calleeHost);
             return;
         }
 
@@ -2175,16 +2182,8 @@ public class HttpCallParser {
             // The caller has no collection of its own - nothing calls it, so its inbound traffic
             // never created one. createCollectionForServiceTag upserts, so writing here would
             // materialise an empty collection; skip and log so the gap is measurable.
-            loggerMaker.debug("Skipping ai-agent-caller tag, no collection for caller service: "
-                    + callerService);
-            return;
-        }
-        if (callerCollection.getServiceTag() == null) {
-            // Collection ids are hashCode()s, so a service tag can collide with a host-based
-            // collection. Writing through createCollectionForServiceTag would rewrite that
-            // collection as a service-tag one.
-            loggerMaker.debug("Skipping ai-agent-caller tag, id " + callerCollectionId
-                    + " is not a service-tag collection (caller service: " + callerService + ")");
+            loggerMaker.debug("ai-agent-caller: no collection " + callerCollectionId
+                    + " for caller service " + callerService + ", skipping");
             return;
         }
 
@@ -2192,26 +2191,47 @@ public class HttpCallParser {
         boolean alreadyTagged = existingTags != null && existingTags.stream()
                 .anyMatch(t -> Constants.AKTO_AI_AGENT_CALLER_TAG.equals(t.getKeyName()));
         if (alreadyTagged) {
+            loggerMaker.debug("ai-agent-caller: collection " + callerCollectionId + " ("
+                    + callerService + ") already tagged, skipping");
             return;
         }
 
         int lastSyncTime = this.aiAgentCallerTagSyncTimestampMap.getOrDefault(callerCollectionId, 0);
         if (Context.now() - lastSyncTime < this.sync_threshold_time) {
+            loggerMaker.debug("ai-agent-caller: collection " + callerCollectionId + " ("
+                    + callerService + ") written " + (Context.now() - lastSyncTime)
+                    + "s ago, inside the " + this.sync_threshold_time + "s window, skipping");
             return;
         }
         this.aiAgentCallerTagSyncTimestampMap.put(callerCollectionId, Context.now());
 
         // createCollectionForServiceTag sets the whole tags array, so send existing + new.
+        // NOTE: that makes this write lossy - any other path doing a full-array set with a
+        // recomputed list will drop this tag. Recovery relies on alreadyTagged reading false
+        // afterwards so the next agentic call re-adds it.
         List<CollectionTags> mergedTags = existingTags == null
                 ? new ArrayList<>()
                 : new ArrayList<>(existingTags);
         mergedTags.add(new CollectionTags(Context.now(), Constants.AKTO_AI_AGENT_CALLER_TAG,
-                calleeHost, TagSource.AKTO));
+                calleeHost, TagSource.KUBERNETES));
 
         callerCollection.setTagsList(mergedTags);
         apiCollectionsMap.put(callerCollectionId, callerCollection);
 
-        dataActor.createCollectionForServiceTag(callerCollectionId, callerCollection.getServiceTag(),
+        // serviceTag can be null when the collection was created by the host path first (its id
+        // is hashCode(hostName), which equals hashCode(serviceTag) when they are the same string,
+        // and createCollectionForServiceTag only setOnInsert's SERVICE_TAG). Fall back to the
+        // caller service name so the upsert stays coherent.
+        String serviceTagForWrite = callerCollection.getServiceTag() != null
+                ? callerCollection.getServiceTag()
+                : callerService;
+
+        loggerMaker.infoAndAddToDb("ai-agent-caller: writing tag to collection " + callerCollectionId
+                + " (" + callerService + ") callee=" + calleeHost + " serviceTag=" + serviceTagForWrite
+                + " hostName=" + callerCollection.getHostName()
+                + " tagCount=" + mergedTags.size() + " tags=" + mergedTags);
+
+        dataActor.createCollectionForServiceTag(callerCollectionId, serviceTagForWrite,
                 callerCollection.getHostNames(), mergedTags, callerCollection.getHostName(),
                 callerCollection.getAccessType(), false);
 
