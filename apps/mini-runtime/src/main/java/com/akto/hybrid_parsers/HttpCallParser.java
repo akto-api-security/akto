@@ -98,6 +98,12 @@ public class HttpCallParser {
     private static final List<Integer> AI_AGENT_CALLER_TAGGING_ACCOUNTS = Arrays.asList(
             1736798101, 1718042191, 1662680463);
 
+    // TEST-ONLY, DO NOT MERGE: bypasses the SECURITY_TYPE_AGENTIC entitlement so the AKS test
+    // account can exercise agentic tagging end to end. Deliberately excludes Agoda's accounts -
+    // granting them agentic tagging as a side effect of a test would change live behaviour.
+    // Remove this and the check in isAgenticTaggingAllowed() before merging.
+    private static final List<Integer> AGENTIC_ENTITLEMENT_BYPASS_ACCOUNTS = Arrays.asList(1662680463);
+
     // Last time the ai-agent-caller tag was written, keyed by the CALLER's collection id.
     // Separate from apiCollectionIdTagsSyncTimestampMap, which is keyed by the callee - one
     // callee is called by many services, so a callee-keyed timer would only ever let the
@@ -2097,6 +2103,11 @@ public class HttpCallParser {
         Map<String, String> tagsMap = parseTagsMap(responseParams.getTags());
         String source = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
         if (Constants.AI_AGENT_SOURCE_ENDPOINT.equals(source)) {
+            return true;
+        }
+
+        // TEST-ONLY, DO NOT MERGE: see AGENTIC_ENTITLEMENT_BYPASS_ACCOUNTS.
+        if (AGENTIC_ENTITLEMENT_BYPASS_ACCOUNTS.contains(Context.getActualAccountId())) {
             return true;
         }
 
