@@ -25,7 +25,7 @@ import {
     buildAgentFilterOptions,
     getApplicableAgentKeys,
     applyAgentFilterToRows,
-    splitAgentServersV2,
+    splitPolicyServers,
     resolveClientKey,
 } from "./serverTargetingUtils";
 
@@ -376,16 +376,9 @@ function GuardrailPolicies() {
         return [];
     };
 
-    // selectedAgentServersV2 stores both AI agent and browser-LLM entries merged together.
-    const splitPolicyAgentServers = (rawEntries) =>
-        splitAgentServersV2(rawEntries, allCollections);
-
     // Returns mcp, agent, and llm server lists for a policy in one pass.
     const getEffectiveServers = (policy) => {
-        const raw = policy.selectedAgentServersV2?.length > 0
-            ? policy.selectedAgentServersV2
-            : (policy.selectedAgentServers || []).map(id => ({ id, name: id }));
-        const { agents, llms } = splitPolicyAgentServers(raw);
+        const { agents, llms } = splitPolicyServers(policy, allCollections);
         // Atlas stores every raw wire-level tag value an agent group aliases (e.g. 9 Claude CLI
         // variants) — collapse back to canonical keys so counts show "1 Agent", not "9 Agents".
         const dedupedAgents = isEndpointSecurityCategory()
