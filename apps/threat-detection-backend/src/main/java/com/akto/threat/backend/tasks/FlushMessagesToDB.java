@@ -206,6 +206,11 @@ public class FlushMessagesToDB {
         return;
       }
 
+      // skip misconfigurations events from going to actor_info table
+      if ("settings-scanner".equals(actor)) {
+        return;
+      }
+
       // Get contextSource, default to "API" if null or empty
       String contextSource = event.getContextSource();
       if (contextSource == null || contextSource.isEmpty()) {
