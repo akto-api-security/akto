@@ -1506,6 +1506,9 @@ public class HttpCallParser {
                             loggerMaker.error("Error creating or inserting MCP audit info: " + e.getMessage());
                         }
                     }
+
+                    auditAiAgentForEndpointTraffic(hostName, tagsMap);
+
                     hostNameToIdMap.put(key, apiCollectionId);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Failed to create collection for host : " + hostName);
@@ -2097,6 +2100,25 @@ public class HttpCallParser {
             return Optional.empty();
         }
         return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_GEN_AI_TAG, llmCollectionTag.getSecond(), TagSource.KUBERNETES));
+    }
+
+    private void auditAiAgentForEndpointTraffic(String hostName, Map<String, String> tagsMap) {
+        if (tagsMap == null
+                || !Constants.AI_AGENT_SOURCE_ENDPOINT.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE))) {
+            return;
+        }
+        String agentName = McpRequestResponseUtils.extractAgentNameFromHost(hostName);
+        if (agentName == null) return;
+        try {
+            McpAuditInfo agentInfo = new McpAuditInfo();
+            agentInfo.setType(Constants.AKTO_AI_AGENT_TAG);
+            agentInfo.setResourceName(agentName);
+            agentInfo.setLastDetected(Context.now());
+            agentInfo.setContextSource(Constants.AI_AGENT_SOURCE_ENDPOINT);
+            dataActor.insertMCPAuditDataLog(agentInfo);
+        } catch (Exception e) {
+            loggerMaker.error("Error inserting AI agent audit info: " + e.getMessage());
+        }
     }
 
     private SyncLimit fetchSyncLimit(Organization organization, MetricTypes metricType) {

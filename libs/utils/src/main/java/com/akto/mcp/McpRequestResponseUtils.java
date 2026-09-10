@@ -362,6 +362,20 @@ public final class McpRequestResponseUtils {
         return sb.toString();
     }
 
+    // <device>.<agent>.<server> → agent. Sentinel: when segment 1 is "ai-agent",
+    // the actual agent identity is segment 2 (LLM hook shape).
+    public static String extractAgentNameFromHost(String host) {
+        if (host == null || host.isEmpty()) {
+            return null;
+        }
+        String[] parts = host.split("\\.");
+        if (parts.length < 3) {
+            return null;
+        }
+        String name = "ai-agent".equalsIgnoreCase(parts[1]) ? parts[2] : parts[1];
+        return StringUtils.isBlank(name) ? null : name;
+    }
+
     private static String getPayloadSubstring(String payload) {
         if (StringUtils.isBlank(payload) || payload.length() <= 100) {
             return payload;
