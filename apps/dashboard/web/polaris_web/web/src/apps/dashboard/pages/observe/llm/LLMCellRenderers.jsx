@@ -1,5 +1,6 @@
 import React from "react";
-import { Badge, HorizontalStack, Text, Link } from "@shopify/polaris";
+import { Badge, HorizontalStack, Icon, Text, Link } from "@shopify/polaris";
+import { LockMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import { formatDurationMs, latencyColor, truncate } from "./constants";
 import { OsIcon } from "../agentic/DeviceEndpoints";
@@ -46,10 +47,17 @@ export function ModelIcon({ model, size = 16 }) {
 
 // ── cells ─────────────────────────────────────────────────────────────────────
 
-// Title: prompt text in interactive blue so it reads as a clickable row label.
-// Only used inside the session flyout, which is already gated by the consent dialog.
-export function TitleCell({ data }) {
+// Prompt preview for admins; everyone else identifies the row by the id in `idField`.
+export function PreviewCell({ data, idField }) {
     if (!data) return null;
+    if (!func.isUserAdmin()) {
+        return (
+            <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                <Icon source={LockMinor} color="subdued" />
+                <Text variant="bodySm" color="subdued" truncate>{data[idField] || DASH}</Text>
+            </HorizontalStack>
+        );
+    }
     const name = data._promptText ? truncate(data._promptText, 90) : DASH;
     return <Text variant="bodySm" color="interactive" truncate>{name}</Text>;
 }
