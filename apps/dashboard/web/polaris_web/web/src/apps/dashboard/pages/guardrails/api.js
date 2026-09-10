@@ -91,6 +91,14 @@ export default {
         })
         return resp
     },
+    async startGuardrailPolicyBackfillReplay({ policyName, hexId, startTimestamp, endTimestamp }) {
+        const resp = await request({
+            url: '/api/startPolicyBackfillReplay',
+            method: 'post',
+            data: { policyName, hexId, backfillStartTimestamp: startTimestamp, backfillEndTimestamp: endTimestamp }
+        })
+        return resp
+    },
 
     async fetchBrowserExtensionConfigs() {
         const resp = await request({

@@ -7,7 +7,6 @@ import {
     DiamondAlertMinor,
     FinancesMinor,
     LockMajor,
-    AutomationFilledMajor,
     MagicMinor,
     SocialAdMajor,
 } from "@shopify/polaris-icons";
@@ -118,11 +117,6 @@ export default function LeftNav() {
         "fenil@akto.io"
     ];
     const isAllowedDashboardUser = window.USER_NAME && allowedDashboardUsers.includes(window.USER_NAME.toLowerCase());
-
-
-    // Allowed users to for NHI Data
-    const allowedNhiUsers = ["ankush@akto.io", "umesh@akto.io"];
-    const isAllowedNhiUser = window.USER_NAME && allowedNhiUsers.includes(window.USER_NAME.toLowerCase());
 
     const navItems = useMemo(() => {
         let items = [
