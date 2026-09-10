@@ -58,7 +58,9 @@ const SettingsLeftNav = () => {
         selected: page === "metrics",
         onClick: () => navigate("/dashboard/settings/metrics")
     }] : []
-    const selfHostedArr = window.IS_SAAS === 'true' ? [{
+    const hideBillingAndSelfHosted = String(window.ACTIVE_ACCOUNT) === '1786073624'
+
+    const selfHostedArr = (window.IS_SAAS === 'true' && !hideBillingAndSelfHosted) ? [{
         label: 'Self hosted',
         icon: PlanMajor,
         selected: page === "self-hosted",
@@ -71,7 +73,7 @@ const SettingsLeftNav = () => {
         onClick: () => navigate("/dashboard/settings/audit-logs")
     }] : []
 
-    const billingArr = window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM' ? [{
+    const billingArr = (window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM') && !hideBillingAndSelfHosted ? [{
         label: 'Billing',
         icon: PlanMajor,
         selected: page === "billing",
