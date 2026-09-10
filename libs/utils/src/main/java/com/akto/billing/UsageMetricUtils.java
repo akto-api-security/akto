@@ -359,6 +359,32 @@ public class UsageMetricUtils {
         }
     }
 
+    public static SyncLimit getEndpointSyncLimit(int accountId) {
+        try {
+            Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
+            if (organization == null) {
+                return SyncLimit.noLimit;
+            }
+
+            FeatureAccess endpointAccess = getFeatureAccess(organization, MetricTypes.ENDPOINT_ASSET_COUNT);
+            boolean hasEndpointLimit = !endpointAccess.checkBooleanOrUnlimited();
+
+            if (!hasEndpointLimit) {
+                return SyncLimit.noLimit;
+            }
+
+            int usageLeft = Math.max(endpointAccess.getUsageLimit() - endpointAccess.getUsage(), 0);
+            if (endpointAccess.getUsage() >= endpointAccess.getUsageLimit()) {
+                return new SyncLimit(true, 0);
+            }
+            return new SyncLimit(true, usageLeft);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error getting endpoint sync limit for account: " + accountId, LogDb.DASHBOARD);
+            return SyncLimit.noLimit;
+        }
+    }
+
     public static FeatureAccess getFeatureAccess(int accountId, MetricTypes metricType) {
         FeatureAccess featureAccess = FeatureAccess.fullAccess;
         try {

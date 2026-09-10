@@ -71,7 +71,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
         }
 
         httpCallParser.syncFunction(httpResponseParamsList, false, true, null);
-        httpCallParser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit, SyncLimit.noLimit, SyncLimit.noLimit,
+        httpCallParser.apiCatalogSync.syncWithDB(false, true, SyncLimit.noLimit, SyncLimit.noLimit, SyncLimit.noLimit, SyncLimit.noLimit,
             Source.HAR);
     }
 

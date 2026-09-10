@@ -1908,7 +1908,7 @@ public class APICatalogSync {
     int counter = 0;
     List<String> partnerIpsList = new ArrayList<>();
     
-    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit apiSyncLimit, SyncLimit mcpAssetsSyncLimit, SyncLimit aiAssetsSyncLimit, HttpResponseParams.Source source) {
+    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit apiSyncLimit, SyncLimit mcpAssetsSyncLimit, SyncLimit aiAssetsSyncLimit, SyncLimit endpointAssetsSyncLimit, HttpResponseParams.Source source) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
         List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();
         List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData = new ArrayList<>();
@@ -1939,7 +1939,7 @@ public class APICatalogSync {
 
             Pair<SyncLimit, MetricTypes> syncLimitPair = getSyncLimitForApiCollection(
                 apiCollectionMap.get(apiCollectionId), apiSyncLimit,
-                mcpAssetsSyncLimit, aiAssetsSyncLimit);
+                mcpAssetsSyncLimit, aiAssetsSyncLimit, endpointAssetsSyncLimit);
 
             SyncLimit syncLimit = syncLimitPair.getFirst();
 
@@ -2086,7 +2086,7 @@ public class APICatalogSync {
     }
 
     private Pair<SyncLimit, MetricTypes> getSyncLimitForApiCollection(ApiCollection apiCollection, SyncLimit apiSyncLimit,
-        SyncLimit mcpAssetsSyncLimit, SyncLimit aiAssetsSyncLimit) {
+        SyncLimit mcpAssetsSyncLimit, SyncLimit aiAssetsSyncLimit, SyncLimit endpointAssetsSyncLimit) {
 
         if (apiCollection == null) {
             return new Pair<>(apiSyncLimit, MetricTypes.ACTIVE_ENDPOINTS);
@@ -2109,6 +2109,14 @@ public class APICatalogSync {
                 return new Pair<>(combinedLimit, MetricTypes.AI_ASSET_COUNT);
             }
             return new Pair<>(aiAssetsSyncLimit, MetricTypes.AI_ASSET_COUNT);
+        }
+
+        if (apiCollection.isEndpointCollection()) {
+            SyncLimit endpointLimit = com.akto.billing.UsageMetricUtils.getEndpointSyncLimit(Context.accountId.get());
+            if (endpointLimit.checkLimit) {
+                return new Pair<>(endpointLimit, MetricTypes.ENDPOINT_ASSET_COUNT);
+            }
+            return new Pair<>(endpointAssetsSyncLimit, MetricTypes.ENDPOINT_ASSET_COUNT);
         }
 
         return new Pair<>(apiSyncLimit, MetricTypes.ACTIVE_ENDPOINTS);

@@ -571,6 +571,7 @@ public abstract class Config {
         private String activeAccountsLabel;
         private String aiAssetsLabel;
         private String mcpAssetsLabel;
+        private String endpointAssetsLabel;
 
         public static final String CONFIG_ID = ConfigType.STIGG.name() + CONFIG_SALT;
 
@@ -665,6 +666,14 @@ public abstract class Config {
 
         public void setMcpAssetsLabel(String mcpAssetsLabel) {
             this.mcpAssetsLabel = mcpAssetsLabel;
+        }
+
+        public String getEndpointAssetsLabel() {
+            return endpointAssetsLabel;
+        }
+
+        public void setEndpointAssetsLabel(String endpointAssetsLabel) {
+            this.endpointAssetsLabel = endpointAssetsLabel;
         }
     }
     @BsonDiscriminator
