@@ -9,8 +9,9 @@ import java.util.function.Supplier;
 
 public class SequenceAnalyzerConfig {
 
-    // Number of APIs in a tracked sequence. 2 = pairs (A→B), 3 = triplets (A→B→C).
-    private final int sequenceLength;
+    // Maximum Markov chain order. 10 means track orders 1 through 10.
+    // Order 1 = pairs (A→B), order 2 = triples (A→B→C), etc.
+    private final int maxOrder;
 
     private final long windowDurationMs;
     private final UserIdentifier userIdentifier;
@@ -24,13 +25,13 @@ public class SequenceAnalyzerConfig {
     // and as a guard to skip URLs not yet known in the catalog.
     private final AktoPolicyNew aktoPolicyNew;
 
-    public SequenceAnalyzerConfig(int sequenceLength, long windowDurationMs,
+    public SequenceAnalyzerConfig(int maxOrder, long windowDurationMs,
                                   UserIdentifier userIdentifier,
                                   Supplier<WindowAccumulator> accumulatorFactory,
                                   WindowFlusher flusher,
                                   AktoPolicyNew aktoPolicyNew) {
-        if (sequenceLength < 2) throw new IllegalArgumentException("sequenceLength must be >= 2");
-        this.sequenceLength = sequenceLength;
+        if (maxOrder < 1) throw new IllegalArgumentException("maxOrder must be >= 1");
+        this.maxOrder = maxOrder;
         this.windowDurationMs = windowDurationMs;
         this.userIdentifier = userIdentifier;
         this.accumulatorFactory = accumulatorFactory;
@@ -38,8 +39,8 @@ public class SequenceAnalyzerConfig {
         this.aktoPolicyNew = aktoPolicyNew;
     }
 
-    public int getSequenceLength() {
-        return sequenceLength;
+    public int getMaxOrder() {
+        return maxOrder;
     }
 
     public long getWindowDurationMs() {
