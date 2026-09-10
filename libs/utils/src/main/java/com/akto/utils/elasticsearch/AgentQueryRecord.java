@@ -143,7 +143,7 @@ public class AgentQueryRecord {
         boolean isAtlasTraffic = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(source);
 
         if ((sessionIdentifier == null || sessionIdentifier.isEmpty())
-                && (isAtlasTraffic || Context.getActualAccountId() == URL_SESSION_ACCOUNT_ID)) {
+                && (isAtlasTraffic && Context.getActualAccountId() == URL_SESSION_ACCOUNT_ID)) {
             String url = p.getRequestParams().getURL();
             sessionIdentifier = sessionIdFromUrl(url);
             if (sessionIdentifier != null) {
