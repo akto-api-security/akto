@@ -877,7 +877,7 @@ public class ElasticSearchClient extends SearchClient {
     public static final String RESOLUTION_ORPHAN        = "orphan";
 
     // Half-width of the raw band searched around the target timestamp for context-window candidates.
-    private static final long CONTEXT_WINDOW_BAND_MS = 2L * 3600 * 1000; // +/- 2h
+    private static final long CONTEXT_WINDOW_BAND_MS = 2L * 900 * 1000; // +/- 30mins
 
     public static class ContextWindowResult {
         public final Map<String, Object> anchor;
