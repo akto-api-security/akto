@@ -13,11 +13,14 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class TrafficCollectorAlert {
 
     private static final LoggerMaker loggerMaker =
             new LoggerMaker(TrafficCollectorAlert.class, LogDb.DB_ABS);
+    private static final ExecutorService executorService = Executors.newFixedThreadPool(2);
 
     private static final List<Integer> MONITORED_ACCOUNT_IDS = Arrays.asList(1772780065, 1000000, 1726615470);
     private static final int CHECK_INTERVAL_SECONDS = 5 * 60;
@@ -32,18 +35,32 @@ public class TrafficCollectorAlert {
         if (!MONITORED_ACCOUNT_IDS.contains(accountId)) {
             return;
         }
+        List<ModuleInfo> snapshot = moduleInfoList == null ? null : new ArrayList<>(moduleInfoList);
         try {
-            int now = Context.now();
-            Integer lastCheck = lastCheckTs.get(accountId);
-            if (lastCheck == null || (now - lastCheck) >= CHECK_INTERVAL_SECONDS) {
-                lastCheckTs.put(accountId, now);
-                checkStaleHeartbeats(accountId, now);
-            }
-            if (moduleInfoList != null) {
-                checkMetricsSpikes(accountId, moduleInfoList);
-            }
+            executorService.submit(() -> {
+                Context.accountId.set(accountId);
+                try {
+                    runChecks(accountId, snapshot);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e,
+                            "Error checking traffic collector alerts for account " + accountId);
+                }
+            });
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error checking traffic collector alerts for account " + accountId);
+            loggerMaker.errorAndAddToDb(e,
+                    "Error submitting traffic collector alert check for account " + accountId);
+        }
+    }
+
+    private static void runChecks(int accountId, List<ModuleInfo> moduleInfoList) {
+        int now = Context.now();
+        Integer lastCheck = lastCheckTs.get(accountId);
+        if (lastCheck == null || (now - lastCheck) >= CHECK_INTERVAL_SECONDS) {
+            lastCheckTs.put(accountId, now);
+            checkStaleHeartbeats(accountId, now);
+        }
+        if (moduleInfoList != null) {
+            checkMetricsSpikes(accountId, moduleInfoList);
         }
     }
 
