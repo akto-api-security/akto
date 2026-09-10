@@ -7,7 +7,7 @@ import ssl
 import sys
 import time
 import urllib.request
-from typing import Any, Dict, Set, Tuple, Union
+from typing import Any, Dict, Tuple, Union
 
 from akto_helpers import get_device_ip
 from akto_ingestion_utility import installer_headers, resolve_session_info
@@ -39,6 +39,8 @@ AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
 AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "claudecli")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "AGENTIC")
 WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_prompt_warn_pending.json")
+# Reply text that resubmits a pending warn-flagged prompt (case-insensitive, trimmed).
+AFFIRMATIVE_TRIGGERS = {"yes", "proceed"}
 
 DEVICE_IP = get_device_ip()
 HOST_HEADER = AKTO_HOST.replace("https://", "").replace("http://", "")
@@ -200,23 +202,24 @@ def prompt_fingerprint(prompt: str) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-def load_warn_pending() -> Set[str]:
+def load_warn_pending() -> Dict[str, Dict[str, str]]:
+    """Session-keyed map of warn-flagged prompts awaiting a "yes"/"proceed" reply."""
     if not os.path.exists(WARN_STATE_PATH):
-        return set()
+        return {}
     try:
         with open(WARN_STATE_PATH, encoding="utf-8") as f:
             data = json.load(f)
-        return set(data.get("warn_pending", []))
+        return data if isinstance(data, dict) else {}
     except (json.JSONDecodeError, OSError) as e:
         logger.warning(f"Could not read warn-pending map: {e}")
-        return set()
+        return {}
 
 
-def save_warn_pending(hashes: Set[str]) -> None:
+def save_warn_pending(pending: Dict[str, Dict[str, str]]) -> None:
     tmp_path = WARN_STATE_PATH + ".tmp"
     try:
         with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump({"warn_pending": sorted(hashes)}, f, indent=0)
+            json.dump(pending, f, indent=0)
             f.write("\n")
         os.replace(tmp_path, WARN_STATE_PATH)
     except OSError as e:
@@ -226,34 +229,6 @@ def save_warn_pending(hashes: Set[str]) -> None:
                 os.remove(tmp_path)
             except OSError:
                 pass
-
-
-def apply_warn_resubmit_flow(
-    gr_allowed: bool,
-    reason: str,
-    behaviour: str,
-    fingerprint: str,
-) -> Tuple[bool, str]:
-    if gr_allowed:
-        return True, ""
-
-    if _is_alert_behaviour(behaviour):
-        logger.info("Alert behaviour: allowing despite violation (server-side alert only)")
-        return True, ""
-
-    if not _is_warn_behaviour(behaviour):
-        return False, reason
-
-    pending = load_warn_pending()
-    if fingerprint in pending:
-        pending.discard(fingerprint)
-        save_warn_pending(pending)
-        logger.info("Warn flow: allowing resubmit; removed fingerprint from map")
-        return True, ""
-
-    pending.add(fingerprint)
-    save_warn_pending(pending)
-    return False, reason
 
 
 def ingest_blocked_request(user_prompt: str, reason: str, session_info: dict = None):
@@ -295,6 +270,7 @@ def main():
         sys.exit(0)
 
     prompt = input_data.get("prompt", "")
+    session_id = str(input_data.get("session_id") or "")
 
     # Persist + open the message turn, and backfill any missing ids from prior events.
     session_info = resolve_session_info(input_data, logger, is_prompt_hook=True)
@@ -306,22 +282,62 @@ def main():
     logger.info(f"Processing prompt (length: {len(prompt)} chars)")
 
     if AKTO_SYNC_MODE:
-        gr_allowed, gr_reason, behaviour = call_guardrails(prompt, session_info)
-        fingerprint = prompt_fingerprint(prompt)
-        allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint)
+        pending = load_warn_pending()
+        pending_entry = pending.get(session_id) if session_id else None
 
-        if not allowed:
-            if _is_warn_behaviour(behaviour):
-                block_reason = (
-                    "Warning!!, prompt blocked, please review it. Send again to bypass. "
-                    f"Reason for blocking: {gr_reason}"
-                )
+        if pending_entry:
+            original_prompt = pending_entry.get("prompt", "")
+            if prompt.strip().lower() in AFFIRMATIVE_TRIGGERS:
+                pending.pop(session_id, None)
+                save_warn_pending(pending)
+                logger.info("Warn flow: user confirmed via yes/proceed, resubmitting stored prompt via additionalContext")
+                output = {
+                    "hookSpecificOutput": {
+                        "hookEventName": "UserPromptSubmit",
+                        "permissionDecision": "allow",
+                        "additionalContext": original_prompt
+                    }
+                }
+                print(json.dumps(output))
+                sys.exit(0)
+            elif prompt_fingerprint(prompt) == pending_entry.get("fingerprint"):
+                # Exact resubmit of the identical blocked text still bypasses, same as before.
+                pending.pop(session_id, None)
+                save_warn_pending(pending)
+                logger.info("Warn flow: exact resubmit matched pending prompt; allowing")
+                sys.exit(0)
             else:
-                block_reason = f"Prompt blocked: {gr_reason}"
+                logger.info("Warn flow: reply matched neither confirmation nor exact resubmit; clearing pending prompt")
+                pending.pop(session_id, None)
+                save_warn_pending(pending)
 
-            output = {"decision": "block", "reason": block_reason}
+        gr_allowed, gr_reason, behaviour = call_guardrails(prompt, session_info)
+
+        if not gr_allowed and _is_alert_behaviour(behaviour):
+            logger.info("Alert behaviour: allowing despite violation (server-side alert only)")
+            gr_allowed = True
+
+        if not gr_allowed and _is_warn_behaviour(behaviour):
+            if session_id:
+                pending[session_id] = {
+                    "prompt": prompt,
+                    "reason": gr_reason,
+                    "fingerprint": prompt_fingerprint(prompt),
+                }
+                save_warn_pending(pending)
+            block_reason = (
+                "Warning!!, prompt blocked, please review it. Reply with \"yes\" or \"proceed\" or send the exact same text to continue. "
+                f"Reason for blocking: {gr_reason}"
+            )
             logger.warning(f"BLOCKING prompt - Reason: {gr_reason}")
-            print(json.dumps(output))
+            print(json.dumps({"decision": "block", "reason": block_reason}))
+            ingest_blocked_request(prompt, gr_reason, session_info)
+            sys.exit(0)
+
+        if not gr_allowed:
+            block_reason = f"Prompt blocked: {gr_reason}"
+            logger.warning(f"BLOCKING prompt - Reason: {gr_reason}")
+            print(json.dumps({"decision": "block", "reason": block_reason}))
             ingest_blocked_request(prompt, gr_reason, session_info)
             sys.exit(0)
 
