@@ -1132,6 +1132,15 @@ const settingRequests = {
             data: {moduleId, moduleName, envData}
         })
     },
+    // Bulk counterpart for the Endpoint Shield table's multi-select (e.g. enabling/disabling
+    // system proxy for several agents at once) — same envData shape as updateModuleEnvAndReboot.
+    bulkUpdateModuleEnvAndReboot(moduleIds, envData) {
+        return request({
+            url: '/api/bulkUpdateModuleEnvAndReboot',
+            method: 'post',
+            data: {moduleIds, envData}
+        })
+    },
     fetchFilterYamlTemplate() {
         return request({
             url: '/api/fetchFilterYamlTemplate',
