@@ -10,6 +10,8 @@ import com.akto.util.JSONUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -56,6 +58,16 @@ public class AgentQueryRecord {
 
     private static final int ATLAS_SESSION_TTL = Constants.ONE_DAY_TIMESTAMP;
     private static final Map<String, Integer> ATLAS_SESSION_LAST_SEEN = new ConcurrentHashMap<>();
+
+    private static final int SESSION_SYNTH_ACCOUNT_ID = 1785654409;
+    private static final int MAX_SYNTHESIZED_SESSIONS = 10_000;
+    private static final Map<String, String> TRACE_SESSION_IDS = Collections.synchronizedMap(
+            new LinkedHashMap<String, String>(16, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+                    return size() > MAX_SYNTHESIZED_SESSIONS;
+                }
+            });
 
     public AgentQueryRecord(String docId, int accountId, String serviceId, String deviceId,
                             String userName, String sessionIdentifier,
@@ -128,6 +140,11 @@ public class AgentQueryRecord {
 
         Map<String, List<String>> headers = p.getRequestParams().getHeaders();
         String sessionIdentifier = getFirstHeader(headers, HEADER_PREFIX + HEADER_SESSION_ID);
+        String traceId           = getFirstHeader(headers, HEADER_PREFIX + HEADER_TRACE_ID);
+
+        if (sessionIdentifier == null || sessionIdentifier.isEmpty()) {
+            sessionIdentifier = synthesizeSessionId(Context.getActualAccountId(), traceId);
+        }
 
         String source = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_SOURCE) : null;
         boolean isBrowserExtensionTraffic = tagsMap != null && tagsMap.containsKey(Constants.AKTO_BROWSER_LLM_TAG);
@@ -194,7 +211,6 @@ public class AgentQueryRecord {
             deviceId  = getFirstHeader(headers, HEADER_PREFIX + HEADER_DEVICE_ID);
         }
 
-        String traceId           = getFirstHeader(headers, HEADER_PREFIX + HEADER_TRACE_ID);
         String messageIdHeader   = getFirstHeader(headers, Constants.AKTO_MESSAGE_ID_HEADER);
         String spanId = (messageIdHeader != null && !messageIdHeader.isEmpty())
                 ? messageIdHeader
@@ -228,6 +244,13 @@ public class AgentQueryRecord {
         );
         record.setGuardrailVerdict(p.getGuardrailVerdict());
         return record;
+    }
+
+    private static String synthesizeSessionId(int accountId, String traceId) {
+        if (accountId != SESSION_SYNTH_ACCOUNT_ID || traceId == null || traceId.isEmpty()) {
+            return null;
+        }
+        return TRACE_SESSION_IDS.computeIfAbsent(traceId, k -> "session_" + UUID.randomUUID());
     }
 
     private static boolean isKnownAtlasSession(String sessionIdentifier) {
