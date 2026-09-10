@@ -113,6 +113,11 @@ public class Constants {
     public static final String AI_AGENT_SOURCE_ENDPOINT = "ENDPOINT";
     public static final String AI_AGENT_TAG_BOT_NAME = "bot-name";
     public static final String AI_AGENT_TAG_BOT_SCHEMA_NAME = "bot-schemaname";
+    public static final String AI_AGENT_TAG_GATEWAY_NAME = "gateway-name";
+    // No literal "gateway-role" tag is ever sent — AWS breaks it into "gateway-role-*"
+    // sub-fields (services, actions, resources, etc). Of those, "-resources" is the one
+    // that actually identifies what the gateway's role can act on.
+    public static final String AI_AGENT_TAG_GATEWAY_ROLE = "gateway-role-resources";
     public static final String AI_AGENT_TAG_SOURCE = "source";
     public static final String AI_AGENT_TAG_CONNECTOR = "connector";
     public static final String AI_AGENT_CONNECTOR_MICROSOFT_DEFENDER = "MICROSOFT_DEFENDER";
