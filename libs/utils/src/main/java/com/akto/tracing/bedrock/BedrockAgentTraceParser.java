@@ -182,11 +182,22 @@ public class BedrockAgentTraceParser implements TraceParser {
 
     @Override
     public Map<String, ServiceGraphEdgeInfo> extractServiceGraph(Object input) throws Exception {
-        return extractServiceGraph(input, null);
+        return extractServiceGraph(input, null, null, null);
     }
 
     /** @param botName see {@link #parse(Object, String)}. */
     public Map<String, ServiceGraphEdgeInfo> extractServiceGraph(Object input, String botName) throws Exception {
+        return extractServiceGraph(input, botName, null, null);
+    }
+
+    /**
+     * @param botName see {@link #parse(Object, String)}.
+     * @param gatewayName the HTTP-level "gateway-name" tag; when present alongside gatewayRole, an
+     *        extra Gateway node is spliced into the chain between User and the agent node.
+     * @param gatewayRole the HTTP-level "gateway-role" tag, shown as the Gateway node's role.
+     */
+    public Map<String, ServiceGraphEdgeInfo> extractServiceGraph(Object input, String botName,
+            String gatewayName, String gatewayRole) throws Exception {
         try {
             JsonNode awsMetadata = parseToJsonNode(input);
 
@@ -212,13 +223,31 @@ public class BedrockAgentTraceParser implements TraceParser {
             agentMetadata.put("type", TracingConstants.SpanKind.AGENT);
             agentMetadata.put("edgeParam", "AI Agent");
             agentMetadata.put("role", executionRole);
-            edges.put(sourceService, new ServiceGraphEdgeInfo("User", sourceService, agentMetadata));
 
-            // LLM Call edge
-            Map<String, Object> llmMetadata = new HashMap<>();
-            llmMetadata.put("type", "llmCall");
-            llmMetadata.put("edgeParam", "Call to model");
-            edges.put(model, new ServiceGraphEdgeInfo(sourceService, model, llmMetadata));
+            // Only known when both tags are present — a gateway node with no role to show
+            // isn't worth splicing in, so fall back to the plain User -> Agent edge.
+            boolean hasGateway = gatewayName != null && !gatewayName.isEmpty()
+                && gatewayRole != null && !gatewayRole.isEmpty();
+            if (hasGateway) {
+                Map<String, Object> gatewayMetadata = new HashMap<>();
+                gatewayMetadata.put("type", TracingConstants.SpanKind.GATEWAY);
+                gatewayMetadata.put("edgeParam", "Gateway");
+                gatewayMetadata.put("role", gatewayRole);
+                edges.put(gatewayName, new ServiceGraphEdgeInfo("User", gatewayName, gatewayMetadata));
+                edges.put(sourceService, new ServiceGraphEdgeInfo(gatewayName, sourceService, agentMetadata));
+            } else {
+                edges.put(sourceService, new ServiceGraphEdgeInfo("User", sourceService, agentMetadata));
+            }
+
+            // LLM Call edge — "model" is present-but-empty (not absent) for pure tool-routing
+            // calls like a Gateway MCP passthrough, where no foundation model was ever invoked;
+            // an empty key would otherwise create a blank, nameless node in the graph.
+            if (!model.isEmpty()) {
+                Map<String, Object> llmMetadata = new HashMap<>();
+                llmMetadata.put("type", "llmCall");
+                llmMetadata.put("edgeParam", "Call to model");
+                edges.put(model, new ServiceGraphEdgeInfo(sourceService, model, llmMetadata));
+            }
 
             // Add tools edge for AgentCore
             if (agentType.equals(AGENT_TYPE_AGENTCORE)) {

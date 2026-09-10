@@ -945,6 +945,12 @@ public class HttpCallParser {
             // "bot-name" tag (the same one used to name the collection) covers that gap.
             String fallbackBotName = resolveAgentNameFromTags(httpResponseParam.getTags());
 
+            // Optional "gateway-name"/"gateway-role" tags splice a Gateway node between
+            // User and the agent node in the service graph below.
+            Map<String, String> tagsMap = parseTagsMap(httpResponseParam.getTags());
+            String gatewayName = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_GATEWAY_NAME) : null;
+            String gatewayRole = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_GATEWAY_ROLE) : null;
+
             // Parse trace using BedrockAgentTraceParser
             TraceParseResult result = BedrockAgentTraceParser.getInstance().parse(bedrockTraceJson, fallbackBotName);
             if (result.getTrace() != null && httpResponseParam.getRequestParams() != null) {
@@ -967,7 +973,7 @@ public class HttpCallParser {
             if (httpResponseParam.getRequestParams() != null) {
                 int apiCollectionId = httpResponseParam.getRequestParams().getApiCollectionId();
                 if (apiCollectionId != -1) {
-                    Map<String, ServiceGraphEdgeInfo> edges = BedrockAgentTraceParser.getInstance().extractServiceGraph(bedrockTraceJson, fallbackBotName);
+                    Map<String, ServiceGraphEdgeInfo> edges = BedrockAgentTraceParser.getInstance().extractServiceGraph(bedrockTraceJson, fallbackBotName, gatewayName, gatewayRole);
                     if (edges != null && !edges.isEmpty()) {
                         ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
                         loggerMaker.info("Updated service graph for Bedrock Agent: " + botName
