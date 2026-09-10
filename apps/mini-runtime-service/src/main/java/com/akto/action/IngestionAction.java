@@ -10,6 +10,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.runtime.utils.Utils;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
+import com.akto.util.SecretUtils;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -77,7 +78,7 @@ public class IngestionAction extends ActionSupport {
 
     public static int getAccountId() {
         try {
-            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+            String token = SecretUtils.readSecret("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
             DecodedJWT jwt = JWT.decode(token);
             String payload = jwt.getPayload();
             byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);

@@ -17,6 +17,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import com.akto.log.LoggerMaker;
+import com.akto.util.SecretUtils;
 import com.akto.log.LoggerMaker.LogDb;
 
 public class PayloadEncodeUtil {
@@ -25,9 +26,9 @@ public class PayloadEncodeUtil {
 
     public static RSAPrivateKey getPrivateKey() {
         try {
-            String privateKeyPem = System.getenv("PRIVATE_KEY");
+            String privateKeyPem = SecretUtils.readSecret("PRIVATE_KEY");
             if (privateKeyPem == null || privateKeyPem.isEmpty()) {
-                throw new IllegalStateException("Environment variable RSA_PRIVATE_KEY is not set or empty");
+                throw new IllegalStateException("PRIVATE_KEY is not set or empty (checked PRIVATE_KEY_FILE first)");
             }
 
             // Remove PEM headers/footers and whitespace
@@ -48,9 +49,9 @@ public class PayloadEncodeUtil {
 
     public static RSAPublicKey getPublicKey() {
         try {
-            String publicKeyPem = System.getenv("PUBLIC_KEY");
+            String publicKeyPem = SecretUtils.readSecret("PUBLIC_KEY");
             if (publicKeyPem == null || publicKeyPem.isEmpty()) {
-                throw new IllegalStateException("Environment variable RSA_PUBLIC_KEY is not set or empty");
+                throw new IllegalStateException("PUBLIC_KEY is not set or empty (checked PUBLIC_KEY_FILE first)");
             }
 
             // Remove PEM headers/footers and whitespace
@@ -71,7 +72,7 @@ public class PayloadEncodeUtil {
     }
 
     public static KeyPair generateRSAKeyPairFromSecret() {
-        String secretKey = System.getenv("SECRET_KEY");
+        String secretKey = SecretUtils.readSecret("SECRET_KEY");
         if (secretKey == null || secretKey.isEmpty()) {
             loggerMaker.errorAndAddToDb("payload encode secret key absent, avoiding key pair generation");
             return null;

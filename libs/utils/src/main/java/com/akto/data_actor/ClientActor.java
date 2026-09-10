@@ -45,6 +45,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
+import com.akto.util.SecretUtils;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -3862,7 +3863,7 @@ public class ClientActor extends DataActor {
         if (exchangedAuthToken != null) {
             return exchangedAuthToken;
         }
-        return System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+        return SecretUtils.readSecret("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
     }
 
     private static void ensureModuleTypeExchanged() {
@@ -3889,7 +3890,7 @@ public class ClientActor extends DataActor {
         try {
             loggerMaker.warn("Attempting database abstractor token exchange for moduleType " + moduleType);
             Map<String, List<String>> headers = new HashMap<>();
-            headers.put(AUTHORIZATION, Collections.singletonList(System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN")));
+            headers.put(AUTHORIZATION, Collections.singletonList(SecretUtils.readSecret("DATABASE_ABSTRACTOR_SERVICE_TOKEN")));
 
             BasicDBObject obj = new BasicDBObject();
             obj.put("moduleType", moduleType);
