@@ -40,7 +40,7 @@ public class ApiDistributionDataService {
 
     List<String> RL_ALLOWED_ACCOUNTS = Arrays.asList("1662680463");
     public ApiDistributionDataResponsePayload saveApiDistributionData(String accountId, ApiDistributionDataRequestPayload payload) {
-        if (!RL_ALLOWED_ACCOUNTS.contains(accountId)) {
+        if (!RL_ALLOWED_ACCOUNTS.contains(accountId) || true) {
             return ApiDistributionDataResponsePayload.newBuilder().build();
         }
         List<WriteModel<ApiDistributionDataModel>> bulkUpdates = new ArrayList<>();

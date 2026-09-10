@@ -99,7 +99,7 @@ public class Main {
      // Start PercentilesCron (single scheduler for all accounts, runs every 2 hours)
     try {
       PercentilesCron percentilesCron = new PercentilesCron(threatProtectionMongo);
-      percentilesCron.startCron();
+      // percentilesCron.startCron();
       logger.infoAndAddToDb("Started PercentilesCron scheduler (runs every 2 hours for all accounts)");
     } catch (Exception e) {
       logger.errorAndAddToDb("Error starting PercentilesCron: " + e.getMessage());
