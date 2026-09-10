@@ -2,36 +2,29 @@ package com.akto.action.threat_detection;
 
 import com.akto.dao.GuardrailPoliciesDao;
 import com.akto.dao.context.Context;
-import com.akto.database_abstractor_authenticator.JwtAuthenticator;
-import com.akto.dto.EnterpriseLicenseComplianceCatalog;
+import com.akto.dao.jobs.AccountJobDao;
 import com.akto.dto.GuardrailPolicies;
+import com.akto.dto.jobs.AccountJob;
+import com.akto.dto.jobs.JobStatus;
+import com.akto.dto.jobs.ScheduleType;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
-import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
+import com.akto.utils.guardrails.GuardrailsServiceClient;
 import com.akto.utils.guardrails.PromptSnippet;
-import com.akto.utils.search.SearchClient;
 import com.akto.utils.search.SearchClientFactory;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
 import lombok.Getter;
 import lombok.Setter;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -65,18 +58,9 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
 
     private static final LoggerMaker loggerMaker =
         new LoggerMaker(GuardrailPolicyReplayAction.class, LogDb.DASHBOARD);
-    private static final ObjectMapper objectMapper = new ObjectMapper();
-
-    // A page evaluates every item against up to two policies, each of which can reach the LLM
-    // scanners, so allow a generous read timeout; the guardrails service bounds each evaluation.
-    private static final OkHttpClient httpClient = CoreHTTPClient.client.newBuilder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(180, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .build();
 
     /** Must not exceed maxReplayItems in the guardrails service's replay handler. */
-    private static final int PAGE_SIZE = 25;
+    private static final int PAGE_SIZE = GuardrailsServiceClient.PAGE_SIZE;
     /** Items examined per run, newest first. */
     private static final int MAX_VIOLATIONS = 100;
 
@@ -86,13 +70,6 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
      */
     private static final long TRACE_LOOKBACK_MS = TimeUnit.DAYS.toMillis(30);
 
-    /**
-     * Placeholder request line for a trace-derived envelope. AgentQueryRecord records the prompt but
-     * not the HTTP method/path, so there is nothing real to put here; with no field mapping matching
-     * this path the guardrails service scans the raw payload, which is what we want.
-     */
-    private static final String TRACE_METHOD = "POST";
-    private static final String TRACE_PATH = "/v1/messages";
     /** Which recent sample to compare over. */
     static final String SOURCE_VIOLATIONS = "VIOLATIONS";
     static final String SOURCE_TRACES = "TRACES";
@@ -106,12 +83,13 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
      */
     private static final ExecutorService executor = Executors.newFixedThreadPool(2);
 
-    /** Account whose guardrails traffic is served by the shared ingest host rather than its own. */
-    private static final int SHARED_INGEST_ACCOUNT_ID = 1768175789;
-    private static final int TOKEN_VALIDITY_MINUTES = 120;
-
     private static final long RUN_TTL_MS = TimeUnit.MINUTES.toMillis(15);
     private static final long BASELINE_TTL_MS = TimeUnit.MINUTES.toMillis(30);
+
+    /** jobType this action schedules for {@link #startPolicyBackfillReplay()}; must match the
+     *  key {@code GuardrailPolicyBackfillReplayExecutor} is registered under in
+     *  {@code AccountJobExecutorFactory}. */
+    public static final String BACKFILL_JOB_TYPE = "GUARDRAIL_POLICY_BACKFILL_REPLAY";
 
     /**
      * How coarsely the violation window is bucketed for baseline caching, in seconds.
@@ -209,6 +187,19 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
     @Getter
     private BasicDBObject replayResult;
 
+    // ---------------------------------------------------------------- backfill replay
+
+    /** Backfill window lower bound, epoch seconds. Defaults to 0 (all history) when unset/&lt;=0. */
+    @Setter
+    private Integer backfillStartTimestamp;
+
+    /** Backfill window upper bound, epoch seconds. Defaults to "now" when unset/&lt;=0. */
+    @Setter
+    private Integer backfillEndTimestamp;
+
+    @Getter
+    private String backfillJobId;
+
     // ---------------------------------------------------------------- start
 
     public String startPolicyReplay() {
@@ -228,7 +219,7 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
         // Serialize on the request thread: it reads the saved policy and mutates the draft, and the
         // draft object is request-scoped.
         GuardrailPolicies saved = loadSavedPolicy();
-        BasicDBObject editedPayload = serializePolicy(policy, policyName);
+        BasicDBObject editedPayload = GuardrailsServiceClient.serializePolicy(policy, policyName, contextSource);
         // Snap the window's upper bound to the same bucket the baseline cache is keyed on. If this
         // were plain Context.now(), every run would examine a slightly different set of events while
         // looking up ids cached against the previous set: violations arriving between runs would be
@@ -267,6 +258,114 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
         });
 
         replayResult = new BasicDBObject("runId", id).append("status", "RUNNING");
+        return SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Schedules a background job that replays historical traffic through the currently active,
+     * saved policy and, for anything it now catches, records a real guardrail activity
+     * (malicious_events, label GUARDRAIL) timestamped at the original traffic time — unlike
+     * {@link #startPolicyReplay()}, which only ever reports a comparison and never persists.
+     *
+     * <p>Runs as one {@link AccountJob} (jobType {@link #BACKFILL_JOB_TYPE}) picked up by
+     * {@code AccountJobsCron} in apps/account-job-executor, not the in-process executor above:
+     * a backfill can cover a large window and must survive a restart without reprocessing or
+     * losing progress, which the ephemeral {@link #executor} here does not guarantee.
+     */
+    public String startPolicyBackfillReplay() {
+        if (StringUtils.isBlank(policyName)) {
+            addActionError("Policy name is required");
+            return ERROR.toUpperCase();
+        }
+
+        GuardrailPolicies saved = loadSavedPolicy();
+        if (saved == null || !saved.isActive()) {
+            addActionError("An active saved policy named '" + policyName + "' is required to backfill against");
+            return ERROR.toUpperCase();
+        }
+
+        int now = Context.now();
+        int startTs = (backfillStartTimestamp != null && backfillStartTimestamp > 0) ? backfillStartTimestamp : 0;
+        int rawEndTs = (backfillEndTimestamp != null && backfillEndTimestamp > 0) ? backfillEndTimestamp : now;
+        // Nothing to backfill from the future: a range picker's "All time"/preset upper bound can
+        // land past "now", so clamp rather than reject — the practical window is always [start, now].
+        int endTs = Math.min(rawEndTs, now);
+
+        if (endTs <= startTs) {
+            addActionError("endTimestamp must be after startTimestamp");
+            return ERROR.toUpperCase();
+        }
+
+        // Computed once, at creation time: a RUN_ONCE job sitting briefly SCHEDULED before being
+        // claimed should still cover up through when it was queued, even if the caller's endTs
+        // default ("now" at request time) was computed a moment earlier.
+        int effectiveEndTimestamp = Math.max(now, endTs);
+
+        // account-job-executor has no direct MongoDB connection (it only talks to Cyborg/HTTP —
+        // see its Main.java), so the policy is serialized once here, on the request thread that
+        // already has full Mongo access, and carried inline in job.config — exactly the same
+        // "sent inline, never read from Mongo" convention startPolicyReplay() already uses for
+        // its edited-draft payload. A side effect a long backfill actually wants: the run stays
+        // pinned to the policy version that was active when it was queued, even if someone edits
+        // the policy again while the backfill is still in progress.
+        BasicDBObject policyPayload = GuardrailsServiceClient.serializePolicy(saved, policyName, contextSource());
+        // serializePolicy fills in a default contextSource when the policy has none of its own, so
+        // this is always a real value after the call above — the caller never chooses it, the
+        // policy's own configuration decides.
+        String resolvedContextSource = saved.getContextSource().name();
+
+        // Minted once, here, instead of per-call inside the executor: a backfill can make
+        // hundreds of guardrails-service/threat-detection-backend calls over its lifetime, and
+        // signing a fresh JWT for every one of them is pure waste when a single longer-lived
+        // token (verified the same way — RSA signature + accountId claim, nothing subject- or
+        // scope-specific) works for the whole job.
+        String apiToken;
+        try {
+            apiToken = GuardrailsServiceClient.createLongLivedAuthToken(
+                Collections.singletonList("GUARDRAIL"), 1);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Could not create auth token for backfill job: " + e.getMessage());
+            addActionError("Could not start backfill");
+            return ERROR.toUpperCase();
+        }
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("policyName", policyName);
+        config.put("policyPayload", policyPayload);
+        config.put("contextSource", resolvedContextSource);
+        config.put("apiToken", apiToken);
+        config.put("startTimestamp", startTs);
+        config.put("endTimestamp", endTs);
+        config.put("effectiveEndTimestamp", effectiveEndTimestamp);
+        // Resumable checkpoint: an opaque Elasticsearch search_after cursor, empty until the
+        // executor commits its first page. See GuardrailPolicyBackfillReplayExecutor.
+        config.put("searchAfterJson", "");
+        config.put("processedCount", 0);
+        config.put("detectedCount", 0);
+        config.put("lastBatchError", null);
+
+        AccountJob accountJob = new AccountJob(
+            Context.accountId.get(),
+            BACKFILL_JOB_TYPE,
+            policyName,
+            config,
+            0,      // recurringIntervalSeconds: this is a RUN_ONCE job
+            now,
+            now
+        );
+        accountJob.setJobStatus(JobStatus.SCHEDULED);
+        accountJob.setScheduleType(ScheduleType.RUN_ONCE);
+        accountJob.setScheduledAt(now);
+        accountJob.setHeartbeatAt(0);
+        accountJob.setStartedAt(0);
+        accountJob.setFinishedAt(0);
+
+        AccountJobDao.instance.insertOne(accountJob);
+        backfillJobId = accountJob.getId().toHexString();
+        loggerMaker.info("Created guardrail backfill replay job " + backfillJobId
+            + " for policy " + policyName + " window=[" + startTs + "," + endTs + "]");
+
+        replayResult = new BasicDBObject("jobId", backfillJobId).append("status", "SCHEDULED");
         return SUCCESS.toUpperCase();
     }
 
@@ -342,7 +441,8 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
             }
 
             if (!items.isEmpty()) {
-                for (JsonNode verdict : replay(items, editedPayload, baselinePayload, contextSource)) {
+                for (JsonNode verdict : GuardrailsServiceClient.replay(
+                        items, editedPayload, baselinePayload, contextSource.name())) {
                     if (!verdict.path("skipReason").asText("").isEmpty()) {
                         continue;
                     }
@@ -376,35 +476,6 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
             + " examined=" + run.examined + " compared=" + run.compared
             + " current=" + run.currentDetected + " modified=" + run.modifiedDetected
             + " missed=" + run.missed.size() + " baselineCached=" + run.baselineFromCache);
-    }
-
-    /** POSTs one page to the guardrails service and returns the verdict nodes. */
-    private Iterable<JsonNode> replay(List<BasicDBObject> items, BasicDBObject editedPayload,
-                                      BasicDBObject baselinePayload, CONTEXT_SOURCE contextSource) throws Exception {
-        BasicDBObject body = new BasicDBObject()
-            .append("policy", editedPayload)
-            .append("contextSource", contextSource.name())
-            .append("items", items);
-        if (baselinePayload != null) {
-            body.append("baselinePolicy", baselinePayload);
-        }
-
-        Request request = new Request.Builder()
-            .url(guardrailsBaseUrl() + "/api/validate/replayWithPolicy")
-            .post(RequestBody.create(body.toJson(), MediaType.parse("application/json")))
-            .addHeader("Content-Type", "application/json")
-            .addHeader("Authorization", guardrailsAuthToken())
-            .build();
-
-        try (Response response = httpClient.newCall(request).execute()) {
-            ResponseBody responseBody = response.body();
-            String raw = responseBody != null ? responseBody.string() : "";
-            if (!response.isSuccessful()) {
-                throw new IllegalStateException(
-                    "guardrails service returned " + response.code() + ": " + raw);
-            }
-            return objectMapper.readTree(raw).path("verdicts");
-        }
     }
 
     // ---------------------------------------------------------------- helpers
@@ -459,26 +530,9 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
                 id = "trace-" + out.size();
             }
             out.add(new ReplaySample(id,
-                traceEnvelope(prompt, asText(row.get(AgentQueryRecord.F_RESPONSE_PAYLOAD)))));
+                GuardrailsServiceClient.traceEnvelope(prompt, asText(row.get(AgentQueryRecord.F_RESPONSE_PAYLOAD)))));
         }
         return out;
-    }
-
-    /**
-     * Wraps a recorded prompt in the stored-traffic envelope the guardrails service already parses.
-     *
-     * <p>{@code queryPayload} is passed through untouched because it is <em>already</em> the request
-     * payload JSON — real rows look like {@code {"body": ...}} or {@code {"body":..., "toolName":...}},
-     * the same shape live gateway traffic has. Wrapping it again would bury the prompt one level
-     * deeper than any field mapping or extractor looks.
-     */
-    private static String traceEnvelope(String requestPayload, String responsePayload) {
-        return new BasicDBObject()
-            .append("method", TRACE_METHOD)
-            .append("path", TRACE_PATH)
-            .append("requestPayload", requestPayload)
-            .append("responsePayload", responsePayload == null ? "" : responsePayload)
-            .toJson();
     }
 
     private static String asText(Object value) {
@@ -504,7 +558,7 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
 
     /** Null when there is no saved policy — a brand-new policy has no baseline to compare against. */
     private BasicDBObject serializeBaseline(GuardrailPolicies saved) {
-        return saved == null ? null : serializePolicy(saved, policyName);
+        return saved == null ? null : GuardrailsServiceClient.serializePolicy(saved, policyName, contextSource());
     }
 
     private String baselineCacheKey(GuardrailPolicies saved, int endTimestamp, boolean useTraces) {
@@ -542,82 +596,9 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
         runs.entrySet().removeIf(e -> now - e.getValue().startedAtMs > RUN_TTL_MS);
     }
 
-    // ------------------------------------------------- guardrails service transport
-
-    /**
-     * Base URL of the calling account's guardrails service, without a trailing slash.
-     *
-     * <p>{@code GUARDRAILS_SERVICE_URL} overrides the per-account host — set it to point a local or
-     * self-hosted dashboard at a specific guardrails service.
-     */
-    private static String guardrailsBaseUrl() {
-        String override = System.getenv("GUARDRAILS_SERVICE_URL");
-        if (StringUtils.isNotBlank(override)) {
-            return StringUtils.stripEnd(override.trim(), "/");
-        }
-        int accountId = Context.accountId.get();
-        if (accountId == SHARED_INGEST_ACCOUNT_ID) {
-            return "https://ingest.akto.io";
-        }
-        return "https://" + accountId + "-guardrails.akto.io";
-    }
-
-    /** Short-lived JWT authenticating the dashboard to the guardrails service. */
-    private static String guardrailsAuthToken() throws Exception {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("accountId", Context.accountId.get());
-        return JwtAuthenticator.createJWT(claims, "Akto", "invite_user", Calendar.MINUTE, TOKEN_VALIDITY_MINUTES);
-    }
-
     /** The context source to evaluate under, defaulting to AGENTIC when the request carries none. */
     private static CONTEXT_SOURCE contextSource() {
         CONTEXT_SOURCE fromRequest = Context.contextSource.get();
         return fromRequest != null ? fromRequest : CONTEXT_SOURCE.AGENTIC;
-    }
-
-    /**
-     * Serializes a policy for transmission to the guardrails service, dropping Mongo-internal fields
-     * and forcing {@code active} on — an inactive policy would allow everything, making the
-     * comparison meaningless.
-     *
-     * <p>Mutates {@code policy}: expands enterprise-licence categories into denied topics and fills
-     * in {@code contextSource} / {@code applyOnRequest} when unset, so both sides of the comparison
-     * are shaped identically.
-     *
-     * @param fallbackName used when the policy has no name of its own (unsaved drafts)
-     */
-    private static BasicDBObject serializePolicy(GuardrailPolicies policy, String fallbackName) {
-        policy.setActive(true);
-        if (policy.getContextSource() == null) {
-            policy.setContextSource(contextSource());
-        }
-        // Request validation is the common case; a policy targeting neither side would no-op.
-        if (!policy.isApplyOnRequest() && !policy.isApplyOnResponse()) {
-            policy.setApplyOnRequest(true);
-        }
-        EnterpriseLicenseComplianceCatalog.applyToPolicy(policy);
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> policyMap = objectMapper.convertValue(policy, Map.class);
-
-        policyMap.remove("id");
-        policyMap.remove("hexId");
-        policyMap.remove("createdTimestamp");
-        policyMap.remove("updatedTimestamp");
-        policyMap.remove("createdBy");
-        policyMap.remove("updatedBy");
-
-        String name = policy.getName();
-        if (StringUtils.isBlank(name)) {
-            name = fallbackName;
-        }
-        policyMap.put("name", name);
-        policyMap.put("active", true);
-        if (policy.getContextSource() != null) {
-            policyMap.put("contextSource", policy.getContextSource().name());
-        }
-        policyMap.put("policyVersion", "1.0");
-
-        return new BasicDBObject(policyMap);
     }
 }
