@@ -561,6 +561,11 @@ function SampleDetails(props) {
         const [sessionLoading, setSessionLoading] = useState(false);
         const [isSessionBased, setIsSessionBased] = useState(hasSessionId);
 
+        // Agentic Security events with no sessionId: fall back to fetching the nearest
+        // before/after messages on the same host from ES instead of showing nothing.
+        const [contextWindow, setContextWindow] = useState(null); // {anchor, before, after, llmInvoked}
+        const [contextWindowLoading, setContextWindowLoading] = useState(false);
+
         // Fetch session data from agentic_session_context table API using sessionId
         useEffect(() => {
             if (hasSessionId) {
@@ -588,6 +593,29 @@ function SampleDetails(props) {
                 setIsSessionBased(false);
             }
         }, [sessionId, hasSessionId]);
+
+        // No usable session found for this event: for Agentic Security events, fetch the nearest
+        // before/after messages on the same host (there's no session/trace id to key off) instead
+        // of leaving the analyst with nothing. Endpoint Security keeps the plain fallback text.
+        const host = moreInfoData?.host;
+        const anchorTimestamp = data?.[0]?.ts;
+        useEffect(() => {
+            if (sessionLoading || isSessionBased || !isAgenticSecurityCategory() || !host || !anchorTimestamp) {
+                return;
+            }
+            setContextWindowLoading(true);
+            threatDetectionApi.fetchContextMessages(host, anchorTimestamp)
+                .then((resp) => {
+                    const hasContent = resp && (resp.anchor || resp.before?.length > 0 || resp.after?.length > 0);
+                    setContextWindow(hasContent ? resp : null);
+                })
+                .catch(() => {
+                    setContextWindow(null);
+                })
+                .finally(() => {
+                    setContextWindowLoading(false);
+                });
+        }, [sessionLoading, isSessionBased, host, anchorTimestamp]);
 
         // Parse conversation info from session data
         let sessionPrompts = [];
@@ -645,6 +673,52 @@ function SampleDetails(props) {
                 minute: '2-digit',
                 hour12: true
             });
+        };
+
+        // How confidently a context-window turn (see ElasticSearchClient.fetchContextWindow /
+        // ConversationContinuityClassifier) can be trusted as part of the flagged message's own
+        // conversation - a raw session match is a hard signal, everything else went through (or
+        // failed to resolve via) the AI fallback and is shown as such rather than asserted.
+        const contextTurnBadge = (turn) => {
+            if (turn?.resolutionMethod === 'session_match') {
+                return { tone: 'success', label: 'Same session' };
+            }
+            if (turn?.sameConversation === true) {
+                return { tone: 'info', label: `AI-inferred${turn.confidence ? ` (${turn.confidence})` : ''}` };
+            }
+            if (turn?.sameConversation === false) {
+                return { tone: undefined, label: 'Likely unrelated' };
+            }
+            return { tone: 'warning', label: 'Uncertain' };
+        };
+
+        const renderContextTurn = (turn, key) => {
+            const badge = contextTurnBadge(turn);
+            return (
+                <Box key={key} padding={"4"} background="bg-surface-secondary" borderRadius="200">
+                    <VerticalStack gap={"3"}>
+                        <HorizontalStack align="space-between" blockAlign="center">
+                            <Badge size="small" tone={badge.tone}>{badge.label}</Badge>
+                            {turn?.latestTimestamp ? (
+                                <Text variant="bodySm" color="subdued">
+                                    {formatTimestamp(Math.floor(turn.latestTimestamp / 1000))}
+                                </Text>
+                            ) : null}
+                        </HorizontalStack>
+                        <Box padding={"3"} background="bg-surface" borderRadius="200" style={{ maxHeight: '160px', overflowY: 'auto', fontSize: '14px', lineHeight: '1.6', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                            <Text variant="bodyMd">{turn?.queryPayload || ''}</Text>
+                        </Box>
+                        {turn?.responsePayload ? (
+                            <Box padding={"3"} background="bg-surface" borderRadius="200" style={{ maxHeight: '160px', overflowY: 'auto', fontSize: '14px', lineHeight: '1.6', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                                <Text variant="bodyMd">{turn.responsePayload}</Text>
+                            </Box>
+                        ) : null}
+                        {turn?.reason ? (
+                            <Text variant="bodySm" color="subdued">{turn.reason}</Text>
+                        ) : null}
+                    </VerticalStack>
+                </Box>
+            );
         };
 
         return (
@@ -810,7 +884,54 @@ function SampleDetails(props) {
                         </>
                     )}
 
-                    {!isSessionBased && (
+                    {!isSessionBased && isAgenticSecurityCategory() && (contextWindowLoading || contextWindow) ? (
+                        <>
+                            <Divider />
+                            {contextWindowLoading && (
+                                <Box padding={"4"}>
+                                    <HorizontalStack gap={"2"} align="center">
+                                        <Spinner size="small" />
+                                        <Text variant="bodyMd" color="subdued">Loading nearby messages...</Text>
+                                    </HorizontalStack>
+                                </Box>
+                            )}
+                            {!contextWindowLoading && contextWindow && (
+                                <VerticalStack gap={"3"}>
+                                    <VerticalStack gap={"1"}>
+                                        <Text variant="headingMd">Nearby Messages</Text>
+                                        <Text variant="bodySm" color="subdued">
+                                            No session ID was available for this event, so these are the closest
+                                            messages on the same host{contextWindow.llmInvoked ? ', checked with AI where a direct session match wasn\'t available' : ', matched by session'}.
+                                        </Text>
+                                    </VerticalStack>
+                                    {(contextWindow.before || []).map((turn, idx) => renderContextTurn(turn, `before-${idx}`))}
+                                    {contextWindow.anchor && (
+                                        <Box padding={"4"} background="bg-surface-critical" borderRadius="200">
+                                            <VerticalStack gap={"3"}>
+                                                <HorizontalStack align="space-between" blockAlign="center">
+                                                    <Badge tone="critical" size="small">Flagged Message</Badge>
+                                                    {contextWindow.anchor.latestTimestamp ? (
+                                                        <Text variant="bodySm" color="subdued">
+                                                            {formatTimestamp(Math.floor(contextWindow.anchor.latestTimestamp / 1000))}
+                                                        </Text>
+                                                    ) : null}
+                                                </HorizontalStack>
+                                                <Box padding={"3"} background="bg-surface" borderRadius="200" style={{ maxHeight: '160px', overflowY: 'auto', fontSize: '14px', lineHeight: '1.6', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                                                    <Text variant="bodyMd">{contextWindow.anchor.queryPayload || ''}</Text>
+                                                </Box>
+                                                {contextWindow.anchor.responsePayload ? (
+                                                    <Box padding={"3"} background="bg-surface" borderRadius="200" style={{ maxHeight: '160px', overflowY: 'auto', fontSize: '14px', lineHeight: '1.6', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+                                                        <Text variant="bodyMd">{contextWindow.anchor.responsePayload}</Text>
+                                                    </Box>
+                                                ) : null}
+                                            </VerticalStack>
+                                        </Box>
+                                    )}
+                                    {(contextWindow.after || []).map((turn, idx) => renderContextTurn(turn, `after-${idx}`))}
+                                </VerticalStack>
+                            )}
+                        </>
+                    ) : (!isSessionBased && (
                         <>
                             <Divider />
                             <Box padding={"3"} background="bg-surface-secondary" borderRadius="200">
@@ -819,7 +940,7 @@ function SampleDetails(props) {
                                 </Text>
                             </Box>
                         </>
-                    )}
+                    ))}
                 </VerticalStack>
             </Box>
         );

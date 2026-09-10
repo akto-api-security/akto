@@ -860,6 +860,130 @@ public class ElasticSearchClient extends SearchClient {
         return source != null ? source.optString(AgentQueryRecord.F_SESSION_IDENTIFIER, null) : null;
     }
 
+    // ── Conversation context window (before/after a message with no session/trace id) ─────────
+    // Used by the threat-detection "Session Context" fallback: a flagged event that carries no
+    // sessionId of its own, so the only correlation we have is serviceId (host header) + a rough
+    // timestamp. Always fetches the nearest before/after docs by proximity (deterministic — this
+    // never fails to return *something* as long as the host has nearby traffic), and separately
+    // tags each returned turn with how confidently it can be said to share the anchor's
+    // conversation: a raw sessionIdentifier match is a free, hard signal when present, but
+    // sessionIdentifier is optional per-integration and frequently blank, so turns without it are
+    // left tagged RESOLUTION_ORPHAN for the caller to resolve via LLM content classification
+    // instead of silently trusting mere host+time proximity as "the same conversation".
+
+    /** fetchContextWindow row-shape key: how a turn's relation to the anchor was resolved. */
+    public static final String KEY_RESOLUTION_METHOD    = "resolutionMethod";
+    public static final String RESOLUTION_SESSION_MATCH = "session_match";
+    public static final String RESOLUTION_ORPHAN        = "orphan";
+
+    // Half-width of the raw band searched around the target timestamp for context-window candidates.
+    private static final long CONTEXT_WINDOW_BAND_MS = 2L * 3600 * 1000; // +/- 2h
+
+    public static class ContextWindowResult {
+        public final Map<String, Object> anchor;
+        public final List<Map<String, Object>> before;
+        public final List<Map<String, Object>> after;
+        public final boolean configured;
+
+        public ContextWindowResult(Map<String, Object> anchor, List<Map<String, Object>> before,
+                                    List<Map<String, Object>> after, boolean configured) {
+            this.anchor = anchor;
+            this.before = before;
+            this.after = after;
+            this.configured = configured;
+        }
+
+        static ContextWindowResult unconfigured() {
+            return new ContextWindowResult(null, new ArrayList<>(), new ArrayList<>(), false);
+        }
+    }
+
+    public ContextWindowResult fetchContextWindow(int accountId, String serviceId, long targetTsMs,
+                                                   int beforeCount, int afterCount, boolean isAtlasTraffic) {
+        if (!isConfigured() || serviceId == null || serviceId.trim().isEmpty()) {
+            return ContextWindowResult.unconfigured();
+        }
+        try {
+            Map<String, List<String>> filters = new HashMap<>();
+            filters.put(AgentQueryRecord.F_SERVICE_ID_KW, java.util.Collections.singletonList(serviceId));
+
+            JSONObject query = buildQuery(accountId,
+                Math.max(0, targetTsMs - CONTEXT_WINDOW_BAND_MS), targetTsMs + CONTEXT_WINDOW_BAND_MS,
+                filters, null, isAtlasTraffic);
+            List<Map<String, Object>> docsDesc = fetchRawDocsDescByTime(query, RAW_FETCH_CAP, "fetchContextWindow", accountId);
+            if (docsDesc.isEmpty()) {
+                return new ContextWindowResult(null, new ArrayList<>(), new ArrayList<>(), true);
+            }
+            List<Map<String, Object>> docsAsc = new ArrayList<>(docsDesc);
+            java.util.Collections.reverse(docsAsc);
+
+            // Anchor = doc with timestamp closest to targetTsMs (the flagged message itself, when
+            // its own detection timestamp lines up with its ES doc within the search band).
+            Map<String, Object> anchorDoc = docsAsc.get(0);
+            long bestDelta = Math.abs(asLong(anchorDoc.get(AgentQueryRecord.F_TIMESTAMP)) - targetTsMs);
+            for (Map<String, Object> d : docsAsc) {
+                long delta = Math.abs(asLong(d.get(AgentQueryRecord.F_TIMESTAMP)) - targetTsMs);
+                if (delta < bestDelta) { bestDelta = delta; anchorDoc = d; }
+            }
+            String anchorSessionId = strVal(anchorDoc.get(AgentQueryRecord.F_SESSION_IDENTIFIER));
+            long anchorTs = asLong(anchorDoc.get(AgentQueryRecord.F_TIMESTAMP));
+
+            // Partition the rest of the window into: same session as the anchor (deterministic
+            // match, kept), a different non-empty session on the same host (a different
+            // conversation — excluded, not just noise worth diluting the window with), or orphan
+            // (no sessionIdentifier at all — kept, left for the LLM fallback to judge).
+            List<Map<String, Object>> beforePool = new ArrayList<>();
+            List<Map<String, Object>> afterPool  = new ArrayList<>();
+            for (Map<String, Object> d : docsAsc) {
+                if (d == anchorDoc) continue;
+                String sid = strVal(d.get(AgentQueryRecord.F_SESSION_IDENTIFIER));
+                if (!sid.isEmpty() && !sid.equals(anchorSessionId)) continue;
+                long ts = asLong(d.get(AgentQueryRecord.F_TIMESTAMP));
+                if (ts < anchorTs) beforePool.add(d);
+                else if (ts > anchorTs) afterPool.add(d);
+            }
+
+            List<Map<String, Object>> before = foldIntoTurns(lastN(beforePool, beforeCount), anchorSessionId);
+            List<Map<String, Object>> after  = foldIntoTurns(firstN(afterPool, afterCount), anchorSessionId);
+            Map<String, Object> anchorTurn = foldIntoTurns(
+                java.util.Collections.singletonList(anchorDoc), anchorSessionId).get(0);
+
+            return new ContextWindowResult(anchorTurn, before, after, true);
+        } catch (Exception e) {
+            logger.error("fetchContextWindow error for accountId=" + accountId + ": " + e.getMessage());
+            return ContextWindowResult.unconfigured();
+        }
+    }
+
+    /** Folds same-instant/same-trace docs into turn rows via the existing carry-forward grouping
+     *  (resolveGroups/buildTraceRowFromGroup — the same logic fetchMessages uses), then tags each
+     *  resulting turn with how trustworthy its relation to the anchor's session is. */
+    private List<Map<String, Object>> foldIntoTurns(List<Map<String, Object>> docsAsc, String anchorSessionId) {
+        if (docsAsc.isEmpty()) return new ArrayList<>();
+        Map<String, String> effectiveTraceIdByGroup = new HashMap<>();
+        LinkedHashMap<String, List<Map<String, Object>>> groups = resolveGroups(docsAsc, effectiveTraceIdByGroup);
+
+        List<Map<String, Object>> turns = new ArrayList<>();
+        for (Map.Entry<String, List<Map<String, Object>>> e : groups.entrySet()) {
+            Map<String, Object> row = buildTraceRowFromGroup(e.getValue(), effectiveTraceIdByGroup.get(e.getKey()));
+            String sid = strVal(row.get(AgentQueryRecord.F_SESSION_IDENTIFIER));
+            row.put(KEY_RESOLUTION_METHOD,
+                (!sid.isEmpty() && sid.equals(anchorSessionId)) ? RESOLUTION_SESSION_MATCH : RESOLUTION_ORPHAN);
+            turns.add(row);
+        }
+        turns.sort((a, b) -> Long.compare(asLong(a.get(KEY_LATEST_TS)), asLong(b.get(KEY_LATEST_TS))));
+        return turns;
+    }
+
+    private static List<Map<String, Object>> lastN(List<Map<String, Object>> ascList, int n) {
+        int size = ascList.size();
+        return n >= size ? new ArrayList<>(ascList) : new ArrayList<>(ascList.subList(size - n, size));
+    }
+
+    private static List<Map<String, Object>> firstN(List<Map<String, Object>> ascList, int n) {
+        return n >= ascList.size() ? new ArrayList<>(ascList) : new ArrayList<>(ascList.subList(0, n));
+    }
+
     // ── Real-invocation check for known-malicious tool/skill names ─────────────
 
     @Override
