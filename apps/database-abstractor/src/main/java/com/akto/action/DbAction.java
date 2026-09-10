@@ -94,8 +94,8 @@ import com.akto.utils.KafkaUtils;
 import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
 import com.akto.utils.StiCountAlert;
-import com.akto.utils.elasticsearch.AgentQueryRecord;
-import com.akto.utils.elasticsearch.ElasticSearchClient;
+import com.akto.utils.TrafficCollectorAlert;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -103,8 +103,8 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
-import com.opensymphony.xwork2.Action;
-import com.opensymphony.xwork2.ActionSupport;
+import org.apache.struts2.action.Action;
+import org.apache.struts2.ActionSupport;
 
 
 import org.apache.struts2.ServletActionContext;
@@ -672,6 +672,7 @@ public class DbAction extends ActionSupport {
     public String bulkUpdateModuleInfo() {
         try {
             DbLayer.bulkUpdateModuleInfo(moduleInfoList);
+            TrafficCollectorAlert.checkOnHeartbeat(moduleInfoList);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in bulkUpdateModuleInfo " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -704,6 +705,7 @@ public class DbAction extends ActionSupport {
             logEndpointShieldModuleIngest("updateModuleInfoForHeartbeatV2", moduleInfo);
             moduleInfo = DbLayer.updateModuleInfoForHeartbeatV2(moduleInfo);
             StiCountAlert.checkStiCount();
+            TrafficCollectorAlert.checkOnHeartbeat(Collections.singletonList(moduleInfo));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in updateModuleInfoForHeartbeat " + e.toString());
             return Action.ERROR.toUpperCase();
