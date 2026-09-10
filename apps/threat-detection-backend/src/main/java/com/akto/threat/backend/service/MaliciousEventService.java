@@ -4,6 +4,7 @@ import com.akto.dao.AgenticSessionContextDao;
 import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.threat.backend.utils.ThreatUtils;
+import com.akto.threat.backend.utils.MaliciousEventRedactor;
 import com.akto.dto.type.URLMethods;
 import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
@@ -165,12 +166,26 @@ public class MaliciousEventService {
         sessionId = evt.getSessionId();
     }
 
+    String rawApiPayload = "settings-scanner".equals(actor)
+        ? ThreatUtils.repairConfigScanEnvelope(evt.getLatestApiPayload())
+        : evt.getLatestApiPayload();
+    // Redact sensitive fields (password, email, custom account types, ...) before this payload
+    // is ever queued for Mongo/Kafka - see MaliciousEventRedactor. Must happen here, at the
+    // single choke point every guardrail/threat event passes through on its way to storage, not
+    // client-side at render time.
+    // Skipped for human_approval events: mcp-endpoint-shield deliberately sends those
+    // unredacted (ReportThreat's `redact := !EqualFold(behaviour, HumanApproval)`) so a human
+    // reviewer can see the real content before approving/rejecting - redacting here would break
+    // that review.
+    boolean isHumanApproval = ThreatDetectionConstants.HUMAN_APPROVAL.equalsIgnoreCase(status);
+    String redactedApiPayload = isHumanApproval ? rawApiPayload : MaliciousEventRedactor.redact(rawApiPayload, accountId);
+
     builder.setDetectedAt(evt.getDetectedAt())
         .setActor(actor)
         .setFilterId(filterId)
         .setLatestApiEndpoint(evt.getLatestApiEndpoint())
         .setLatestApiMethod(URLMethods.Method.fromString(evt.getLatestApiMethod()))
-        .setLatestApiOrig("settings-scanner".equals(actor) ? ThreatUtils.repairConfigScanEnvelope(evt.getLatestApiPayload()) : evt.getLatestApiPayload())
+        .setLatestApiOrig(redactedApiPayload)
         .setLatestApiCollectionId(evt.getLatestApiCollectionId())
         .setEventType(maliciousEventType)
         .setLatestApiIp(evt.getLatestApiIp())
