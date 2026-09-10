@@ -677,43 +677,42 @@ function SampleDetails(props) {
             });
         };
 
-        const renderContextTurn = (turn, key, isAnchor = false) => {
-            const turnTimestamp = turn?.latestTimestamp ? Math.floor(turn.latestTimestamp / 1000) : null;
-            const messages = (
-                <VerticalStack gap={"2"}>
-                    <ChatMessage
-                        type={MESSAGE_TYPES.REQUEST}
-                        content={turn?.queryPayload || ''}
-                        timestamp={turnTimestamp}
-                        isCode={false}
-                    />
-                    {turn?.responsePayload ? (
-                        <ChatMessage
-                            type={MESSAGE_TYPES.RESPONSE}
-                            content={turn.responsePayload}
-                            isCode={false}
-                        />
-                    ) : null}
-                </VerticalStack>
-            );
-
-            if (isAnchor) {
-                return (
-                    <Box key={key} padding={"3"} background="bg-surface-critical" borderRadius="200">
-                        <VerticalStack gap={"2"}>
-                            <Badge status="critical" size="medium">Current Message</Badge>
-                            {messages}
-                        </VerticalStack>
+        const renderContextTurn = (turn, key, isAnchor = false) => (
+            <Box
+                key={key}
+                borderWidth="1"
+                borderRadius="2"
+                borderColor={isAnchor ? "border-critical" : "border-subdued"}
+                background="bg"
+            >
+                {isAnchor && (
+                    <Box background="bg-critical-subdued" padding="2" borderRadius="2">
+                        <Badge status="critical" size="small">Current Message</Badge>
                     </Box>
-                );
-            }
-
-            return (
-                <Box key={key} background="bg-surface-secondary" borderRadius="200">
-                    {messages}
+                )}
+                <Box padding="3">
+                    <VerticalStack gap="3">
+                        <ChatMessage
+                            type={MESSAGE_TYPES.REQUEST}
+                            content={turn?.queryPayload || ''}
+                            timestamp={turn?.latestTimestamp ? Math.floor(turn.latestTimestamp / 1000) : null}
+                            customLabel="User prompt"
+                            isCode={false}
+                            toolsMetadata={{}}
+                        />
+                        {turn?.responsePayload ? (
+                            <ChatMessage
+                                type={MESSAGE_TYPES.RESPONSE}
+                                content={turn.responsePayload}
+                                customLabel="AI agent response"
+                                isCode={false}
+                                toolsMetadata={{}}
+                            />
+                        ) : null}
+                    </VerticalStack>
                 </Box>
-            );
-        };
+            </Box>
+        );
 
         return (
             <Box padding={"4"}>
@@ -890,7 +889,7 @@ function SampleDetails(props) {
                                 </Box>
                             )}
                             {!contextWindowLoading && contextWindow && (
-                                <VerticalStack gap={"3"}>
+                                <VerticalStack gap="4">
                                     {(contextWindow.before || []).slice(-3).map((turn, idx) => renderContextTurn(turn, `before-${idx}`))}
                                     {contextWindow.anchor && renderContextTurn(contextWindow.anchor, "anchor", true)}
                                     {(contextWindow.after || []).slice(0, 3).map((turn, idx) => renderContextTurn(turn, `after-${idx}`))}
