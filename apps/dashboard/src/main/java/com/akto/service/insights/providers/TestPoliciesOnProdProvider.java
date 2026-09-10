@@ -65,7 +65,10 @@ public class TestPoliciesOnProdProvider extends AbstractInsightProvider {
         }
 
         List<ThreatCategoryCount> subCategoryCounts = bundle.subCategoryCounts;
-        if (subCategoryCounts == null) {
+        // subCategoryCounts is a threat-backend aggregate and the bundle never returns null
+        // for it — a failed call is signalled by threatBackendAvailable instead, so an empty
+        // list here can't be told apart from a real zero unless that flag is also checked.
+        if (!bundle.threatBackendAvailable) {
             result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(matched.size() + " " + (matched.size() == 1 ? "policy is" : "policies are")
                     + " named for testing; violation counts are unavailable right now.");
@@ -169,13 +172,49 @@ public class TestPoliciesOnProdProvider extends AbstractInsightProvider {
                 InsightUtil.count(allActors.size(), "users"), null);
         metrics.add(realUsersMetric);
 
+        // A policy literally named for testing, running in BLOCK mode, actively blocking real
+        // production users, is arguably the single worst misconfiguration this insight can surface
+        // — worse than any raw violation-share number — so it overrides the share-based severity
+        // outright rather than just nudging it to HIGH.
         boolean anyBlockingWithUsers = matched.stream().anyMatch(p ->
                 "block".equalsIgnoreCase(p.getBehaviour())
                         && !actorsByPolicyLower.getOrDefault(lower(p.getName()), Collections.emptySet()).isEmpty());
-        String detailSeverity = anyBlockingWithUsers ? "HIGH" : severity;
+        String detailSeverity = anyBlockingWithUsers ? "CRITICAL" : severity;
+        String detailHeadline = anyBlockingWithUsers
+                ? headline + " At least one is in block mode and is actively blocking real production users."
+                : headline;
+
+        String concern;
+        String impact;
+        String remediation;
+        if (anyBlockingWithUsers) {
+            GuardrailPolicies blockingWithUsers = matched.stream()
+                    .filter(p -> "block".equalsIgnoreCase(p.getBehaviour())
+                            && !actorsByPolicyLower.getOrDefault(lower(p.getName()), Collections.emptySet()).isEmpty())
+                    .findFirst().orElse(null);
+            int affectedUsers = blockingWithUsers != null
+                    ? actorsByPolicyLower.getOrDefault(lower(blockingWithUsers.getName()), Collections.emptySet()).size() : 0;
+            concern = String.format(Locale.US,
+                    "\"%s\" is named for testing but is running in block mode and has actively blocked %s.",
+                    blockingWithUsers != null ? blockingWithUsers.getName() : "a test-named policy",
+                    InsightUtil.count(affectedUsers, "real users"));
+            impact = "A policy meant for testing is actively taking a production action against real users — "
+                    + "whatever it was testing is now live, unreviewed enforcement.";
+            remediation = "Switch this policy to alert mode or retire it immediately, then re-create it as a "
+                    + "properly-scoped, non-test policy if the underlying rule is actually meant for production.";
+        } else {
+            concern = String.format(Locale.US,
+                    "%s come from %d %s named for testing, still running against production traffic.",
+                    InsightUtil.ofTotal(testViolations, totalViolations, "violations"), matched.size(),
+                    matched.size() == 1 ? "policy" : "policies");
+            impact = "A policy left over from testing wasn't necessarily reviewed for production scope or rules — "
+                    + "it's either dead weight or an unreviewed control, neither of which should stay by accident.";
+            remediation = "Retire the test-named policies that are no longer needed, or rename and rescope the ones "
+                    + "that turned out to be doing real work so they're not mistaken for leftover test config.";
+        }
 
         result.setStatus(InsightResult.Status.READY.name());
-        result.setHeadline(headline);
+        result.setHeadline(detailHeadline);
         result.setSeverity(detailSeverity);
         result.setMetrics(metrics);
         result.setMetricsComplete(true);
@@ -183,6 +222,9 @@ public class TestPoliciesOnProdProvider extends AbstractInsightProvider {
         result.setCaveats(Collections.singletonList(
                 "\"Real users affected\" is a lower bound: it only counts the most recent "
                         + EVENT_PAGE_LIMIT + " matching violations with a resolved actor."));
+        result.setConcern(concern);
+        result.setImpact(impact);
+        result.setRemediation(remediation);
         result.setEvidence(Collections.singletonList(
                 fullEvidence(matched, violationsByPolicyLower, actorsByPolicyLower)));
         result.setCtas(buildCtas(matched));
@@ -222,7 +264,7 @@ public class TestPoliciesOnProdProvider extends AbstractInsightProvider {
         for (GuardrailPolicies p : capped) {
             Map<String, Object> row = new HashMap<>();
             row.put("Policy", p.getName());
-            row.put("Mode", defaultStr(p.getBehaviour(), "unknown"));
+            row.put("Mode", InsightUtil.humanizePolicyMode(p.getBehaviour()));
             rows.add(row);
         }
         return new InsightResult.Evidence("test_named_policies", "Policies named for testing",
@@ -249,7 +291,7 @@ public class TestPoliciesOnProdProvider extends AbstractInsightProvider {
             Map<String, Object> row = new HashMap<>();
             row.put("Policy", p.getName());
             row.put("Violations", InsightUtil.count(violations, "violations"));
-            row.put("Mode", defaultStr(p.getBehaviour(), "unknown"));
+            row.put("Mode", InsightUtil.humanizePolicyMode(p.getBehaviour()));
             row.put("Real users affected", actors.isEmpty() ? "—" : InsightUtil.count(actors.size(), "users"));
             row.put("Sample users", sample.isEmpty() ? "—" : sample);
             rows.add(row);
@@ -276,7 +318,4 @@ public class TestPoliciesOnProdProvider extends AbstractInsightProvider {
         return ctas;
     }
 
-    private static String defaultStr(String value, String fallback) {
-        return value == null || value.trim().isEmpty() ? fallback : value;
-    }
 }

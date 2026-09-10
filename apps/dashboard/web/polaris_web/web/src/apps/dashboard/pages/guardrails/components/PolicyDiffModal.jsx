@@ -186,7 +186,7 @@ const PolicyDiffModal = ({ open, onClose, source, onSourceChange, result, rows, 
                                 height={TABLE_HEIGHT}
                                 pagination
                                 paginationPageSize={10}
-                                paginationPageSizeSelector={[10, 20, 50]}
+                                paginationPageSizeSelector={[10, 20, 50, 100]}
                                 filterStateUrl="/guardrails/policy-diff"
                                 suppressRowHoverHighlight
                             />

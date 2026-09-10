@@ -92,6 +92,9 @@ type ValidateRequestParams struct {
 	ContextSource   string `json:"contextSource,omitempty"` // Optional context source for policy filtering
 	// SkipThreat is optional; nil/absent means false (same semantics as batch ingest).
 	SkipThreat *bool `json:"skipThreat,omitempty"` // Optional: skip threat reporting to TBS (default: false)
+	// ActivityID, when set, turns this call into a Human Approval status check instead of
+	// a fresh validation — no other field is required.
+	ActivityID string `json:"activityId,omitempty"`
 }
 
 // EffectiveSkipThreat returns skip threat reporting bypass: false when nil or unset.

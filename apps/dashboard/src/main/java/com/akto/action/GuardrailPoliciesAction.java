@@ -2,6 +2,8 @@ package com.akto.action;
 
 import com.akto.dao.AgentUsersDao;
 import com.akto.dao.GuardrailPoliciesDao;
+import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dto.AgenticUsers;
 import com.akto.dto.EnterpriseLicenseComplianceCatalog;
 import com.akto.dao.context.Context;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
@@ -236,6 +238,42 @@ public class GuardrailPoliciesAction extends UserAction {
             
             EnterpriseLicenseComplianceCatalog.applyToPolicy(policy);
 
+            // userMetadata is derived solely from policy.targetUserNames — the explicit "Users"
+            // picks — never combined with the identities behind targetDeviceIds (device targeting
+            // stays purely device-level, resolved separately via applyToDeviceIds). targetUserNames
+            // itself is never persisted (see GuardrailPolicies#targetUserNames, @BsonIgnore);
+            // userMetadata is the durable record of which identities were picked, so it's always
+            // re-resolved fresh from live sources here rather than trusting whatever the client sent.
+            List<String> pickedUserNames = new ArrayList<>();
+            if (policy.getTargetUserNames() != null) {
+                for (String userName : policy.getTargetUserNames()) {
+                    if (StringUtils.isNotBlank(userName)) pickedUserNames.add(userName.trim());
+                }
+            }
+            List<AgenticUsers> resolvedUserMetadata = new ArrayList<>();
+            if (!pickedUserNames.isEmpty()) {
+                resolvedUserMetadata.addAll(AgentUsersDao.instance.findByUserIdsOrUserNames(new ArrayList<>(), pickedUserNames));
+
+                // A pick whose only source is module_info reporting (browser extension / Claude
+                // Desktop app) has no agent_users doc at all, so the lookup above can't find it —
+                // re-verify against module_info directly (never trust a client-supplied email) and
+                // always keep the username, attaching an email when module_info actually has one.
+                List<String> resolvedNames = new ArrayList<>();
+                for (AgenticUsers u : resolvedUserMetadata) {
+                    if (u.getUserName() != null) resolvedNames.add(u.getUserName());
+                }
+                Map<String, String> moduleInfoEmailsByUsername = ModuleInfoDao.instance.fetchUsernameToEmailForEndpointShield();
+                for (String userName : pickedUserNames) {
+                    if (resolvedNames.contains(userName)) continue;
+                    AgenticUsers snapshot = new AgenticUsers();
+                    snapshot.setUserName(userName);
+                    snapshot.setUserEmail(moduleInfoEmailsByUsername.get(userName));
+                    resolvedUserMetadata.add(snapshot);
+                    resolvedNames.add(userName);
+                }
+            }
+            policy.setUserMetadata(resolvedUserMetadata);
+
             List<Bson> updates = buildPolicyUpdates(policy, contextSource);
 
             // Only set createdBy and createdTimestamp on insert
@@ -278,6 +316,9 @@ public class GuardrailPoliciesAction extends UserAction {
         updates.add(Updates.set("applyOnRequest", p.isApplyOnRequest()));
         updates.add(Updates.set("applyToAllServers", p.isApplyToAllServers()));
         updates.add(Updates.set("active", p.isActive()));
+        updates.add(Updates.set("negatedAgentServers", p.isNegatedAgentServers()));
+        updates.add(Updates.set("negatedMcpServers", p.isNegatedMcpServers()));
+        updates.add(Updates.set("negatedLlmServers", p.isNegatedLlmServers()));
 
         if (StringUtils.isNotBlank(p.getDescription())) {
             updates.add(Updates.set("description", p.getDescription()));
@@ -351,6 +392,9 @@ public class GuardrailPoliciesAction extends UserAction {
         if (p.getSelectedAgentServersV2() != null) {
             updates.add(Updates.set("selectedAgentServersV2", p.getSelectedAgentServersV2()));
         }
+        if (p.getSelectedLlmServersV2() != null) {
+            updates.add(Updates.set("selectedLlmServersV2", p.getSelectedLlmServersV2()));
+        }
         if (p.getBlockedHosts() != null) {
             updates.add(Updates.set("blockedHosts", p.getBlockedHosts()));
         }
@@ -360,9 +404,14 @@ public class GuardrailPoliciesAction extends UserAction {
         if (p.getTargetDeviceIds() != null) {
             updates.add(Updates.set("targetDeviceIds", p.getTargetDeviceIds()));
         }
+        // targetUserNames is intentionally never persisted (@BsonIgnore) — it's an inbound-only
+        // request field; userMetadata (set unconditionally below) is the durable record instead.
         if (p.getTargetTags() != null) {
             updates.add(Updates.set("targetTags", p.getTargetTags()));
         }
+        // Always set (never conditional): computed fresh from targetDeviceIds/targetUserNames
+        // right before this call, so it must overwrite any stale snapshot from a previous save.
+        updates.add(Updates.set("userMetadata", p.getUserMetadata()));
         updates.add(Updates.set("blockPersonalAccounts", p.isBlockPersonalAccounts()));
         if (StringUtils.isNotBlank(p.getBehaviour())) {
             updates.add(Updates.set("behaviour", p.getBehaviour()));

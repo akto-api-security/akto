@@ -11,6 +11,7 @@ import { current } from 'immer';
 import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
+import { categoryToShortName, getDashboardCategory } from '../apps/main/labelHelper';
 
 import { circle_cancel, circle_tick_minor, car_icon } from "@/apps/dashboard/components/icons";
 import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
@@ -102,6 +103,8 @@ const agenticCategoryMapping = {
   "ROGUE_AGENTS": ASI10,
 }
 const stringCollator = new Intl.Collator(undefined, { sensitivity: 'base' });
+const IPV4_REGEX = /^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
+const IPV6_REGEX = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:)*[0-9a-fA-F]{1,4})?::(([0-9a-fA-F]{1,4}:)*[0-9a-fA-F]{1,4})?)$/;
 
 const func = {
   categoryMapping: categoryMapping,
@@ -1434,6 +1437,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={description} text={description}/></Box>),
               lastTested: apiInfoMap[key] ? apiInfoMap[key]["lastTested"] : 0,
               isThreatEnabled: apiInfoMap[key] ? (apiInfoMap[key]["threatScore"] > 0 || (x.url?.includes("/skills/") && (apiInfoMap[key]["tagsList"] || []).some(t => (((t.keyName === "skill-tags" || t.key === "skill-tags") && t.value && !/^version=/i.test(t.value)) || ((t.keyName === "malicious-skill-tag" || t.key === "malicious-skill-tag") && t.value === "true"))))) : false,
+              threatScore: apiInfoMap[key] ? (apiInfoMap[key]["threatScore"] || 0) : 0,
               agentProxyGuardrailEnabled: apiInfoMap[key] ? (apiInfoMap[key]["agentProxyGuardrailEnabled"] || false) : false,
               guardrailSchema: apiInfoMap[key] ? (apiInfoMap[key]["guardrailSchema"] || null) : null,
               isMalicious: apiInfoMap[key] ? (apiInfoMap[key]["tagsList"] || []).some(t => (t.keyName === "malicious-skill-tag" || t.key === "malicious-skill-tag") && t.value === "true") : false,
@@ -2304,6 +2308,10 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   hasThreatAccess(){
     return !['MEMBER', 'DEVELOPER', 'GUEST', 'NO_ACCESS'].includes(window.USER_ROLE)
   },
+  isUserAdmin(){
+    const scopeRole = window.SCOPE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]]
+    return (scopeRole || window.USER_ROLE) === 'ADMIN'
+  },
   checkUserValidForIntegrations(){
     const rbacAccess = this.checkForRbacFeatureBasic();
     if(!rbacAccess){
@@ -2784,6 +2792,11 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
   },
 
+  isValidIpAddress(ip) {
+    if (!ip || ip === "-") return false;
+    const v = String(ip).trim();
+    return IPV4_REGEX.test(v) || IPV6_REGEX.test(v);
+  },
    getStiggFeatureGrants() {
       const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {}
       const agenticSecurityGranted = stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false

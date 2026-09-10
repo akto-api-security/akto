@@ -279,7 +279,8 @@ function ThreatCompliancePage() {
                     sessionId: threatData.sessionId || '',
                     ruleViolated: threatData.ruleViolated || '-',
                     complianceMap: threatData.complianceMapData || {},
-                    metadata: threatData.metadata || ''
+                    metadata: threatData.metadata || '',
+                    remediation: threatData.remediation || ''
                 },
                 currentEventId: threatData.eventId || '',
                 currentEventStatus: threatData.status || '',

@@ -65,11 +65,11 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [deniedTopics, setDeniedTopics] = useState([]);
     const [enableHarmfulCategories, setEnableHarmfulCategories] = useState(false);
     const [harmfulCategoriesSettings, setHarmfulCategoriesSettings] = useState({
-        hate: "HIGH",
-        insults: "HIGH",
-        sexual: "HIGH",
-        violence: "HIGH",
-        misconduct: "HIGH",
+        hate: "none",
+        insults: "none",
+        sexual: "none",
+        violence: "none",
+        misconduct: "none",
         useForResponses: false
     });
     const [enableBasePromptRule, setEnableBasePromptRule] = useState(false);
@@ -354,11 +354,11 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setDeniedTopics([]);
         setEnableHarmfulCategories(false);
         setHarmfulCategoriesSettings({
-            hate: "HIGH",
-            insults: "HIGH",
-            sexual: "HIGH",
-            violence: "HIGH",
-            misconduct: "HIGH",
+            hate: "none",
+            insults: "none",
+            sexual: "none",
+            violence: "none",
+            misconduct: "none",
             useForResponses: false
         });
         setEnableBasePromptRule(false);
@@ -614,15 +614,19 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 deniedTopics,
                 wordFilters,
                 piiFilters: enablePiiTypes ? piiTypes : [],
-                regexPatterns: regexPatterns
-                    .filter(r => r && r.pattern)
-                    .map(r => r.pattern),
-                regexPatternsV2: regexPatterns
-                    .filter(r => r && r.pattern && r.behavior)
-                    .map(r => ({
-                        pattern: r.pattern,
-                        behavior: r.behavior.toLowerCase()
-                    })),
+                regexPatterns: enableRegexPatterns
+                    ? regexPatterns
+                        .filter(r => r && r.pattern)
+                        .map(r => r.pattern)
+                    : [],
+                regexPatternsV2: enableRegexPatterns
+                    ? regexPatterns
+                        .filter(r => r && r.pattern && r.behavior)
+                        .map(r => ({
+                            pattern: r.pattern,
+                            behavior: r.behavior.toLowerCase()
+                        }))
+                    : [],
                 ...(enableLlmPrompt && llmPrompt && llmPrompt.trim() ? {
                     llmRule: {
                         enabled: true,

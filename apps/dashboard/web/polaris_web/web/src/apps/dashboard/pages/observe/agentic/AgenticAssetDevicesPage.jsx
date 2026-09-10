@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { Badge, Box, Button, HorizontalStack, Text, DataTable } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, VerticalStack, Text, TextField, DataTable } from "@shopify/polaris";
 import { ArrowLeftMinor } from "@shopify/polaris-icons";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import FlyLayout from "../../../components/layouts/FlyLayout";
@@ -76,7 +76,52 @@ const ENDPOINT_TAGS_FILTER_DEF = { key: "endpointTags", label: "Endpoint tags", 
     { label: "Local MCP Server", value: "Local MCP Server" },
     { label: "Misconfigured", value: "Misconfigured" },
     { label: "Malicious Skills", value: "Malicious Skills" },
+    { label: "Owner", value: "Owner" },
 ] };
+
+// McpClientRegistry canonical group keys the ai-agent-email filter is offered for. "claude1" is
+// Claude Desktop (the raw collection tag ai-agent=claude-desktop folds into it via
+// resolveClientKey); "claude2" would be Claude CLI. Scoped to Claude Desktop for now — add keys
+// here AND to AI_AGENT_EMAIL_GROUP_KEYS in AgenticObserveAction.java, which enforces the same scope
+// server-side so a stale URL can't apply this filter to another asset.
+const AI_AGENT_EMAIL_GROUP_KEYS = ["claude1"];
+
+// Free-text regex box for the ai-agent-email filter, supplied via GithubServerTable's renderFilter
+// escape hatch (same pattern as SusDataTable's risk-score control) so the shared table needs no
+// new filter type. Debounced because the table refetches on every appliedFilters change and
+// handleFilterStatusChange is not itself debounced — committing per keystroke would fire one
+// request per character typed.
+const AI_AGENT_EMAIL_DEBOUNCE_MS = 400;
+
+function AiAgentEmailFilterControl({ selected, onChange }) {
+    const committed = selected?.[0] || "";
+    const [draft, setDraft] = useState(committed);
+    // Resync when the value changes from outside this control (chip removed, "Clear all",
+    // a filters= URL restored on load).
+    useEffect(() => { setDraft(committed); }, [committed]);
+
+    const timerRef = useRef(null);
+    useEffect(() => () => clearTimeout(timerRef.current), []);
+
+    const handleChange = useCallback((value) => {
+        setDraft(value);
+        clearTimeout(timerRef.current);
+        const trimmed = value.trim();
+        timerRef.current = setTimeout(() => onChange(trimmed ? [trimmed] : []), AI_AGENT_EMAIL_DEBOUNCE_MS);
+    }, [onChange]);
+
+    return (
+        <TextField
+            label="AI agent email"
+            labelHidden
+            autoComplete="off"
+            value={draft}
+            onChange={handleChange}
+            placeholder="Regex, e.g. .*@gmail\.com$"
+            helpText="Matches anywhere in the email unless anchored with ^ or $"
+        />
+    );
+}
 
 const resourceName = { singular: "endpoint", plural: "endpoints" };
 
@@ -248,6 +293,7 @@ function shapeEndpointRow(row, { rowType, onOpenBundle }) {
         ...(row.hasLocalMcpServer ? ["Local MCP Server"] : []),
         ...(row.hasMisconfiguredConfig ? ["Misconfigured"] : []),
         ...(row.hasMaliciousSkill ? ["Malicious Skills"] : []),
+        ...(row.hasOwnerTag ? ["Owner"] : []),
     ];
     const children = row.children || [];
     const misconfiguredChildId = row.hasMisconfiguredConfig
@@ -267,6 +313,10 @@ function shapeEndpointRow(row, { rowType, onOpenBundle }) {
                 {row.hasLocalMcpServer && <Badge size="small" status="critical">Local MCP Server</Badge>}
                 {row.hasMisconfiguredConfig && <MisconfiguredBadge />}
                 {row.hasMaliciousSkill && <Badge size="small" status="critical">Malicious Skills</Badge>}
+                {row.hasOwnerTag && <Badge size="small" status="success">Owner</Badge>}
+                {row.hasOwnerTag && row.environmentName && (
+                    <Badge size="small" status="info">{`Env: ${row.environmentName}`}</Badge>
+                )}
             </HorizontalStack>
         ),
         usernameComp: (
@@ -274,7 +324,10 @@ function shapeEndpointRow(row, { rowType, onOpenBundle }) {
                 <TooltipText tooltip={row.username || "-"} text={row.username || "-"} />
             </Box>
         ),
-        riskScoreComp: <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
+        riskScoreComp: transform.wrapRiskScoreTooltip(
+            <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
+            riskScore, row.baseRiskScore, row.baseRiskScoreReason
+        ),
         sensitiveSubTypes: transform.prettifySubtypes(row.sensitiveInRespTypes || []),
         lastTraffic: func.prettifyEpoch(row.lastSeenEpoch || 0),
         discovered: func.prettifyEpoch(row.startTs || 0),
@@ -303,13 +356,18 @@ export default function AgenticAssetDevicesPage() {
     // "<Type> - <Name>" template + TitleWithInfo's info icon) — that page and this one are the
     // two places this exact asset's device breakdown is shown, so the header should read the same
     // regardless of which one a click landed on.
+    const [description, setDescription] = useState("");
+
     const pageTitle = useMemo(() => (
-        <TitleWithInfo
-            tooltipContent={`Viewing devices for ${assetType || "asset"} ${assetName}`}
-            titleText={assetType ? `${assetType} - ${assetName}` : assetName}
-            docsUrl="https://ai-security-docs.akto.io/agentic-ai-discovery/get-started"
-        />
-    ), [assetType, assetName]);
+        <VerticalStack gap="1">
+            <TitleWithInfo
+                tooltipContent={`Viewing devices for ${assetType || "asset"} ${assetName}`}
+                titleText={assetType ? `${assetType} - ${assetName}` : assetName}
+                docsUrl="https://ai-security-docs.akto.io/agentic-ai-discovery/get-started"
+            />
+            {description && <Text variant="bodyMd">{description}</Text>}
+        </VerticalStack>
+    ), [assetType, assetName, description]);
 
     // Same "Explore mode" primaryAction ApiCollections.jsx always shows next to its title —
     // generic query-explorer shortcut, not scoped to this asset, kept only for header parity.
@@ -369,6 +427,7 @@ export default function AgenticAssetDevicesPage() {
                 enrichRef.current = { usernameMap: settledValue(usernameSettled, {}) };
                 const detail = settledValue(detailSettled, {});
                 collectionIdsRef.current = detail?.collectionIds || [];
+                setDescription(detail?.description || "");
                 setPluginBundle(rowType === "plugin" ? {
                     mcpServers: detail?.pluginMcpServers || [],
                     mcpServerCollectionIds: detail?.pluginMcpServerCollectionIds || {},
@@ -377,7 +436,7 @@ export default function AgenticAssetDevicesPage() {
                 } : null);
                 setOwningPluginName(rowType !== "plugin" ? (detail?.owningPluginName || null) : null);
             } catch {
-                if (!cancelled) { collectionIdsRef.current = []; setPluginBundle(null); setOwningPluginName(null); }
+                if (!cancelled) { collectionIdsRef.current = []; setDescription(""); setPluginBundle(null); setOwningPluginName(null); }
             } finally {
                 if (!cancelled) { setLoading(false); setRefreshKey((k) => k + 1); }
             }
@@ -392,6 +451,13 @@ export default function AgenticAssetDevicesPage() {
         if (filtersObj?.endpointTags?.length) filters.endpointTags = filtersObj.endpointTags;
         if (filtersObj?.endpointId?.length) filters.endpointId = filtersObj.endpointId;
         if (filtersObj?.username?.length) filters.username = filtersObj.username;
+        // Gated the same way filtersDef is. GithubServerTable persists applied filters under a key
+        // derived from the pathname only (this route is static — the asset lives in the query
+        // string), so a filter applied on one asset is replayed on the next. Without this guard we
+        // would keep sending aiAgentEmail after navigating to an asset that never offered it.
+        if (filtersObj?.aiAgentEmail?.length && rowType === "agent" && AI_AGENT_EMAIL_GROUP_KEYS.includes(groupKey)) {
+            filters.aiAgentEmail = filtersObj.aiAgentEmail;
+        }
         const res = await api.fetchAgenticAssetEndpointsPage({
             apiCollectionIds: collectionIdsRef.current,
             rowType,
@@ -413,8 +479,22 @@ export default function AgenticAssetDevicesPage() {
         if (filterChoices.usernames.length) {
             defs.push({ key: "username", label: "Username", choices: filterChoices.usernames.map((v) => ({ label: v, value: v })) });
         }
+        // Free-text regex over the collection's ai-agent-email tag. Offered only for the asset
+        // groups in AI_AGENT_EMAIL_GROUP_KEYS (Claude Desktop today) — on every other asset page
+        // the chip is simply not rendered. choices:[] because renderFilter supplies the control.
+        if (rowType === "agent" && AI_AGENT_EMAIL_GROUP_KEYS.includes(groupKey)) {
+            defs.push({
+                key: "aiAgentEmail",
+                label: "AI agent email",
+                title: "AI agent email",
+                choices: [],
+                renderFilter: ({ selected, onChange }) => (
+                    <AiAgentEmailFilterControl selected={selected} onChange={onChange} />
+                ),
+            });
+        }
         return defs;
-    }, [filterChoices]);
+    }, [filterChoices, rowType, groupKey]);
 
     const disambiguateLabel = useCallback((key, value) => func.convertToDisambiguateLabelObj(value, null, 2), []);
 

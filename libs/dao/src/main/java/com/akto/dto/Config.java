@@ -409,6 +409,9 @@ public abstract class Config {
         private String redirectUri;
         public static final String ORGANIZATION_DOMAIN = "organizationDomain";
         private String organizationDomain;
+        /** Extra email domains allowed alongside {@link #organizationDomain}, for orgs with more than one mail domain. */
+        public static final String ADDITIONAL_ORGANIZATION_DOMAINS = "additionalOrganizationDomains";
+        private List<String> additionalOrganizationDomains;
         public static final String ACCOUNT_ID = "accountId";
         private int accountId;
         /** BSON key for the Okta Management API (SSWS) token. */
@@ -492,6 +495,33 @@ public abstract class Config {
         }
         public void setOrganizationDomain(String organizationDomain) {
             this.organizationDomain = organizationDomain;
+        }
+
+        public List<String> getAdditionalOrganizationDomains() {
+            return additionalOrganizationDomains;
+        }
+        public void setAdditionalOrganizationDomains(List<String> additionalOrganizationDomains) {
+            this.additionalOrganizationDomains = additionalOrganizationDomains;
+        }
+
+        /** True if domain matches organizationDomain or any entry in additionalOrganizationDomains. */
+        public boolean isDomainAllowed(String domain) {
+            if (domain == null) return false;
+            if (organizationDomain != null && organizationDomain.equalsIgnoreCase(domain)) return true;
+            if (additionalOrganizationDomains != null) {
+                for (String allowed : additionalOrganizationDomains) {
+                    if (allowed != null && allowed.equalsIgnoreCase(domain)) return true;
+                }
+            }
+            return false;
+        }
+
+        /** organizationDomain plus additionalOrganizationDomains. Not a bean getter, so it is never persisted. */
+        public List<String> allowedDomainsForLog() {
+            List<String> domains = new ArrayList<>();
+            if (organizationDomain != null) domains.add(organizationDomain);
+            if (additionalOrganizationDomains != null) domains.addAll(additionalOrganizationDomains);
+            return domains;
         }
 
         public int getAccountId() {
@@ -1200,7 +1230,10 @@ public abstract class Config {
 
         String domain = companyKeyArr[1];
         OktaConfig config = (OktaConfig) ConfigsDao.instance.findOne(
-                Filters.eq(OktaConfig.ORGANIZATION_DOMAIN, domain)
+                Filters.or(
+                    Filters.eq(OktaConfig.ORGANIZATION_DOMAIN, domain),
+                    Filters.eq(OktaConfig.ADDITIONAL_ORGANIZATION_DOMAINS, domain)
+                )
         );
         return config;
     }

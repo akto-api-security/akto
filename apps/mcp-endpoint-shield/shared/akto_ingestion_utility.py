@@ -2,6 +2,7 @@
 Common utilities for Akto AI agent hooks (Claude CLI, Cursor, and others).
 Shared config, HTTP, ingestion payload building, transcript reading, and hook runners.
 """
+import base64
 import json
 import logging
 import os
@@ -9,7 +10,7 @@ import ssl
 import sys
 import time
 import urllib.request
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 try:
     from akto_machine_id import get_machine_id, get_username
@@ -37,9 +38,10 @@ CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 _CONNECTOR_TAG: Dict[str, str] = {
     "claude_code_cli": "claudecli",
     "cursor": "cursor",
-    "vscode": "vscode",
+    "vscode": "copilot",
     "gemini_cli": "geminicli",
     "github": "github",
+    "github_cli": "copilot",
     "codex_cli": "codexcli",
     "kiro_cli": "kirocli"
 }
@@ -186,7 +188,11 @@ _SESSION_FIELD_MAP: Dict[str, Dict[str, Any]] = {
         "message_id_field": None,
         "message_id_strategy": "transcript_uuid",
         "state_key": "session_id",
-        "extra_fields": ("transcript_path", "cwd", "permission_mode", "hook_event_name"),
+        # user_email never arrives on Claude's stdin — it is resolved locally from
+        # ~/.claude.json (see _LOCAL_IDENTITY_CONNECTORS). Declared here so it is
+        # also picked up should the CLI ever start sending it.
+        "extra_fields": ("transcript_path", "cwd", "permission_mode",
+                         "hook_event_name", "user_email"),
     },
     "gemini_cli": {
         "session_id_field": "session_id",
@@ -257,6 +263,130 @@ def _id_fields(fm: Dict[str, Any]) -> List[str]:
     return fields
 
 
+# Terminal `copilot` CLI sends camelCase; VS Code's Copilot Chat sends snake_case.
+INPUT_FIELD_TRANSFORMATIONS = {"sessionId": "session_id", "transcriptPath": "transcript_path"}
+
+
+def _alias_camel_keys(input_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Fill in the snake_case key from its camelCase alias when only the latter is present."""
+    for camel, snake in INPUT_FIELD_TRANSFORMATIONS.items():
+        if snake not in input_data and camel in input_data:
+            input_data[snake] = input_data[camel]
+    return input_data
+
+
+# ── Locally resolved identity ──────────────────────────────────────────────────
+#
+# Some agents carry no user identity on their hook stdin, so the email is read from
+# the agent's own profile file instead. For these the locally resolved value is
+# AUTHORITATIVE: it must overwrite — and when empty, delete — whatever the session
+# state row holds, because the row may have been written before a login or logout.
+# (cursor/github pass user_email through on stdin; they must not be touched here.)
+#
+# Readers live here, keyed by connector, rather than in each agent's own
+# akto_machine_id.py: that file is a separate copy per agent (claude's and codex's
+# differ by ~55 lines), so a per-agent helper would mean one copy of the same logic
+# per connector. This module is installed into every agent's hooks dir, so one map
+# serves them all and a new agent is a single small function.
+
+
+def _profile_home(subdir: str, env_override: str = "") -> str:
+    """Path to an agent's profile dir: $<env_override> if set, else ~/<subdir>.
+
+    The override is expanded rather than used verbatim: os.open() performs no
+    tilde expansion, and these vars reach us unexpanded from quoted assignments
+    ("~/.codex"), launchd plists and MDM-provisioned environments — which would
+    otherwise resolve nothing at all. abspath() keeps a relative override from
+    resolving against the hook's cwd, which is whatever project the user is in.
+
+    Under root/launchd ~ is /var/root, so the console user's home is used instead.
+    That lookup is best effort: get_username() falls back to the literal "unknown"
+    when the console user cannot be determined and getpwnam() raises KeyError for
+    it, so any failure degrades to ~ instead of abandoning the resolution (the
+    caller cannot tell an exception from "signed out" — both yield no header).
+    """
+    override = (os.environ.get(env_override) or "").strip() if env_override else ""
+    if override:
+        return os.path.abspath(os.path.expanduser(os.path.expandvars(override)))
+
+    home = os.path.expanduser("~")
+    if hasattr(os, "getuid"):  # absent on Windows
+        try:
+            if os.getuid() == 0:
+                user = get_username()
+                if user and user not in ("unknown", "root"):
+                    import pwd  # Unix-only
+                    home = pwd.getpwnam(user).pw_dir
+        except Exception:
+            pass  # ImportError, KeyError (no such user), anything else — keep ~
+    return os.path.join(home, subdir)
+
+
+def _email_from_jwt_claim(token: Any, claim: str = "email") -> str:
+    """One claim from a JWT's payload segment ('' if absent/undecodable).
+
+    The token is NOT verified: this reads a local file to label our own telemetry,
+    it authenticates nobody. An EXPIRED token is still used — the claim identifies
+    the account, and refusing it would blank the header between token refreshes.
+    """
+    if not isinstance(token, str) or token.count(".") < 2:
+        return ""
+    try:
+        seg = token.split(".")[1]
+        payload = json.loads(base64.urlsafe_b64decode(seg + "=" * (-len(seg) % 4)))
+        return str(payload.get(claim) or "").strip()
+    except Exception:
+        return ""
+
+
+def _codex_user_email() -> str:
+    """Signed-in Codex account, from $CODEX_HOME/auth.json (default ~/.codex).
+
+    Shared by the Codex CLI and the codex bundled in ChatGPT.app — both read this
+    same file. The address is the `email` claim inside tokens.id_token, not a plain
+    key. Returns "" for an API-key login (no tokens block), which has no email at
+    all. Only the claim is ever returned; the tokens themselves are never logged.
+    """
+    try:
+        path = os.path.join(_profile_home(".codex", "CODEX_HOME"), "auth.json")
+        with open(path, encoding="utf-8") as f:
+            auth = json.load(f)
+        email = _email_from_jwt_claim((auth.get("tokens") or {}).get("id_token"))
+        if not email:  # shape drift / other login paths
+            email = str(auth.get("email") or "").strip()
+        return email if "@" in email else ""
+    except Exception:
+        return ""
+
+
+# connector → reader. Membership here is what makes a connector locally resolved.
+_PROFILE_READERS = {
+    "codex_cli": _codex_user_email,
+}
+
+_LOCAL_IDENTITY_CONNECTORS = {"claude_code_cli"} | set(_PROFILE_READERS)
+
+
+def _local_user_email() -> str:
+    """Current account email for connectors that resolve identity locally ('' if none).
+
+    The agent's own akto_machine_id.get_user_email wins when it exists (claude ships
+    one); otherwise the connector's reader from _PROFILE_READERS is used.
+    """
+    try:
+        from akto_machine_id import get_user_email
+        return get_user_email()
+    except Exception:
+        pass
+    reader = _PROFILE_READERS.get(AKTO_CONNECTOR)
+    if reader is None:
+        return ""
+    try:
+        return reader()
+    except Exception:
+        return ""
+
+
 def extract_session_info(input_data: Dict[str, Any]) -> Dict[str, Any]:
     """Pull the present (non-None) id/extra fields from a hook's stdin input, using
     this agent's field map. Keys are the agent's RAW field names."""
@@ -293,8 +423,17 @@ def load_session_state(key: str, logger: logging.Logger) -> Dict[str, Any]:
         return {}
 
 
-def save_session_state(key: str, session_info: Dict[str, Any], logger: logging.Logger) -> None:
-    """Upsert-merge session_info into the keyed row (atomic write)."""
+def save_session_state(
+    key: str,
+    session_info: Dict[str, Any],
+    logger: logging.Logger,
+    drop_keys: Iterable[str] = (),
+) -> None:
+    """Upsert-merge session_info into the keyed row (atomic write).
+
+    drop_keys are removed from the row afterwards. Needed for locally resolved
+    identity fields that must be cleared on sign-out, since a merge can only ever
+    add or overwrite — never delete."""
     try:
         data: Dict[str, Any] = {}
         if os.path.exists(SESSION_STATE_PATH):
@@ -304,6 +443,8 @@ def save_session_state(key: str, session_info: Dict[str, Any], logger: logging.L
                     data = loaded
         row = data.get(key, {}) if isinstance(data.get(key), dict) else {}
         row.update({k: v for k, v in session_info.items() if v is not None})
+        for drop in drop_keys:
+            row.pop(drop, None)
         data[key] = row
         os.makedirs(os.path.dirname(SESSION_STATE_PATH), exist_ok=True)
         tmp_path = SESSION_STATE_PATH + ".tmp"
@@ -384,10 +525,24 @@ def resolve_session_info(
         state_key = _state_key(input_data, session_info)
         row = load_session_state(state_key, logger)
 
+        # Resolve identity on EVERY event (not just prompt hooks), so an account
+        # switch mid-session propagates on the next hook of any kind.
+        drop_keys: Tuple[str, ...] = ()
+        if AKTO_CONNECTOR in _LOCAL_IDENTITY_CONNECTORS and not session_info.get("user_email"):
+            email = _local_user_email()
+            if email:
+                session_info["user_email"] = email  # switch: overwrites the row below
+            else:
+                # Signed out: neither backfill the old address into this event's
+                # headers nor leave it on disk for the next one. Never write "" —
+                # installer_headers skips only None, so "" ships as an empty header.
+                row.pop("user_email", None)
+                drop_keys = ("user_email",)
+
         if is_prompt_hook:
             session_info.update(open_message_turn(input_data, session_info, state_key, row, logger))
 
-        save_session_state(state_key, session_info, logger)
+        save_session_state(state_key, session_info, logger, drop_keys=drop_keys)
 
         # Backfill any id/extra fields and the current message id from the stored row.
         merged = dict(row)
@@ -550,7 +705,7 @@ def run_observability_hook(hook_name: str) -> None:
     logger = setup_logger("hook-executions.log")
     logger.info(f"=== {hook_name} hook started ===")
     try:
-        input_data = json.load(sys.stdin)
+        input_data = _alias_camel_keys(json.load(sys.stdin))
         logger.info(f"{hook_name} input:\n%s", json.dumps(input_data, indent=2))
         session_info = resolve_session_info(input_data, logger)
         send_ingestion_data(

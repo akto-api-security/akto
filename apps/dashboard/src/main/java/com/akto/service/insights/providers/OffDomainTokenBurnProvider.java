@@ -27,6 +27,9 @@ public class OffDomainTokenBurnProvider extends AbstractInsightProvider {
 
         Map<String, Long> totalTokensByUser = new HashMap<>();
         Map<String, Long> offDomainTokensByUser = new HashMap<>();
+        Map<String, String> topOffDomainTopicByUser = new HashMap<>();
+        Map<String, Long> topOffDomainTopicTokensByUser = new HashMap<>();
+        Map<String, Long> offDomainTokensByTopic = new HashMap<>();
 
         for (UserAnalysisData d : bundle.userAnalysis) {
             if (d.getUserName() == null) continue;
@@ -52,6 +55,19 @@ public class OffDomainTokenBurnProvider extends AbstractInsightProvider {
             if (rowTotalInteractions > 0) {
                 long offTokens = Math.round(tokens * ((double) rowOffInteractions / rowTotalInteractions));
                 offDomainTokensByUser.merge(d.getUserName(), offTokens, Long::sum);
+
+                // Apportion further, per off-domain topic, to find what's actually driving the burn.
+                for (Map.Entry<String, Map<String, Integer>> e : d.getTopicHierarchy().entrySet()) {
+                    if ("ON".equals(classification.get(e.getKey()))) continue;
+                    int topicCount = 0;
+                    for (int v : e.getValue().values()) topicCount += v;
+                    long topicTokens = Math.round(tokens * ((double) topicCount / rowTotalInteractions));
+                    offDomainTokensByTopic.merge(e.getKey(), topicTokens, Long::sum);
+                    if (topicTokens > topOffDomainTopicTokensByUser.getOrDefault(d.getUserName(), -1L)) {
+                        topOffDomainTopicTokensByUser.put(d.getUserName(), topicTokens);
+                        topOffDomainTopicByUser.put(d.getUserName(), e.getKey());
+                    }
+                }
             }
         }
 
@@ -78,6 +94,24 @@ public class OffDomainTokenBurnProvider extends AbstractInsightProvider {
         r.setHeadline(ranked.isEmpty() ? "No token usage data available"
                 : "Team median is " + InsightUtil.count(teamMedian, "tokens") + "; top user is " + InsightUtil.count(ranked.get(0).getValue(), "tokens"));
 
+        String topOffDomainTopicOverall = null;
+        if (!offDomainTokensByTopic.isEmpty()) {
+            topOffDomainTopicOverall = offDomainTokensByTopic.entrySet().stream()
+                    .max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
+        }
+        if (topOffDomainTopicOverall != null) {
+            long topTopicTokens = offDomainTokensByTopic.get(topOffDomainTopicOverall);
+            r.setSeverity(!ranked.isEmpty() && teamMedian > 0 && ranked.get(0).getValue() > teamMedian * 3 ? "HIGH" : "MEDIUM");
+            r.setConcern("\"" + topOffDomainTopicOverall + "\" is the single biggest off-domain topic, burning an estimated " + InsightUtil.count(topTopicTokens, "tokens") + " across affected users.");
+            r.setImpact("Off-domain token burn is wasted spend on top of being off-purpose use — it inflates your AI bill without producing anything the business asked for.");
+            r.setRemediation("Block the \"" + topOffDomainTopicOverall + "\" topic with a guardrail policy, then check in with the top users below about what they actually need the agent for.");
+        } else if (!ranked.isEmpty() && teamMedian > 0 && ranked.get(0).getValue() > teamMedian * 3) {
+            r.setSeverity("LOW");
+            r.setConcern(ranked.get(0).getKey() + " is using " + InsightUtil.count(ranked.get(0).getValue(), "tokens") + " — more than 3x the team median.");
+            r.setImpact("A single user burning outsized token volume is worth understanding, even without an off-domain classification yet.");
+            r.setRemediation("Check in with " + ranked.get(0).getKey() + " about what's driving the volume.");
+        }
+
         List<Map<String, Object>> rows = new ArrayList<>();
         List<String> topUsers = new ArrayList<>();
         for (Map.Entry<String, Long> e : ranked.subList(0, Math.min(10, ranked.size()))) {
@@ -85,16 +119,27 @@ public class OffDomainTokenBurnProvider extends AbstractInsightProvider {
             row.put("user", e.getKey());
             row.put("totalTokens", e.getValue());
             row.put("offDomainTokens", offDomainTokensByUser.getOrDefault(e.getKey(), null));
+            row.put("topOffDomainTopic", topOffDomainTopicByUser.getOrDefault(e.getKey(), "-"));
             row.put("team", bundle.teamForUser(e.getKey()));
             rows.add(row);
             topUsers.add(e.getKey());
         }
         r.addEvidence(new InsightResult.Evidence("top_users", "Top users by token volume",
-                Arrays.asList("user", "totalTokens", "offDomainTokens", "team"), rows, ranked.size()));
+                Arrays.asList("user", "totalTokens", "offDomainTokens", "topOffDomainTopic", "team"), rows, ranked.size()));
 
-        r.addCta(new InsightResult.Cta("view_llm", "View LLM observability", "NAVIGATE", InsightRoutes.LLM_OBSERVABILITY, new HashMap<>(), true));
+        r.addCta(new InsightResult.Cta("view_llm", "View session-level AI usage (LLM Observability)", "NAVIGATE", InsightRoutes.LLM_OBSERVABILITY, new HashMap<>(), true));
         r.addCta(new InsightResult.Cta("view_users", "View users and devices", "NAVIGATE", InsightRoutes.USERS_AND_DEVICES,
                 InsightUtil.usersAndDevicesFilterParams(topUsers), false));
+        if (topOffDomainTopicOverall != null) {
+            // blockTopic (not a full GuardrailPolicies-shaped prefill) — InsightDetailView builds
+            // the actual deniedTopics/description/etc. prefill from this via the same
+            // buildTopicGuardrailPrefillForTopic helper the LLM Observability "Create guardrail"
+            // flow already uses, instead of duplicating GuardrailPolicies.DeniedTopic's shape here.
+            Map<String, Object> blockTopicParams = new HashMap<>();
+            blockTopicParams.put("blockTopic", topOffDomainTopicOverall);
+            r.addCta(new InsightResult.Cta("block_topic", "Create guardrail blocking \"" + topOffDomainTopicOverall + "\"",
+                    "GUARDRAIL_TEMPLATE", InsightRoutes.GUARDRAIL_POLICIES, blockTopicParams, false));
+        }
         return r;
     }
 

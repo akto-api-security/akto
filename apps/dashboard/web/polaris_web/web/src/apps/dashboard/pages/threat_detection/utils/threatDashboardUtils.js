@@ -1,7 +1,7 @@
 import { flags } from "../components/flags/index.mjs";
 import SessionStore from "../../../../main/SessionStore";
 import PersistStore from "../../../../main/PersistStore";
-import { getDashboardCategory, categoryToShortName } from "../../../../main/labelHelper";
+import { getDashboardCategory, categoryToShortName, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import values from "@/util/values";
 import GUARDRAIL_RULE_DEFINITIONS from "../constants/guardrailRuleDefinitions";
 import { formatDisplayName } from "../../observe/agentic/mcpClientHelper";
@@ -164,19 +164,26 @@ export const applyThreatActivityTableFilter = (filterKey, filterValue) => {
     return { resolvedValue, filterStr };
 };
 
+// Config/settings-risk categories belong on the "Misconfigured Settings" tab.
+const isMisconfigurationCategory = (filterId) =>
+    isEndpointSecurityCategory() && /_(config|settings)_risk$/i.test(filterId || "");
+
 const openActivityPage = (path, filters) => {
     const params = new URLSearchParams();
     const filterParts = [];
     if (filters.host) filterParts.push(`host__${filters.host}`);
+    let resolvedFilterId = null;
     if (filters.latestAttack) {
-        const filterId = subCategoryToFilterId(filters.latestAttack);
-        filterParts.push(`latestAttack__${filterId}`);
+        resolvedFilterId = subCategoryToFilterId(filters.latestAttack);
+        filterParts.push(`latestAttack__${resolvedFilterId}`);
     }
     if (filters.actor) filterParts.push(`actor__${filters.actor}`);
     if (filters.url) filterParts.push(`url__${filters.url}`);
     if (filters.severity) filterParts.push(`severity__${filters.severity}`);
     if (filterParts.length > 0) params.set("filters", filterParts.join("&"));
-    if (filters.eventStatus) params.set("eventStatus", filters.eventStatus);
+    const eventStatus = filters.eventStatus
+        || (isMisconfigurationCategory(resolvedFilterId) ? "misconfigured_settings" : null);
+    if (eventStatus) params.set("eventStatus", eventStatus);
     setTimeRangeParams(params, filters, "startTimestamp", "endTimestamp");
     const categoryParam = getCategoryParam();
     if (categoryParam) params.set("category", categoryParam);

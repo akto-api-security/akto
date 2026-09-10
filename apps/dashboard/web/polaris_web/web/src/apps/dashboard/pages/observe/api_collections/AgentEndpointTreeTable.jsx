@@ -194,6 +194,8 @@ const groupByEndpointId = (collections) => {
                 endpointId,
                 children: [],
                 riskScore: 0,
+                baseRiskScore: 0,
+                baseRiskScoreReason: null,
                 sensitiveInRespTypes: [],
                 detectedTimestamp: 0,
                 startTs: Infinity,
@@ -229,6 +231,12 @@ const groupByEndpointId = (collections) => {
         }
 
         // Merge values
+        // Carry the base score/remarks from whichever child owns the current max risk score,
+        // so the parent row's tooltip can explain the score it displays.
+        if ((collection.riskScore || 0) >= groups[endpointId].riskScore) {
+            groups[endpointId].baseRiskScore = collection.baseRiskScore;
+            groups[endpointId].baseRiskScoreReason = collection.baseRiskScoreReason;
+        }
         groups[endpointId].riskScore = Math.max(groups[endpointId].riskScore, collection.riskScore || 0);
         groups[endpointId].sensitiveInRespTypes = [...new Set([
             ...groups[endpointId].sensitiveInRespTypes, 
@@ -327,7 +335,10 @@ const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expand
                 </HorizontalStack>
             ),
             ...(showCategoryColumn ? { parentTypeComp: "-" } : {}),
-            riskScoreComp: isPluginScope ? '-' : <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
+            riskScoreComp: isPluginScope ? '-' : transform.wrapRiskScoreTooltip(
+                <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
+                riskScore, group.baseRiskScore, group.baseRiskScoreReason
+            ),
             sensitiveSubTypes: isPluginScope ? '-' : transform.prettifySubtypes(group.sensitiveInRespTypes || []),
             sensitiveSubTypesVal: isPluginScope ? '-' : ((group.sensitiveInRespTypes || []).join(' ') || '-'),
             lastTraffic: func.prettifyEpoch(group.detectedTimestamp),

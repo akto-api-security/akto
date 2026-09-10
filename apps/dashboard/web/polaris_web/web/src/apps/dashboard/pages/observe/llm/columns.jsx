@@ -2,6 +2,8 @@ import {
     AppCell,
     CountCell,
     DurationCell,
+    GuardrailPolicyCell,
+    GuardrailStatusCell,
     IdCell,
     ModelChipCellRenderer,
     ModelsCell,
@@ -16,7 +18,6 @@ import { formatDurationMs } from "./constants";
 
 // AG Grid column definitions for the three LLM Observability tables. Kept in a .jsx
 // file (separate from constants.js) because they reference React cell renderers.
-// Status/violations columns are intentionally absent — no data source for them.
 
 const FLEX_CELL = { display: "flex", alignItems: "center" };
 
@@ -143,6 +144,27 @@ export const SESSION_COLUMN_DEFS = [
         sortable: true,
     },
     countCol("Traces", "messageCount", 85),
+    {
+        headerName: "Guardrail",
+        field: "hasActiveGuardrail",
+        width: 140,
+        cellRenderer: GuardrailStatusCell,
+        cellStyle: FLEX_CELL,
+        filter: "agSetColumnFilter",
+        filterAllowed: true,
+        sortable: true,
+        filterParams: { valueFormatter: p => p.value === "true" ? "Guardrail hit" : "Clean" },
+    },
+    {
+        headerName: "Policy Triggered",
+        field: "guardrailPolicies",
+        width: 220,
+        cellRenderer: GuardrailPolicyCell,
+        cellStyle: FLEX_CELL,
+        filter: "agSetColumnFilter",
+        filterAllowed: true,
+        sortable: false,
+    },
     topicCol("Topics Queried"),
     tokensCol,
     {
@@ -188,6 +210,14 @@ export function getTraceColumnDefs({ showSession, onSessionClick } = {}) {
             ...NO_FILTER,
         },
         countCol("Spans", "spanCount", 80),
+        {
+            headerName: "Guardrail",
+            field: "hasActiveGuardrail",
+            width: 140,
+            cellRenderer: GuardrailStatusCell,
+            cellStyle: FLEX_CELL,
+            filter: "agSetColumnFilter",
+        },
         topicCol("Topics Queried"),
         topicCol("SubTopic queried", false),
         tokensCol,

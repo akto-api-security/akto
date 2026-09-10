@@ -6,6 +6,7 @@ import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
 import Dropdown from "../../../components/layouts/Dropdown";
 import PersistStore from "../../../../main/PersistStore";
+import { categoryToShortName, getDashboardCategory } from "../../../../main/labelHelper";
 import SearchableResourceList from "../../../components/shared/SearchableResourceList";
 import ResourceListModal from "../../../components/shared/ResourceListModal";
 import observeApi from "../../observe/api";
@@ -390,6 +391,15 @@ const Users = () => {
         return usersCollection[userId] || [];
     };
 
+    const isAdminForCurrentProduct = (item) => {
+        const mapping = item?.scopeRoleMapping
+        if (mapping && Object.keys(mapping).length > 0) {
+            const currentScope = categoryToShortName[getDashboardCategory()] || "API"
+            return mapping[currentScope] === "ADMIN"
+        }
+        return item?.role === "ADMIN"
+    }
+
     // drop ids for collections that are deleted or deactivated; the picker cannot list them
     const selectable = (ids) => ids.filter((id) => id in collectionsMap);
 
@@ -494,7 +504,7 @@ const Users = () => {
                                     {
                                         content: (
                                             <HorizontalStack gap={4}>
-                                                { (role === 'ADMIN' || userRole !== 'ADMIN' || !rbacAccessAdvanced) ? undefined :
+                                                { (isAdminForCurrentProduct(item) || role === 'ADMIN' || userRole !== 'ADMIN' || !rbacAccessAdvanced) ? undefined :
                                                     <ResourceListModal
                                                         title={"Collection list"}
                                                         activatorPlaceaholder={`${selectable(getUserApiCollectionIds(id)).length} collections accessible`}

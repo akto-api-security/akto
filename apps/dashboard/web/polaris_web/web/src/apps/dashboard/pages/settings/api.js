@@ -901,6 +901,14 @@ const settingRequests = {
             data: {}
         })
     },
+    // installedAppsToCheck: [{ name, version }, ...] — returns installedAppVulnerabilities keyed by "name#version"
+    async checkInstalledAppVulnerabilities(installedAppsToCheck) {
+        return await request({
+            url: '/api/checkInstalledAppVulnerabilities',
+            method: 'post',
+            data: { installedAppsToCheck }
+        })
+    },
     async deleteModuleInfo(moduleIds) {
         return await request({
             url: '/api/deleteModuleInfo',

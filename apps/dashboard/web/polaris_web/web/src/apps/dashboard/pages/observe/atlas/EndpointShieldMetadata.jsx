@@ -1,5 +1,5 @@
 import { Text, HorizontalStack, Icon, Tooltip } from "@shopify/polaris"
-import { StatusActiveMajor, DiamondAlertMinor, RefreshMinor } from "@shopify/polaris-icons"
+import { StatusActiveMajor, DiamondAlertMinor, RefreshMinor, ClockMinor } from "@shopify/polaris-icons"
 import { useEffect, useReducer, useState, useCallback } from "react"
 import values from "@/util/values";
 import { produce } from "immer"
@@ -71,6 +71,8 @@ const resourceName = {
 const OS_ICON_MAP = { darwin: '/public/os-mac.svg', mac: '/public/os-mac.svg', windows: '/public/os-windows.svg', linux: '/public/linux.svg' };
 const BROWSER_ICON_MAP = { chrome: '/public/chrome.svg', firefox: '/public/firefox.svg', safari: '/public/safari.svg', brave: '/public/brave.svg', edge: '/public/edge.svg' };
 const GENERIC_BROWSER_ICON = '/public/Globe_icon.svg';
+const CLAUDE_ICON = '/public/claude.svg';
+const CLAUDE_COMPLIANCE_LABEL = 'Claude Compliance';
 
 const getIconFromMap = (value, map) => {
     if (!value || value === DEFAULT_VALUE) return null;
@@ -87,6 +89,15 @@ const isExtensionAgent = (deviceId, agentVersion) =>
     !deviceId || deviceId.includes('-') || !!agentVersion?.toLowerCase().includes('extension');
 
 const getOsOrBrowserComp = (agentData) => {
+    if (agentData?.provider === 'claude' && agentData?.orgName) {
+        return (
+            <HorizontalStack gap="1" wrap={false} blockAlign="center">
+                <img src={CLAUDE_ICON} alt={CLAUDE_COMPLIANCE_LABEL} style={{ width: '16px', height: '16px', flexShrink: 0 }} />
+                <Text variant="bodySm">{CLAUDE_COMPLIANCE_LABEL}</Text>
+            </HorizontalStack>
+        );
+    }
+
     if (isExtensionAgent(agentData?.deviceId, agentData?.agentVersion)) {
         const browserName = agentData?.browserName;
         const browserVersion = agentData?.browserVersion;
@@ -116,7 +127,16 @@ const getOsOrBrowserComp = (agentData) => {
     );
 };
 
-const getStatusComp = (installStatus, lastHeartbeat) => {
+// currentStatus is computed server-side (ModuleInfoAction.fetchEndpointShieldAgents) from
+// lastHeartbeatReceived: active (<2h), inactive (<24h), error (stale >24h), failed (never heartbeat).
+const CURRENT_STATUS_COMP_MAP = {
+    active: { icon: StatusActiveMajor, color: "success", tooltip: "Running" },
+    inactive: { icon: ClockMinor, color: "warning", tooltip: "No heartbeat in over 2 hours" },
+    error: { icon: DiamondAlertMinor, color: "critical", tooltip: "No heartbeat in over 24 hours" },
+    failed: { icon: DiamondAlertMinor, color: "critical", tooltip: "Never connected" },
+};
+
+const getStatusComp = (installStatus, currentStatus) => {
     if (installStatus === 'installing') {
         return (
             <Tooltip content="Installation in progress" dismissOnMouseOut>
@@ -131,14 +151,13 @@ const getStatusComp = (installStatus, lastHeartbeat) => {
             </Tooltip>
         );
     }
-    if (lastHeartbeat > 0) {
-        return (
-            <Tooltip content="Running" dismissOnMouseOut>
-                <Icon source={StatusActiveMajor} color="success" />
-            </Tooltip>
-        );
-    }
-    return null;
+    const statusComp = CURRENT_STATUS_COMP_MAP[currentStatus];
+    if (!statusComp) return null;
+    return (
+        <Tooltip content={statusComp.tooltip} dismissOnMouseOut>
+            <Icon source={statusComp.icon} color={statusComp.color} />
+        </Tooltip>
+    );
 };
 
 const convertDataIntoTableFormat = (agentData) => ({
@@ -147,17 +166,20 @@ const convertDataIntoTableFormat = (agentData) => ({
     lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
     lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed),
     osComp: getOsOrBrowserComp(agentData),
-    statusComp: getStatusComp(agentData?.installStatus, agentData?.lastHeartbeat),
+    statusComp: getStatusComp(agentData?.installStatus, agentData?.currentStatus),
 });
 
 const mapModuleToAgent = (module) => ({
     agentId: module.id,
     hostname: module.name,
-    deviceId: module.additionalData?.deviceId || DEFAULT_VALUE,
+    deviceId: module.additionalData?.deviceId || module?.id || DEFAULT_VALUE,
     agentVersion: module.currentVersion || DEFAULT_VALUE,
-    username: module.additionalData?.username || DEFAULT_VALUE,
+    username: module.additionalData?.username || module?.additionalData?.email || DEFAULT_VALUE,
     lastHeartbeat: module.lastHeartbeatReceived || 0,
     lastDeployed: module.startedTs || 0,
+    currentStatus: module.additionalData?.currentStatus || null,
+    provider: module.additionalData?.provider || null,
+    orgName: module.additionalData?.orgName || null,
     os: module.additionalData?.os || DEFAULT_VALUE,
     osDisplayName: module.additionalData?.osDisplayName || DEFAULT_VALUE,
     browserName: module.additionalData?.browserName || DEFAULT_VALUE,

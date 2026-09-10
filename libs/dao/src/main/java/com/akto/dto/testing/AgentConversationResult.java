@@ -26,7 +26,7 @@ public class AgentConversationResult extends GenericAgentConversation {
     private Map<String,Object> toolsMetadata;
 
     public AgentConversationResult(String conversationId, String originalPrompt, String response, List<String> conversation, int timestamp, boolean validation, String validationMessage, String finalSentPrompt, String remediationMessage, int externalApiTokens){
-        super("", conversationId, originalPrompt, response, finalSentPrompt, timestamp, timestamp, 0, externalApiTokens, 0, ConversationType.TEST_EXECUTION_RESULT);
+        super("", conversationId, originalPrompt, response, finalSentPrompt, timestamp, timestamp, 0, externalApiTokens, 0, ConversationType.TEST_EXECUTION_RESULT, null);
         this.validation = validation;
         this.validationMessage = validationMessage;
         this.remediationMessage = remediationMessage;

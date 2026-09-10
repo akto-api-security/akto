@@ -1,5 +1,6 @@
 package com.akto.utils.search;
 
+import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -34,6 +35,8 @@ public abstract class SearchClient {
     protected static final String KEY_TERM            = "term";
     protected static final String KEY_TRACE_ID        = "traceId";
     protected static final String KEY_TIMESTAMP       = "timestamp";
+    protected static final String KEY_HAS_ACTIVE_GUARDRAIL = "hasActiveGuardrail";
+    protected static final String KEY_GUARDRAIL_POLICIES   = "guardrailPolicies";
 
     public abstract boolean isConfigured();
 
@@ -45,7 +48,7 @@ public abstract class SearchClient {
     public abstract SessionsResult fetchSessions(
         int accountId, long startMs, long endMs, String searchString,
         Map<String, List<String>> filters, Boolean atlasTrafficFilter,
-        int sessionsLimit, String sessionsAfterKey);
+        int sessionsLimit, String sessionsAfterKey, boolean includeTracesContent);
 
     public abstract List<Map<String, Object>> fetchMessages(
         int accountId, long startMs, long endMs,
@@ -56,7 +59,15 @@ public abstract class SearchClient {
         Map<String, List<String>> filters, Boolean atlasTrafficFilter);
 
     public abstract ArgusStats fetchArgusStats(
-        int accountId, long startMs, long endMs, Boolean atlasTrafficFilter);
+        int accountId, long startMs, long endMs, Boolean atlasTrafficFilter, boolean includeTracesContent);
+
+    /**
+     * Time-ranged replacement for UserAnalysisDataDao's lifetime-total read — sums input/output
+     * tokens per (serviceId, deviceId) within [startMs, endMs). Only id/totalInputTokens/
+     * totalOutputTokens are populated; topic/summary fields are cron-computed elsewhere.
+     */
+    public abstract List<UserAnalysisData> fetchUserAnalysisTokenTotals(
+        int accountId, long startMs, long endMs);
 
     public abstract List<Map<String, Object>> fetchTraceDetail(
         int accountId, String traceId, Boolean atlasTrafficFilter);
@@ -67,7 +78,8 @@ public abstract class SearchClient {
     public abstract SearchResult searchPrompts(
         int accountId, long startMs, long endMs, int skip, int limit,
         String sortKey, boolean sortAsc, String searchAfterJson,
-        Map<String, List<String>> filters, Boolean atlasTrafficFilter, String searchString);
+        Map<String, List<String>> filters, Boolean atlasTrafficFilter, String searchString,
+        boolean includeTracesContent);
 
     /** Used by UserAnalysisCron to fetch not-yet-topic-classified records. */
     public abstract void scrollQueryData(int accountId, long startTsMs, long endTsMs,

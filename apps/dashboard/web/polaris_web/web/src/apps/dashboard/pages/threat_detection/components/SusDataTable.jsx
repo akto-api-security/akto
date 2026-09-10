@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import api from "../api";
@@ -9,7 +9,7 @@ import func from "../../../../../util/func";
 import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, VerticalStack } from "@shopify/polaris";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
-import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap } from "../utils/formatUtils";
+import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap, parseStoredRiskScore, parseStoredReason, truncateToWords, truncateToChars } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory } from "../../../../main/labelHelper";
@@ -17,11 +17,98 @@ import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "../../
 import IpReputationScore from "./IpReputationScore";
 import guardrailApi from "../../guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "../../guardrails/utils";
+import AdvancedPayloadSearch from "../../guardrails/violations/AdvancedPayloadSearch";
+import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "../../guardrails/violations/attributeSearch";
+import { HumanApprovalActions, HumanApprovalTabLabel, HumanResponseBadge, humanApprovalTabAccessibilityLabel, isHumanApprovalPending } from "../../guardrails/violations/ViolationFlyoutSections";
 
 const resourceName = {
   singular: "activity",
   plural: "activities",
 };
+
+const RISK_SCORE_OPS = [
+  { label: "Equals", value: "equals" },
+  { label: "Greater than", value: "greaterThan" },
+  { label: "Less than", value: "lessThan" },
+];
+
+const RISK_SCORE_OP_LABELS = {
+  equals: "Equals",
+  greaterThan: "Greater than",
+  lessThan: "Less than",
+};
+
+function parseRiskScoreFilter(values) {
+  const raw = Array.isArray(values) ? values[0] : values;
+  if (!raw) return { operator: "greaterThan", amount: "" };
+  const text = String(raw);
+  const idx = text.indexOf(":");
+  if (idx === -1) return { operator: RISK_SCORE_OP_LABELS[text] ? text : "greaterThan", amount: "" };
+  return { operator: text.slice(0, idx), amount: text.slice(idx + 1) };
+}
+
+function encodeRiskScoreFilter(operator, amount) {
+  if (!operator || amount === "" || amount == null) return [];
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return [];
+  return [`${operator}:${amount}`];
+}
+
+function RiskScoreFilterControl({ selected, onChange, onClose }) {
+  const selectedKey = Array.isArray(selected) ? selected.join(",") : String(selected || "");
+  const initial = parseRiskScoreFilter(selected);
+  const [operator, setOperator] = useState(initial.operator);
+  const [amount, setAmount] = useState(initial.amount);
+
+  useEffect(() => {
+    const next = parseRiskScoreFilter(selectedKey ? selectedKey.split(",") : []);
+    setOperator(next.operator);
+    setAmount(next.amount);
+  }, [selectedKey]);
+
+  const commit = (nextOp, nextAmount) => {
+    const encoded = encodeRiskScoreFilter(nextOp, nextAmount);
+    if (encoded.length === 0 && !selectedKey) return;
+    onChange(encoded);
+  };
+
+  return (
+    <VerticalStack gap="2">
+      <ChoiceList
+        title="Condition"
+        titleHidden
+        choices={RISK_SCORE_OPS}
+        selected={operator ? [operator] : []}
+        onChange={(vals) => {
+          const v = vals[0];
+          if (!v) return;
+          setOperator(v);
+          if (amount !== "") commit(v, amount);
+        }}
+      />
+      <div
+        onKeyDown={(e) => {
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          e.stopPropagation();
+          commit(operator, amount);
+          onClose?.();
+        }}
+      >
+        <TextField
+          label="Value"
+          labelHidden
+          type="number"
+          value={amount}
+          placeholder="e.g. 0.8"
+          autoComplete="off"
+          onChange={setAmount}
+          onBlur={() => commit(operator, amount)}
+        />
+      </div>
+    </VerticalStack>
+  );
+}
 
 const getHeaders = () => {
   const baseHeaders = [
@@ -48,6 +135,25 @@ const getHeaders = () => {
     },
   ];
 
+  if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+    baseHeaders.push({
+      text: "Reason",
+      value: "reason",
+      title: "Reason",
+      maxWidth: "240px",
+      type: CellType.TEXT,
+      tooltipKey: "reasonFull",
+    });
+    baseHeaders.push({
+      text: "Evidence",
+      value: "evidenceLine",
+      title: "Evidence",
+      maxWidth: "240px",
+      type: CellType.TEXT,
+      tooltipKey: "evidenceLineFull",
+    });
+  }
+
   if (func.shouldShowIpReputation()) {
     baseHeaders.push({
       text: "Reputation",
@@ -68,6 +174,12 @@ const getHeaders = () => {
       text: "Detection Type",
       value: "detectionType",
       title: "Detection Type",
+    });
+    baseHeaders.push({
+      text: "Risk score",
+      value: "riskScore",
+      title: "Risk score",
+      sortActive: true,
     });
     baseHeaders.push({
       text: "Rule Violated",
@@ -120,29 +232,51 @@ const getHeaders = () => {
 };
 
 const getSortOptions = (headers) => {
-  const columnIndex = headers.findIndex((h) => h.value === "discoveredTs") + 1;
-  if (columnIndex === 0) return [];
-  return [
+  const detectedIdx = headers.findIndex((h) => h.value === "discoveredTs") + 1;
+  if (detectedIdx === 0) return [];
+  const options = [
     {
       label: "Discovered time",
       value: "detectedAt asc",
       directionLabel: "Newest",
       sortKey: "detectedAt",
-      columnIndex,
+      columnIndex: detectedIdx,
     },
     {
       label: "Discovered time",
       value: "detectedAt desc",
       directionLabel: "Oldest",
       sortKey: "detectedAt",
-      columnIndex,
+      columnIndex: detectedIdx,
     },
   ];
+  const riskIdx = headers.findIndex((h) => h.value === "riskScore") + 1;
+  if (riskIdx > 0) {
+    options.push(
+      {
+        label: "Risk score",
+        value: "riskScore asc",
+        directionLabel: "Highest",
+        sortKey: "riskScore",
+        columnIndex: riskIdx,
+      },
+      {
+        label: "Risk score",
+        value: "riskScore desc",
+        directionLabel: "Lowest",
+        sortKey: "riskScore",
+        columnIndex: riskIdx,
+      },
+    );
+  }
+  return options;
 };
 
 let filters = [];
 
-function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, initialTab }) {
+const HUMAN_RESPONSE = { PENDING: "PENDING", APPROVED: "APPROVED", BLOCKED: "BLOCKED" };
+
+function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, initialTab, onRegisterPayloadSearch, refreshNonce = 0 }) {
   const location = useLocation();
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
@@ -152,6 +286,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   const [loading, setLoading] = useState(true);
   const misconfigRowMetaRef = useRef({});
+  const humanResponseByIdRef = useRef({});
   const collectionsMap = PersistStore((state) => state.collectionsMap);
   const hostNameMap = PersistStore((state) => state.hostNameMap);
   const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
@@ -160,14 +295,37 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const guardrailApprovedByPolicy = SessionStore((state) => state.guardrailApprovedByPolicy);
   const setGuardrailApprovedByPolicy = SessionStore((state) => state.setGuardrailApprovedByPolicy);
   const needsGuardrailCompliance = label === LABELS.GUARDRAIL || isAgenticSecurityCategory() || isEndpointSecurityCategory();
-  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, needs_approval: 3, training: 4, skills_evaluations: 4, misconfigured_settings: 5 };
+  const tabIndexMap = { active: 0, under_review: 1, ignored: 2, needs_approval: 3, human_approval: 3, training: 4, skills_evaluations: 4, misconfigured_settings: 5 };
   const resolvedInitialTab = initialTab || 'active';
   const [currentTab, setCurrentTab] = useState(resolvedInitialTab);
   const [selected, setSelected] = useState(tabIndexMap[resolvedInitialTab] || 0)
   const [currentFilters, setCurrentFilters] = useState({})
   const [totalFilteredCount, setTotalFilteredCount] = useState(0)
+  const [pendingHumanApprovalCount, setPendingHumanApprovalCount] = useState(null)
   const [usernameMap, setUsernameMap] = useState({});
   const [usernameMapLoaded, setUsernameMapLoaded] = useState(!isEndpointSecurityCategory());
+  const [advancedFilters, setAdvancedFilters] = useState([]);
+  const [advancedFetchKey, setAdvancedFetchKey] = useState(0);
+
+  const handleAdvancedFiltersChange = (next) => {
+    setAdvancedFilters(next);
+    setAdvancedFetchKey((k) => k + 1);
+  };
+
+  useEffect(() => {
+    if (!onRegisterPayloadSearch) return undefined;
+    onRegisterPayloadSearch((text, side, line) => {
+      const parsed = filterFromEditorSelection(text, line, side);
+      if (!parsed) {
+        func.setToast(true, true, "Select a field and value, like host: example.com");
+        return;
+      }
+      setAdvancedFilters((prev) => addAdvancedFilter(prev, parsed));
+      setAdvancedFetchKey((k) => k + 1);
+      func.setToast(true, false, "Added as search filter");
+    });
+    return undefined;
+  }, [onRegisterPayloadSearch]);
 
   // Inline "Approve server" (Needs Approval tab). approveRow holds the raw event being approved.
   const [approveRow, setApproveRow] = useState(null);
@@ -240,6 +398,22 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     }
   };
 
+  const handleBulkHumanApproval = async (selectedIds, response) => {
+    if (!Array.isArray(selectedIds) || selectedIds.length === 0) return;
+    try {
+      const result = await api.updateMaliciousEventStatus({ eventIds: selectedIds, humanResponse: response });
+      if (result?.updateSuccess) {
+        const verb = response === HUMAN_RESPONSE.APPROVED ? "approved" : "blocked";
+        func.setToast(true, false, `${selectedIds.length} event${selectedIds.length === 1 ? "" : "s"} ${verb}`);
+        if (triggerRefresh) triggerRefresh();
+      } else {
+        func.setToast(true, true, "Failed to update selected events");
+      }
+    } catch {
+      func.setToast(true, true, "Failed to update selected events");
+    }
+  };
+
   useEffect(() => {
     if (isEndpointSecurityCategory()) {
       fetchEndpointShieldUsernameMap().then(map => {
@@ -248,6 +422,19 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       });
     }
   }, []);
+
+  useEffect(() => {
+    if (!isAgenticSecurityCategory()) return;
+    let cancelled = false;
+    api.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "HUMAN_APPROVAL", undefined, undefined, undefined, undefined, undefined, false, [], undefined, undefined, undefined, undefined, HUMAN_RESPONSE.PENDING)
+      .then(res => {
+        if (!cancelled) setPendingHumanApprovalCount(res?.total || 0);
+      })
+      .catch(() => {
+        if (!cancelled) setPendingHumanApprovalCount(0);
+      });
+    return () => { cancelled = true; };
+  }, [startTimestamp, endTimestamp, refreshNonce]);
 
   useEffect(() => {
     if (!needsGuardrailCompliance) return;
@@ -315,6 +502,15 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       badge: 'Beta',
       onAction: () => { setCurrentTab('needs_approval'); },
       id: 'needs_approval',
+      index: 3
+    });
+  }
+  if (isAgenticSecurityCategory()) {
+    guardrailExtraTabs.push({
+      content: <HumanApprovalTabLabel count={pendingHumanApprovalCount} />,
+      accessibilityLabel: humanApprovalTabAccessibilityLabel(pendingHumanApprovalCount),
+      onAction: () => { setCurrentTab('human_approval'); },
+      id: 'human_approval',
       index: 3
     });
   }
@@ -443,7 +639,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       delete: { ing: 'deleting', ed: 'deleted' },
       markForReview: { ing: 'marking for review', ed: 'marked for review' },
       removeFromReview: { ing: 'removing from review', ed: 'removed from review' },
-      markForTraining: { ing: 'marking for training', ed: 'marked for training' }
+      markForTraining: { ing: 'marking for training', ed: 'marked for training' },
+      approve: { ing: 'approving', ed: 'approved' },
+      block: { ing: 'blocking', ed: 'blocked' }
     };
 
     const label = actionLabels[operation];
@@ -474,6 +672,18 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           startTimestamp: filterParams[4],
           endTimestamp: filterParams[5],
           statusFilter: filterParams[6],
+          hosts: filterParams[7]
+        });
+      } else if (operation === 'approve' || operation === 'block') {
+        response = await threatDetectionRequests.updateMaliciousEventStatus({
+          actors: filterParams[0],
+          urls: filterParams[1],
+          types: filterParams[2],
+          latestAttack: filterParams[3],
+          startTimestamp: filterParams[4],
+          endTimestamp: filterParams[5],
+          statusFilter: 'HUMAN_APPROVAL',
+          humanResponse: operation === 'approve' ? HUMAN_RESPONSE.APPROVED : HUMAN_RESPONSE.BLOCKED,
           hosts: filterParams[7]
         });
       } else {
@@ -552,7 +762,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     // Execute the filtered operation
     await handleFilteredOperation('markForTraining', 'TRAINING');
   };
-
+  const handleApproveAllFiltered = () => handleFilteredOperation('approve');
+  const handleBlockAllFiltered = () => handleFilteredOperation('block');
 
   const promotedBulkActions = (selectedIds) => {
     const actions = [];
@@ -578,47 +789,75 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     if (eventCount === 0) return actions;
 
     // Helper function to create an action button
-    const createAction = (label, actionType, validationType = null, includeWarning = false) => {
+    const createAction = (label, actionType, validationType = null, includeWarning = false, override = null) => {
       const warningText = includeWarning
         ? '\n\nNote: Future events matching these URL and Attack Type combinations will be automatically blocked.'
         : '';
+      const actionIds = override?.ids ?? selectedIds;
+      const displayText = override?.text ?? eventText;
+      const useFilters = override?.useFilters ?? useFilterBasedUpdate;
 
       return {
-        content: `${label} ${eventText}`,
+        content: `${label} ${displayText}`,
         onAction: () => {
-          if (useFilterBasedUpdate) {
+          if (useFilters) {
             if (!validateFiltersForBulkOperation(validationType)) return;
             const message = actionType === 'delete'
-              ? `Are you sure you want to permanently delete ${eventText}? This action cannot be undone.`
-              : `Are you sure you want to ${label.toLowerCase()} ${eventText}?${warningText}`;
+              ? `Are you sure you want to permanently delete ${displayText}? This action cannot be undone.`
+              : `Are you sure you want to ${label.toLowerCase()} ${displayText}?${warningText}`;
             const handlers = {
               markForReview: handleMarkAllFilteredForReview,
               ignore: handleIgnoreAllFiltered,
               removeFromReview: handleRemoveAllFilteredFromReview,
               reactivate: handleRemoveAllFilteredFromReview,
               delete: handleDeleteAllFiltered,
-              markForTraining: handleMarkAllFilteredForTraining
+              markForTraining: handleMarkAllFilteredForTraining,
+              approve: handleApproveAllFiltered,
+              block: handleBlockAllFiltered,
             };
             func.showConfirmationModal(message, label, handlers[actionType]);
           } else {
             const message = actionType === 'delete'
-              ? `Are you sure you want to permanently delete ${eventText}? This action cannot be undone.`
+              ? `Are you sure you want to permanently delete ${displayText}? This action cannot be undone.`
               : includeWarning && actionType === 'ignore'
-                ? `Are you sure you want to ${label.toLowerCase()} ${eventText}?`
-                : `Are you sure you want to ${label.toLowerCase()} ${eventText}?`;
+                ? `Are you sure you want to ${label.toLowerCase()} ${displayText}?`
+                : `Are you sure you want to ${label.toLowerCase()} ${displayText}?`;
             const handlers = {
-              markForReview: () => handleBulkMarkForReview(selectedIds),
-              ignore: () => handleBulkIgnore(selectedIds),
-              removeFromReview: () => handleBulkRemoveFromReview(selectedIds),
-              reactivate: () => handleBulkRemoveFromReview(selectedIds),
-              delete: () => (currentTab === 'misconfigured_settings' ? handleMisconfigGroupDelete(selectedIds) : handleBulkDelete(selectedIds)),
-              markForTraining: () => handleBulkMarkForTraining(selectedIds)
+              markForReview: () => handleBulkMarkForReview(actionIds),
+              ignore: () => handleBulkIgnore(actionIds),
+              removeFromReview: () => handleBulkRemoveFromReview(actionIds),
+              reactivate: () => handleBulkRemoveFromReview(actionIds),
+              delete: () => (currentTab === 'misconfigured_settings' ? handleMisconfigGroupDelete(actionIds) : handleBulkDelete(actionIds)),
+              markForTraining: () => handleBulkMarkForTraining(actionIds),
+              approve: () => handleBulkHumanApproval(actionIds, HUMAN_RESPONSE.APPROVED),
+              block: () => handleBulkHumanApproval(actionIds, HUMAN_RESPONSE.BLOCKED),
             };
             func.showConfirmationModal(message, label, handlers[actionType]);
           }
         },
       };
     };
+
+    if (currentTab === 'human_approval') {
+      const pendingIds = Array.isArray(selectedIds)
+        ? selectedIds.filter((id) => isHumanApprovalPending(humanResponseByIdRef.current[id]))
+        : [];
+      const pendingCount = selectedIds === 'All' ? (pendingHumanApprovalCount || 0) : pendingIds.length;
+      if (pendingCount > 0) {
+        const pendingText = selectedIds === 'All'
+          ? `ALL ${pendingCount} pending event${pendingCount === 1 ? '' : 's'}`
+          : `${pendingCount} selected event${pendingCount === 1 ? '' : 's'}`;
+        const pendingOverride = {
+          ids: selectedIds === 'All' ? 'All' : pendingIds,
+          text: pendingText,
+          useFilters: selectedIds === 'All',
+        };
+        actions.push(createAction('Approve', 'approve', null, false, pendingOverride));
+        actions.push(createAction('Block', 'block', null, false, pendingOverride));
+      }
+      actions.push(createAction('Delete', 'delete'));
+      return actions;
+    }
 
     // Define actions for each tab
     const tabActions = {
@@ -638,7 +877,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       ],
       'training': [
         // No actions for training data - training data cannot be removed
-      ]
+      ],
     };
 
     // Add tab-specific actions
@@ -646,6 +885,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     currentTabActions.forEach(({ label, type, validationType, warning }) => {
       actions.push(createAction(label, type, validationType, warning));
     });
+
+    if (isEndpointSecurityCategory() && (currentTab === 'skills_evaluations' || currentTab === 'misconfigured_settings')) {
+      actions.push(createAction('Mark for Review', 'markForReview'));
+      actions.push(createAction('Ignore', 'ignore', 'ignore', true));
+    }
 
     // Delete button for all tabs
     actions.push(createAction('Delete', 'delete'));
@@ -668,24 +912,25 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     // "Needs Approval" is a client-side view over ACTIVE events filtered to behaviour==="approval".
     // Fetch active events with a high limit (single page) and filter after mapping.
     const isNeedsApproval = currentTab === 'needs_approval';
+    const isHumanApproval = currentTab === 'human_approval';
     const isSkillsEvaluations = currentTab === 'skills_evaluations';
     const isMisconfiguredSettings = currentTab === 'misconfigured_settings';
     // Needs Approval is a client-side view (fetch a big page, filter after mapping). Skills
-    // Evaluations / Misconfigured Settings are SERVER-paginated: each shows ACTIVE events narrowed
-    // to its own partition by the backend (x-skill-eval-mode / x-config-eval-mode headers), so
-    // totals/pagination are correct.
+    // Evaluations / Misconfigured Settings are SERVER-paginated. Human Approval is also
+    // server-paginated, isolated by status=HUMAN_APPROVAL (same pattern as Training Data).
     const isClientSideView = isNeedsApproval;
-    const effectiveStatus = (isNeedsApproval || isSkillsEvaluations || isMisconfiguredSettings) ? 'ACTIVE' : currentTab.toUpperCase();
+    const effectiveStatus = isHumanApproval
+      ? 'HUMAN_APPROVAL'
+      : ((isNeedsApproval || isSkillsEvaluations || isMisconfiguredSettings) ? 'ACTIVE' : currentTab.toUpperCase());
     const effectiveSkip = isClientSideView ? 0 : skip;
     const effectiveLimit = isClientSideView ? 200 : limit;
-    // Skills Evaluations / Misconfigured Settings partitions (Atlas only): "only" on their own tab,
-    // "exclude" on the Active tab so neither shows up there. Backend applies each independently
-    // (gated to contextSource=ENDPOINT); undefined elsewhere.
+    // Skills Evaluations / Misconfigured Settings: excluded on plain Active, not once severity/host/actor is filtered.
+    const hasAuxiliaryFilter = Boolean(filters?.severity?.length || filters?.host?.length || filters?.actor?.length);
     const skillEvaluationMode = isEndpointSecurityCategory()
-      ? (isSkillsEvaluations ? 'only' : (currentTab === 'active' ? 'exclude' : undefined))
+      ? (isSkillsEvaluations ? 'only' : (currentTab === 'active' && !hasAuxiliaryFilter ? 'exclude' : undefined))
       : undefined;
     const configEvaluationMode = isEndpointSecurityCategory()
-      ? (isMisconfiguredSettings ? 'only' : (currentTab === 'active' ? 'exclude' : undefined))
+      ? (isMisconfiguredSettings ? 'only' : (currentTab === 'active' && !hasAuxiliaryFilter ? 'exclude' : undefined))
       : undefined;
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
@@ -694,7 +939,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       latestAttack = [],
       hostFilter = [],
       severityFilter = [];
-    let latestApiOrigRegex = queryValue.length > 3 ? queryValue : "";
+    let latestApiOrigRegex = toLatestApiOrigRegex(queryValue, advancedFilters) || "";
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
     }
@@ -715,6 +960,19 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     }
     if(filters?.severity){
       severityFilter = filters?.severity
+    }
+
+    let riskScoreFilterType;
+    let riskScoreFilterValue;
+    if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+      const parsed = parseRiskScoreFilter(filters?.riskScore);
+      if (parsed.operator && parsed.amount !== "") {
+        const n = Number(parsed.amount);
+        if (Number.isFinite(n)) {
+          riskScoreFilterType = parsed.operator;
+          riskScoreFilterValue = n;
+        }
+      }
     }
 
     // Store current filters for bulk operations
@@ -759,12 +1017,13 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       undefined,
       severityFilter,
       skillEvaluationMode,
-      configEvaluationMode
+      configEvaluationMode,
+      riskScoreFilterType,
+      riskScoreFilterValue
     );
 
     // Store the total count for filtered results
     setTotalFilteredCount(res.total || 0);
-//    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
     if (isMisconfiguredSettings) {
       misconfigRowMetaRef.current = {};
@@ -834,6 +1093,19 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
         ),
+        ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && {
+          riskScore: parseStoredRiskScore(x?.metadata) ?? "",
+          ...(() => {
+            const r = parseStoredReason(x?.metadata);
+            if (!r) return { reason: "", reasonFull: "" };
+            const { preview, full } = truncateToWords(r, 30);
+            return { reason: preview, reasonFull: full };
+          })(),
+          ...(() => {
+            const { preview, full } = truncateToChars(x?.evidenceLine || "", 120);
+            return { evidenceLine: preview || "-", evidenceLineFull: full };
+          })(),
+        }),
         // Successful Exploit is only shown for API Security (not Argus/Agentic or Atlas/Endpoint)
         ...(isApiSecurityCategory() && {
           successfulComp: (
@@ -890,7 +1162,24 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
             <Button size="slim" onClick={() => openInlineApprove(x)}>Approve</Button>
           </div>
-        )
+        ),
+        ...(isHumanApproval && {
+          humanResponseComp: (
+            <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+              <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                <HumanResponseBadge response={x.humanResponse} />
+                {isHumanApprovalPending(x.humanResponse) && (
+                  <HumanApprovalActions
+                    pending
+                    subtle
+                    onApprove={() => handleBulkHumanApproval([x.id], HUMAN_RESPONSE.APPROVED)}
+                    onBlock={() => handleBulkHumanApproval([x.id], HUMAN_RESPONSE.BLOCKED)}
+                  />
+                )}
+              </HorizontalStack>
+            </div>
+          ),
+        }),
       };
 
       if (func.shouldShowIpReputation()) {
@@ -912,6 +1201,13 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     // x-skill-eval-mode: filterId == "skill_evaluation"), so total/pagination come straight from
     // the backend. Active applies the complementary "exclude" mode, so skill-evaluation rows don't
     // also appear there.
+    if (isHumanApproval) {
+      const next = {};
+      ret.forEach((row) => {
+        if (row?.id) next[row.id] = row.humanResponse;
+      });
+      humanResponseByIdRef.current = next;
+    }
     setLoading(false);
     return { value: ret, total: total };
   }
@@ -998,6 +1294,18 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       },
     ];
 
+    if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+      filters.push({
+        key: 'riskScore',
+        label: "Risk score",
+        title: "Risk score",
+        choices: [],
+        renderFilter: ({ selected, onChange }) => (
+          <RiskScoreFilterControl selected={selected} onChange={onChange} />
+        ),
+      });
+    }
+
     // Successful Exploit filter is only relevant for API Security (not Argus/Agentic or Atlas/Endpoint)
     if (isApiSecurityCategory()) {
       filters.push({
@@ -1029,6 +1337,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           ])
         );
         return func.convertToDisambiguateLabelObj(value, latestAttackLabelMap, 2);
+      case "riskScore": {
+        const parsed = parseRiskScoreFilter(value);
+        const opLabel = RISK_SCORE_OP_LABELS[parsed.operator] || parsed.operator;
+        return parsed.amount !== "" ? `${opLabel} ${parsed.amount}` : opLabel;
+      }
       default:
         return func.convertToDisambiguateLabelObj(value, null, 2);
     }
@@ -1036,10 +1349,20 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   // Recompute rows once the async guardrail compliance map has loaded (same pattern as usernameMapLoaded).
   const guardrailComplianceLoaded = !needsGuardrailCompliance || Object.keys(guardrailComplianceMap).length > 0;
-  const key = startTimestamp + endTimestamp + (usernameMapLoaded ? '_u' : '') + (guardrailComplianceLoaded ? '_gc' : '');
+  const key = startTimestamp + endTimestamp + currentTab + (usernameMapLoaded ? '_u' : '') + (guardrailComplianceLoaded ? '_gc' : '');
   const headers = getHeaders();
   if (currentTab === 'needs_approval') {
     headers.push({ text: "Action", value: "approveAction", title: "Action" });
+  }
+  if (currentTab === 'human_approval') {
+    const behaviourIdx = headers.findIndex((h) => h.value === "behaviour");
+    if (behaviourIdx >= 0) headers.splice(behaviourIdx, 1);
+    const detectedCol = headers.find((h) => h.value === "discoveredTs");
+    if (detectedCol) {
+      detectedCol.text = "Reported";
+      detectedCol.title = "Reported";
+    }
+    headers.unshift({ text: "Status", value: "humanResponseComp", title: "Status" });
   }
   const sortOptions = getSortOptions(headers);
   return (
@@ -1064,6 +1387,22 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         selected={selected}
         onSelect={handleSelectedTab}
         mode={IndexFiltersMode.Default}
+        searchAccessory={
+          <AdvancedPayloadSearch
+            filters={advancedFilters}
+            onChange={handleAdvancedFiltersChange}
+            showTags={false}
+          />
+        }
+        searchBelow={advancedFilters.length > 0 ? (
+          <AdvancedPayloadSearch
+            filters={advancedFilters}
+            onChange={handleAdvancedFiltersChange}
+            showButton={false}
+          />
+        ) : null}
+        callFromOutside={advancedFetchKey + refreshNonce}
+        clearSelectionKey={refreshNonce}
       />
 
       <Modal

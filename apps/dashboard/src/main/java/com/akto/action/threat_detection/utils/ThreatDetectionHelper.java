@@ -77,6 +77,19 @@ public class ThreatDetectionHelper {
             Filter.Builder filter,
             String status,
             String jiraTicketUrl) {
+        return updateMaliciousEvent(httpClient, backendUrl, apiToken, eventId, eventIds, filter, status, jiraTicketUrl, null);
+    }
+
+    public static UpdateResult updateMaliciousEvent(
+            CloseableHttpClient httpClient,
+            String backendUrl,
+            String apiToken,
+            String eventId,
+            List<String> eventIds,
+            Filter.Builder filter,
+            String status,
+            String jiraTicketUrl,
+            String humanResponse) {
 
         try {
             HttpPost post = new HttpPost(
@@ -108,6 +121,10 @@ public class ThreatDetectionHelper {
 
             if (!StringUtils.isEmpty(jiraTicketUrl)) {
                 requestBuilder.setJiraTicketUrl(jiraTicketUrl);
+            }
+
+            if (!StringUtils.isEmpty(humanResponse)) {
+                requestBuilder.setHumanResponse(humanResponse);
             }
 
             UpdateMaliciousEventStatusRequest request = requestBuilder.build();

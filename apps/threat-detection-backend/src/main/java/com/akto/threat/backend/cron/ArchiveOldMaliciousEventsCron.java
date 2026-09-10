@@ -1,6 +1,7 @@
 package com.akto.threat.backend.cron;
 
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dao.context.Context;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.dao.ThreatConfigurationDao;
@@ -22,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 
 public class ArchiveOldMaliciousEventsCron implements Runnable {
 
-    private static final LoggerMaker logger = new LoggerMaker(ArchiveOldMaliciousEventsCron.class);
+    private static final LoggerMaker logger = new LoggerMaker(ArchiveOldMaliciousEventsCron.class, LogDb.THREAT_DETECTION);
 
     private static final int BATCH_SIZE = 5000;
     private static final long DEFAULT_RETENTION_DAYS = 60L; // default, can be overridden from DB
@@ -43,7 +44,7 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
         long initialDelaySeconds = 0;
         long periodSeconds = Duration.ofHours(6).getSeconds();
         scheduler.scheduleAtFixedRate(this, initialDelaySeconds, periodSeconds, TimeUnit.SECONDS);
-        logger.infoAndAddToDb("Scheduled ArchiveOldMaliciousEventsCron every 6 hours", LoggerMaker.LogDb.RUNTIME);
+        logger.infoAndAddToDb("Scheduled ArchiveOldMaliciousEventsCron every 6 hours");
     }
 
     @Override
@@ -51,7 +52,7 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
         try {
             runOnce();
         } catch (Throwable t) {
-            logger.errorAndAddToDb("Archive cron failed unexpectedly: " + t.getMessage(), LoggerMaker.LogDb.RUNTIME);
+            logger.errorAndAddToDb("Archive cron failed unexpectedly: " + t.getMessage());
         }
     }
 
@@ -74,10 +75,10 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
                     if (accId != null) {
                         archiveOldMaliciousEvents(dbName, nowSeconds);
                     } else {
-                        logger.infoAndAddToDb("Skipping archive for db as context wasn't set: " + dbName, LoggerMaker.LogDb.RUNTIME);
+                        logger.infoAndAddToDb("Skipping archive for db as context wasn't set: " + dbName);
                     }
                 } catch (Exception e) {
-                    logger.errorAndAddToDb("Error processing database: " + dbName + " : " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+                    logger.errorAndAddToDb("Error processing database: " + dbName + " : " + e.getMessage());
                 } finally {
                     Context.resetContextThreadLocals();
                 }
@@ -98,7 +99,7 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
 
         // Check if deletion is enabled for this account
         if (!isDeletionEnabled(accountId)) {
-            logger.infoAndAddToDb("Deletion is disabled for account " + accountId + ", skipping", LoggerMaker.LogDb.RUNTIME);
+            logger.infoAndAddToDb("Deletion is disabled for account " + accountId + ", skipping");
             return;
         }
 
@@ -135,30 +136,30 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
             deletesThisIteration += deleted;
 
             long iterationElapsedMs = (System.nanoTime() - iterationStartNanos) / 1_000_000L;
-            logger.infoAndAddToDb("Delete loop iteration in db " + dbName + ": batch=" + batch.size() + ", deleted=" + deleted + ", tookMs=" + iterationElapsedMs, LoggerMaker.LogDb.RUNTIME);
+            logger.infoAndAddToDb("Delete loop iteration in db " + dbName + ": batch=" + batch.size() + ", deleted=" + deleted + ", tookMs=" + iterationElapsedMs);
 
             if (batch.size() < BATCH_SIZE) {
                 break;
             }
 
             if (deletesThisIteration >= MAX_DELETES_PER_ITERATION) {
-                logger.infoAndAddToDb("Reached delete cap (" + MAX_DELETES_PER_ITERATION + ") for this iteration in db " + dbName + ", stopping further deletes", LoggerMaker.LogDb.RUNTIME);
+                logger.infoAndAddToDb("Reached delete cap (" + MAX_DELETES_PER_ITERATION + ") for this iteration in db " + dbName + ", stopping further deletes");
                 break;
             }
         }
 
         if (totalDeleted > 0) {
-            logger.infoAndAddToDb("Completed deletion for db " + dbName + ", total deleted: " + totalDeleted, LoggerMaker.LogDb.RUNTIME);
+            logger.infoAndAddToDb("Completed deletion for db " + dbName + ", total deleted: " + totalDeleted);
         }
 
         try {
             if (deletesThisIteration < MAX_DELETES_PER_ITERATION) {
                 trimCollectionIfExceedsCap(accountId, source);
             } else {
-                logger.infoAndAddToDb("Skipping trim step as delete cap reached in db " + dbName, LoggerMaker.LogDb.RUNTIME);
+                logger.infoAndAddToDb("Skipping trim step as delete cap reached in db " + dbName);
             }
         } catch (Exception e) {
-            logger.errorAndAddToDb("Error trimming collection to cap in db " + dbName + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+            logger.errorAndAddToDb("Error trimming collection to cap in db " + dbName + ": " + e.getMessage());
         }
     }
 
@@ -171,7 +172,7 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
                 return (Boolean) val;
             }
         } catch (Exception e) {
-            logger.errorAndAddToDb("Failed fetching archivalEnabled from threat_configuration for account " + accountId + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+            logger.errorAndAddToDb("Failed fetching archivalEnabled from threat_configuration for account " + accountId + ": " + e.getMessage());
         }
         return false; // disabled by default
     }
@@ -189,7 +190,7 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
                 return days;
             }
         } catch (Exception e) {
-            logger.errorAndAddToDb("Failed fetching archivalDays from threat_configuration for account " + accountId + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+            logger.errorAndAddToDb("Failed fetching archivalDays from threat_configuration for account " + accountId + ": " + e.getMessage());
         }
         return DEFAULT_RETENTION_DAYS;
     }
@@ -200,7 +201,7 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
         if (approxCount <= MAX_SOURCE_DOCS) return;
 
         long totalDeleted = 0L;
-        logger.infoAndAddToDb("Starting overflow trim in account " + accountId + ": approxCount=" + approxCount + ", overCap=" + (approxCount - MAX_SOURCE_DOCS), LoggerMaker.LogDb.RUNTIME);
+        logger.infoAndAddToDb("Starting overflow trim in account " + accountId + ": approxCount=" + approxCount + ", overCap=" + (approxCount - MAX_SOURCE_DOCS));
 
         while (true) {
             int batch = BATCH_SIZE;
@@ -231,7 +232,7 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
         }
 
         if (totalDeleted > 0) {
-            logger.infoAndAddToDb("Completed overflow trim in account " + accountId + ": deleted=" + totalDeleted, LoggerMaker.LogDb.RUNTIME);
+            logger.infoAndAddToDb("Completed overflow trim in account " + accountId + ": deleted=" + totalDeleted);
         }
     }
 
@@ -239,10 +240,10 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
         if (ids == null || ids.isEmpty()) return 0L;
         try {
             long deleted = source.deleteMany(Filters.in("_id", ids)).getDeletedCount();
-            logger.infoAndAddToDb("Deleted " + deleted + " documents from source in account " + accountId, LoggerMaker.LogDb.RUNTIME);
+            logger.infoAndAddToDb("Deleted " + deleted + " documents from source in account " + accountId);
             return deleted;
         } catch (Exception e) {
-            logger.errorAndAddToDb("Failed to delete documents from source in account " + accountId + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+            logger.errorAndAddToDb("Failed to delete documents from source in account " + accountId + ": " + e.getMessage());
             return 0L;
         }
     }

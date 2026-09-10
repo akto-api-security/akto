@@ -75,18 +75,36 @@ public class GuardrailPolicies {
     private List<String> selectedMcpServers;
     private List<String> selectedAgentServers;
     
-    // Step 6: Enhanced Server settings (new format with ID and name)
+    // Step 6: Enhanced Server settings. selectedAgentServersV2 = agents only; LLM entries live in selectedLlmServersV2.
     private List<SelectedServer> selectedMcpServersV2;
     private List<SelectedServer> selectedAgentServersV2;
+    private List<SelectedServer> selectedLlmServersV2;
     private boolean applyOnResponse;
     private boolean applyOnRequest;
     private boolean applyToAllServers;
 
+    // Include/Exclude toggle per server list, independently matched by type; empty+negated matches everything, including future assets.
+    private boolean negatedAgentServers;
+    private boolean negatedMcpServers;
+    private boolean negatedLlmServers;
+
     // Tag/Device targeting — controls which agentic users/devices this policy applies to.
-    // targetDeviceIds holds explicitly-picked device IDs (dropdown shows them labeled by username,
-    // but the stored value is the device ID itself — usernames aren't a reliable unique identity).
-    // applyToDeviceIds is resolved at fetch time (not stored) by the dashboard before serving to the enforcement layer.
+    // targetDeviceIds holds explicitly-picked device IDs ONLY (dropdown shows them labeled by
+    // username, but the stored value is the device ID itself — usernames aren't a reliable unique
+    // identity).
     private List<String> targetDeviceIds;
+    // Explicitly-picked identities (agent_users/module_info username), independent of any device —
+    // the "Users" targeting pool (beta; currently only reliably populated for Browser extensions
+    // and the Claude Desktop app — see CreateGuardrailPage). Deliberately kept separate from
+    // targetDeviceIds/applyToDeviceIds, which is resolved purely at the device level; a Users
+    // selection is instead matched downstream by email via userMetadata.
+    // Inbound-only: never persisted (see GuardrailPoliciesAction#buildPolicyUpdates). userMetadata
+    // is derived solely from this field on save (GuardrailPoliciesAction#createGuardrailPolicy) —
+    // never combined with the identities behind targetDeviceIds — so userMetadata alone is the
+    // durable record of what was picked here; the UI reconstructs this field on edit from
+    // userMetadata's userNames rather than reading it back off the fetched policy.
+    @BsonIgnore
+    private List<String> targetUserNames;
     // Arbitrary device-tag key → values — AND across keys, OR within one key's values. See
     // scripts/migrate_guardrail_target_teams_roles_to_tags.js for converting pre-existing
     // policies that used the old fixed targetTeams/targetRoles fields.
@@ -98,6 +116,15 @@ public class GuardrailPolicies {
     // falsy/empty check (e.g. !arr || arr.length === 0) that would treat them the same.
     @BsonIgnore
     private List<String> applyToDeviceIds;
+
+    // Snapshot of the agent_users doc(s) behind the selected targets. Inbound (from the UI): each
+    // entry carries just the identity (userId/userName) the UI already resolved via
+    // fetchAgenticUsers for a selected target — not a full doc. Outbound (after save): replaced
+    // with the authoritative doc(s) fetched from AgentUsersDao by that identity (see
+    // GuardrailPoliciesAction#createGuardrailPolicy), so the policy can be differentiated by user
+    // email downstream, not only by device id. Always re-resolved on save; empty means no selected
+    // target's identity matched a real agent_users doc (or no targeting is configured).
+    private List<AgenticUsers> userMetadata;
 
     // Blocked host/path list — any traffic from a listed host is blocked outright.
     // Modeled as objects (not bare strings) so the entry schema can be extended later
@@ -185,11 +212,23 @@ public class GuardrailPolicies {
         if (selectedAgentServersV2 != null && !selectedAgentServersV2.isEmpty()) {
             return selectedAgentServersV2;
         }
+
+        if (selectedLlmServersV2 != null) {
+            return new java.util.ArrayList<>();
+        }
         // Convert old format to new format for compatibility
         if (selectedAgentServers != null && !selectedAgentServers.isEmpty()) {
             return selectedAgentServers.stream()
                     .map(serverId -> new SelectedServer(serverId, serverId)) // ID as name for old data
                     .collect(java.util.stream.Collectors.toList());
+        }
+        return new java.util.ArrayList<>();
+    }
+
+    // No legacy fallback — this list is new, there's no old-format data to fall back to.
+    public List<SelectedServer> getEffectiveSelectedLlmServers() {
+        if (selectedLlmServersV2 != null) {
+            return selectedLlmServersV2;
         }
         return new java.util.ArrayList<>();
     }

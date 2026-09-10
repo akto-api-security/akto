@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import { Box, Card, Divider, HorizontalGrid, HorizontalStack, Text } from "@shopify/polaris";
+import { Box, Card, Divider, HorizontalGrid, HorizontalStack, Modal, Text } from "@shopify/polaris";
 import { produce } from "immer";
 
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
@@ -20,6 +20,7 @@ import SessionsView from "./SessionsView";
 import SessionFlyout from "./SessionFlyout";
 import ArgusTraceFlyout from "./ArgusTraceFlyout";
 import MessagesView from "./MessagesView";
+import { NO_ACCESS_MESSAGE } from "./LLMCellRenderers";
 import { fetchGuardrailPolicyNamesCached } from "../../guardrails/topicGuardrailUtils";
 import { CATEGORY_ENDPOINT_SECURITY, CATEGORY_AGENTIC_SECURITY } from "../../../../main/labelHelper";
 
@@ -56,6 +57,9 @@ export default function LLMObservability() {
     );
     const [selectedSession, setSelectedSession] = useState(null);
     const [selectedTrace, setSelectedTrace]     = useState(null);
+    // Prompt content is admin-only; admins confirm per row that opening it is recorded in audit data.
+    const isAdmin = func.isUserAdmin();
+    const [pendingReveal, setPendingReveal] = useState(null);
     const [argusStats, setArgusStats] = useState(null);
     // Aggregated stats from the dedicated endpoint (accurate, not 500-capped)
     const [sessionStats, setSessionStats] = useState(null);
@@ -69,7 +73,8 @@ export default function LLMObservability() {
     useEffect(() => {
         if (!initialTraceId) return;
         setDashboardCategory(CATEGORY_AGENTIC_SECURITY);
-        setSelectedTrace({ traceId: initialTraceId });
+        if (!func.isUserAdmin()) { func.setToast(true, true, NO_ACCESS_MESSAGE); return; }
+        setPendingReveal({ open: () => setSelectedTrace({ traceId: initialTraceId }), traceId: initialTraceId });
     }, [initialTraceId, setDashboardCategory]);
 
     useEffect(() => {
@@ -105,8 +110,21 @@ export default function LLMObservability() {
     }, [epochs, isArgus]);
 
     const openSession = useCallback((row) => {
-        setSelectedSession(row);
-    }, []);
+        if (!isAdmin) { func.setToast(true, true, NO_ACCESS_MESSAGE); return; }
+        setPendingReveal({ open: () => setSelectedSession(row), sessionId: row?.sessionIdentifier });
+    }, [isAdmin]);
+
+    const openTrace = useCallback((row) => {
+        if (!isAdmin) { func.setToast(true, true, NO_ACCESS_MESSAGE); return; }
+        setPendingReveal({ open: () => setSelectedTrace(row), traceId: row?.traceId, sessionId: row?.sessionIdentifier });
+    }, [isAdmin]);
+
+    // Opening the flyout fetches the content, and that fetch is what gets recorded in audit data.
+    const confirmReveal = useCallback(() => {
+        if (!pendingReveal) return;
+        pendingReveal.open();
+        setPendingReveal(null);
+    }, [pendingReveal]);
 
     // ─── Atlas graph data (sessions) ─────────────────────────────────────────
 
@@ -213,10 +231,10 @@ export default function LLMObservability() {
             const tokens = (Number(r._inputTokens) || 0) + (Number(r._outputTokens) || 0);
             return {
                 id: r.traceId || i,
-                name: truncate(r._promptText || r.traceId || `Trace ${i + 1}`, 40),
+                name: truncate((isAdmin ? r._promptText : "") || r.traceId || `Trace ${i + 1}`, 40),
                 type: "LLM",
                 assetTagValue: r._model,
-                onClick: () => setSelectedTrace(r),
+                onClick: () => openTrace(r),
                 renderValue: () => (
                     <HorizontalStack align="end" blockAlign="center" wrap={false} gap="0">
                         <Box minHeight="28px">
@@ -226,7 +244,7 @@ export default function LLMObservability() {
                 ),
             };
         });
-    }, [argusStats, setSelectedTrace]);
+    }, [argusStats, openTrace, isAdmin]);
 
     const totalDisplaySessions = sessionStats?.totalSessions || 0;
 
@@ -344,7 +362,7 @@ export default function LLMObservability() {
                         </Box>
                     ) : topCards,
                     isArgus ? (
-                        <MessagesView key="traces-table" currDateRange={currDateRange} columnDefs={ARGUS_TRACE_COL_DEFS} onRowClicked={p => p.data && setSelectedTrace(p.data)} />
+                        <MessagesView key="traces-table" currDateRange={currDateRange} columnDefs={ARGUS_TRACE_COL_DEFS} onRowClicked={p => p.data && openTrace(p.data)} />
                     ) : (
                         <SessionsView key="sessions-table" currDateRange={currDateRange} onOpenSession={openSession} initialFilters={urlFilters} />
                     ),
@@ -362,6 +380,20 @@ export default function LLMObservability() {
                     onClose={() => setSelectedSession(null)}
                 />
             )}
+            <Modal
+                open={!!pendingReveal}
+                onClose={() => setPendingReveal(null)}
+                title="Show prompt content?"
+                primaryAction={{ content: "Show content", onAction: confirmReveal }}
+                secondaryActions={[{ content: "Cancel", onAction: () => setPendingReveal(null) }]}
+            >
+                <Modal.Section>
+                    <Text variant="bodyMd">
+                        Prompts and responses can contain sensitive data. Your email, IP address and the time of
+                        this access will be recorded in audit data.
+                    </Text>
+                </Modal.Section>
+            </Modal>
         </>
     );
 }

@@ -1226,7 +1226,7 @@ function ApiEndpoints(props) {
         const envType = collectionsObj?.envType
         const envTypeList = envType?.map(func.formatCollectionType) || []
 
-        return getTagsCompactComponent(envTypeList)
+        return transform.getCollectionTypeList(envTypeList, 5, true)
     }
 
     function getEmptyScreenText(collectionsObj) {

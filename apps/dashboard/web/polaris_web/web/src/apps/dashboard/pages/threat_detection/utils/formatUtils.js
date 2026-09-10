@@ -1,32 +1,46 @@
 import React from 'react';
-import { Text } from "@shopify/polaris";
+import { Text, Tooltip } from "@shopify/polaris";
 import { getGuardrailCapabilityForRule } from '../constants/guardrailRuleDefinitions';
 import SessionStore from '@/apps/main/SessionStore';
 import threatDetectionApi from '../api';
 import guardrailApi from '../../guardrails/api';
 
-// Regular expression to validate IP address (IPv4 and IPv6)
-const IPV4_REGEX = /^(\d{1,3}\.){3}\d{1,3}$/;
-const IPV6_REGEX = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
+const looksLikeSecret = (value) => {
+  const v = String(value).trim();
+  if (/^bearer\s+/i.test(v)) return true;
+  if (/^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\./.test(v)) return true;
+  return false;
+};
 
-export const formatActorId = (actorId) => {
+const ACTOR_ID_MAX_LENGTH = 25;
+
+export const actorIdFullDisplay = (actorId) => {
+  if (!actorId) return "-";
+  return looksLikeSecret(actorId) ? "Non IP Value" : String(actorId);
+};
+
+export const actorIdDisplayText = (actorId) => {
+  const display = actorIdFullDisplay(actorId);
+  return display.length > ACTOR_ID_MAX_LENGTH
+    ? `${display.slice(0, ACTOR_ID_MAX_LENGTH)}...`
+    : display;
+};
+
+export const formatActorId = (actorId, textProps = { variant: "bodyMd", fontWeight: "medium" }) => {
   if (!actorId) return "-";
 
-  const isValidIP = IPV4_REGEX.test(actorId) || IPV6_REGEX.test(actorId);
+  const display = actorIdFullDisplay(actorId);
+  const truncated = actorIdDisplayText(actorId);
 
-  if (isValidIP) {
-    return (
-      <Text variant="bodyMd" fontWeight="medium">
-        {actorId}
-      </Text>
-    );
-  } else {
-    return (
-      <Text variant="bodyMd" fontWeight="medium">
-        Non IP Value
-      </Text>
-    );
-  }
+  const text = (
+    <Text {...textProps}>
+      {truncated}
+    </Text>
+  );
+
+  return display.length > ACTOR_ID_MAX_LENGTH
+    ? <Tooltip content={display}>{text}</Tooltip>
+    : text;
 };
 
 export const extractRuleViolated = (metadata) => {
@@ -38,6 +52,45 @@ export const extractRuleViolated = (metadata) => {
   } catch (e) {
     return "-";
   }
+};
+
+function parseMetadataObj(metadata) {
+  if (!metadata) return {};
+  if (typeof metadata === "object") return metadata;
+  try { return JSON.parse(metadata); } catch { return {}; }
+}
+
+export const parseStoredRiskScore = (metadata) => {
+  const meta = parseMetadataObj(metadata);
+  const raw = meta.riskScore ?? meta.risk_score;
+  if (raw == null || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+};
+
+export const parseStoredReason = (metadata) => {
+  const meta = parseMetadataObj(metadata);
+  const raw = meta.reason || meta.nreason || "";
+  if (!raw) return "";
+  const text = String(raw);
+  const idx = text.indexOf(": ");
+  if (idx === -1 || idx > 60) return text;
+  return text.slice(idx + 2);
+};
+
+export const truncateToWords = (text, maxWords = 30) => {
+  const full = text == null ? "" : String(text).trim();
+  if (!full) return { preview: "", full: "", isTruncated: false };
+  const words = full.split(/\s+/);
+  if (words.length <= maxWords) return { preview: full, full, isTruncated: false };
+  return { preview: `${words.slice(0, maxWords).join(" ")}...`, full, isTruncated: true };
+};
+
+export const truncateToChars = (text, maxChars = 30) => {
+  const full = text == null ? "" : String(text).trim();
+  if (!full) return { preview: "", full: "", isTruncated: false };
+  if (full.length <= maxChars) return { preview: full, full, isTruncated: false };
+  return { preview: `${full.slice(0, maxChars)}...`, full, isTruncated: true };
 };
 
 /**
@@ -154,6 +207,12 @@ export const extractOverviewAndRemediation = (metadata) => {
   } catch (e) {
     return { overview: null, remediation: null };
   }
+};
+
+export const storedRemediationMarkdown = (raw) => {
+  if (!raw || typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  return trimmed || null;
 };
 
 export const getBehaviourTone = (behaviour) =>

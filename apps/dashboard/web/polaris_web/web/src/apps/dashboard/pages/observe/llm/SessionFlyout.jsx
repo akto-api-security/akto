@@ -16,6 +16,9 @@ import { enrichRow } from "./utils";
 import { getTraceColumnDefs } from "./columns";
 import { formatCompact, formatDurationMs, truncate, TOKEN_ESTIMATE_TOOLTIP } from "./constants";
 
+// Ask Akto chat is temporarily hidden here; flip to re-enable.
+const SHOW_ASK_AKTO_CHAT = false;
+
 const TAB_OVERVIEW = 0;
 const TAB_TRACES   = 1;
 const TABS = [
@@ -54,13 +57,18 @@ function SessionTopicsSection({ topicHierarchy }) {
 
 // ─── Overview ─────────────────────────────────────────────────────────────────
 
-function OverviewContent({ session, traceCount }) {
+function OverviewContent({ session, traceCount, guardrailViolationCount }) {
     const totalTokens = (Number(session._inputTokens) || 0) + (Number(session._outputTokens) || 0);
 
     const stats = [
         { label: "Traces",       value: traceCount },
         { label: "Total tokens", value: formatCompact(totalTokens), tooltip: TOKEN_ESTIMATE_TOOLTIP },
         { label: "Duration",     value: formatDurationMs(session.durationMs) },
+        {
+            label: "Guardrail violations",
+            value: `${guardrailViolationCount} / ${traceCount}`,
+            valueColor: guardrailViolationCount > 0 ? "critical" : undefined,
+        },
     ];
 
     const detailItems = [
@@ -77,7 +85,7 @@ function OverviewContent({ session, traceCount }) {
                 <HorizontalGrid columns={4} gap="3">
                     {stats.map(s => (
                         <VerticalStack gap="1" key={s.label}>
-                            <Text variant="heading2xl" as="p">{s.value}</Text>
+                            <Text variant="heading2xl" as="p" color={s.valueColor}>{s.value}</Text>
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text variant="bodySm" color="subdued">{s.label}</Text>
                                 <InfoTooltipIcon content={s.tooltip} />
@@ -179,8 +187,9 @@ export default function SessionFlyout({ session, currDateRange, onClose }) {
                     setHasMessages(true);
                     setTraceLoading(false);
                 } else {
-                    // Old records with no traceId — load spans directly so both the
-                    // Overview count and the Traces tab have data without a second fetch.
+                    // fetchMessages already folds in traceId-less spans as individual rows, so
+                    // an empty result here means this session genuinely has nothing in range
+                    // (rather than "no traceId") — fall back to a flat span search as a last resort.
                     return api.searchPrompts({ startTime: since, endTime: until, sessionId: session.sessionIdentifier, limit: 100 })
                         .then(result => {
                             if (!cancelled) {
@@ -213,13 +222,27 @@ export default function SessionFlyout({ session, currDateRange, onClose }) {
     const traceCount = hasMessages === true  ? traceRows.length
                      : hasMessages === false ? spanRows.length
                      : (session.messageCount || 0);
+    // Traces are pre-aggregated (hasActiveGuardrail); old traceId-less sessions fall back to the
+    // flat span rows, which carry the raw guardrailViolated field straight from the ES source.
+    const guardrailViolationCount = hasMessages === true  ? traceRows.filter(r => r.hasActiveGuardrail).length
+                                   : hasMessages === false ? spanRows.filter(r => r.guardrailViolated).length
+                                   : 0;
 
     function renderContent() {
-        if (topNav) return <TraceDetailView trace={topNav.trace} currDateRange={currDateRange} />;
+        // Rows with no traceId (fetchMessages surfaces those as individual single-span
+        // "traces" instead of dropping them) can't be re-fetched by traceId — the row itself
+        // already *is* the only span, so hand it to TraceDetailView directly.
+        if (topNav) return (
+            <TraceDetailView
+                trace={topNav.trace}
+                currDateRange={currDateRange}
+                initialSpans={topNav.trace?.traceId ? undefined : [topNav.trace]}
+            />
+        );
         switch (activeTab) {
             case TAB_OVERVIEW: return (
                 <Scrollable style={{ flex: 1 }}>
-                    <OverviewContent session={session} traceCount={traceCount} />
+                    <OverviewContent session={session} traceCount={traceCount} guardrailViolationCount={guardrailViolationCount} />
                 </Scrollable>
             );
             case TAB_TRACES: return (
@@ -263,12 +286,14 @@ export default function SessionFlyout({ session, currDateRange, onClose }) {
                 </>
             }
             footer={
-                <AiChatSection
-                    placeholder="Ask anything about this session..."
-                    resetKey={session?.sessionIdentifier}
-                    conversationType="AGENTIC_OBSERVE"
-                    chatMetadata={chatMetadata}
-                />
+                SHOW_ASK_AKTO_CHAT ? (
+                    <AiChatSection
+                        placeholder="Ask anything about this session..."
+                        resetKey={session?.sessionIdentifier}
+                        conversationType="AGENTIC_OBSERVE"
+                        chatMetadata={chatMetadata}
+                    />
+                ) : null
             }
         >
             {renderContent()}

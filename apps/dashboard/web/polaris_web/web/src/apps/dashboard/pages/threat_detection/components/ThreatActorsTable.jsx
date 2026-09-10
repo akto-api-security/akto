@@ -22,19 +22,26 @@ const resourceName = {
   plural: "actors",
 };
 
+const getActorColumnLabel = () => {
+  if (isEndpointSecurityCategory()) return "Username";
+  if (isAgenticSecurityCategory()) return "Actor";
+  return "Actor Id";
+};
+
 const getBaseHeaders = () => {
+  const actorLabel = getActorColumnLabel();
   const baseHeaders = [
     {
-      text: isEndpointSecurityCategory() ? "Username" : "Actor Id",
+      text: actorLabel,
       value: "actor",
-      title: isEndpointSecurityCategory() ? "Username" : "Actor Id",
+      title: actorLabel,
     },
     {
       text: "Country",
       title: "Country",
       value: "country",
     },
-    ...(!isEndpointSecurityCategory() ? [{
+    ...(!isEndpointSecurityCategory() && !isAgenticSecurityCategory() ? [{
       text: "Actor Ip",
       title: "Actor Ip",
       value: "latestIp",
@@ -137,7 +144,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   const [filters, setFilters] = useState([
     {
       key: 'actorId',
-      label: 'Actor Id',
+      label: getActorColumnLabel(),
       type: 'select',
       choices: [],
       multiple: true
@@ -346,7 +353,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     setFilters([
       {
         key: 'actorId',
-        label: 'Actor Id',
+        label: getActorColumnLabel(),
         type: 'select',
         choices: actorIdChoices,
         multiple: true

@@ -47,7 +47,9 @@ export default function FlyoutBreadcrumb({ items = [], onClose, children, subtit
                             {children}
                         </HorizontalStack>
                         {onClose && (
-                            <Button plain icon={MobileCancelMajor} onClick={onClose} accessibilityLabel="Close" />
+                            <Box position="relative" zIndex="1">
+                                <Button plain icon={MobileCancelMajor} onClick={onClose} accessibilityLabel="Close" />
+                            </Box>
                         )}
                     </HorizontalStack>
                     {subtitle && <Text variant="bodySm">{subtitle}</Text>}

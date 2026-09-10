@@ -8,6 +8,7 @@ import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.ExecutorConfigParserResult;
 import com.akto.dto.test_editor.Info;
+import com.akto.dto.test_editor.Strategy;
 
 public class FilterConfig {
     private String id;
@@ -29,6 +30,8 @@ public class FilterConfig {
     private AggregationRules aggregationRules;
     public static final String _INFO = "info";
     private Info info;
+    public static final String STRATEGY = "strategy";
+    private Strategy strategy;
     public static final String DEFAULT_ALLOW_FILTER = "DEFAULT_ALLOW_FILTER";
     public static final String DEFAULT_BLOCK_FILTER = "DEFAULT_BLOCK_FILTER";
 
@@ -164,6 +167,14 @@ public class FilterConfig {
 
     public void setFailureFilter(ConfigParserResult failureFilter) {
         this.failureFilter = failureFilter;
+    }
+
+    public Strategy getStrategy() {
+        return strategy;
+    }
+
+    public void setStrategy(Strategy strategy) {
+        this.strategy = strategy;
     }
 
 }

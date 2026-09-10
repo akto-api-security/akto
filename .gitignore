@@ -54,3 +54,4 @@ run-embedder.sh
 data-adhoc/**
 .playwright-mcp/
 run-guardrails-threat-client.sh
+run-threat-detection-backend.sh

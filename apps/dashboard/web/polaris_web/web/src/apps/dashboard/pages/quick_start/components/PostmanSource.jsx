@@ -121,9 +121,11 @@ function PostmanSource() {
 
     const [type, setType] = useState("api")
     const [allowResponses,setAllowResponses] = useState(true)
+    const [forceCreateCollection, setForceCreateCollection] = useState(false)
     const [files, setFiles] = useState(null)
 
     const toggleResponse = useCallback(newChecked => setAllowResponses(newChecked),[],);
+    const toggleForceCreateCollection = useCallback(newChecked => setForceCreateCollection(newChecked),[],);
 
     const handleMiniTestingServiceChange = (value) => {
         setSelectedMiniTestingService(value);
@@ -190,7 +192,7 @@ function PostmanSource() {
 
     const importCollection = async() => {
         setLoading(true)
-        await api.importPostmanWorkspace(selected,allowResponses,postmanKey, selectedMiniTestingService).then((resp)=> {
+        await api.importPostmanWorkspace(selected,allowResponses,postmanKey, selectedMiniTestingService, forceCreateCollection).then((resp)=> {
             let uploadId = resp.uploadId;
             setLoading(false)
             setToast(true, false, "Workspace imported successfully")
@@ -214,7 +216,7 @@ function PostmanSource() {
 
     const uploadCollection = async() => {
         setLoading(true)
-        await api.importDataFromPostmanFile(files.content, allowResponses, selectedMiniTestingService).then((resp)=> {
+        await api.importDataFromPostmanFile(files.content, allowResponses, selectedMiniTestingService, forceCreateCollection).then((resp)=> {
             let uploadId = resp.uploadId;
             setLoading(false)
             setToast(true, false, "File uploaded successfully.")
@@ -360,6 +362,7 @@ function PostmanSource() {
 
             <VerticalStack gap="2">
                 <Checkbox label="Allow Akto to replay API requests if responses are not found." checked={allowResponses} onChange={toggleResponse} />
+                <Checkbox label="Allow Akto to forcefully create collections for API requests with non-2xx or empty responses." checked={forceCreateCollection} onChange={toggleForceCreateCollection} />
                 <ButtonGroup>
                     <Button onClick={primaryAction} primary disabled={!buttonActive} loading={loading}>{primaryText}</Button>
                     <Button onClick={goToDocs}>Go to docs</Button>

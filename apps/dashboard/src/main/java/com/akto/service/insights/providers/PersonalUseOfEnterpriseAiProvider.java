@@ -27,6 +27,8 @@ public class PersonalUseOfEnterpriseAiProvider extends AbstractInsightProvider {
         long totalInteractions = 0, offDomainInteractions = 0;
         int agentsWithDescription = 0, agentsWithoutDescription = 0;
         Map<String, Long> offDomainByUser = new HashMap<>();
+        Map<String, String> topOffDomainTopicByUser = new HashMap<>();
+        Map<String, Integer> topOffDomainTopicCountByUser = new HashMap<>();
 
         for (UserAnalysisData d : bundle.userAnalysis) {
             if (d.getTopicHierarchy() == null || d.getTopicHierarchy().isEmpty()) continue;
@@ -46,8 +48,13 @@ public class PersonalUseOfEnterpriseAiProvider extends AbstractInsightProvider {
             Map<String, String> classification = InsightClassificationHelper.classifyDomains(description, domains);
             long rowOffDomain = 0;
             for (Map.Entry<String, Map<String, Integer>> e : d.getTopicHierarchy().entrySet()) {
-                if (!"ON".equals(classification.get(e.getKey()))) {
-                    for (int c : e.getValue().values()) rowOffDomain += c;
+                if ("ON".equals(classification.get(e.getKey()))) continue;
+                int topicCount = 0;
+                for (int c : e.getValue().values()) topicCount += c;
+                rowOffDomain += topicCount;
+                if (d.getUserName() != null && topicCount > topOffDomainTopicCountByUser.getOrDefault(d.getUserName(), -1)) {
+                    topOffDomainTopicCountByUser.put(d.getUserName(), topicCount);
+                    topOffDomainTopicByUser.put(d.getUserName(), e.getKey());
                 }
             }
             offDomainInteractions += rowOffDomain;
@@ -61,7 +68,7 @@ public class PersonalUseOfEnterpriseAiProvider extends AbstractInsightProvider {
             r.setStatus(InsightResult.Status.PARTIAL.name());
             r.addDataGap(new InsightResult.Gap("AGENT_DESCRIPTION", "DEFERRED_TO_DETAIL", "Off-domain classification runs only when this insight is opened."));
             r.setHeadline(InsightUtil.count(totalInteractions, "interactions") + " observed; off-domain share computed on open");
-            r.addCta(new InsightResult.Cta("view_llm", "View LLM observability", "NAVIGATE", InsightRoutes.LLM_OBSERVABILITY, new HashMap<>(), true));
+            r.addCta(new InsightResult.Cta("view_llm", "View session-level AI usage (LLM Observability)", "NAVIGATE", InsightRoutes.LLM_OBSERVABILITY, new HashMap<>(), true));
             return r;
         }
 
@@ -78,6 +85,14 @@ public class PersonalUseOfEnterpriseAiProvider extends AbstractInsightProvider {
         r.setHeadline(agentsWithDescription == 0 ? "No agent has a description set — off-domain use cannot be judged"
                 : InsightUtil.percent(offDomainShare) + " of interactions are off-domain for their agent");
 
+        if (agentsWithDescription > 0 && offDomainInteractions > 0) {
+            r.setSeverity(offDomainShare >= 0.3 ? "HIGH" : offDomainShare >= 0.1 ? "MEDIUM" : "LOW");
+            r.setConcern(InsightUtil.count(offDomainInteractions, "interactions") + " (" + InsightUtil.percent(offDomainShare) + ") don't match what the agent they went through is actually meant for.");
+            r.setImpact("Off-domain use is how enterprise AI access quietly turns into a personal-use channel — it burns token budget and puts unrelated data through a system that wasn't scoped or reviewed for it.");
+            r.setRemediation("Talk to the users below about what they're using these agents for, and consider a guardrail policy that blocks off-topic prompts on the affected agents.");
+            r.addCaveat("Off-domain is judged by comparing each topic against the agent's own description with an LLM classifier — it's a best-effort judgment call, not a certainty. Spot-check a few before acting on it.");
+        }
+
         List<Map<String, Object>> rows = new ArrayList<>();
         List<String> topOffDomainUsers = new ArrayList<>();
         List<Map.Entry<String, Long>> ranked = new ArrayList<>(offDomainByUser.entrySet());
@@ -86,13 +101,14 @@ public class PersonalUseOfEnterpriseAiProvider extends AbstractInsightProvider {
             Map<String, Object> row = new HashMap<>();
             row.put("user", e.getKey());
             row.put("offDomainInteractions", e.getValue());
+            row.put("topOffDomainTopic", topOffDomainTopicByUser.getOrDefault(e.getKey(), "-"));
             rows.add(row);
             topOffDomainUsers.add(e.getKey());
         }
         r.addEvidence(new InsightResult.Evidence("top_off_domain_users", "Top users by off-domain interactions",
-                Arrays.asList("user", "offDomainInteractions"), rows, ranked.size()));
+                Arrays.asList("user", "offDomainInteractions", "topOffDomainTopic"), rows, ranked.size()));
 
-        r.addCta(new InsightResult.Cta("view_llm", "View LLM observability", "NAVIGATE", InsightRoutes.LLM_OBSERVABILITY, new HashMap<>(), true));
+        r.addCta(new InsightResult.Cta("view_llm", "View session-level AI usage (LLM Observability)", "NAVIGATE", InsightRoutes.LLM_OBSERVABILITY, new HashMap<>(), true));
         r.addCta(new InsightResult.Cta("view_users", "View users and devices", "NAVIGATE", InsightRoutes.USERS_AND_DEVICES,
                 InsightUtil.usersAndDevicesFilterParams(topOffDomainUsers), false));
         return r;

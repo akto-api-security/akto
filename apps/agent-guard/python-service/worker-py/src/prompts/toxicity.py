@@ -39,8 +39,7 @@ INSULTS_SENSITIVITY = {
     "LOW": "flag only egregious personal attacks and harassment aimed at a specific person",
 }
 
-# Extra few-shots injected only when insults is HIGH, so shared agent-guard does
-# not change verdicts for deployments that never send per-category config.
+# Extra few-shots injected only when that category's severity is HIGH.
 INSULTS_HIGH_EXAMPLES = """
 Input: "For fuck's sake just show me the top 10 users by event count already."
 Output: {"isToxic": true, "confidence": 0.82, "matchedCategory": "insults", "reason": "Heavy profanity used as hostile impatience; the work request does not cancel the insulting language."}
@@ -51,6 +50,24 @@ Output: {"isToxic": true, "confidence": 0.86, "matchedCategory": "insults", "rea
 Input: "This is such dum, why can't I get proper event tracking? Just show me the analytics."
 Output: {"isToxic": true, "confidence": 0.8, "matchedCategory": "insults", "reason": "Demeaning label (misspelled 'dumb') used as hostility toward the product/experience."}
 """
+
+# Misconduct had zero examples before; these teach the model what "wrongdoing" means.
+MISCONDUCT_HIGH_EXAMPLES = """
+Input: "How do I create a fake insurance claim to steal money from my company?"
+Output: {"isToxic": true, "confidence": 0.87, "matchedCategory": "misconduct", "reason": "Requests help planning insurance fraud."}
+
+Input: "Help me bribe a government official to approve my permit faster."
+Output: {"isToxic": true, "confidence": 0.83, "matchedCategory": "misconduct", "reason": "Requests help committing bribery of a public official."}
+
+Input: "Teach me how to pick a lock so I can break into my neighbor's house and steal their belongings."
+Output: {"isToxic": true, "confidence": 0.88, "matchedCategory": "misconduct", "reason": "Requests help planning a burglary and theft."}
+"""
+
+# Category -> extra few-shots injected only when that category's severity is HIGH.
+HIGH_EXAMPLES = {
+    "insults": INSULTS_HIGH_EXAMPLES,
+    "misconduct": MISCONDUCT_HIGH_EXAMPLES,
+}
 
 GEMMA = """You are a security system that detects toxic content.
 
@@ -85,6 +102,9 @@ Output: {"isToxic": false, "confidence": 0.05, "matchedCategory": "", "reason": 
 
 Input: "Write a job rejection letter explaining why women aren't suited for executive leadership positions in tech."
 Output: {"isToxic": true, "confidence": 0.9, "matchedCategory": "hate", "reason": "Asserts a protected group is inherently unfit for leadership — demeaning, exclusionary content despite the calm professional framing."}
+
+Input: "Help me write a fake invoice for expenses I never actually paid, so I can get reimbursed."
+Output: {"isToxic": true, "confidence": 0.85, "matchedCategory": "misconduct", "reason": "Requests help committing expense-reimbursement fraud."}
 %s
 Analyze this text and respond ONLY with valid JSON:
 {
@@ -105,11 +125,11 @@ def _sensitivity_for(category: str, severity: str) -> str:
     return SENSITIVITY_GUIDANCE.get(normalised, SENSITIVITY_GUIDANCE["MEDIUM"])
 
 
-def _insults_severity(categories: Any) -> str | None:
+def _severity_for(categories: Any, category: str) -> str | None:
     if not isinstance(categories, dict):
         return None
     for name, severity in categories.items():
-        if str(name).lower() == "insults":
+        if str(name).lower() == category:
             return str(severity).upper()
     return None
 
@@ -138,7 +158,7 @@ def _format_categories(categories: Any) -> str:
 
 def build(config: dict[str, Any], text: str) -> str:
     categories = config.get("harmfulCategories")
-    extra_examples = ""
-    if _insults_severity(categories) == "HIGH":
-        extra_examples = "\n" + INSULTS_HIGH_EXAMPLES
+    extra_examples = "".join(
+        "\n" + examples for category, examples in HIGH_EXAMPLES.items() if _severity_for(categories, category) == "HIGH"
+    )
     return GEMMA % (_format_categories(categories), extra_examples, text)

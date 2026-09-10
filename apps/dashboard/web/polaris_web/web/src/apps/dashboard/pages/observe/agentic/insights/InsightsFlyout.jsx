@@ -85,6 +85,7 @@ export default function InsightsFlyout({ show, onClose, startTimestamp, endTimes
                     insightId={selectedInsight.insightId}
                     startTimestamp={startTimestamp}
                     endTimestamp={endTimestamp}
+                    onClose={onClose}
                 />
             ) : (
                 <InsightsListView insights={insights} error={listError} onSelect={handleSelectInsight} />

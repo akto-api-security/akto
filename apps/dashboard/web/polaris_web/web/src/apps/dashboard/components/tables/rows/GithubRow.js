@@ -163,9 +163,11 @@ function GithubRow(props) {
     }
 
     function TextCell(header) {
+        const text = data[header.value];
+        const tooltip = header.tooltipKey ? data[header.tooltipKey] : text;
         return (
             <Box maxWidth={header.maxWidth ? header.maxWidth : ''} key={header.value}>
-                <TooltipText text={data[header.value]} tooltip={data[header.value]} />
+                <TooltipText text={text} tooltip={tooltip} />
             </Box>
         )
     }

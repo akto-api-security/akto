@@ -48,18 +48,37 @@ public class PromptInjectionRepeatsProvider extends AbstractInsightProvider {
     private static final int EVENT_PAGE_LIMIT = 1000;
     private static final int EVIDENCE_ROW_CAP = 20;
     private static final int HIGH_SEVERITY_REPEAT_COUNT = 3;
+    // Past this many identical repeats, it reads as sustained, high-volume probing rather than
+    // "happened a few times" — escalate past HIGH.
+    private static final int CRITICAL_SEVERITY_REPEAT_COUNT = 10;
 
     public PromptInjectionRepeatsProvider() { super(InsightId.PROMPT_INJECTION_REPEATS, 1); }
 
     @Override
     public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope) {
         List<ThreatCategoryCount> subCategoryCounts = bundle.subCategoryCounts;
-        if (subCategoryCounts == null) {
+        // subCategoryCounts is a threat-backend aggregate and the bundle never returns null
+        // for it — a failed call is signalled by threatBackendAvailable instead, so an empty
+        // list here can't be told apart from a real zero unless that flag is also checked.
+        if (!bundle.threatBackendAvailable) {
             return failed("THREAT_BACKEND", "Could not load violation counts");
         }
 
+        // Taxonomy-mismatch fallback (confirmed on real accounts): subCategory frequently carries
+        // the firing policy's own name instead of "PromptInjection", so a policy with prompt-attack
+        // detection enabled can go entirely uncounted by an exact-literal match. Recognize its hits
+        // too, via the policy's own config, not just the literal.
+        Map<String, GuardrailPolicies> policyByLowerName = new HashMap<>();
+        if (bundle.policies != null) {
+            for (GuardrailPolicies p : bundle.policies) {
+                if (p.getName() != null) {
+                    policyByLowerName.put(lower(p.getName()), p);
+                }
+            }
+        }
         long totalAttempts = subCategoryCounts.stream()
-                .filter(c -> INJECTION_SUBCATEGORY.equalsIgnoreCase(c.getSubCategory()))
+                .filter(c -> INJECTION_SUBCATEGORY.equalsIgnoreCase(c.getSubCategory())
+                        || InsightUtil.policyHasPromptInjectionDetection(policyByLowerName.get(lower(c.getCategory()))))
                 .mapToLong(ThreatCategoryCount::getCount)
                 .sum();
 
@@ -81,9 +100,15 @@ public class PromptInjectionRepeatsProvider extends AbstractInsightProvider {
         }
 
         if (scope == Scope.LIST) {
+            // A real, if approximate, severity from the volume alone — the actual repeat pattern
+            // still requires paging raw events (below), but a reader shouldn't see "Coming soon" for
+            // a card that already has real attempts behind it. Same template as
+            // TestPoliciesOnProdProvider's LIST-scope severityFromShare; DETAIL can still move this
+            // up (e.g. to CRITICAL for sustained repeats) or down once the real grouping is known.
             result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(InsightUtil.count(totalAttempts, "attempts")
                     + "; grouping by source and finding repeats requires the detail view.");
+            result.setSeverity(severityFromVolume(totalAttempts));
             result.setMetrics(Collections.singletonList(totalMetric));
             result.setMetricsComplete(false);
             result.setDataGaps(Collections.singletonList(new InsightResult.Gap(
@@ -94,11 +119,21 @@ public class PromptInjectionRepeatsProvider extends AbstractInsightProvider {
             return result;
         }
 
-        // DETAIL: unlike item #4, this subCategory is reliably labeled, so the raw-event page can
-        // be narrowed server-side instead of sweeping every violation.
-        List<DashboardMaliciousEvent> events = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT,
-                Collections.singletonMap("subCategory", Collections.singletonList(INJECTION_SUBCATEGORY)), null);
-        if (events == null) events = new ArrayList<>();
+        // DETAIL: same taxonomy-mismatch fallback as the LIST-scope count above means this can no
+        // longer narrow the server-side query to subCategory == "PromptInjection" alone (a policy's
+        // real hits may not carry that literal) — sweep unfiltered instead, like item #4's
+        // credential scan, and keep only events that are actually injection-shaped by either signal.
+        // "exclude" drops Skills Evaluations traffic — same convention as AlertFatigueProvider (see
+        // its comment): a skill's own safety-scan verdict isn't a live-traffic injection attempt, and
+        // on a real account it can outnumber genuine attempts by 70:1, drowning any real repeat
+        // pattern under near-unique per-skill evidence text that structurally never repeats.
+        List<DashboardMaliciousEvent> rawEvents = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT, null, "exclude");
+        if (rawEvents == null) rawEvents = new ArrayList<>();
+        boolean rawSweepCapped = rawEvents.size() == EVENT_PAGE_LIMIT;
+        List<DashboardMaliciousEvent> events = rawEvents.stream()
+                .filter(e -> INJECTION_SUBCATEGORY.equalsIgnoreCase(e.getSubCategory())
+                        || InsightUtil.policyHasPromptInjectionDetection(policyByLowerName.get(lower(e.getFilterId()))))
+                .collect(Collectors.toList());
 
         if (events.isEmpty()) {
             result.setStatus(InsightResult.Status.PARTIAL.name());
@@ -114,15 +149,6 @@ public class PromptInjectionRepeatsProvider extends AbstractInsightProvider {
             return result;
         }
 
-        Map<String, GuardrailPolicies> policyByLowerName = new HashMap<>();
-        List<GuardrailPolicies> policies = bundle.policies;
-        if (policies != null) {
-            for (GuardrailPolicies p : policies) {
-                if (p.getName() != null) {
-                    policyByLowerName.put(lower(p.getName()), p);
-                }
-            }
-        }
         Map<String, String> deviceIdToUsername = bundle.deviceIdToUsername != null
                 ? bundle.deviceIdToUsername : Collections.emptyMap();
 
@@ -172,7 +198,12 @@ public class PromptInjectionRepeatsProvider extends AbstractInsightProvider {
         int maxRepeatCount = repeatGroups.stream().mapToInt(a -> a.count).max().orElse(0);
         String severity;
         String headline;
-        if (maxRepeatCount >= HIGH_SEVERITY_REPEAT_COUNT) {
+        if (maxRepeatCount >= CRITICAL_SEVERITY_REPEAT_COUNT) {
+            severity = "CRITICAL";
+            headline = String.format(Locale.US,
+                    "%s of the %s seen are repeats from the same source, asset, and phrasing — the worst repeats %d times, sustained high-volume probing rather than a handful of attempts.",
+                    InsightUtil.count(attemptsInRepeats, "attempts"), InsightUtil.count(observedTotal, "attempts"), maxRepeatCount);
+        } else if (maxRepeatCount >= HIGH_SEVERITY_REPEAT_COUNT) {
             severity = "HIGH";
             headline = String.format(Locale.US,
                     "%s of the %s seen are repeats from the same source, asset, and phrasing — the worst repeats %d times.",
@@ -191,14 +222,31 @@ public class PromptInjectionRepeatsProvider extends AbstractInsightProvider {
         List<String> caveats = new ArrayList<>();
         caveats.add("\"Source\" may be a device identifier when no live agent could resolve it to a username.");
         caveats.add("Repeats are detected by exact phrase match after normalizing case/whitespace — paraphrased or reworded repeat attempts are not linked together.");
-        if (events.size() == EVENT_PAGE_LIMIT) {
-            caveats.add("Attempts examined are capped at " + EVENT_PAGE_LIMIT + "; more may exist beyond this page.");
+        caveats.add("A hit counts as prompt injection if its subCategory says so, or if the policy that caught it has prompt-attack detection enabled — subCategory alone understates this on some accounts.");
+        if (rawSweepCapped) {
+            caveats.add("Examined the most recent " + EVENT_PAGE_LIMIT + " violations account-wide (not just injection ones) to apply that fallback; more injection attempts may exist beyond this page.");
         }
 
         List<Attempt> topRepeats = repeatGroups.stream()
                 .sorted(Comparator.comparingInt((Attempt a) -> a.count).reversed())
                 .limit(EVIDENCE_ROW_CAP)
                 .collect(Collectors.toList());
+
+        String concern = null;
+        String impact = null;
+        String remediation = null;
+        if (!topRepeats.isEmpty()) {
+            Attempt worstRepeat = topRepeats.get(0);
+            String displaySource = deviceIdToUsername.getOrDefault(worstRepeat.actor, worstRepeat.actor);
+            concern = String.format(Locale.US,
+                    "\"%s\" has repeated the same prompt-injection phrasing against \"%s\" %d times.",
+                    displaySource, worstRepeat.asset, worstRepeat.count);
+            impact = "A single accidental trip doesn't repeat with identical phrasing — this pattern reads as "
+                    + "deliberate probing to find a gap in the guardrail, not a one-off mistake.";
+            remediation = String.format(Locale.US,
+                    "Escalate the policy protecting \"%s\" to block mode if it isn't already, and investigate \"%s\" directly.",
+                    worstRepeat.asset, displaySource);
+        }
 
         List<Map<String, Object>> rows = new ArrayList<>();
         for (Attempt attempt : topRepeats) {
@@ -222,8 +270,11 @@ public class PromptInjectionRepeatsProvider extends AbstractInsightProvider {
         result.setMetricsComplete(true);
         result.setDataGaps(new ArrayList<>());
         result.setCaveats(caveats);
+        result.setConcern(concern);
+        result.setImpact(impact);
+        result.setRemediation(remediation);
         result.setEvidence(evidence);
-        result.setCtas(buildCtas(topRepeats, policyByLowerName));
+        result.setCtas(buildCtas(topRepeats));
         return result;
     }
 
@@ -269,27 +320,41 @@ public class PromptInjectionRepeatsProvider extends AbstractInsightProvider {
         return s == null ? "" : s.trim().toLowerCase(Locale.US);
     }
 
+    /** LIST-scope approximation from raw volume alone, before repeats are known — an injection
+     *  attempt is a stronger per-event signal than routine PII noise, so even a single one is
+     *  worth flagging rather than waiting for a volume threshold. */
+    private static String severityFromVolume(long totalAttempts) {
+        if (totalAttempts >= HIGH_SEVERITY_REPEAT_COUNT * 3L) {
+            return "HIGH";
+        }
+        if (totalAttempts >= HIGH_SEVERITY_REPEAT_COUNT) {
+            return "MEDIUM";
+        }
+        return "LOW";
+    }
 
-    private static List<InsightResult.Cta> buildCtas(List<Attempt> topRepeats, Map<String, GuardrailPolicies> policyByLowerName) {
+
+    private static List<InsightResult.Cta> buildCtas(List<Attempt> topRepeats) {
         if (topRepeats.isEmpty()) {
             return new ArrayList<>();
         }
         Attempt worst = topRepeats.get(0); // already sorted by count desc
-        GuardrailPolicies policy = policyByLowerName.get(lower(worst.policyName));
+        // ViolationsPage.jsx reads "?user=" and "?policy=" and seeds its existing card-click
+        // filters on arrival. There's no working "asset" filter on that page today (the Agentic
+        // Asset column has no column filter at all), so it's left out rather than passed as dead
+        // weight.
         Map<String, Object> params = new HashMap<>();
-        params.put("source", worst.actor);
-        params.put("asset", worst.asset);
-        params.put("policyId", policy != null ? policy.getHexId() : null);
-        params.put("policyName", worst.policyName);
+        params.put("user", worst.actor);
+        params.put("policy", worst.policyName);
 
         List<InsightResult.Cta> ctas = new ArrayList<>();
         ctas.add(new InsightResult.Cta("view_source_sessions", "View source sessions",
                 "NAVIGATE", "/dashboard/guardrails/violations", params, true));
         ctas.add(new InsightResult.Cta("escalate_to_block_mode", "Escalate to block mode",
-                "BULK_ACTION", "/dashboard/guardrails/policies", params, false));
+                "BULK_ACTION", "/dashboard/guardrails/policies", InsightUtil.guardrailPolicyParams(worst.policyName), false));
         ctas.add(new InsightResult.Cta("investigate_user", "Investigate user",
                 "NAVIGATE", "/dashboard/observe/users-and-devices",
-                Collections.singletonMap("username", worst.actor), false));
+                InsightUtil.usersAndDevicesFilterParams(Collections.singletonList(worst.actor)), false));
         return ctas;
     }
 }

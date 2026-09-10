@@ -1,12 +1,16 @@
 import React, { useMemo } from "react";
 import {
     Avatar,
+    Badge,
     Box,
+    Button,
     Divider,
+    HorizontalGrid,
     HorizontalStack,
     Icon,
     Link,
     Text,
+    Tooltip,
     VerticalStack,
 } from "@shopify/polaris";
 import { NoteMinor } from "@shopify/polaris-icons";
@@ -23,6 +27,64 @@ import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/co
 import { getOwaspThreatsForRule } from "@/apps/dashboard/pages/guardrails/components/owaspConfig";
 import OwaspTag from "@/apps/dashboard/pages/guardrails/components/OwaspTag";
 import ComplianceTags from "@/apps/dashboard/pages/guardrails/components/ComplianceTags";
+
+export function HumanResponseBadge({ response }) {
+    const key = String(response || "PENDING").toUpperCase();
+    const isApproved = key === "APPROVED";
+    const isBlocked = key === "BLOCKED";
+    return (
+        <Badge size="small" status={isApproved ? "success" : isBlocked ? "critical" : "warning"}>
+            {isApproved ? "Approved" : isBlocked ? "Denied" : "Pending"}
+        </Badge>
+    );
+}
+
+export function isHumanApprovalPending(response) {
+    const key = String(response || "PENDING").toUpperCase();
+    return key !== "APPROVED" && key !== "BLOCKED";
+}
+
+const PENDING_HUMAN_APPROVAL_TOOLTIP = "Events waiting for you to approve or block";
+
+export function humanApprovalTabAccessibilityLabel(count) {
+    const n = typeof count === "number" && count > 0 ? count : 0;
+    return n > 0
+        ? `Human Approval, ${n.toLocaleString()} events pending a decision`
+        : "Human Approval";
+}
+
+export function HumanApprovalTabLabel({ count }) {
+    const n = typeof count === "number" && count > 0 ? count : 0;
+    if (n === 0) {
+        return (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                Human Approval
+                <Badge size="small" status="info">Beta</Badge>
+            </span>
+        );
+    }
+    return (
+        <Tooltip content={PENDING_HUMAN_APPROVAL_TOOLTIP} dismissOnMouseOut>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                Human Approval
+                <Badge size="small" status="info">Beta</Badge>
+                <Badge size="small">{n.toLocaleString()}</Badge>
+            </span>
+        </Tooltip>
+    );
+}
+
+export function HumanApprovalActions({ pending, response, onApprove, onBlock, loading, subtle }) {
+    if (!pending) {
+        return <HumanResponseBadge response={response} />;
+    }
+    return (
+        <>
+            <Button size="slim" primary={!subtle} plain={!!subtle} loading={loading} onClick={onApprove}>Approve</Button>
+            <Button size="slim" destructive plain={!!subtle} loading={loading} onClick={onBlock}>Deny</Button>
+        </>
+    );
+}
 
 // ─── Evidence block (Blocked Prompt / Suspicious Skill / Suspicious Config) ──────
 
@@ -64,7 +126,9 @@ export function EvidenceBlock({ evidence }) {
                                     {evidence.time && <Text variant="bodySm" color="subdued">{evidence.time}</Text>}
                                 </HorizontalStack>
                             )}
-                            <HighlightedText text={evidence.text} highlights={evidence.highlights} mono={evidence.mono} />
+                            <Box className="violation-evidence-clamp">
+                                <HighlightedText text={evidence.text} highlights={evidence.highlights} mono={evidence.mono} />
+                            </Box>
                         </VerticalStack>
                     </Box>
                 </Box>
@@ -290,6 +354,97 @@ export function OverviewSection({ row, detail }) {
                     </Box>
                 </>
             )}
+        </VerticalStack>
+    );
+}
+
+// ─── Prompt & Response tab ────────────────────────────────────────────────────────
+
+export function PromptResponseSection({ detail }) {
+    const pr = detail?.promptResponse;
+    const hasPrompt = !!pr?.promptBody;
+    const hasResponse = !!(pr && (pr.behaviour || pr.blockedBy || pr.blockedAt || pr.reason || pr.message));
+
+    if (!hasPrompt && !hasResponse) {
+        return (
+            <Box padding="8">
+                <VerticalStack gap="1" inlineAlign="center">
+                    <Text variant="bodySm" fontWeight="semibold">No prompt or response data</Text>
+                    <Text variant="bodySm" color="subdued">This violation has no captured prompt or response payload.</Text>
+                </VerticalStack>
+            </Box>
+        );
+    }
+
+    // epoch or ISO string
+    const blockedAtDisplay = (() => {
+        if (!pr.blockedAt) return "N/A";
+        if (typeof pr.blockedAt === "number") return func.epochToDateTime(pr.blockedAt);
+        const d = new Date(pr.blockedAt);
+        return Number.isNaN(d.getTime()) ? pr.blockedAt : d.toLocaleString();
+    })();
+
+    const responseItems = [
+        { label: "Behaviour", value: pr.behaviour ? func.toSentenceCase(pr.behaviour) : "N/A" },
+        { label: "Blocked At", value: blockedAtDisplay },
+        { label: "Blocked By", value: pr.blockedBy || "N/A" },
+    ];
+
+    return (
+        <VerticalStack gap="0">
+            <Box padding="4">
+                <VerticalStack gap="3">
+                    <Text variant="headingMd" color="subdued">{pr.valueLabel || "Flagged Content"}</Text>
+                    {!hasPrompt
+                        ? <Text variant="bodySm" color="subdued">No content captured for this violation.</Text>
+                        : pr.valueLabel === "Prompt"
+                            ? <HighlightedText text={pr.promptBody} mono />
+                            : (
+                                <SampleData
+                                    data={{
+                                        message: pr.promptBody,
+                                        vulnerabilitySegments: (pr.highlights || []).map((highlight) =>
+                                            typeof highlight === "string"
+                                                ? { phrase: highlight }
+                                                : { ...highlight, includeKeyInHighlight: true }
+                                        ),
+                                    }}
+                                    editorLanguage="plaintext"
+                                    minHeight="400px"
+                                    readOnly
+                                    wordWrap
+                                />
+                            )}
+                </VerticalStack>
+            </Box>
+
+            <Divider />
+
+            <Box padding="4">
+                <VerticalStack gap="4">
+                    <Text variant="headingMd" color="subdued">Response</Text>
+                    <HorizontalGrid columns={3} gap="3">
+                        {responseItems.map((item) => (
+                            <VerticalStack gap="1" key={item.label}>
+                                <Text variant="bodySm" fontWeight="semibold" color="subdued">{item.label}</Text>
+                                <Text variant="bodyMd">{item.value}</Text>
+                            </VerticalStack>
+                        ))}
+                    </HorizontalGrid>
+                    {pr.reason && (
+                        <VerticalStack gap="1">
+                            <Text variant="bodySm" fontWeight="semibold" color="subdued">Reason</Text>
+                            <Text variant="bodyMd">{pr.reason}</Text>
+                        </VerticalStack>
+                    )}
+                    {pr.message && (
+                        <VerticalStack gap="1">
+                            <Text variant="bodySm" fontWeight="semibold" color="subdued">Message</Text>
+                            <Text variant="bodyMd">{pr.message}</Text>
+                        </VerticalStack>
+                    )}
+                </VerticalStack>
+            </Box>
         </VerticalStack>
     );
 }

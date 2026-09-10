@@ -97,6 +97,32 @@ public class ThreatUtils {
         return new Document("latestApiEndpoint", new Document("$not", SKILLS_ENDPOINT_PATTERN));
     }
 
+    // Collapse repeated config-scan re-detections into one.
+    public static List<Document> configScanDedupeStages(String contextSource) {
+        if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
+            return Collections.emptyList();
+        }
+        Document isConfigEvent = new Document("$regexMatch",
+            new Document("input", new Document("$ifNull", Arrays.asList("$latestApiEndpoint", "")))
+                .append("regex", "/config/"));
+
+        Document dedupeKey = new Document("$cond", Arrays.asList(
+            isConfigEvent,
+            new Document("host", "$host").append("actor", "$actor").append("category", "$category")
+                .append("latestApiEndpoint", "$latestApiEndpoint"),
+            new Document("uniqueId", "$_id")));
+
+        return Arrays.asList(
+            new Document("$sort", new Document("detectedAt", -1)),
+            new Document("$group",
+                new Document("_id", dedupeKey)
+                    .append("category", new Document("$first", "$category"))
+                    .append("subCategory", new Document("$first", "$subCategory"))
+                    .append("status", new Document("$first", "$status"))
+                    .append("severity", new Document("$first", "$severity"))
+                    .append("successfulExploit", new Document("$first", "$successfulExploit"))));
+    }
+
     public static boolean isAgenticOrEndpointContext(String contextSource) {
         if (contextSource == null || contextSource.isEmpty()) {
             return false;

@@ -62,6 +62,9 @@ public class InsightNarrativeCacheDao extends AccountsContextDao<InsightNarrativ
                         Updates.set(InsightNarrativeCache.PROVIDER_VERSION, entry.getProviderVersion()),
                         Updates.set(InsightNarrativeCache.PROMPT_VERSION, entry.getPromptVersion()),
                         Updates.set(InsightNarrativeCache.NARRATIVE_MARKDOWN, entry.getNarrativeMarkdown()),
+                        Updates.set(InsightNarrativeCache.NARRATIVE_CONCERN, entry.getNarrativeConcern()),
+                        Updates.set(InsightNarrativeCache.NARRATIVE_IMPACT, entry.getNarrativeImpact()),
+                        Updates.set(InsightNarrativeCache.NARRATIVE_REMEDIATION, entry.getNarrativeRemediation()),
                         Updates.set(InsightNarrativeCache.GENERATED_AT, entry.getGeneratedAt()),
                         Updates.set(InsightNarrativeCache.EXPIRES_AT, entry.getExpiresAt())
                 ),

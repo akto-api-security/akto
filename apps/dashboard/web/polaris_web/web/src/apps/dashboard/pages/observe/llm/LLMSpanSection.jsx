@@ -142,7 +142,9 @@ function InputOutputSection({ label, tokens, messages }) {
 
 // ─── SpanSection ──────────────────────────────────────────────────────────────
 
-export default function SpanSection({ span, index }) {
+// `id` anchors this card as a scroll target — the span waterfall above (LLMTraceDetail.jsx)
+// scrolls here when its bar for the same span is clicked.
+export default function SpanSection({ span, index, id }) {
     const [collapsed, setCollapsed] = useState(false);
 
     const inputMessages = useMemo(() => {
@@ -178,7 +180,7 @@ export default function SpanSection({ span, index }) {
     const outputTok = Number(span.outputTokens || span._outputTokens || 0);
 
     return (
-        <Box borderWidth="1" borderColor="border" borderRadius="2" background="bg" padding={"2"}>
+        <Box id={id} borderWidth="1" borderColor="border" borderRadius="2" background="bg" padding={"2"}>
             {/* ── Header ── */}
             <Box
                 onClick={() => setCollapsed(c => !c)}

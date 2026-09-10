@@ -62,6 +62,13 @@ public class UngovernedAiRatioProvider extends AbstractInsightProvider {
         }
         r.setHeadline(total == 0 ? "No agentic assets found" : InsightUtil.percent(ratio) + " of AI surfaces are ungoverned");
 
+        if (total > 0 && ungoverned > 0) {
+            r.setSeverity(ratio >= 0.5 ? "CRITICAL" : ratio >= 0.25 ? "HIGH" : "MEDIUM");
+            r.setConcern(InsightUtil.count(ungoverned, "AI assets") + " are shadow, personal, local, or unapproved — nobody signed off on them and no policy is guaranteed to be watching their traffic.");
+            r.setImpact("Ungoverned assets are where data leaves without a guardrail in front of it — they're the most likely place for a real incident to start undetected.");
+            r.setRemediation("Work down the breakdown below team by team: approve the legitimate ones (add to the allowlist), and block or remove the rest.");
+        }
+
         java.util.List<Map<String, Object>> rows = new java.util.ArrayList<>();
         for (String bucket : new String[]{SANCTIONED, UNAPPROVED, SHADOW, LOCAL, PERSONAL, REJECTED, MALICIOUS}) {
             Map<String, Object> row = new HashMap<>();

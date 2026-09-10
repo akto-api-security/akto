@@ -11,9 +11,10 @@ import AssetTopologyGraph from "./AssetTopologyGraph";
 import { RiskFactorRow } from "./RiskFactorRow";
 import DetailGrid from "./DetailGrid";
 import agenticObserveApi, { buildAgenticObserveChatMetadata, fetchAgenticViolationsPage, openViolationInThreatActivity, deviceServiceKey } from "./agenticObserveApi";
+import { buildAgentBuiltinToolsFromStis } from "./agenticPageBuilders";
+import { TOOL_EDGE_COLOR, useMcpTools, withToolRows } from "./topologyTools";
 import api from "../api";
-import { extractServiceName, extractEndpointId } from "./constants";
-import { getFriendlyLlmName } from "./mcpClientHelper";
+import { extractEndpointId } from "./constants";
 import func from "@/util/func";
 import settingsApi from "../../settings/api";
 import "../../../components/layouts/style.css";
@@ -158,48 +159,29 @@ const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 
 // ─── Topology graph ───────────────────────────────────────────────────────────
 
-// Build col3 items (MCPs, LLMs, Skills) linked to a given AI Agent using collections data.
-// The agent's collectionIds tell us which collections it owns; service names on those
-// collections (excluding the agent's own service segment) are its linked MCP/LLM servers.
-function buildAgentCol3Items(agent, collections, agentIdx, builtinTools = []) {
-    const agentIdSet = new Set((agent.collectionIds || []).map(Number));
-    const deviceId = agent.path?.[0];
-    const agentServiceKey = agent.rawServiceName?.toLowerCase();
-    const seen = new Set();
+// Build col3 items (MCPs, Skills, Plugins) linked to a given AI Agent — from the batch detail
+// fetch (mcpServers/skillCount/pluginNames, keyed by agent.groupKey), the same fields
+// AssetTopologyGraph.jsx's own asset-flyout graph uses. No detail (fetch still pending, or this
+// agent has no groupKey) means no col3Items — nothing rather than a wrong guess.
+function buildAgentCol3Items(detail, agentIdx, builtinTools = []) {
     const items = [];
-
-    collections.forEach((c) => {
-        if (!agentIdSet.has(Number(c.id))) return;
-        const hostName = c.hostName || c.displayName || c.name;
-        if (!hostName) return;
-        if (extractEndpointId(hostName) !== deviceId) return;
-        const svc = extractServiceName(hostName);
-        if (!svc || svc.toLowerCase() === agentServiceKey) return;
-        if (seen.has(svc)) return;
-        seen.add(svc);
-        const tags = c.envType || [];
-        const isLlm = tags.some(t => t.keyName === "gen-ai" || t.keyName === "llm");
-        const cat = isLlm ? "ai-model" : "mcp";
-        const type = isLlm ? "LLM" : "MCP Server";
-        const edgeColor = isLlm ? "#ec4899" : "#4cbebb";
-        items.push({ id: `c3-${agentIdx}-${seen.size}`, cat, type, label: svc, agentIdx, edgeColor });
-    });
-
-    // Also add skills from the agent's skillNames
-    (agent.skillNames || []).forEach((name, si) => {
-        items.push({ id: `skl-${agentIdx}-${si}`, cat: "skill", type: "Skill", label: name, agentIdx, edgeColor: "#7C3AED" });
-    });
-
-    // Inline LLM on agent host (e.g. Cowork /v1/messages on *.ai-agent.* collection)
-    const hasAgentHostCollection = collections.some((c) => {
-        if (!agentIdSet.has(Number(c.id))) return false;
-        const hostName = c.hostName || c.displayName || c.name || "";
-        return hostName.includes(".ai-agent.") && extractEndpointId(hostName) === deviceId;
-    });
-    if (hasAgentHostCollection) {
-        const tag = agentServiceKey || "claude";
-        const label = tag.includes("claude") ? getFriendlyLlmName("claude.ai") : tag;
-        items.push({ id: `inline-llm-${agentIdx}`, cat: "ai-model", type: "LLM", label, agentIdx, edgeColor: "#ec4899" });
+    if (detail) {
+        const llmNames = new Set(detail.llmServers || []);
+        (detail.mcpServers || []).forEach((name, i) => {
+            const isLlm = llmNames.has(name);
+            const collectionId = detail.mcpServerCollectionIds?.[name]?.[0];
+            items.push(isLlm
+                ? { id: `c3-${agentIdx}-${i}`, cat: "ai-model", type: "LLM", label: name, agentIdx, edgeColor: "#ec4899" }
+                : { id: `c3-${agentIdx}-${i}`, cat: "mcp", type: "MCP Server", label: name, agentIdx, edgeColor: "#4cbebb", collectionId });
+        });
+        if (detail.skillCount > 0) {
+            items.push({ id: `skl-${agentIdx}`, cat: "skill", type: "Skill", label: detail.skillCount === 1 ? "1 Skill" : `${detail.skillCount} Skills`, agentIdx, edgeColor: "#7C3AED" });
+        }
+        // pluginNames are compound "pluginName|ownerKey" keys (see AgenticObserveAction's
+        // classifyAllGroups) — only the bare name in front of "|" is ever shown.
+        (detail.pluginNames || []).forEach((key, i) => {
+            items.push({ id: `plg-${agentIdx}-${i}`, cat: "plugin", type: "Plugin", label: key.split("|")[0], agentIdx, edgeColor: "#4F46E5" });
+        });
     }
 
     const seenTools = new Set();
@@ -207,59 +189,105 @@ function buildAgentCol3Items(agent, collections, agentIdx, builtinTools = []) {
         const name = tool?.name;
         if (!name || seenTools.has(name)) return;
         seenTools.add(name);
-        items.push({ id: `inline-tool-${agentIdx}-${ti}`, cat: "mcp", type: "Tool", label: name, agentIdx, edgeColor: "#4cbebb" });
+        items.push({ id: `inline-tool-${agentIdx}-${ti}`, cat: "tool", type: "Tool", label: name, agentIdx, edgeColor: TOOL_EDGE_COLOR });
     });
 
     return items;
 }
 
-function TopologyGraph({ device, agents, collections = [], agentTools = {} }) {
+const TOPO_ROW_H = 76;      // one component row
+const TOPO_BLOCK_GAP = 28;  // gap between two agents' blocks
+const TOPO_NODE_H = 64;     // rendered node height, for vertical centering
+
+// A device-child row's own edgeColor/cat, for a "direct" node — one that hangs straight off the
+// device rather than behind an AI Agent. Only "MCP Server" carries a collectionId (buildDeviceChildren
+// — only agent rows get a groupKey instead, for the detail batch fetch), so it's the only direct
+// type with tools of its own; LLM/Skill/Plugin render as plain leaves.
+function directNodeStyle(type) {
+    switch (type) {
+        case "LLM":    return { cat: "ai-model", edgeColor: "#ec4899" };
+        case "Skill":  return { cat: "skill",    edgeColor: "#7C3AED" };
+        case "Plugin": return { cat: "plugin",   edgeColor: "#4F46E5" };
+        default:       return { cat: "mcp",      edgeColor: "#4cbebb" }; // MCP Server
+    }
+}
+
+function TopologyGraph({ device, agents, agentDetails = new Map(), agentTools = {}, mcpTools = {} }) {
     const { nodes, edges } = useMemo(() => {
         const aiAgents = agents.filter(a => a.type === "AI Agent");
-        const hasAgents = aiAgents.length > 0;
+        // Anything the device talks to directly, not behind a recognized AI Agent — its own
+        // sibling branch off the device, same as an agent's, instead of being dropped just because
+        // this device also happens to have agents.
+        const directChildren = agents.filter(a => ["MCP Server", "LLM", "Skill", "Plugin"].includes(a.type));
 
-        const NODE_H = 84;
-        const COL1_X = 40, COL2_X = 230, COL3_X = 420;
+        const COL1_X = 40, COL2_X = 250, COL3_X = 470, COL4_X = 690;
+        const centerIn = (top, blockH) => top + (blockH - TOPO_NODE_H) / 2;
 
         const deviceLabel = device.username && device.username !== "-" ? device.username : device.endpoint;
         const ns = [];
         const es = [];
 
-        if (hasAgents) {
-            // Build col3 items for all agents, tagged with agentIdx
-            const col3Items = aiAgents.flatMap((a, ai) => buildAgentCol3Items(a, collections, ai, agentTools[ai] || []));
-            const maxRows = Math.max(aiAgents.length, col3Items.length, 1);
-            const totalH  = maxRows * NODE_H;
-            const devY    = (totalH - 44) / 2;
-            const agentOffset = Math.max(0, (col3Items.length - aiAgents.length) * NODE_H / 2);
+        // Each agent (and each direct child) owns a vertical block sized to its own components, so
+        // a component always sits directly across from the thing it belongs to. Laying every
+        // agent's components out as one flat list instead (the old approach) left them lined up
+        // against whichever agent happened to share that row.
+        let cursor = 0;
+        const agentBlocks = aiAgents.map((a, i) => {
+            const items = buildAgentCol3Items(agentDetails.get(a.groupKey), i, agentTools[i] || []);
+            const rows = withToolRows(items, mcpTools);
+            const blockH = Math.max(1, rows.length) * TOPO_ROW_H;
+            const block = { idx: i, label: a.endpoint, rows, top: cursor, blockH };
+            cursor += blockH + TOPO_BLOCK_GAP;
+            return block;
+        });
+        const directBlocks = directChildren.map((a, i) => {
+            const style = directNodeStyle(a.type);
+            const collectionId = a.type === "MCP Server" ? a.collectionIds?.[0] : undefined;
+            const item = { id: `direct-${i}`, type: a.type, label: a.endpoint, cat: style.cat, edgeColor: style.edgeColor, collectionId };
+            // Row 0 (the item itself) is reserved implicitly — only the tool rows behind it, if any,
+            // need laying out here.
+            const toolRows = withToolRows([item], mcpTools).slice(1);
+            const blockH = Math.max(1, toolRows.length + 1) * TOPO_ROW_H;
+            const block = { idx: i, item, toolRows, top: cursor, blockH };
+            cursor += blockH + TOPO_BLOCK_GAP;
+            return block;
+        });
+        const contentH = Math.max(cursor - TOPO_BLOCK_GAP, TOPO_ROW_H);
 
-            ns.push({ id: "device", type: "topoNode", draggable: false, position: { x: COL1_X, y: devY }, data: { component: { category: "external", type: "User", label: deviceLabel } } });
-            aiAgents.forEach((a, i) => {
-                ns.push({ id: `agent-${i}`, type: "topoNode", draggable: false, position: { x: COL2_X, y: agentOffset + i * NODE_H }, data: { component: { category: "agent", type: "AI Agent", label: a.endpoint } } });
-                es.push({ id: `e-d-a${i}`, source: "device", target: `agent-${i}`, type: "smoothstep", style: { stroke: "#9ca3af", strokeWidth: 1.5 } });
+        ns.push({ id: "device", type: "topoNode", draggable: false, position: { x: COL1_X, y: centerIn(0, contentH) }, data: { component: { category: "external", type: "User", label: deviceLabel } } });
+
+        agentBlocks.forEach((b) => {
+            ns.push({ id: `agent-${b.idx}`, type: "topoNode", draggable: false, position: { x: COL2_X, y: centerIn(b.top, b.blockH) }, data: { component: { category: "agent", type: "AI Agent", label: b.label } } });
+            es.push({ id: `e-d-a${b.idx}`, source: "device", target: `agent-${b.idx}`, type: "smoothstep", style: { stroke: "#9ca3af", strokeWidth: 1.5 } });
+            b.rows.forEach((row, j) => {
+                const y = b.top + j * TOPO_ROW_H;
+                if (row.tool) {
+                    ns.push({ id: row.tool.id, type: "topoNode", draggable: false, position: { x: COL4_X, y }, data: { component: { category: "tool", type: "Tool", label: row.tool.label } } });
+                    es.push({ id: `e-${row.tool.id}`, source: row.item.id, target: row.tool.id, type: "smoothstep", style: { stroke: TOOL_EDGE_COLOR, strokeWidth: 1.5 } });
+                    return;
+                }
+                const item = row.item;
+                ns.push({ id: item.id, type: "topoNode", draggable: false, position: { x: COL3_X, y }, data: { component: { category: item.cat, type: item.type, label: item.label, collectionId: item.collectionId } } });
+                es.push({ id: `e-a${b.idx}-${item.id}`, source: `agent-${b.idx}`, target: item.id, type: "smoothstep", style: { stroke: item.edgeColor, strokeWidth: 1.5 } });
             });
-            col3Items.forEach((item, i) => {
-                ns.push({ id: item.id, type: "topoNode", draggable: false, position: { x: COL3_X, y: i * NODE_H }, data: { component: { category: item.cat, type: item.type, label: item.label } } });
-                es.push({ id: `e-a${item.agentIdx}-${item.id}`, source: `agent-${item.agentIdx}`, target: item.id, type: "smoothstep", style: { stroke: item.edgeColor, strokeWidth: 1.5 } });
+        });
+
+        directBlocks.forEach((b) => {
+            ns.push({ id: b.item.id, type: "topoNode", draggable: false, position: { x: COL2_X, y: centerIn(b.top, b.blockH) }, data: { component: { category: b.item.cat, type: b.item.type, label: b.item.label } } });
+            es.push({ id: `e-d-${b.item.id}`, source: "device", target: b.item.id, type: "smoothstep", style: { stroke: b.item.edgeColor, strokeWidth: 1.5 } });
+            b.toolRows.forEach((row, j) => {
+                const y = b.top + (j + 1) * TOPO_ROW_H; // row 0 is the item itself
+                ns.push({ id: row.tool.id, type: "topoNode", draggable: false, position: { x: COL3_X, y }, data: { component: { category: "tool", type: "Tool", label: row.tool.label } } });
+                es.push({ id: `e-${row.tool.id}`, source: b.item.id, target: row.tool.id, type: "smoothstep", style: { stroke: TOOL_EDGE_COLOR, strokeWidth: 1.5 } });
             });
-        } else {
-            // No AI Agents — show device → direct service children (MCP/LLM)
-            const direct = agents.filter(a => a.type === "MCP Server" || a.type === "LLM");
-            const maxRows = Math.max(direct.length, 1);
-            const devY = (maxRows * NODE_H - 44) / 2;
-            ns.push({ id: "device", type: "topoNode", draggable: false, position: { x: COL1_X, y: devY }, data: { component: { category: "external", type: "User", label: deviceLabel } } });
-            direct.forEach((a, i) => {
-                const cat = a.type === "LLM" ? "ai-model" : "mcp";
-                const color = a.type === "LLM" ? "#ec4899" : "#9ca3af";
-                ns.push({ id: `svc-${i}`, type: "topoNode", draggable: false, position: { x: COL2_X, y: i * NODE_H }, data: { component: { category: cat, type: a.type, label: a.endpoint } } });
-                es.push({ id: `e-d-s${i}`, source: "device", target: `svc-${i}`, type: "smoothstep", style: { stroke: color, strokeWidth: 1.5 } });
-            });
-        }
+        });
 
         return { nodes: ns, edges: es };
-    }, [agents, device.endpoint, device.username, collections, agentTools]);
+    }, [agents, device.endpoint, device.username, agentDetails, agentTools, mcpTools]);
 
-    return <AssetTopologyGraph nodes={nodes} edges={edges} />;
+    // No height passed — same fixed box the Agentic Assets page graph uses. focusNodeId opens the
+    // view on the device this flyout is about, rather than fitting every agent branch at once.
+    return <AssetTopologyGraph nodes={nodes} edges={edges} focusNodeId="device" />;
 }
 
 // ─── User analysis section ─────────────────────────────────────────────────────
@@ -338,42 +366,70 @@ function UserAnalysisSection({ username, startTimestamp, endTimestamp }) {
 
 const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 
-function OverviewTab({ device, agents, collections, onTabChange, startTimestamp, endTimestamp }) {
+function OverviewTab({ device, agents, collections, onTabChange, startTimestamp, endTimestamp, violationsTotal }) {
     const [agentTools, setAgentTools] = useState({});
 
     const aiAgents = useMemo(() => agents.filter(a => a.type === "AI Agent"), [agents]);
 
     useEffect(() => {
         if (!aiAgents.length) { setAgentTools({}); return; }
+        // One batch over every agent's collections (3 requests total) rather than
+        // fetchAgentBuiltinToolsData per collection per agent, which was 3 requests each — a
+        // device with 10 agents across 3 collections apiece fired 90.
+        const allIds = [...new Set(aiAgents.flatMap(a => a.collectionIds || []))];
+        if (!allIds.length) { setAgentTools({}); return; }
         let cancelled = false;
-        (async () => {
-            try {
-                // allSettled at both levels — one failing collection used to blank the tools list for
-                // every agent in the flyout, not just its own.
-                const settled = await Promise.allSettled(aiAgents.map(async (agent, idx) => {
-                    const ids = agent.collectionIds || [];
-                    if (!ids.length) return [idx, []];
-                    const bundles = await Promise.allSettled(ids.map(id => agenticObserveApi.fetchAgentBuiltinToolsData(id)));
+        agenticObserveApi.fetchCollectionStiBundlesBatch(allIds)
+            .then(bundles => {
+                if (cancelled) return;
+                const next = {};
+                aiAgents.forEach((agent, idx) => {
                     const seen = new Set();
                     const tools = [];
-                    bundles.forEach((b) => {
-                        if (b.status !== "fulfilled") return;
-                        (b.value || []).forEach((tool) => {
+                    (agent.collectionIds || []).forEach((id) => {
+                        const b = bundles.get(typeof id === "string" ? parseInt(id, 10) : id);
+                        if (!b) return;
+                        buildAgentBuiltinToolsFromStis(b.stiEndpoints, b.apiInfoList, b.id, b.auditRows).forEach((tool) => {
                             if (!tool?.name || seen.has(tool.name)) return;
                             seen.add(tool.name);
                             tools.push(tool);
                         });
                     });
-                    return [idx, tools];
-                }));
-                const entries = settled.filter((s) => s.status === "fulfilled").map((s) => s.value);
-                if (!cancelled) setAgentTools(Object.fromEntries(entries));
-            } catch {
-                if (!cancelled) setAgentTools({});
-            }
-        })();
+                    next[idx] = tools;
+                });
+                setAgentTools(next);
+            })
+            .catch(() => { if (!cancelled) setAgentTools({}); });
         return () => { cancelled = true; };
     }, [aiAgents]);
+
+    // One batch call for every AI Agent's mcpServers/skillCount/pluginNames (context graph's
+    // col3Items) instead of one fetchAgenticAssetDetail per agent — a device can show 10+ agents.
+    const [agentDetails, setAgentDetails] = useState(new Map());
+    useEffect(() => {
+        const groupKeys = [...new Set(aiAgents.map(a => a.groupKey).filter(Boolean))];
+        if (!groupKeys.length) { setAgentDetails(new Map()); return; }
+        let cancelled = false;
+        api.fetchAgenticAssetDetailsBatch({ groupKeys, rowType: "agent" })
+            .then(byGroupKey => { if (!cancelled) setAgentDetails(byGroupKey); })
+            .catch(() => { if (!cancelled) setAgentDetails(new Map()); });
+        return () => { cancelled = true; };
+    }, [aiAgents]);
+
+    // Each MCP server's own tools, keyed by collection id. Fetched here rather than inside
+    // AssetTopologyGraph because the graph rows are laid out here — tools need reserved rows or
+    // they land on top of the next MCP's row. Covers both an agent-linked MCP (via agentDetails)
+    // and a direct one hanging straight off the device (buildDeviceChildren's own collectionIds).
+    const mcpCollectionIds = useMemo(() => {
+        const ids = new Set();
+        agentDetails.forEach(d => Object.values(d?.mcpServerCollectionIds || {}).forEach(arr => {
+            if (arr?.[0]) ids.add(arr[0]);
+        }));
+        agents.forEach(a => { if (a.type === "MCP Server" && a.collectionIds?.[0]) ids.add(a.collectionIds[0]); });
+        return [...ids];
+    }, [agentDetails, agents]);
+
+    const mcpTools = useMcpTools(mcpCollectionIds);
 
     const inlineToolCount = useMemo(
         () => Object.values(agentTools).reduce((n, tools) => n + (tools?.length || 0), 0),
@@ -395,8 +451,11 @@ function OverviewTab({ device, agents, collections, onTabChange, startTimestamp,
         aiCount:  aiAgents.length,
         mcpCount: agents.filter(a => a.type === "MCP Server").length,
         llmCount: agents.filter(a => a.type === "LLM").length + inlineLlmCount,
-        totalV:   (device.violations?.critical || 0) + (device.violations?.high || 0) + (device.violations?.medium || 0) + (device.violations?.low || 0),
-    }), [agents, aiAgents.length, device.violations, inlineLlmCount]);
+        // device.violations is an exact-hostName join and can undercount vs. the Violations
+        // tab's own query (loose host/Claude-config attribution). Once that tab has actually
+        // loaded (violationsTotal, lifted from DeviceFlyout), prefer its real total.
+        totalV: violationsTotal ?? ((device.violations?.critical || 0) + (device.violations?.high || 0) + (device.violations?.medium || 0) + (device.violations?.low || 0)),
+    }), [agents, aiAgents.length, device.violations, inlineLlmCount, violationsTotal]);
 
     const osLabel = useMemo(() => {
         if (device.os === "mac") return "macOS";
@@ -445,7 +504,7 @@ function OverviewTab({ device, agents, collections, onTabChange, startTimestamp,
 
                 <VerticalStack gap="2">
                     <Text variant="headingXs" color="subdued">Context graph</Text>
-                    <TopologyGraph device={device} agents={agents} collections={collections} agentTools={agentTools} />
+                    <TopologyGraph device={device} agents={agents} agentDetails={agentDetails} agentTools={agentTools} mcpTools={mcpTools} />
                 </VerticalStack>
 
                 <VerticalStack gap="2">
@@ -459,14 +518,14 @@ function OverviewTab({ device, agents, collections, onTabChange, startTimestamp,
                                 // Open endpoints page with this specific device's flyout pre-opened
                                 const deviceId = device.path?.[0] || device.deviceId;
                                 handleClick = deviceId
-                                    ? () => window.open(`/dashboard/observe/endpoints?device=${encodeURIComponent(deviceId)}`, "_blank")
+                                    ? () => { window.location.href = `/dashboard/observe/endpoints?device=${encodeURIComponent(deviceId)}`; }
                                     : undefined;
                             } else if (f.type === "malicious_skill") {
                                 const maliciousAgents = agents.filter(a => a.isMalicious);
                                 const firstSkill = maliciousAgents[0];
                                 handleClick = firstSkill
-                                    ? () => window.open(`/dashboard/observe/agentic-assets?asset=${encodeURIComponent(firstSkill.rawServiceName || firstSkill.endpoint)}`, "_blank")
-                                    : () => window.open("/dashboard/observe/agentic-assets", "_blank");
+                                    ? () => { window.location.href = `/dashboard/observe/agentic-assets?asset=${encodeURIComponent(firstSkill.rawServiceName || firstSkill.endpoint)}`; }
+                                    : () => { window.location.href = "/dashboard/observe/agentic-assets"; };
                             } else {
                                 handleClick = undefined;
                             }
@@ -525,7 +584,7 @@ function AgenticsTab({ deviceId }) {
         if (!isAgentNavigable(e.data)) return;
         const assetId = e.data.rawServiceName || e.data.endpoint;
         const params = new URLSearchParams({ asset: assetId, type: e.data.type });
-        window.open(`/dashboard/observe/agentic-assets?${params}`, "_blank");
+        window.location.href = `/dashboard/observe/agentic-assets?${params}`;
     }, []);
 
     return (
@@ -554,7 +613,7 @@ function AgenticsTab({ deviceId }) {
 // claudeDeviceIds always includes this device's own id (not just hosts already seen ending in
 // ".claude") so an orphan claude-config-scanner event still attributes correctly even if no real
 // Claude collection has been seen for this device yet — matches the original client-side filter.
-function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp }) {
+function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp, onTotalChange }) {
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
         if (!hostNames.length && !deviceId) {
             return Promise.resolve({ value: [], total: 0 });
@@ -582,14 +641,17 @@ function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp 
             sort: sortBySeverity ? { severity: mongoOrder } : { detectedAt: mongoOrder },
             sortBySeverity,
             searchText: searchString || undefined,
-        }).then((res) => ({
-            value: res.violations.map((r) => ({
-                ...r,
-                time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
-            })),
-            total: res.total,
-        }));
-    }, [hostNames, deviceId, startTimestamp, endTimestamp]);
+        }).then((res) => {
+            onTotalChange?.(res.total ?? 0);
+            return {
+                value: res.violations.map((r) => ({
+                    ...r,
+                    time: r.timeEpoch ? func.formatChatTimestamp(r.timeEpoch) : "",
+                })),
+                total: res.total,
+            };
+        });
+    }, [hostNames, deviceId, startTimestamp, endTimestamp, onTotalChange]);
 
     const handleViolationClick = useCallback((e) => {
         if (!e.data) return;
@@ -620,6 +682,11 @@ function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp 
 export default function DeviceFlyout({ device, agents, show, onClose, onAgentClick, deviceHostNames = [], collections = [], startTimestamp, endTimestamp }) {
     const [selectedTab, setSelectedTab] = useState(0);
     const deviceId = device?.path?.[0] || device?.deviceId;
+    // See OverviewTab/ViolationsTab below - device.violations undercounts vs. the tab's own
+    // query, so once the Violations tab has actually loaded, its real total wins everywhere
+    // in this flyout. Reset per device so a stale total never carries over to the next one.
+    const [violationsTotal, setViolationsTotal] = useState(null);
+    useEffect(() => { setViolationsTotal(null); }, [deviceId]);
 
     // Minimal identity only — the MCP agent resolves this device's collections and fetches
     // its endpoints/components/violations on demand via akto_agentic_asset_details (deviceId).
@@ -630,13 +697,14 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
 
     const tabs = useMemo(() => {
         if (!device) return [];
-        const totalV = (device.violations?.critical || 0) + (device.violations?.high || 0) + (device.violations?.medium || 0) + (device.violations?.low || 0);
+        const assetTotalV = (device.violations?.critical || 0) + (device.violations?.high || 0) + (device.violations?.medium || 0) + (device.violations?.low || 0);
+        const totalV = violationsTotal ?? assetTotalV;
         return [
             { id: "overview",   content: "Overview" },
             { id: "assets",     content: `Agentic Assets (${(agents || []).length})` },
             { id: "violations", content: `Violations (${totalV})` },
         ];
-    }, [device, agents]);
+    }, [device, agents, violationsTotal]);
 
     if (!device) return null;
 
@@ -666,9 +734,9 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
             }
         >
             <Box padding="2" style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-                {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} collections={collections} onTabChange={setSelectedTab} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
+                {selectedTab === 0 && <OverviewTab device={device} agents={agents || []} collections={collections} onTabChange={setSelectedTab} startTimestamp={startTimestamp} endTimestamp={endTimestamp} violationsTotal={violationsTotal} />}
                 {selectedTab === 1 && <AgenticsTab deviceId={deviceId} />}
-                {selectedTab === 2 && <ViolationsTab hostNames={deviceHostNames} deviceId={deviceId} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
+                {selectedTab === 2 && <ViolationsTab hostNames={deviceHostNames} deviceId={deviceId} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onTotalChange={setViolationsTotal} />}
             </Box>
         </AgenticFlyoutShell>
     );

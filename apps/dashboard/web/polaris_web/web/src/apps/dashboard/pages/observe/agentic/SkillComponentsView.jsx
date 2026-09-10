@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Box, Spinner, VerticalStack, Text, HorizontalStack, Badge } from "@shopify/polaris";
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
-import { stripMarkdownLinks } from "../../../components/shared/markdownUtils";
 import observeApi from "../api";
 import PersistStore from "../../../../main/PersistStore";
 
@@ -14,9 +13,9 @@ export function buildSkillMarkdown(sampleMessage, skillName) {
         // Only return content for the specific skill being viewed
         if (skillName && body.skill_name.toLowerCase() !== skillName.toLowerCase()) return null;
         return (
-            `# ${stripMarkdownLinks(body.skill_name)}\n\n` +
-            (body.skill_description ? `**${stripMarkdownLinks(body.skill_description)}**\n\n` : "") +
-            stripMarkdownLinks(body.skill_content || "")
+            `# ${body.skill_name}\n\n` +
+            (body.skill_description ? `**${body.skill_description}**\n\n` : "") +
+            (body.skill_content || "")
         );
     } catch (_) {
         return null;
@@ -122,7 +121,7 @@ export default function SkillComponentsView({ asset, hideOwningPlugin, fetchMark
                 paddingInlineStart="5"
                 paddingInlineEnd="5"
             >
-                <MarkdownViewer markdown={markdown} />
+                <MarkdownViewer markdown={markdown} inertLinks />
             </Box>
         </Box>
     );

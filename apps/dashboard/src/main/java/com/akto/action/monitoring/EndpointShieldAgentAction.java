@@ -12,6 +12,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.Log;
 import com.akto.dao.context.Context;
+import com.akto.utils.search.SearchClientFactory;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
@@ -49,11 +50,25 @@ public class EndpointShieldAgentAction extends UserAction {
     private List<UserAnalysisData> userAnalysisList = new ArrayList<>();
 
     public String fetchUserAnalysisList() {
-        userAnalysisList = UserAnalysisDataDao.instance.findAll(Filters.empty(),
-                Projections.include(UserAnalysisData.USER_NAME, UserAnalysisData.LAST_UPDATED_AT,
-                        UserAnalysisData.TOTAL_INPUT_TOKENS,
-                        UserAnalysisData.TOTAL_OUTPUT_TOKENS, UserAnalysisData.AI_SUMMARY,
-                        UserAnalysisData.HARMFUL_TOPICS));
+        // startTime > 0 means a real range was picked (endTime is always nonzero, even for "All
+        // time" — see AgenticAssetsPage.jsx), so branch on startTime alone to keep "All time" on
+        // the cheap lifetime-counter path below instead of an on-the-fly query.
+        if (startTime > 0) {
+            long startMs = startTime > 0 ? startTime * 1000L : 0L;
+            long endMs = endTime > 0 ? endTime * 1000L : System.currentTimeMillis();
+            long t0 = System.currentTimeMillis();
+            userAnalysisList = SearchClientFactory.instance()
+                    .fetchUserAnalysisTokenTotals(Context.accountId.get(), startMs, endMs);
+            loggerMaker.warnAndAddToDb("[fetchUserAnalysisList-timing] on-the-fly query TOTAL="
+                    + (System.currentTimeMillis() - t0) + "ms, rows=" + userAnalysisList.size()
+                    + ", rangeMs=" + (endMs - startMs));
+        } else {
+            userAnalysisList = UserAnalysisDataDao.instance.findAll(Filters.empty(),
+                    Projections.include(UserAnalysisData.USER_NAME, UserAnalysisData.LAST_UPDATED_AT,
+                            UserAnalysisData.TOTAL_INPUT_TOKENS,
+                            UserAnalysisData.TOTAL_OUTPUT_TOKENS, UserAnalysisData.AI_SUMMARY,
+                            UserAnalysisData.HARMFUL_TOPICS));
+        }
         return SUCCESS.toUpperCase();
     }
 

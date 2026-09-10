@@ -6,20 +6,23 @@ This directory contains the VSCode-specific hook configuration for Akto guardrai
 
 | File (this directory) | System destination |
 |---|---|
-| `hooks.json` | `~/.copilot/hooks/hooks.json` |
+| `hooks.json` | `~/.copilot/hooks/hooks.json` (shared with GitHub Copilot CLI -- merge, don't overwrite, if it already has entries) |
 | `akto-validate-prompt-wrapper.sh` | `~/.vscode/copilot/hooks/akto/` |
 | `akto-validate-pre-tool-wrapper.sh` | `~/.vscode/copilot/hooks/akto/` |
 | `akto-validate-post-tool-wrapper.sh` | `~/.vscode/copilot/hooks/akto/` |
 
-The Python scripts below must also be copied from `../github-cli-hooks/` to `~/.vscode/copilot/hooks/akto/`:
+The Python scripts and generic observability wrapper below must also be copied from `../github-cli-hooks/` to `~/.vscode/copilot/hooks/akto/` (needed for the `sessionStart`/`agentStop`/`subagentStart`/`subagentStop`/`preCompact` entries in `hooks.json` -- these are the VS Code-recognized subset of the observability hooks; `sessionEnd`/`errorOccurred`/`notification`/`userPromptTransformed` have no VS Code equivalent and can be skipped for a VS Code-only setup):
 
 | File (from `../github-cli-hooks/`) | System destination |
 |---|---|
 | `akto-validate-prompt.py` | `~/.vscode/copilot/hooks/akto/` |
 | `akto-validate-pre-tool.py` | `~/.vscode/copilot/hooks/akto/` |
 | `akto-validate-post-tool.py` | `~/.vscode/copilot/hooks/akto/` |
+| `akto-hooks.py` | `~/.vscode/copilot/hooks/akto/` |
+| `akto-hook-wrapper.sh` | `~/.vscode/copilot/hooks/akto/` |
 | `akto_machine_id.py` | `~/.vscode/copilot/hooks/akto/` |
 | `akto_heartbeat.py` | `~/.vscode/copilot/hooks/akto/` |
+| `../shared/akto_ingestion_utility.py` | `~/.vscode/copilot/hooks/akto/` |
 
 ## Setup
 
@@ -42,6 +45,12 @@ cp ../github-cli-hooks/akto-validate-pre-tool.py ~/.vscode/copilot/hooks/akto/
 cp ../github-cli-hooks/akto-validate-post-tool.py ~/.vscode/copilot/hooks/akto/
 cp ../github-cli-hooks/akto_machine_id.py ~/.vscode/copilot/hooks/akto/
 cp ../github-cli-hooks/akto_heartbeat.py ~/.vscode/copilot/hooks/akto/
+
+# Observability hooks (sessionStart/agentStop/subagentStart/subagentStop/preCompact)
+cp ../github-cli-hooks/akto-hooks.py ~/.vscode/copilot/hooks/akto/
+cp ../github-cli-hooks/akto-hook-wrapper.sh ~/.vscode/copilot/hooks/akto/
+cp ../shared/akto_ingestion_utility.py ~/.vscode/copilot/hooks/akto/
+chmod +x ~/.vscode/copilot/hooks/akto/akto-hook-wrapper.sh
 ```
 
 ### 3. Fill in wrapper placeholders
@@ -62,21 +71,24 @@ cp hooks.json ~/.copilot/hooks/hooks.json
 | `AKTO_DATA_INGESTION_URL` | _(required)_ | Guardrails service base URL |
 | `AKTO_API_TOKEN` | _(required)_ | API token for authentication |
 | `AKTO_SYNC_MODE` | `true` | `true` = validate synchronously and block; `false` = ingest only |
-| `AKTO_CONNECTOR` | `vscode` | Connector identifier sent with each request |
+| `AKTO_CONNECTOR` | _(unset)_ | Not hardcoded -- `detect_connector()` infers `vscode` vs `github_cli` from the payload; both report under the shared `"copilot"` ai_agent_tag |
 | `MODE` | `atlas` | Runtime mode (`atlas` or `argus`) |
-| `LOG_DIR` | `~/.vscode/copilot/hooks/akto/logs` | Directory for hook log files |
+| `LOG_DIR` | `~/.copilot/akto/logs` | Shared with the GitHub CLI installer's wrappers so prompt/response turns correlate |
 | `LOG_LEVEL` | `INFO` | Log verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `LOG_PAYLOADS` | `false` | Set to `true` to log full request/response payloads |
-| `ENABLE_MCP_HOOKS_VSCODE` | _(unset)_ | Set to `false` to disable all hooks without removing them |
+| `ENABLE_PROMPT_HOOKS_VSCODE_COPILOT` | _(unset)_ | Set to `false` to disable the `userPromptSubmitted` hook without removing it |
+| `ENABLE_MCP_HOOKS_VSCODE_COPILOT` | _(unset)_ | Set to `false` to disable the `preToolUse`/`postToolUse` hooks without removing them |
 
 ## Disabling hooks
-To temporarily disable all hooks without removing them, add the following to `~/.akto-mcp-endpoint-shield/config/config.env`:
+To temporarily disable hooks without removing them, add the following to `~/.akto-endpoint-shield/config/config.env`:
 ```bash
-ENABLE_MCP_HOOKS_VSCODE=false
+ENABLE_PROMPT_HOOKS_VSCODE_COPILOT=false
+ENABLE_MCP_HOOKS_VSCODE_COPILOT=false
 ```
 
 ## Logs
-Hook execution logs are written to `~/.vscode/copilot/hooks/akto/logs/`:
+Hook execution logs are written to `~/.copilot/akto/logs/` (shared with the GitHub CLI installer so prompt/response turns correlate):
 - `validate-prompt.log`
 - `validate-pre-tool.log`
 - `validate-post-tool.log`
+- `hook-executions.log` (sessionStart/agentStop/subagentStart/subagentStop/preCompact)

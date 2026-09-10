@@ -88,11 +88,14 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   // the threat backend as headers.
   @Getter @Setter String skillEvaluationMode;
   @Getter @Setter String configEvaluationMode;
+  @Getter @Setter String humanResponse;
   // ---- Agentic Assets flyout Violations tab server-side pagination/search ----
   @Getter @Setter String searchText; // free-text match across filterId/host/actor
   @Getter @Setter List<String> looseHostKeys; // "<firstSegment> <lastSegment>" — see ViolationsTab.jsx's looseHostSet
   @Getter @Setter List<String> claudeDeviceIds;
   @Getter @Setter Boolean matchClaudeConfig;
+  @Getter @Setter String riskScoreFilterType;
+  @Getter @Setter Double riskScoreFilterValue;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -124,6 +127,9 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     }
     if (this.configEvaluationMode != null && !this.configEvaluationMode.isEmpty()) {
       post.addHeader("x-config-eval-mode", this.configEvaluationMode);
+    }
+    if (this.humanResponse != null && !this.humanResponse.isEmpty()) {
+      post.addHeader("x-human-response", this.humanResponse);
     }
 
     Map<String, Object> filter = new HashMap<>();
@@ -197,6 +203,13 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       filter.put("sortBySeverity", this.sortBySeverity);
     }
 
+    if (this.riskScoreFilterType != null && !this.riskScoreFilterType.isEmpty()) {
+      filter.put("riskScoreFilterType", this.riskScoreFilterType);
+    }
+    if (this.riskScoreFilterValue != null) {
+      filter.put("riskScoreFilterValue", this.riskScoreFilterValue);
+    }
+
     Map<String, Integer> time_range = new HashMap<>();
     if (this.startTimestamp > 0) {
       time_range.put("start", this.startTimestamp);
@@ -256,6 +269,9 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                                 smr.getJiraTicketUrl(),
                                 smr.getSeverity(),
                                 smr.getSessionId() != null && !smr.getSessionId().isEmpty() ? smr.getSessionId() : "");
+                            event.setRemediation(smr.getRemediation());
+                            event.setEvidenceLine(smr.getEvidenceLine());
+                            event.setHumanResponse(smr.getHumanResponse());
                             if (!smr.getOwaspCategoriesList().isEmpty()) {
                                 event.setOwaspCategories(smr.getOwaspCategoriesList().stream()
                                     .map(o -> new DashboardMaliciousEvent.OwaspCategory(
@@ -418,7 +434,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
             this.eventIds,
             filterBuilder,
             this.status,
-            null  // No Jira URL in this method
+            null,  // No Jira URL in this method
+            this.humanResponse
         );
 
     // Set response fields from result

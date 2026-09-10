@@ -6,9 +6,15 @@ import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.DeviceTag;
+import com.akto.dto.monitoring.InstalledAppVulnerability;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.akto.dto.monitoring.ModuleInfoConstants;
+import com.akto.utils.vulnerability.InstalledAppVulnerabilityAnalysis;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Field;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
@@ -17,14 +23,19 @@ import com.mongodb.client.model.Updates;
 import lombok.Getter;
 import lombok.Setter;
 
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -119,20 +130,97 @@ public class ModuleInfoAction extends UserAction {
         }
     }
 
+    private static final int ENDPOINT_SHIELD_ACTIVE_THRESHOLD_SECONDS = 4 * 60 * 60;
+    private static final int ENDPOINT_SHIELD_INACTIVE_THRESHOLD_SECONDS = 2 * 24 * 60 * 60;
+    private static final String STATUS_FAILED = "failed";
+    private static final String STATUS_ACTIVE = "active";
+    private static final String STATUS_INACTIVE = "inactive";
+    private static final String STATUS_ERROR = "error";
+    private static final String ORIG_ID_FIELD = "origId";
+
+    // A physical host can show up as multiple ModuleInfo docs per {name, os} (reinstall/reconnect) — this
+    // is the dedup key used to collapse those down to one row per host.
+    private static Bson endpointShieldGroupId() {
+        return new Document(ModuleInfo.NAME, "$" + ModuleInfo.NAME).append("os", "$" + AD_OS);
+    }
+
+    // $group's $first materializes a source field that's missing on every doc in the group as an explicit
+    // null (unlike find(), which just leaves the Java field at its default) — fine for reference-typed
+    // fields, but a null decoded into a primitive boolean/int setter NPEs on unboxing. Default it in the
+    // pipeline instead for the four primitive-backed ModuleInfo fields.
+    private static Document ifNullExpr(String fieldPath, Object defaultValue) {
+        return new Document("$ifNull", Arrays.asList("$" + fieldPath, defaultValue));
+    }
+
+    private static Document endpointShieldCurrentStatusExpr(int now) {
+        return new Document("$switch", new Document()
+                .append("branches", Arrays.asList(
+                        new Document("case", new Document("$eq", Arrays.asList("$" + ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)))
+                                .append("then", STATUS_FAILED),
+                        new Document("case", new Document("$gte", Arrays.asList(
+                                "$" + ModuleInfo.LAST_HEARTBEAT_RECEIVED, now - ENDPOINT_SHIELD_ACTIVE_THRESHOLD_SECONDS)))
+                                .append("then", STATUS_ACTIVE),
+                        new Document("case", new Document("$gte", Arrays.asList(
+                                "$" + ModuleInfo.LAST_HEARTBEAT_RECEIVED, now - ENDPOINT_SHIELD_INACTIVE_THRESHOLD_SECONDS)))
+                                .append("then", STATUS_INACTIVE)
+                ))
+                .append("default", STATUS_ERROR));
+    }
+
     /**
      * Server-side paginated Endpoint Shield agent list (ATLAS). Replaces the old load-all fetchModuleInfo
      * on that page which pulled every device's full module doc at once (~10MB at 1000 devices).
+     *
+     * Collapses multiple docs per {name, os} down to the latest one (by lastHeartbeatReceived, always
+     * descending for the dedup — independent of whatever sortKey/sortOrder the UI asked for the final
+     * list order) and adds a computed additionalData.currentStatus, all inside the aggregation so
+     * skip/limit/filters still apply against the deduped set.
      */
     public String fetchEndpointShieldAgents() {
         Bson filter = buildEndpointShieldFilter();
-        total = ModuleInfoDao.instance.count(filter);
+        Bson groupId = endpointShieldGroupId();
+
+        Document countResult = ModuleInfoDao.instance.getMCollection().aggregate(Arrays.asList(
+                Aggregates.match(filter),
+                Aggregates.group(groupId),
+                Aggregates.count("total")
+        ), Document.class).first();
+        total = countResult == null ? 0 : ((Number) countResult.get("total")).longValue();
 
         String sortField = mapEndpointShieldSortField(sortKey);
-        Bson sort = (sortOrder < 0) ? Sorts.descending(sortField) : Sorts.ascending(sortField);
-
+        Bson finalSort = (sortOrder < 0) ? Sorts.descending(sortField) : Sorts.ascending(sortField);
         int lim = (limit <= 0) ? 20 : Math.min(limit, 200);
         int sk = Math.max(skip, 0);
-        moduleInfos = ModuleInfoDao.instance.findAll(filter, sk, lim, sort);
+
+        List<Bson> pipeline = Arrays.asList(
+                Aggregates.match(filter),
+                Aggregates.sort(Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED)),
+                Aggregates.group(groupId,
+                        Accumulators.first(ORIG_ID_FIELD, "$" + ModuleInfoDao.ID),
+                        Accumulators.first(ModuleInfo.MODULE_TYPE, "$" + ModuleInfo.MODULE_TYPE),
+                        Accumulators.first(ModuleInfo.CURRENT_VERSION, "$" + ModuleInfo.CURRENT_VERSION),
+                        Accumulators.first(ModuleInfo.STARTED_TS, ifNullExpr(ModuleInfo.STARTED_TS, 0)),
+                        Accumulators.first(ModuleInfo.LAST_HEARTBEAT_RECEIVED, ifNullExpr(ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)),
+                        Accumulators.first(ModuleInfo.NAME, "$" + ModuleInfo.NAME),
+                        Accumulators.first(ModuleInfo.ADDITIONAL_DATA, "$" + ModuleInfo.ADDITIONAL_DATA),
+                        Accumulators.first(ModuleInfo._REBOOT, ifNullExpr(ModuleInfo._REBOOT, false)),
+                        Accumulators.first(ModuleInfo.DELETE_TOPIC_AND_REBOOT, ifNullExpr(ModuleInfo.DELETE_TOPIC_AND_REBOOT, false)),
+                        Accumulators.first(ModuleInfo.MINI_RUNTIME_NAME, "$" + ModuleInfo.MINI_RUNTIME_NAME)),
+                Aggregates.addFields(
+                        new Field<>(ModuleInfoDao.ID, "$" + ORIG_ID_FIELD),
+                        new Field<>(ModuleInfo.ADDITIONAL_DATA + ".currentStatus", endpointShieldCurrentStatusExpr(Context.now()))),
+                Aggregates.project(Projections.exclude(ORIG_ID_FIELD)),
+                Aggregates.sort(finalSort),
+                Aggregates.skip(sk),
+                Aggregates.limit(lim)
+        );
+
+        moduleInfos = new ArrayList<>();
+        MongoCursor<ModuleInfo> cursor = ModuleInfoDao.instance.getMCollection().aggregate(pipeline, ModuleInfo.class).cursor();
+        while (cursor.hasNext()) {
+            moduleInfos.add(cursor.next());
+        }
+
         filterEnvironmentVariables(moduleInfos);
         allowedEnvFields = computeAllowedEnvFields();
         return SUCCESS.toUpperCase();
@@ -146,6 +234,34 @@ public class ModuleInfoAction extends UserAction {
         filterOptions.put("usernames", distinctStrings(AD_USERNAME, base));
         filterOptions.put("deviceIds", distinctStrings(AD_DEVICE_ID, base));
         filterOptions.put("oses", distinctStrings(AD_OS, base));
+        return SUCCESS.toUpperCase();
+    }
+
+    @Setter private List<Map<String, String>> installedAppsToCheck; // [{name, version}, ...]
+    @Getter private Map<String, InstalledAppVulnerability> installedAppVulnerabilities;
+
+    /**
+     * Known-vulnerability check for the "Apps" tab of the agent details flyout — one cache-or-compute
+     * lookup per {name, version} pair (see InstalledAppVulnerabilityAnalysis), keyed in the response by
+     * "{name}#{version}" so the frontend can match each row back to its verdict. Runs sequentially and
+     * calls out to OSV.dev on every cache miss, so a host's first-ever check (dozens of apps) is slower
+     * than repeat checks once the cache is warm.
+     */
+    public String checkInstalledAppVulnerabilities() {
+        installedAppVulnerabilities = new HashMap<>();
+        if (installedAppsToCheck == null) {
+            return SUCCESS.toUpperCase();
+        }
+
+        for (Map<String, String> app : installedAppsToCheck) {
+            String name = app == null ? null : app.get("name");
+            String version = app == null ? null : app.get("version");
+            InstalledAppVulnerability info = InstalledAppVulnerabilityAnalysis.getVulnerabilityInfo(name, version);
+            if (info != null) {
+                installedAppVulnerabilities.put(info.getId(), info);
+            }
+        }
+
         return SUCCESS.toUpperCase();
     }
 
@@ -452,31 +568,78 @@ public class ModuleInfoAction extends UserAction {
     }
 
     public String fetchAgenticUsers() {
-        agenticUsers = AgentUsersDao.instance.findAll(Filters.empty());
+        // The list is the plain union of both identity sources — every agent_users doc plus every
+        // username reporting a device in module_info — deduped by username. A user with no device
+        // in either source still belongs in the list: they are a real identity that can be tagged,
+        // they just have nothing to enforce against yet. Devices are therefore merged (stored ∪
+        // reported), never overwritten, so a source that happens to be empty can never delete a
+        // user from the list.
+        Map<String, AgenticUsers> byUsername = new LinkedHashMap<>();
+        for (AgenticUsers u : AgentUsersDao.instance.findAll(Filters.empty())) {
+            String username = u.getUserName() == null ? "" : u.getUserName().trim();
+            // Nothing to key or display on, and its devices are pre-migration raw machine IDs that
+            // never match at enforcement — dropping it is what dedupe by username means.
+            if (username.isEmpty()) continue;
+            u.setUserName(username);
+            u.setDevices(u.getDevices() == null ? new ArrayList<>() : new ArrayList<>(new LinkedHashSet<>(u.getDevices())));
 
-        // AgenticUsers.devices is only ever backfilled once by a startup migration and never
-        // kept in sync afterwards — overwrite with live devices from module_info (updated every
-        // heartbeat) instead of trusting the stored field.
-        Map<String, Set<String>> liveDevicesByUsername = ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield();
-        for (AgenticUsers u : agenticUsers) {
-            Set<String> liveDevices = liveDevicesByUsername.remove(u.getUserName());
-            // Inference-hooks-tagged identities have no heartbeat to overwrite from, so their stored devices are kept and unioned with any live ones.
-            boolean fromInferenceHooks = u.getDeviceTags() != null
-                    && u.getDeviceTags().stream().anyMatch(t -> DeviceTag.SOURCE_INFERENCE_HOOKS.equals(t.getSource()));
-            Set<String> devices = new HashSet<>();
-            if (liveDevices != null) devices.addAll(liveDevices);
-            if (fromInferenceHooks && u.getDevices() != null) devices.addAll(u.getDevices());
-            u.setDevices(new ArrayList<>(devices));
+            AgenticUsers existing = byUsername.get(username);
+            if (existing == null) {
+                byUsername.put(username, u);
+            } else {
+                mergeInto(existing, u);
+            }
         }
-        // Any username reporting devices but with no team/role ever assigned has no AgenticUsers
-        // doc yet — synthesize a lightweight entry so it still shows up as filterable/previewable.
-        for (Map.Entry<String, Set<String>> entry : liveDevicesByUsername.entrySet()) {
-            AgenticUsers synthetic = new AgenticUsers();
-            synthetic.setUserName(entry.getKey());
-            synthetic.setDevices(new ArrayList<>(entry.getValue()));
-            agenticUsers.add(synthetic);
+
+        Map<String, Set<String>> reportedDevicesByUsername = ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield();
+        // module_info is the only place an email exists for an identity that has no agent_users
+        // doc (e.g. a browser extension or the Claude Desktop app, which reports
+        // additionalData.email but is never explicitly tagged) — without this, such an identity
+        // would show up in the Users picker with no email at all.
+        Map<String, String> reportedEmailByUsername = ModuleInfoDao.instance.fetchUsernameToEmailForEndpointShield();
+        for (Map.Entry<String, Set<String>> entry : reportedDevicesByUsername.entrySet()) {
+            AgenticUsers existing = byUsername.get(entry.getKey());
+            if (existing == null) {
+                // Reporting a device but never tagged, so no agent_users doc exists — synthesize a
+                // lightweight entry so the identity still shows up as filterable/previewable.
+                AgenticUsers synthetic = new AgenticUsers();
+                synthetic.setUserName(entry.getKey());
+                synthetic.setDevices(new ArrayList<>(entry.getValue()));
+                synthetic.setUserEmail(reportedEmailByUsername.get(entry.getKey()));
+                byUsername.put(entry.getKey(), synthetic);
+            } else {
+                addDevices(existing, entry.getValue());
+                if (existing.getUserEmail() == null) {
+                    existing.setUserEmail(reportedEmailByUsername.get(entry.getKey()));
+                }
+            }
         }
+
+        agenticUsers = new ArrayList<>(byUsername.values());
         return SUCCESS.toUpperCase();
+    }
+
+    /** Folds a duplicate agent_users row into the one already kept for that username. */
+    private static void mergeInto(AgenticUsers target, AgenticUsers duplicate) {
+        addDevices(target, duplicate.getDevices());
+        if (duplicate.getDeviceTags() != null) {
+            List<DeviceTag> tags = target.getDeviceTags() == null ? new ArrayList<>() : new ArrayList<>(target.getDeviceTags());
+            for (DeviceTag t : duplicate.getDeviceTags()) {
+                boolean alreadyPresent = tags.stream().anyMatch(
+                        e -> Objects.equals(e.getKey(), t.getKey()) && Objects.equals(e.getValue(), t.getValue()));
+                if (!alreadyPresent) tags.add(t);
+            }
+            target.setDeviceTags(tags);
+        }
+        if (target.getUserEmail() == null) target.setUserEmail(duplicate.getUserEmail());
+        if (target.getUserId() == null) target.setUserId(duplicate.getUserId());
+    }
+
+    private static void addDevices(AgenticUsers target, Collection<String> devices) {
+        if (devices == null || devices.isEmpty()) return;
+        Set<String> merged = new LinkedHashSet<>(target.getDevices() == null ? Collections.emptyList() : target.getDevices());
+        merged.addAll(devices);
+        target.setDevices(new ArrayList<>(merged));
     }
 
     public String updateModuleEnvAndReboot() {

@@ -108,6 +108,8 @@ function extractFilterModel(model) {
             out[field] = state.values;
         } else if (state.filterType === "text" && state.filter) {
             out[field] = [state.filter];
+        } else if (state.filterType === "number") {
+            out[field] = { type: state.type, filter: state.filter, filterTo: state.filterTo };
         }
     });
     return out;
@@ -149,7 +151,11 @@ export default function AgGridTable({
     bulkActions = [],
     onClearBulk,
     pagination,
-    paginationPageSize = 20,
+    // Every table defaults to 50, regardless of whatever paginationPageSize a given page passes —
+    // a page only keeps its own smaller size (e.g. a compact 10-row list) by also opting out of
+    // the selector via hidePageSizeSelector. Mirrors GithubServerTable's page-size default.
+    paginationPageSize: paginationPageSizeProp = 50,
+    hidePageSizeSelector = false,
     paginationPageSizeSelector = [20, 50, 100],
     sideBar = { toolPanels: ["columns", "filters"], defaultToolPanel: null },
     gridRef: gridRefProp,
@@ -158,6 +164,12 @@ export default function AgGridTable({
     domLayout = "autoHeight",
     height,
     onServerFetch,
+    renderSearch,
+    searchValue: searchValueProp,
+    onSearchChange,
+    searchAccessory,
+    searchBelow,
+    fetchTrigger,
     filterStateUrl,
     // Opt-in: use AG Grid's native Server-Side Row Model + built-in pagination footer
     // instead of the custom Polaris Pagination bar. Only affects callers that pass this;
@@ -165,9 +177,17 @@ export default function AgGridTable({
     serverSideRowModel = false,
     ...rest
 }) {
-    const hasSearch = !!searchPlaceholder;
-    const [searchValue, setSearchValue] = useState("");
-    const [debouncedSearchValue, setDebouncedSearchValue] = useState("");
+    const paginationPageSize = hidePageSizeSelector ? (paginationPageSizeProp || 20) : 50;
+    const hasSearch = !!searchPlaceholder || !!renderSearch;
+    const isSearchControlled = searchValueProp !== undefined;
+    const [uncontrolledSearch, setUncontrolledSearch] = useState("");
+    const searchValue = isSearchControlled ? searchValueProp : uncontrolledSearch;
+    const setSearchValue = (val) => {
+        if (!isSearchControlled) setUncontrolledSearch(val);
+        onSearchChange?.(val);
+    };
+    const [debouncedSearchValue, setDebouncedSearchValue] = useState(searchValue || "");
+    const skipMinSearchLength = !!renderSearch;
     const theme = noOuterBorder
         ? agTableTheme.withParams({ wrapperBorder: false, wrapperBorderRadius: 0 })
         : agTableTheme;
@@ -223,7 +243,7 @@ export default function AgGridTable({
         const searchAfterJson = (skip >= 9980 && lastSortValues.current)
             ? JSON.stringify(lastSortValues.current)
             : undefined;
-        const result = onServerFetch({ filters: query.filters, sortKey: query.sortKey, sortOrder: query.sortOrder, skip, limit: paginationPageSize, searchAfterJson, searchString: debouncedSearchValue.length >= 3 ? debouncedSearchValue : "" });
+        const result = onServerFetch({ filters: query.filters, sortKey: query.sortKey, sortOrder: query.sortOrder, skip, limit: paginationPageSize, searchAfterJson, searchString: (skipMinSearchLength || debouncedSearchValue.length >= 3) ? debouncedSearchValue : "" });
         if (result && typeof result.then === "function") {
             result.then(r => {
                 if (r?.total !== undefined) dispatchQuery({ type: "SET_TOTAL", total: r.total });
@@ -235,7 +255,7 @@ export default function AgGridTable({
                 }
             });
         }
-    }, [query.filters, query.sortKey, query.sortOrder, query.page, debouncedSearchValue]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [query.filters, query.sortKey, query.sortOrder, query.page, debouncedSearchValue, fetchTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleFilterChanged = useCallback((e) => {
         if (!isServerMode) return;
@@ -265,7 +285,7 @@ export default function AgGridTable({
     const onServerFetchRef = useRef(onServerFetch);
     onServerFetchRef.current = onServerFetch;
 
-    const searchRef = useRef("");
+    const searchRef = useRef(searchValue || "");
     useEffect(() => { searchRef.current = debouncedSearchValue; }, [debouncedSearchValue]);
 
     const firstSearchRun = useRef(true);
@@ -277,7 +297,7 @@ export default function AgGridTable({
         // page index against the new filter, it doesn't reset it.
         gridRef.current?.api?.paginationGoToFirstPage();
         gridRef.current?.api?.refreshServerSide({ purge: true });
-    }, [debouncedSearchValue]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [debouncedSearchValue, fetchTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const serverSideDatasource = useMemo(() => {
         if (!useSSRM) return undefined;
@@ -290,7 +310,7 @@ export default function AgGridTable({
                 const sortOrder = sortEntry?.sort === "asc" ? -1 : 1;
                 const skip = startRow;
                 const limit = (endRow ?? (startRow + paginationPageSize)) - startRow;
-                const searchString = searchRef.current.length >= 3 ? searchRef.current : "";
+                const searchString = (skipMinSearchLength || searchRef.current.length >= 3) ? searchRef.current : "";
                 // groupKeys is [] at the top level; for SSRM tree-data callers (isServerSideGroup/
                 // getServerSideGroupKey passed via ...rest) it holds the expand path when a parent
                 // row's children are being fetched — e.g. [deviceId] for that device's children.
@@ -300,7 +320,7 @@ export default function AgGridTable({
                     .catch(() => params.fail());
             },
         };
-    }, [useSSRM, paginationPageSize]);
+    }, [useSSRM, paginationPageSize, skipMinSearchLength]);
 
     const handleGridReady = useCallback((e) => {
         if (!useSSRM) return;
@@ -336,14 +356,43 @@ export default function AgGridTable({
     ) : null;
 
     // ── Grid node ───────────────────────────────────────────────────────────
+    // Row Group / Values / Pivot Mode never make sense in this app's tables (asset/entity lists,
+    // not analytics grids) — unconditionally off, not just on a server-paginated table where they'd
+    // also be misleading (operating on whatever page happens to be loaded client-side).
     const effectiveDefaultColDef = React.useMemo(() => ({
-        enableRowGroup: true,
-        enablePivot: true,
-        enableValue: true,
+        enableRowGroup: false,
+        enablePivot: false,
+        enableValue: false,
         ...defaultColDef,
     }), [defaultColDef]);
 
-    const effectiveSideBar = sideBar;
+    // Mirrors effectiveDefaultColDef above: also closes the Columns tool panel's own Row
+    // Group/Values/Pivot Mode UI, and the right-click context menu's "Group by"/"Pivot"/
+    // "Aggregate" options (which key off the columnDef flags above independently of this panel).
+    // Column show/hide and the Filters panel are unaffected. `sideBar` shorthand `true` (AG Grid's
+    // own default) is expanded to the same panel set first so it gets the same treatment.
+    const effectiveSideBar = useMemo(() => {
+        if (!sideBar) return sideBar;
+        const base = sideBar === true ? { toolPanels: ["columns", "filters"] } : sideBar;
+        const toolPanels = (base.toolPanels || []).map((panel) => {
+            const isColumnsPanel = panel === "columns" || panel?.toolPanel === "agColumnsToolPanel";
+            if (!isColumnsPanel) return panel;
+            const basePanel = panel === "columns"
+                ? { id: "columns", labelDefault: "Columns", labelKey: "columns", iconKey: "columns", toolPanel: "agColumnsToolPanel" }
+                : panel;
+            return {
+                ...basePanel,
+                toolPanelParams: {
+                    ...basePanel.toolPanelParams,
+                    suppressRowGroups: true,
+                    suppressValues: true,
+                    suppressPivots: true,
+                    suppressPivotMode: true,
+                },
+            };
+        });
+        return { ...base, toolPanels };
+    }, [sideBar]);
 
     const gridNode = (
         <AgGridReact
@@ -384,9 +433,20 @@ export default function AgGridTable({
 
     return (
         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            {hasSearch && <SearchBar value={searchValue} onChange={(val) => {
-                setSearchValue(val);
-            }} placeholder={searchPlaceholder} topRadius={!noOuterBorder} />}
+            {hasSearch && (renderSearch
+                ? renderSearch({ value: searchValue, onChange: setSearchValue, placeholder: searchPlaceholder })
+                : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <SearchBar value={searchValue} onChange={(val) => {
+                                setSearchValue(val);
+                            }} placeholder={searchPlaceholder} topRadius={!noOuterBorder} />
+                        </div>
+                        {searchAccessory}
+                    </div>
+                )
+            )}
+            {searchBelow ? <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="3" paddingBlockEnd="3">{searchBelow}</Box> : null}
             <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} noRadius />
             <div style={height ? { height } : { flex: 1, minHeight: 0 }}>
                 {gridNode}

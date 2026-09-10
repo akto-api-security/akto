@@ -41,6 +41,9 @@ public class CredentialExposureProvider extends AbstractInsightProvider {
 
     private static final String SECRETS_SUBCATEGORY = "Secrets";
     private static final int EVENT_PAGE_LIMIT = 1000;
+    // Above this many mislabeled (undetected) credential hits, this reads as active, ongoing
+    // leakage rather than a handful of missed detections — escalate past HIGH.
+    private static final int CRITICAL_MISLABELED_THRESHOLD = 20;
     private static final int EVIDENCE_ROW_CAP = 20;
 
     public CredentialExposureProvider() { super(InsightId.CREDENTIAL_EXPOSURE, 1); }
@@ -48,7 +51,10 @@ public class CredentialExposureProvider extends AbstractInsightProvider {
     @Override
     public InsightResult compute(InsightDataBundle bundle, InsightContext ctx, Scope scope) {
         List<ThreatCategoryCount> subCategoryCounts = bundle.subCategoryCounts;
-        if (subCategoryCounts == null) {
+        // subCategoryCounts is a threat-backend aggregate and the bundle never returns null
+        // for it — a failed call is signalled by threatBackendAvailable instead, so an empty
+        // list here can't be told apart from a real zero unless that flag is also checked.
+        if (!bundle.threatBackendAvailable) {
             return failed("THREAT_BACKEND", "Could not load violation counts");
         }
 
@@ -65,9 +71,18 @@ public class CredentialExposureProvider extends AbstractInsightProvider {
         InsightResult result = skeleton();
 
         if (scope == Scope.LIST) {
+            // A real severity when there's already-labeled Secrets volume to show — but this can
+            // only ever be a floor: the mislabeled-credential case this insight exists to catch is,
+            // by definition, NOT counted in labeledSecretsCount, and finding it needs the raw-event
+            // scan below. So unlike most providers here, labeledSecretsCount == 0 does NOT mean
+            // severity stays null out of caution — it stays null because there is genuinely nothing
+            // cheap to show yet, not because it's a confirmed-clean result.
             result.setStatus(InsightResult.Status.PARTIAL.name());
             result.setHeadline(InsightUtil.count(labeledSecretsCount, "violations")
                     + " already labeled Secrets; checking other buckets for mislabeled credentials requires the detail view.");
+            if (labeledSecretsCount > 0) {
+                result.setSeverity("MEDIUM");
+            }
             result.setMetrics(Collections.singletonList(labeledMetric));
             result.setMetricsComplete(false);
             result.setDataGaps(Collections.singletonList(new InsightResult.Gap(
@@ -80,7 +95,10 @@ public class CredentialExposureProvider extends AbstractInsightProvider {
 
         // DETAIL: page the most recent violations account-wide (no subCategory narrowing — the
         // whole point is to find credential-shaped evidence wherever it landed) and pattern-match.
-        List<DashboardMaliciousEvent> events = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT, null, null);
+        // "exclude" drops Skills Evaluations traffic — a skill's own documentation matching a
+        // credential-shaped pattern isn't a live credential leak (same convention as
+        // AlertFatigueProvider and PromptInjectionRepeatsProvider).
+        List<DashboardMaliciousEvent> events = bundle.fetchViolationEvents(scope, EVENT_PAGE_LIMIT, null, "exclude");
         if (events == null) events = new ArrayList<>();
 
         if (events.isEmpty()) {
@@ -149,7 +167,7 @@ public class CredentialExposureProvider extends AbstractInsightProvider {
         String severity;
         String headline;
         if (mislabeledCount > 0) {
-            severity = "HIGH";
+            severity = mislabeledCount >= CRITICAL_MISLABELED_THRESHOLD ? "CRITICAL" : "HIGH";
             headline = String.format(Locale.US,
                     "%s look like live credentials but %s labeled as something other than Secrets — same bucket, same severity as PII.",
                     InsightUtil.count(totalMatches, "violations"), InsightUtil.ofTotal(mislabeledCount, totalMatches, "violations"));
@@ -170,6 +188,23 @@ public class CredentialExposureProvider extends AbstractInsightProvider {
             caveats.add("Violations examined are capped at " + EVENT_PAGE_LIMIT + "; more may exist beyond this page.");
         }
 
+        String concern = null;
+        String impact = null;
+        String remediation = null;
+        if (mislabeledCount > 0) {
+            concern = String.format(Locale.US,
+                    "%s look like live credentials (e.g. %s) but %s labeled as something other than Secrets, "
+                            + "across %s and %s.",
+                    InsightUtil.count(totalMatches, "violations"), matches.stream().filter(m -> !m.labeledSecrets).findFirst().map(m -> m.patternLabel).orElse("a credential pattern"),
+                    InsightUtil.ofTotal(mislabeledCount, totalMatches, "violations"),
+                    InsightUtil.count(distinctUsers.size(), "users"), InsightUtil.count(distinctDestinations.size(), "destinations"));
+            impact = "A credential mislabeled as PII or something else evades any policy control that's specifically "
+                    + "tuned for Secrets (e.g. stricter blocking, different alerting) — it's real credential exposure "
+                    + "hiding under the wrong control.";
+            remediation = "Enable the Secrets scanner on whichever policy is catching these hosts, so future hits are "
+                    + "correctly classified and routed to the right control instead of falling through to a generic one.";
+        }
+
         List<InsightResult.Evidence> evidence = new ArrayList<>();
         if (!matches.isEmpty()) {
             List<Match> sorted = matches.stream()
@@ -184,7 +219,7 @@ public class CredentialExposureProvider extends AbstractInsightProvider {
                 String host = StringUtils.defaultIfBlank(m.event.getHost(), "(unknown)");
                 String device = AgenticObserveUtil.extractEndpointId(host);
                 String labeledAs = m.labeledSecrets ? "Secrets (correct)"
-                        : StringUtils.defaultIfBlank(m.event.getSubCategory(), "(no subCategory)");
+                        : InsightUtil.humanizeSubCategory(m.event.getSubCategory());
 
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("User", actor);
@@ -206,6 +241,9 @@ public class CredentialExposureProvider extends AbstractInsightProvider {
         result.setMetricsComplete(true);
         result.setDataGaps(new ArrayList<>());
         result.setCaveats(caveats);
+        result.setConcern(concern);
+        result.setImpact(impact);
+        result.setRemediation(remediation);
         result.setEvidence(evidence);
         result.setCtas(buildCtas(matches));
         return result;
@@ -231,14 +269,18 @@ public class CredentialExposureProvider extends AbstractInsightProvider {
         Set<String> actors = matches.stream()
                 .map(m -> StringUtils.defaultIfBlank(m.event.getActor(), "(unattributed)"))
                 .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+        // ViolationsPage.jsx reads "?user=" and seeds its existing per-user card-click filter —
+        // there's no bulk "force sync/block on this class" action anywhere today (that's a policy
+        // config change, not something these actor identities alone can drive), so all three route
+        // to the filtered evidence instead of a Guardrail Policies page they have nothing to act on.
         Map<String, Object> params = new HashMap<>();
-        params.put("actors", new ArrayList<>(actors));
+        params.put("user", String.join(",", actors));
 
         List<InsightResult.Cta> ctas = new ArrayList<>();
         ctas.add(new InsightResult.Cta("rotate_exposed_credential", "Rotate exposed credential",
                 "NAVIGATE", "/dashboard/guardrails/violations", params, true));
-        ctas.add(new InsightResult.Cta("force_sync_block_credentials", "Force sync/block on this class",
-                "BULK_ACTION", "/dashboard/guardrails/policies", params, false));
+        ctas.add(new InsightResult.Cta("review_affected_users", "Review affected users' violations",
+                "NAVIGATE", "/dashboard/guardrails/violations", params, false));
         ctas.add(new InsightResult.Cta("notify_user_security_lead", "Notify user + security lead",
                 "NAVIGATE", "/dashboard/guardrails/violations", params, false));
         return ctas;
