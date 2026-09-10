@@ -45,7 +45,7 @@ public class ContextWindowAction extends AbstractThreatDetectionAction {
 
     // A before/after turn is only worth surfacing in the UI if it's either right next to the
     // flagged message in time, or the AI fallback is confident it's the same conversation.
-    private static final long HIGHLIGHT_TIME_DELTA_MS = 2 * 60 * 1000; // 2 minutes
+    private static final long HIGHLIGHT_TIME_DELTA_MS = 20 * 60 * 1000; // 2 minutes
     private static final double HIGHLIGHT_CONFIDENCE_THRESHOLD = 0.8;
     private static final int DISPLAY_COUNT = 3;
 
