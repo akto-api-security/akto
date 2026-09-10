@@ -276,7 +276,15 @@ public class DbLayer {
         updateList.add(Updates.set(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()));
         updateList.add(Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()));
         updateList.add(Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS)));
-        updateList.add(Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()));
+        // lastHeartbeatReceived is a primitive int, so a payload that omits it arrives as 0 —
+        // skip the update in that case instead of wiping the stored timestamp.
+        if (moduleInfo.getLastHeartbeatReceived() != 0) {
+            updateList.add(Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()));
+        } else {
+            // no stored value to preserve on a brand-new doc, and keeping the field present means
+            // queries on it (eg. the V2 stale-heartbeat cleanup) still see this document.
+            updateList.add(Updates.setOnInsert(ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0));
+        }
         updateList.addAll(buildAdditionalDataUpdates(moduleInfo.getModuleType(), moduleInfo.getAdditionalData()));
 
         ModuleInfo result = ModuleInfoDao.instance.getMCollection().findOneAndUpdate(
