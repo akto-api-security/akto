@@ -642,6 +642,31 @@ public class ModuleInfoAction extends UserAction {
         target.setDevices(new ArrayList<>(merged));
     }
 
+    // Shared by updateModuleEnvAndReboot (one module) and bulkUpdateModuleEnvAndReboot (many) —
+    // same allowed-key/secret-redaction rules and reboot flag either way, just a different filter.
+    private List<Bson> buildEnvUpdates(Map<String, String> envData) {
+        List<Bson> updates = new ArrayList<>();
+
+        // Write directly to additionalData.env — same field the Go module writes at startup.
+        // Go module only writes env vars once at startup (not on every heartbeat), so no race condition.
+        for (Map.Entry<String, String> entry : envData.entrySet()) {
+            boolean isAllowedKey = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.values().stream()
+                .anyMatch(moduleEnvMap -> moduleEnvMap.containsKey(entry.getKey()));
+
+            if (isAllowedKey) {
+                // Skip secret fields if the user submitted the redacted placeholder unchanged
+                if (ModuleInfoConstants.SECRET_ENV_KEYS.contains(entry.getKey())
+                        && ModuleInfoConstants.REDACTED_PLACEHOLDER.equals(entry.getValue())) {
+                    continue;
+                }
+                updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".env." + entry.getKey(), entry.getValue()));
+            }
+        }
+
+        updates.add(Updates.set(ModuleInfo._REBOOT, true));
+        return updates;
+    }
+
     public String updateModuleEnvAndReboot() {
         if (moduleId == null || moduleId.isEmpty()) {
             return ERROR.toUpperCase();
@@ -653,31 +678,30 @@ public class ModuleInfoAction extends UserAction {
 
         try {
             Bson moduleFilter = Filters.eq(ModuleInfoDao.ID, moduleId);
+            ModuleInfoDao.instance.updateMany(moduleFilter, Updates.combine(buildEnvUpdates(envData)));
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ERROR.toUpperCase();
+        }
+    }
 
+    // Bulk counterpart of updateModuleEnvAndReboot, for the Endpoint Shield table's multi-select
+    // (e.g. enabling/disabling system proxy for several agents at once) — reuses the existing
+    // moduleIds field (already used by deleteModuleInfo/rebootModules) and envData, same allowed-
+    // key rules, one updateMany instead of looping per id.
+    public String bulkUpdateModuleEnvAndReboot() {
+        if (moduleIds == null || moduleIds.isEmpty()) {
+            return ERROR.toUpperCase();
+        }
 
-            List<Bson> updates = new ArrayList<>();
+        if (envData == null || envData.isEmpty()) {
+            return SUCCESS.toUpperCase();
+        }
 
-            // Write directly to additionalData.env — same field the Go module writes at startup.
-            // Go module only writes env vars once at startup (not on every heartbeat), so no race condition.
-            for (Map.Entry<String, String> entry : envData.entrySet()) {
-                boolean isAllowedKey = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.values().stream()
-                    .anyMatch(moduleEnvMap -> moduleEnvMap.containsKey(entry.getKey()));
-
-                if (isAllowedKey) {
-                    // Skip secret fields if the user submitted the redacted placeholder unchanged
-                    if (ModuleInfoConstants.SECRET_ENV_KEYS.contains(entry.getKey())
-                            && ModuleInfoConstants.REDACTED_PLACEHOLDER.equals(entry.getValue())) {
-                        continue;
-                    }
-                    updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".env." + entry.getKey(), entry.getValue()));
-                }
-            }
-
-            updates.add(Updates.set(ModuleInfo._REBOOT, true));
-
-
-            ModuleInfoDao.instance.updateMany(moduleFilter, Updates.combine(updates));
-
+        try {
+            Bson moduleFilter = Filters.in(ModuleInfoDao.ID, moduleIds);
+            ModuleInfoDao.instance.updateMany(moduleFilter, Updates.combine(buildEnvUpdates(envData)));
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             e.printStackTrace();
