@@ -2111,7 +2111,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">ENDPOINT_SECURITY SECURITY_TYPE_AGENTIC </param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
@@ -2141,7 +2141,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">ENDPOINT_SECURITY SECURITY_TYPE_AGENTIC </param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
@@ -2172,7 +2172,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">ENDPOINT_SECURITY SECURITY_TYPE_AGENTIC </param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
@@ -2203,7 +2203,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">ENDPOINT_SECURITY SECURITY_TYPE_AGENTIC </param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
@@ -2233,7 +2233,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">ENDPOINT_SECURITY SECURITY_TYPE_AGENTIC </param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
@@ -2264,7 +2264,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">ENDPOINT_SECURITY SECURITY_TYPE_AGENTIC </param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
@@ -2295,7 +2295,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">ENDPOINT_SECURITY SECURITY_TYPE_AGENTIC </param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
@@ -2326,7 +2326,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">ENDPOINT_SECURITY SECURITY_TYPE_AGENTIC </param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
@@ -2357,7 +2357,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">ENDPOINT_SECURITY SECURITY_TYPE_AGENTIC </param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
@@ -2386,7 +2386,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">ENDPOINT_SECURITY SECURITY_TYPE_AGENTIC </param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
@@ -2415,7 +2415,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">ENDPOINT_SECURITY SECURITY_TYPE_AGENTIC </param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
@@ -2444,7 +2444,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ENDPOINT_SECURITY</param>
+                <param name="featureLabel">ENDPOINT_SECURITY SECURITY_TYPE_AGENTIC </param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">THREAT_PROTECTION</param>
