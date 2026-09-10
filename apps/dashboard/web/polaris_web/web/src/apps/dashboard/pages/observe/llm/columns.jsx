@@ -71,16 +71,17 @@ const leadIdCol = (headerName, field) => ({
     headerName,
     field,
     flex: 1,
-    minWidth: 260,
+    minWidth: 300,
     cellRenderer: IdCell,
     cellStyle: FLEX_CELL,
     ...NO_FILTER,
 });
 
-const idCol = (headerName, field) => ({
+const idCol = (headerName, field, width = 180) => ({
     headerName,
     field,
-    width: 180,
+    width,
+    minWidth: width,
     cellRenderer: IdCell,
     cellStyle: FLEX_CELL,
     ...NO_FILTER,
@@ -286,7 +287,7 @@ export const ARGUS_TRACE_COL_DEFS = [
     // },
     tokensCol,
     durationCol,
-    idCol("Session ID", "sessionIdentifier"),
+    idCol("Session ID", "sessionIdentifier", 300),
 ];
 
 // Messages table — flat span-level rows.
