@@ -96,7 +96,11 @@ public class ConsumerUtil {
         return new SingleTestPayload(testingRunId, testingRunResultSummaryId, apiInfoKey, subcategory, testLogs, accountId);
     }
 
-    public void runTestFromMessage(String message){
+    public void runTestFromMessage(String message, String recordId){
+        // Record the REAL worker thread here, on the worker thread itself - onSubmit only ever sees
+        // the pc-pool caller (always future.get(), never the actual work), so a stall dump jstack'd
+        // on that name is a dead end. This is the fix for that gap.
+        metrics.onWorkerStart(recordId, Thread.currentThread().getName());
         SingleTestPayload singleTestPayload = parseTestMessage(message);
         Context.accountId.set(singleTestPayload.getAccountId());
         ObjectId summaryId = singleTestPayload.getTestingRunResultSummaryId();
@@ -344,7 +348,7 @@ public class ConsumerUtil {
                     try {
                         if(!executor.isShutdown()){
                             metrics.onSubmit(recordId, threadName);
-                            Future<?> future = executor.submit(() -> runTestFromMessage(message));
+                            Future<?> future = executor.submit(() -> runTestFromMessage(message, recordId));
                             firstRecordRead.set(true);
                             try {
                                 future.get(maxRunTimeForTests, TimeUnit.SECONDS);

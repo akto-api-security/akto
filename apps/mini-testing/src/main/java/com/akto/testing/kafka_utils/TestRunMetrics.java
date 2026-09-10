@@ -80,11 +80,15 @@ public class TestRunMetrics {
     private static final class InflightTask {
         final String label;      // recordId (topic-partition-offset)
         final long startMs;
-        final String threadName;
-        InflightTask(String label, long startMs, String threadName) {
+        final String callerThreadName; // the pc-pool thread that submitted this task - always just
+                                        // blocked on future.get(), never the one doing the actual work.
+        // Set once the task actually starts running, from INSIDE runTestFromMessage on the real
+        // mini-test-worker thread - this is the name a stall dump needs to jstack, not callerThreadName.
+        volatile String workerThreadName;
+        InflightTask(String label, long startMs, String callerThreadName) {
             this.label = label;
             this.startMs = startMs;
-            this.threadName = threadName;
+            this.callerThreadName = callerThreadName;
         }
     }
 
@@ -159,6 +163,19 @@ public class TestRunMetrics {
     /** A task was submitted to the executor; start tracking it as in-flight. */
     public void onSubmit(String recordId, String threadName) {
         inflightTasks.put(recordId, new InflightTask(recordId, System.currentTimeMillis(), threadName));
+    }
+
+    /**
+     * Called from INSIDE runTestFromMessage, on the actual mini-test-worker thread executing this
+     * recordId - records the REAL worker name so a stall dump can jstack the thread that's really
+     * stuck, instead of the pc-pool caller (which only ever shows future.get(), never the real work).
+     * A no-op if the task already finished by the time this runs (rare race, harmless either way).
+     */
+    public void onWorkerStart(String recordId, String workerThreadName) {
+        InflightTask t = inflightTasks.get(recordId);
+        if (t != null) {
+            t.workerThreadName = workerThreadName;
+        }
     }
 
     /** A task finished (any outcome); stop tracking it and fold its wall-clock into the timing aggregates. */
@@ -408,8 +425,13 @@ public class TestRunMetrics {
         int limit = Math.min(STALL_DUMP_LIMIT, tasks.size());
         for (int i = 0; i < limit; i++) {
             InflightTask t = tasks.get(i);
+            // worker=<name> is the one to jstack - it's the thread actually doing the work.
+            // caller=<name> is the pc-pool thread that submitted it - always just future.get(), not
+            // useful to jstack, kept only for cross-checking against the "picked up record" log line.
+            String worker = t.workerThreadName != null ? t.workerThreadName : "not-started-yet";
             sb.append("{age=").append((nowMs - t.startMs) / 1000).append("s ")
-                    .append(t.label).append(" thread=").append(t.threadName).append("}");
+                    .append(t.label).append(" worker=").append(worker)
+                    .append(" caller=").append(t.callerThreadName).append("}");
             if (i < limit - 1) sb.append(", ");
         }
         sb.append("]");
