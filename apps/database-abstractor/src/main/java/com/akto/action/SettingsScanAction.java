@@ -29,6 +29,7 @@ public class SettingsScanAction extends ActionSupport {
     private static final String TOOL_CODEX = "codex";
     private static final String TOOL_CODEX_REQUIREMENTS = "codex_requirements";
     private static final String TOOL_COPILOT = "copilot";
+    private static final String TOOL_CLAUDE_DESKTOP = "claude_desktop";
 
     // ─── Shared base: rules, output schema, and message style used by every tool prompt ───
     private static final String BASE_SCAN_PROMPT = "You are a security analyst auditing an AI coding agent's config file for settings that weaken its permission model, sandbox, or approval flow. Use your own judgment: a field is a finding only if its actual value measurably increases what the agent can do without a human checking it, or exposes/reaches credentials and sensitive paths. The mere presence of a field, or a config that mentions credentials/paths/URLs, is NOT itself a finding — judge the value.\n" +
@@ -186,6 +187,14 @@ public class SettingsScanAction extends ActionSupport {
         if (settingsJson == null || settingsJson.isEmpty()) {
             addActionError("settingsJson is required");
             return Action.ERROR.toUpperCase();
+        }
+
+        // Claude Desktop misconfiguration scanning is temporarily disabled: always
+        // return zero findings for this tool, regardless of what the LLM would say.
+        if (TOOL_CLAUDE_DESKTOP.equals(tool)) {
+            logger.info("[SettingsScan] Skipping scan — tool=claude_desktop is disabled", LogDb.DB_ABS);
+            findings = new ArrayList<>();
+            return Action.SUCCESS.toUpperCase();
         }
 
         String prompt = resolvePrompt(tool);
