@@ -672,11 +672,11 @@ public class DbAction extends ActionSupport {
     public String bulkUpdateModuleInfo() {
         try {
             DbLayer.bulkUpdateModuleInfo(moduleInfoList);
-            TrafficCollectorAlert.checkOnHeartbeat(moduleInfoList);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in bulkUpdateModuleInfo " + e.toString());
             return Action.ERROR.toUpperCase();
         }
+        TrafficCollectorAlert.checkOnHeartbeat(moduleInfoList);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -705,11 +705,11 @@ public class DbAction extends ActionSupport {
             logEndpointShieldModuleIngest("updateModuleInfoForHeartbeatV2", moduleInfo);
             moduleInfo = DbLayer.updateModuleInfoForHeartbeatV2(moduleInfo);
             StiCountAlert.checkStiCount();
-            TrafficCollectorAlert.checkOnHeartbeat(Collections.singletonList(moduleInfo));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in updateModuleInfoForHeartbeat " + e.toString());
             return Action.ERROR.toUpperCase();
         }
+        TrafficCollectorAlert.checkOnHeartbeat(Collections.singletonList(moduleInfo));
         return Action.SUCCESS.toUpperCase();
     }
 
