@@ -844,9 +844,6 @@ function GithubServerTable(props) {
                 onSelectionChange={customSelectionChange}
                 headings={processedHeadings}
                 promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(bulkActionResources) : []}
-                // Overflow ("...") menu for bulk actions that shouldn't always sit alongside the
-                // promoted ones — Polaris recommends at most 2 promoted actions at once.
-                bulkActions={props.selectable ? props.bulkActions && props.bulkActions(bulkActionResources) : []}
                 hasZebraStriping={props.hasZebraStriping || false}
                 sortable={sortableColumns}
                 sortColumnIndex={activeColumnSort.columnIndex}

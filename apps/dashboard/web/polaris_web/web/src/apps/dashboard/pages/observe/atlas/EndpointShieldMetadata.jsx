@@ -324,31 +324,25 @@ function EndpointShieldMetadata() {
             onAction: bulkToggleSystemProxy(false),
         });
 
+        if (allowBulkActions) {
+            actions.push({
+                content: `Delete ${agentCount} agent info entr${agentCount > 1 ? "ies" : "y"}`,
+                onAction: async () => {
+                    const msg = `Are you sure you want to delete ${agentCount} agent info entr${agentCount > 1 ? "ies" : "y"}?`;
+                    func.showConfirmationModal(msg, "Delete", async () => {
+                        try {
+                            await settingRequests.deleteModuleInfo(selectedAgents);
+                            func.setToast(true, false, `${agentCount} agent info entr${agentCount > 1 ? "ies" : "y"} deleted successfully`);
+                            window.location.reload();
+                        } catch (error) {
+                            console.error("Error deleting agent info:", error);
+                            func.setToast(true, true, "Failed to delete agent info");
+                        }
+                    });
+                },
+            });
+        }
         return actions;
-    };
-
-    // Delete lives in the overflow ("...") menu rather than alongside the promoted actions above —
-    // Polaris recommends at most 2 promoted actions at once, and Delete is the akto.io-only,
-    // destructive one, so it doesn't need the same prominence as Enable/Disable.
-    const bulkActions = (selectedAgents) => {
-        if (!allowBulkActions) return [];
-        const agentCount = selectedAgents.length;
-        return [{
-            content: `Delete ${agentCount} agent info entr${agentCount > 1 ? "ies" : "y"}`,
-            onAction: async () => {
-                const msg = `Are you sure you want to delete ${agentCount} agent info entr${agentCount > 1 ? "ies" : "y"}?`;
-                func.showConfirmationModal(msg, "Delete", async () => {
-                    try {
-                        await settingRequests.deleteModuleInfo(selectedAgents);
-                        func.setToast(true, false, `${agentCount} agent info entr${agentCount > 1 ? "ies" : "y"} deleted successfully`);
-                        window.location.reload();
-                    } catch (error) {
-                        console.error("Error deleting agent info:", error);
-                        func.setToast(true, true, "Failed to delete agent info");
-                    }
-                });
-            },
-        }];
     };
 
     const handleRowClick = useCallback((agent) => {
@@ -402,7 +396,6 @@ function EndpointShieldMetadata() {
                         rowClickable={true}
                         selectable={true}
                         promotedBulkActions={promotedBulkActions}
-                        bulkActions={bulkActions}
                     />
                 ]}
             />
