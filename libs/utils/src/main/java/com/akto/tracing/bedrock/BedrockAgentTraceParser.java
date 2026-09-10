@@ -253,11 +253,17 @@ public class BedrockAgentTraceParser implements TraceParser {
             }
             edges.put(sourceService, new ServiceGraphEdgeInfo("User", sourceService, agentMetadata));
 
-            // LLM Call edge
-            Map<String, Object> llmMetadata = new HashMap<>();
-            llmMetadata.put("type", "llmCall");
-            llmMetadata.put("edgeParam", "Call to model");
-            edges.put(model, new ServiceGraphEdgeInfo(sourceService, model, llmMetadata));
+            // LLM Call edge. Skipped when the model is unknown: a gateway
+            // interceptor sees MCP tool traffic and never a model call, so it sends
+            // "model" empty to satisfy the validity check without naming something
+            // it cannot know. Keying an edge on "" would put a nameless node in the
+            // graph for every such request.
+            if (!model.isEmpty() && !model.equals("unknown")) {
+                Map<String, Object> llmMetadata = new HashMap<>();
+                llmMetadata.put("type", "llmCall");
+                llmMetadata.put("edgeParam", "Call to model");
+                edges.put(model, new ServiceGraphEdgeInfo(sourceService, model, llmMetadata));
+            }
 
             // Add tools edge for AgentCore
             if (agentType.equals(AGENT_TYPE_AGENTCORE)) {
