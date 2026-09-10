@@ -9,7 +9,7 @@ import {
     ModelsCell,
     SessionLinkCell,
     TimeCell,
-    TitleCell,
+    PreviewCell,
     TokensCell,
     TopicCell,
     UserCell,
@@ -55,13 +55,14 @@ const topicCol = (headerName, isTopic = true) => ({
     ...NO_FILTER,
 });
 
-// Prompt preview. Lists never use this — only the session flyout, which is gated by consent.
-const titleCol = (headerName) => ({
+// Prompt preview for admins, falling back to `idField` for everyone else.
+const previewCol = (headerName, idField) => ({
     headerName,
     field: "_promptText",
     flex: 1,
-    minWidth: 320,
-    cellRenderer: TitleCell,
+    minWidth: 340,
+    cellRenderer: PreviewCell,
+    cellRendererParams: { idField },
     cellStyle: FLEX_CELL,
     ...NO_FILTER,
 });
@@ -197,7 +198,7 @@ export const SESSION_COLUMN_DEFS = [
 export function getTraceColumnDefs({ showSession, onSessionClick } = {}) {
     return [
         timeCol("latestTimestamp"),
-        titleCol("Trace"),
+        previewCol("Trace", "traceId"),
         {
             headerName: "Application",
             field: "serviceId",
@@ -266,7 +267,7 @@ export const ARGUS_TRACE_COL_DEFS = [
         },
         ...NO_FILTER,
     },
-    leadIdCol("Trace", "traceId"),
+    previewCol("Trace", "traceId"),
     {
         headerName: "Application",
         field: "serviceId",
