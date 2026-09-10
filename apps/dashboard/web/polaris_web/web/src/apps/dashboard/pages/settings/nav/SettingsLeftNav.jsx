@@ -58,7 +58,7 @@ const SettingsLeftNav = () => {
         selected: page === "metrics",
         onClick: () => navigate("/dashboard/settings/metrics")
     }] : []
-    const hideBillingAndSelfHosted = String(window.ACTIVE_ACCOUNT) === '1786073624'
+    const hideBillingAndSelfHosted = String(window.ACTIVE_ACCOUNT) === '1786073624' && !window.USER_NAME?.toLowerCase()?.endsWith("@akto.io")
 
     const selfHostedArr = (window.IS_SAAS === 'true' && !hideBillingAndSelfHosted) ? [{
         label: 'Self hosted',
