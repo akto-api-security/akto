@@ -65,7 +65,7 @@ public class TestingRun {
     }
 
     public enum DashboardContext {
-        AGENTIC, API
+        API, MCP, GEN_AI, AGENTIC, DAST, ENDPOINT
     }
 
     public static final String DASHBOARD_CONTEXT = "dashboardContext";

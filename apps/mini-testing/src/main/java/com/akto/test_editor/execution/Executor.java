@@ -33,11 +33,11 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.OrgUtils;
-import com.akto.test_editor.utils.Utils;
+import com.akto.test_editor.Utils;
 import static com.akto.test_editor.Utils.createWebhookSiteToken;
 import static com.akto.test_editor.Utils.getSsrfWebhookServiceBase;
 import static com.akto.test_editor.Utils.sendRequestToWebhookService;
-import static com.akto.test_editor.utils.Utils.storeSsrfWebhookMapping;
+import static com.akto.test_editor.Utils.storeSsrfWebhookMapping;
 import com.akto.util.Constants;
 import com.akto.mcp.McpJsonRpcModel;
 import com.akto.mcp.McpRequestResponseUtils;
@@ -54,8 +54,8 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import com.mongodb.BasicDBObject;
-import static com.akto.test_editor.utils.Utils.bodyValuesUnchanged;
-import static com.akto.test_editor.utils.Utils.headerValuesUnchanged;
+import static com.akto.test_editor.Utils.bodyValuesUnchanged;
+import static com.akto.test_editor.Utils.headerValuesUnchanged;
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 
 import org.apache.commons.lang3.StringUtils;
@@ -280,7 +280,9 @@ public class Executor {
                         McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
 
                         requestAttempted = true;
+                        long sendStart = System.nanoTime();
                         testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                        TestPhaseTimer.addSendRequest(System.nanoTime() - sendStart);
                         requestSent = true;
                         ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                         res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);

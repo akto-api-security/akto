@@ -231,7 +231,11 @@ public class OriginalHttpRequest {
     }
 
     public String findProtocolFromHeader() {
-        return findHeaderValue("x-forwarded-proto");
+        String protocol = findHeaderValue("x-forwarded-proto");
+        if (protocol != null && !protocol.trim().isEmpty()) {
+            return protocol;
+        }
+        return findHeaderValue(":scheme");
     }
 
     public String getFullUrlIncludingDomain() throws Exception {

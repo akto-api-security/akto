@@ -1709,9 +1709,36 @@ public class ClientActor extends DataActor {
             case "LOGICAL_GROUP":
                 ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.LogicalGroupTestingEndpoint");
                 break;
+            case "REGEX":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.RegexTestingEndpoints");
+                break;
+            case "RISK_SCORE":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.RiskScoreTestingEndpoints");
+                break;
             default:
+                loggerMaker.errorAndAddToDb("unsupported testingEndpoints type " + type
+                        + ", testing run cannot be decoded by this module", LoggerMaker.LogDb.RUNTIME);
                 break;
         }
+    }
+
+    private void logTestingRunDecodeFailure(String apiName, Document testingRun, Exception e) {
+        String hexId = null;
+        String endpointsType = null;
+        Object dashboardContext = null;
+        if (testingRun != null) {
+            hexId = testingRun.getString("hexId");
+            dashboardContext = testingRun.get("dashboardContext");
+            Object endpoints = testingRun.get("testingEndpoints");
+            if (endpoints instanceof Document) {
+                endpointsType = ((Document) endpoints).getString("type");
+            }
+        }
+        loggerMaker.errorAndAddToDb("failed to decode testing run in " + apiName
+                + ", testingRunId: " + hexId
+                + ", testingEndpoints.type: " + endpointsType
+                + ", dashboardContext: " + dashboardContext
+                + ", error: " + e, LoggerMaker.LogDb.RUNTIME);
     }
 
     public TestingRun findPendingTestingRun(int delta, String miniTestingName) {
@@ -1727,9 +1754,14 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in findPendingTestingRun", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
+            Document testingRun = null;
             try {
                 Document doc = Document.parse(responsePayload);
-                Document testingRun = (Document) doc.get("testingRun");
+                testingRun = (Document) doc.get("testingRun");
+                if (testingRun == null) {
+                    // nothing pending, the common case for this once-per-second poll. stay quiet.
+                    return null;
+                }
                 Codec<TestingRun> apiInfoKeyCodec = codecRegistry.get(TestingRun.class);
                 String type = ((Document) testingRun.get("testingEndpoints")).getString("type");
                 fillTestingEndpointsType(type, testingRun);
@@ -1739,6 +1771,9 @@ public class ClientActor extends DataActor {
                 res.setId(new ObjectId(hexId));
                 return res;
             } catch(Exception e) {
+                // the run has already been marked RUNNING server side by the claim query, so a
+                // silent failure here leaves it stuck with nothing executing it.
+                logTestingRunDecodeFailure("findPendingTestingRun", testingRun, e);
                 return null;
             }
         } catch (Exception e) {
@@ -1821,9 +1856,10 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in findTestingRun", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
+            Document testingRun = null;
             try {
                 Document doc = Document.parse(responsePayload);
-                Document testingRun = (Document) doc.get("testingRun");
+                testingRun = (Document) doc.get("testingRun");
                 Codec<TestingRun> apiInfoKeyCodec = codecRegistry.get(TestingRun.class);
                 String type = ((Document) testingRun.get("testingEndpoints")).getString("type");
                 fillTestingEndpointsType(type, testingRun);
@@ -1833,6 +1869,7 @@ public class ClientActor extends DataActor {
                 res.setId(new ObjectId(hexId));
                 return res;
             } catch(Exception e) {
+                logTestingRunDecodeFailure("findTestingRun", testingRun, e);
                 return null;
             }
         } catch (Exception e) {
@@ -2226,6 +2263,8 @@ public class ClientActor extends DataActor {
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
+            loggerMaker.infoAndAddToDb("recordWebhookSendResult: callback for webhookId=" + webhookId
+                    + " statusCode=" + response.getStatusCode() + " responseBody=" + responsePayload, LoggerMaker.LogDb.RUNTIME);
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in recordWebhookSendResult", LoggerMaker.LogDb.RUNTIME);
                 return;
@@ -2587,6 +2626,31 @@ public class ClientActor extends DataActor {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in insertTestingRunResults" + e, LoggerMaker.LogDb.TESTING);
+            return;
+        }
+    }
+
+    public void bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunResultsForRecord", testingRunResults);
+        obj.put("rerunDeleteIds", rerunDeleteIds);
+        obj.put("doNotMarkIssuesAsFixed", doNotMarkIssuesAsFixed);
+        String objString = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkRecordTestingRunResults", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response == null) {
+                loggerMaker.errorAndAddToDb("null response (all retries failed) in bulkRecordTestingRunResults", LoggerMaker.LogDb.TESTING);
+                return;
+            }
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in bulkRecordTestingRunResults: status=" + response.getStatusCode() + " body=" + responsePayload, LoggerMaker.LogDb.TESTING);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in bulkRecordTestingRunResults" + e, LoggerMaker.LogDb.TESTING);
             return;
         }
     }
@@ -4301,7 +4365,11 @@ public class ClientActor extends DataActor {
             try {
                 payloadObj = BasicDBObject.parse(responsePayload);
                 BasicDBObject testScriptObj = (BasicDBObject) payloadObj.get("testScript");
-                testScript = objectMapper.readValue(testScriptObj.toJson(), TestScript.class);
+                // No script configured for this type is a normal, common outcome (most accounts
+                // don't set one) — not an error. Avoid NPE-ing on toJson() and don't log it.
+                if (testScriptObj != null) {
+                    testScript = objectMapper.readValue(testScriptObj.toJson(), TestScript.class);
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("error extracting response in fetchTestScript" + e, LoggerMaker.LogDb.RUNTIME);
             }

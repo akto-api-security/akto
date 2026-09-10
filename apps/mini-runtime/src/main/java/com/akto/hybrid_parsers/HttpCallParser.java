@@ -47,8 +47,6 @@ import com.akto.tracing.copilot.CopilotInventoryParser;
 import com.akto.tracing.n8n.N8nTraceParser;
 import com.akto.tracing.snowflake.SnowflakeTraceParser;
 import com.akto.tracing.bedrock.BedrockAgentTraceParser;
-import com.akto.dao.tracing.TraceDao;
-import com.akto.dao.tracing.SpanDao;
 import com.akto.usage.OrgUtils;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
@@ -87,6 +85,8 @@ public class HttpCallParser {
     public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
     private static final String NON_HOSTNAME_KEY = "null" + " "; // used for collections created without hostnames
 
+    private static final String AGENTIC_COLLECTION_PREFIX = "-agentic";
+
     private static final List<Integer> INPROCESS_ADVANCED_FILTERS_ACCOUNTS = Arrays.asList(1736798101, 1718042191, 1759692400);
     private DataActor dataActor = DataActorFactory.fetchInstance();
     private Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
@@ -122,6 +122,10 @@ public class HttpCallParser {
         List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta(true);
         for (ApiCollection apiCollection: apiCollections) {
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
+
+            if (apiCollection.getHostName() != null && !apiCollection.getHostName().isEmpty()) {
+                hostNameToIdMap.put(apiCollection.getHostName().toLowerCase().trim(), apiCollection.getId());
+            }
 
             // Initialize cache for service-tag collections with existing hostNames
             if (apiCollection.getServiceTag() != null) {
@@ -359,6 +363,7 @@ public class HttpCallParser {
                     && !source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)
                     && !source.equals(Constants.AI_AGENT_SOURCE_ENDPOINT)
                     && !source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK)
+                    && !source.equals(Constants.AI_AGENT_SOURCE_AWS_QUICK)
                     )) {
                 // Not AI agent traffic, return base hostname
                 return baseHostname;
@@ -393,7 +398,7 @@ public class HttpCallParser {
                 }
             }
 
-            if (source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK)){
+            if (source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK) || source.equals(Constants.AI_AGENT_SOURCE_AWS_QUICK)){
                 return botName;
             }
             // Reconstruct full hostname: bot-name.base-hostname
@@ -581,7 +586,8 @@ public class HttpCallParser {
         if (tagsMap == null) {
             return false;
         }
-        return Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+        return Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE))
+                || Constants.AI_AGENT_SOURCE_AWS_QUICK.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
     }
 
     private boolean isCopilotTrafficRaw(Map<String,String> tagsMap) {
@@ -1434,6 +1440,23 @@ public class HttpCallParser {
             hostName = hostName.toLowerCase();
             hostName = hostName.trim();
 
+            Optional<CollectionTags> mcpServerTagOpt = getMcpServerTag(httpResponseParam);
+            Optional<CollectionTags> ragTagOpt = mcpServerTagOpt.isPresent() ? Optional.empty() : getRagTag(httpResponseParam);
+            Optional<CollectionTags> genAiTagOpt = getGenAiTag(httpResponseParam);
+            boolean isAgenticEndpoint = mcpServerTagOpt.isPresent() || ragTagOpt.isPresent() || genAiTagOpt.isPresent();
+            String contextSource = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+            boolean isEndpointSource = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(contextSource);
+
+            String realHostName = hostName;
+
+            Integer realHostCollectionId = hostNameToIdMap.get(realHostName);
+            ApiCollection realHostCollection = realHostCollectionId != null ? apiCollectionsMap.get(realHostCollectionId) : null;
+
+            if (realHostCollection != null && !hasAtlasOrArgusTag(realHostCollection)
+                    && isAgenticEndpoint && !isEndpointSource) {
+                hostName = hostName + AGENTIC_COLLECTION_PREFIX;
+            }
+
             String key = hostName;
             boolean ismcpServer = false;
 
@@ -1445,24 +1468,19 @@ public class HttpCallParser {
             } else {
                 int id = hostName.hashCode();
 
-                Optional<CollectionTags> mcpServerTagOpt = getMcpServerTag(httpResponseParam);
                 if (mcpServerTagOpt.isPresent()) {
                     if (tagList == null) {
                         tagList = new ArrayList<>();
                     }
                     tagList.add(mcpServerTagOpt.get());
                     ismcpServer = true;
-                } else {
-                    Optional<CollectionTags> ragTagOpt = getRagTag(httpResponseParam);
-                    if (ragTagOpt.isPresent()) {
-                        if (tagList == null) {
-                            tagList = new ArrayList<>();
-                        }
-                        tagList.add(ragTagOpt.get());
+                } else if (ragTagOpt.isPresent()) {
+                    if (tagList == null) {
+                        tagList = new ArrayList<>();
                     }
+                    tagList.add(ragTagOpt.get());
                 }
 
-                Optional<CollectionTags> genAiTagOpt = getGenAiTag(httpResponseParam);
                 if (genAiTagOpt.isPresent()) {
                     if (tagList == null) {
                         tagList = new ArrayList<>();
@@ -1485,7 +1503,7 @@ public class HttpCallParser {
                         try {
                             auditInfo = new McpAuditInfo(
                                 Context.now(), "", AKTO_MCP_SERVER_TAG, 0,
-                                hostName, "", null,
+                                realHostName, "", null,
                                 apiCollectionId,
                                 null
                             );
@@ -2025,26 +2043,66 @@ public class HttpCallParser {
         return deviceUserMapCache;
     }
 
-    private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {
-        if (McpRequestResponseUtils.isMcpRequest(responseParams).getFirst()) {
-            return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES));
+    private boolean hasAtlasOrArgusTag(ApiCollection collection) {
+        List<CollectionTags> existingTags = collection.getTagsList();
+        if (existingTags == null) {
+            return false;
         }
-        return Optional.empty();
+        for (CollectionTags tag : existingTags) {
+            if (Constants.AKTO_MCP_SERVER_TAG.equals(tag.getKeyName())
+                    || Constants.AKTO_GEN_AI_TAG.equals(tag.getKeyName())) {
+                return true;
+            }
+            if (Constants.AI_AGENT_TAG_SOURCE.equals(tag.getKeyName())
+                    && Constants.AI_AGENT_SOURCE_ENDPOINT.equals(tag.getValue())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isAgenticTaggingAllowed(HttpResponseParams responseParams) {
+        Map<String, String> tagsMap = parseTagsMap(responseParams.getTags());
+        String source = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+        if (Constants.AI_AGENT_SOURCE_ENDPOINT.equals(source)) {
+            return true;
+        }
+
+        return UsageMetricUtils.isFeatureAccessGranted(Context.getActualAccountId(), "SECURITY_TYPE_AGENTIC");
+    }
+
+    private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {
+        if (!McpRequestResponseUtils.isMcpRequest(responseParams).getFirst()) {
+            return Optional.empty();
+        }
+        if (!isAgenticTaggingAllowed(responseParams)) {
+            loggerMaker.infoAndAddToDb("Agentic tagging not allowed for request: " + responseParams.getRequestParams().getURL());
+            return Optional.empty();
+        }
+        return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES));
     }
 
     private Optional<CollectionTags> getRagTag(HttpResponseParams responseParams) {
-        if (RagDetector.isRagRequest(responseParams)) {
-            return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_RAG_DATABASE_TAG, "RAG Database", TagSource.KUBERNETES));
+        if (!RagDetector.isRagRequest(responseParams)) {
+            return Optional.empty();
         }
-        return Optional.empty();
+        if (!isAgenticTaggingAllowed(responseParams)) {
+            loggerMaker.infoAndAddToDb("Agentic tagging not allowed for request: " + responseParams.getRequestParams().getURL());
+            return Optional.empty();
+        }
+        return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_RAG_DATABASE_TAG, "RAG Database", TagSource.KUBERNETES));
     }
 
     private Optional<CollectionTags> getGenAiTag(HttpResponseParams responseParams) {
         Pair<Boolean, String> llmCollectionTag = GenAiCollectionUtils.checkAndTagLLMCollection(responseParams);
-        if (llmCollectionTag.getFirst()) {
-            return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_GEN_AI_TAG, llmCollectionTag.getSecond(), TagSource.KUBERNETES));
+        if (!llmCollectionTag.getFirst()) {
+            return Optional.empty();
         }
-        return Optional.empty();
+        if (!isAgenticTaggingAllowed(responseParams)) {
+            loggerMaker.infoAndAddToDb("Agentic tagging not allowed for request: " + responseParams.getRequestParams().getURL());
+            return Optional.empty();
+        }
+        return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_GEN_AI_TAG, llmCollectionTag.getSecond(), TagSource.KUBERNETES));
     }
 
     private SyncLimit fetchSyncLimit(Organization organization, MetricTypes metricType) {

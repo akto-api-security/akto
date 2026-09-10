@@ -25,6 +25,8 @@ public class BedrockAgentTraceParser implements TraceParser {
     private static final String FIELD_HARNESS_ROLE = "harness-execution-role";
     private static final String FIELD_RUNTIME_ROLE = "runtime-execution-role";
     private static final String FIELD_BEDROCK_ROLE = "bedrock-execution-role";
+    private static final String FIELD_BEDROCK_POLICIES = "bedrock-role-policies";
+    private static final String FIELD_HARNESS_POLICIES = "harness-role-policies";
 
     // CloudWatch's trace data has no structured success/failure field for a tool
     // result — only free-text. These are the phrasings actually observed across real
@@ -81,12 +83,42 @@ public class BedrockAgentTraceParser implements TraceParser {
         return AGENT_TYPE_BEDROCK;
     }
 
+    // AWS sends all three keys and blanks the ones that don't apply, so presence alone
+    // isn't enough — take the first field that actually carries a value.
     private String extractExecutionRoleValue(JsonNode awsMetadata) {
-        String field = awsMetadata.has(FIELD_HARNESS_ROLE) ? FIELD_HARNESS_ROLE
-            : awsMetadata.has(FIELD_RUNTIME_ROLE) ? FIELD_RUNTIME_ROLE
-            : FIELD_BEDROCK_ROLE;
-        String value = awsMetadata.path(field).asText("");
-        return value.isEmpty() ? "unknown" : value;
+        for (String field : new String[]{FIELD_HARNESS_ROLE, FIELD_RUNTIME_ROLE, FIELD_BEDROCK_ROLE}) {
+            String value = awsMetadata.path(field).asText("").trim();
+            if (!value.isEmpty()) {
+                return value;
+            }
+        }
+        return "unknown";
+    }
+
+    /**
+     * AWS sends the attached policies as one comma-separated string. It's stored split, as
+     * metadata.policies = ["policy1", "policy2"] — a BSON array, so a consumer can count them
+     * or render one per line without re-parsing the string.
+     */
+    private List<String> extractRolePolicies(JsonNode awsMetadata) {
+        for (String field : new String[]{FIELD_HARNESS_POLICIES, FIELD_BEDROCK_POLICIES}) {
+            String raw = awsMetadata.path(field).asText("").trim();
+            if (raw.isEmpty()) {
+                continue;
+            }
+
+            List<String> policies = new ArrayList<>();
+            for (String part : raw.split(",")) {
+                String policy = part.trim();
+                if (!policy.isEmpty()) {
+                    policies.add(policy);
+                }
+            }
+            if (!policies.isEmpty()) {
+                return policies;
+            }
+        }
+        return Collections.emptyList();
     }
 
     @Override
@@ -185,7 +217,6 @@ public class BedrockAgentTraceParser implements TraceParser {
         return extractServiceGraph(input, null, null, null);
     }
 
-    /** @param botName see {@link #parse(Object, String)}. */
     public Map<String, ServiceGraphEdgeInfo> extractServiceGraph(Object input, String botName) throws Exception {
         return extractServiceGraph(input, botName, null, null);
     }
@@ -212,17 +243,25 @@ public class BedrockAgentTraceParser implements TraceParser {
             // Extract model edge
             String model = awsMetadata.path("model").asText("unknown");
             String executionRole = extractExecutionRoleValue(awsMetadata);
+            List<String> rolePolicies = extractRolePolicies(awsMetadata);
 
+            // Node identity is the bot name alone; the role and its policies live in the edge
+            // metadata below. The map key IS the node id, so folding text that changes (a policy
+            // attached to the role, a reordered list) into the name forks a second node for the
+            // same agent, and the merge in ServiceGraphBuilder never removes the old one.
             String sourceService = extractBotName(botName);
 
-            // The agent node is only ever a source below, never a target — without an
-            // edge that targets it, the UI has no "type" for it and defaults to
-            // "Internal Service" (see buildServiceGraphFromSpans in HttpCallParser for
-            // the same pattern used by Copilot/Snowflake).
+            // Keyed and targeted by the same name — the "User -> agent" edge is what gives the
+            // node its "AI Agent" type; a node that is only ever a source has no type and the UI
+            // falls back to "Internal Service" (same pattern as buildServiceGraphFromSpans in
+            // HttpCallParser, used by Copilot/Snowflake).
             Map<String, Object> agentMetadata = new HashMap<>();
             agentMetadata.put("type", TracingConstants.SpanKind.AGENT);
             agentMetadata.put("edgeParam", "AI Agent");
             agentMetadata.put("role", executionRole);
+            if (!rolePolicies.isEmpty()) {
+                agentMetadata.put("policies", rolePolicies);
+            }
 
             // Only known when both tags are present — a gateway node with no role to show
             // isn't worth splicing in, so fall back to the plain User -> Agent edge.
@@ -239,10 +278,12 @@ public class BedrockAgentTraceParser implements TraceParser {
                 edges.put(sourceService, new ServiceGraphEdgeInfo("User", sourceService, agentMetadata));
             }
 
-            // LLM Call edge — "model" is present-but-empty (not absent) for pure tool-routing
-            // calls like a Gateway MCP passthrough, where no foundation model was ever invoked;
-            // an empty key would otherwise create a blank, nameless node in the graph.
-            if (!model.isEmpty()) {
+            // LLM Call edge. Skipped when the model is unknown: a gateway
+            // interceptor sees MCP tool traffic and never a model call, so it sends
+            // "model" empty to satisfy the validity check without naming something
+            // it cannot know. Keying an edge on "" would put a nameless node in the
+            // graph for every such request.
+            if (!model.isEmpty() && !model.equals("unknown")) {
                 Map<String, Object> llmMetadata = new HashMap<>();
                 llmMetadata.put("type", "llmCall");
                 llmMetadata.put("edgeParam", "Call to model");

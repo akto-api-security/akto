@@ -41,11 +41,30 @@ public class Constants {
     }
     public static final String TEST_RESULTS_TOPIC_NAME = withTopicPrefix("akto.test.messages");
     public static final String AKTO_KAFKA_GROUP_ID_CONFIG = withTopicPrefix("testing-group");
+
+    public static final boolean CONCURRENT_TESTING = (StringUtils.hasLength(System.getenv("CONCURRENT_TESTING")) && System.getenv("CONCURRENT_TESTING").equals("true"));
+
+    public static String getTestResultsTopicName(String runIdentifier) {
+        if (CONCURRENT_TESTING && runIdentifier != null && !runIdentifier.isEmpty()) {
+            return withTopicPrefix(runIdentifier + ".akto.test.messages");
+        }
+        return TEST_RESULTS_TOPIC_NAME;
+    }
+
+    public static String getKafkaGroupIdConfig(String runIdentifier) {
+        if (CONCURRENT_TESTING && runIdentifier != null && !runIdentifier.isEmpty()) {
+            return withTopicPrefix(runIdentifier + ".testing-group");
+        }
+        return AKTO_KAFKA_GROUP_ID_CONFIG;
+    }
     public static final int AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG = 1; // read one message at a time
     public static final String TESTING_STATE_FOLDER_PATH = System.getenv("TESTING_STATE_FOLDER_PATH") != null ? System.getenv("TESTING_STATE_FOLDER_PATH") : "testing-info";
     public static final String TESTING_STATE_FILE_NAME = "testing-state.json";
     public static final boolean IS_NEW_TESTING_ENABLED = (StringUtils.hasLength(System.getenv("NEW_TESTING_ENABLED")) && System.getenv("NEW_TESTING_ENABLED").equals("true"));
     public static final boolean KAFKA_DEBUG_MODE = (StringUtils.hasLength(System.getenv("KAFKA_DEBUG_MODE")) && System.getenv("KAFKA_DEBUG_MODE").equals("true"));
+    // RCA flag: when true, mini-testing skips the insertResultsAndMakeIssues() DB write entirely (result + issue
+    // creation are not persisted) so the per-test cost/throughput of everything BUT that I/O can be isolated.
+    public static final boolean SKIP_INSERT_TEST_RESULTS = (StringUtils.hasLength(System.getenv("SKIP_INSERT_TEST_RESULTS")) && System.getenv("SKIP_INSERT_TEST_RESULTS").equals("true"));
     public static final int MAX_REQUEST_TIMEOUT = StringUtils.hasLength(System.getenv("MAX_REQUEST_TIMEOUT")) ? Integer.parseInt(System.getenv("MAX_REQUEST_TIMEOUT")) : 15000;
     public static final int LINGER_MS_KAFKA = StringUtils.hasLength(System.getenv("LINGER_MS_KAFKA")) ?  Integer.parseInt(System.getenv("LINGER_MS_KAFKA")) : 5000;
     public static final int MAX_POLL_INTERVAL_MS = StringUtils.hasLength(System.getenv("MAX_POLL_INTERVAL_MS")) ? Integer.parseInt(System.getenv("MAX_POLL_INTERVAL_MS")) : 300000;
@@ -90,6 +109,7 @@ public class Constants {
     public static final String AI_AGENT_SOURCE_ARCADE_DEV = "ARCADE_DEV";
     public static final String AI_AGENT_SOURCE_MICROSOFT_DEFENDER = "DEFENDER";
     public static final String AI_AGENT_SOURCE_AWS_BEDROCK="AWS_BEDROCK";
+    public static final String AI_AGENT_SOURCE_AWS_QUICK="AWS_QUICK";
     public static final String AI_AGENT_SOURCE_ENDPOINT = "ENDPOINT";
     public static final String AI_AGENT_TAG_BOT_NAME = "bot-name";
     public static final String AI_AGENT_TAG_BOT_SCHEMA_NAME = "bot-schemaname";

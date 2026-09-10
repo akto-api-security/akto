@@ -48,9 +48,10 @@ public class TestRunMetrics {
 
     /**
      * Pipeline stages timed per test. LOOKUP is config/sample resolution; RUN_TEST is the full
-     * {@code runTestNew} wall (the bulk of a test's cost).
+     * {@code runTestNew} wall; SEND_REQUEST is the slice of it spent hitting the API under test;
+     * INSERT_RESULTS is the ultron result-write round-trip.
      */
-    public enum Stage { LOOKUP, RUN_TEST }
+    public enum Stage { LOOKUP, RUN_TEST, SEND_REQUEST, INSERT_RESULTS }
 
     /** WARN-level progress + cost heartbeat cadence. */
     private static final long HEARTBEAT_INTERVAL_MS = 60_000L;
@@ -62,6 +63,12 @@ public class TestRunMetrics {
     private static final int STALL_DUMP_LIMIT = 15;
     /** A slot is "stuck" if a single task has held it at least this long (live capacity-waste signal). */
     private static final long STUCK_AGE_MS = 60_000L;
+    /**
+     * slotsClogged fires once at least 1/STALL_CLOGGED_DIVISOR of the pool is stuck. Was 2 (half the pool) —
+     * too high to catch chronic partial degradation (observed stuckSlots plateauing around 35-40% of pool
+     * while still limping forward, never freezing and never reaching 50%, so STALL never fired). Lowered to 3.
+     */
+    private static final int STALL_CLOGGED_DIVISOR = 3;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestRunMetrics.class, LogDb.TESTING);
 
@@ -244,11 +251,11 @@ public class TestRunMetrics {
 
         // Two independent stall triggers, sharing the spam guard + dump:
         //   1. progress frozen  -> aggregate processed hasn't moved for STALL_THRESHOLD_MS (total hang)
-        //   2. slots clogged    -> half+ the pool is tied up in tasks older than STUCK_AGE_MS (partial starvation)
+        //   2. slots clogged    -> STALL_CLOGGED_FRACTION+ of the pool is tied up in tasks older than STUCK_AGE_MS (partial starvation)
         int pool = poolSize();
         long stuck = inflightAgeStats()[0];
         boolean progressFrozen = !inflightTasks.isEmpty() && (nowMs - lastProgressMs) >= STALL_THRESHOLD_MS;
-        boolean slotsClogged = pool > 0 && stuck >= (pool / 2);
+        boolean slotsClogged = pool > 0 && stuck * STALL_CLOGGED_DIVISOR >= pool;
         if ((progressFrozen || slotsClogged) && (nowMs - lastStallLogMs) >= STALL_LOG_INTERVAL_MS) {
             lastStallLogMs = nowMs;
             String reason = progressFrozen
@@ -334,16 +341,22 @@ public class TestRunMetrics {
 
         long lookup   = stageNanos.get(Stage.LOOKUP).sum();
         long runTest  = stageNanos.get(Stage.RUN_TEST).sum();
+        long sendReq  = stageNanos.get(Stage.SEND_REQUEST).sum();
+        long insertRt = stageNanos.get(Stage.INSERT_RESULTS).sum();
         long runCpu   = runTestCpuNanos.sum();
-        long billed   = lookup + runTest;
+        long other    = Math.max(0, runTest - sendReq);   // RUN_TEST minus target-API send = compute/setup
+        long billed   = lookup + runTest + insertRt;
 
-        long avgWallMs = ms(runTest + lookup) / n;
+        long avgWallMs = ms(runTest + lookup + insertRt) / n;
         loggerMaker.warnAndAddToDb("TESTRUN COST summaryId=" + summaryId
                 + " n=" + n
                 + " avgPerTestMs=" + avgWallMs
                 + " cpuPerTestMs=" + msPer(runCpu, n)
                 + " | RUN_TEST=" + msPer(runTest, n) + "ms (" + pctOf(runTest, billed) + " of billed)"
-                + " LOOKUP=" + msPer(lookup, n) + "ms");
+                + " [SEND_REQUEST=" + msPer(sendReq, n) + "ms/" + pctOf(sendReq, runTest)
+                + " | OTHER=" + msPer(other, n) + "ms/" + pctOf(other, runTest) + "]"
+                + " LOOKUP=" + msPer(lookup, n) + "ms"
+                + " INSERT_RESULTS=" + msPer(insertRt, n) + "ms/" + pctOf(insertRt, billed) + " of billed");
     }
 
     private static long ms(long nanos) { return nanos / 1_000_000L; }

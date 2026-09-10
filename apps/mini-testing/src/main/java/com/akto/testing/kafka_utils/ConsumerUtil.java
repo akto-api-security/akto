@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -34,6 +35,7 @@ import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.test_editor.execution.TestPhaseTimer;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
 import com.akto.testing.kafka_utils.TestRunMetrics.Stage;
@@ -64,7 +66,13 @@ public class ConsumerUtil {
     }
     private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null;
 
-    public static ExecutorService executor = Executors.newFixedThreadPool(150);
+    // Named so diagnose.sh's jstack-based worker classifier (which keys off "mini-test-worker") can
+    // actually find these threads - the default Executors thread factory names them "pool-N-thread-M".
+    private static final AtomicInteger workerThreadCounter = new AtomicInteger();
+    private static final ThreadFactory workerThreadFactory =
+            r -> new Thread(r, "mini-test-worker-" + workerThreadCounter.incrementAndGet());
+
+    public static ExecutorService executor = Executors.newFixedThreadPool(150, workerThreadFactory);
     private static final int maxRunTimeForTests = 5 * 60;
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
@@ -119,6 +127,7 @@ public class ConsumerUtil {
 
                 // RUN_TEST wall + CPU. Recorded in a finally so a test that times out / throws still
                 // gets its timing counted once it unwinds (else COST only ever sees fast completers).
+                TestPhaseTimer.reset();
                 long runCpuStart = CPU_TIME_SUPPORTED ? THREAD_MX.getCurrentThreadCpuTime() : -1L;
                 long runWallStart = System.nanoTime();
                 TestingRunResult runResult;
@@ -126,11 +135,16 @@ public class ConsumerUtil {
                     runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
                 } finally {
                     metrics.recordStage(Stage.RUN_TEST, System.nanoTime() - runWallStart);
+                    metrics.recordStage(Stage.SEND_REQUEST, TestPhaseTimer.sendReqNanos());
                     if (runCpuStart >= 0) metrics.recordRunTestCpu(THREAD_MX.getCurrentThreadCpuTime() - runCpuStart);
                 }
 
                 executor.persistTestLogsToDb(runResult != null ? runResult.getTestLogs() : null);
-                executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+                long insertStart = System.nanoTime();
+                if (!Constants.SKIP_INSERT_TEST_RESULTS) {
+                    executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+                }
+                metrics.recordStage(Stage.INSERT_RESULTS, System.nanoTime() - insertStart);
 
                 if (runResult != null && runResult.isVulnerable()) {
                     metrics.markVulnerable();
@@ -171,7 +185,9 @@ public class ConsumerUtil {
             String testSubType = testConfig.getInfo().getSubCategory();
 
             TestingRunResult runResult = Utils.generateFailedRunResultForMessage(singleTestPayload.getTestingRunId(), singleTestPayload.getApiInfoKey(), testSuperType, testSubType, singleTestPayload.getTestingRunResultSummaryId(), new ArrayList<>(),  TestError.TEST_TIMED_OUT.getMessage());
-            testExecutor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+            if (!Constants.SKIP_INSERT_TEST_RESULTS) {
+                testExecutor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+            }
         } catch (Exception e) {
             String errMsg = "createTimedOutResultFromMessage failed"
                     + (singleTestPayload != null
@@ -228,7 +244,7 @@ public class ConsumerUtil {
         TestingConfigurations instance = TestingConfigurations.getInstance();
         int concurrency = instance.getMaxConcurrentRequest();
         shutdownExecutorQuietly(5, true);
-        executor = Executors.newFixedThreadPool(concurrency);
+        executor = Executors.newFixedThreadPool(concurrency, workerThreadFactory);
 
         final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
         int startTime = Context.now();
@@ -295,7 +311,13 @@ public class ConsumerUtil {
                         loggerMaker.warnAndAddToDb("Error closing previous kafka consumer: " + e.getMessage());
                     }
                 }
-                consumer = new KafkaConsumer<>(properties);
+                Properties consumerProperties = properties;
+                if (Constants.CONCURRENT_TESTING) {
+                    consumerProperties = new Properties();
+                    consumerProperties.putAll(properties);
+                    consumerProperties.put(ConsumerConfig.GROUP_ID_CONFIG, Constants.getKafkaGroupIdConfig(summaryIdForTest));
+                }
+                consumer = new KafkaConsumer<>(consumerProperties);
                 ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
                     .consumer(consumer)
                     .ordering(ParallelConsumerOptions.ProcessingOrder.UNORDERED)
@@ -305,7 +327,7 @@ public class ConsumerUtil {
                     .maxFailureHistory(3)
                     .build();
                 parallelConsumer = ParallelStreamProcessor.createEosStreamProcessor(options);
-                parallelConsumer.subscribe(Arrays.asList(Constants.TEST_RESULTS_TOPIC_NAME));
+                parallelConsumer.subscribe(Arrays.asList(Constants.getTestResultsTopicName(summaryIdForTest)));
                 metrics.logConsumerUp(consumerAttempt);
 
                 parallelConsumer.poll(record -> {
@@ -457,7 +479,7 @@ public class ConsumerUtil {
                     loggerMaker.errorAndAddToDb(e,"Error closing kafka consumer: " + e.getMessage());
                 }
             }
-            Producer.deleteTestResultsTopic();
+            Producer.deleteTestResultsTopic(summaryIdForTest);
             TestingStateStore.clear();
         }
     }

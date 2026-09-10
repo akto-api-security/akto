@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 
 import com.akto.dao.TestingRunWebhookDao;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.TestingRunWebhook;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
@@ -922,6 +923,38 @@ public class Utils {
 
     public static ExecutorSingleOperationResp sendRequestToSsrfServer(String requestUrl, String redirectUrl, String tokenVal) {
         return sendRequestToWebhookService(requestUrl, redirectUrl, tokenVal);
+    }
+
+    /**
+     * Persist webhook UUID → test run context for dashboard correlation.
+     * Uses DataActor so the insert goes through the configured layer (e.g. HTTP to backend or local TestingRunWebhookDao).
+     */
+    public static void storeSsrfWebhookMapping(String uuid, Map<String, Object> varMap) {
+        try {
+            Integer accountId = (Integer) varMap.get("accountId");
+            String apiInfoKeyStr = (String) varMap.get("apiInfoKey");
+            String testSubType = (String) varMap.get("testSubType");
+            if (accountId == null || apiInfoKeyStr == null || testSubType == null) {
+                return;
+            }
+            String testRunIdStr = (String) varMap.get("testRunId");
+            String testRunResultSummaryIdStr = (String) varMap.get("testRunResultSummaryId");
+            ObjectId runId = (testRunIdStr != null && !testRunIdStr.isEmpty() && ObjectId.isValid(testRunIdStr))
+                    ? new ObjectId(testRunIdStr) : null;
+            ObjectId summaryId = (testRunResultSummaryIdStr != null && !testRunResultSummaryIdStr.isEmpty() && ObjectId.isValid(testRunResultSummaryIdStr))
+                    ? new ObjectId(testRunResultSummaryIdStr) : null;
+            TestingRunWebhook mapping = new TestingRunWebhook(
+                    uuid,
+                    accountId,
+                    runId,
+                    summaryId,
+                    apiInfoKeyStr,
+                    testSubType,
+                    Context.now()
+            );
+            DataActorFactory.fetchInstance().storeTestingRunWebhook(mapping);
+        } catch (Exception ignored) {
+        }
     }
 
     public static ApiAccessType getApiAccessTypeFromString(String apiAccessType){

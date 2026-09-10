@@ -15,6 +15,8 @@ import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.notifications.data.TestingAlertData;
 import com.akto.notifications.teams.TeamsAlert;
+import com.akto.runtime.utils.Utils;
+import com.akto.testing.ApiExecutor;
 import com.akto.util.enums.GlobalEnums;
 
 import java.util.ArrayList;
@@ -181,6 +183,10 @@ public class TestCompletion {
                         webhook.getMethod().toString(), payload, headers, "");
                 try {
                     response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+                    loggerMaker.infoAndAddToDb("sendTeamsAlertIfNeeded: webhook callback for webhookId=" + webhook.getId()
+                            + " url=" + webhook.getUrl()
+                            + " statusCode=" + (response != null ? response.getStatusCode() : "null")
+                            + " responseBody=" + (response != null ? response.getBody() : "null"), LogDb.TESTING);
                     if (response == null || response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
                         String statusCode = response == null ? "null" : String.valueOf(response.getStatusCode());
                         errors.add("Webhook endpoint returned non-2xx status: " + statusCode);
@@ -189,7 +195,11 @@ public class TestCompletion {
                     loggerMaker.errorAndAddToDb(e, "sendTeamsAlertIfNeeded: ApiExecutor.sendRequest threw for url=" + webhook.getUrl());
                     errors.add("API execution failed: " + e.getMessage());
                 }
-                message = "url=" + webhook.getUrl() + ", statusCode=" + (response != null ? response.getStatusCode() : "null");
+                try {
+                    message = Utils.convertOriginalReqRespToString(request, response);
+                } catch (Exception e) {
+                    errors.add("Failed converting sample data: " + e.getMessage());
+                }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "sendTeamsAlertIfNeeded: error building/sending Teams alert");
                 errors.add("Error building/sending Teams alert: " + e.getMessage());

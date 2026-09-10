@@ -1,6 +1,7 @@
 package com.akto.dto;
 
 import com.akto.dto.settings.DefaultPayload;
+import com.akto.dto.settings.DetectionCorrectorSettings;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -137,6 +138,22 @@ public class AccountSettings {
 
     // Used by mini-runtime to send to threat topic.
     public static final String THREAT_KAFKA_PARTITION_KEY = "threatKafkaPartitionKey";
+
+    /*
+     * External detection corrector. Local detection can tell that a value looks like an email or a
+     * card; it cannot tell whose it is, because that lives in a system outside Akto. Grouped into
+     * its own object - it is one optional feature and does not need a dozen fields at this level.
+     */
+    public static final String DETECTION_CORRECTOR = "detectionCorrector";
+    private DetectionCorrectorSettings detectionCorrector;
+
+    public DetectionCorrectorSettings getDetectionCorrector() {
+        return detectionCorrector;
+    }
+
+    public void setDetectionCorrector(DetectionCorrectorSettings detectionCorrector) {
+        this.detectionCorrector = detectionCorrector;
+    }
     private ThreatKafkaPartitionKey threatKafkaPartitionKey;
 
     public enum ThreatKafkaPartitionKey {
