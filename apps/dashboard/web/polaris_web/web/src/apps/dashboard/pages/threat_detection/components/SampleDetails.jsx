@@ -605,6 +605,9 @@ function SampleDetails(props) {
             if (sessionLoading || isSessionBased || !isAgenticSecurityCategory() || !host || !anchorTimestamp) {
                 return;
             }
+            if(window?.ACTIVE_ACCOUNT !== 1703087742){
+                return;
+            }
             setContextWindowLoading(true);
             threatDetectionApi.fetchContextMessages(host, anchorTimestamp)
                 .then((resp) => {
@@ -877,7 +880,7 @@ function SampleDetails(props) {
                         </>
                     )}
 
-                    {!isSessionBased && isAgenticSecurityCategory() && (contextWindowLoading || contextWindow) ? (
+                    {!isSessionBased && isAgenticSecurityCategory() && (window?.ACTIVE_ACCOUNT ===1703087742) && (contextWindowLoading || contextWindow) ? (
                         <>
                             <Divider />
                             {contextWindowLoading && (
