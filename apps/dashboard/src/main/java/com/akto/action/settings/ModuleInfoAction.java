@@ -1,5 +1,6 @@
 package com.akto.action.settings;
 
+import com.akto.action.AgenticObserveAction;
 import com.akto.action.UserAction;
 import com.akto.dao.AgentUsersDao;
 import com.akto.dao.context.Context;
@@ -549,6 +550,7 @@ public class ModuleInfoAction extends UserAction {
         String identityUserName = AgentUsersDao.instance.ensureDashboardIdentity(username, userEmail, getSUser().getLogin());
         AgentUsersDao.instance.mergeDeviceTags(identityUserName, DeviceTag.SOURCE_MANUAL,
                 tags != null ? tags : Collections.emptyMap(), getSUser().getLogin());
+        AgenticObserveAction.invalidateTagsByUsernameCache();
         return SUCCESS.toUpperCase();
     }
 
@@ -564,6 +566,7 @@ public class ModuleInfoAction extends UserAction {
             String identityUserName = AgentUsersDao.instance.ensureDashboardIdentity(u, null, updatedBy);
             AgentUsersDao.instance.mergeDeviceTags(identityUserName, DeviceTag.SOURCE_MANUAL, tagsToApply, updatedBy);
         }
+        AgenticObserveAction.invalidateTagsByUsernameCache();
         return SUCCESS.toUpperCase();
     }
 
