@@ -351,6 +351,13 @@ const threatDetectionRequests = {
             data: { sessionId }
         })
     },
+    fetchContextMessages(host, timestamp) {
+        return request({
+            url: '/api/fetchContextMessages',
+            method: 'post',
+            data: { host, timestamp }
+        })
+    },
     fetchGuardrailLatency(startTs, endTs) {
         return request({
             url: '/api/metrics',
