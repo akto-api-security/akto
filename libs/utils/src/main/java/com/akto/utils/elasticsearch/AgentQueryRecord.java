@@ -3,6 +3,7 @@ package com.akto.utils.elasticsearch;
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.billing.Organization;
+import com.akto.log.LoggerMaker;
 import com.akto.usage.OrgUtils;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
@@ -56,6 +57,10 @@ public class AgentQueryRecord {
 
     private static final String SESSIONS_PATH_SEGMENT = "sessions";
     private static final String EVENTS_PATH_SEGMENT   = "events";
+
+    private static final int URL_SESSION_ACCOUNT_ID = 1785654409;
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AgentQueryRecord.class);
 
     private static final int ATLAS_SESSION_TTL = Constants.ONE_DAY_TIMESTAMP;
     private static final Map<String, Integer> ATLAS_SESSION_LAST_SEEN = new ConcurrentHashMap<>();
@@ -133,13 +138,22 @@ public class AgentQueryRecord {
         String sessionIdentifier = getFirstHeader(headers, HEADER_PREFIX + HEADER_SESSION_ID);
         String traceId           = getFirstHeader(headers, HEADER_PREFIX + HEADER_TRACE_ID);
 
-        if (sessionIdentifier == null || sessionIdentifier.isEmpty()) {
-            sessionIdentifier = sessionIdFromUrl(p.getRequestParams().getURL());
-        }
-
         String source = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_SOURCE) : null;
         boolean isBrowserExtensionTraffic = tagsMap != null && tagsMap.containsKey(Constants.AKTO_BROWSER_LLM_TAG);
         boolean isAtlasTraffic = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(source);
+
+        if ((sessionIdentifier == null || sessionIdentifier.isEmpty())
+                && (isAtlasTraffic || Context.getActualAccountId() == URL_SESSION_ACCOUNT_ID)) {
+            String url = p.getRequestParams().getURL();
+            sessionIdentifier = sessionIdFromUrl(url);
+            if (sessionIdentifier != null) {
+                loggerMaker.info("[agent-session] derived session id from url: sessionId=" + sessionIdentifier
+                        + " url=" + url + " traceId=" + traceId + " isAtlasTraffic=" + isAtlasTraffic);
+            } else {
+                loggerMaker.info("[agent-session] no session id in header or url: url=" + url
+                        + " traceId=" + traceId + " isAtlasTraffic=" + isAtlasTraffic);
+            }
+        }
 
         if (isAtlasTraffic) {
             if (sessionIdentifier != null) {
