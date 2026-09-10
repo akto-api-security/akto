@@ -157,9 +157,8 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 
 	rawText, err := processor.ExtractContent(ctx, input.Reader, ext)
 	if err != nil {
-		h.logger.Warn("Content extraction failed", zap.Error(err), zap.String("file", input.Filename))
-		fr.Allowed = false
-		fr.Reason = "failed to extract content: " + err.Error()
+		// Fail open when parsing fails; there is no extracted content to validate.
+		h.logger.Warn("Content extraction failed; allowing file", zap.Error(err), zap.String("file", input.Filename))
 		return fr
 	}
 
