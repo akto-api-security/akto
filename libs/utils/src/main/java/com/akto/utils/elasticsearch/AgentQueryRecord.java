@@ -3,6 +3,7 @@ package com.akto.utils.elasticsearch;
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.billing.Organization;
+import com.akto.log.LoggerMaker;
 import com.akto.usage.OrgUtils;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
@@ -53,6 +54,13 @@ public class AgentQueryRecord {
     private static final String HEADER_USER_EMAIL = "user_email";
     private static final String HEADER_SESSION_ID = "akto_session_id";
     private static final String HEADER_TRACE_ID   = "akto_message_id";
+
+    private static final String SESSIONS_PATH_SEGMENT = "sessions";
+    private static final String EVENTS_PATH_SEGMENT   = "events";
+
+    private static final int URL_SESSION_ACCOUNT_ID = 1785654409;
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AgentQueryRecord.class);
 
     private static final int ATLAS_SESSION_TTL = Constants.ONE_DAY_TIMESTAMP;
     private static final Map<String, Integer> ATLAS_SESSION_LAST_SEEN = new ConcurrentHashMap<>();
@@ -128,10 +136,24 @@ public class AgentQueryRecord {
 
         Map<String, List<String>> headers = p.getRequestParams().getHeaders();
         String sessionIdentifier = getFirstHeader(headers, HEADER_PREFIX + HEADER_SESSION_ID);
+        String traceId           = getFirstHeader(headers, HEADER_PREFIX + HEADER_TRACE_ID);
 
         String source = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_SOURCE) : null;
         boolean isBrowserExtensionTraffic = tagsMap != null && tagsMap.containsKey(Constants.AKTO_BROWSER_LLM_TAG);
         boolean isAtlasTraffic = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(source);
+
+        if ((sessionIdentifier == null || sessionIdentifier.isEmpty())
+                && (isAtlasTraffic && Context.getActualAccountId() == URL_SESSION_ACCOUNT_ID)) {
+            String url = p.getRequestParams().getURL();
+            sessionIdentifier = sessionIdFromUrl(url);
+            if (sessionIdentifier != null) {
+                loggerMaker.info("[agent-session] derived session id from url: sessionId=" + sessionIdentifier
+                        + " url=" + url + " traceId=" + traceId + " isAtlasTraffic=" + isAtlasTraffic);
+            } else {
+                loggerMaker.info("[agent-session] no session id in header or url: url=" + url
+                        + " traceId=" + traceId + " isAtlasTraffic=" + isAtlasTraffic);
+            }
+        }
 
         if (isAtlasTraffic) {
             if (sessionIdentifier != null) {
@@ -194,7 +216,6 @@ public class AgentQueryRecord {
             deviceId  = getFirstHeader(headers, HEADER_PREFIX + HEADER_DEVICE_ID);
         }
 
-        String traceId           = getFirstHeader(headers, HEADER_PREFIX + HEADER_TRACE_ID);
         String messageIdHeader   = getFirstHeader(headers, Constants.AKTO_MESSAGE_ID_HEADER);
         String spanId = (messageIdHeader != null && !messageIdHeader.isEmpty())
                 ? messageIdHeader
@@ -228,6 +249,21 @@ public class AgentQueryRecord {
         );
         record.setGuardrailVerdict(p.getGuardrailVerdict());
         return record;
+    }
+
+    static String sessionIdFromUrl(String url) {
+        if (url == null || url.isEmpty()) {
+            return null;
+        }
+        int queryStart = url.indexOf('?');
+        String[] parts = (queryStart >= 0 ? url.substring(0, queryStart) : url).split("/");
+        for (int i = 0; i + 2 < parts.length; i++) {
+            if (SESSIONS_PATH_SEGMENT.equals(parts[i]) && EVENTS_PATH_SEGMENT.equals(parts[i + 2])
+                    && !parts[i + 1].isEmpty()) {
+                return parts[i + 1];
+            }
+        }
+        return null;
     }
 
     private static boolean isKnownAtlasSession(String sessionIdentifier) {
