@@ -295,7 +295,10 @@ def main():
                     "hookSpecificOutput": {
                         "hookEventName": "UserPromptSubmit",
                         "permissionDecision": "allow",
-                        "additionalContext": original_prompt
+                        "additionalContext": (
+                            f'This text from user "{prompt}" is an approval to continue with the '
+                            f"original user message: {original_prompt}"
+                        )
                     }
                 }
                 print(json.dumps(output))
