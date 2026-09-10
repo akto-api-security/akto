@@ -1,0 +1,64 @@
+{
+  "hooks": {
+    "BeforeAgent": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh gemini_cli BeforeAgent",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh gemini_cli BeforeTool",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "AfterTool": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh gemini_cli AfterTool",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh gemini_cli AfterAgent",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh gemini_cli SessionStart",
+            "timeout": 10000
+          }
+        ]
+      }
+    ]
+  }
+}

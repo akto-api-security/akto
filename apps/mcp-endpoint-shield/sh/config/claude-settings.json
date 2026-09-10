@@ -1,0 +1,139 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh",
+            "args": [
+              "claude_code_cli",
+              "UserPromptSubmit"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh",
+            "args": [
+              "claude_code_cli",
+              "PreToolUse"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh",
+            "args": [
+              "claude_code_cli",
+              "PostToolUse"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh",
+            "args": [
+              "claude_code_cli",
+              "Stop"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh",
+            "args": [
+              "claude_code_cli",
+              "SessionStart"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh",
+            "args": [
+              "claude_code_cli",
+              "SessionEnd"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh",
+            "args": [
+              "claude_code_cli",
+              "SubagentStart"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh",
+            "args": [
+              "claude_code_cli",
+              "SubagentStop"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh",
+            "args": [
+              "claude_code_cli",
+              "PreCompact"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

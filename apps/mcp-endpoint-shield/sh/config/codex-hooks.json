@@ -1,0 +1,79 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh",
+            "args": [
+              "codex_cli",
+              "UserPromptSubmit"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh",
+            "args": [
+              "codex_cli",
+              "PreToolUse"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh",
+            "args": [
+              "codex_cli",
+              "PostToolUse"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh",
+            "args": [
+              "codex_cli",
+              "Stop"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.akto/hooks/akto-hook.sh",
+            "args": [
+              "codex_cli",
+              "SessionStart"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

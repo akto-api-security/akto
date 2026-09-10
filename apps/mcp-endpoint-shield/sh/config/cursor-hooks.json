@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "~/.akto/hooks/akto-hook.sh cursor beforeSubmitPrompt",
+        "type": "command",
+        "timeout": 20
+      }
+    ],
+    "afterAgentResponse": [
+      {
+        "command": "~/.akto/hooks/akto-hook.sh cursor afterAgentResponse",
+        "type": "command",
+        "timeout": 20
+      }
+    ],
+    "beforeMCPExecution": [
+      {
+        "command": "~/.akto/hooks/akto-hook.sh cursor beforeMCPExecution",
+        "type": "command",
+        "timeout": 20,
+        "failClosed": true
+      }
+    ],
+    "afterMCPExecution": [
+      {
+        "command": "~/.akto/hooks/akto-hook.sh cursor afterMCPExecution",
+        "type": "command",
+        "timeout": 20
+      }
+    ],
+    "sessionStart": [
+      {
+        "command": "~/.akto/hooks/akto-hook.sh cursor sessionStart",
+        "type": "command",
+        "timeout": 20
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "~/.akto/hooks/akto-hook.sh cursor sessionEnd",
+        "type": "command",
+        "timeout": 20
+      }
+    ],
+    "stop": [
+      {
+        "command": "~/.akto/hooks/akto-hook.sh cursor stop",
+        "type": "command",
+        "timeout": 20
+      }
+    ]
+  }
+}
