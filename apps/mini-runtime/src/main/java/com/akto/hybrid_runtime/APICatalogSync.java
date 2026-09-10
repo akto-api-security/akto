@@ -1457,6 +1457,17 @@ public class APICatalogSync {
             redact =  accountSettings.isRedactPayload();
         }
 
+        // ============================================================
+        // TEMPORARY TEST HARDCODE - DO NOT MERGE, DO NOT RELEASE
+        // Forces the redaction path on so the encrypt -> postgres insert
+        // flow can be exercised without flipping the account setting in
+        // the dashboard. Revert before building any shippable image.
+        // ============================================================
+        redact = true;
+        loggerMaker.warn("TEMPORARY TEST BUILD: redaction force-enabled in code, "
+                + "ignoring the account setting. This build must not be released.");
+        // ============================================================
+
         counter++;
         
         for(int apiCollectionId: this.delta.keySet()) {

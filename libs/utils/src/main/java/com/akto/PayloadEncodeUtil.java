@@ -43,6 +43,9 @@ public class PayloadEncodeUtil {
             KeyFactory keyFactory = KeyFactory.getInstance("RSA");
             return (RSAPrivateKey) keyFactory.generatePrivate(keySpec);   
         } catch (Exception e) {
+            // Never fail silently: a missing or malformed private key means
+            // payloads cannot be decrypted, and the cause has to be visible.
+            loggerMaker.errorAndAddToDb("could not load PRIVATE_KEY: " + e.getMessage());
             return null;
         }
     }
@@ -66,6 +69,9 @@ public class PayloadEncodeUtil {
             KeyFactory keyFactory = KeyFactory.getInstance("RSA");
             return (RSAPublicKey) keyFactory.generatePublic(keySpec);
         } catch (Exception e) {
+            // Never fail silently: without the public key, payload redaction
+            // cannot encrypt, and the cause has to be visible.
+            loggerMaker.errorAndAddToDb("could not load PUBLIC_KEY: " + e.getMessage());
             return null;
         }
         
