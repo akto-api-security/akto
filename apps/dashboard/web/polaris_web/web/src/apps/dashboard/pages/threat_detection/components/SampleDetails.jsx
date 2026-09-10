@@ -27,6 +27,8 @@ import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../
 import OwaspTag from "../../guardrails/components/OwaspTag";
 import ComplianceTags from "../../guardrails/components/ComplianceTags";
 import { parseConfigEvidence } from "../../guardrails/violations/violationsData";
+import ChatMessage from "../../testing/TestRunResultPage/components/ChatMessage";
+import { MESSAGE_TYPES } from "../../testing/TestRunResultPage/components/chatConstants";
 
 // For config-scan events: pull evidence/message/config_content out of the sample's raw orig.
 // requestPayload is normally valid JSON (repaired server-side if PII redaction corrupted it);
@@ -675,48 +677,40 @@ function SampleDetails(props) {
             });
         };
 
-        // How confidently a context-window turn (see ElasticSearchClient.fetchContextWindow /
-        // ConversationContinuityClassifier) can be trusted as part of the flagged message's own
-        // conversation - a raw session match is a hard signal, everything else went through (or
-        // failed to resolve via) the AI fallback and is shown as such rather than asserted.
-        const contextTurnBadge = (turn) => {
-            if (turn?.resolutionMethod === 'session_match') {
-                return { tone: 'success', label: 'Same session' };
-            }
-            if (turn?.sameConversation === true) {
-                return { tone: 'info', label: `AI-inferred${turn.confidence ? ` (${turn.confidence})` : ''}` };
-            }
-            if (turn?.sameConversation === false) {
-                return { tone: undefined, label: 'Likely unrelated' };
-            }
-            return { tone: 'warning', label: 'Uncertain' };
-        };
+        const renderContextTurn = (turn, key, isAnchor = false) => {
+            const turnTimestamp = turn?.latestTimestamp ? Math.floor(turn.latestTimestamp / 1000) : null;
+            const messages = (
+                <VerticalStack gap={"2"}>
+                    <ChatMessage
+                        type={MESSAGE_TYPES.REQUEST}
+                        content={turn?.queryPayload || ''}
+                        timestamp={turnTimestamp}
+                        isCode={false}
+                    />
+                    {turn?.responsePayload ? (
+                        <ChatMessage
+                            type={MESSAGE_TYPES.RESPONSE}
+                            content={turn.responsePayload}
+                            isCode={false}
+                        />
+                    ) : null}
+                </VerticalStack>
+            );
 
-        const renderContextTurn = (turn, key) => {
-            const badge = contextTurnBadge(turn);
+            if (isAnchor) {
+                return (
+                    <Box key={key} padding={"3"} background="bg-surface-critical" borderRadius="200">
+                        <VerticalStack gap={"2"}>
+                            <Badge status="critical" size="medium">Current Message</Badge>
+                            {messages}
+                        </VerticalStack>
+                    </Box>
+                );
+            }
+
             return (
-                <Box key={key} padding={"4"} background="bg-surface-secondary" borderRadius="200">
-                    <VerticalStack gap={"3"}>
-                        <HorizontalStack align="space-between" blockAlign="center">
-                            <Badge size="small" tone={badge.tone}>{badge.label}</Badge>
-                            {turn?.latestTimestamp ? (
-                                <Text variant="bodySm" color="subdued">
-                                    {formatTimestamp(Math.floor(turn.latestTimestamp / 1000))}
-                                </Text>
-                            ) : null}
-                        </HorizontalStack>
-                        <Box padding={"3"} background="bg-surface" borderRadius="200" style={{ maxHeight: '160px', overflowY: 'auto', fontSize: '14px', lineHeight: '1.6', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-                            <Text variant="bodyMd">{turn?.queryPayload || ''}</Text>
-                        </Box>
-                        {turn?.responsePayload ? (
-                            <Box padding={"3"} background="bg-surface" borderRadius="200" style={{ maxHeight: '160px', overflowY: 'auto', fontSize: '14px', lineHeight: '1.6', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-                                <Text variant="bodyMd">{turn.responsePayload}</Text>
-                            </Box>
-                        ) : null}
-                        {turn?.reason ? (
-                            <Text variant="bodySm" color="subdued">{turn.reason}</Text>
-                        ) : null}
-                    </VerticalStack>
+                <Box key={key} background="bg-surface-secondary" borderRadius="200">
+                    {messages}
                 </Box>
             );
         };
@@ -897,37 +891,9 @@ function SampleDetails(props) {
                             )}
                             {!contextWindowLoading && contextWindow && (
                                 <VerticalStack gap={"3"}>
-                                    <VerticalStack gap={"1"}>
-                                        <Text variant="headingMd">Nearby Messages</Text>
-                                        <Text variant="bodySm" color="subdued">
-                                            No session ID was available for this event, so these are the closest
-                                            messages on the same host{contextWindow.llmInvoked ? ', checked with AI where a direct session match wasn\'t available' : ', matched by session'}.
-                                        </Text>
-                                    </VerticalStack>
-                                    {(contextWindow.before || []).map((turn, idx) => renderContextTurn(turn, `before-${idx}`))}
-                                    {contextWindow.anchor && (
-                                        <Box padding={"4"} background="bg-surface-critical" borderRadius="200">
-                                            <VerticalStack gap={"3"}>
-                                                <HorizontalStack align="space-between" blockAlign="center">
-                                                    <Badge tone="critical" size="small">Flagged Message</Badge>
-                                                    {contextWindow.anchor.latestTimestamp ? (
-                                                        <Text variant="bodySm" color="subdued">
-                                                            {formatTimestamp(Math.floor(contextWindow.anchor.latestTimestamp / 1000))}
-                                                        </Text>
-                                                    ) : null}
-                                                </HorizontalStack>
-                                                <Box padding={"3"} background="bg-surface" borderRadius="200" style={{ maxHeight: '160px', overflowY: 'auto', fontSize: '14px', lineHeight: '1.6', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-                                                    <Text variant="bodyMd">{contextWindow.anchor.queryPayload || ''}</Text>
-                                                </Box>
-                                                {contextWindow.anchor.responsePayload ? (
-                                                    <Box padding={"3"} background="bg-surface" borderRadius="200" style={{ maxHeight: '160px', overflowY: 'auto', fontSize: '14px', lineHeight: '1.6', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
-                                                        <Text variant="bodyMd">{contextWindow.anchor.responsePayload}</Text>
-                                                    </Box>
-                                                ) : null}
-                                            </VerticalStack>
-                                        </Box>
-                                    )}
-                                    {(contextWindow.after || []).map((turn, idx) => renderContextTurn(turn, `after-${idx}`))}
+                                    {(contextWindow.before || []).slice(-3).map((turn, idx) => renderContextTurn(turn, `before-${idx}`))}
+                                    {contextWindow.anchor && renderContextTurn(contextWindow.anchor, "anchor", true)}
+                                    {(contextWindow.after || []).slice(0, 3).map((turn, idx) => renderContextTurn(turn, `after-${idx}`))}
                                 </VerticalStack>
                             )}
                         </>
