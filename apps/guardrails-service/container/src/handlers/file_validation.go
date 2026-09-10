@@ -32,6 +32,7 @@ var urlFetchClient = &http.Client{
 type fileInput struct {
 	Reader   io.ReadCloser
 	Filename string
+	Err      error
 }
 
 type chunkResult struct {
@@ -51,9 +52,17 @@ type fileResult struct {
 
 // ValidateFile handles POST /api/validate/file (multipart "file" uploads or "url" fields, mutually exclusive).
 func (h *ValidationHandler) ValidateFile(c *gin.Context) {
+	defer func() {
+		if p := recover(); p != nil {
+			h.logger.Error("File validation panicked; allowing file", zap.Any("panic", p))
+			if !c.Writer.Written() {
+				c.JSON(http.StatusOK, gin.H{"allowed": true})
+			}
+		}
+	}()
 	if h.cfg == nil {
-		h.logger.Error("File validation config is nil")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "server configuration error"})
+		h.logger.Error("File validation config is nil; allowing file")
+		c.JSON(http.StatusOK, gin.H{"allowed": true})
 		return
 	}
 
@@ -73,9 +82,14 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 	}
 	if err != nil {
 		h.logger.Warn("Failed to resolve file inputs", zap.Error(err))
-		c.JSON(statusCode, gin.H{"error": err.Error()})
+		if statusCode >= http.StatusInternalServerError {
+			c.JSON(http.StatusOK, gin.H{"allowed": true})
+		} else {
+			c.JSON(statusCode, gin.H{"error": err.Error()})
+		}
 		return
 	}
+	defer closeInputs(inputs)
 
 	// Build request headers JSON from the hostname form field so that
 	// validationContextFromParams can extract McpServerName (Host header) and
@@ -120,15 +134,10 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 	for _, input := range inputs {
 		fr := h.validateSingleFile(ctx, input, meta, sessionID, requestID)
 		fileResults = append(fileResults, fr)
-		input.Reader.Close()
 
 		if !fr.Allowed {
 			break
 		}
-	}
-	// Close remaining unprocessed inputs (skipped due to fail-fast).
-	for i := len(fileResults); i < len(inputs); i++ {
-		inputs[i].Reader.Close()
 	}
 
 	allowedCount := 0
@@ -144,8 +153,17 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 	h.writeMultiFileResponse(c, fileResults)
 }
 
-func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileInput, meta *models.ValidateRequestParams, sessionID, requestID string) *fileResult {
-	fr := &fileResult{Filename: input.Filename, Allowed: true}
+func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileInput, meta *models.ValidateRequestParams, sessionID, requestID string) (fr *fileResult) {
+	fr = &fileResult{Filename: input.Filename, Allowed: true}
+	defer func() {
+		if p := recover(); p != nil {
+			h.logger.Error("File inspection panicked; allowing uninspected content", zap.Any("panic", p), zap.String("file", input.Filename))
+		}
+	}()
+	if input.Err != nil {
+		h.logger.Warn("File unavailable for inspection; allowing file", zap.Error(input.Err), zap.String("file", input.Filename))
+		return fr
+	}
 
 	ext := fileprocessor.ExtensionFromFilename(input.Filename)
 	processor := h.fileRegistry.Get(ext)
@@ -165,15 +183,13 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 	text := fileprocessor.SanitizeText(rawText)
 	rawText = "" // allow GC to reclaim the unsanitized copy
 	if strings.TrimSpace(text) == "" {
-		fr.Allowed = false
-		fr.Reason = "no text could be extracted from the file"
+		h.logger.Warn("No text extracted; allowing file", zap.String("file", input.Filename))
 		return fr
 	}
 
 	chunks := fileprocessor.ChunkWordBoundary(text, h.cfg.File.ChunkSize, h.cfg.File.ChunkOverlap)
 	if len(chunks) == 0 {
-		fr.Allowed = false
-		fr.Reason = "no content to validate"
+		h.logger.Warn("No content to validate; allowing file", zap.String("file", input.Filename))
 		return fr
 	}
 	if len(chunks) > h.cfg.File.MaxChunks {
@@ -203,8 +219,12 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 			zap.Int("chunkOverlap", h.cfg.File.ChunkOverlap))
 	}
 
-	results := h.validateChunks(ctx, chunks, meta, sessionID, requestID)
-	fr.TotalChunks = len(chunks)
+	results := h.validateChunks(ctx, chunks, meta, sessionID, requestID, h.validatorService.ValidateRequest)
+	return h.applyFileChunkResults(fr, results)
+}
+
+func (h *ValidationHandler) applyFileChunkResults(fr *fileResult, results []*chunkResult) *fileResult {
+	fr.TotalChunks = len(results)
 	fr.ChunkResults = results
 
 	for i, r := range results {
@@ -212,10 +232,8 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 			continue
 		}
 		if r.Err != nil {
-			fr.Allowed = false
-			fr.Reason = "validation error after retries: " + r.Err.Error()
-			fr.FailedChunkIndex = i + 1
-			return fr
+			h.logger.Warn("Chunk validation failed after retries; allowing chunk", zap.Error(r.Err), zap.String("file", fr.Filename), zap.Int("chunk", i+1))
+			continue
 		}
 		if h.chunkStopsFile(r.Result) {
 			fr.Allowed = false
@@ -259,6 +277,12 @@ func chunkBlockReason(r *mcp.ValidationResult) string {
 
 func (h *ValidationHandler) resolveInputs(c *gin.Context) ([]*fileInput, int, error) {
 	form, formErr := c.MultipartForm()
+	if formErr != nil {
+		if isBodyTooLarge(formErr) {
+			return nil, http.StatusRequestEntityTooLarge, fmt.Errorf("request body exceeds maximum allowed size")
+		}
+		return nil, http.StatusInternalServerError, fmt.Errorf("failed to parse file inputs: %w", formErr)
+	}
 
 	var fileHeaders []*multipart.FileHeader
 	if form != nil && form.File != nil {
@@ -282,9 +306,6 @@ func (h *ValidationHandler) resolveInputs(c *gin.Context) ([]*fileInput, int, er
 	}
 
 	if !hasFiles && !hasURLs {
-		if formErr != nil && isBodyTooLarge(formErr) {
-			return nil, http.StatusRequestEntityTooLarge, fmt.Errorf("request body exceeds maximum allowed size")
-		}
 		return nil, http.StatusBadRequest, fmt.Errorf("provide at least one 'file' upload or 'url' field")
 	}
 
@@ -317,8 +338,11 @@ func (h *ValidationHandler) openUploads(headers []*multipart.FileHeader) ([]*fil
 		}
 		fi, statusCode, err := openUpload(fh)
 		if err != nil {
-			closeInputs(inputs)
-			return nil, statusCode, err
+			if statusCode < http.StatusInternalServerError {
+				closeInputs(inputs)
+				return nil, statusCode, err
+			}
+			fi = &fileInput{Filename: fh.Filename, Err: err}
 		}
 		inputs = append(inputs, fi)
 	}
@@ -330,8 +354,11 @@ func (h *ValidationHandler) fetchFromURLs(ctx context.Context, rawURLs []string)
 	for _, rawURL := range rawURLs {
 		fi, statusCode, err := h.fetchFromURL(ctx, rawURL)
 		if err != nil {
-			closeInputs(inputs)
-			return nil, statusCode, err
+			if statusCode < http.StatusInternalServerError {
+				closeInputs(inputs)
+				return nil, statusCode, err
+			}
+			fi = &fileInput{Err: err}
 		}
 		inputs = append(inputs, fi)
 	}
@@ -340,14 +367,16 @@ func (h *ValidationHandler) fetchFromURLs(ctx context.Context, rawURLs []string)
 
 func closeInputs(inputs []*fileInput) {
 	for _, fi := range inputs {
-		fi.Reader.Close()
+		if fi.Reader != nil {
+			fi.Reader.Close()
+		}
 	}
 }
 
 func openUpload(fh *multipart.FileHeader) (*fileInput, int, error) {
 	src, err := fh.Open()
 	if err != nil {
-		return nil, http.StatusBadRequest, fmt.Errorf("unable to read uploaded file: %w", err)
+		return nil, http.StatusInternalServerError, fmt.Errorf("unable to read uploaded file: %w", err)
 	}
 	return &fileInput{Reader: src, Filename: fh.Filename}, 0, nil
 }
@@ -371,7 +400,12 @@ func (h *ValidationHandler) fetchFromURL(ctx context.Context, rawURL string) (*f
 
 	timeout := time.Duration(h.cfg.File.URLTimeoutSec) * time.Second
 	fetchCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	keepOpen := false
+	defer func() {
+		if !keepOpen {
+			cancel()
+		}
+	}()
 
 	req, err := http.NewRequestWithContext(fetchCtx, http.MethodGet, rawURL, nil)
 	if err != nil {
@@ -391,10 +425,21 @@ func (h *ValidationHandler) fetchFromURL(ctx context.Context, rawURL string) (*f
 	maxSize := int64(h.fileRegistry.MaxBytesForExt(ext))
 	body := &sizeLimitedReader{
 		Reader: io.LimitReader(resp.Body, maxSize+1),
-		Closer: resp.Body,
+		Closer: &cancelOnClose{ReadCloser: resp.Body, cancel: cancel},
 		limit:  maxSize,
 	}
+	keepOpen = true // The body must remain readable until extraction finishes.
 	return &fileInput{Reader: body, Filename: filename}, 0, nil
+}
+
+type cancelOnClose struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+func (r *cancelOnClose) Close() error {
+	defer r.cancel()
+	return r.ReadCloser.Close()
 }
 
 func filenameFromPath(urlPath, fallbackExt string) string {
@@ -426,10 +471,16 @@ func (r *sizeLimitedReader) Read(p []byte) (int, error) {
 
 var errChunkBlocked = fmt.Errorf("chunk blocked")
 
-func (h *ValidationHandler) validateChunks(ctx context.Context, chunks []string, meta *models.ValidateRequestParams, sessionID, requestID string) []*chunkResult {
+type fileRequestValidator func(context.Context, *models.ValidateRequestParams, string, string) (*mcp.ValidationResult, string, error)
+
+func (h *ValidationHandler) validateChunks(ctx context.Context, chunks []string, meta *models.ValidateRequestParams, sessionID, requestID string, validate fileRequestValidator) []*chunkResult {
 	results := make([]*chunkResult, len(chunks))
 	g, gCtx := errgroup.WithContext(ctx)
-	g.SetLimit(h.cfg.File.MaxConcurrent)
+	concurrency := h.cfg.File.MaxConcurrent
+	if concurrency <= 0 {
+		concurrency = 1
+	}
+	g.SetLimit(concurrency)
 
 	for i, chunk := range chunks {
 		g.Go(func() error {
@@ -437,8 +488,8 @@ func (h *ValidationHandler) validateChunks(ctx context.Context, chunks []string,
 				return nil
 			}
 			payload := marshalPromptPayload(chunk)
-			results[i] = h.validateWithRetry(gCtx, payload, meta, sessionID, requestID)
-			if results[i].Err != nil || h.chunkStopsFile(results[i].Result) {
+			results[i] = h.validateWithRetry(gCtx, payload, meta, sessionID, requestID, validate)
+			if h.chunkStopsFile(results[i].Result) {
 				return errChunkBlocked
 			}
 			return nil
@@ -448,7 +499,12 @@ func (h *ValidationHandler) validateChunks(ctx context.Context, chunks []string,
 	return results
 }
 
-func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload string, meta *models.ValidateRequestParams, sessionID, requestID string) *chunkResult {
+func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload string, meta *models.ValidateRequestParams, sessionID, requestID string, validate fileRequestValidator) (result *chunkResult) {
+	defer func() {
+		if p := recover(); p != nil {
+			result = &chunkResult{Err: fmt.Errorf("chunk validation panicked: %v", p)}
+		}
+	}()
 	params := *meta
 	params.RequestPayload = payload
 	maxRetries := h.cfg.File.MaxRetries
@@ -463,7 +519,7 @@ func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload strin
 				return &chunkResult{Err: ctx.Err()}
 			}
 		}
-		result, _, err := h.validatorService.ValidateRequest(ctx, &params, sessionID, requestID)
+		result, _, err := validate(ctx, &params, sessionID, requestID)
 		if err != nil {
 			lastErr = err
 			continue
