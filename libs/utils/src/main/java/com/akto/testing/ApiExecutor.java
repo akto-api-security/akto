@@ -6,6 +6,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
+import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResult.TestLog;
@@ -41,7 +42,7 @@ public class ApiExecutor {
     private static final int MAX_RESPONSE_SIZE = 1024*1024*5;
     private static final ObjectMapper objectMapper = new ObjectMapper();
     
-    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
+    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol, TLSAuthParam authParam) throws Exception {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
@@ -82,6 +83,10 @@ public class ApiExecutor {
 
         if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
+        }
+
+        if (authParam != null) {
+            client = CustomHTTPClientHandler.instance.getClient(authParam, isHttps, followRedirects, requestProtocol);
         }
 
         Call call = client.newCall(request);
@@ -453,7 +458,7 @@ public class ApiExecutor {
 
     private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String type)  throws Exception{
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, type);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, type, request.getTlsAuthParam());
     }
 
     public static RequestBody getFileRequestBody(String fileUrl){
@@ -683,7 +688,7 @@ public class ApiExecutor {
             builder.post(requestBody);
             builder.removeHeader(Constants.AKTO_ATTACH_FILE);
             Request updatedRequest = builder.build();
-            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, requestProtocol);
+            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, requestProtocol, request.getTlsAuthParam());
         }
 
         String payload = request.getBody();
@@ -821,7 +826,7 @@ public class ApiExecutor {
         }
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, requestProtocol);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, requestProtocol, request.getTlsAuthParam());
     }
 
     private static boolean isJsonRpcRequest(OriginalHttpRequest request) {
