@@ -120,6 +120,7 @@ def get_connector_config(connector: str) -> dict:
             "atlas_domain": "ai-agent.copilot",
             "log_dir_default": "~/.github/akto/vscode/logs",
             "blocked_exit_code": 2,
+            "ask_exit_code": 0,
         }
     else:
         api_url = os.getenv("GITHUB_COPILOT_API_URL", "https://api.github.com")
@@ -132,6 +133,7 @@ def get_connector_config(connector: str) -> dict:
             "atlas_domain": "ai-agent.copilot",
             "log_dir_default": "~/.github/akto/copilot/logs",
             "blocked_exit_code": 0,
+            "ask_exit_code": 0,
         }
 
 
@@ -649,7 +651,7 @@ def main():
             mcp_server_name=mcp_server_name,
             mcp_tool_name=mcp_tool_name,
         )
-        sys.exit(0)
+        sys.exit(cfg["ask_exit_code"])
 
     if not gr_allowed:
         denial_reason = f"Blocked by Akto Guardrails: {gr_reason or 'Policy violation'}"

@@ -518,9 +518,6 @@ def main():
             gr_allowed = True
 
         if not gr_allowed and _is_warn_behaviour(behaviour):
-            # Cursor's beforeMCPExecution supports permission: "ask" (native interactive
-            # dialog) — use it directly on the original request instead of the
-            # deny+identical-resubmit emulation apply_warn_resubmit_flow implements.
             output = {
                 "permission": "ask",
                 "user_message": f"Akto guardrails flagged this MCP request: {gr_reason or 'Policy violation'}",
