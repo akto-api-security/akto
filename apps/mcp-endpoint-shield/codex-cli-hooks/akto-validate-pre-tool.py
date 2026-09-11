@@ -486,6 +486,10 @@ def main():
             mcp_tool_name=mcp_tool_name,
             session_info=session_info,
         )
+        if not gr_allowed and _is_alert_behaviour(behaviour):
+            logger.info("Alert behaviour: allowing despite violation (server-side alert only)")
+            gr_allowed = True
+
         if not gr_allowed and _is_warn_behaviour(behaviour):
             ask_reason = f"Akto guardrails flagged this tool request: {gr_reason or 'Policy violation'}"
             logger.warning(f"ASKING for approval - Tool: {tool_name}, Reason: {gr_reason}")
@@ -508,15 +512,9 @@ def main():
             )
             sys.exit(0)
 
-        fingerprint = pretool_fingerprint(tool_name, tool_input)
-        allowed, _ = apply_warn_resubmit_flow(
-            gr_allowed, gr_reason, behaviour, fingerprint
-        )
-
-        if not allowed:
+        if not gr_allowed:
             block_reason = gr_reason or "Policy violation"
 
-            # PreToolUse: documented deny shape (hookSpecificOutput only; no continue/stopReason).
             output = {
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
