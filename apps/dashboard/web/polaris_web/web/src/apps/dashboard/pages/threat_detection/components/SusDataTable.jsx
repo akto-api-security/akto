@@ -276,7 +276,7 @@ let filters = [];
 
 const HUMAN_RESPONSE = { PENDING: "PENDING", APPROVED: "APPROVED", BLOCKED: "BLOCKED" };
 
-function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, initialTab, onRegisterPayloadSearch, refreshNonce = 0 }) {
+function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, initialTab, onRegisterPayloadSearch, onRegisterExport, refreshNonce = 0 }) {
   const location = useLocation();
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
@@ -898,6 +898,10 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   };
 
   const limit = 50;
+  const EXPORT_LIMIT = 2000;
+  // Snapshot of the exact request params the visible table last fetched with (all filters +
+  // current tab/status), so Export can reuse them instead of dumping unfiltered data.
+  const lastFetchParamsRef = useRef(null);
 
   async function fetchData(
     sortKey,
@@ -997,6 +1001,25 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
                         : (successfulFilterValue === false || successfulFilterValue === 'false') ? false
                         : undefined;
     }
+    lastFetchParamsRef.current = {
+      sourceIpsFilter,
+      apiCollectionIdsFilter,
+      matchingUrlFilter,
+      typeFilter,
+      latestAttack,
+      sort,
+      effectiveStatus,
+      successfulBool,
+      hostFilter,
+      latestApiOrigRegex,
+      severityFilter,
+      skillEvaluationMode,
+      configEvaluationMode,
+      riskScoreFilterType,
+      riskScoreFilterValue,
+      isNeedsApproval,
+    };
+
     const res = await api.fetchSuspectSampleData(
       effectiveSkip,
       sourceIpsFilter,
@@ -1211,6 +1234,53 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     setLoading(false);
     return { value: ret, total: total };
   }
+
+  // Re-fetches with the same filters/tab currently applied to the visible table (just skip=0 and a
+  // higher limit), so Export matches what's on screen instead of dumping every event.
+  async function runExport(exportLimit = EXPORT_LIMIT) {
+    const p = lastFetchParamsRef.current;
+    if (!p) return { maliciousEvents: [], total: 0 };
+    const res = await api.fetchSuspectSampleData(
+      0,
+      p.sourceIpsFilter,
+      p.apiCollectionIdsFilter,
+      p.matchingUrlFilter,
+      p.typeFilter,
+      p.sort,
+      startTimestamp,
+      endTimestamp,
+      p.latestAttack,
+      exportLimit,
+      p.effectiveStatus,
+      p.successfulBool,
+      label,
+      p.hostFilter,
+      p.latestApiOrigRegex,
+      undefined,
+      undefined,
+      p.severityFilter,
+      p.skillEvaluationMode,
+      p.configEvaluationMode,
+      p.riskScoreFilterType,
+      p.riskScoreFilterValue
+    );
+    let events = res?.maliciousEvents || [];
+    // "Needs Approval" is a client-side view over ACTIVE events (see fetchData above) — apply the
+    // same post-filter so export matches what's actually visible on that tab.
+    if (p.isNeedsApproval) {
+      events = events.filter((x) =>
+        String(extractBehaviour(x?.metadata)).toLowerCase() === 'approval' &&
+        !isServerApproved(guardrailApprovedByPolicy, x.filterId, x.host)
+      );
+    }
+    return { maliciousEvents: events, total: events.length };
+  }
+
+  useEffect(() => {
+    if (!onRegisterExport) return undefined;
+    onRegisterExport(runExport);
+    return undefined;
+  }, [onRegisterExport, startTimestamp, endTimestamp, label, guardrailApprovedByPolicy]);
 
   async function fillFilters() {
     const res = await api.fetchFiltersThreatTable(startTimestamp, endTimestamp);
