@@ -809,15 +809,55 @@ public class VariableResolver {
         return wordListVal;
     }
 
+    // Caches, per distinct sample string, the parsed envelope (HttpResponseParams/HttpRequestParams -
+    // avoids re-parsing the same sample's method/path/headers/payload once per (template x wordlist)
+    // call) plus a flattened (fieldName, value) list of the request/response body, walked once
+    // instead of once per pattern. Keyed by the sample string itself (not ApiInfoKey) since the
+    // parsed result is a pure function of the sample content, and a wordlist can legitimately be
+    // checked against samples from multiple APIs at once (the all_apis:true fan-out).
+    // A sentinel (EMPTY_PARSED_SAMPLE) is cached on parse failure so a permanently-broken sample
+    // doesn't get re-parsed (and re-fail) on every subsequent call - mirrors the existing
+    // computeIfAbsent-never-caches-null gap fix already applied elsewhere (ApiCollectionMetaCache).
+    private static final class ParsedSample {
+        final HttpResponseParams httpResponseParams;
+        final HttpRequestParams httpRequestParams;
+        final List<Map.Entry<String, String>> reqPayloadFlat;
+        final List<Map.Entry<String, String>> respPayloadFlat;
+        ParsedSample(HttpResponseParams r, HttpRequestParams q, List<Map.Entry<String, String>> reqFlat, List<Map.Entry<String, String>> respFlat) {
+            this.httpResponseParams = r;
+            this.httpRequestParams = q;
+            this.reqPayloadFlat = reqFlat;
+            this.respPayloadFlat = respFlat;
+        }
+    }
+    private static final ParsedSample EMPTY_PARSED_SAMPLE = new ParsedSample(null, null, new ArrayList<>(), new ArrayList<>());
+    private static final ConcurrentHashMap<String, ParsedSample> parsedSampleCache = new ConcurrentHashMap<>();
+
+    private static ParsedSample getOrParseSample(String sample) {
+        return parsedSampleCache.computeIfAbsent(sample, s -> {
+            try {
+                HttpResponseParams httpResponseParams = parseSampleMessage(s);
+                HttpRequestParams httpRequestParams = httpResponseParams.getRequestParams();
+                List<Map.Entry<String, String>> reqFlat = Utils.flattenAllValues(httpRequestParams.getPayload());
+                List<Map.Entry<String, String>> respFlat = Utils.flattenAllValues(httpResponseParams.getPayload());
+                return new ParsedSample(httpResponseParams, httpRequestParams, reqFlat, respFlat);
+            } catch (Exception e) {
+                return EMPTY_PARSED_SAMPLE;
+            }
+        });
+    }
+
     public static Set<String> extractValuesFromSampleData(List<String> samples, String key, String location, boolean isRegex) {
 
         Set<String> worklistVal = new HashSet<>();
         for (String sample: samples) {
-            HttpResponseParams httpResponseParams;
-            HttpRequestParams httpRequestParams;
             try {
-                httpResponseParams = parseSampleMessage(sample);
-                httpRequestParams = httpResponseParams.getRequestParams();
+                ParsedSample parsed = getOrParseSample(sample);
+                if (parsed == EMPTY_PARSED_SAMPLE) {
+                    continue;
+                }
+                HttpResponseParams httpResponseParams = parsed.httpResponseParams;
+                HttpRequestParams httpRequestParams = parsed.httpRequestParams;
 
                 if ("terminal_keys".equals(location)) {
                     worklistVal.addAll(Utils.findAllTerminalKeys(httpResponseParams.getPayload(), key));
@@ -849,10 +889,18 @@ public class VariableResolver {
                 }
 
                 if (location == null || location.equals("payload")) {
-                    worklistVal.addAll(Utils.findAllValuesForKey(httpRequestParams.getPayload(), key, isRegex));
-                    worklistVal.addAll(Utils.findAllValuesForKey(httpResponseParams.getPayload(), key, isRegex));
+                    for (Map.Entry<String, String> e: parsed.reqPayloadFlat) {
+                        if (Utils.checkIfMatches(e.getKey(), key, isRegex)) {
+                            worklistVal.add(e.getValue());
+                        }
+                    }
+                    for (Map.Entry<String, String> e: parsed.respPayloadFlat) {
+                        if (Utils.checkIfMatches(e.getKey(), key, isRegex)) {
+                            worklistVal.add(e.getValue());
+                        }
+                    }
                 }
-                
+
                 if (location == null || location.equals("query_param")) {
                     BasicDBObject queryParams = RequestTemplate.getQueryJSON(httpRequestParams.getURL());
                     for (String qu: queryParams.keySet()) {
@@ -866,7 +914,7 @@ public class VariableResolver {
             } catch (Exception e) {
                 continue;
             }
-            
+
         }
 
         return worklistVal;
