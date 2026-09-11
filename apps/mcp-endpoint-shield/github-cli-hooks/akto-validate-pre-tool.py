@@ -619,6 +619,34 @@ def main():
         mcp_server_name=mcp_server_name,
         mcp_tool_name=mcp_tool_name,
     )
+    if not gr_allowed and _is_warn_behaviour(behaviour):
+        ask_reason = f"Akto guardrails flagged this tool use: {gr_reason or 'Policy violation'}"
+        logger.warning(f"ASKING for approval - Tool: {tool_name}, Reason: {gr_reason}")
+        output = {
+            "permissionDecision": "ask",
+            "permissionDecisionReason": ask_reason,
+            "hookSpecificOutput": {
+                "permissionDecision": "ask",
+                "permissionDecisionReason": ask_reason,
+            },
+        }
+        sys.stdout.write(json.dumps(output))
+        sys.stdout.flush()
+
+        ingest_blocked_tool_use(
+            tool_name,
+            tool_args,
+            cwd,
+            timestamp,
+            gr_reason,
+            cfg,
+            logger,
+            is_mcp=is_mcp,
+            mcp_server_name=mcp_server_name,
+            mcp_tool_name=mcp_tool_name,
+        )
+        sys.exit(0)
+
     fingerprint = pretool_fingerprint(tool_name, tool_args)
     allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint, warn_state_path, logger)
 

@@ -512,23 +512,32 @@ def main():
 
     if AKTO_SYNC_MODE:
         gr_allowed, gr_reason, behaviour = call_guardrails(tool_name, tool_input_obj, mcp_server_name)
-        fingerprint = pretool_fingerprint(tool_name, tool_input_obj)
-        allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint)
 
-        if not allowed:
-            if _is_warn_behaviour(behaviour):
-                user_message = (
-                    f"Warning!! Cursor MCP call blocked, send the same request again to bypass. "
-                    f"Reason: {gr_reason or 'Policy violation'}"
-                )
-            else:
-                user_message = "Request blocked by Akto security policy"
+        if not gr_allowed and _is_alert_behaviour(behaviour):
+            logger.info("Alert behaviour: allowing despite violation (server-side alert only)")
+            gr_allowed = True
+
+        if not gr_allowed and _is_warn_behaviour(behaviour):
+            # Cursor's beforeMCPExecution supports permission: "ask" (native interactive
+            # dialog) — use it directly on the original request instead of the
+            # deny+identical-resubmit emulation apply_warn_resubmit_flow implements.
             output = {
-                "permission": "deny",
-                "user_message": user_message,
+                "permission": "ask",
+                "user_message": f"Akto guardrails flagged this MCP request: {gr_reason or 'Policy violation'}",
                 "agent_message": f"Blocked by Akto Guardrails: {gr_reason or 'Policy violation'}",
             }
-            logger.warning(f"BLOCKING request - server: {mcp_server_name}, behaviour={behaviour!r}, reason: {gr_reason}")
+            logger.warning(f"ASKING for approval - server: {mcp_server_name}, reason: {gr_reason}")
+            print(json.dumps(output))
+            ingest_blocked_request(tool_name, tool_input_obj, gr_reason, mcp_server_name)
+            sys.exit(0)
+
+        if not gr_allowed:
+            output = {
+                "permission": "deny",
+                "user_message": "Request blocked by Akto security policy",
+                "agent_message": f"Blocked by Akto Guardrails: {gr_reason or 'Policy violation'}",
+            }
+            logger.warning(f"BLOCKING request - server: {mcp_server_name}, reason: {gr_reason}")
             print(json.dumps(output))
             ingest_blocked_request(tool_name, tool_input_obj, gr_reason, mcp_server_name)
             sys.exit(0)

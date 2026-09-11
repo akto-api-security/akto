@@ -486,19 +486,35 @@ def main():
             mcp_tool_name=mcp_tool_name,
             session_info=session_info,
         )
+        if not gr_allowed and _is_warn_behaviour(behaviour):
+            ask_reason = f"Akto guardrails flagged this tool request: {gr_reason or 'Policy violation'}"
+            logger.warning(f"ASKING for approval - Tool: {tool_name}, Reason: {gr_reason}")
+            output = {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "ask",
+                    "permissionDecisionReason": ask_reason,
+                }
+            }
+            print(json.dumps(output))
+            ingest_blocked_request(
+                tool_name,
+                tool_input,
+                gr_reason or "Policy violation",
+                is_mcp=is_mcp,
+                mcp_server_name=mcp_server_name,
+                mcp_tool_name=mcp_tool_name,
+                session_info=session_info,
+            )
+            sys.exit(0)
+
         fingerprint = pretool_fingerprint(tool_name, tool_input)
         allowed, _ = apply_warn_resubmit_flow(
             gr_allowed, gr_reason, behaviour, fingerprint
         )
 
         if not allowed:
-            if _is_warn_behaviour(behaviour):
-                block_reason = (
-                    "Warning!!, tool request blocked, please review it. Send again to bypass. "
-                    f"Reason for blocking: {gr_reason}"
-                )
-            else:
-                block_reason = gr_reason or "Policy violation"
+            block_reason = gr_reason or "Policy violation"
 
             # PreToolUse: documented deny shape (hookSpecificOutput only; no continue/stopReason).
             output = {
