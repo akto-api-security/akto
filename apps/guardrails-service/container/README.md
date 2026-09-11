@@ -128,7 +128,16 @@ curl -X POST http://localhost:8080/api/validate/file \
   -F "contextSource=AGENTIC"
 ```
 
-Response includes `allowed`, `reason`, `totalChunks`, `failedChunkIndex`, and optionally `chunkResults`. See `scripts/test-validate-file.sh` for a quick test script.
+Response includes `allowed` and, when blocked, `reason`.
+
+This endpoint never rejects a request: it always answers `200` with a verdict, and `allowed: false` only ever comes from a guardrail policy (including redaction, when `FILE_VALIDATE_BLOCK_ON_REDACTION` is on). Everything that stops content from being inspected fails open and is logged with a `skipReason`:
+
+- **Nothing applies** — before any content is read, the service checks whether any policy applies to the caller (context source plus `Host`/installer user email). With none, it allows immediately without fetching, extracting or inspecting. If the policy list can't be loaded, content is inspected rather than allowed.
+- **Per input** — unreadable uploads, files over the per-type size limit, unparseable URLs, non-`http(s)` schemes, unsupported or missing extensions, URL-fetch failures and non-200 responses, parsing errors and empty extracted text all allow that one input. The other inputs are still inspected.
+- **Whole request** — an unparseable multipart body (including one past the max body size) allows, since there is nothing left to inspect.
+- **Over a limit** — inputs past `FILE_VALIDATE_MAX_FILES` and chunks past `FILE_VALIDATE_MAX_CHUNKS` are dropped uninspected; whatever fits under the limit is still inspected, so padding a request cannot switch inspection off for the rest of it.
+
+Uploads and `url` fields may be combined in one request (uploads are taken first). Policy blocks always take precedence over a fail-open input elsewhere in the same request.
 
 ### Health Check
 ```bash
