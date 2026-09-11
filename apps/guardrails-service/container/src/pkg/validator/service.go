@@ -484,6 +484,36 @@ func (s *Service) filterApprovedServers(policies []types.Policy, mcpServerName s
 	return filtered
 }
 
+func (s *Service) applicablePolicies(policies []types.Policy, valCtx *mcp.ValidationContext) []types.Policy {
+	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
+	policies = s.filterPoliciesByDevice(policies, valCtx.McpServerName, valCtx.RequestHeaders)
+	// Bypass "approval" policies whose server is already approved (allow, no threat).
+	return s.filterApprovedServers(policies, valCtx.McpServerName)
+}
+
+func (s *Service) HasApplicablePolicies(contextSource, requestHeaders string) (bool, error) {
+	policies, _, compiledRules, _, err := s.getCachedPolicies(contextSource)
+	if err != nil {
+		return false, fmt.Errorf("failed to load policies: %w", err)
+	}
+
+	// Only McpServerName and RequestHeaders are read by the filters; the rest of the
+	// context is irrelevant to which policies apply.
+	valCtx := s.validationContextFromParams(&models.ValidateRequestParams{
+		ContextSource:  contextSource,
+		RequestHeaders: requestHeaders,
+	}, "", "", "", "HasApplicablePolicies", nil, compiledRules)
+
+	applicable := s.applicablePolicies(policies, valCtx)
+	s.logger.Debug("HasApplicablePolicies - resolved",
+		zap.String("contextSource", contextSource),
+		zap.String("mcpServerName", valCtx.McpServerName),
+		zap.Int("candidateCount", len(policies)),
+		zap.Int("applicableCount", len(applicable)),
+		zap.Strings("applicablePolicies", policyNames(applicable)))
+	return len(applicable) > 0, nil
+}
+
 // isServerApproved reports whether mcpServerName has a currently-valid approval entry.
 // serverId is matched exactly (case-insensitive) — it is stored as the same device-prefixed
 // host the threat event uses, which is exactly valCtx.McpServerName. Mode ALWAYS is always
@@ -1819,12 +1849,9 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Create validation context with full request metadata (matching batch flow)
 	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList, compiledRules)
 
-	// Filter policies by MCP server name so all subsequent checks only fire for
-	// rules that belong to policies applicable to this server.
-	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
-	policies = s.filterPoliciesByDevice(policies, valCtx.McpServerName, valCtx.RequestHeaders)
-	// Bypass "approval" policies whose server is already approved (allow, no threat).
-	policies = s.filterApprovedServers(policies, valCtx.McpServerName)
+	// Narrow to the policies that apply to this server/device/user so all subsequent
+	// checks only fire for rules that belong to them.
+	policies = s.applicablePolicies(policies, valCtx)
 
 	// [GUARDRAIL_FLOW] 2/3 — policies that APPLY to this request after server/device/approval filtering.
 	s.logger.Info("[GUARDRAIL_FLOW] policies applied to request",
@@ -2037,11 +2064,8 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	// Create validation context with full request metadata (matching batch flow)
 	valCtx := s.validationContextFromParams(params, sessionID, params.RequestPayload, responseBody, "ValidateResponse", mcpAllowedHostList, compiledRules)
 
-	// Filter policies by MCP server name — policies with no server configured are skipped
-	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
-	policies = s.filterPoliciesByDevice(policies, valCtx.McpServerName, valCtx.RequestHeaders)
-	// Bypass "approval" policies whose server is already approved (allow, no threat).
-	policies = s.filterApprovedServers(policies, valCtx.McpServerName)
+	// Narrow to the policies that apply to this server/device/user.
+	policies = s.applicablePolicies(policies, valCtx)
 
 	s.logger.Info("ValidateResponse - calling ProcessResponse",
 		zap.String("path", params.Path),

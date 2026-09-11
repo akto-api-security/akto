@@ -119,7 +119,9 @@ type MediaConfig struct {
 const defaultChunkSize = 6000
 
 // defaultMaxChunks derives the chunk ceiling from the byte cap so shrinking ChunkSize can
-// never start rejecting files that used to pass. FILE_VALIDATE_MAX_CHUNKS still wins.
+// never start leaving content uninspected in files that used to be covered end to end
+// (chunks past the cap are dropped uninspected, not rejected — see ValidateFile).
+// FILE_VALIDATE_MAX_CHUNKS still wins.
 //
 // Chunks advance by chunkSize-overlap, not chunkSize, so the overlap has to be in the
 // divisor: at 5MB/6000 the naive figure is 874 but the real count is 904.

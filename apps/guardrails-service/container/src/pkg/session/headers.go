@@ -27,20 +27,32 @@ func ExtractSessionID(headers map[string]string) string {
 	return ""
 }
 
-// ExtractInstallerUserEmail extracts the installer-supplied user email, used to resolve
-// which devices a request's user is associated with for device-targeted policies. Checked
-// both http.Header-canonicalized and raw lowercase (stdio custom-header maps) forms.
-func ExtractInstallerUserEmail(headers map[string]string) string {
-	candidates := []string{
-		"X-Akto-Installer-User_email", "x-akto-installer-user_email",
-	}
+var installerUserEmailHeaders = []string{
+	"X-Akto-Installer-User_email", "x-akto-installer-user_email",
+}
 
-	for _, key := range candidates {
+// ExtractInstallerUserEmail extracts the installer-supplied user email, used to resolve
+// which devices a request's user is associated with for device-targeted policies.
+func ExtractInstallerUserEmail(headers map[string]string) string {
+	for _, key := range installerUserEmailHeaders {
 		if val, ok := headers[key]; ok && val != "" {
 			return val
 		}
 	}
 	return ""
+}
+
+func CopyIdentityHeaders(dst map[string]string, h http.Header) {
+	if dst == nil || h == nil {
+		return
+	}
+	for _, key := range installerUserEmailHeaders {
+		// http.Header.Get is case-insensitive, so the first key covers both spellings.
+		if val := strings.TrimSpace(h.Get(key)); val != "" {
+			dst[installerUserEmailHeaders[0]] = val
+			return
+		}
+	}
 }
 
 // ExtractRequestID extracts request ID from various headers with fallback

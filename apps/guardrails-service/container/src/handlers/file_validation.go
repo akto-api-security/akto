@@ -50,7 +50,7 @@ type fileResult struct {
 	FailedResult     *mcp.ValidationResult
 }
 
-// ValidateFile handles POST /api/validate/file (multipart "file" uploads or "url" fields, mutually exclusive).
+// ValidateFile handles POST /api/validate/file (multipart "file" uploads and/or "url" fields).
 func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 	defer func() {
 		if p := recover(); p != nil {
@@ -74,36 +74,48 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 	maxBody := int64(h.fileRegistry.MaxPerFileBytes()) * int64(h.cfg.File.MaxFiles)
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBody)
 
-	contextSource := strings.TrimSpace(c.PostForm("contextSource"))
-
-	inputs, statusCode, err := h.resolveInputs(c)
-	if form := c.Request.MultipartForm; form != nil {
+	form, formErr := c.MultipartForm()
+	if form != nil {
 		defer form.RemoveAll()
 	}
-	if err != nil {
-		h.logger.Warn("Failed to resolve file inputs", zap.Error(err))
-		if statusCode >= http.StatusInternalServerError {
-			c.JSON(http.StatusOK, gin.H{"allowed": true})
-		} else {
-			c.JSON(statusCode, gin.H{"error": err.Error()})
-		}
+	if formErr != nil {
+		h.logger.Warn("Failed to parse file inputs; allowing request",
+			zap.String("skipReason", "multipart-parse-failed"), zap.Error(formErr))
+		c.JSON(http.StatusOK, gin.H{"allowed": true})
 		return
 	}
-	defer closeInputs(inputs)
 
-	// Build request headers JSON from the hostname form field so that
-	// validationContextFromParams can extract McpServerName (Host header) and
-	// the threat dashboard shows the correct hostname — mirroring validate/request.
-	requestHeaders := strings.TrimSpace(c.PostForm("requestHeaders"))
-	if requestHeaders == "" {
-		if hostname := strings.TrimSpace(c.PostForm("hostname")); hostname != "" {
-			if b, err := json.Marshal(map[string]string{"Host": hostname}); err == nil {
-				requestHeaders = string(b)
-			}
+	contextSource := strings.TrimSpace(c.PostForm("contextSource"))
+
+	requestHeaders := h.fileRequestHeaders(c)
+
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, requestHeaders)
+
+	// Pre-flight policy gate: with no policy applicable to this caller there is nothing
+	// to enforce, so skip fetching, extracting and inspecting the content entirely.
+	if h.policyGate != nil {
+		applicable, err := h.policyGate(contextSource, requestHeaders)
+		if err != nil {
+			// Could not tell — inspect rather than assume there is nothing to enforce.
+			h.logger.Warn("Policy gate failed; inspecting content",
+				zap.String("sessionID", sessionID), zap.Error(err))
+		} else if !applicable {
+			h.logger.Info("ValidateFile - no applicable policies; allowing without inspection",
+				zap.String("contextSource", contextSource),
+				zap.String("sessionID", sessionID))
+			c.JSON(http.StatusOK, gin.H{"allowed": true})
+			return
 		}
 	}
 
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, requestHeaders)
+	inputs := h.resolveInputs(c.Request.Context(), form)
+	defer closeInputs(inputs)
+	if len(inputs) == 0 {
+		h.logger.Warn("No file inputs to inspect; allowing request",
+			zap.String("skipReason", "no-inputs"), zap.String("sessionID", sessionID))
+		c.JSON(http.StatusOK, gin.H{"allowed": true})
+		return
+	}
 
 	h.logger.Info("ValidateFile - received request",
 		zap.Int("fileCount", len(inputs)),
@@ -168,8 +180,10 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 	ext := fileprocessor.ExtensionFromFilename(input.Filename)
 	processor := h.fileRegistry.Get(ext)
 	if processor == nil {
-		fr.Allowed = false
-		fr.Reason = "unsupported file type; allowed: " + strings.Join(h.fileRegistry.SupportedExtensions(), ", ")
+		h.logger.Warn("Unsupported file type; allowing uninspected file",
+			zap.String("skipReason", "unsupported-file-type"),
+			zap.String("file", input.Filename), zap.String("ext", ext),
+			zap.Strings("supported", h.fileRegistry.SupportedExtensions()))
 		return fr
 	}
 
@@ -192,10 +206,8 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 		h.logger.Warn("No content to validate; allowing file", zap.String("file", input.Filename))
 		return fr
 	}
-	if len(chunks) > h.cfg.File.MaxChunks {
-		fr.Allowed = false
-		fr.Reason = fmt.Sprintf("file content too large: produced %d chunks (max %d)", len(chunks), h.cfg.File.MaxChunks)
-		return fr
+	if h.cfg.File.MaxChunks > 0 {
+		chunks = capInputs(h.logger, chunks, h.cfg.File.MaxChunks, "chunk")
 	}
 
 	h.logger.Info("Validating file",
@@ -275,15 +287,28 @@ func chunkBlockReason(r *mcp.ValidationResult) string {
 	return "content blocked by guardrail policy"
 }
 
-func (h *ValidationHandler) resolveInputs(c *gin.Context) ([]*fileInput, int, error) {
-	form, formErr := c.MultipartForm()
-	if formErr != nil {
-		if isBodyTooLarge(formErr) {
-			return nil, http.StatusRequestEntityTooLarge, fmt.Errorf("request body exceeds maximum allowed size")
-		}
-		return nil, http.StatusInternalServerError, fmt.Errorf("failed to parse file inputs: %w", formErr)
+func (h *ValidationHandler) fileRequestHeaders(c *gin.Context) string {
+	if raw := strings.TrimSpace(c.PostForm("requestHeaders")); raw != "" {
+		return raw
 	}
 
+	headers := make(map[string]string, 2)
+	if hostname := strings.TrimSpace(c.PostForm("hostname")); hostname != "" {
+		headers["Host"] = hostname
+	}
+	session.CopyIdentityHeaders(headers, c.Request.Header)
+	if len(headers) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(headers)
+	if err != nil {
+		h.logger.Warn("Failed to build request headers for file validation", zap.Error(err))
+		return ""
+	}
+	return string(b)
+}
+
+func (h *ValidationHandler) resolveInputs(ctx context.Context, form *multipart.Form) []*fileInput {
 	var fileHeaders []*multipart.FileHeader
 	if form != nil && form.File != nil {
 		fileHeaders = form.File["file"]
@@ -298,71 +323,58 @@ func (h *ValidationHandler) resolveInputs(c *gin.Context) ([]*fileInput, int, er
 		}
 	}
 
-	hasFiles := len(fileHeaders) > 0
-	hasURLs := len(rawURLs) > 0
-
-	if hasFiles && hasURLs {
-		return nil, http.StatusBadRequest, fmt.Errorf("provide either 'file' uploads or 'url' fields, not both")
-	}
-
-	if !hasFiles && !hasURLs {
-		return nil, http.StatusBadRequest, fmt.Errorf("provide at least one 'file' upload or 'url' field")
-	}
-
 	maxFiles := h.cfg.File.MaxFiles
 	if maxFiles <= 0 {
 		maxFiles = 1
 	}
 
-	if hasFiles {
-		if len(fileHeaders) > maxFiles {
-			return nil, http.StatusBadRequest, fmt.Errorf("too many files: %d provided (max %d)", len(fileHeaders), maxFiles)
-		}
-		return h.openUploads(fileHeaders)
+	// Uploads and URLs are no longer mutually exclusive: inspecting both is strictly safer
+	// than rejecting the request, and uploads go first so a URL can never crowd one out.
+	inputs := h.openUploads(capInputs(h.logger, fileHeaders, maxFiles, "file"))
+	if remaining := maxFiles - len(inputs); remaining > 0 {
+		inputs = append(inputs, h.fetchFromURLs(ctx, capInputs(h.logger, rawURLs, remaining, "url"))...)
+	} else if len(rawURLs) > 0 {
+		h.logger.Warn("URL inputs dropped uninspected; upload count already at the limit",
+			zap.String("skipReason", "max-files-exceeded"),
+			zap.Int("droppedURLs", len(rawURLs)), zap.Int("maxFiles", maxFiles))
 	}
-
-	if len(rawURLs) > maxFiles {
-		return nil, http.StatusBadRequest, fmt.Errorf("too many URLs: %d provided (max %d)", len(rawURLs), maxFiles)
-	}
-	return h.fetchFromURLs(c.Request.Context(), rawURLs)
+	return inputs
 }
 
-func (h *ValidationHandler) openUploads(headers []*multipart.FileHeader) ([]*fileInput, int, error) {
+// capInputs truncates items to limit, logging whatever it drops uninspected.
+func capInputs[T any](logger *zap.Logger, items []T, limit int, kind string) []T {
+	if len(items) <= limit {
+		return items
+	}
+	logger.Warn("Inputs dropped uninspected; count over limit",
+		zap.String("skipReason", "max-files-exceeded"),
+		zap.String("kind", kind),
+		zap.Int("provided", len(items)), zap.Int("limit", limit))
+	return items[:limit]
+}
+
+func (h *ValidationHandler) openUploads(headers []*multipart.FileHeader) []*fileInput {
 	inputs := make([]*fileInput, 0, len(headers))
 	for _, fh := range headers {
 		ext := fileprocessor.ExtensionFromFilename(fh.Filename)
 		limit := h.fileRegistry.MaxBytesForExt(ext)
 		if limit > 0 && fh.Size > int64(limit) {
-			closeInputs(inputs)
-			return nil, http.StatusBadRequest, fmt.Errorf("file %q is too large: %s (max %s)", fh.Filename, fileprocessor.FormatBytes(int(fh.Size)), fileprocessor.FormatBytes(limit))
+			inputs = append(inputs, &fileInput{Filename: fh.Filename, Err: fmt.Errorf(
+				"file is too large: %s (max %s)",
+				fileprocessor.FormatBytes(int(fh.Size)), fileprocessor.FormatBytes(limit))})
+			continue
 		}
-		fi, statusCode, err := openUpload(fh)
-		if err != nil {
-			if statusCode < http.StatusInternalServerError {
-				closeInputs(inputs)
-				return nil, statusCode, err
-			}
-			fi = &fileInput{Filename: fh.Filename, Err: err}
-		}
-		inputs = append(inputs, fi)
+		inputs = append(inputs, openUpload(fh))
 	}
-	return inputs, 0, nil
+	return inputs
 }
 
-func (h *ValidationHandler) fetchFromURLs(ctx context.Context, rawURLs []string) ([]*fileInput, int, error) {
+func (h *ValidationHandler) fetchFromURLs(ctx context.Context, rawURLs []string) []*fileInput {
 	inputs := make([]*fileInput, 0, len(rawURLs))
 	for _, rawURL := range rawURLs {
-		fi, statusCode, err := h.fetchFromURL(ctx, rawURL)
-		if err != nil {
-			if statusCode < http.StatusInternalServerError {
-				closeInputs(inputs)
-				return nil, statusCode, err
-			}
-			fi = &fileInput{Err: err}
-		}
-		inputs = append(inputs, fi)
+		inputs = append(inputs, h.fetchFromURL(ctx, rawURL))
 	}
-	return inputs, 0, nil
+	return inputs
 }
 
 func closeInputs(inputs []*fileInput) {
@@ -373,29 +385,30 @@ func closeInputs(inputs []*fileInput) {
 	}
 }
 
-func openUpload(fh *multipart.FileHeader) (*fileInput, int, error) {
+func openUpload(fh *multipart.FileHeader) *fileInput {
 	src, err := fh.Open()
 	if err != nil {
-		return nil, http.StatusInternalServerError, fmt.Errorf("unable to read uploaded file: %w", err)
+		return &fileInput{Filename: fh.Filename, Err: fmt.Errorf("unable to read uploaded file: %w", err)}
 	}
-	return &fileInput{Reader: src, Filename: fh.Filename}, 0, nil
+	return &fileInput{Reader: src, Filename: fh.Filename}
 }
 
-func (h *ValidationHandler) fetchFromURL(ctx context.Context, rawURL string) (*fileInput, int, error) {
+func (h *ValidationHandler) fetchFromURL(ctx context.Context, rawURL string) *fileInput {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return nil, http.StatusBadRequest, fmt.Errorf("invalid URL: %w", err)
+		return &fileInput{Err: fmt.Errorf("invalid URL: %w", err)}
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return nil, http.StatusBadRequest, fmt.Errorf("only http and https URLs are supported")
+		return &fileInput{Err: fmt.Errorf("only http and https URLs are supported, got %q", parsed.Scheme)}
 	}
 
 	ext, err := fileprocessor.ExtensionFromURL(rawURL)
 	if err != nil {
-		return nil, http.StatusBadRequest, err
+		return &fileInput{Err: err}
 	}
 	if h.fileRegistry.Get(ext) == nil {
-		return nil, http.StatusBadRequest, fmt.Errorf("unsupported file type from URL; allowed: %s", strings.Join(h.fileRegistry.SupportedExtensions(), ", "))
+		return &fileInput{Filename: filenameFromPath(parsed.Path, ext),
+			Err: fmt.Errorf("unsupported file type from URL: %q", ext)}
 	}
 
 	timeout := time.Duration(h.cfg.File.URLTimeoutSec) * time.Second
@@ -407,21 +420,22 @@ func (h *ValidationHandler) fetchFromURL(ctx context.Context, rawURL string) (*f
 		}
 	}()
 
+	filename := filenameFromPath(parsed.Path, ext)
+
 	req, err := http.NewRequestWithContext(fetchCtx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return nil, http.StatusBadRequest, fmt.Errorf("invalid URL: %w", err)
+		return &fileInput{Filename: filename, Err: fmt.Errorf("invalid URL: %w", err)}
 	}
 
 	resp, err := urlFetchClient.Do(req)
 	if err != nil {
-		return nil, http.StatusBadGateway, fmt.Errorf("failed to fetch URL: %w", err)
+		return &fileInput{Filename: filename, Err: fmt.Errorf("failed to fetch URL: %w", err)}
 	}
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
-		return nil, http.StatusBadGateway, fmt.Errorf("URL returned HTTP %d", resp.StatusCode)
+		return &fileInput{Filename: filename, Err: fmt.Errorf("URL returned HTTP %d", resp.StatusCode)}
 	}
 
-	filename := filenameFromPath(parsed.Path, ext)
 	maxSize := int64(h.fileRegistry.MaxBytesForExt(ext))
 	body := &sizeLimitedReader{
 		Reader: io.LimitReader(resp.Body, maxSize+1),
@@ -429,7 +443,7 @@ func (h *ValidationHandler) fetchFromURL(ctx context.Context, rawURL string) (*f
 		limit:  maxSize,
 	}
 	keepOpen = true // The body must remain readable until extraction finishes.
-	return &fileInput{Reader: body, Filename: filename}, 0, nil
+	return &fileInput{Reader: body, Filename: filename}
 }
 
 type cancelOnClose struct {
@@ -557,13 +571,4 @@ func marshalPromptPayload(content string) string {
 		return content
 	}
 	return string(b)
-}
-
-func isBodyTooLarge(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, "http: request body too large") ||
-		strings.Contains(msg, "max bytes")
 }
