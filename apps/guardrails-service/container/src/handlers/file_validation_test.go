@@ -112,6 +112,57 @@ func TestValidateFileInspectionFailures(t *testing.T) {
 	})
 }
 
+// The blocked-file response must match the /validate/request shape: Allowed=false plus the
+// Reason (and behaviour) that stopped the upload, so a caller sees why the file was rejected.
+func TestWriteMultiFileResponseVerdict(t *testing.T) {
+	h := &ValidationHandler{logger: zap.NewNop()}
+
+	t.Run("allow carries no reason or behaviour", func(t *testing.T) {
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		h.writeMultiFileResponse(c, []*fileResult{{Filename: "a.txt", Allowed: true}})
+
+		var resp mcp.ValidationResult
+		if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
+			t.Fatal(err)
+		}
+		if !resp.Allowed || resp.Reason != "" || resp.Behaviour != "" {
+			t.Fatalf("unexpected allow verdict: %s", recorder.Body.String())
+		}
+	})
+
+	t.Run("block carries reason and behaviour from the failing chunk", func(t *testing.T) {
+		blocked := &fileResult{
+			Filename:     "b.txt",
+			Allowed:      false,
+			Reason:       "file contains sensitive content redacted by guardrail policy (mask)",
+			FailedResult: &mcp.ValidationResult{Allowed: true, Modified: true, Behaviour: "mask", ModifiedPayload: "secret"},
+		}
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		// The first blocked file wins even when an allowed file precedes it.
+		h.writeMultiFileResponse(c, []*fileResult{{Allowed: true}, blocked})
+
+		var resp mcp.ValidationResult
+		if err := json.Unmarshal(recorder.Body.Bytes(), &resp); err != nil {
+			t.Fatal(err)
+		}
+		if resp.Allowed {
+			t.Fatalf("blocked file must not be allowed: %s", recorder.Body.String())
+		}
+		if resp.Reason != blocked.Reason {
+			t.Fatalf("reason = %q, want %q", resp.Reason, blocked.Reason)
+		}
+		if resp.Behaviour != "mask" {
+			t.Fatalf("behaviour = %q, want mask", resp.Behaviour)
+		}
+		// The endpoint enforces by blocking and must never leak the rewritten content.
+		if resp.ModifiedPayload != "" {
+			t.Fatalf("modifiedPayload must be empty, got %q", resp.ModifiedPayload)
+		}
+	})
+}
+
 func TestFileChunkFailuresDoNotHidePolicyBlocks(t *testing.T) {
 	for _, tc := range []struct {
 		name       string

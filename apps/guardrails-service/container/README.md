@@ -128,7 +128,15 @@ curl -X POST http://localhost:8080/api/validate/file \
   -F "contextSource=AGENTIC"
 ```
 
-Response includes `allowed` and, when blocked, `reason`.
+The response uses the same `ValidationResult` shape as `/validate/request` and `/validate/response`: `allowed`, and on a block the `reason` and `behaviour` that stopped the upload (the verdict from the failing chunk). `modifiedPayload` is always empty — this endpoint enforces by blocking and never returns rewritten file content.
+
+```json
+{
+  "allowed": false,
+  "reason": "file contains sensitive content redacted by guardrail policy (mask)",
+  "behaviour": "mask"
+}
+```
 
 This endpoint never rejects a request: it always answers `200` with a verdict, and `allowed: false` only ever comes from a guardrail policy (including redaction, when `FILE_VALIDATE_BLOCK_ON_REDACTION` is on). Everything that stops content from being inspected fails open and is logged with a `skipReason`:
 
