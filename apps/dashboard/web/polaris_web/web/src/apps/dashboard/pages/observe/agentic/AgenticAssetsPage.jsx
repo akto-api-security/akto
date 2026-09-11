@@ -28,21 +28,18 @@ import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentere
 import "../../../components/layouts/style.css";
 import NewLayoutTooltip from "./NewLayoutTooltip";
 import api from "../api";
-import agenticObserveApi, {
+import {
   fetchAgenticViolationCountsByHost,
   fetchViolationCountsByCollection,
   fetchAgenticSkillViolationCounts,
 } from "./agenticObserveApi";
 import {
-  buildUserAnalysisLookup,
-  buildUserAnalysisFlatMap,
   fetchAndCacheSkillApiData,
   settledValue,
   logRejected,
 } from "./constants";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
-import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import values from "@/util/values";
 import func from "@/util/func";
@@ -373,9 +370,6 @@ export default function AgenticAssetsPage() {
   const enrichRef = useRef({
     violationsByCollectionId: {},
     skillViolationsByName: {},
-    usernameMap: {},
-    analysisByKey: new Map(),
-    userAnalysisFlatMap: {},
   });
 
   useEffect(() => {
@@ -409,9 +403,9 @@ export default function AgenticAssetsPage() {
   const loadStats = useCallback(async () => {
     try {
       // trafficMap/riskScoreMap no longer sent — backend computes both itself when omitted.
-      const { violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap } = enrichRef.current;
+      const { violationsByCollectionId, skillViolationsByName } = enrichRef.current;
       const result = await api.fetchAgenticAssetsStats({
-        startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap,
+        startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName,
       });
       setStats(result);
     } catch (e) {
@@ -429,16 +423,6 @@ export default function AgenticAssetsPage() {
 
     (async () => {
       try {
-        const shieldResult = await fetchEndpointShieldUserMetadata();
-        if (!isMountedRef.current) return;
-
-        const { usernameMap = {} } = shieldResult || {};
-
-        enrichRef.current = {
-          ...enrichRef.current,
-          usernameMap,
-        };
-
         // The only grid remount — Tier 2 used to also bump this, causing an unwanted second refetch.
         setRefreshKey((k) => k + 1);
         setLoading(false);
@@ -455,27 +439,22 @@ export default function AgenticAssetsPage() {
         Promise.allSettled([
           fetchAgenticViolationCountsByHost({ startTimestamp, endTimestamp }),
           fetchAgenticSkillViolationCounts({ startTimestamp, endTimestamp }),
-          agenticObserveApi.listUserAnalysis(startTimestamp, endTimestamp),
         ])
-          .then(async ([hostCountsSettled, skillViolationsSettled, userAnalysisSettled]) => {
+          .then(async ([hostCountsSettled, skillViolationsSettled]) => {
             if (!isMountedRef.current) return;
-            logRejected("AgenticAssetsPage tier-2", { violations: hostCountsSettled, skills: skillViolationsSettled, userAnalysis: userAnalysisSettled });
+            logRejected("AgenticAssetsPage tier-2", { violations: hostCountsSettled, skills: skillViolationsSettled });
             const hostCounts = settledValue(hostCountsSettled, {});
             const skillViolationsByName = settledValue(skillViolationsSettled, {});
-            const userAnalysisList = settledValue(userAnalysisSettled, []);
             // Host -> collection-id attribution now happens server-side (no raw collection list
             // needed client-side for this — see attributeViolationCountsToCollections). Skills
             // aren't attributable by host at all (see skillViolationsByName's own comment), so
             // fetchAgenticSkillViolationCounts above already returns them keyed by skill name.
             const violationsByCollectionId = await fetchViolationCountsByCollection(hostCounts);
             if (!isMountedRef.current) return;
-            const analysisByKey = buildUserAnalysisLookup(userAnalysisList);
             enrichRef.current = {
               ...enrichRef.current,
               violationsByCollectionId,
               skillViolationsByName,
-              analysisByKey,
-              userAnalysisFlatMap: buildUserAnalysisFlatMap(analysisByKey),
             };
             setHostSeverityCounts(hostCounts);
             loadStats(); // refined pass — no setRefreshKey, so this never remounts the grid
@@ -505,7 +484,7 @@ export default function AgenticAssetsPage() {
     // AG Grid SSRM sends sortOrder: -1 for asc, 1 for desc — opposite of the backend's Mongo
     // convention (1 asc / -1 desc, matching NhiGovernanceViolationsAction's own onServerFetch).
     const mongoSortOrder = sortOrder ? -sortOrder : -1;
-    const { userAnalysisFlatMap, violationsByCollectionId, skillViolationsByName, usernameMap } = enrichRef.current;
+    const { violationsByCollectionId, skillViolationsByName } = enrichRef.current;
 
     // trafficMap/riskScoreMap omitted — backend computes both server-side now.
     return api.fetchAgenticAssetsSummary({
@@ -516,7 +495,6 @@ export default function AgenticAssetsPage() {
       queryValue: searchString || undefined,
       startTimestamp,
       endTimestamp,
-      userAnalysisFlatMap,
       filters,
       // Precomputed account-wide already (attributeViolationCountsToCollections, via
       // fetchViolationCountsByCollection in the Tier-2 mount effect below) — passed straight through
@@ -527,8 +505,6 @@ export default function AgenticAssetsPage() {
       // is shared with the agent/device that invoked it, so collection-based attribution can't
       // give a skill its own count (see fetchAgenticSkillViolationCounts's own comment).
       skillViolationsByName,
-      // Endpoint Shield username map, so the server can precompute each row's AI-interaction totals.
-      usernameMap,
     }).then((res) => ({
       value: (res.rows || []).map((row) => shapeRow(row)),
       total: res.total || 0,
