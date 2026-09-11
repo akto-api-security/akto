@@ -27,8 +27,16 @@ func ExtractSessionID(headers map[string]string) string {
 	return ""
 }
 
+// InstallerUserEmailHeader is the canonical spelling of the header carrying the user a
+// request belongs to. Write it with this key; read it with ExtractInstallerUserEmail.
+const InstallerUserEmailHeader = "X-Akto-Installer-User_email"
+
+// tagKeyBrowserLLMAccountEmail is where the browser extension puts the signed-in account
+// email: in the request tag, not in the headers.
+const tagKeyBrowserLLMAccountEmail = "browser-llm-account-email"
+
 var installerUserEmailHeaders = []string{
-	"X-Akto-Installer-User_email", "x-akto-installer-user_email",
+	InstallerUserEmailHeader, "x-akto-installer-user_email",
 }
 
 // ExtractInstallerUserEmail extracts the installer-supplied user email, used to resolve
@@ -49,10 +57,32 @@ func CopyIdentityHeaders(dst map[string]string, h http.Header) {
 	for _, key := range installerUserEmailHeaders {
 		// http.Header.Get is case-insensitive, so the first key covers both spellings.
 		if val := strings.TrimSpace(h.Get(key)); val != "" {
-			dst[installerUserEmailHeaders[0]] = val
+			dst[InstallerUserEmailHeader] = val
 			return
 		}
 	}
+}
+
+// AccountEmailFromTag extracts the signed-in account email from a request tag (a JSON map,
+// e.g. {"browser-llm-account-email":"someone@example.com"}). Empty when the tag is absent,
+// unparseable, or carries a placeholder rather than an address.
+//
+// Callers convert this into InstallerUserEmailHeader at the edge, so that everything
+// downstream resolves the user from the headers alone.
+func AccountEmailFromTag(tag string) string {
+	tag = strings.TrimSpace(tag)
+	if tag == "" {
+		return ""
+	}
+	var m map[string]string
+	if err := json.Unmarshal([]byte(tag), &m); err != nil {
+		return ""
+	}
+	email := strings.TrimSpace(m[tagKeyBrowserLLMAccountEmail])
+	if !strings.Contains(email, "@") {
+		return ""
+	}
+	return email
 }
 
 // ExtractRequestID extracts request ID from various headers with fallback

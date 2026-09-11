@@ -99,6 +99,8 @@ Content-Type: application/json
 }
 ```
 
+**Policy targeting on this endpoint:** a policy scoped to Devices matches the first dot-separated segment of the `Host` header in `requestHeaders`; a policy scoped to Users matches the `x-akto-installer-user_email` header there. A caller that names the signed-in user in `tag` instead, under `browser-llm-account-email` — the browser extension does — has it converted into that header on the way in, so Users-scoped policies apply to its prompts. An explicitly sent header always wins. `/api/validate/file` does the same conversion; `/api/validate/response` and the ingest/batch path do not.
+
 **Validate Response:** uses the same traffic-envelope fields as validate request (`ValidateRequestParams`). Supply the body to check as **`responsePayload`**, or legacy **`payload`** (both names are accepted; `responsePayload` wins if both are set).
 
 ```bash
@@ -140,7 +142,7 @@ The response uses the same `ValidationResult` shape as `/validate/request` and `
 
 This endpoint never rejects a request: it always answers `200` with a verdict, and `allowed: false` only ever comes from a guardrail policy (including redaction, when `FILE_VALIDATE_BLOCK_ON_REDACTION` is on). Everything that stops content from being inspected fails open and is logged with a `skipReason`:
 
-- **Nothing applies** — before any content is read, the service checks whether any policy applies to the caller (context source plus `Host`/installer user email). With none, it allows immediately without fetching, extracting or inspecting. If the policy list can't be loaded, content is inspected rather than allowed.
+- **Nothing applies** — before any content is read, the service checks whether any policy applies to the caller. Identity comes from the context source, the `Host` header (whose first segment is the device label a Devices-scoped policy matches on), and the `x-akto-installer-user_email` header (which a Users-scoped policy matches on). A caller that names the signed-in user in the `tag` field instead, under `browser-llm-account-email` — the browser extension does — has it converted into that header on the way in, so policy targeting only ever reads headers. An explicitly sent header always wins. With no policy applicable, the file is allowed immediately without fetching, extracting or inspecting. If the policy list can't be loaded, content is inspected rather than allowed.
 - **Per input** — unreadable uploads, files over the per-type size limit, unparseable URLs, non-`http(s)` schemes, unsupported or missing extensions, URL-fetch failures and non-200 responses, parsing errors and empty extracted text all allow that one input. The other inputs are still inspected.
 - **Whole request** — an unparseable multipart body (including one past the max body size) allows, since there is nothing left to inspect.
 - **Over a limit** — inputs past `FILE_VALIDATE_MAX_FILES` and chunks past `FILE_VALIDATE_MAX_CHUNKS` are dropped uninspected; whatever fits under the limit is still inspected, so padding a request cannot switch inspection off for the rest of it.

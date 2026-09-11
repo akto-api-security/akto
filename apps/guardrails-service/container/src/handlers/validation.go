@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -62,6 +63,39 @@ func NewValidationHandler(validatorService *validator.Service, logger *zap.Logge
 		h.policyGate = validatorService.HasApplicablePolicies
 	}
 	return h
+}
+
+// applyIdentityFromTag converts a tag-supplied account email into the identity header that
+// policy targeting reads, so a caller that names its user in the tag (the browser
+// extension, whose requestHeaders carry only Host) resolves against a policy's Users
+// selection the same way an installer-supplied header would. A no-op for callers that
+// already send the header, or send no account email at all.
+func (h *ValidationHandler) applyIdentityFromTag(params *models.ValidateRequestParams) {
+	params.RequestHeaders = h.withInstallerUserEmail(params.RequestHeaders, session.AccountEmailFromTag(params.Tag))
+}
+
+// withInstallerUserEmail adds email to a caller-supplied request-headers JSON unless it
+// already names a user. The original string is returned untouched when there is nothing to
+// add or it is not a flat header map, so a caller's headers are never reshaped needlessly.
+func (h *ValidationHandler) withInstallerUserEmail(raw, email string) string {
+	if email == "" {
+		return raw
+	}
+	var headers map[string]string
+	if err := json.Unmarshal([]byte(raw), &headers); err != nil || headers == nil {
+		h.logger.Warn("Could not add the user email to request headers; leaving them as sent",
+			zap.Error(err))
+		return raw
+	}
+	if session.ExtractInstallerUserEmail(headers) != "" {
+		return raw
+	}
+	headers[session.InstallerUserEmailHeader] = email
+	b, err := json.Marshal(headers)
+	if err != nil {
+		return raw
+	}
+	return string(b)
 }
 
 // IngestData handles batch data ingestion and validation
@@ -174,6 +208,10 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		})
 		return
 	}
+
+	// Normalise the caller's identity before anything reads the headers, so a user named
+	// only in the tag still resolves against a policy's Users selection.
+	h.applyIdentityFromTag(&req)
 
 	// Extract session and request IDs from headers (falling back to the body's
 	// requestHeaders JSON for traffic forwarded via /api/http-proxy).

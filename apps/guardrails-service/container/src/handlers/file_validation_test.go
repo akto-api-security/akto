@@ -399,6 +399,10 @@ func TestValidateFilePolicyGate(t *testing.T) {
 			if contextSource != "AGENTIC" {
 				t.Errorf("contextSource = %q, want AGENTIC", contextSource)
 			}
+			// The user must already be resolvable from the headers the gate is handed.
+			if !strings.Contains(requestHeaders, "someone@example.com") {
+				t.Errorf("requestHeaders = %q, want the account email", requestHeaders)
+			}
 			return false, nil
 		})
 		// A URL input proves nothing is fetched either: this server must never be hit.
@@ -411,6 +415,7 @@ func TestValidateFilePolicyGate(t *testing.T) {
 		c, _ := gin.CreateTestContext(recorder)
 		c.Request = fileUploadRequest(t, "doc.pdf", "content", map[string]string{
 			"contextSource": "AGENTIC", "url": server.URL + "/doc.pdf",
+			"tag": `{"browser-llm-account-email":"someone@example.com"}`,
 		})
 		h.ValidateFile(c)
 
@@ -482,6 +487,69 @@ func TestFileRequestHeaders(t *testing.T) {
 		})
 		if got := h.fileRequestHeaders(c); got != raw {
 			t.Fatalf("headers = %q, want %q", got, raw)
+		}
+	})
+
+	// The browser extension names the signed-in user in the tag, not the headers; the
+	// endpoint converts it once here so policy targeting downstream only reads headers.
+	t.Run("account email in the tag becomes an identity header", func(t *testing.T) {
+		for _, tc := range []struct {
+			name   string
+			fields map[string]string
+		}{
+			{"synthesized headers", map[string]string{
+				"hostname": "someone.chrome.chatgpt.com",
+				"tag":      `{"gen-ai":"Gen AI","browser-llm-account-email":"someone@example.com"}`,
+			}},
+			// The extension sends both: requestHeaders with only Host, and the tag.
+			{"caller-supplied headers", map[string]string{
+				"requestHeaders": `{"host":"someone.chrome.chatgpt.com"}`,
+				"tag":            `{"browser-llm-account-email":"someone@example.com"}`,
+			}},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				c, _ := gin.CreateTestContext(httptest.NewRecorder())
+				c.Request = fileUploadRequest(t, "", "", tc.fields)
+
+				var headers map[string]string
+				if err := json.Unmarshal([]byte(h.fileRequestHeaders(c)), &headers); err != nil {
+					t.Fatal(err)
+				}
+				if got := session.ExtractInstallerUserEmail(headers); got != "someone@example.com" {
+					t.Fatalf("installer email = %q, want someone@example.com", got)
+				}
+				if headers["host"] == "" && headers["Host"] == "" {
+					t.Fatalf("Host was lost: %v", headers)
+				}
+			})
+		}
+	})
+
+	t.Run("a real identity header outranks the tag", func(t *testing.T) {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = fileUploadRequest(t, "", "", map[string]string{
+			"hostname": "api.example.com",
+			"tag":      `{"browser-llm-account-email":"tag@example.com"}`,
+		})
+		c.Request.Header.Set("x-akto-installer-user_email", "header@example.com")
+
+		var headers map[string]string
+		if err := json.Unmarshal([]byte(h.fileRequestHeaders(c)), &headers); err != nil {
+			t.Fatal(err)
+		}
+		if got := session.ExtractInstallerUserEmail(headers); got != "header@example.com" {
+			t.Fatalf("installer email = %q, want the header value", got)
+		}
+	})
+
+	t.Run("headers without a usable tag email are passed through untouched", func(t *testing.T) {
+		raw := `{"Host":"forwarded.example.com"}`
+		for _, tag := range []string{"", "not json", `{"gen-ai":"Gen AI"}`, `{"browser-llm-account-email":"not-signed-in"}`} {
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = fileUploadRequest(t, "", "", map[string]string{"requestHeaders": raw, "tag": tag})
+			if got := h.fileRequestHeaders(c); got != raw {
+				t.Fatalf("tag %q reshaped the headers: %q", tag, got)
+			}
 		}
 	})
 

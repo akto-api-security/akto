@@ -288,8 +288,10 @@ func chunkBlockReason(r *mcp.ValidationResult) string {
 }
 
 func (h *ValidationHandler) fileRequestHeaders(c *gin.Context) string {
+	tagEmail := session.AccountEmailFromTag(c.PostForm("tag"))
+
 	if raw := strings.TrimSpace(c.PostForm("requestHeaders")); raw != "" {
-		return raw
+		return h.withInstallerUserEmail(raw, tagEmail)
 	}
 
 	headers := make(map[string]string, 2)
@@ -297,6 +299,9 @@ func (h *ValidationHandler) fileRequestHeaders(c *gin.Context) string {
 		headers["Host"] = hostname
 	}
 	session.CopyIdentityHeaders(headers, c.Request.Header)
+	if session.ExtractInstallerUserEmail(headers) == "" && tagEmail != "" {
+		headers[session.InstallerUserEmailHeader] = tagEmail
+	}
 	if len(headers) == 0 {
 		return ""
 	}
