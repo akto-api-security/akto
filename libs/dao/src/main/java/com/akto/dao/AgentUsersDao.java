@@ -5,6 +5,7 @@ import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.DeviceTag;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -16,9 +17,11 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -325,5 +328,30 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
     @Override
     public Class<AgenticUsers> getClassT() {
         return AgenticUsers.class;
+    }
+
+    // Username -> device tags (key/value/source only, the fields the UI reads), deduped like fetchAgenticUsers.
+    public Map<String, List<Map<String, String>>> fetchDeviceTagsByUsername() {
+        Map<String, List<Map<String, String>>> result = new HashMap<>();
+        List<AgenticUsers> users = findAll(Filters.empty(),
+                Projections.include(AgenticUsers.USER_NAME, AgenticUsers.DEVICE_TAGS));
+        for (AgenticUsers u : users) {
+            String username = u.getUserName() == null ? "" : u.getUserName().trim();
+            if (username.isEmpty() || u.getDeviceTags() == null) continue;
+
+            List<Map<String, String>> tags = result.computeIfAbsent(username, k -> new ArrayList<>());
+            for (DeviceTag t : u.getDeviceTags()) {
+                if (t == null || t.getKey() == null) continue;
+                boolean alreadyPresent = tags.stream().anyMatch(m ->
+                        Objects.equals(m.get(DeviceTag.KEY), t.getKey()) && Objects.equals(m.get(DeviceTag.VALUE), t.getValue()));
+                if (alreadyPresent) continue;
+                Map<String, String> tagMap = new HashMap<>();
+                tagMap.put(DeviceTag.KEY, t.getKey());
+                tagMap.put(DeviceTag.VALUE, t.getValue());
+                tagMap.put(DeviceTag.SOURCE, t.getSource());
+                tags.add(tagMap);
+            }
+        }
+        return result;
     }
 }
