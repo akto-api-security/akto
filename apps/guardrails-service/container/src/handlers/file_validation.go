@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
@@ -543,8 +544,36 @@ func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload strin
 	return &chunkResult{Err: lastErr}
 }
 
+// fileValidationVerdict is the lowercase-keyed JSON form of the file endpoint's verdict.
+// The mcp.ValidationResult library struct marshals with capitalized Go field names
+// (Allowed, Reason, ...); this DTO keeps the same fields but the lowercase keys clients
+// expect. Only the file endpoint uses it; /validate/request and /validate/response are
+// unchanged.
+type fileValidationVerdict struct {
+	Allowed         bool                 `json:"allowed"`
+	Modified        bool                 `json:"modified"`
+	ModifiedPayload string               `json:"modifiedPayload"`
+	Reason          string               `json:"reason"`
+	Metadata        types.ThreatMetadata `json:"metadata"`
+	Behaviour       string               `json:"behaviour,omitempty"`
+}
+
+func newFileValidationVerdict(r *mcp.ValidationResult) fileValidationVerdict {
+	if r == nil {
+		return fileValidationVerdict{Allowed: true}
+	}
+	return fileValidationVerdict{
+		Allowed:         r.Allowed,
+		Modified:        r.Modified,
+		ModifiedPayload: r.ModifiedPayload,
+		Reason:          r.Reason,
+		Metadata:        r.Metadata,
+		Behaviour:       r.Behaviour,
+	}
+}
+
 func (h *ValidationHandler) writeMultiFileResponse(c *gin.Context, results []*fileResult) {
-	c.JSON(http.StatusOK, fileVerdict(results))
+	c.JSON(http.StatusOK, newFileValidationVerdict(fileVerdict(results)))
 }
 
 // fileVerdict collapses the per-file results into a single mcp.ValidationResult so the
@@ -572,7 +601,7 @@ func fileVerdict(results []*fileResult) *mcp.ValidationResult {
 // allowFile writes the fail-open verdict shared by every path that cannot (or need not)
 // inspect content, in the same mcp.ValidationResult shape as a validated allow.
 func allowFile(c *gin.Context) {
-	c.JSON(http.StatusOK, &mcp.ValidationResult{Allowed: true})
+	c.JSON(http.StatusOK, newFileValidationVerdict(nil))
 }
 
 func marshalPromptPayload(content string) string {
