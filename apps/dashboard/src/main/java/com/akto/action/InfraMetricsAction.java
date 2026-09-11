@@ -22,6 +22,8 @@ import org.bson.Document;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -32,11 +34,46 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsAction.class, LogDb.DASHBOARD);;
 
+    private static final String METRICS_AUTH_TOKEN_ENV = "METRICS_AUTH_TOKEN";
+    private static final String BEARER_PREFIX = "Bearer ";
+
+    /**
+     * Prometheus scrape endpoint (/metrics). Emits pure Prometheus text exposition.
+     *
+     * Gated purely by the METRICS_AUTH_TOKEN env var: if it is unset the endpoint is
+     * disabled (404) so metrics are never publicly exposed by default; if set, callers
+     * must present a matching "Authorization: Bearer <token>" header.
+     */
     @Override
     public String execute() throws Exception {
-        // todo: move this once we have proper way to scrape metrics
-        // InfraMetricsListener.registry.scrape(servletResponse.getWriter());
+        String configuredToken = System.getenv(METRICS_AUTH_TOKEN_ENV);
+        if (configuredToken == null || configuredToken.trim().isEmpty()) {
+            servletResponse.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            return null;
+        }
+
+        String presentedToken = null;
+        String authHeader = servletRequest.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
+            presentedToken = authHeader.substring(BEARER_PREFIX.length()).trim();
+        }
+
+        if (presentedToken == null || !constantTimeEquals(configuredToken, presentedToken)) {
+            servletResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            return null;
+        }
+
+        servletResponse.setContentType("text/plain; version=0.0.4; charset=utf-8");
+        PrintWriter out = servletResponse.getWriter();
+        InfraMetricsListener.registry.scrape(out);
+        out.flush();
+        out.close();
         return null;
+    }
+
+    private static boolean constantTimeEquals(String a, String b) {
+        if (a == null || b == null) return false;
+        return MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8), b.getBytes(StandardCharsets.UTF_8));
     }
 
     private static final ExecutorService executorService = Executors.newFixedThreadPool(2);
