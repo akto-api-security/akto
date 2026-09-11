@@ -20,12 +20,10 @@ public class Main {
     final static String connectionUri = 
     System.getenv("POSTGRES_URL");
     // "jdbc:postgresql://localhost:5432/shivansh";
-    final static String user = 
-    System.getenv("POSTGRES_USER");
-    // "shivansh";
-    final static String password = 
-    System.getenv("POSTGRES_PASSWORD");
-    // "example";
+    final static String user =
+    com.akto.util.SecretUtils.readSecret("POSTGRES_USER");
+    final static String password =
+    com.akto.util.SecretUtils.readSecret("POSTGRES_PASSWORD");
     
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
@@ -118,7 +116,10 @@ public class Main {
         final String url = connectionUri;
         final PGSimpleDataSource dataSource = new PGSimpleDataSource();
         if (connectionUri == null || user == null || password == null) {
-            logger.info("createDataSource values: " + connectionUri + " user: " + user + " password: " + password );
+            logger.error("Postgres datasource is not fully configured. missing: "
+                    + (connectionUri == null ? "POSTGRES_URL " : "")
+                    + (user == null ? "POSTGRES_USER " : "")
+                    + (password == null ? "POSTGRES_PASSWORD" : ""));
             return dataSource;
         }
         dataSource.setUrl(url);

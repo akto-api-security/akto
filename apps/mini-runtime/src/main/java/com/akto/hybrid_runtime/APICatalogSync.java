@@ -1650,6 +1650,13 @@ public class APICatalogSync {
         loggerMaker.debug("Inserting bulk sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
 
         if (accountLevelRedact || apiCollectionLevelRedact) {
+            if (publicKey == null) {
+                loggerMaker.errorAndAddToDb("acc: " + Context.accountId.get() + ", apiCollectionId: "
+                        + apiCollectionId + ", redaction is enabled but the public key is unavailable, "
+                        + "so samples are not stored in postgres rather than stored unencrypted. "
+                        + "Check PUBLIC_KEY / PUBLIC_KEY_FILE, then restart the pod: the key is read "
+                        + "once at startup.");
+            }
             try {
                 long start = System.currentTimeMillis();
                 List<SampleDataAlt> samplesBatch = new ArrayList<>();
@@ -1733,17 +1740,23 @@ public class APICatalogSync {
                         Key id = sample.getId();
                         int accountId = Context.accountId.get();
                         String piiRedactedSample = RedactSampleData.redactIfRequired(s, false, false);
+                        // This copy is protected by encryption alone - redactIfRequired is
+                        // called with both flags false above - so if the key is missing or
+                        // encryption fails, the sample must be dropped rather than stored in
+                        // clear. Failing closed here keeps unencrypted payloads out of the
+                        // database when PUBLIC_KEY / PUBLIC_KEY_FILE is misconfigured.
+                        boolean encrypted = false;
                         if (publicKey != null) {
                             try {
-                                piiRedactedSample = PayloadEncodeUtil.encryptAndPack(piiRedactedSample, publicKey);                                
+                                piiRedactedSample = PayloadEncodeUtil.encryptAndPack(piiRedactedSample, publicKey);
+                                encrypted = true;
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb("error encoding payload string " + e.getMessage());
                             }
                         }
-                        SampleDataAlt sampleDataAlt = new SampleDataAlt(uuid, piiRedactedSample, id.getApiCollectionId(),
-                                id.getMethod().name(), id.getUrl(), id.getResponseCode(), now, accountId);
-                        if (sample.getId().getApiCollectionId() != 0) {
-                            unfilteredSamples.add(sampleDataAlt);
+                        if (encrypted && sample.getId().getApiCollectionId() != 0) {
+                            unfilteredSamples.add(new SampleDataAlt(uuid, piiRedactedSample, id.getApiCollectionId(),
+                                    id.getMethod().name(), id.getUrl(), id.getResponseCode(), now, accountId));
                         }
                         sampleIds.add(uuid.toString());
 
