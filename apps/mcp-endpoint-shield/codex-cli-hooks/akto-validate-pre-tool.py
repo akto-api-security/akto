@@ -500,6 +500,7 @@ def main():
             else:
                 block_reason = gr_reason or "Policy violation"
 
+            # PreToolUse: documented deny shape (hookSpecificOutput only; no continue/stopReason).
             output = {
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
