@@ -17,6 +17,7 @@ import { LABELS } from "../threat_detection/constants";
 import SusDataTable from "../threat_detection/components/SusDataTable";
 import NormalSampleDetails from "../threat_detection/components/NormalSampleDetails";
 import { extractBehaviour } from "../threat_detection/utils/formatUtils";
+import { downloadMaliciousEventsAsJson } from "../threat_detection/utils/exportEvents";
 
 // Apply ?category= before the first render — same as GuardrailPolicies.jsx. A link opened in a new
 // tab has no PersistStore session, so without this the page would load the wrong category.
@@ -56,6 +57,7 @@ function GuardrailDetection() {
     const [currentHumanResponse, setCurrentHumanResponse] = useState(null)
     const [triggerTableRefresh, setTriggerTableRefresh] = useState(0)
     const applyPayloadSearchRef = useRef(() => {});
+    const applyExportRef = useRef(async () => ({ maliciousEvents: [] }));
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
 
@@ -105,6 +107,7 @@ function GuardrailDetection() {
             refreshNonce={triggerTableRefresh}
             label={LABELS.GUARDRAIL}
             onRegisterPayloadSearch={(fn) => { applyPayloadSearchRef.current = fn; }}
+            onRegisterExport={(fn) => { applyExportRef.current = fn; }}
         />,
         !showNewTab ? <NormalSampleDetails
             title={"Attacker payload"}
@@ -128,6 +131,13 @@ function GuardrailDetection() {
             />
     ]
 
+    const exportJson = async () => {
+        // Reuses the exact filters/tab/search currently applied on the table (registered by
+        // SusDataTable via onRegisterExport), instead of dumping every event regardless of filters.
+        const res = await applyExportRef.current();
+        downloadMaliciousEventsAsJson(res?.maliciousEvents, "guardrail_events.json");
+    }
+
     const secondaryActionsComp = (
         <HorizontalStack gap={2}>
             <Popover
@@ -150,7 +160,7 @@ function GuardrailDetection() {
                                     items: [
                                         {
                                             content: 'Export',
-                                            onAction: () => {},
+                                            onAction: () => exportJson(),
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         }
                                     ]

@@ -2,13 +2,16 @@ import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } 
 import { useNavigate, useLocation } from "react-router-dom";
 import { produce } from "immer";
 import {
+    ActionList,
     Badge,
     Box,
     Button,
     Card,
     HorizontalGrid,
     HorizontalStack,
+    Icon,
     Modal,
+    Popover,
     RadioButton,
     Tabs,
     Text,
@@ -16,6 +19,7 @@ import {
     Tooltip,
     VerticalStack,
 } from "@shopify/polaris";
+import { FileMinor } from "@shopify/polaris-icons";
 
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
@@ -36,6 +40,7 @@ import LocalStore from "@/apps/main/LocalStorageStore";
 import guardrailApi from "@/apps/dashboard/pages/guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "@/apps/dashboard/pages/guardrails/utils";
 import { resolveComplianceClauseMap, loadGuardrailComplianceMap, formatActorId, actorIdDisplayText } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
+import { downloadMaliciousEventsAsJson } from "@/apps/dashboard/pages/threat_detection/utils/exportEvents";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
 import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
 
@@ -865,6 +870,7 @@ function Violations() {
     const [bulkSelectedCount, setBulkSelectedCount] = useState(0);
     const [bulkPendingCount, setBulkPendingCount] = useState(0);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [moreActionsOpen, setMoreActionsOpen] = useState(false);
     const [filterValues, setFilterValues] = useState({ hosts: [], subCategory: [], actors: [] });
     const [latencyData, setLatencyData] = useState(null);
     const [activeSeverityFilter, setActiveSeverityFilter] = useState(new Set());
@@ -1366,7 +1372,10 @@ function Violations() {
     // ─── Server-side data fetch for AG Grid (replaces fetch-all-then-filter) ──
     // Uses the existing fetchSuspectSampleData API that SusDataTable also uses.
     // AgGridTable's onServerFetch mode handles pagination, sort, and search automatically.
-    const onServerFetch = useCallback(({ filters, sortKey, sortOrder, skip, limit, searchString }) => {
+    // Split out the pure request-building + response fetch (no setState) from onServerFetch's grid
+    // side-effects, so Export can reuse the exact same filters without disturbing the visible page.
+    const lastServerFetchArgsRef = useRef({ filters: {} });
+    const fetchViolations = useCallback(({ filters, sortKey, sortOrder, skip, limit, searchString }) => {
         const severityFilter = filters?.severity || [];
         const hostFilter = [...new Set([...(filters?.user || []), ...activeAssetFilter])];
         // Union the column filter, the "Top Policies" card selection, and the pie's type filter
@@ -1420,29 +1429,48 @@ function Violations() {
             riskScoreFilter?.type,
             riskScoreFilter?.filter,
         ).then(result => {
-            const events = result?.maliciousEvents || [];
-            let transformed = events.map(e => transformEvent(e, collectionsMap, usernameMapRef.current, guardrailComplianceMapRef.current));
+            const rawEvents = result?.maliciousEvents || [];
+            let transformed = rawEvents.map(e => transformEvent(e, collectionsMap, usernameMapRef.current, guardrailComplianceMapRef.current));
             let total = result?.total || 0;
             // Needs Approval: keep only approval-behaviour rows, and drop rows whose (policy, server)
             // is already approved for that policy — same filter as SusDataTable.jsx.
             if (isNeedsApprovalTab) {
-                transformed = transformed.filter(r =>
-                    String(r.behaviourRaw || '').toLowerCase() === 'approval' &&
-                    !isServerApproved(guardrailApprovedByPolicy, r.filterId, r.host)
-                );
+                const keepIds = new Set();
+                transformed = transformed.filter(r => {
+                    const keep = String(r.behaviourRaw || '').toLowerCase() === 'approval' &&
+                        !isServerApproved(guardrailApprovedByPolicy, r.filterId, r.host);
+                    if (keep) keepIds.add(r.id);
+                    return keep;
+                });
                 total = transformed.length;
+                return { value: transformed, total, rawEvents: rawEvents.filter(e => keepIds.has(e.id)) };
             }
-            setRows(transformed);
+            return { value: transformed, total, rawEvents };
+        });
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, activeAssetFilter, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, guardrailApprovedByPolicy, advancedFilters]);
+
+    const onServerFetch = useCallback((args) => {
+        lastServerFetchArgsRef.current = args;
+        return fetchViolations(args).then(({ value, total }) => {
+            setRows(value);
             if (pendingDeepLinkRefId.current) {
-                const deepLinkMatch = transformed.find(r => r.refId === pendingDeepLinkRefId.current);
+                const deepLinkMatch = value.find(r => r.refId === pendingDeepLinkRefId.current);
                 if (deepLinkMatch) {
                     setSelectedViolation(deepLinkMatch);
                     pendingDeepLinkRefId.current = null;
                 }
             }
-            return { value: transformed, total };
+            return { value, total };
         });
-    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, activeAssetFilter, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, guardrailApprovedByPolicy, advancedFilters]);
+    }, [fetchViolations]);
+
+    // Export the currently filtered view (same filters/tab/search/sort as the visible grid last
+    // fetched with) instead of dumping every event — mirrors GuardrailDetection/ThreatDetectionPage.
+    const exportViolations = async () => {
+        const args = lastServerFetchArgsRef.current || { filters: {} };
+        const { rawEvents } = await fetchViolations({ ...args, skip: 0, limit: 2000 });
+        downloadMaliciousEventsAsJson(rawEvents, "guardrail_violations.json");
+    };
 
     // Reload the grid when the Top Policies card selection changes (skip the initial mount).
     const policyFilterFirstRun = useRef(true);
@@ -1821,8 +1849,38 @@ function Violations() {
             isFirstPage
             secondaryActions={
                 <HorizontalStack gap="2" blockAlign="center">
-                    <InsightsEntryButton granted={insights.granted} onClick={insights.handleOpen} label="Guardrail Insights" />
                     <NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />
+                    <InsightsEntryButton granted={insights.granted} onClick={insights.handleOpen} label="Guardrail Insights" />
+                    <Popover
+                        active={moreActionsOpen}
+                        activator={(
+                            <Button onClick={() => setMoreActionsOpen((v) => !v)} disclosure removeUnderline>
+                                More Actions
+                            </Button>
+                        )}
+                        autofocusTarget="first-node"
+                        onClose={() => setMoreActionsOpen(false)}
+                    >
+                        <Popover.Pane fixed>
+                            <Box minWidth="200px">
+                                <ActionList
+                                    actionRole="menuitem"
+                                    sections={[
+                                        {
+                                            title: "Export",
+                                            items: [
+                                                {
+                                                    content: "Export",
+                                                    onAction: () => { setMoreActionsOpen(false); exportViolations(); },
+                                                    prefix: <Box><Icon source={FileMinor} /></Box>,
+                                                },
+                                            ],
+                                        },
+                                    ]}
+                                />
+                            </Box>
+                        </Popover.Pane>
+                    </Popover>
                 </HorizontalStack>
             }
             primaryAction={
