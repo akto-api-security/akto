@@ -56,18 +56,18 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 		if p := recover(); p != nil {
 			h.logger.Error("File validation panicked; allowing file", zap.Any("panic", p))
 			if !c.Writer.Written() {
-				c.JSON(http.StatusOK, gin.H{"allowed": true})
+				allowFile(c)
 			}
 		}
 	}()
 	if h.cfg == nil {
 		h.logger.Error("File validation config is nil; allowing file")
-		c.JSON(http.StatusOK, gin.H{"allowed": true})
+		allowFile(c)
 		return
 	}
 
 	if !h.cfg.File.Enabled {
-		c.JSON(http.StatusOK, gin.H{"allowed": true})
+		allowFile(c)
 		return
 	}
 
@@ -81,7 +81,7 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 	if formErr != nil {
 		h.logger.Warn("Failed to parse file inputs; allowing request",
 			zap.String("skipReason", "multipart-parse-failed"), zap.Error(formErr))
-		c.JSON(http.StatusOK, gin.H{"allowed": true})
+		allowFile(c)
 		return
 	}
 
@@ -103,7 +103,7 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 			h.logger.Info("ValidateFile - no applicable policies; allowing without inspection",
 				zap.String("contextSource", contextSource),
 				zap.String("sessionID", sessionID))
-			c.JSON(http.StatusOK, gin.H{"allowed": true})
+			allowFile(c)
 			return
 		}
 	}
@@ -113,7 +113,7 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 	if len(inputs) == 0 {
 		h.logger.Warn("No file inputs to inspect; allowing request",
 			zap.String("skipReason", "no-inputs"), zap.String("sessionID", sessionID))
-		c.JSON(http.StatusOK, gin.H{"allowed": true})
+		allowFile(c)
 		return
 	}
 
@@ -544,25 +544,35 @@ func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload strin
 }
 
 func (h *ValidationHandler) writeMultiFileResponse(c *gin.Context, results []*fileResult) {
-	overallAllowed := true
-	var overallReason string
+	c.JSON(http.StatusOK, fileVerdict(results))
+}
 
+// fileVerdict collapses the per-file results into a single mcp.ValidationResult so the
+// file endpoint answers in the same shape as /validate/request and /validate/response:
+// `Allowed` plus, on a block, the `Reason` and `behaviour` that stopped the upload. The
+// first blocked file wins (evaluation already stops at it). ModifiedPayload is always
+// left empty — this endpoint enforces by blocking and never returns rewritten file
+// content (see chunkStopsFile).
+func fileVerdict(results []*fileResult) *mcp.ValidationResult {
 	for _, fr := range results {
-		if !fr.Allowed {
-			overallAllowed = false
-			overallReason = fr.Reason
-			break
+		if fr.Allowed {
+			continue
 		}
+		verdict := &mcp.ValidationResult{Allowed: false, Reason: fr.Reason}
+		if fr.FailedResult != nil {
+			verdict.Behaviour = fr.FailedResult.Behaviour
+			verdict.Modified = fr.FailedResult.Modified
+			verdict.Metadata = fr.FailedResult.Metadata
+		}
+		return verdict
 	}
+	return &mcp.ValidationResult{Allowed: true}
+}
 
-	resp := gin.H{
-		"allowed": overallAllowed,
-	}
-	if !overallAllowed {
-		resp["reason"] = overallReason
-	}
-
-	c.JSON(http.StatusOK, resp)
+// allowFile writes the fail-open verdict shared by every path that cannot (or need not)
+// inspect content, in the same mcp.ValidationResult shape as a validated allow.
+func allowFile(c *gin.Context) {
+	c.JSON(http.StatusOK, &mcp.ValidationResult{Allowed: true})
 }
 
 func marshalPromptPayload(content string) string {
