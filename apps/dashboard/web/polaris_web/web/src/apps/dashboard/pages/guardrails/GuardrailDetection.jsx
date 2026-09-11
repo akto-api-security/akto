@@ -17,7 +17,7 @@ import { LABELS } from "../threat_detection/constants";
 import SusDataTable from "../threat_detection/components/SusDataTable";
 import NormalSampleDetails from "../threat_detection/components/NormalSampleDetails";
 import { extractBehaviour } from "../threat_detection/utils/formatUtils";
-import { downloadMaliciousEventsAsJson } from "../threat_detection/utils/exportEvents";
+import { downloadMaliciousEventsAsJson, downloadMaliciousEventsAsCsv } from "../threat_detection/utils/exportEvents";
 
 // Apply ?category= before the first render — same as GuardrailPolicies.jsx. A link opened in a new
 // tab has no PersistStore session, so without this the page would load the wrong category.
@@ -131,11 +131,16 @@ function GuardrailDetection() {
             />
     ]
 
+    // Both reuse the exact filters/tab/search currently applied on the table (registered by
+    // SusDataTable via onRegisterExport), instead of dumping every event regardless of filters.
     const exportJson = async () => {
-        // Reuses the exact filters/tab/search currently applied on the table (registered by
-        // SusDataTable via onRegisterExport), instead of dumping every event regardless of filters.
         const res = await applyExportRef.current();
-        downloadMaliciousEventsAsJson(res?.maliciousEvents, "guardrail_events.json");
+        downloadMaliciousEventsAsJson(res?.maliciousEvents, `guardrail_events_${res?.tab || 'active'}.json`);
+    }
+
+    const exportCsv = async () => {
+        const res = await applyExportRef.current();
+        downloadMaliciousEventsAsCsv(res?.maliciousEvents, `guardrail_events_${res?.tab || 'active'}`);
     }
 
     const secondaryActionsComp = (
@@ -156,11 +161,15 @@ function GuardrailDetection() {
                         sections={
                             [
                                 {
-                                    title: 'Export',
                                     items: [
                                         {
-                                            content: 'Export',
+                                            content: 'Export as JSON',
                                             onAction: () => exportJson(),
+                                            prefix: <Box><Icon source={FileMinor} /></Box>
+                                        },
+                                        {
+                                            content: 'Export as CSV',
+                                            onAction: () => exportCsv(),
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         }
                                     ]

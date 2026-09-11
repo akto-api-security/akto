@@ -40,7 +40,7 @@ import LocalStore from "@/apps/main/LocalStorageStore";
 import guardrailApi from "@/apps/dashboard/pages/guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "@/apps/dashboard/pages/guardrails/utils";
 import { resolveComplianceClauseMap, loadGuardrailComplianceMap, formatActorId, actorIdDisplayText } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
-import { downloadMaliciousEventsAsJson } from "@/apps/dashboard/pages/threat_detection/utils/exportEvents";
+import { downloadMaliciousEventsAsJson, downloadMaliciousEventsAsCsv } from "@/apps/dashboard/pages/threat_detection/utils/exportEvents";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
 import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
 
@@ -1469,7 +1469,13 @@ function Violations() {
     const exportViolations = async () => {
         const args = lastServerFetchArgsRef.current || { filters: {} };
         const { rawEvents } = await fetchViolations({ ...args, skip: 0, limit: 2000 });
-        downloadMaliciousEventsAsJson(rawEvents, "guardrail_violations.json");
+        downloadMaliciousEventsAsJson(rawEvents, `guardrail_violations_${currentTab}.json`);
+    };
+
+    const exportViolationsCsv = async () => {
+        const args = lastServerFetchArgsRef.current || { filters: {} };
+        const { rawEvents } = await fetchViolations({ ...args, skip: 0, limit: 2000 });
+        downloadMaliciousEventsAsCsv(rawEvents, `guardrail_violations_${currentTab}`);
     };
 
     // Reload the grid when the Top Policies card selection changes (skip the initial mount).
@@ -1867,11 +1873,15 @@ function Violations() {
                                     actionRole="menuitem"
                                     sections={[
                                         {
-                                            title: "Export",
                                             items: [
                                                 {
-                                                    content: "Export",
+                                                    content: "Export as JSON",
                                                     onAction: () => { setMoreActionsOpen(false); exportViolations(); },
+                                                    prefix: <Box><Icon source={FileMinor} /></Box>,
+                                                },
+                                                {
+                                                    content: "Export as CSV",
+                                                    onAction: () => { setMoreActionsOpen(false); exportViolationsCsv(); },
                                                     prefix: <Box><Icon source={FileMinor} /></Box>,
                                                 },
                                             ],

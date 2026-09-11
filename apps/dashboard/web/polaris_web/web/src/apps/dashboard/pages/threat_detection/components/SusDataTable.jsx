@@ -1239,7 +1239,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   // higher limit), so Export matches what's on screen instead of dumping every event.
   async function runExport(exportLimit = EXPORT_LIMIT) {
     const p = lastFetchParamsRef.current;
-    if (!p) return { maliciousEvents: [], total: 0 };
+    if (!p) return { maliciousEvents: [], total: 0, tab: currentTab };
     const res = await api.fetchSuspectSampleData(
       0,
       p.sourceIpsFilter,
@@ -1273,7 +1273,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         !isServerApproved(guardrailApprovedByPolicy, x.filterId, x.host)
       );
     }
-    return { maliciousEvents: events, total: events.length };
+    return { maliciousEvents: events, total: events.length, tab: currentTab };
   }
 
   useEffect(() => {
