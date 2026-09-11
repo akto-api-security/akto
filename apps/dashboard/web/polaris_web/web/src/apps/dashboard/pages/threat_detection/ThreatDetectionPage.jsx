@@ -29,7 +29,7 @@ import WebhookIntegrationModal from "./components/WebhookIntegrationModal";
 import { updateThreatFiltersStore } from "./utils/threatFilters";
 import { applyThreatActivityTableFilter } from "./utils/threatDashboardUtils";
 import { redactSampleDataByKeywords } from "./utils/redactSampleData";
-import { downloadMaliciousEventsAsJson } from "./utils/exportEvents";
+import { downloadMaliciousEventsAsJson, downloadMaliciousEventsAsCsv } from "./utils/exportEvents";
 import { resolveComplianceClauseMap, extractBehaviour } from "./utils/formatUtils";
 import LocalStore from "@/apps/main/LocalStorageStore";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
@@ -789,11 +789,16 @@ function ThreatDetectionPage() {
 
     ]
 
+    // Both reuse the exact filters/tab/search currently applied on the table (registered by
+    // SusDataTable via onRegisterExport), instead of dumping every event regardless of filters.
     const exportJson = async () => {
-        // Reuses the exact filters/tab/search currently applied on the table (registered by
-        // SusDataTable via onRegisterExport), instead of dumping every event regardless of filters.
         const res = await applyExportRef.current();
-        downloadMaliciousEventsAsJson(res?.maliciousEvents, "malicious_events.json");
+        downloadMaliciousEventsAsJson(res?.maliciousEvents, `malicious_events_${res?.tab || 'active'}.json`);
+    }
+
+    const exportCsv = async () => {
+        const res = await applyExportRef.current();
+        downloadMaliciousEventsAsCsv(res?.maliciousEvents, `malicious_events_${res?.tab || 'active'}`);
     }
 
     const exportToAdx = async () => {
@@ -866,8 +871,13 @@ function ThreatDetectionPage() {
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         },
                                         {
-                                            content: 'Export',
+                                            content: 'Export as JSON',
                                             onAction: () => exportJson(),
+                                            prefix: <Box><Icon source={FileMinor} /></Box>
+                                        },
+                                        {
+                                            content: 'Export as CSV',
+                                            onAction: () => exportCsv(),
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         },
                                         {
