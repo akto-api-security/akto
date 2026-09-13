@@ -33,15 +33,23 @@ public class WebhookSender {
         webhook.setLastSentTimestamp(now);
         CustomWebhooksDao.instance.updateOne(Filters.eq("_id", webhook.getId()), Updates.set("lastSentTimestamp", now));
 
-        Map<String, List<String>> headers = OriginalHttpRequest.buildHeadersMap(webhook.getHeaderString());
-        OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(), webhook.getQueryParams(), webhook.getMethod().toString(), payload, headers, "");
+        OriginalHttpRequest request = null;
         OriginalHttpResponse response = null; // null response means api request failed. Do not use new OriginalHttpResponse() in such cases else the string parsing fails.
 
         try {
+            Map<String, List<String>> headers = OriginalHttpRequest.buildHeadersMap(webhook.getHeaderString());
+            request = new OriginalHttpRequest(webhook.getUrl(), webhook.getQueryParams(), webhook.getMethod().toString(), payload, headers, "");
             response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-            loggerMaker.infoAndAddToDb("webhook request sent", LogDb.DASHBOARD);
+            if (response == null || response.getStatusCode() < 200 || response.getStatusCode() >= 300) {
+                String statusCode = response == null ? "null" : String.valueOf(response.getStatusCode());
+                errors.add("Webhook endpoint returned non-2xx status: " + statusCode);
+                loggerMaker.errorAndAddToDb("webhook request sent but got non-2xx response, status: " + statusCode + " webhookId: " + webhook.getId());
+            } else {
+                loggerMaker.infoAndAddToDb("webhook request sent", LogDb.DASHBOARD);
+            }
         } catch (Exception e) {
-            errors.add("API execution failed");
+            errors.add("API execution failed: " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "API execution failed for webhookId: " + webhook.getId());
         }
 
         String message = null;
