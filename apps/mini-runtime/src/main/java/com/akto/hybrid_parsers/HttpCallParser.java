@@ -98,12 +98,6 @@ public class HttpCallParser {
     private static final List<Integer> AI_AGENT_CALLER_TAGGING_ACCOUNTS = Arrays.asList(
             1736798101, 1718042191, 1662680463);
 
-    // TEST-ONLY, DO NOT MERGE: bypasses the SECURITY_TYPE_AGENTIC entitlement so the AKS test
-    // account can exercise agentic tagging end to end. Deliberately excludes Agoda's accounts -
-    // granting them agentic tagging as a side effect of a test would change live behaviour.
-    // Remove this and the check in isAgenticTaggingAllowed() before merging.
-    private static final List<Integer> AGENTIC_ENTITLEMENT_BYPASS_ACCOUNTS = Arrays.asList(1662680463);
-
     // Last time the ai-agent-caller tag was written, keyed by the CALLER's collection id.
     // Separate from apiCollectionIdTagsSyncTimestampMap, which is keyed by the callee - one
     // callee is called by many services, so a callee-keyed timer would only ever let the
@@ -1479,7 +1473,13 @@ public class HttpCallParser {
             Optional<CollectionTags> ragTagOpt = mcpServerTagOpt.isPresent() ? Optional.empty() : getRagTag(httpResponseParam);
             Optional<CollectionTags> genAiTagOpt = getGenAiTag(httpResponseParam);
             boolean isAgenticEndpoint = mcpServerTagOpt.isPresent() || ragTagOpt.isPresent() || genAiTagOpt.isPresent();
-            if (isAgenticEndpoint) {
+            // The three getters above discard their detection when SECURITY_TYPE_AGENTIC is not
+            // granted, so isAgenticEndpoint is always false for an unentitled account. Caller
+            // attribution must not depend on that entitlement (it adds a tag to the CALLER and
+            // never makes a collection gen-ai/mcp, so it cannot move a collection between quotas),
+            // hence the ungated re-check. Short-circuits for entitled accounts.
+            if (isAgenticEndpoint
+                    || GenAiCollectionUtils.checkAndTagLLMCollection(httpResponseParam).getFirst()) {
                 markAiAgentCaller(httpResponseParam, tagsMap, direction, hostName);
             }
             String contextSource = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
@@ -2099,15 +2099,11 @@ public class HttpCallParser {
         return false;
     }
 
-    private boolean isAgenticTaggingAllowed(HttpResponseParams responseParams) {
+    // protected so tests can override the entitlement gate without touching production logic.
+    protected boolean isAgenticTaggingAllowed(HttpResponseParams responseParams) {
         Map<String, String> tagsMap = parseTagsMap(responseParams.getTags());
         String source = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
         if (Constants.AI_AGENT_SOURCE_ENDPOINT.equals(source)) {
-            return true;
-        }
-
-        // TEST-ONLY, DO NOT MERGE: see AGENTIC_ENTITLEMENT_BYPASS_ACCOUNTS.
-        if (AGENTIC_ENTITLEMENT_BYPASS_ACCOUNTS.contains(Context.getActualAccountId())) {
             return true;
         }
 
@@ -2160,18 +2156,18 @@ public class HttpCallParser {
         // Every early return below logs, so a missing tag can be traced to one branch. The
         // silent version of this method made a live failure impossible to diagnose.
         if (!AI_AGENT_CALLER_TAGGING_ACCOUNTS.contains(Context.getActualAccountId())) {
-            loggerMaker.debug("ai-agent-caller: account not enabled, skipping");
+            loggerMaker.infoAndAddToDb("ai-agent-caller: account not enabled, skipping");
             return;
         }
         // Inbound labels describe the callee, so there is no caller to attribute.
         if (!DIRECTION_OUTBOUND.equals(direction)) {
-            loggerMaker.debug("ai-agent-caller: not outbound (direction=" + direction
+            loggerMaker.infoAndAddToDb("ai-agent-caller: not outbound (direction=" + direction
                     + "), no caller to attribute");
             return;
         }
         String callerService = tagsMap == null ? null : tagsMap.get(SERVICE_TAG_KEY);
         if (callerService == null || callerService.isEmpty()) {
-            loggerMaker.debug("ai-agent-caller: outbound request carries no " + SERVICE_TAG_KEY
+            loggerMaker.infoAndAddToDb("ai-agent-caller: outbound request carries no " + SERVICE_TAG_KEY
                     + " tag, cannot identify caller. callee=" + calleeHost);
             return;
         }
@@ -2182,7 +2178,7 @@ public class HttpCallParser {
             // The caller has no collection of its own - nothing calls it, so its inbound traffic
             // never created one. createCollectionForServiceTag upserts, so writing here would
             // materialise an empty collection; skip and log so the gap is measurable.
-            loggerMaker.debug("ai-agent-caller: no collection " + callerCollectionId
+            loggerMaker.infoAndAddToDb("ai-agent-caller: no collection " + callerCollectionId
                     + " for caller service " + callerService + ", skipping");
             return;
         }
@@ -2191,24 +2187,25 @@ public class HttpCallParser {
         boolean alreadyTagged = existingTags != null && existingTags.stream()
                 .anyMatch(t -> Constants.AKTO_AI_AGENT_CALLER_TAG.equals(t.getKeyName()));
         if (alreadyTagged) {
-            loggerMaker.debug("ai-agent-caller: collection " + callerCollectionId + " ("
+            loggerMaker.infoAndAddToDb("ai-agent-caller: collection " + callerCollectionId + " ("
                     + callerService + ") already tagged, skipping");
             return;
         }
 
         int lastSyncTime = this.aiAgentCallerTagSyncTimestampMap.getOrDefault(callerCollectionId, 0);
         if (Context.now() - lastSyncTime < this.sync_threshold_time) {
-            loggerMaker.debug("ai-agent-caller: collection " + callerCollectionId + " ("
+            loggerMaker.infoAndAddToDb("ai-agent-caller: collection " + callerCollectionId + " ("
                     + callerService + ") written " + (Context.now() - lastSyncTime)
                     + "s ago, inside the " + this.sync_threshold_time + "s window, skipping");
             return;
         }
         this.aiAgentCallerTagSyncTimestampMap.put(callerCollectionId, Context.now());
 
-        // createCollectionForServiceTag sets the whole tags array, so send existing + new.
-        // NOTE: that makes this write lossy - any other path doing a full-array set with a
-        // recomputed list will drop this tag. Recovery relies on alreadyTagged reading false
-        // afterwards so the next agentic call re-adds it.
+        // createCollectionForServiceTag SETS the whole tags array, so the list we send must
+        // already contain every tag the collection has - anything missing is destroyed. The
+        // in-memory copy is only refreshed on the catalog-sync cycle, so re-read the collection
+        // first and merge onto that. This runs once per caller (guarded by alreadyTagged and the
+        // sync window above), not per request.
         List<CollectionTags> mergedTags = existingTags == null
                 ? new ArrayList<>()
                 : new ArrayList<>(existingTags);
