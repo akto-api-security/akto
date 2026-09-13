@@ -85,10 +85,15 @@ const expandAgentGroupsToV2 = (selectedKeys) =>
         getClientTagVariants(key).map(rawValue => ({ id: rawValue, name: rawValue }))
     );
 
+// A collection can carry both a mode=inline and a mode=observe tag at once (e.g. it saw
+// traffic through both paths at different times) — prefer inline when both are present.
+const hasModeTag = (c, value) => c.envType?.some(t => t.keyName === 'mode' && t.value === value);
+const isCollectionInline = (c) => hasModeTag(c, 'inline') || !hasModeTag(c, 'observe');
+
 const groupToOption = (g) => ({
     label: g.groupName,
     value: g.groupKey,
-    isInline: g.collections.some(c => !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe'))
+    isInline: g.collections.some(isCollectionInline)
 });
 
 // Converts stored V2 server entries back to the option-value keys used by the dropdowns.
@@ -668,7 +673,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     return {
                         label: name,
                         value: name,
-                        isInline: !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe')
+                        isInline: isCollectionInline(c)
                     };
                 };
                 const dedup = (opts) => [...new Map(opts.map(o => [o.value, o])).values()].filter(o => o.value);
@@ -678,7 +683,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     ...opt,
                     isInline: genAiCollections.some(c =>
                         (c.hostName || c.displayName || c.name || '') === opt.value
-                        && !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe')
+                        && isCollectionInline(c)
                     )
                 })));
                 setBrowserLlmServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'browser-llm')).map(toOption)));

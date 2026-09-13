@@ -4,6 +4,7 @@ import com.akto.account_job_executor.executor.executors.AIAgentConnectorExecutor
 import com.akto.account_job_executor.executor.executors.BigQueryExecutor;
 import com.akto.account_job_executor.executor.executors.CopilotStudioMultiEnvExecutor;
 import com.akto.account_job_executor.executor.executors.CrowdStrikeExecutor;
+import com.akto.account_job_executor.executor.executors.GuardrailPolicyBackfillReplayExecutor;
 import com.akto.account_job_executor.executor.executors.MicrosoftDefenderExecutor;
 import com.akto.account_job_executor.executor.executors.SentinelOneExecutor;
 
@@ -34,6 +35,7 @@ public class AccountJobExecutorFactory {
         map.put("MICROSOFT_DEFENDER_AH", MicrosoftDefenderExecutor.INSTANCE);
         map.put("SENTINELONE_AH", SentinelOneExecutor.INSTANCE);
         map.put("CROWDSTRIKE_AH", CrowdStrikeExecutor.INSTANCE);
+        map.put("GUARDRAIL_POLICY_BACKFILL_REPLAY", GuardrailPolicyBackfillReplayExecutor.INSTANCE);
 
         registry = Collections.unmodifiableMap(map);
     }

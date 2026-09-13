@@ -32,6 +32,7 @@ import com.akto.threat.backend.utils.KafkaUtils;
 import com.akto.threat.backend.utils.ParallelQueryExecutor;
 import com.akto.util.ThreatDetectionConstants;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.WriteModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.UpdateOneModel;
@@ -722,6 +723,7 @@ public class MaliciousEventService {
 
       List<Document> pipeline = new ArrayList<>(Arrays.asList(
           new Document("$match", query),
+          new Document("$unset", "latestApiOrig"),
           new Document("$sort", new Document("detectedAt", -1)),
           new Document("$group", new Document("_id", dedupeGroupKey).append("doc", new Document("$first", "$$ROOT"))),
           new Document("$replaceRoot", new Document("newRoot", "$doc"))
@@ -741,6 +743,7 @@ public class MaliciousEventService {
       cursor = maliciousEventDao.getCollection(accountId)
           .aggregate(Arrays.asList(
               new Document("$match", query),
+              new Document("$unset", "latestApiOrig"),
               new Document("$addFields", new Document("severityRank",
                   new Document("$switch", new Document()
                       .append("branches", Arrays.asList(
@@ -762,6 +765,7 @@ public class MaliciousEventService {
       cursor = maliciousEventDao.getCollection(accountId)
           .aggregate(Arrays.asList(
               new Document("$match", query),
+              new Document("$unset", "latestApiOrig"),
               new Document("$addFields", riskScoreSortAddFields()),
               new Document("$sort", new Document("riskScoreNum", riskScoreDir).append("detectedAt", -1)),
               new Document("$skip", skip),
@@ -772,6 +776,7 @@ public class MaliciousEventService {
       total = maliciousEventDao.countDocuments(accountId, query);
       cursor = maliciousEventDao.getCollection(accountId)
           .find(query)
+          .projection(Projections.exclude("latestApiOrig"))
           .sort(new Document("detectedAt", sort.getOrDefault("detectedAt", -1)))
           .skip(skip)
           .limit(limit)
@@ -806,7 +811,7 @@ public class MaliciousEventService {
                 .setIp(evt.getLatestApiIp())
                 .setCountry(evt.getCountry())
                 .setDestCountry(evt.getDestCountry() != null ? evt.getDestCountry() : "")
-                .setPayload(evt.getLatestApiOrig())
+                .setPayload("")
                 .setEndpoint(evt.getLatestApiEndpoint())
                 .setMethod(evt.getLatestApiMethod().name())
                 .setDetectedAt(evt.getDetectedAt())

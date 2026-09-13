@@ -9,7 +9,7 @@ import {
     ModelsCell,
     SessionLinkCell,
     TimeCell,
-    TitleCell,
+    PreviewCell,
     TokensCell,
     TopicCell,
     UserCell,
@@ -55,20 +55,34 @@ const topicCol = (headerName, isTopic = true) => ({
     ...NO_FILTER,
 });
 
-const titleCol = (headerName) => ({
+// Prompt preview for admins, falling back to `idField` for everyone else.
+const previewCol = (headerName, idField) => ({
     headerName,
     field: "_promptText",
     flex: 1,
-    minWidth: 320,
-    cellRenderer: TitleCell,
+    minWidth: 340,
+    cellRenderer: PreviewCell,
+    cellRendererParams: { idField },
     cellStyle: FLEX_CELL,
     ...NO_FILTER,
 });
 
-const idCol = (headerName, field) => ({
+// Rows are identified by their id — prompt content is never rendered in a list.
+const leadIdCol = (headerName, field) => ({
     headerName,
     field,
-    width: 180,
+    flex: 1,
+    minWidth: 300,
+    cellRenderer: IdCell,
+    cellStyle: FLEX_CELL,
+    ...NO_FILTER,
+});
+
+const idCol = (headerName, field, width = 180) => ({
+    headerName,
+    field,
+    width,
+    minWidth: width,
     cellRenderer: IdCell,
     cellStyle: FLEX_CELL,
     ...NO_FILTER,
@@ -114,7 +128,7 @@ const countCol = (headerName, field, width = 90) => ({
 
 // Sessions table — one row per session (traces grouped on session id).
 export const SESSION_COLUMN_DEFS = [
-    titleCol("Session"),
+    leadIdCol("Session", "sessionIdentifier"),
     {
         headerName: "User",
         field: "userName",
@@ -177,7 +191,6 @@ export const SESSION_COLUMN_DEFS = [
         ...NO_FILTER,
     },
     timeCol("latestTimestamp", "Last activity"),
-    idCol("Session ID", "sessionIdentifier"),
 ];
 
 // Traces table — one row per trace (spans grouped on trace id). `showSession` adds a
@@ -185,7 +198,7 @@ export const SESSION_COLUMN_DEFS = [
 export function getTraceColumnDefs({ showSession, onSessionClick } = {}) {
     return [
         timeCol("latestTimestamp"),
-        titleCol("Trace"),
+        previewCol("Trace", "traceId"),
         {
             headerName: "Application",
             field: "serviceId",
@@ -254,7 +267,7 @@ export const ARGUS_TRACE_COL_DEFS = [
         },
         ...NO_FILTER,
     },
-    titleCol("Trace"),
+    previewCol("Trace", "traceId"),
     {
         headerName: "Application",
         field: "serviceId",
@@ -275,12 +288,12 @@ export const ARGUS_TRACE_COL_DEFS = [
     // },
     tokensCol,
     durationCol,
-    idCol("Session ID", "sessionIdentifier"),
+    idCol("Session ID", "sessionIdentifier", 300),
 ];
 
 // Messages table — flat span-level rows.
 export const MESSAGE_FLAT_COLUMN_DEFS = [
-    titleCol("Message"),
+    leadIdCol("Trace", "traceId"),
     ...userServiceCols,
     {
         headerName: "Model",
@@ -294,5 +307,4 @@ export const MESSAGE_FLAT_COLUMN_DEFS = [
     topicCol("SubTopic queried", false),
     tokensCol,
     timeCol("timestamp"),
-    idCol("Trace ID", "traceId"),
 ];

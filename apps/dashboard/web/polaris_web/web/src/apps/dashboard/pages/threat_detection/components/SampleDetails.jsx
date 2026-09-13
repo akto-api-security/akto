@@ -27,6 +27,8 @@ import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../
 import OwaspTag from "../../guardrails/components/OwaspTag";
 import ComplianceTags from "../../guardrails/components/ComplianceTags";
 import { parseConfigEvidence } from "../../guardrails/violations/violationsData";
+import ChatMessage from "../../testing/TestRunResultPage/components/ChatMessage";
+import { MESSAGE_TYPES } from "../../testing/TestRunResultPage/components/chatConstants";
 
 // For config-scan events: pull evidence/message/config_content out of the sample's raw orig.
 // requestPayload is normally valid JSON (repaired server-side if PII redaction corrupted it);
@@ -561,6 +563,11 @@ function SampleDetails(props) {
         const [sessionLoading, setSessionLoading] = useState(false);
         const [isSessionBased, setIsSessionBased] = useState(hasSessionId);
 
+        // Agentic Security events with no sessionId: fall back to fetching the nearest
+        // before/after messages on the same host from ES instead of showing nothing.
+        const [contextWindow, setContextWindow] = useState(null); // {anchor, before, after, llmInvoked}
+        const [contextWindowLoading, setContextWindowLoading] = useState(false);
+
         // Fetch session data from agentic_session_context table API using sessionId
         useEffect(() => {
             if (hasSessionId) {
@@ -588,6 +595,32 @@ function SampleDetails(props) {
                 setIsSessionBased(false);
             }
         }, [sessionId, hasSessionId]);
+
+        // No usable session found for this event: for Agentic Security events, fetch the nearest
+        // before/after messages on the same host (there's no session/trace id to key off) instead
+        // of leaving the analyst with nothing. Endpoint Security keeps the plain fallback text.
+        const host = moreInfoData?.host;
+        const anchorTimestamp = data?.[0]?.ts;
+        useEffect(() => {
+            if (sessionLoading || isSessionBased || !isAgenticSecurityCategory() || !host || !anchorTimestamp) {
+                return;
+            }
+            if(window?.ACTIVE_ACCOUNT !== 1703087742){
+                return;
+            }
+            setContextWindowLoading(true);
+            threatDetectionApi.fetchContextMessages(host, anchorTimestamp)
+                .then((resp) => {
+                    const hasContent = resp && (resp.anchor || resp.before?.length > 0 || resp.after?.length > 0);
+                    setContextWindow(hasContent ? resp : null);
+                })
+                .catch(() => {
+                    setContextWindow(null);
+                })
+                .finally(() => {
+                    setContextWindowLoading(false);
+                });
+        }, [sessionLoading, isSessionBased, host, anchorTimestamp]);
 
         // Parse conversation info from session data
         let sessionPrompts = [];
@@ -646,6 +679,43 @@ function SampleDetails(props) {
                 hour12: true
             });
         };
+
+        const renderContextTurn = (turn, key, isAnchor = false) => (
+            <Box
+                key={key}
+                borderWidth="1"
+                borderRadius="2"
+                borderColor={isAnchor ? "border-critical" : "border-subdued"}
+                background="bg"
+            >
+                {isAnchor && (
+                    <Box background="bg-critical-subdued" padding="2" borderRadius="2">
+                        <Badge status="critical" size="small">Current Message</Badge>
+                    </Box>
+                )}
+                <Box padding="3">
+                    <VerticalStack gap="3">
+                        <ChatMessage
+                            type={MESSAGE_TYPES.REQUEST}
+                            content={turn?.queryPayload || ''}
+                            timestamp={turn?.latestTimestamp ? Math.floor(turn.latestTimestamp / 1000) : null}
+                            customLabel="User prompt"
+                            isCode={false}
+                            toolsMetadata={{}}
+                        />
+                        {turn?.responsePayload ? (
+                            <ChatMessage
+                                type={MESSAGE_TYPES.RESPONSE}
+                                content={turn.responsePayload}
+                                customLabel="AI agent response"
+                                isCode={false}
+                                toolsMetadata={{}}
+                            />
+                        ) : null}
+                    </VerticalStack>
+                </Box>
+            </Box>
+        );
 
         return (
             <Box padding={"4"}>
@@ -810,7 +880,26 @@ function SampleDetails(props) {
                         </>
                     )}
 
-                    {!isSessionBased && (
+                    {!isSessionBased && isAgenticSecurityCategory() && (window?.ACTIVE_ACCOUNT ===1703087742) && (contextWindowLoading || contextWindow) ? (
+                        <>
+                            <Divider />
+                            {contextWindowLoading && (
+                                <Box padding={"4"}>
+                                    <HorizontalStack gap={"2"} align="center">
+                                        <Spinner size="small" />
+                                        <Text variant="bodyMd" color="subdued">Loading nearby messages...</Text>
+                                    </HorizontalStack>
+                                </Box>
+                            )}
+                            {!contextWindowLoading && contextWindow && (
+                                <VerticalStack gap="4">
+                                    {(contextWindow.before || []).slice(-3).map((turn, idx) => renderContextTurn(turn, `before-${idx}`))}
+                                    {contextWindow.anchor && renderContextTurn(contextWindow.anchor, "anchor", true)}
+                                    {(contextWindow.after || []).slice(0, 3).map((turn, idx) => renderContextTurn(turn, `after-${idx}`))}
+                                </VerticalStack>
+                            )}
+                        </>
+                    ) : (!isSessionBased && (
                         <>
                             <Divider />
                             <Box padding={"3"} background="bg-surface-secondary" borderRadius="200">
@@ -819,7 +908,7 @@ function SampleDetails(props) {
                                 </Text>
                             </Box>
                         </>
-                    )}
+                    ))}
                 </VerticalStack>
             </Box>
         );
