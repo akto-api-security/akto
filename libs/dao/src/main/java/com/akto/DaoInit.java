@@ -497,9 +497,6 @@ public class DaoInit {
         EndpointRemoteCommandDao.instance.createIndicesIfAbsent();
         EndpointRemoteCommandExecutionDao.instance.createIndicesIfAbsent();
         ModuleInfoDao.instance.createIndicesIfAbsent();
-        // metrics_data is written by ingestMetricsData on every guardrails /
-        // agent-guard / traffic-collector flush; without this it is created
-        // implicitly by insertMany with only an _id index.
         MetricDataDao.instance.createIndicesIfAbsent();
     }
 
