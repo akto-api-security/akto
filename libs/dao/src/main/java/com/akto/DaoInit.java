@@ -5,6 +5,7 @@ import com.akto.dao.agentic_sessions.SessionDocumentDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.jobs.JobsDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -496,6 +497,10 @@ public class DaoInit {
         EndpointRemoteCommandDao.instance.createIndicesIfAbsent();
         EndpointRemoteCommandExecutionDao.instance.createIndicesIfAbsent();
         ModuleInfoDao.instance.createIndicesIfAbsent();
+        // metrics_data is written by ingestMetricsData on every guardrails /
+        // agent-guard / traffic-collector flush; without this it is created
+        // implicitly by insertMany with only an _id index.
+        MetricDataDao.instance.createIndicesIfAbsent();
     }
 
 }
