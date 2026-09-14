@@ -14,7 +14,6 @@ export const LanguageSafetyConfig = {
     getSummary: ({ enableGibberishDetection, enableSentiment }) => {
         const filters = [];
         if (enableGibberishDetection) filters.push('Gibberish detection');
-        if (enableSentiment) filters.push('Sentiment');
         return filters.length > 0 ? filters.join(", ") : null;
     }
 };
@@ -55,23 +54,6 @@ const LanguageSafetyStep = ({
                     />
                 </Box>
 
-                {/* Sentiment Detection */}
-                <Box>
-                    <Checkbox
-                        label={
-                            <HorizontalStack gap="1" blockAlign="center">
-                                <Text as="span">Enable sentiment detection</Text>
-                                <ControlInfoIcon
-                                    {...LANGUAGE_SAFETY_DESCRIPTIONS.sentimentDetection}
-                                    onTryPrompt={onTryPrompt}
-                                />
-                            </HorizontalStack>
-                        }
-                        checked={enableSentiment}
-                        onChange={setEnableSentiment}
-                        helpText="Analyze sentiment in user inputs to detect negative, toxic, or inappropriate emotional content."
-                    />
-                </Box>
             </VerticalStack>
         </VerticalStack>
     );

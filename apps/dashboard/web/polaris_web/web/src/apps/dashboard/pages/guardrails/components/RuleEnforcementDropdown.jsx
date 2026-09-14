@@ -44,7 +44,7 @@ export default function RuleEnforcementDropdown({
                 />
             </Box>
             {showEndpointOnlyNote && (
-                <Banner tone="info">
+                <Banner status="info">
                     <Text variant="bodyMd">
                         In the browser extension, <Text as="span" fontWeight="bold">{menuItems.find((o) => o.value === initial)?.label}</Text> behaves the same as <Text as="span" fontWeight="bold">Block</Text>.
                     </Text>

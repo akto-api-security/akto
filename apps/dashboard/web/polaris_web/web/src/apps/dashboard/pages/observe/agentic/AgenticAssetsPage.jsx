@@ -374,7 +374,6 @@ export default function AgenticAssetsPage() {
     violationsByCollectionId: {},
     skillViolationsByName: {},
     usernameMap: {},
-    userMetadataMap: {},
     analysisByKey: new Map(),
     userAnalysisFlatMap: {},
   });
@@ -433,12 +432,11 @@ export default function AgenticAssetsPage() {
         const shieldResult = await fetchEndpointShieldUserMetadata();
         if (!isMountedRef.current) return;
 
-        const { usernameMap = {}, userMetadataMap = {} } = shieldResult || {};
+        const { usernameMap = {} } = shieldResult || {};
 
         enrichRef.current = {
           ...enrichRef.current,
           usernameMap,
-          userMetadataMap,
         };
 
         // The only grid remount — Tier 2 used to also bump this, causing an unwanted second refetch.
@@ -507,7 +505,7 @@ export default function AgenticAssetsPage() {
     // AG Grid SSRM sends sortOrder: -1 for asc, 1 for desc — opposite of the backend's Mongo
     // convention (1 asc / -1 desc, matching NhiGovernanceViolationsAction's own onServerFetch).
     const mongoSortOrder = sortOrder ? -sortOrder : -1;
-    const { userAnalysisFlatMap, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap } = enrichRef.current;
+    const { userAnalysisFlatMap, violationsByCollectionId, skillViolationsByName, usernameMap } = enrichRef.current;
 
     // trafficMap/riskScoreMap omitted — backend computes both server-side now.
     return api.fetchAgenticAssetsSummary({
@@ -529,11 +527,8 @@ export default function AgenticAssetsPage() {
       // is shared with the agent/device that invoked it, so collection-based attribution can't
       // give a skill its own count (see fetchAgenticSkillViolationCounts's own comment).
       skillViolationsByName,
-      // Endpoint Shield maps, so the server can precompute each row's own Teams breakdown/AI
-      // interactions total from its own per-device list, instead of sending that raw list (up to
-      // hundreds of entries per row) just for the browser to derive these few small values.
+      // Endpoint Shield username map, so the server can precompute each row's AI-interaction totals.
       usernameMap,
-      userMetadataMap,
     }).then((res) => ({
       value: (res.rows || []).map((row) => shapeRow(row)),
       total: res.total || 0,
