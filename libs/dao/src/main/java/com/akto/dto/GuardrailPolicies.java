@@ -122,6 +122,15 @@ public class GuardrailPolicies {
     // AgentUsersDao.findDeviceIdsByTags, and unioned with that result at fetch time.
     private Map<String, List<String>> targetTags;
 
+    // Per-tag-key Include/Exclude, keyed like targetTags — per-key because keys AND together, so
+    // one flag could only negate the whole conjunction. This branch predates targetUserNames, so
+    // there's no negatedTargetUserNames counterpart yet.
+    private Map<String, Boolean> negatedTargetTags;
+
+    // Include/Exclude for targetDeviceIds. Only one Device row can exist per policy, so unlike
+    // negatedTargetTags this doesn't need to be keyed.
+    private boolean negatedTargetDeviceIds;
+
     @BsonIgnore
     private List<String> applyToDeviceIds;
 

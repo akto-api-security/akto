@@ -3539,9 +3539,10 @@ public class DbLayer {
         }
     }
 
-    public static List<String> findDeviceIdsByTags(Map<String, List<String>> tagFilters, List<String> deviceIds) {
+    public static List<String> findDeviceIdsByTags(Map<String, List<String>> tagFilters, Map<String, Boolean> negatedTagFilters,
+                                                    List<String> deviceIds, boolean negatedDeviceIds) {
         try {
-            return AgentUsersDao.instance.findDeviceIdsByTags(tagFilters, deviceIds);
+            return AgentUsersDao.instance.findDeviceIdsByTags(tagFilters, negatedTagFilters, deviceIds, negatedDeviceIds);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in findDeviceIdsByTags: " + e.getMessage());
             return new ArrayList<>();
