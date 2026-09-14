@@ -76,7 +76,10 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.12.0</version>
+            <!-- struts 6.x pulls commons-text 1.15, whose NumericEntityEscaper needs
+                 Range.of(..) - added in lang3 3.13. Pinning 3.12 here made every
+                 Struts action fail at DefaultActionProxy.<clinit>. -->
+            <version>3.17.0</version>
         </dependency>
 
         <dependency>
