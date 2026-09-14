@@ -105,7 +105,13 @@ const tableFunc = {
         // inactive. A running hash keeps this a fixed-size, cheap-to-compute key (no huge
         // joined string) even for large tables, while still reflecting every row - not just
         // the first/last - so an interior-row toggle is caught too.
-        const filterableKeys = (props.headers || []).filter(h => h.showFilter).map(h => h.filterKey || h.value);
+        // Opt-in via contentAwareFilterCache: this is an O(rows x filterable columns) scan on
+        // every fetch, so tables that already know their showFilter fields are set once (from
+        // the source data) and never mutated in place - the overwhelming majority of existing
+        // callers - skip it entirely and keep the original cheap id-only fingerprint.
+        const filterableKeys = props.contentAwareFilterCache
+          ? (props.headers || []).filter(h => h.showFilter).map(h => h.filterKey || h.value)
+          : [];
         let filterContentHash = 0;
         if (filterableKeys.length > 0) {
           for (let i = 0; i < tempData.length; i++) {

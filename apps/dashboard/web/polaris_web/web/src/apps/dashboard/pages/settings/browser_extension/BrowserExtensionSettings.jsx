@@ -402,6 +402,7 @@ function BrowserExtensionSettings() {
                 emptyStateMarkup={emptyHostsMarkup}
                 searchKeys={["host", "name"]}
                 disambiguateLabel={disambiguateLabel}
+                contentAwareFilterCache={true}
                 filterStateUrl="/dashboard/settings/browser-extension/"
             />
         </Box>
