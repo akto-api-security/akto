@@ -17,9 +17,8 @@ import com.akto.dto.sql.SampleDataAlt;
 
 public class Main {
 
-    final static String connectionUri = 
-    System.getenv("POSTGRES_URL");
-    // "jdbc:postgresql://localhost:5432/shivansh";
+    final static String connectionUri =
+    com.akto.util.SecretUtils.readSecret("POSTGRES_URL");
     final static String user =
     com.akto.util.SecretUtils.readSecret("POSTGRES_USER");
     final static String password =
