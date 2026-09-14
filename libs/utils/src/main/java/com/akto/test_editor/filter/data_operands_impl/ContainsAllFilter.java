@@ -20,9 +20,18 @@ public class ContainsAllFilter extends DataOperandsImpl {
         } catch(Exception e) {
             return result;
         }
+        // data is the same for every item in querySet - trim+lowercase it once instead of once per item.
+        // On failure, leave it null so the per-item try/catch below fails exactly like the old
+        // per-item data.trim() would have - same res=false per item, same accumulated result.
+        String normalizedData = null;
+        try {
+            normalizedData = data.trim().toLowerCase();
+        } catch (Exception e) {
+            // fall through with normalizedData=null, preserving old per-item error behavior
+        }
         for (String queryString: querySet) {
             try {
-                res = evaluateOnStringQuerySet(data.trim(), queryString.trim());
+                res = evaluateOnStringQuerySet(normalizedData, queryString.trim());
             } catch (Exception e) {
                 res = false;
             }
@@ -33,14 +42,16 @@ public class ContainsAllFilter extends DataOperandsImpl {
 
     public Boolean evaluateOnListQuerySet(String data, List<String> querySet) {
         Boolean result = true;
+        String normalizedData = data.trim().toLowerCase();
         for (String queryString: querySet) {
-            result = result && evaluateOnStringQuerySet(data.trim(), queryString.trim());
+            result = result && evaluateOnStringQuerySet(normalizedData, queryString.trim());
         }
         return result;
     }
 
+    // data is expected pre-normalized (trimmed + lowercased) by callers now - see isValid/evaluateOnListQuerySet above.
     public Boolean evaluateOnStringQuerySet(String data, String query) {
-        return data.toLowerCase().contains(query.toLowerCase());
+        return data.contains(query.toLowerCase());
     }
 
 }

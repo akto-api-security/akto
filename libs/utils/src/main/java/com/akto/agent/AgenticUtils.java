@@ -100,11 +100,9 @@ public class AgenticUtils {
 
     public static boolean isCopilotBotCollection(ApiCollection col) {
         if (col == null || col.getTagsList() == null) {
-            loggerMaker.infoAndAddToDb("isCopilotBotCollection: collection not found or has no tags");
             return false;
         }
         List<CollectionTags> tags = col.getTagsList();
-        loggerMaker.infoAndAddToDb("isCopilotBotCollection: collection " + col.getId() + " tags=" + tags.stream().map(t -> t.getKeyName() + "=" + t.getValue()).collect(java.util.stream.Collectors.joining(", ")));
         boolean hasSource  = tags.stream().anyMatch(t -> Constants.AKTO_ENDPOINT_SOURCE_TAG.equals(t.getKeyName()) && Constants.AKTO_COPILOT_SOURCE_VALUE.equals(t.getValue()));
         boolean hasBotName = tags.stream().anyMatch(t -> Constants.AKTO_COPILOT_BOT_NAME_TAG.equals(t.getKeyName()));
         return hasSource && hasBotName;
@@ -112,7 +110,6 @@ public class AgenticUtils {
 
     public static boolean isLiteLLMAgent(ApiCollection col) {
         if (col == null || col.getTagsList() == null) {
-            loggerMaker.infoAndAddToDb("isCopilotBotCollection: collection not found or has no tags");
             return false;
         }
         List<CollectionTags> tags = col.getTagsList();

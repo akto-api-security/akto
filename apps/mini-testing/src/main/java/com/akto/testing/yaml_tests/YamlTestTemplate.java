@@ -11,6 +11,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.auth.AuthValidator;
 import com.akto.test_editor.execution.Executor;
+import com.akto.test_editor.execution.TestPhaseTimer;
 import com.akto.testing.StatusCodeAnalyser;
 
 import java.util.List;
@@ -50,9 +51,16 @@ public class YamlTestTemplate extends SecurityTestTemplate {
             return true;
         }
 
-        boolean isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap, this.logId);
-        // loggerMaker.infoAndAddToDb("filter status " + isValid + " " + logId, LogDb.TESTING);
-        return isValid;
+        long filterStart = System.nanoTime();
+        try {
+            boolean isValid = TestPlugin.validateFilter(this.getFilterNode(),this.getRawApi(), this.getApiInfoKey(), this.varMap, this.logId);
+            // loggerMaker.infoAndAddToDb("filter status " + isValid + " " + logId, LogDb.TESTING);
+            return isValid;
+        } finally {
+            // finally, not a bare statement after the call - a slow-then-throwing filter must still
+            // get its elapsed time credited here, or it silently misattributes to OTHER (08sep finding).
+            TestPhaseTimer.addFilter(System.nanoTime() - filterStart);
+        }
     }
 
 

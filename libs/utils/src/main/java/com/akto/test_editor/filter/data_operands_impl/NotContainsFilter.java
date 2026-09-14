@@ -21,19 +21,29 @@ public class NotContainsFilter extends DataOperandsImpl {
             return result;
         }
 
+        // data is the same for every item in querySet (up to 27+ items per template in practice) -
+        // trim+lowercase it once here instead of once per item inside evaluateOnStringQuerySet.
+        // On failure, leave it null so the per-item try/catch below fails exactly like the old
+        // per-item data.trim() would have - same res=false per item, same accumulated result.
+        String normalizedData = null;
+        try {
+            normalizedData = data.trim().toLowerCase();
+        } catch (Exception e) {
+            // fall through with normalizedData=null, preserving old per-item error behavior
+        }
         for (String queryString: querySet) {
             try {
-                res = evaluateOnStringQuerySet(data.trim(), queryString.trim());
+                res = evaluateOnStringQuerySet(normalizedData, queryString.trim());
             } catch (Exception e) {
                 res = false;
             }
             result = result && res;
         }
-        return result;    
+        return result;
     }
 
-
+    // data is expected pre-normalized (trimmed + lowercased) by the caller now - see isValid above.
     public Boolean evaluateOnStringQuerySet(String data, String query) {
-        return !data.toLowerCase().contains(query.toLowerCase());
+        return !data.contains(query.toLowerCase());
     }
 }

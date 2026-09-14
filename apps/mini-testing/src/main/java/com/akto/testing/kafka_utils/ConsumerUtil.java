@@ -96,7 +96,11 @@ public class ConsumerUtil {
         return new SingleTestPayload(testingRunId, testingRunResultSummaryId, apiInfoKey, subcategory, testLogs, accountId);
     }
 
-    public void runTestFromMessage(String message){
+    public void runTestFromMessage(String message, String recordId){
+        // Record the REAL worker thread here, on the worker thread itself - onSubmit only ever sees
+        // the pc-pool caller (always future.get(), never the actual work), so a stall dump jstack'd
+        // on that name is a dead end. This is the fix for that gap.
+        metrics.onWorkerStart(recordId, Thread.currentThread().getName());
         SingleTestPayload singleTestPayload = parseTestMessage(message);
         Context.accountId.set(singleTestPayload.getAccountId());
         ObjectId summaryId = singleTestPayload.getTestingRunResultSummaryId();
@@ -123,6 +127,7 @@ public class ConsumerUtil {
                 debugLogToDb(singleTestPayload.getAccountId(), skipMsg);
             } else {
                 String sample = messagesList.get(messagesList.size() - 1);
+                metrics.recordPayloadSize(sample == null ? 0 : sample.length());
                 loggerMaker.infoAndAddToDb("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
 
                 // RUN_TEST wall + CPU. Recorded in a finally so a test that times out / throws still
@@ -136,6 +141,9 @@ public class ConsumerUtil {
                 } finally {
                     metrics.recordStage(Stage.RUN_TEST, System.nanoTime() - runWallStart);
                     metrics.recordStage(Stage.SEND_REQUEST, TestPhaseTimer.sendReqNanos());
+                    metrics.recordStage(Stage.FILTER, TestPhaseTimer.filterNanos());
+                    metrics.recordStage(Stage.WORDLIST, TestPhaseTimer.wordlistNanos());
+                    metrics.recordStage(Stage.VALIDATE, TestPhaseTimer.validateNanos());
                     if (runCpuStart >= 0) metrics.recordRunTestCpu(THREAD_MX.getCurrentThreadCpuTime() - runCpuStart);
                 }
 
@@ -154,7 +162,7 @@ public class ConsumerUtil {
 
                 testedApisMap.put(apiInfoKey, Context.now());
 
-                loggerMaker.insertImportantTestingLog("Test completed for: " + apiInfoKey + " with subcategory: " + subCategory + " in " + (Context.now() - timeNow) + " seconds");
+                // loggerMaker.insertImportantTestingLog("Test completed for: " + apiInfoKey + " with subcategory: " + subCategory + " in " + (Context.now() - timeNow) + " seconds");
             }
         } catch (Exception e) {
             String errMsg = "runTestFromMessage failed apiInfoKey=" + apiInfoKey
@@ -340,7 +348,7 @@ public class ConsumerUtil {
                     try {
                         if(!executor.isShutdown()){
                             metrics.onSubmit(recordId, threadName);
-                            Future<?> future = executor.submit(() -> runTestFromMessage(message));
+                            Future<?> future = executor.submit(() -> runTestFromMessage(message, recordId));
                             firstRecordRead.set(true);
                             try {
                                 future.get(maxRunTimeForTests, TimeUnit.SECONDS);

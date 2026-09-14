@@ -205,8 +205,14 @@ public class Utils {
     }
 
     public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
-        RecordedLoginFlowInput recordedLoginFlowInput = dataActor.fetchRecordedLoginFlowInput();
-        return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, recordedLoginFlowInput);
+        // fetchRecordedLoginFlowInput() is only ever used by the RECORDED node branch below - fetch it
+        // lazily, only for that type, instead of unconditionally on every node (OTP/API nodes - the
+        // common case - discarded it immediately, at the cost of one wasted remote call per node).
+        if (node.getWorkflowNodeDetails().getType() == WorkflowNodeDetails.Type.RECORDED) {
+            RecordedLoginFlowInput recordedLoginFlowInput = dataActor.fetchRecordedLoginFlowInput();
+            return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, recordedLoginFlowInput);
+        }
+        return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, (RecordedLoginFlowInput) null);
     }
 
     public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, AuthMechanism authMechanism) {
