@@ -3,6 +3,9 @@ import Dropdown from "../../../components/layouts/Dropdown";
 import GuardrailEnforcementInfoIcon from "./GuardrailEnforcementInfoIcon";
 import { GUARDRAIL_BEHAVIOUR, GUARDRAIL_BEHAVIOUR_OPTIONS, normalizeBehaviourValue } from "../utils";
 import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
+import Store from "../../../store";
+
+const WARN_ENABLED_ACCOUNT_IDS = ['1726615470', '1000000'];
 
 export default function RuleEnforcementDropdown({
     id,
@@ -14,11 +17,14 @@ export default function RuleEnforcementDropdown({
     const initial = normalizeBehaviourValue(value);
     const isAtlas = isEndpointSecurityCategory();
     const isArgus = isAgenticSecurityCategory();
+    const activeAccount = Store(state => state.activeAccount);
+    const isWarnEnabled = WARN_ENABLED_ACCOUNT_IDS.includes(String(activeAccount));
     // "Approval" (Atlas server-preapproval) is Endpoint-only; "Human Approval" (Argus per-call
     // pending/poll) is Agentic-only — each category only ever sees its own option.
     const menuItems = GUARDRAIL_BEHAVIOUR_OPTIONS.filter((o) => {
         if (o.value === GUARDRAIL_BEHAVIOUR.APPROVAL) return isAtlas;
         if (o.value === GUARDRAIL_BEHAVIOUR.HUMAN_APPROVAL) return isArgus;
+        if (o.value === GUARDRAIL_BEHAVIOUR.WARN) return isWarnEnabled;
         return true;
     });
     const showLabelRow = typeof label === "string" && label.trim().length > 0;
