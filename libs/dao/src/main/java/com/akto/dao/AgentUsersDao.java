@@ -19,6 +19,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -334,7 +335,25 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         if (conditions.isEmpty()) return new ArrayList<>();
 
         Bson filter = conditions.size() == 1 ? conditions.get(0) : Filters.or(conditions);
-        return instance.findAll(filter);
+        // agent_users can hold multiple un-deduped docs for the same username (e.g. one per
+        // device/session from repeated Okta-sync or heartbeat upserts, rather than one doc with a
+        // devices array) — $in on userName then returns every one of them. Left un-deduped here,
+        // a caller picking 3 people could get back hundreds of rows if any of them has many such
+        // duplicates, silently inflating anything downstream that counts this result (e.g.
+        // GuardrailPolicies#userMetadata). Dedupe by username (falling back to userId), merging
+        // devices/deviceTags across duplicates — same convention as ModuleInfoAction#mergeInto.
+        Map<String, AgenticUsers> byIdentity = new LinkedHashMap<>();
+        for (AgenticUsers u : instance.findAll(filter)) {
+            String key = (u.getUserName() != null && !u.getUserName().trim().isEmpty()) ? "n:" + u.getUserName() : "i:" + u.getUserId();
+            AgenticUsers existing = byIdentity.get(key);
+            if (existing == null) {
+                byIdentity.put(key, u);
+            } else {
+                if (existing.getUserEmail() == null) existing.setUserEmail(u.getUserEmail());
+                if (existing.getUserId() == null) existing.setUserId(u.getUserId());
+            }
+        }
+        return new ArrayList<>(byIdentity.values());
     }
 
     private static List<String> filterBlank(Collection<String> values) {
