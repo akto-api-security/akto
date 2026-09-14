@@ -23,6 +23,7 @@ export default function RuleEnforcementDropdown({
     });
     const showLabelRow = typeof label === "string" && label.trim().length > 0;
     const showEndpointOnlyNote = isAtlas && initial === GUARDRAIL_BEHAVIOUR.APPROVAL;
+    const showWarnNote = initial === GUARDRAIL_BEHAVIOUR.WARN;
 
     return (
         <VerticalStack gap="2">
@@ -47,6 +48,15 @@ export default function RuleEnforcementDropdown({
                 <Banner status="info">
                     <Text variant="bodyMd">
                         In the browser extension, <Text as="span" fontWeight="bold">{menuItems.find((o) => o.value === initial)?.label}</Text> behaves the same as <Text as="span" fontWeight="bold">Block</Text>.
+                    </Text>
+                </Banner>
+            )}
+            {showWarnNote && (
+                <Banner tone="info">
+                    <Text variant="bodyMd">
+                        Warn currently applies only to input prompts submitted by the user - a flagged prompt is held, and resending it unchanged lets it through.
+                        On Claude CLI, Copilot CLI, and VS Code, a flagged tool call prompts you to explicitly allow it before it runs.
+                        Output messages and responses from internal tools aren't supported by Warn yet - these are blocked instead.
                     </Text>
                 </Banner>
             )}
