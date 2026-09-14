@@ -377,7 +377,6 @@ public class AgentQueryRecord {
                 ", payload='" + queryPayload + '\'' +
                 ", body='" + responsePayload + '\'' +
                 ", isAtlasTraffic=" + isAtlasTraffic +
-                ", orgId='" + orgId + '\'' +
                 ", guardrailViolated=" + guardrailViolated +
                 ", guardrailAction='" + guardrailAction + '\'' +
                 ", guardrailPolicy='" + guardrailPolicy + '\'' +
