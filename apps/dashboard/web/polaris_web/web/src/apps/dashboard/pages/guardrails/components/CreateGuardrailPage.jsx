@@ -32,7 +32,7 @@ import { ENTERPRISE_LICENSE_COMPLIANCE_ORIGIN } from './enterpriseLicenseComplia
 import { groupCollectionsByAgent, groupCollectionsByService, groupCollectionsByLLM, extractServiceName } from '../../observe/agentic/constants';
 import { findAssetTag } from '../../observe/agentic/mcpClientHelper';
 import { isEndpointSecurityCategory } from '../../../../main/labelHelper';
-import { isVisibilityOnly, buildAgentFilterOptions, getClientTagVariants, resolveClientKey } from '../serverTargetingUtils';
+import { isVisibilityOnly, buildAgentFilterOptions, getClientTagVariants, resolveClientKey, splitPolicyServers } from '../serverTargetingUtils';
 import func from "@/util/func";
 import {
     PolicyDetailsStep,
@@ -85,10 +85,15 @@ const expandAgentGroupsToV2 = (selectedKeys) =>
         getClientTagVariants(key).map(rawValue => ({ id: rawValue, name: rawValue }))
     );
 
+// A collection can carry both a mode=inline and a mode=observe tag at once (e.g. it saw
+// traffic through both paths at different times) — prefer inline when both are present.
+const hasModeTag = (c, value) => c.envType?.some(t => t.keyName === 'mode' && t.value === value);
+const isCollectionInline = (c) => hasModeTag(c, 'inline') || !hasModeTag(c, 'observe');
+
 const groupToOption = (g) => ({
     label: g.groupName,
     value: g.groupKey,
-    isInline: g.collections.some(c => !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe'))
+    isInline: g.collections.some(isCollectionInline)
 });
 
 // Converts stored V2 server entries back to the option-value keys used by the dropdowns.
@@ -136,18 +141,6 @@ const buildRedactionRules = (enabled, rules) => {
             userPrompt: r.userPrompt.trim(),
             confidenceScore: r.confidenceScore ?? 0.5
         }));
-};
-
-const getLlmServiceKeySet = (allCollections) => {
-    const keys = new Set();
-    (allCollections || []).forEach(c => {
-        if (c.envType?.some(e => e.keyName === 'browser-llm')) {
-            const rawName = c.hostName || c.displayName || '';
-            const svcKey = extractServiceName(rawName) || rawName;
-            if (svcKey) keys.add(svcKey);
-        }
-    });
-    return keys;
 };
 
 const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false, initialStep = 1 }) => {
@@ -680,7 +673,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     return {
                         label: name,
                         value: name,
-                        isInline: !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe')
+                        isInline: isCollectionInline(c)
                     };
                 };
                 const dedup = (opts) => [...new Map(opts.map(o => [o.value, o])).values()].filter(o => o.value);
@@ -690,7 +683,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     ...opt,
                     isInline: genAiCollections.some(c =>
                         (c.hostName || c.displayName || c.name || '') === opt.value
-                        && !c.envType?.some(t => t.keyName === 'mode' && t.value === 'observe')
+                        && isCollectionInline(c)
                     )
                 })));
                 setBrowserLlmServers(dedup(nonVisibility.filter(c => c.envType?.some(t => t.keyName === 'browser-llm')).map(toOption)));
@@ -921,29 +914,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             : (policy.selectedMcpServers || []).map(name => ({ id: name, name }));
         setSelectedMcpServers(reverseToServiceKeys(storedMcpV2, allCollections));
 
-        // selectedAgentServersV2 is agent-only now; LLM entries live in selectedLlmServersV2 (see GuardrailPolicies.java). Old policies fall back to reclassifying below.
-        const rawAgentServersV2 = policy.selectedAgentServersV2?.length > 0
-            ? policy.selectedAgentServersV2
-            : (policy.selectedAgentServers || []).map(id => ({ id, name: id }));
-
-        let rawAgentEntries, rawLlmEntries;
-        if (policy.selectedLlmServersV2?.length > 0) {
-            rawAgentEntries = rawAgentServersV2;
-            rawLlmEntries = policy.selectedLlmServersV2;
-        } else {
-            // Legacy path: classify each commingled entry using live collection data
-            const llmServiceKeySet = getLlmServiceKeySet(allCollections);
-            rawAgentEntries = [];
-            rawLlmEntries = [];
-            rawAgentServersV2.forEach(s => {
-                const col = allCollections?.find(c => c.id?.toString() === s.id?.toString());
-                const isBrowserLlm = col
-                    ? col.envType?.some(e => e.keyName === 'browser-llm')
-                    : llmServiceKeySet.has(s.name || '');
-                if (isBrowserLlm) rawLlmEntries.push(s);
-                else rawAgentEntries.push(s);
-            });
-        }
+        // Agent and LLM lists are stored separately; pre-split policies get reclassified.
+        const { agents: rawAgentEntries, llms: rawLlmEntries } = splitPolicyServers(policy, allCollections);
 
         setSelectedAgentServers(reverseAgentKeys(rawAgentEntries, allCollections));
         setSelectedBrowserLlms(reverseToServiceKeys(rawLlmEntries, allCollections));

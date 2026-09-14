@@ -334,6 +334,11 @@ func (h *ValidationHandler) ReplayWithPolicy(c *gin.Context) {
 		BaselinePolicy *mcp.GuardrailsPolicy  `json:"baselinePolicy,omitempty"`
 		ContextSource  string                 `json:"contextSource,omitempty"`
 		Items          []validator.ReplayItem `json:"items" binding:"required,min=1"`
+		// IncludeDetectionDetails additionally populates category/subCategory/severity on each
+		// detected verdict, for a caller that persists a real malicious_events record from the
+		// replay (e.g. a backfill job) rather than just showing a detected/not-detected count.
+		// Omitted by the dashboard's compare feature, which sees identical behavior to before.
+		IncludeDetectionDetails bool `json:"includeDetectionDetails,omitempty"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -352,7 +357,7 @@ func (h *ValidationHandler) ReplayWithPolicy(c *gin.Context) {
 	}
 
 	verdicts, err := h.validatorService.ReplayWithPolicy(
-		c.Request.Context(), req.Items, req.Policy, req.BaselinePolicy, req.ContextSource)
+		c.Request.Context(), req.Items, req.Policy, req.BaselinePolicy, req.ContextSource, req.IncludeDetectionDetails)
 	if err != nil {
 		h.logger.Error("ReplayWithPolicy failed",
 			zap.String("policyName", req.Policy.Name),

@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList, Scrollable, Avatar, Box, Banner } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
+import BackfillReplayModal from "./components/BackfillReplayModal";
 import InsightsFlyout from "@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout";
 import InsightsEntryButton from "@/apps/dashboard/pages/observe/agentic/insights/InsightsEntryButton";
 import useInsightsEntryPoint from "@/apps/dashboard/pages/observe/agentic/insights/useInsightsEntryPoint";
@@ -25,7 +26,7 @@ import {
     buildAgentFilterOptions,
     getApplicableAgentKeys,
     applyAgentFilterToRows,
-    splitAgentServersV2,
+    splitPolicyServers,
     resolveClientKey,
 } from "./serverTargetingUtils";
 
@@ -171,6 +172,7 @@ function GuardrailPolicies() {
     const [presetsPopoverActive, setPresetsPopoverActive] = useState(false);
     const [pendingPolicyName, setPendingPolicyName] = useState(null);
     const [openedViaDeepLink, setOpenedViaDeepLink] = useState(false);
+    const [backfillPolicies, setBackfillPolicies] = useState([]);
     const insights = useInsightsEntryPoint();
     // No date-range filter on this page today — insights default to the last 30 days,
     // same window AgenticAssetsPage's own DateRangeFilter opens on.
@@ -376,16 +378,9 @@ function GuardrailPolicies() {
         return [];
     };
 
-    // selectedAgentServersV2 stores both AI agent and browser-LLM entries merged together.
-    const splitPolicyAgentServers = (rawEntries) =>
-        splitAgentServersV2(rawEntries, allCollections);
-
     // Returns mcp, agent, and llm server lists for a policy in one pass.
     const getEffectiveServers = (policy) => {
-        const raw = policy.selectedAgentServersV2?.length > 0
-            ? policy.selectedAgentServersV2
-            : (policy.selectedAgentServers || []).map(id => ({ id, name: id }));
-        const { agents, llms } = splitPolicyAgentServers(raw);
+        const { agents, llms } = splitPolicyServers(policy, allCollections);
         // Atlas stores every raw wire-level tag value an agent group aliases (e.g. 9 Claude CLI
         // variants) — collapse back to canonical keys so counts show "1 Agent", not "9 Agents".
         const dedupedAgents = isEndpointSecurityCategory()
@@ -605,6 +600,16 @@ function GuardrailPolicies() {
 
     const promotedBulkActions = (selectedPolicies) => {
         return [
+            {
+                content: `Backfill histor${selectedPolicies.length > 1 ? "ies" : "y"} for ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}`,
+                onAction: () => {
+                    const selectedRows = tablePolicyData.filter(row => selectedPolicies.includes(row.id));
+                    setBackfillPolicies(selectedRows.map(row => ({
+                        name: row.originalData.name,
+                        hexId: row.originalData.hexId,
+                    })));
+                },
+            },
             {
                 content: `Delete ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}`,
                 onAction: async () => {
@@ -882,6 +887,11 @@ function GuardrailPolicies() {
                 group={INSIGHT_GROUP.ATLAS_DISCOVERY}
             />
         )}
+        <BackfillReplayModal
+            open={backfillPolicies.length > 0}
+            onClose={() => setBackfillPolicies([])}
+            policies={backfillPolicies}
+        />
     </>
 }
 

@@ -258,11 +258,11 @@ export default {
     // maliciousSkillKeys is NOT sent — AgenticObserveAction computes/caches it itself now
     // (getOrBuildSkillData) instead of requiring the whole account-wide set (14,218 entries /
     // ~500KB+ on Atlas Scale Test) to be re-POSTed on every paginated request.
-    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap } = {}) {
+    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, skillViolationsByName, usernameMap } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsSummary',
             method: 'post',
-            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap },
+            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, skillViolationsByName, usernameMap },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0, distinctUsernames: resp?.distinctUsernames || [] }
     },
@@ -325,6 +325,33 @@ export default {
             inlineToolNames: resp?.assetInlineToolNames || [],
             mcpComponentCount: resp?.assetMcpComponentCount || 0,
         }
+    },
+    // Batch form of fetchAgenticAssetDetail, scoped to just mcpServers/mcpServerCollectionIds/
+    // skillCount/pluginNames — the device flyout's context graph needs this for every AI Agent
+    // shown on a device (can be 10+), and firing fetchAgenticAssetDetail once per agent would mean
+    // that many concurrent requests just to draw one graph (see AgenticObserveAction.
+    // fetchAgenticAssetDetailsBatch's own comment). Returns a Map<groupKey, detail>.
+    async fetchAgenticAssetDetailsBatch({ groupKeys, rowType, trafficMap, riskScoreMap } = {}) {
+        if (!groupKeys?.length) return new Map();
+        const resp = await request({
+            url: '/api/fetchAgenticAssetDetailsBatch',
+            method: 'post',
+            data: { groupKeys, rowType, trafficMap, riskScoreMap },
+        })
+        const byGroupKey = resp?.detailsByGroupKey || {};
+        const out = new Map();
+        Object.entries(byGroupKey).forEach(([key, d]) => {
+            out.set(key, {
+                mcpServers: d?.mcpServers || [],
+                mcpServerCollectionIds: d?.mcpServerCollectionIds || {},
+                // Subset of mcpServers that are actually LLMs (gen-ai/browser-llm tagged), so the
+                // graph can label them "LLM" instead of lumping everything under "MCP Server".
+                llmServers: d?.llmServers || [],
+                skillCount: d?.skillCount || 0,
+                pluginNames: d?.pluginNames || [],
+            });
+        });
+        return out;
     },
     // Server-side paginated device list for ONE asset's flyout Devices tab — scoped to just
     // that asset's own apiCollectionIds (cheap), not the whole account. usernameMap is the
@@ -398,21 +425,21 @@ export default {
     },
     // Paginated, sorted, searchable user/device rows for Users-and-Devices / Endpoints — same
     // lightweight-summary-first-then-slice shape as fetchAgenticAssetsSummary. groupBy: "user"|"device".
-    async fetchUsersAndDevicesSummary({ groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap, tagsByUsername } = {}) {
+    async fetchUsersAndDevicesSummary({ groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap } = {}) {
         const resp = await request({
             url: '/api/fetchUsersAndDevicesSummary',
             method: 'post',
-            data: { groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap, tagsByUsername },
+            data: { groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0 }
     },
     // Tab-header counts ("Users (N)" / "Devices (N)") for Users-and-Devices / Endpoints, each tab's
     // "Agentic assets" total, plus distinct device-tag keys for the Tags filter/"Edit device tags" modal.
-    async fetchUsersAndDevicesStats({ trafficMap, riskScoreMap, usernameMap, userMetadataMap, tagsByUsername } = {}) {
+    async fetchUsersAndDevicesStats({ trafficMap, riskScoreMap } = {}) {
         const resp = await request({
             url: '/api/fetchUsersAndDevicesStats',
             method: 'post',
-            data: { trafficMap, riskScoreMap, usernameMap, userMetadataMap, tagsByUsername },
+            data: { trafficMap, riskScoreMap },
         })
         return {
             usersCount: resp?.usersCount || 0,
