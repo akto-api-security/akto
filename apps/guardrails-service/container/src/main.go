@@ -106,41 +106,43 @@ func metricsFlushLoop(dbClient *dbabstractor.Client, logger *zap.Logger, acc *me
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
-		for accountId, batch := range acc.DrainAll() {
-			flushMetrics(dbClient, logger, accountId, batch)
+		var batch []metrics.MetricData
+		for _, accountBatch := range acc.DrainAll() {
+			batch = append(batch, accountBatch...)
 		}
 		// Instance-level CPU/memory/goroutine gauges, cache hit/miss counts,
 		// and downstream-dependency call health, attributed to the service
 		// token's account (see metrics.SystemSampler).
 		if sysSampler != nil {
-			sysBatch := sysSampler.Sample()
+			batch = append(batch, sysSampler.Sample()...)
 			cacheStats := guardcache.DrainStats()
-			sysBatch = append(sysBatch, sysSampler.CacheStats(cacheStats.HitsExact, cacheStats.HitsFuzzy, cacheStats.Misses)...)
+			batch = append(batch, sysSampler.CacheStats(cacheStats.HitsExact, cacheStats.HitsFuzzy, cacheStats.Misses)...)
 			agStats := depstats.AgentGuard.Drain()
-			sysBatch = append(sysBatch, sysSampler.DependencyStats("GUARDRAIL_AGENT_GUARD", agStats.Calls, agStats.Errors, agStats.AvgLatencyMs)...)
+			batch = append(batch, sysSampler.DependencyStats("GUARDRAIL_AGENT_GUARD", agStats.Calls, agStats.Errors, agStats.AvgLatencyMs)...)
 			embStats := depstats.Embedder.Drain()
-			sysBatch = append(sysBatch, sysSampler.DependencyStats("GUARDRAIL_EMBEDDER", embStats.Calls, embStats.Errors, embStats.AvgLatencyMs)...)
-			if len(sysBatch) > 0 {
-				flushMetrics(dbClient, logger, strconv.FormatInt(sysBatch[0].AccountId, 10), sysBatch)
-			}
+			batch = append(batch, sysSampler.DependencyStats("GUARDRAIL_EMBEDDER", embStats.Calls, embStats.Errors, embStats.AvgLatencyMs)...)
 		}
+		flushMetrics(dbClient, logger, batch)
 	}
 }
 
-// flushMetrics POSTs one account's metric batch to the db-abstractor and logs
-// each value sent so the emitted metrics are observable in the service logs.
-func flushMetrics(dbClient *dbabstractor.Client, logger *zap.Logger, account string, batch []metrics.MetricData) {
+// flushMetrics POSTs this tick's metric batch to the db-abstractor and logs each
+// value sent so the emitted metrics are observable in the service logs.
+func flushMetrics(dbClient *dbabstractor.Client, logger *zap.Logger, batch []metrics.MetricData) {
+	if len(batch) == 0 {
+		return
+	}
 	payload := make([]interface{}, len(batch))
 	for i, m := range batch {
 		payload[i] = m
 	}
 	if err := dbClient.IngestMetrics(payload); err != nil {
-		logger.Error("Failed to flush guardrail metrics", zap.String("account", account), zap.Error(err))
+		logger.Error("Failed to flush guardrail metrics", zap.Int("count", len(batch)), zap.Error(err))
 		return
 	}
 	for _, m := range batch {
 		logger.Info("Flushed guardrail metric",
-			zap.String("account", account),
+			zap.Int64("account", m.AccountId),
 			zap.String("metricId", m.MetricId),
 			zap.Float64("value", m.Value),
 			zap.String("instance", m.InstanceId),
