@@ -5,6 +5,7 @@ import com.akto.dao.agentic_sessions.SessionDocumentDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.jobs.JobsDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -496,6 +497,7 @@ public class DaoInit {
         EndpointRemoteCommandDao.instance.createIndicesIfAbsent();
         EndpointRemoteCommandExecutionDao.instance.createIndicesIfAbsent();
         ModuleInfoDao.instance.createIndicesIfAbsent();
+        MetricDataDao.instance.createIndicesIfAbsent();
     }
 
 }

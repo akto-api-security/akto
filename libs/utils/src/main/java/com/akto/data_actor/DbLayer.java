@@ -186,6 +186,7 @@ public class DbLayer {
     private static final long COLLECTION_SIZE_THRESHOLD = 100_000;
 
     private static final ExecutorService telemetryForwardingExecutorService = Executors.newFixedThreadPool(1);
+    private static final TelemetryIntegrationCache telemetryIntegrationCache = new TelemetryIntegrationCache();
 
     private static int getLastUpdatedTsForAccount(int accountId) {
         return lastUpdatedTsMap.computeIfAbsent(accountId, k -> 0);
@@ -242,8 +243,8 @@ public class DbLayer {
         }
 
         int accountId = Context.accountId.get();
-        boolean forwardToNewRelic = NewRelicIntegrationDao.instance.findOne(new BasicDBObject()) != null;
-        boolean forwardToOpenTelemetry = OpenTelemetryIntegrationDao.instance.findOne(new BasicDBObject()) != null;
+        boolean forwardToNewRelic = telemetryIntegrationCache.hasNewRelicIntegration(accountId);
+        boolean forwardToOpenTelemetry = telemetryIntegrationCache.hasOpenTelemetryIntegration(accountId);
 
         if (forwardToNewRelic) {
             loggerMaker.infoAndAddToDb(String.format("Forwarding module heartbeat to New Relic for module %s (account %d)", moduleInfo.getName(), accountId), LogDb.DB_ABS);
@@ -2800,17 +2801,19 @@ public class DbLayer {
     }
 
 
+    /*
+     * Retention for metrics_data is owned by the dashboard's daily
+     * trimCappedCollectionsJob (clear(MetricDataDao.instance, maxDocuments)),
+     * which deletes by _id. Nothing here may delete: this runs on the request
+     * thread for every metrics batch from every guardrails / agent-guard /
+     * traffic-collector instance.
+     */
     public static void ingestMetricsData(List<MetricData> metricData) {
-        // First check if cleanup should be performed
-        if (MetricDataDao.instance.shouldPerformCleanup()) {
-            long deletedCount = MetricDataDao.instance.deleteOldMetrics();
-            loggerMaker.infoAndAddToDb("Deleted " + deletedCount + " old metrics records", LogDb.DASHBOARD);
-        }
         MetricDataDao.instance.insertMany(metricData);
 
         int accountId = Context.accountId.get();
-        boolean forwardToNewRelic = NewRelicIntegrationDao.instance.findOne(new BasicDBObject()) != null;
-        boolean forwardToOpenTelemetry = OpenTelemetryIntegrationDao.instance.findOne(new BasicDBObject()) != null;
+        boolean forwardToNewRelic = telemetryIntegrationCache.hasNewRelicIntegration(accountId);
+        boolean forwardToOpenTelemetry = telemetryIntegrationCache.hasOpenTelemetryIntegration(accountId);
 
         if (forwardToNewRelic) {
             loggerMaker.infoAndAddToDb(String.format("Forwarding %d metrics to New Relic for account %d", metricData.size(), accountId), LogDb.DB_ABS);
