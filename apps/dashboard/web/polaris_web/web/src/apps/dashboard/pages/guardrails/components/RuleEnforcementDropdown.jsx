@@ -24,7 +24,7 @@ export default function RuleEnforcementDropdown({
     const menuItems = GUARDRAIL_BEHAVIOUR_OPTIONS.filter((o) => {
         if (o.value === GUARDRAIL_BEHAVIOUR.APPROVAL) return isAtlas;
         if (o.value === GUARDRAIL_BEHAVIOUR.HUMAN_APPROVAL) return isArgus;
-        if (o.value === GUARDRAIL_BEHAVIOUR.WARN) return isWarnEnabled;
+        if (o.value === GUARDRAIL_BEHAVIOUR.WARN) return isAtlas && isWarnEnabled;
         return true;
     });
     const showLabelRow = typeof label === "string" && label.trim().length > 0;
