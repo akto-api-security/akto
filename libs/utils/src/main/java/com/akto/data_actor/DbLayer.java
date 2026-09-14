@@ -3668,6 +3668,41 @@ public class DbLayer {
         return result;
     }
 
+    private static final String AGENT_LOGINS_KEY = "agentLogins";
+    private static final String CLAUDE_DESKTOP_AGENT_TYPE = "claude-desktop";
+
+    /**
+     * device name -> the device's claude-desktop login block from
+     * additionalData.agentLogins["claude-desktop"] (email, emailCategory, accountType,
+     * accountUuid, organizationUuid, loggedIn, source, ...).
+     * Devices that never reported a claude-desktop entry are left out; a reported entry is
+     * returned as-is, logged in or not.
+     */
+    public static Map<String, Map<String, Object>> fetchDeviceClaudeDesktopInfoMap() {
+        List<ModuleInfo> modules = ModuleInfoDao.instance.findAll(
+            Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD.name()),
+            Projections.include(ModuleInfo.NAME,
+                ModuleInfo.ADDITIONAL_DATA + "." + AGENT_LOGINS_KEY + "." + CLAUDE_DESKTOP_AGENT_TYPE)
+        );
+        Map<String, Map<String, Object>> result = new HashMap<>();
+        if (modules == null) return result;
+        for (ModuleInfo m : modules) {
+            if (m.getName() == null || m.getAdditionalData() == null) continue;
+            Object agentLoginsObj = m.getAdditionalData().get(AGENT_LOGINS_KEY);
+            if (!(agentLoginsObj instanceof Map)) continue;
+            Object claudeDesktopObj = ((Map<?, ?>) agentLoginsObj).get(CLAUDE_DESKTOP_AGENT_TYPE);
+            if (!(claudeDesktopObj instanceof Map)) continue;
+            Map<String, Object> info = new HashMap<>();
+            for (Map.Entry<?, ?> entry : ((Map<?, ?>) claudeDesktopObj).entrySet()) {
+                if (entry.getKey() == null) continue;
+                info.put(String.valueOf(entry.getKey()), entry.getValue());
+            }
+            if (info.isEmpty()) continue;
+            result.put(m.getName(), info);
+        }
+        return result;
+    }
+
     // --- Endpoint Remote Commands ---
 
     /**
