@@ -190,8 +190,6 @@ public class ApiExecutorUtil {
                 return originalHttpRequest.getBody();
             }
 
-            loggerMaker.infoAndAddToDb("Starting calculateHashAndAddAuth");
-
             Map<String, Object> bindings = new HashMap<>();
             bindings.put("method", originalHttpRequest.getMethod());
             bindings.put("headers", originalHttpRequest.getHeaders());
