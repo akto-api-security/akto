@@ -62,7 +62,7 @@ export default function RuleEnforcementDropdown({
                     <Text variant="bodyMd">
                         Warn currently applies only to input prompts submitted by the user - a flagged prompt is held, and resending it unchanged lets it through.
                         On Claude CLI, Copilot CLI, and VS Code, a flagged tool call prompts you to explicitly allow it before it runs.
-                        Output messages and responses from internal tools aren't supported by Warn yet - these are blocked instead.
+                        Output messages and internal responses generated inside agent aren't supported by Warn yet - these are blocked instead.
                     </Text>
                 </Banner>
             )}
