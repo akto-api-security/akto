@@ -98,8 +98,29 @@ const tableFunc = {
         // Including a row-id fingerprint prevents collisions across different scopes
         // (e.g., two users that each happen to produce 1 grouped row would otherwise
         // share the same cache entry and show stale dropdown choices).
+        // Also fold in every showFilter column's values: row count and boundary ids alone
+        // don't change when a filterable field is toggled in place on an existing row (e.g.
+        // an active/inactive flag) - the choices cache would otherwise go stale, e.g. a
+        // dropdown that keeps offering only "Active" after rows have been flipped to
+        // inactive. A running hash keeps this a fixed-size, cheap-to-compute key (no huge
+        // joined string) even for large tables, while still reflecting every row - not just
+        // the first/last - so an interior-row toggle is caught too.
+        const filterableKeys = (props.headers || []).filter(h => h.showFilter).map(h => h.filterKey || h.value);
+        let filterContentHash = 0;
+        if (filterableKeys.length > 0) {
+          for (let i = 0; i < tempData.length; i++) {
+            for (let k = 0; k < filterableKeys.length; k++) {
+              const v = tempData[i]?.[filterableKeys[k]];
+              const s = v === undefined || v === null ? '' : String(v);
+              for (let c = 0; c < s.length; c++) {
+                filterContentHash = (filterContentHash * 31 + s.charCodeAt(c)) | 0;
+              }
+              filterContentHash = (filterContentHash * 31 + k) | 0;
+            }
+          }
+        }
         const dataFingerprint = tempData.length > 0
-          ? `${tempData.length}:${tempData[0]?.id ?? ''}:${tempData[tempData.length - 1]?.id ?? ''}`
+          ? `${tempData.length}:${tempData[0]?.id ?? ''}:${tempData[tempData.length - 1]?.id ?? ''}:${filterContentHash}`
           : '0';
         const cacheKey = `${dataFingerprint}_${props.headers.map(h => `${h.value}:${h.filterKey || ''}:${h.filterLabel || ''}`).join('_')}`;
 

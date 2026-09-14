@@ -125,6 +125,15 @@ export default {
         return resp
     },
 
+    async setBrowserExtensionConfigsActive(hosts, active) {
+        const resp = await request({
+            url: '/api/setBrowserExtensionConfigsActive',
+            method: 'post',
+            data: { hosts, browserExtensionConfig: { active } }
+        })
+        return resp
+    },
+
     async saveBrowserExtensionConfig(browserExtensionConfig, hexId) {
         const resp = await request({
             url: '/api/saveBrowserExtensionConfig',
