@@ -490,14 +490,27 @@ function GuardrailPolicies() {
         if (isEndpointSecurityCategory()) {
             const targetTags = policy.targetTags || {};
             const targetDeviceIds = policy.targetDeviceIds || [];
-            const tagKeyCount = Object.keys(targetTags).filter(k => (targetTags[k] || []).length > 0).length;
-            if (tagKeyCount === 0 && targetDeviceIds.length === 0) {
+            const negatedTargetTags = policy.negatedTargetTags || {};
+            const negatedTargetDeviceIds = !!policy.negatedTargetDeviceIds;
+            // Exclude-with-zero still needs a line — same reasoning as the server-scope part() above.
+            const tagKeyCount = Object.keys(targetTags).filter(k => (targetTags[k] || []).length > 0 || negatedTargetTags[k]).length;
+            if (tagKeyCount === 0 && targetDeviceIds.length === 0 && !negatedTargetDeviceIds) {
                 details.push({ label: "Target Users", value: "All users" });
             } else {
                 const userParts = Object.entries(targetTags)
-                    .filter(([, values]) => (values || []).length > 0)
-                    .map(([key, values]) => `${values.length} ${key.charAt(0).toUpperCase()}${key.slice(1)}${values.length !== 1 ? 's' : ''}`);
-                if (targetDeviceIds.length > 0) userParts.push(`${targetDeviceIds.length} User${targetDeviceIds.length !== 1 ? 's' : ''}`);
+                    .filter(([key, values]) => (values || []).length > 0 || negatedTargetTags[key])
+                    .map(([key, values]) => {
+                        const label = `${key.charAt(0).toUpperCase()}${key.slice(1)}${values.length !== 1 ? 's' : ''}`;
+                        return negatedTargetTags[key]
+                            ? (values.length > 0 ? `All ${label} except ${values.length}` : `All ${label}`)
+                            : `${values.length} ${label}`;
+                    });
+                if (targetDeviceIds.length > 0 || negatedTargetDeviceIds) {
+                    const label = `User${targetDeviceIds.length !== 1 ? 's' : ''}`;
+                    userParts.push(negatedTargetDeviceIds
+                        ? (targetDeviceIds.length > 0 ? `All ${label} except ${targetDeviceIds.length}` : `All ${label}`)
+                        : `${targetDeviceIds.length} ${label}`);
+                }
                 details.push({ label: "Target Users", value: userParts.join(", ") });
             }
         }
@@ -711,6 +724,10 @@ function GuardrailPolicies() {
                 // Explicit "Users" picks (beta) — independent of targetDeviceIds; matched
                 // downstream by email via userMetadata (see GuardrailPoliciesAction#createGuardrailPolicy).
                 targetUserNames: guardrailData.targetUserNames || [],
+                // Include/Exclude toggles for the three targeting dimensions above.
+                negatedTargetTags: guardrailData.negatedTargetTags || {},
+                negatedTargetDeviceIds: guardrailData.negatedTargetDeviceIds || false,
+                negatedTargetUserNames: guardrailData.negatedTargetUserNames || false,
                 // Identities behind the selected targets (both targetDeviceIds and
                 // targetUserNames) — CreateGuardrailPage already resolved these from
                 // fetchAgenticUsers; re-fetched authoritatively by the backend on save.

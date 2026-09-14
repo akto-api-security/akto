@@ -121,7 +121,7 @@ public class GuardrailPoliciesAction extends UserAction {
                         || (p.getTargetDeviceIds() != null && !p.getTargetDeviceIds().isEmpty());
                 if (hasTargeting) {
                     p.setApplyToDeviceIds(AgentUsersDao.instance.findDeviceIdsByTags(
-                            p.getTargetTags(), p.getTargetDeviceIds()));
+                            p.getTargetTags(), p.getNegatedTargetTags(), p.getTargetDeviceIds(), p.isNegatedTargetDeviceIds()));
                 }
                 EnterpriseLicenseComplianceCatalog.applyToPolicy(p);
             }
@@ -409,6 +409,10 @@ public class GuardrailPoliciesAction extends UserAction {
         if (p.getTargetTags() != null) {
             updates.add(Updates.set("targetTags", p.getTargetTags()));
         }
+        // Always set (not conditional) so toggling back to false (Include) actually persists.
+        updates.add(Updates.set("negatedTargetTags", p.getNegatedTargetTags()));
+        updates.add(Updates.set("negatedTargetDeviceIds", p.isNegatedTargetDeviceIds()));
+        updates.add(Updates.set("negatedTargetUserNames", p.isNegatedTargetUserNames()));
         // Always set (never conditional): computed fresh from targetDeviceIds/targetUserNames
         // right before this call, so it must overwrite any stale snapshot from a previous save.
         updates.add(Updates.set("userMetadata", p.getUserMetadata()));
