@@ -23,26 +23,27 @@ export const ServerSettingsConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, negatedAgentServers, negatedMcpServers, negatedLlmServers, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTags, targetDeviceIds, targetUserNames }) => {
+    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, negatedAgentServers, negatedMcpServers, negatedLlmServers, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTags, targetDeviceIds, targetUserNames, negatedTargetTags, negatedTargetDeviceIds, negatedTargetUserNames }) => {
         const appSettings = (applyOnRequest || applyOnResponse) ?
             ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
         const behaviourSuffix = policyBehaviour ? `Rule behaviour: ${policyBehaviour}` : '';
+        // Shared "N X" / "All X except N" phrasing — used for both the agentic-asset buckets and
+        // the device/tag/user targeting below.
+        const part = (negated, arr, singular) => {
+            const count = arr?.length || 0;
+            if (negated) return count > 0 ? `All ${singular} except ${count}` : `All ${singular}`;
+            if (count === 1 && arr[0] === ALL_VALUES_SENTINEL) return `All ${singular}`;
+            return count > 0 ? `${count} ${singular}` : null;
+        };
         let summary = '';
         if (applyToAllServers) {
             summary += 'All assets';
         } else {
-            const parts = [];
-            const part = (negated, arr, singular) => {
-                const count = arr?.length || 0;
-                if (negated) return count > 0 ? `All ${singular} except ${count}` : `All ${singular}`;
-                if (count === 1 && arr[0] === ALL_VALUES_SENTINEL) return `All ${singular}`;
-                return count > 0 ? `${count} ${singular}` : null;
-            };
-            [
+            const parts = [
                 part(negatedMcpServers, selectedMcpServers, 'MCP'),
                 part(negatedAgentServers, selectedAgentServers, 'Agents'),
                 part(negatedLlmServers, selectedBrowserLlms, 'LLMs'),
-            ].filter(Boolean).forEach(p => parts.push(p));
+            ].filter(Boolean);
             summary += parts.join(', ') || 'No assets';
         }
         if (applyToAllUsers) {
@@ -50,13 +51,16 @@ export const ServerSettingsConfig = {
         } else {
             const userParts = [];
             Object.entries(targetTags || {}).forEach(([key, values]) => {
-                if (values?.length > 0) {
+                if (values?.length > 0 || negatedTargetTags?.[key]) {
                     const label = key.charAt(0).toUpperCase() + key.slice(1);
-                    userParts.push(`${values.length} ${label}${values.length !== 1 ? 's' : ''}`);
+                    const p = part(!!negatedTargetTags?.[key], values, `${label}${(values?.length || 0) !== 1 ? 's' : ''}`);
+                    if (p) userParts.push(p);
                 }
             });
-            if (targetDeviceIds?.length > 0) userParts.push(`${targetDeviceIds.length} Device${targetDeviceIds.length !== 1 ? 's' : ''}`);
-            if (targetUserNames?.length > 0) userParts.push(`${targetUserNames.length} User${targetUserNames.length !== 1 ? 's' : ''}`);
+            const devicePart = part(negatedTargetDeviceIds, targetDeviceIds, `Device${targetDeviceIds?.length !== 1 ? 's' : ''}`);
+            if (devicePart) userParts.push(devicePart);
+            const userPart = part(negatedTargetUserNames, targetUserNames, `User${targetUserNames?.length !== 1 ? 's' : ''}`);
+            if (userPart) userParts.push(userPart);
             if (userParts.length > 0) summary += ` | ${userParts.join(', ')}`;
         }
         summary += `${appSettings} ${behaviourSuffix}`;
@@ -189,6 +193,12 @@ const ServerSettingsStep = ({
     setTargetDeviceIds,
     targetUserNames,
     setTargetUserNames,
+    negatedTargetTags,
+    setNegatedTargetTags,
+    negatedTargetDeviceIds,
+    setNegatedTargetDeviceIds,
+    negatedTargetUserNames,
+    setNegatedTargetUserNames,
     availableTagKeyValues = [],
     availableDevices,
     availableUsers = [],
@@ -213,11 +223,12 @@ const ServerSettingsStep = ({
     });
 
     const [userConditions, userDispatch] = useReducer(conditionsReducer, null, () => {
+        // A negated DEVICE/USER row with zero values ("Exclude nothing") is meaningful — keep it.
         const conds = Object.entries(targetTags || {})
             .filter(([, values]) => (values || []).length > 0)
-            .map(([key, values]) => ({ type: key, values }));
-        if ((targetDeviceIds || []).length > 0) conds.push({ type: 'DEVICE', values: targetDeviceIds });
-        if ((targetUserNames || []).length > 0) conds.push({ type: 'USER', values: targetUserNames });
+            .map(([key, values]) => ({ type: key, values, negated: !!negatedTargetTags?.[key] }));
+        if ((targetDeviceIds || []).length > 0 || negatedTargetDeviceIds) conds.push({ type: 'DEVICE', values: targetDeviceIds, negated: negatedTargetDeviceIds });
+        if ((targetUserNames || []).length > 0 || negatedTargetUserNames) conds.push({ type: 'USER', values: targetUserNames, negated: negatedTargetUserNames });
         return conds;
     });
 
@@ -374,6 +385,18 @@ const ServerSettingsStep = ({
             case 'MCP_SERVER': return { negated: negatedMcpServers, onToggle: setNegatedMcpServers };
             case 'LLM': return { negated: negatedLlmServers, onToggle: setNegatedLlmServers };
             default: return null;
+        }
+    };
+    // TAG keys are dynamic, so negation is per key rather than fixed booleans like the agentic
+    // buckets above; DEVICE and USER each only ever have one row, so they stay plain booleans.
+    const userNegationProps = (type) => {
+        switch (type) {
+            case 'DEVICE': return { negated: negatedTargetDeviceIds, onToggle: setNegatedTargetDeviceIds };
+            case 'USER': return { negated: negatedTargetUserNames, onToggle: setNegatedTargetUserNames };
+            default: return {
+                negated: !!negatedTargetTags?.[type],
+                onToggle: (val) => setNegatedTargetTags(prev => ({ ...(prev || {}), [type]: val })),
+            };
         }
     };
     // Custom underline-tab strip, not Polaris LegacyTabs — LegacyTabs collapses into a "..." overflow menu at this popover's width
@@ -665,7 +688,7 @@ const ServerSettingsStep = ({
                                     />
                                     {!applyToAllUsers && (
                                         <Box paddingInlineStart="6">
-                                            {renderConditionRows(userConditions, userTypeOptions, userDispatch, 'AND', showUserConditionError)}
+                                            {renderConditionRows(userConditions, userTypeOptions, userDispatch, 'AND', showUserConditionError, userNegationProps)}
                                         </Box>
                                     )}
                                 </VerticalStack>

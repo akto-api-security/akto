@@ -421,6 +421,10 @@ func deviceIDsContain(ids []string, label string) bool {
 // these are the two independent picks the dashboard offers ("Devices" vs. "Users"), so a match on
 // either is sufficient. A policy is targeted when either ApplyToDeviceIds is non-nil or UserMetadata
 // is non-empty; when neither is configured, the policy applies to everyone.
+//
+// ApplyToDeviceIds already has device/tag Include-vs-Exclude baked in server-side, so labelMatched
+// needs no further negation. UserMetadata has no such resolution, so NegatedTargetUserNames is
+// applied here instead, against the actual request's email.
 func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName string, headers map[string]string) []types.Policy {
 	deviceLabel := deviceLabelFromMcpServerName(mcpServerName)
 	email := ""
@@ -444,6 +448,9 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 			}
 			if email != "" {
 				emailMatched = findUserMetadataByEmail(p.UserMetadata, email) != nil
+				if p.NegatedTargetUserNames {
+					emailMatched = !emailMatched
+				}
 			}
 		}
 

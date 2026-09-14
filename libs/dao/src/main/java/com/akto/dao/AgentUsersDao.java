@@ -245,9 +245,11 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
 
     /**
      * Generalizes findDeviceIdsByTeamsRolesAndDeviceIds to arbitrary tag keys: entries in
-     * tagFilters AND together; within one key, any of its values match (OR).
+     * tagFilters AND together; within one key, any of its values match (OR). Each key and the
+     * device-id pick can independently be negated.
      */
-    public List<String> findDeviceIdsByTags(Map<String, List<String>> tagFilters, List<String> deviceIds) {
+    public List<String> findDeviceIdsByTags(Map<String, List<String>> tagFilters, Map<String, Boolean> negatedTagFilters,
+                                             List<String> deviceIds, boolean negatedDeviceIds) {
         List<Bson> conditions = new ArrayList<>();
         if (tagFilters != null) {
             for (Map.Entry<String, List<String>> entry : tagFilters.entrySet()) {
@@ -257,9 +259,14 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
                         .map(v -> v.trim().toLowerCase())
                         .collect(Collectors.toList());
                 if (values.isEmpty()) continue;
-                conditions.add(Filters.elemMatch(AgenticUsers.DEVICE_TAGS, Filters.and(
+                Bson positiveMatch = Filters.elemMatch(AgenticUsers.DEVICE_TAGS, Filters.and(
                         Filters.eq(DeviceTag.KEY, entry.getKey().trim().toLowerCase()),
-                        Filters.in(DeviceTag.VALUE, values))));
+                        Filters.in(DeviceTag.VALUE, values)));
+                boolean negated = negatedTagFilters != null && Boolean.TRUE.equals(negatedTagFilters.get(entry.getKey()));
+                // deviceTags is a union array across sources — a device can carry both a matching
+                // and non-matching value for the same key. Negate the whole elemMatch ($nor), not
+                // an inline $nin, or a co-existing non-excluded value would wrongly keep it.
+                conditions.add(negated ? Filters.nor(positiveMatch) : positiveMatch);
             }
         }
         boolean hasTagFilters = !conditions.isEmpty();
@@ -268,10 +275,20 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
             return new ArrayList<>();
         }
 
-        // Device IDs come straight from a dropdown built off live module_info data at pick time —
-        // trust them directly rather than re-deriving through a username/tag join.
         if (!hasTagFilters) {
-            return new ArrayList<>(new HashSet<>(deviceIds));
+            if (!negatedDeviceIds) {
+                // Device IDs come straight from a dropdown built off live module_info data at pick
+                // time — trust them directly rather than re-deriving through a username/tag join.
+                return new ArrayList<>(new HashSet<>(deviceIds));
+            }
+            // "Apply to everyone except these devices" — resolve against the full live device
+            // universe instead, computed fresh so newly-online devices are still covered.
+            Set<String> allLiveDevices = new HashSet<>();
+            for (Set<String> devices : ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield().values()) {
+                allLiveDevices.addAll(devices);
+            }
+            allLiveDevices.removeAll(new HashSet<>(deviceIds));
+            return new ArrayList<>(allLiveDevices);
         }
 
         // module_info is updated on every heartbeat, unlike AgenticUsers.devices which is only
@@ -290,8 +307,13 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
             return new ArrayList<>(tagDeviceIds);
         }
 
-        // Both dimensions given — a device must satisfy the tag match AND be explicitly picked.
-        tagDeviceIds.retainAll(new HashSet<>(deviceIds));
+        // Both dimensions given — a device must satisfy the tag match AND (be explicitly picked,
+        // or, if negated, NOT be explicitly picked).
+        if (negatedDeviceIds) {
+            tagDeviceIds.removeAll(new HashSet<>(deviceIds));
+        } else {
+            tagDeviceIds.retainAll(new HashSet<>(deviceIds));
+        }
         return new ArrayList<>(tagDeviceIds);
     }
 

@@ -272,6 +272,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // A Users pick is never written into targetDeviceIds; it's matched downstream by email via
     // userMetadata instead (see GuardrailPoliciesAction#createGuardrailPolicy).
     const [targetUserNames, setTargetUserNames] = useState([]);
+    // Include/Exclude toggles. negatedTargetTags is keyed per tag key (they AND together, so one
+    // flag can't negate just one); Device and User each have one row, so plain booleans.
+    const [negatedTargetTags, setNegatedTargetTags] = useState({});
+    const [negatedTargetDeviceIds, setNegatedTargetDeviceIds] = useState(false);
+    const [negatedTargetUserNames, setNegatedTargetUserNames] = useState(false);
     const [enterpriseLicenseComplianceCategories, setEnterpriseLicenseComplianceCategories] = useState([]);
 
     const [agenticUsers, setAgenticUsers] = useState([]);
@@ -379,11 +384,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         return rows.filter(r => {
             const matchesAllTagKeys = tagKeys.every(k => {
                 const valueSet = new Set(targetTags[k]);
-                return r.tags.some(t => t.key === k && valueSet.has(t.value));
+                const hasMatch = r.tags.some(t => t.key === k && valueSet.has(t.value));
+                return negatedTargetTags?.[k] ? !hasMatch : hasMatch;
             });
-            return matchesAllTagKeys && (deviceSet.size === 0 || deviceSet.has(r.deviceId));
+            const deviceOk = deviceSet.size === 0
+                || (negatedTargetDeviceIds ? !deviceSet.has(r.deviceId) : deviceSet.has(r.deviceId));
+            return matchesAllTagKeys && deviceOk;
         });
-    }, [agenticUsers, applyToAllUsers, targetTags, targetDeviceIds]);
+    }, [agenticUsers, applyToAllUsers, targetTags, targetDeviceIds, negatedTargetTags, negatedTargetDeviceIds]);
 
     // Create validation state object
     const getStoredStateData = () => ({
@@ -464,6 +472,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         targetTags,
         targetDeviceIds,
         targetUserNames,
+        negatedTargetTags,
+        negatedTargetDeviceIds,
+        negatedTargetUserNames,
         enterpriseLicenseComplianceCategories,
         // A negated row with zero values is a deliberate "apply to everything" scope, not an unfinished one
         serverScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllServers &&
@@ -948,6 +959,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setTargetTags(loadedTargetTags);
         setTargetDeviceIds(policy.targetDeviceIds || []);
         setTargetUserNames(loadedTargetUserNames);
+        setNegatedTargetTags(policy.negatedTargetTags || {});
+        setNegatedTargetDeviceIds(policy.negatedTargetDeviceIds || false);
+        setNegatedTargetUserNames(policy.negatedTargetUserNames || false);
         setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
     };
 
@@ -1094,6 +1108,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 // resolved into applyToDeviceIds, only into userMetadata below (matched downstream
                 // by email).
                 targetUserNames: applyToAllUsers ? [] : targetUserNames,
+                // Include/Exclude toggles — filtered to the keys actually present in targetTags so
+                // a stale entry from a deleted/renamed row doesn't linger in the saved map.
+                negatedTargetTags: applyToAllUsers ? {} : Object.fromEntries(
+                    Object.entries(negatedTargetTags || {}).filter(([key]) => targetTags[key]?.length > 0)
+                ),
+                negatedTargetDeviceIds: applyToAllUsers ? false : negatedTargetDeviceIds,
+                negatedTargetUserNames: applyToAllUsers ? false : negatedTargetUserNames,
                 // Identities behind the selected targets — both the devices picked via
                 // targetDeviceIds and the identities picked directly via targetUserNames — deduped
                 // by userId (falling back to userName when an identity has no userId). Resolved
@@ -1311,6 +1332,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setTargetDeviceIds={setTargetDeviceIds}
                         targetUserNames={targetUserNames}
                         setTargetUserNames={setTargetUserNames}
+                        negatedTargetTags={negatedTargetTags}
+                        setNegatedTargetTags={setNegatedTargetTags}
+                        negatedTargetDeviceIds={negatedTargetDeviceIds}
+                        setNegatedTargetDeviceIds={setNegatedTargetDeviceIds}
+                        negatedTargetUserNames={negatedTargetUserNames}
+                        setNegatedTargetUserNames={setNegatedTargetUserNames}
                         availableTagKeyValues={availableTagKeyValues}
                         availableDevices={availableDevices}
                         availableUsers={availableUsers}
