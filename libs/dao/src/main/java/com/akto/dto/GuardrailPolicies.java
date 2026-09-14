@@ -123,8 +123,7 @@ public class GuardrailPolicies {
     private Map<String, List<String>> targetTags;
 
     // Per-tag-key Include/Exclude, keyed like targetTags — per-key because keys AND together, so
-    // one flag could only negate the whole conjunction. This branch predates targetUserNames, so
-    // there's no negatedTargetUserNames counterpart yet.
+    // one flag could only negate the whole conjunction.
     private Map<String, Boolean> negatedTargetTags;
 
     // Include/Exclude for targetDeviceIds. Only one Device row can exist per policy, so unlike
@@ -135,6 +134,14 @@ public class GuardrailPolicies {
     private List<String> applyToDeviceIds;
 
     private List<AgenticUsers> userMetadata;
+
+    // Include/Exclude for userMetadata above. This branch predates targetUserNames (the dashboard
+    // never persists that field — @BsonIgnore there too, inbound-only), so there's no
+    // targetUserNames field here to pair it with; userMetadata is the only durable record. Without
+    // this field, the dashboard's negatedTargetUserNames=true was silently dropped when this DTO
+    // read the same Mongo doc — a policy configured as "exclude these 3" was enforced as "include
+    // only these 3" instead, since NegatedTargetUserNames never reached the Go validator.
+    private boolean negatedTargetUserNames;
 
 
     // Blocked host/path list — block-only glob patterns matched against the request host+path.
