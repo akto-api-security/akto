@@ -386,14 +386,30 @@ func deviceLabelFromMcpServerName(mcpServerName string) string {
 	return ""
 }
 
-// deviceIDsContain reports whether ids contains label (exact match — device labels embedded in
-// MCP server names are not user-supplied free text, unlike UserMetadata email/device matching).
+// deviceIDsContain reports whether ids contains label, compared case-insensitively.
+//
+// Whole-string still: no prefix, suffix or substring matching, so a device label lifted off a
+// Host header can never widen its own scope. Only the casing is forgiven, because the two
+// sides of this comparison are minted independently and their casing drifts:
+//
+//   - applyToDeviceIds comes from module_info.name, which is frozen when the document is
+//     created (the heartbeat upsert keys on it) — so it preserves the email casing of that
+//     moment, e.g. "AlexTaylor" from Alex.Taylor@corp.com.
+//   - The label is re-derived from the CURRENT login on every session, and the browser
+//     extension prefers the page-detected account over the Chrome profile one — so the same
+//     person now sends "alextaylor" from alex.taylor@corp.com.
+//
+// Compared exactly, that mismatch silently drops a targeted policy: it is filtered out before
+// any detector runs, so the traffic is never inspected and nothing is reported. Matching the
+// way every other identity comparison here already does (findUserMetadataByEmail,
+// isServerApproved, and the dashboard's lowercased device tags) keeps the same person matched
+// across a casing change.
 func deviceIDsContain(ids []string, label string) bool {
 	if label == "" {
 		return false
 	}
 	for _, id := range ids {
-		if id == label {
+		if strings.EqualFold(id, label) {
 			return true
 		}
 	}

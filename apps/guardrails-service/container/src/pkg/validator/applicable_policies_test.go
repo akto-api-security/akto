@@ -60,3 +60,39 @@ func TestApplicablePolicies(t *testing.T) {
 		}
 	})
 }
+
+// applyToDeviceIds carries whatever casing module_info.name was created with, while the device
+// label on the wire is re-derived from the current login — the same person reaches us as
+// "AlexTaylor" in the policy and "alextaylor" on the request. Compared exactly, the policy is
+// dropped and the traffic silently goes uninspected.
+func TestFilterPoliciesByDeviceIgnoresLabelCasing(t *testing.T) {
+	s := &Service{logger: zap.NewNop()}
+	policy := types.Policy{
+		Info:             types.PolicyInfo{Name: "device-targeted"},
+		ApplyToDeviceIds: []string{"AlexTaylor", "jordan", "SamRivera"},
+	}
+
+	for _, tc := range []struct {
+		name          string
+		mcpServerName string
+		applies       bool
+	}{
+		{"stored capitalised, wire lowercase", "alextaylor.chrome.chatgpt.com", true},
+		{"stored capitalised, wire same case", "AlexTaylor.chrome.chatgpt.com", true},
+		{"stored lowercase, wire capitalised", "Jordan.chrome.chatgpt.com", true},
+		{"mixed every which way", "sAmRiVeRa.chrome.chatgpt.com", true},
+		// Only casing is forgiven: a different identity must still miss, and the match stays
+		// whole-string so neither a prefix nor a superstring of a listed label can slip in.
+		{"different account entirely", "ataylor.chrome.chatgpt.com", false},
+		{"prefix of a listed label", "alex.chrome.chatgpt.com", false},
+		{"listed label as a prefix of the device", "alextaylor2.chrome.chatgpt.com", false},
+		{"no device label in the host", "chatgpt.com", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := s.filterPoliciesByDevice([]types.Policy{policy}, tc.mcpServerName, nil)
+			if applied := len(got) == 1; applied != tc.applies {
+				t.Fatalf("policy applied = %v for %q, want %v", applied, tc.mcpServerName, tc.applies)
+			}
+		})
+	}
+}
