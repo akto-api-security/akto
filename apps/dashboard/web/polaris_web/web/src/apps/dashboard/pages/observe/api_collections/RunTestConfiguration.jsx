@@ -331,11 +331,22 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 onChange={() => setTestRun(prev => ({ ...prev, doNotMarkIssuesAsFixed: !prev.doNotMarkIssuesAsFixed }))}
             />
             { (window?.STIGG_FEATURE_WISE_ALLOWED?.AUTOMATED_AGENTIC_TEST_RUN?.isGranted === true || window?.USER_NAME?.indexOf("@akto.io") !== -1) && (
-                <Checkbox
-                    label="Smart Automated Testing"
-                    checked={testRun.runAutomatedTests}
-                    onChange={(val) => setTestRun(prev => ({ ...prev, runAutomatedTests: val }))}
-                />
+                <VerticalStack gap="2">
+                    <Checkbox
+                        label="Smart Automated Testing"
+                        checked={testRun.runAutomatedTests}
+                        onChange={(val) => setTestRun(prev => ({ ...prev, runAutomatedTests: val }))}
+                    />
+                    {testRun.runAutomatedTests &&
+                        <TextField
+                            label="Custom prompt for Smart Automated Testing (optional)"
+                            multiline
+                            placeholder="e.g. Focus on auth bypass and IDOR on admin endpoints"
+                            value={testRun.automatedTestsCustomPrompt || ""}
+                            onChange={(automatedTestsCustomPrompt) => setTestRun(prev => ({ ...prev, automatedTestsCustomPrompt: automatedTestsCustomPrompt }))}
+                        />
+                    }
+                </VerticalStack>
             )}
             { (window?.STIGG_FEATURE_WISE_ALLOWED?.CLEAN_UP_TESTING_RESOURCES?.isGranted === true) && (
                 <Checkbox
