@@ -4253,6 +4253,19 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    @Getter @Setter
+    private Map<String, Map<String, Object>> deviceClaudeDesktopInfoMap;
+
+    public String fetchDeviceClaudeDesktopInfoMap() {
+        try {
+            deviceClaudeDesktopInfoMap = DbLayer.fetchDeviceClaudeDesktopInfoMap();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchDeviceClaudeDesktopInfoMap " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     private TestingRunWebhook testingRunWebhook;
 
     public TestingRunWebhook getTestingRunWebhook() {
