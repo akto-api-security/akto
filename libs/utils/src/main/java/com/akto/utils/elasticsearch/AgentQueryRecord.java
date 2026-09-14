@@ -239,7 +239,9 @@ public class AgentQueryRecord {
                 sessionIdentifier,
                 requestPayload,
                 responsePayload,
-                Context.now() * 1000L,
+                // When the traffic was actually seen, not when we ingested it - replays and
+                // backlogged batches would otherwise all collapse onto the processing time.
+                p.getTimeOrNow() * 1000L,
                 inputTokens,
                 outputTokens,
                 traceId,
