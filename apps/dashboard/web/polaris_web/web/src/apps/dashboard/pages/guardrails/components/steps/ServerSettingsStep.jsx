@@ -216,9 +216,9 @@ const ServerSettingsStep = ({
     const [agenticConditions, agenticDispatch] = useReducer(conditionsReducer, null, () => {
         const conds = [];
         // A negated row with zero values ("Exclude nothing") is meaningful — keep it, don't drop it on reopen
-        if ((selectedAgentServers || []).length > 0 || negatedAgentServers) conds.push({ type: 'AGENT', values: selectedAgentServers, negated: negatedAgentServers });
-        if ((selectedMcpServers || []).length > 0 || negatedMcpServers) conds.push({ type: 'MCP_SERVER', values: selectedMcpServers, negated: negatedMcpServers });
-        if ((selectedBrowserLlms || []).length > 0 || negatedLlmServers) conds.push({ type: 'LLM', values: selectedBrowserLlms, negated: negatedLlmServers });
+        if ((selectedAgentServers || []).length > 0 || negatedAgentServers) conds.push({ type: 'AGENT', values: selectedAgentServers, otherValues: [], negated: negatedAgentServers });
+        if ((selectedMcpServers || []).length > 0 || negatedMcpServers) conds.push({ type: 'MCP_SERVER', values: selectedMcpServers, otherValues: [], negated: negatedMcpServers });
+        if ((selectedBrowserLlms || []).length > 0 || negatedLlmServers) conds.push({ type: 'LLM', values: selectedBrowserLlms, otherValues: [], negated: negatedLlmServers });
         return conds;
     });
 
@@ -226,9 +226,9 @@ const ServerSettingsStep = ({
         // A negated DEVICE/USER row with zero values ("Exclude nothing") is meaningful — keep it.
         const conds = Object.entries(targetTags || {})
             .filter(([, values]) => (values || []).length > 0)
-            .map(([key, values]) => ({ type: key, values, negated: !!negatedTargetTags?.[key] }));
-        if ((targetDeviceIds || []).length > 0 || negatedTargetDeviceIds) conds.push({ type: 'DEVICE', values: targetDeviceIds, negated: negatedTargetDeviceIds });
-        if ((targetUserNames || []).length > 0 || negatedTargetUserNames) conds.push({ type: 'USER', values: targetUserNames, negated: negatedTargetUserNames });
+            .map(([key, values]) => ({ type: key, values, otherValues: [], negated: !!negatedTargetTags?.[key] }));
+        if ((targetDeviceIds || []).length > 0 || negatedTargetDeviceIds) conds.push({ type: 'DEVICE', values: targetDeviceIds, otherValues: [], negated: negatedTargetDeviceIds });
+        if ((targetUserNames || []).length > 0 || negatedTargetUserNames) conds.push({ type: 'USER', values: targetUserNames, otherValues: [], negated: negatedTargetUserNames });
         return conds;
     });
 
@@ -465,7 +465,7 @@ const ServerSettingsStep = ({
                                         selected={(val) => {
                                             dispatch({ type: 'updateKey', index, key: 'type', obj: val });
                                             dispatch({ type: 'updateKey', index, key: 'values', obj: [] });
-                                            // Row's type changed — reset the old type's toggle so Exclude can't linger with no row showing it
+                                            dispatch({ type: 'updateKey', index, key: 'otherValues', obj: [] });
                                             negationProps?.onToggle(false);
                                         }}
                                     />
@@ -476,9 +476,16 @@ const ServerSettingsStep = ({
                                         id={`cond-val-${condition.type}-${index}`}
                                         placeholder="Select value"
                                         headerContent={negationProps ? negationHeader(negated, (val) => {
-                                            // Switching tabs starts fresh — carrying over values would silently reinterpret them (included <-> excluded).
+                                            if (val === negated) return; // clicking the already-active tab is a no-op
+                                            // Swap rather than clear: the polarity you're leaving keeps its picks in
+                                            // otherValues, restored if you switch back without touching the other tab.
+                                            // Only clears the first time you visit a tab you've never touched — never
+                                            // silently reinterprets one polarity's picks as the other's. Two updateKey
+                                            // dispatches, not one combined action — both read from this closure's
+                                            // condition snapshot, so dispatch order between them doesn't matter.
                                             negationProps.onToggle(val);
-                                            dispatch({ type: 'updateKey', index, key: 'values', obj: [] });
+                                            dispatch({ type: 'updateKey', index, key: 'values', obj: condition.otherValues || [] });
+                                            dispatch({ type: 'updateKey', index, key: 'otherValues', obj: condition.values || [] });
                                         }) : undefined}
                                         optionsList={sortSelectedFirst(getOptionsForType(condition.type), condition.values || [])}
                                         setSelected={(vals) => dispatch({ type: 'updateKey', index, key: 'values', obj: vals })}
@@ -661,10 +668,15 @@ const ServerSettingsStep = ({
                                             // Devices and Users are two independent pools (see targetDeviceIds/targetUserNames) —
                                             // shown as two separate counts rather than one merged "N users" figure, which would
                                             // hide which half of the selection actually contributed the count.
-                                            const matchedUserItems = (targetUserNames || []).map(name => {
-                                                const option = (availableUsers || []).find(o => o.value === name);
-                                                return { value: name, label: option?.label || name };
-                                            });
+                                            // Negated (Exclude) means "everyone except these picks" — mirror matchingDeviceRows'
+                                            // negation handling instead of showing the raw pick count/list, which would render
+                                            // an Exclude-3 selection as if only 3 people were in scope instead of the other ~97.
+                                            const matchedUserItems = negatedTargetUserNames
+                                                ? (availableUsers || []).filter(o => !(targetUserNames || []).includes(o.value))
+                                                : (targetUserNames || []).map(name => {
+                                                    const option = (availableUsers || []).find(o => o.value === name);
+                                                    return { value: name, label: option?.label || name };
+                                                });
                                             const nonZeroItems = [
                                                 matchingDeviceRows.length > 0 && { count: matchingDeviceRows.length, label: "Devices", items: matchingDeviceRows.map(r => ({ value: r.deviceId, label: `${r.username} · ${deviceIdSuffix(r.deviceId)}` })) },
                                                 matchedUserItems.length > 0 && { count: matchedUserItems.length, label: "Users", items: matchedUserItems },
