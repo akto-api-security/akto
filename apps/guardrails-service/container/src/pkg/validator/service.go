@@ -1992,6 +1992,12 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	}
 
 	result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, payloadToValidate, sessionID)
+	// Browser-extension traffic that inlined file-attachment content can only be enforced by
+	// blocking — a mask or alert verdict is unenforceable on that payload shape. Skipped for a
+	// pending approval, which owns its own response. See upgradeBrowserAttachmentVerdict.
+	if activityID == "" {
+		s.upgradeBrowserAttachmentVerdict(result, params, sessionID)
+	}
 	return result, activityID, nil
 }
 
