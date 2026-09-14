@@ -2099,8 +2099,7 @@ public class HttpCallParser {
         return false;
     }
 
-    // protected so tests can override the entitlement gate without touching production logic.
-    protected boolean isAgenticTaggingAllowed(HttpResponseParams responseParams) {
+    private boolean isAgenticTaggingAllowed(HttpResponseParams responseParams) {
         Map<String, String> tagsMap = parseTagsMap(responseParams.getTags());
         String source = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
         if (Constants.AI_AGENT_SOURCE_ENDPOINT.equals(source)) {
