@@ -3,6 +3,7 @@ package com.akto.data_actor;
 import com.akto.dao.ApiSequencesDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dto.claude_identity.ClaudeDesktopInfo;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
@@ -866,6 +867,10 @@ public class DbActor extends DataActor {
     }
 
     public Map<String, String> fetchDeviceUserMap() {
+        return new HashMap<>();
+    }
+
+    public Map<String, ClaudeDesktopInfo> fetchDeviceClaudeDesktopInfoMap() {
         return new HashMap<>();
     }
 }

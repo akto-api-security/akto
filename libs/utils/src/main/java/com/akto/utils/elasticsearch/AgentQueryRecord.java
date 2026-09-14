@@ -2,6 +2,7 @@ package com.akto.utils.elasticsearch;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.claude_identity.ClaudeDesktopInfo;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.akto.usage.OrgUtils;
@@ -32,6 +33,8 @@ public class AgentQueryRecord {
     private final String traceId;
     private final String spanId;
     private final boolean isAtlasTraffic;
+    /** Claude Desktop org uuid the device was last seen in; null when the device is unknown. */
+    private final String orgId;
 
     // Guardrail result for this prompt, recorded on the traffic by the ingestion gateway
     // (Gateway.recordGuardrailVerdict). Not final: set once by setGuardrailVerdict right after the
@@ -65,11 +68,13 @@ public class AgentQueryRecord {
     private static final int ATLAS_SESSION_TTL = Constants.ONE_DAY_TIMESTAMP;
     private static final Map<String, Integer> ATLAS_SESSION_LAST_SEEN = new ConcurrentHashMap<>();
 
+    private static final String CLAUDE_DESKTOP_SERVICE_ID = "claude-desktop";
+
     public AgentQueryRecord(String docId, int accountId, String serviceId, String deviceId,
                             String userName, String sessionIdentifier,
                             String queryPayload, String responsePayload,
                             long timeStampMs, int inputTokens, int outputTokens,
-                            String traceId, String spanId, boolean isAtlasTraffic) {
+                            String traceId, String spanId, boolean isAtlasTraffic, String orgId) {
         this.docId = docId;
         this.accountId = accountId;
         this.serviceId = serviceId;
@@ -84,6 +89,7 @@ public class AgentQueryRecord {
         this.traceId = traceId;
         this.spanId = spanId;
         this.isAtlasTraffic = isAtlasTraffic;
+        this.orgId = orgId;
     }
 
     public String getDocId()             { return docId; }
@@ -100,6 +106,7 @@ public class AgentQueryRecord {
     public String getTraceId()           { return traceId; }
     public String getSpanId()            { return spanId; }
     public boolean getIsAtlasTraffic()   { return isAtlasTraffic; }
+    public String getOrgId()             { return orgId; }
 
     public Boolean getGuardrailViolated() { return guardrailViolated; }
     public String getGuardrailAction()    { return guardrailAction; }
@@ -129,6 +136,15 @@ public class AgentQueryRecord {
             HttpResponseParams p,
             Map<String, String> tagsMap,
             Map<String, String> deviceUserMap) {
+
+        return fromHttpResponseParams(p, tagsMap, deviceUserMap, null);
+    }
+
+    public static AgentQueryRecord fromHttpResponseParams(
+            HttpResponseParams p,
+            Map<String, String> tagsMap,
+            Map<String, String> deviceUserMap,
+            Map<String, ClaudeDesktopInfo> deviceClaudeDesktopInfoMap) {
 
         if (p == null || p.getRequestParams() == null) {
             return null;
@@ -164,6 +180,7 @@ public class AgentQueryRecord {
         }
 
         String serviceId, deviceId, userName;
+        String orgId = null;
 
         userName = getFirstHeader(headers, HEADER_PREFIX + HEADER_USER_EMAIL);
 
@@ -184,6 +201,17 @@ public class AgentQueryRecord {
                 if (deviceUserMap != null && deviceUserMap.containsKey(deviceId) ) {
                     userName = deviceUserMap.get(deviceId);
                 }    
+            }
+
+            ClaudeDesktopInfo desktopInfo = (deviceId != null && deviceClaudeDesktopInfoMap != null)
+                    ? deviceClaudeDesktopInfoMap.get(deviceId) : null;
+            orgId = desktopInfo != null ? desktopInfo.getOrganizationUuid() : null;
+
+            // Claude Desktop reports one serviceId for every install on the planet, so on its own
+            // it collapses every org's traffic into a single service. Qualifying it with the org
+            // keeps them apart. Only for this serviceId: everything else is already org-specific.
+            if (CLAUDE_DESKTOP_SERVICE_ID.equals(serviceId) && orgId != null && !orgId.isEmpty()) {
+                serviceId = serviceId + "-" + orgId;
             }
         } else if (isBrowserExtensionTraffic) {
             // Host id is <heartbeat name>.<browser>.<site>, so its first label keys deviceUserMap.
@@ -245,7 +273,8 @@ public class AgentQueryRecord {
                 traceId,
                 spanId,
                 // Browser collections are registered source=ENDPOINT, so their traffic reports as Atlas too.
-                isAtlasTraffic || isBrowserExtensionTraffic
+                isAtlasTraffic || isBrowserExtensionTraffic,
+                orgId
         );
         record.setGuardrailVerdict(p.getGuardrailVerdict());
         return record;
@@ -345,6 +374,7 @@ public class AgentQueryRecord {
                 ", payload='" + queryPayload + '\'' +
                 ", body='" + responsePayload + '\'' +
                 ", isAtlasTraffic=" + isAtlasTraffic +
+                ", orgId='" + orgId + '\'' +
                 ", guardrailViolated=" + guardrailViolated +
                 ", guardrailAction='" + guardrailAction + '\'' +
                 ", guardrailPolicy='" + guardrailPolicy + '\'' +

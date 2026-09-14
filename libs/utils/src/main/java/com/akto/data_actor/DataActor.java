@@ -1,5 +1,6 @@
 package com.akto.data_actor;
 
+import com.akto.dto.claude_identity.ClaudeDesktopInfo;
 import com.akto.dto.*;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.dto.billing.Organization;
@@ -379,4 +380,6 @@ public abstract class DataActor {
     public abstract void storeAgentQueryData(AgentQueryRecord agentQueryRecord);
     public abstract List<AgentQueryRecord> fetchAgentQueryRecords(String messageId);
     public abstract Map<String, String> fetchDeviceUserMap();
+
+    public abstract Map<String, ClaudeDesktopInfo> fetchDeviceClaudeDesktopInfoMap();
 }
