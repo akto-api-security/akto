@@ -134,13 +134,13 @@ public class CollectionTagsTest {
     }
 
     /**
-     * A request with no pod labels (an istio envoy leg never carries any) must not erase the
+     * A request that carries no tags of its own must not erase the
      * tags the collection already has - every tag write is a full-array set, so a truncated
      * list here is persisted and the tags are lost for good.
      */
     @Test
     public void testEmptyIncomingTagsKeepsExistingTags() {
-        ApiCollection collection = collectionWith("app", "privatecloud.agoda.com/service");
+        ApiCollection collection = collectionWith("app", "service");
 
         assertEquals(2, CollectionTags.getUniqueTags(collection, null).size());
         assertEquals(2, CollectionTags.getUniqueTags(collection, new ArrayList<>()).size());

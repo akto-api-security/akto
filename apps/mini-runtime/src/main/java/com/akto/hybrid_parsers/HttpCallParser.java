@@ -93,8 +93,6 @@ public class HttpCallParser {
     private static final String DIRECTION_OUTBOUND = "2";
 
     // Accounts allowed to tag a caller collection when it is seen calling an AI agent.
-    // 1736798101 + 1718042191: Agoda's two accounts - paired the same way in
-    // ClientActor.checkAccountHighTraffic(). 1662680463: the AKS test account.
     private static final List<Integer> AI_AGENT_CALLER_TAGGING_ACCOUNTS = Arrays.asList(
             1736798101, 1718042191, 1662680463);
 
