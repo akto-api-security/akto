@@ -88,6 +88,19 @@ public class HttpCallParser {
     private static final String AGENTIC_COLLECTION_PREFIX = "-agentic";
 
     private static final List<Integer> INPROCESS_ADVANCED_FILTERS_ACCOUNTS = Arrays.asList(1736798101, 1718042191, 1759692400);
+
+    /** HttpResponseParams.direction: "1" = inbound (callee side), "2" = outbound (caller side). */
+    private static final String DIRECTION_OUTBOUND = "2";
+
+    // Accounts allowed to tag a caller collection when it is seen calling an AI agent.
+    private static final List<Integer> AI_AGENT_CALLER_TAGGING_ACCOUNTS = Arrays.asList(
+            1736798101, 1718042191, 1662680463);
+
+    // Last time the ai-agent-caller tag was written, keyed by the CALLER's collection id.
+    // Separate from apiCollectionIdTagsSyncTimestampMap, which is keyed by the callee - one
+    // callee is called by many services, so a callee-keyed timer would only ever let the
+    // caller that happened to hit the window get tagged.
+    private Map<Integer, Integer> aiAgentCallerTagSyncTimestampMap = new HashMap<>();
     private DataActor dataActor = DataActorFactory.fetchInstance();
     private Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
 
@@ -1326,11 +1339,19 @@ public class HttpCallParser {
                     + " url: " + httpResponseParams.getRequestParams().getURL() + " and tags: " + httpResponseParams.getTags());
         }
 
-        List<CollectionTags> tagsList = CollectionTags.convertTagsFormat(httpResponseParams.getTags());
-        tagsList = filterTagsForAccount(tagsList);
-        tagsList = CollectionTags.getUniqueTags(apiCollection, tagsList);
-        apiCollection.setTagsList(tagsList);
-        apiCollectionsMap.put(apiCollectionId, apiCollection);
+        List<CollectionTags> tagsList;
+        if (DIRECTION_OUTBOUND.equals(httpResponseParams.getDirection())) {
+            // On outbound traffic the pod labels describe the CALLER, not this collection, so
+            // merging them here would give the callee one tag per calling service. Keep the tags
+            // the collection already has rather than clearing them.
+            tagsList = apiCollection.getTagsList();
+        } else {
+            tagsList = CollectionTags.convertTagsFormat(httpResponseParams.getTags());
+            tagsList = filterTagsForAccount(tagsList);
+            tagsList = CollectionTags.getUniqueTags(apiCollection, tagsList);
+            apiCollection.setTagsList(tagsList);
+            apiCollectionsMap.put(apiCollectionId, apiCollection);
+        }
         
 
         int lastSynctime = this.apiCollectionIdTagsSyncTimestampMap.getOrDefault(apiCollectionId, 0);
@@ -1417,10 +1438,18 @@ public class HttpCallParser {
         int apiCollectionId;
 
         String direction = httpResponseParam.getDirection();
+        boolean isOutbound = DIRECTION_OUTBOUND.equals(direction);
 
-        // Check if service tag is present in tags - if yes, use service-tag based collection
+        // Check if service tag is present in tags - if yes, use service-tag based collection.
+        //
+        // LOAD-BEARING: the direction check is what keeps collection membership correct. On
+        // outbound traffic the mirroring daemonset resolves the labels of the pod that MADE the
+        // call, so routing by them would file the callee's endpoints under the caller. Outbound
+        // deliberately falls through to the host path, where the collection is keyed by the Host
+        // header - the actual callee. The labels are still read, but only to attribute the call
+        // to its caller in markAiAgentCaller().
         String serviceTagValue = extractServiceTag(tagsMap);
-        if (serviceTagValue != null && !serviceTagValue.isEmpty()) {
+        if (serviceTagValue != null && !serviceTagValue.isEmpty() && !isOutbound) {
             return createApiCollectionIdByServiceTag(httpResponseParam, serviceTagValue, tagsMap);
         }
 
@@ -1433,7 +1462,11 @@ public class HttpCallParser {
 
         int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
         String vpcId = System.getenv("VPC_ID");
-        List<CollectionTags> tagList = CollectionTags.convertTagsFormat(httpResponseParam.getTags());
+        // Outbound labels identify the caller, so they must not become tags on the callee's
+        // collection. Matches the same guard in updateApiCollectionTags.
+        List<CollectionTags> tagList = isOutbound
+                ? new ArrayList<>()
+                : CollectionTags.convertTagsFormat(httpResponseParam.getTags());
         tagList = filterTagsForAccount(tagList);
 
         if (useHostCondition(hostName, httpResponseParam.getSource())) {
@@ -1444,6 +1477,15 @@ public class HttpCallParser {
             Optional<CollectionTags> ragTagOpt = mcpServerTagOpt.isPresent() ? Optional.empty() : getRagTag(httpResponseParam);
             Optional<CollectionTags> genAiTagOpt = getGenAiTag(httpResponseParam);
             boolean isAgenticEndpoint = mcpServerTagOpt.isPresent() || ragTagOpt.isPresent() || genAiTagOpt.isPresent();
+            // The three getters above discard their detection when SECURITY_TYPE_AGENTIC is not
+            // granted, so isAgenticEndpoint is always false for an unentitled account. Caller
+            // attribution must not depend on that entitlement (it adds a tag to the CALLER and
+            // never makes a collection gen-ai/mcp, so it cannot move a collection between quotas),
+            // hence the ungated re-check. Short-circuits for entitled accounts.
+            if (isAgenticEndpoint
+                    || GenAiCollectionUtils.checkAndTagLLMCollection(httpResponseParam).getFirst()) {
+                markAiAgentCaller(httpResponseParam, tagsMap, direction, hostName);
+            }
             String contextSource = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
             boolean isEndpointSource = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(contextSource);
 
@@ -2103,6 +2145,98 @@ public class HttpCallParser {
             return Optional.empty();
         }
         return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_GEN_AI_TAG, llmCollectionTag.getSecond(), TagSource.KUBERNETES));
+    }
+
+    /**
+     * Tags the CALLER's collection when its service is seen calling an AI agent / LLM endpoint.
+     *
+     * Only outbound traffic carries the caller's identity: the daemonset resolves the labels of
+     * the pod that made the call. The callee is identified by its Host header and tagged by the
+     * normal gen-ai / mcp-server / rag flow; this only annotates the other side of the call.
+     */
+    private void markAiAgentCaller(HttpResponseParams httpResponseParams, Map<String, String> tagsMap,
+            String direction, String calleeHost) {
+        // Every early return below logs, so a missing tag can be traced to one branch. The
+        // silent version of this method made a live failure impossible to diagnose.
+        if (!AI_AGENT_CALLER_TAGGING_ACCOUNTS.contains(Context.getActualAccountId())) {
+            loggerMaker.infoAndAddToDb("ai-agent-caller: account not enabled, skipping");
+            return;
+        }
+        // Inbound labels describe the callee, so there is no caller to attribute.
+        if (!DIRECTION_OUTBOUND.equals(direction)) {
+            loggerMaker.infoAndAddToDb("ai-agent-caller: not outbound (direction=" + direction
+                    + "), no caller to attribute");
+            return;
+        }
+        String callerService = tagsMap == null ? null : tagsMap.get(SERVICE_TAG_KEY);
+        if (callerService == null || callerService.isEmpty()) {
+            loggerMaker.infoAndAddToDb("ai-agent-caller: outbound request carries no " + SERVICE_TAG_KEY
+                    + " tag, cannot identify caller. callee=" + calleeHost);
+            return;
+        }
+
+        int callerCollectionId = ApiCollection.generateServiceTagCollectionId(callerService);
+        ApiCollection callerCollection = apiCollectionsMap.get(callerCollectionId);
+        if (callerCollection == null) {
+            // The caller has no collection of its own - nothing calls it, so its inbound traffic
+            // never created one. createCollectionForServiceTag upserts, so writing here would
+            // materialise an empty collection; skip and log so the gap is measurable.
+            loggerMaker.infoAndAddToDb("ai-agent-caller: no collection " + callerCollectionId
+                    + " for caller service " + callerService + ", skipping");
+            return;
+        }
+
+        List<CollectionTags> existingTags = callerCollection.getTagsList();
+        boolean alreadyTagged = existingTags != null && existingTags.stream()
+                .anyMatch(t -> Constants.AKTO_AI_AGENT_CALLER_TAG.equals(t.getKeyName()));
+        if (alreadyTagged) {
+            loggerMaker.infoAndAddToDb("ai-agent-caller: collection " + callerCollectionId + " ("
+                    + callerService + ") already tagged, skipping");
+            return;
+        }
+
+        int lastSyncTime = this.aiAgentCallerTagSyncTimestampMap.getOrDefault(callerCollectionId, 0);
+        if (Context.now() - lastSyncTime < this.sync_threshold_time) {
+            loggerMaker.infoAndAddToDb("ai-agent-caller: collection " + callerCollectionId + " ("
+                    + callerService + ") written " + (Context.now() - lastSyncTime)
+                    + "s ago, inside the " + this.sync_threshold_time + "s window, skipping");
+            return;
+        }
+        this.aiAgentCallerTagSyncTimestampMap.put(callerCollectionId, Context.now());
+
+        // createCollectionForServiceTag SETS the whole tags array, so the list we send must
+        // already contain every tag the collection has - anything missing is destroyed. The
+        // in-memory copy is only refreshed on the catalog-sync cycle, so re-read the collection
+        // first and merge onto that. This runs once per caller (guarded by alreadyTagged and the
+        // sync window above), not per request.
+        List<CollectionTags> mergedTags = existingTags == null
+                ? new ArrayList<>()
+                : new ArrayList<>(existingTags);
+        mergedTags.add(new CollectionTags(Context.now(), Constants.AKTO_AI_AGENT_CALLER_TAG,
+                calleeHost, TagSource.KUBERNETES));
+
+        callerCollection.setTagsList(mergedTags);
+        apiCollectionsMap.put(callerCollectionId, callerCollection);
+
+        // serviceTag can be null when the collection was created by the host path first (its id
+        // is hashCode(hostName), which equals hashCode(serviceTag) when they are the same string,
+        // and createCollectionForServiceTag only setOnInsert's SERVICE_TAG). Fall back to the
+        // caller service name so the upsert stays coherent.
+        String serviceTagForWrite = callerCollection.getServiceTag() != null
+                ? callerCollection.getServiceTag()
+                : callerService;
+
+        loggerMaker.infoAndAddToDb("ai-agent-caller: writing tag to collection " + callerCollectionId
+                + " (" + callerService + ") callee=" + calleeHost + " serviceTag=" + serviceTagForWrite
+                + " hostName=" + callerCollection.getHostName()
+                + " tagCount=" + mergedTags.size() + " tags=" + mergedTags);
+
+        dataActor.createCollectionForServiceTag(callerCollectionId, serviceTagForWrite,
+                callerCollection.getHostNames(), mergedTags, callerCollection.getHostName(),
+                callerCollection.getAccessType(), false);
+
+        loggerMaker.infoAndAddToDb("Tagged caller collection " + callerCollectionId + " ("
+                + callerService + ") as calling AI agent host: " + calleeHost);
     }
 
     private SyncLimit fetchSyncLimit(Organization organization, MetricTypes metricType) {

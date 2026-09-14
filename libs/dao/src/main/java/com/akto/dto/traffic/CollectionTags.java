@@ -134,7 +134,17 @@ public class CollectionTags {
 
     public static List<CollectionTags> getUniqueTags(ApiCollection apiCollection, List<CollectionTags> tags) {
         if(tags == null || tags.isEmpty()) {
-            return new ArrayList<>();
+            /*
+             * Nothing incoming to merge, so the union is whatever the collection already has.
+             * Returning an empty list here lets a request that carries no pod labels - e.g. an
+             * istio envoy leg, which never has any - erase the collection's tags in memory. Every
+             * tag write is a full-array set, so the next writer then persists that truncated list
+             * and the collection permanently loses tags it should have kept.
+             */
+            if (apiCollection == null || apiCollection.getTagsList() == null) {
+                return new ArrayList<>();
+            }
+            return new ArrayList<>(apiCollection.getTagsList());
         }
 
         List<String> ignoreList = Arrays.asList("pod-template-hash");
