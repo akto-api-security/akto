@@ -1,5 +1,6 @@
 package com.akto.filter;
 
+import com.akto.dao.context.Context;
 import com.akto.listener.InfraMetricsListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -45,6 +46,13 @@ public class InfraMetricsFilter implements Filter {
             String uri = MetricLabelBuilder.templatize(httpServletRequest.getRequestURI());
             String method = httpServletRequest.getMethod();
 
+            // Account id is set by UserDetailsFilter, which wraps this filter in the chain,
+            // so the ThreadLocal is still populated here (metric is recorded before the
+            // outer filter's finally clears it). Fall back to "unknown" for unauthenticated
+            // requests so the label stays present and bounded.
+            Integer accountIdValue = Context.accountId.get();
+            String accountId = accountIdValue == null ? "unknown" : accountIdValue.toString();
+
             // OpenTelemetry HTTP server semantic-convention label names. The Prometheus
             // registry renders the dotted keys as underscores (http_route, etc.).
             ArrayList<Tag> tags = new ArrayList<>(Arrays.asList(
@@ -52,7 +60,9 @@ public class InfraMetricsFilter implements Filter {
                     Tag.of("http.route", uri),
                     Tag.of("http.request.method", method),
                     // real HTTP status code (bounded set) instead of a good/bad collapse
-                    Tag.of("http.response.status_code", Integer.toString(statusCode))
+                    Tag.of("http.response.status_code", Integer.toString(statusCode)),
+                    // tenant dimension; cardinality scales with active account count
+                    Tag.of("account.id", accountId)
             ));
 
             // Single histogram named per the OTel/Micrometer convention. Micrometer
