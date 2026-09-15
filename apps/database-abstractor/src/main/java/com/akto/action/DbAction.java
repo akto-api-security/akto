@@ -4254,13 +4254,13 @@ public class DbAction extends ActionSupport {
     }
 
     @Getter @Setter
-    private Map<String, Map<String, Object>> deviceClaudeDesktopInfoMap;
+    private Map<String, Map<String, Map<String, Object>>> deviceClaudeInfoMap;
 
-    public String fetchDeviceClaudeDesktopInfoMap() {
+    public String fetchDeviceClaudeInfoMap() {
         try {
-            deviceClaudeDesktopInfoMap = DbLayer.fetchDeviceClaudeDesktopInfoMap();
+            deviceClaudeInfoMap = DbLayer.fetchDeviceClaudeInfoMap();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in fetchDeviceClaudeDesktopInfoMap " + e.toString());
+            loggerMaker.errorAndAddToDb(e, "Error in fetchDeviceClaudeInfoMap " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
