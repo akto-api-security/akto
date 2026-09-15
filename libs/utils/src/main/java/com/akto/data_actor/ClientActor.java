@@ -51,6 +51,7 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.akto.dto.claude_identity.ClaudeDesktopInfo;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -5037,6 +5038,29 @@ public class ClientActor extends DataActor {
             return result != null ? result : new HashMap<>();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in fetchDeviceUserMap: " + e, LoggerMaker.LogDb.RUNTIME);
+            return new HashMap<>();
+        }
+    }
+
+    /**
+     * deviceId -> what cyborg knows about that device's Claude Desktop install (org, account,
+     * email). Refreshed far more often than the device->user map because a user can switch org
+     * inside Desktop at any moment, while the user behind a device effectively never changes.
+     */
+    public Map<String, Map<String, ClaudeDesktopInfo>> fetchDeviceClaudeDesktopInfoMap() {
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDeviceClaudeDesktopInfoMap", "", "POST", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String body = response.getBody();
+            if (response.getStatusCode() != 200 || body == null) {
+                return new HashMap<>();
+            }
+            Map<String, Map<String, ClaudeDesktopInfo>> result = gson.fromJson(
+                    body, new TypeToken<Map<String, Map<String, ClaudeDesktopInfo>>>() {}.getType());
+            return result != null ? result : new HashMap<>();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchDeviceClaudeDesktopInfoMap: " + e, LoggerMaker.LogDb.RUNTIME);
             return new HashMap<>();
         }
     }

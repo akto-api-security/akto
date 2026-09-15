@@ -5,6 +5,7 @@ import com.akto.billing.UsageMetricUtils;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
+import com.akto.dto.claude_identity.ClaudeDesktopInfo;
 import com.akto.dto.traffic.CollectionTags.TagSource;
 import com.akto.hybrid_dependency.DependencyAnalyser;
 import com.akto.data_actor.DataActor;
@@ -107,6 +108,10 @@ public class HttpCallParser {
     private Map<String, String> deviceUserMapCache = new HashMap<>();
     private int deviceUserMapLastFetchTs = 0;
     private static final int DEVICE_USER_MAP_REFRESH_INTERVAL = 60 * 10;
+
+    private Map<String, Map<String, ClaudeDesktopInfo>> deviceClaudeDesktopInfoMapCache = new HashMap<>();
+    private int deviceClaudeDesktopInfoMapLastFetchTs = 0;
+    private static final int DEVICE_CLAUDE_DESKTOP_INFO_MAP_REFRESH_INTERVAL = 60;
 
     // Track which hostnames have been added to each service-tag collection to avoid redundant DB calls
     // Key: collectionId, Value: Set of hostnames already added
@@ -1760,7 +1765,7 @@ public class HttpCallParser {
         }
 
         AgentQueryRecord record = AgentQueryRecord.fromHttpResponseParams(
-                httpResponseParam, tagsMap, getDeviceUserMap());
+                httpResponseParam, tagsMap, getDeviceUserMap(), getDeviceClaudeDesktopInfoMap());
         if (record == null) {
             return;
         }
@@ -2083,6 +2088,19 @@ public class HttpCallParser {
             deviceUserMapLastFetchTs = Context.now();
         }
         return deviceUserMapCache;
+    }
+
+    /**
+     * deviceId -> that device's Claude Desktop identity. Refreshed every 60s rather than every 10
+     * minutes like the device->user map: the org a device reports follows whichever org the user
+     * last worked in, so a stale entry attributes traffic to the wrong org.
+     */
+    private Map<String, Map<String, ClaudeDesktopInfo>> getDeviceClaudeDesktopInfoMap() {
+        if (Context.now() - deviceClaudeDesktopInfoMapLastFetchTs > DEVICE_CLAUDE_DESKTOP_INFO_MAP_REFRESH_INTERVAL) {
+            deviceClaudeDesktopInfoMapCache = dataActor.fetchDeviceClaudeDesktopInfoMap();
+            deviceClaudeDesktopInfoMapLastFetchTs = Context.now();
+        }
+        return deviceClaudeDesktopInfoMapCache;
     }
 
     private boolean hasAtlasOrArgusTag(ApiCollection collection) {
