@@ -10,6 +10,7 @@ import com.mongodb.client.model.Projections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -81,5 +82,105 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
             result.putIfAbsent(username, email);
         }
         return result;
+    }
+
+    // Server-side port of endpointShieldHelper.js's buildUsernameMapFromModuleInfos; key shapes must match it exactly.
+    public Map<String, String> fetchUsernameLookupMapForEndpointShield() {
+        return buildUsernameLookupMap(findAll(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD),
+            Projections.include(
+                ModuleInfo.NAME,
+                ModuleInfo.ADDITIONAL_DATA + ".username",
+                ModuleInfo.ADDITIONAL_DATA + ".userName",
+                ModuleInfo.ADDITIONAL_DATA + ".user",
+                ModuleInfo.ADDITIONAL_DATA + ".email",
+                ModuleInfo.ADDITIONAL_DATA + ".deviceId",
+                ModuleInfo.ADDITIONAL_DATA + ".endpointId",
+                ModuleInfo.ADDITIONAL_DATA + ".mcpServers")));
+    }
+
+    // Pure transform split from the query above; key shapes must match the JS builder exactly.
+    public static Map<String, String> buildUsernameLookupMap(List<ModuleInfo> modules) {
+        Map<String, String> result = new HashMap<>();
+        for (ModuleInfo m : modules) {
+            Map<String, Object> ad = m.getAdditionalData();
+            String username = resolveModuleUsername(ad);
+            if (username == null) continue;
+
+            registerDeviceKey(result, username, m.getName());
+            if (ad == null) continue;
+            registerDeviceKey(result, username, ad.get("deviceId"));
+            registerDeviceKey(result, username, ad.get("endpointId"));
+
+            Object mcpServers = ad.get("mcpServers");
+            if (!(mcpServers instanceof Map)) continue;
+            for (Object serverObj : ((Map<?, ?>) mcpServers).values()) {
+                if (!(serverObj instanceof Map)) continue;
+                Object collectionName = ((Map<?, ?>) serverObj).get("collectionName");
+                if (collectionName instanceof String && !((String) collectionName).isEmpty()) {
+                    result.put(((String) collectionName).toLowerCase(Locale.ROOT), username);
+                }
+            }
+        }
+        return result;
+    }
+
+    // Matches the JS resolveModuleUsername's candidate order and "-" rejection.
+    private static String resolveModuleUsername(Map<String, Object> additionalData) {
+        if (additionalData == null) return null;
+        for (String field : new String[]{"username", "userName", "user", "email"}) {
+            Object raw = additionalData.get(field);
+            if (!(raw instanceof String)) continue;
+            String v = ((String) raw).trim();
+            if (!v.isEmpty() && !"-".equals(v)) return v;
+        }
+        return null;
+    }
+
+    private static void registerDeviceKey(Map<String, String> target, String username, Object rawId) {
+        if (rawId == null) return;
+        String key = String.valueOf(rawId).toLowerCase(Locale.ROOT);
+        if (key.isEmpty()) return;
+        target.put("__deviceId__" + key, username);
+    }
+
+    // Server-side port of agenticPageBuilders.js's buildModuleDeviceMap; ModuleInfo.name -> {username, os, browserName}.
+    public Map<String, Map<String, String>> fetchDeviceMetadataMapForEndpointShield() {
+        return buildDeviceMetadataMap(findAll(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD),
+            Projections.include(
+                ModuleInfo.NAME,
+                ModuleInfo.ADDITIONAL_DATA + ".username",
+                ModuleInfo.ADDITIONAL_DATA + ".userName",
+                ModuleInfo.ADDITIONAL_DATA + ".user",
+                ModuleInfo.ADDITIONAL_DATA + ".email",
+                ModuleInfo.ADDITIONAL_DATA + ".os",
+                ModuleInfo.ADDITIONAL_DATA + ".browserName")));
+    }
+
+    // Pure transform split from the query above; shape must match the JS builder exactly.
+    public static Map<String, Map<String, String>> buildDeviceMetadataMap(List<ModuleInfo> modules) {
+        Map<String, Map<String, String>> result = new HashMap<>();
+        for (ModuleInfo m : modules) {
+            String name = m.getName();
+            if (name == null || name.isEmpty()) continue;
+            Map<String, Object> ad = m.getAdditionalData();
+            Map<String, String> meta = new HashMap<>();
+            // JS uses `||` here, which keeps a literal "-" — deliberately NOT resolveModuleUsername's "-" rejection.
+            String username = firstNonEmpty(ad, "username", "userName", "user", "email");
+            meta.put("username", username != null ? username : "-");
+            meta.put("os", firstNonEmpty(ad, "os"));
+            meta.put("browserName", firstNonEmpty(ad, "browserName"));
+            result.put(name, meta);
+        }
+        return result;
+    }
+
+    // Mirrors the JS `a || b || c` chain: first field holding a non-empty string.
+    private static String firstNonEmpty(Map<String, Object> additionalData, String... fields) {
+        if (additionalData == null) return null;
+        for (String field : fields) {
+            Object raw = additionalData.get(field);
+            if (raw instanceof String && !((String) raw).isEmpty()) return (String) raw;
+        }
+        return null;
     }
 }

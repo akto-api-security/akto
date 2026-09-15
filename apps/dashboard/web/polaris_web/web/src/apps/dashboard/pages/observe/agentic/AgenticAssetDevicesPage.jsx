@@ -13,7 +13,6 @@ import TooltipText from "../../../components/shared/TooltipText";
 import api from "../api";
 import func from "@/util/func";
 import transform from "../transform";
-import { fetchEndpointShieldUsernameMap } from "../api_collections/endpointShieldHelper";
 import SkillComponentsView from "./SkillComponentsView";
 import { fetchAgentMarkdownFromCollections } from "./PluginComponentsView";
 import { settledValue, logRejected } from "./constants";
@@ -381,7 +380,6 @@ export default function AgenticAssetDevicesPage() {
     // resolves, so the "loading" feedback lives on this page instead of freezing the previous one.
     const [loading, setLoading] = useState(true);
     const collectionIdsRef = useRef([]);
-    const enrichRef = useRef({ usernameMap: {} });
     const [refreshKey, setRefreshKey] = useState(0);
     // Plugin rows only — the MCP servers/skills this plugin bundles, so old-UI can list them with a
     // direct redirect link (same server-side data new-UI's PluginComponentsView table shows).
@@ -414,17 +412,12 @@ export default function AgenticAssetDevicesPage() {
                 // of them for one asset's own devices. fetchAgenticAssetEndpointsPage computes those
                 // three server-side, scoped to apiCollectionIds, instead of requiring this page to
                 // pull the whole account's map just to read a few entries back out of it.
-                // usernameMap still comes from here since Endpoint Shield's device registry isn't
-                // collection-scoped (it's keyed by physical device, already small account-wide).
-                // allSettled: a usernameMap failure must not also lose detail.collectionIds, which is
-                // this page's entire collection scope.
-                const [usernameSettled, detailSettled] = await Promise.allSettled([
-                    fetchEndpointShieldUsernameMap(),
+                // Usernames are resolved server-side now, so this page no longer fetches that map.
+                const [detailSettled] = await Promise.allSettled([
                     api.fetchAgenticAssetDetail({ groupKey, rowType }),
                 ]);
                 if (cancelled) return;
-                logRejected("AgenticAssetDevicesPage mount", { usernameMap: usernameSettled, detail: detailSettled });
-                enrichRef.current = { usernameMap: settledValue(usernameSettled, {}) };
+                logRejected("AgenticAssetDevicesPage mount", { detail: detailSettled });
                 const detail = settledValue(detailSettled, {});
                 collectionIdsRef.current = detail?.collectionIds || [];
                 setDescription(detail?.description || "");
@@ -445,7 +438,6 @@ export default function AgenticAssetDevicesPage() {
     }, [groupKey, rowType]);
 
     const fetchTableData = useCallback(async (sortKey, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
-        const { usernameMap } = enrichRef.current;
         const mongoSortOrder = sortOrder === -1 ? 1 : -1;
         const filters = {};
         if (filtersObj?.endpointTags?.length) filters.endpointTags = filtersObj.endpointTags;
@@ -463,7 +455,6 @@ export default function AgenticAssetDevicesPage() {
             rowType,
             groupKey,
             skip, limit, sortKey: sortKey || "riskScore", sortOrder: mongoSortOrder, queryValue,
-            usernameMap,
             filters: Object.keys(filters).length ? filters : undefined,
         });
         updateFilterChoicesIfChanged(res.distinctEndpointIds || [], res.distinctUsernames || []);

@@ -333,8 +333,18 @@ func rawBucketContains(mcpServerNameLower string, servers map[string]struct{}, s
 	return false
 }
 
+// canonicalServerToken normalizes agent/server identifiers for policy matching.
+// HttpProxyAction lowercases Host and maps underscores to hyphens before
+// guardrails sees them; inventory and policy UI often keep AWS/runtime
+// underscores. Treat the two spellings as equivalent at match time.
+func canonicalServerToken(s string) string {
+	return strings.ReplaceAll(strings.ToLower(s), "_", "-")
+}
+
 // looseServerMatch is the pre-type-scoping exact/suffix/contains match, kept as a fallback for legacy compound keys.
 func looseServerMatch(nameLower, storedLower string) bool {
+	nameLower = canonicalServerToken(nameLower)
+	storedLower = canonicalServerToken(storedLower)
 	if storedLower == nameLower {
 		return true
 	}
@@ -349,6 +359,8 @@ func looseServerMatch(nameLower, storedLower string) bool {
 
 // agentSegmentMatch checks storedLower against the clientType segment of "{deviceLabel}.{clientType}.{host}".
 func agentSegmentMatch(nameLower, storedLower string) bool {
+	nameLower = canonicalServerToken(nameLower)
+	storedLower = canonicalServerToken(storedLower)
 	if nameLower == storedLower {
 		return true
 	}
@@ -367,6 +379,8 @@ func agentSegmentMatch(nameLower, storedLower string) bool {
 
 // hostSegmentMatch checks storedLower against the trailing host segment of "{deviceLabel}.{clientType}.{host}".
 func hostSegmentMatch(nameLower, storedLower string) bool {
+	nameLower = canonicalServerToken(nameLower)
+	storedLower = canonicalServerToken(storedLower)
 	if nameLower == storedLower {
 		return true
 	}
@@ -423,6 +437,10 @@ func deviceIDsContain(ids []string, label string) bool {
 // these are the two independent picks the dashboard offers ("Devices" vs. "Users"), so a match on
 // either is sufficient. A policy is targeted when either ApplyToDeviceIds is non-nil or UserMetadata
 // is non-empty; when neither is configured, the policy applies to everyone.
+//
+// ApplyToDeviceIds already has device/tag Include-vs-Exclude baked in server-side, so labelMatched
+// needs no further negation. UserMetadata has no such resolution, so NegatedTargetUserNames is
+// applied here instead, against the actual request's email.
 func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName string, headers map[string]string) []types.Policy {
 	deviceLabel := deviceLabelFromMcpServerName(mcpServerName)
 	email := ""
@@ -446,6 +464,9 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 			}
 			if email != "" {
 				emailMatched = findUserMetadataByEmail(p.UserMetadata, email) != nil
+				if p.NegatedTargetUserNames {
+					emailMatched = !emailMatched
+				}
 			}
 		}
 
