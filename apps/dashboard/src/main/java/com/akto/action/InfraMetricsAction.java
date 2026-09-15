@@ -34,15 +34,18 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsAction.class, LogDb.DASHBOARD);;
 
-    // Whether the /metrics endpoint is served at all. Off by default so metrics are
-    // never exposed unless explicitly turned on.
-    private static final String METRICS_EXPOSED_ENV = "METRICS_ENABLED";
-    // Whether Bearer-token auth is enforced on /metrics. On by default; set to "false"
-    // to serve metrics without auth (e.g. a private network where the scraper cannot
-    // send a token).
-    private static final String METRICS_AUTH_ENABLED_ENV = "METRICS_AUTH_ENABLED";
-    private static final String METRICS_AUTH_TOKEN_ENV = "METRICS_AUTH_TOKEN";
     private static final String BEARER_PREFIX = "Bearer ";
+
+    // Metrics config is resolved once at class load: env vars are fixed for the process
+    // lifetime, so there is no point re-reading them on every /metrics request.
+    //   METRICS_ENABLED      - "true" exposes /metrics (a configured token also implies
+    //                          exposed, for backward compatibility).
+    //   METRICS_AUTH_ENABLED - "true"/unset enforces Bearer auth (default); "false" disables it.
+    //   METRICS_AUTH_TOKEN   - the expected Bearer credential; required when auth is enabled.
+    private static final String METRICS_AUTH_TOKEN = System.getenv("METRICS_AUTH_TOKEN");
+    private static final boolean HAS_TOKEN = METRICS_AUTH_TOKEN != null && !METRICS_AUTH_TOKEN.trim().isEmpty();
+    private static final boolean METRICS_EXPOSED = isTrue(System.getenv("METRICS_ENABLED")) || HAS_TOKEN;
+    private static final boolean METRICS_AUTH_ENABLED = !isFalse(System.getenv("METRICS_AUTH_ENABLED"));
 
     /**
      * Prometheus scrape endpoint (/metrics). Emits pure Prometheus text exposition.
@@ -59,24 +62,17 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
      */
     @Override
     public String execute() throws Exception {
-        String configuredToken = System.getenv(METRICS_AUTH_TOKEN_ENV);
-        boolean hasToken = configuredToken != null && !configuredToken.trim().isEmpty();
-
-        // 1) endpoint must be exposed. Backward compatible: an explicit METRICS_ENABLED=true
-        //    OR a configured token (the previous gating) exposes it. Nothing that worked
-        //    before starts returning 404.
-        boolean exposed = isTrue(System.getenv(METRICS_EXPOSED_ENV)) || hasToken;
-        if (!exposed) {
+        // 1) endpoint must be exposed (explicit flag, or a configured token for back-compat)
+        if (!METRICS_EXPOSED) {
             servletResponse.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return null;
         }
 
         // 2) auth is enforced unless explicitly disabled
-        boolean authEnabled = !isFalse(System.getenv(METRICS_AUTH_ENABLED_ENV));
-        if (authEnabled) {
-            if (!hasToken) {
+        if (METRICS_AUTH_ENABLED) {
+            if (!HAS_TOKEN) {
                 // auth on but nothing to check against -> fail closed, never serve open
-                loggerMaker.errorAndAddToDb(METRICS_AUTH_ENABLED_ENV + " is on but " + METRICS_AUTH_TOKEN_ENV
+                loggerMaker.errorAndAddToDb("METRICS_AUTH_ENABLED is on but METRICS_AUTH_TOKEN"
                         + " is unset; refusing to expose /metrics", LogDb.DASHBOARD);
                 servletResponse.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 return null;
@@ -88,7 +84,7 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
                 presentedToken = authHeader.substring(BEARER_PREFIX.length()).trim();
             }
 
-            if (presentedToken == null || !constantTimeEquals(configuredToken, presentedToken)) {
+            if (presentedToken == null || !constantTimeEquals(METRICS_AUTH_TOKEN, presentedToken)) {
                 servletResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 return null;
             }
