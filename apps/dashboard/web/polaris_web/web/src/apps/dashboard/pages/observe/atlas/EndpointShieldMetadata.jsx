@@ -301,7 +301,7 @@ function EndpointShieldMetadata() {
         const allInstallers = selectedAgentsMeta.length === agentCount &&
             selectedAgentsMeta.every((a) => !isExtensionAgent(a.deviceId, a.agentVersion));
         const allAutoUpdateDisabled = allInstallers &&
-            selectedAgentsMeta.every((a) => a._moduleData?.additionalData?.env?.ENABLE_AUTO_UPDATE === "false");
+            selectedAgentsMeta.every((a) => a._moduleData?.additionalData?.env?.ENABLE_AUTO_UPDATE !== "true");
 
         const bulkToggleSystemProxy = (enable) => () => {
             const verb = enable ? "enable" : "disable";
