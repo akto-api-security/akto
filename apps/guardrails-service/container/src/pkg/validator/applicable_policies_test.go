@@ -98,6 +98,89 @@ func TestFilterPoliciesByDeviceNegatedUserList(t *testing.T) {
 	}
 }
 
+// A pick that never resolved to an identity doc is stored with no UserEmail — the dashboard
+// offers email-shaped usernames as picks, so the address ends up in UserName instead. Matching
+// UserEmail alone leaves such a row unable to match anyone, which doesn't merely disable the
+// policy: an Include list then matches nobody and enforces nothing, while an Exclude list turns
+// "matched nobody" into "matches everybody" and exempts nobody — the targeted people get the
+// opposite of what was configured, while the dashboard still shows them selected.
+func TestFindUserMetadataFallsBackToUserName(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		rows  []types.AgenticUsers
+		email string
+		found bool
+	}{
+		{
+			"emailless row carrying the address in UserName",
+			[]types.AgenticUsers{{UserName: "tim.elkins@example.com"}},
+			"tim.elkins@example.com", true,
+		},
+		{
+			"emailless fallback ignores casing",
+			[]types.AgenticUsers{{UserName: "Tim.Elkins@Example.com"}},
+			"tim.elkins@example.com", true,
+		},
+		{
+			"a bare username matches nothing it isn't",
+			[]types.AgenticUsers{{UserName: "Tim.Elkins"}},
+			"tim.elkins@example.com", false,
+		},
+		{
+			"UserEmail still matches when present",
+			[]types.AgenticUsers{{UserName: "Tim.Elkins", UserEmail: "tim.elkins@example.com"}},
+			"tim.elkins@example.com", true,
+		},
+		{
+			// The fallback must not widen a row that already carries an email: there UserEmail is
+			// the identity, and a stale or aliased UserName must not quietly match alongside it.
+			"a row with an email is not matched by its UserName",
+			[]types.AgenticUsers{{UserName: "alias@example.com", UserEmail: "real@example.com"}},
+			"alias@example.com", false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := findUserMetadataByEmail(tc.rows, tc.email) != nil; got != tc.found {
+				t.Fatalf("found = %v, want %v", got, tc.found)
+			}
+		})
+	}
+}
+
+// The same rows as they actually reach us from production, driven through the filter in both
+// modes: Include must cover only the listed people, Exclude must cover everyone but them.
+func TestFilterPoliciesByDeviceWithEmaillessRows(t *testing.T) {
+	s := &Service{logger: zap.NewNop()}
+	rows := []types.AgenticUsers{
+		{UserName: "Tim.Elkins"},
+		{UserName: "tim.elkins@example.com"},
+		{UserName: "Jim.Mihalik"},
+		{UserName: "jim.mihalik@example.com"},
+	}
+	headersFor := func(email string) map[string]string {
+		return map[string]string{"X-Akto-Installer-User_email": email}
+	}
+	applies := func(p types.Policy, email string) bool {
+		return len(s.filterPoliciesByDevice([]types.Policy{p}, "device1.ai-agent.claude-desktop", headersFor(email))) == 1
+	}
+
+	include := types.Policy{Info: types.PolicyInfo{Name: "include"}, UserMetadata: rows}
+	exclude := types.Policy{Info: types.PolicyInfo{Name: "exclude"}, UserMetadata: rows, NegatedTargetUserNames: true}
+
+	if !applies(include, "tim.elkins@example.com") {
+		t.Error("Include list should cover a listed user")
+	}
+	if applies(include, "luca.didio@example.com") {
+		t.Error("Include list should not cover an unlisted user")
+	}
+	if applies(exclude, "tim.elkins@example.com") {
+		t.Error("Exclude list should exempt a listed user")
+	}
+	if !applies(exclude, "luca.didio@example.com") {
+		t.Error("Exclude list should cover an unlisted user")
+	}
+}
+
 // applyToDeviceIds carries whatever casing module_info.name was created with, while the device
 // label on the wire is re-derived from the current login — the same person reaches us as
 // "AlexTaylor" in the policy and "alextaylor" on the request. Compared exactly, the policy is

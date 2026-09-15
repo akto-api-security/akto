@@ -495,11 +495,25 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 	return filtered
 }
 
-// findUserMetadataByEmail returns the first UserMetadata row whose UserEmail matches email
-// case-insensitively, or nil if none match.
+// findUserMetadataByEmail returns the first UserMetadata row matching email case-insensitively,
+// or nil if none match. UserEmail is the field to match on, but a row whose pick never resolved
+// to an identity doc carries no email at all: GuardrailPoliciesAction synthesizes it with
+// setUserEmail(moduleInfoEmailsByUsername.get(userName)), which is null whenever module_info has
+// no entry under that exact username — and the dashboard offers email-shaped usernames as picks,
+// so the address is often sitting in UserName instead.
+//
+// Such a row can never match on UserEmail, which silently inverts the policy: an Include list
+// matches nobody and enforces nothing, while an Exclude list turns "matched nobody" into "matches
+// everybody" and exempts nobody. Both leave the targeted people getting the opposite of what was
+// configured, with the dashboard still showing the selection (it reads back UserName, which is
+// present). Falling back to UserName only when UserEmail is empty recovers those rows without
+// widening a row that does carry an email — there, UserEmail stays the single source of truth.
 func findUserMetadataByEmail(rows []types.AgenticUsers, email string) *types.AgenticUsers {
 	for i := range rows {
 		if strings.EqualFold(rows[i].UserEmail, email) {
+			return &rows[i]
+		}
+		if rows[i].UserEmail == "" && strings.EqualFold(rows[i].UserName, email) {
 			return &rows[i]
 		}
 	}
