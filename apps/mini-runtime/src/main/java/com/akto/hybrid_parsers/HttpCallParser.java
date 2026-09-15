@@ -91,7 +91,7 @@ public class HttpCallParser {
     private static final List<Integer> INPROCESS_ADVANCED_FILTERS_ACCOUNTS = Arrays.asList(1736798101, 1718042191, 1759692400);
 
     /** HttpResponseParams.direction: "1" = inbound (callee side), "2" = outbound (caller side). */
-    private static final String DIRECTION_OUTBOUND = "2";
+    public static final String DIRECTION_OUTBOUND = "2";
 
     // Accounts allowed to tag a caller collection when it is seen calling an AI agent.
     private static final List<Integer> AI_AGENT_CALLER_TAGGING_ACCOUNTS = Arrays.asList(
@@ -1424,7 +1424,8 @@ public class HttpCallParser {
     }
 
     // Agoda-specific tag keys
-    private static final String SERVICE_TAG_KEY = "privatecloud.agoda.com/service";
+    // public: AktoPolicyNew reads the same key to attribute outbound calls to their caller.
+    public static final String SERVICE_TAG_KEY = "privatecloud.agoda.com/service";
     private static final String ENVIRONMENT_TAG_KEY = "privatecloud.agoda.com/environment";
     private static final String COMPONENT_TAG_KEY = "catalog.agoda.com/component";
 
