@@ -609,10 +609,8 @@ function AgentDetails({
     const configureEnvFields = useMemo(() => {
         if (!selectedAgent) return allowedEnvFields;
         const isExtension = isExtensionAgent(selectedAgent.deviceId, selectedAgent.agentVersion);
-        const autoUpdateDisabled = selectedAgent._moduleData?.additionalData?.env?.ENABLE_AUTO_UPDATE !== "true";
         return (allowedEnvFields || []).filter((field) => {
             if (isExtension && (field.key === "ENABLE_AUTO_UPDATE" || field.key === "UPDATE_TO_LATEST_VERSION")) return false;
-            if (field.key === "UPDATE_TO_LATEST_VERSION" && !autoUpdateDisabled) return false;
             return true;
         });
     }, [allowedEnvFields, selectedAgent]);
