@@ -40,7 +40,6 @@ export const ContentPolicyConfig = {
             if (total > 0) filters.push(`${total} denied topic${total !== 1 ? 's' : ''}`);
         }
         if (enableHarmfulCategories) filters.push('Harmful categories');
-        if (enableBasePromptRule) filters.push('Intent verification');
         return filters.length > 0 ? filters.join(', ') : null;
     }
 };
@@ -689,23 +688,6 @@ const ContentPolicyStep = ({
                     )}
                 </Box>
 
-                {/* Intent Based Guardrails (Base Prompt) */}
-                <Box>
-                    <Checkbox
-                        label={
-                            <HorizontalStack gap="1" blockAlign="center">
-                                <RuleLabelWithTag name="Enable agent intent verification" threats={RULE_OWASP_THREATS.intentVerification} />
-                                <ControlInfoIcon
-                                    {...CONTENT_POLICY_DESCRIPTIONS.intentVerification}
-                                    onTryPrompt={onTryPrompt}
-                                />
-                            </HorizontalStack>
-                        }
-                        checked={enableBasePromptRule}
-                        onChange={setEnableBasePromptRule}
-                        helpText="Verify if agent requests match the intent of the base prompt. The base prompt is automatically detected from traffic, and user inputs filling placeholders like {var} or {} are checked against this intent."
-                    />
-                </Box>
             </VerticalStack>
         </VerticalStack>
     );

@@ -7,6 +7,7 @@ import {
   useIndexResourceState,
   Pagination,
   HorizontalStack,
+  HorizontalGrid,
   Key,
   ChoiceList,
   Tabs,
@@ -16,7 +17,8 @@ import {
   Button,
   Tooltip,
   Box,
-  Select
+  Popover,
+  ActionList
 } from '@shopify/polaris';
 import { GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect, useMemo, useRef, useReducer } from 'react';
@@ -106,9 +108,11 @@ function GithubServerTable(props) {
   // page happens to pass in — a page only keeps its own smaller pageLimit (e.g. a compact 10-row
   // flyout list) by also opting out of the selector via hidePageSizeSelector.
   const [pageLimit, setPageLimit] = useState(props?.hidePageSizeSelector ? (props?.pageLimit || 50) : 50);
+  const [pageSizePopoverActive, setPageSizePopoverActive] = useState(false);
   const handlePageLimitChange = (value) => {
     setPage(0);
     setPageLimit(Number(value));
+    setPageSizePopoverActive(false);
   }
   // Selector is on by default for every GithubServerTable/GithubSimpleTable — opt out per-table
   // with hidePageSizeSelector, or override the choices with pageSizeOptions. The table's own
@@ -858,10 +862,8 @@ function GithubServerTable(props) {
             </div>
             </LegacyCard.Section>
             {(total !== 0 && !props?.hidePagination) && <LegacyCard.Section>
-              <HorizontalStack
-                align="center"
-                blockAlign="center"
-                gap="4">
+              <HorizontalGrid columns="1fr auto 1fr" gap="4" alignItems="center">
+                <Box />
                 <Pagination
                   label={
                     total == 0 ? 'No data found' :
@@ -876,18 +878,36 @@ function GithubServerTable(props) {
                   nextKeys={[Key.RightArrow]}
                   onNext={onPageNext}
                 />
-                {pageSizeOptions && pageSizeOptions.length > 0 && (
-                  <Box minWidth="110px">
-                    <Select
-                      label="Show"
-                      labelInline
-                      options={pageSizeOptions.map((size) => ({ label: String(size), value: String(size) }))}
-                      value={String(pageLimit)}
-                      onChange={handlePageLimitChange}
-                    />
-                  </Box>
-                )}
-              </HorizontalStack>
+                {pageSizeOptions && pageSizeOptions.length > 0 ? (
+                  <HorizontalStack align="end">
+                    <Popover
+                      active={pageSizePopoverActive}
+                      onClose={() => setPageSizePopoverActive(false)}
+                      preferredAlignment="right"
+                      fullWidth
+                      activator={
+                        <Box width="120px">
+                          <Button
+                            disclosure="select"
+                            fullWidth
+                            onClick={() => setPageSizePopoverActive((active) => !active)}
+                          >
+                            {`Show ${pageLimit}`}
+                          </Button>
+                        </Box>
+                      }
+                    >
+                      <ActionList
+                        items={pageSizeOptions.map((size) => ({
+                          content: String(size),
+                          active: size === pageLimit,
+                          onAction: () => handlePageLimitChange(size),
+                        }))}
+                      />
+                    </Popover>
+                  </HorizontalStack>
+                ) : <Box />}
+              </HorizontalGrid>
             </LegacyCard.Section>}
           </div>
         }

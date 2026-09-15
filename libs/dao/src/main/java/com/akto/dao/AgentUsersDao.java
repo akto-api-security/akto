@@ -5,6 +5,7 @@ import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.DeviceTag;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -16,9 +17,12 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -242,9 +246,11 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
 
     /**
      * Generalizes findDeviceIdsByTeamsRolesAndDeviceIds to arbitrary tag keys: entries in
-     * tagFilters AND together; within one key, any of its values match (OR).
+     * tagFilters AND together; within one key, any of its values match (OR). Each key and the
+     * device-id pick can independently be negated.
      */
-    public List<String> findDeviceIdsByTags(Map<String, List<String>> tagFilters, List<String> deviceIds) {
+    public List<String> findDeviceIdsByTags(Map<String, List<String>> tagFilters, Map<String, Boolean> negatedTagFilters,
+                                             List<String> deviceIds, boolean negatedDeviceIds) {
         List<Bson> conditions = new ArrayList<>();
         if (tagFilters != null) {
             for (Map.Entry<String, List<String>> entry : tagFilters.entrySet()) {
@@ -254,9 +260,14 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
                         .map(v -> v.trim().toLowerCase())
                         .collect(Collectors.toList());
                 if (values.isEmpty()) continue;
-                conditions.add(Filters.elemMatch(AgenticUsers.DEVICE_TAGS, Filters.and(
+                Bson positiveMatch = Filters.elemMatch(AgenticUsers.DEVICE_TAGS, Filters.and(
                         Filters.eq(DeviceTag.KEY, entry.getKey().trim().toLowerCase()),
-                        Filters.in(DeviceTag.VALUE, values))));
+                        Filters.in(DeviceTag.VALUE, values)));
+                boolean negated = negatedTagFilters != null && Boolean.TRUE.equals(negatedTagFilters.get(entry.getKey()));
+                // deviceTags is a union array across sources — a device can carry both a matching
+                // and non-matching value for the same key. Negate the whole elemMatch ($nor), not
+                // an inline $nin, or a co-existing non-excluded value would wrongly keep it.
+                conditions.add(negated ? Filters.nor(positiveMatch) : positiveMatch);
             }
         }
         boolean hasTagFilters = !conditions.isEmpty();
@@ -265,10 +276,20 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
             return new ArrayList<>();
         }
 
-        // Device IDs come straight from a dropdown built off live module_info data at pick time —
-        // trust them directly rather than re-deriving through a username/tag join.
         if (!hasTagFilters) {
-            return new ArrayList<>(new HashSet<>(deviceIds));
+            if (!negatedDeviceIds) {
+                // Device IDs come straight from a dropdown built off live module_info data at pick
+                // time — trust them directly rather than re-deriving through a username/tag join.
+                return new ArrayList<>(new HashSet<>(deviceIds));
+            }
+            // "Apply to everyone except these devices" — resolve against the full live device
+            // universe instead, computed fresh so newly-online devices are still covered.
+            Set<String> allLiveDevices = new HashSet<>();
+            for (Set<String> devices : ModuleInfoDao.instance.fetchUsernameToDeviceIdsForEndpointShield().values()) {
+                allLiveDevices.addAll(devices);
+            }
+            allLiveDevices.removeAll(new HashSet<>(deviceIds));
+            return new ArrayList<>(allLiveDevices);
         }
 
         // module_info is updated on every heartbeat, unlike AgenticUsers.devices which is only
@@ -287,8 +308,13 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
             return new ArrayList<>(tagDeviceIds);
         }
 
-        // Both dimensions given — a device must satisfy the tag match AND be explicitly picked.
-        tagDeviceIds.retainAll(new HashSet<>(deviceIds));
+        // Both dimensions given — a device must satisfy the tag match AND (be explicitly picked,
+        // or, if negated, NOT be explicitly picked).
+        if (negatedDeviceIds) {
+            tagDeviceIds.removeAll(new HashSet<>(deviceIds));
+        } else {
+            tagDeviceIds.retainAll(new HashSet<>(deviceIds));
+        }
         return new ArrayList<>(tagDeviceIds);
     }
 
@@ -309,7 +335,25 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         if (conditions.isEmpty()) return new ArrayList<>();
 
         Bson filter = conditions.size() == 1 ? conditions.get(0) : Filters.or(conditions);
-        return instance.findAll(filter);
+        // agent_users can hold multiple un-deduped docs for the same username (e.g. one per
+        // device/session from repeated Okta-sync or heartbeat upserts, rather than one doc with a
+        // devices array) — $in on userName then returns every one of them. Left un-deduped here,
+        // a caller picking 3 people could get back hundreds of rows if any of them has many such
+        // duplicates, silently inflating anything downstream that counts this result (e.g.
+        // GuardrailPolicies#userMetadata). Dedupe by username (falling back to userId), merging
+        // devices/deviceTags across duplicates — same convention as ModuleInfoAction#mergeInto.
+        Map<String, AgenticUsers> byIdentity = new LinkedHashMap<>();
+        for (AgenticUsers u : instance.findAll(filter)) {
+            String key = (u.getUserName() != null && !u.getUserName().trim().isEmpty()) ? "n:" + u.getUserName() : "i:" + u.getUserId();
+            AgenticUsers existing = byIdentity.get(key);
+            if (existing == null) {
+                byIdentity.put(key, u);
+            } else {
+                if (existing.getUserEmail() == null) existing.setUserEmail(u.getUserEmail());
+                if (existing.getUserId() == null) existing.setUserId(u.getUserId());
+            }
+        }
+        return new ArrayList<>(byIdentity.values());
     }
 
     private static List<String> filterBlank(Collection<String> values) {
@@ -325,5 +369,30 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
     @Override
     public Class<AgenticUsers> getClassT() {
         return AgenticUsers.class;
+    }
+
+    // Username -> device tags (key/value/source only, the fields the UI reads), deduped like fetchAgenticUsers.
+    public Map<String, List<Map<String, String>>> fetchDeviceTagsByUsername() {
+        Map<String, List<Map<String, String>>> result = new HashMap<>();
+        List<AgenticUsers> users = findAll(Filters.empty(),
+                Projections.include(AgenticUsers.USER_NAME, AgenticUsers.DEVICE_TAGS));
+        for (AgenticUsers u : users) {
+            String username = u.getUserName() == null ? "" : u.getUserName().trim();
+            if (username.isEmpty() || u.getDeviceTags() == null) continue;
+
+            List<Map<String, String>> tags = result.computeIfAbsent(username, k -> new ArrayList<>());
+            for (DeviceTag t : u.getDeviceTags()) {
+                if (t == null || t.getKey() == null) continue;
+                boolean alreadyPresent = tags.stream().anyMatch(m ->
+                        Objects.equals(m.get(DeviceTag.KEY), t.getKey()) && Objects.equals(m.get(DeviceTag.VALUE), t.getValue()));
+                if (alreadyPresent) continue;
+                Map<String, String> tagMap = new HashMap<>();
+                tagMap.put(DeviceTag.KEY, t.getKey());
+                tagMap.put(DeviceTag.VALUE, t.getValue());
+                tagMap.put(DeviceTag.SOURCE, t.getSource());
+                tags.add(tagMap);
+            }
+        }
+        return result;
     }
 }

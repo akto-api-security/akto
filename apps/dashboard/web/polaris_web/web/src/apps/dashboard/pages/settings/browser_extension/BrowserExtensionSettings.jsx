@@ -1,17 +1,17 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-    ActionList, Avatar, Box, Button, Divider, Form, HorizontalStack, Icon,
-    Modal, Pagination, Popover, Text, TextField, Tooltip, VerticalStack,
+    Avatar, Badge, Box, Button, Divider, EmptySearchResult, Form, HorizontalStack, Icon,
+    Modal, Text, TextField, Tooltip, VerticalStack,
 } from "@shopify/polaris";
-import { SearchMinor, HorizontalDotsMinor, DeleteMinor, InfoMinor } from "@shopify/polaris-icons";
+import { DeleteMinor, InfoMinor } from "@shopify/polaris-icons";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import Dropdown from "../../../components/layouts/Dropdown";
+import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
+import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import { sharedIconCacheService } from "../../../components/shared/CollectionIcon";
 import func from "@/util/func";
 import api from "../../guardrails/api";
 import "./BrowserExtensionSettings.css";
-
-const CONFIG_PAGE_SIZE = 10;   // configured hosts per page
 
 // full config-driven custom-host form (mirrors the extension's monitoring-config schema)
 const EMPTY_FORM = {
@@ -30,19 +30,7 @@ const FORMAT_OPTIONS = {
     graphql: [["json", "JSON"]],
 };
 
-// Lightweight, theme-aware toggle (Polaris ships no native switch in this version).
-function Switch({ active, onChange, title }) {
-    return (
-        <Box
-            className={`bext-switch ${active ? "on" : ""}`}
-            role="switch" aria-checked={active} aria-label={title} tabIndex={0} title={title}
-            onClick={onChange}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onChange(); } }}
-        >
-            <Box as="span" className="bext-switch-knob" />
-        </Box>
-    );
-}
+const HOST_RESOURCE_NAME = { singular: "host", plural: "hosts" };
 
 // Prefer a stored icon_url; otherwise derive the site's real favicon from its host (host == domain).
 // Avatar falls back to the host's initials if the favicon fails to load.
@@ -64,9 +52,10 @@ function BrowserExtensionSettings() {
     const [configured, setConfigured] = useState([]);
     const [catalogue, setCatalogue] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [cfgFilter, setCfgFilter] = useState("");
-    const [cfgPage, setCfgPage] = useState(0);            // configured list pagination (10 / page)
-    const [openMenuId, setOpenMenuId] = useState(null);   // which row's ⋯ menu is open
+    // GithubSimpleTable caches its rows/filters internally and only re-derives them when its
+    // own key changes — bump this after every mutation so Activate/Deactivate/Edit/Remove
+    // (which don't change row count) still show fresh data.
+    const [refreshCounter, setRefreshCounter] = useState(0);
 
     // custom-host add/edit modal
     const [pickerOpen, setPickerOpen] = useState(false);
@@ -94,7 +83,30 @@ function BrowserExtensionSettings() {
     }, []);
 
     useEffect(() => { fetchAll(); }, [fetchAll]);
-    useEffect(() => { setCfgPage(0); }, [cfgFilter]);   // jump back to page 1 on a new filter
+
+    // refetch and force the table to re-derive its rows/filters/selection
+    const refresh = async () => {
+        setRefreshCounter((v) => v + 1);
+        await fetchAll();
+    };
+
+    // Applies an active-state change to local state instead of re-fetching the whole catalogue —
+    // toggling/bulk-toggling doesn't change which hosts exist, so there's nothing new to fetch. At
+    // catalogue sizes in the thousands, re-pulling everything on every click doesn't scale; this
+    // keeps the round trip to just the write. Still bumps refreshCounter to remount the table so its
+    // internal filter-choice cache (keyed off row count/identity, not content) doesn't go stale.
+    const patchActive = (hosts, active) => {
+        const hostSet = new Set(hosts.map((h) => h.toLowerCase()));
+        setConfigured((prev) => {
+            const byHost = new Map(prev.map((c) => [(c.host || "").toLowerCase(), c]));
+            hostSet.forEach((key) => {
+                const existing = byHost.get(key);
+                byHost.set(key, existing ? { ...existing, active } : { host: hosts.find((h) => h.toLowerCase() === key), active, hexId: null });
+            });
+            return Array.from(byHost.values());
+        });
+        setRefreshCounter((v) => v + 1);
+    };
 
     // sort by the Mongo id (hexId) ascending — top brands were given the oldest ids, so they lead
     const idOf = (c) => c?.hexId || "￿";
@@ -130,25 +142,24 @@ function BrowserExtensionSettings() {
     const activeCount = useMemo(() => mergedRows.filter((r) => r.active).length, [mergedRows]);
     const offCount = totalCount - activeCount;
 
-    const visibleConfigured = useMemo(() => {
-        const q = cfgFilter.trim().toLowerCase();
-        if (!q) return mergedRows;
-        return mergedRows.filter((r) => (r.host || "").toLowerCase().includes(q) || (r.name || "").toLowerCase().includes(q));
-    }, [mergedRows, cfgFilter]);
-
-    // paginate the configured list (10 / page)
-    const cfgTotalPages = Math.max(1, Math.ceil(visibleConfigured.length / CONFIG_PAGE_SIZE));
-    const cfgPageSafe = Math.min(cfgPage, cfgTotalPages - 1);
-    const cfgStart = cfgPageSafe * CONFIG_PAGE_SIZE;
-    const pagedConfigured = visibleConfigured.slice(cfgStart, cfgStart + CONFIG_PAGE_SIZE);
-
     // ── write actions ───────────────────────────────────────────────────
     const toggleConfigured = async (host, nextActive) => {
         try {
             await api.setBrowserExtensionConfigActive(host, nextActive);
-            await fetchAll();
+            func.setToast(true, false, `${host} ${nextActive ? "activated" : "deactivated"}`);
+            patchActive([host], nextActive);
         } catch (error) {
             func.setToast(true, true, "Failed to update host");
+        }
+    };
+    const bulkSetActive = async (hosts, active) => {
+        if (hosts.length === 0) return;
+        try {
+            await api.setBrowserExtensionConfigsActive(hosts, active);
+            func.setToast(true, false, `${hosts.length} host${hosts.length !== 1 ? "s" : ""} ${active ? "activated" : "deactivated"}`);
+            patchActive(hosts, active);
+        } catch (error) {
+            func.setToast(true, true, "Failed to update selected hosts");
         }
     };
     const removeConfigured = (host, hexId) => {
@@ -156,7 +167,8 @@ function BrowserExtensionSettings() {
             try {
                 await api.deleteBrowserExtensionConfigs([hexId]);
                 func.setToast(true, false, `${host} removed`);
-                await fetchAll();
+                setConfigured((prev) => prev.filter((c) => c.hexId !== hexId));
+                setRefreshCounter((v) => v + 1);
             } catch (error) {
                 func.setToast(true, true, "Failed to remove host");
             }
@@ -256,7 +268,7 @@ function BrowserExtensionSettings() {
             await api.saveBrowserExtensionConfig(payload, editingHexId || undefined);
             func.setToast(true, false, `Config ${editingHexId ? "updated" : "added"} successfully`);
             closePicker();
-            await fetchAll();
+            await refresh();
         } catch (error) {
             func.setToast(true, true, "Failed to save config");
         } finally {
@@ -278,122 +290,121 @@ function BrowserExtensionSettings() {
         func.downloadAsCSV(rows, { name: "browser_extension_configs" });
     };
 
-    // ── configured section ──────────────────────────────────────────────
-    const skeletonList = (
-        <Box className="bext-list">
-            {Array.from({ length: 5 }).map((_, i) => (
-                <Box className="bext-row" key={`sk-${i}`}>
-                    <Box className="bext-sk bext-sk-avatar" />
-                    <Box className="bext-grow">
-                        <Box className="bext-sk bext-sk-title" />
-                        <Box className="bext-sk bext-sk-sub" />
-                    </Box>
-                    <Box className="bext-sk bext-sk-switch" />
-                </Box>
-            ))}
-        </Box>
-    );
-
-    const configuredRow = (c) => {
+    // ── table rows — GithubSimpleTable gives us select-all/deselect-all and an
+    // active/inactive filter for free, matching the table design used elsewhere
+    // (e.g. Misconfigurations, Webhooks) instead of a bespoke list. ────────
+    const tableRows = useMemo(() => mergedRows.map((c) => {
         const isCustom = c.source === "custom";
-        const menuItems = [
-            { content: "Edit", onAction: () => { setOpenMenuId(null); openEdit(c); } },
-            { content: "Remove", destructive: true, onAction: () => { setOpenMenuId(null); removeConfigured(c.host, c.hexId); } },
-        ];
-        return (
-            <Box className={`bext-row ${c.active ? "" : "off"}`} key={c.host}>
-                {hostAvatar(c.host, c.iconUrl)}
-                <Box className="bext-grow">
-                    <Text variant="bodyMd" fontWeight="medium" truncate>{c.name || c.host}</Text>
-                    <Text variant="bodySm" color="subdued" truncate>
-                        {c.name ? c.host : (isCustom ? ((c.paths || []).join(", ") || "Custom") : "Akto")}
-                    </Text>
-                </Box>
-                <Switch active={c.active} onChange={() => toggleConfigured(c.host, !c.active)}
-                    title={c.active ? "Disable for this account" : "Enable"} />
-                {isCustom && (
-                    <Popover
-                        active={openMenuId === c.host}
-                        onClose={() => setOpenMenuId(null)}
-                        preferredAlignment="right"
-                        activator={
-                            <Button
-                                plain
-                                icon={HorizontalDotsMinor}
-                                accessibilityLabel={`Actions for ${c.name || c.host}`}
-                                onClick={() => setOpenMenuId(openMenuId === c.host ? null : c.host)}
-                            />
-                        }
-                    >
-                        <ActionList actionRole="menuitem" items={menuItems} />
-                    </Popover>
-                )}
-            </Box>
-        );
+        return {
+            id: (c.host || "").toLowerCase(),
+            host: c.host,
+            name: c.name || c.host,
+            hexId: c.hexId,
+            isCustom,
+            status: c.active ? "Active" : "Inactive",
+            hostCell: (
+                <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                    {hostAvatar(c.host, c.iconUrl)}
+                    <Box>
+                        <Text variant="bodyMd" fontWeight="medium" truncate>{c.name || c.host}</Text>
+                        <Text variant="bodySm" color="subdued" truncate>
+                            {c.name ? c.host : (isCustom ? ((c.paths || []).join(", ") || "Custom") : "Akto")}
+                        </Text>
+                    </Box>
+                </HorizontalStack>
+            ),
+            source: isCustom ? "Custom" : "Akto",
+            statusComp: (
+                <Badge status={c.active ? "success" : "subdued"}>{c.active ? "Active" : "Inactive"}</Badge>
+            ),
+        };
+    }), [mergedRows]);
+
+    const hostHeaders = [
+        { text: "Host", value: "hostCell", title: "Host" },
+        { text: "Source", value: "source", showFilter: true, singleSelect: true },
+        { text: "Status", value: "statusComp", filterKey: "status", filterLabel: "Status", showFilter: true, singleSelect: true },
+        { text: "Actions", type: CellType.ACTION },
+    ];
+
+    const getActions = (item) => {
+        const items = [];
+        const isActive = item.status === "Active";
+        items.push({
+            content: isActive ? "Deactivate" : "Activate",
+            onAction: () => toggleConfigured(item.host, !isActive),
+        });
+        if (item.isCustom) {
+            items.push({
+                content: "Edit",
+                onAction: () => {
+                    const raw = mergedRows.find((c) => (c.host || "").toLowerCase() === item.id);
+                    if (raw) openEdit(raw);
+                },
+            });
+            items.push({
+                content: "Remove",
+                destructive: true,
+                onAction: () => removeConfigured(item.host, item.hexId),
+            });
+        }
+        return [{ items }];
     };
 
+    const promotedBulkActions = (selectedIds) => {
+        const hosts = tableRows.filter((r) => selectedIds.includes(r.id)).map((r) => r.host);
+        return [
+            { content: "Activate", onAction: () => bulkSetActive(hosts, true) },
+            { content: "Deactivate", onAction: () => bulkSetActive(hosts, false) },
+        ];
+    };
+
+    const emptyHostsMarkup = (
+        <EmptySearchResult
+            title="No hosts yet"
+            description="Akto's supported hosts load here automatically. You can also add your own custom host."
+            withIllustration
+        />
+    );
+
+    // Builds the label shown on an applied filter chip (e.g. "Status: Active"). Required by
+    // GithubServerTable's changeAppliedFilters — without it, selecting a filter choice throws
+    // before the selection is ever applied, so both showFilter columns (Source, Status) just
+    // sit there inert. Values here are plain strings, so the generic join is all that's needed.
+    const disambiguateLabel = (key, value) => func.convertToDisambiguateLabelObj(value, null, 2);
+
+    // ── configured section ──────────────────────────────────────────────
     const configuredSection = (
         <Box key="ext-configured">
-            <HorizontalStack align="space-between" blockAlign="start">
-                <Box>
-                    <span className="bext-eyebrow">Inspected hosts</span>
-                    {!loading && totalCount > 0 && (
-                        <Box className="bext-summary">
-                            <span className="k"><b>{totalCount}</b> host{totalCount !== 1 ? "s" : ""}</span>
-                            <span className="k"><span className="d on" /><b>{activeCount}</b> active</span>
-                            {offCount > 0 && <span className="k"><span className="d off" /><b>{offCount}</b> off</span>}
-                        </Box>
-                    )}
-                </Box>
+            <Box paddingBlockEnd="3">
+                <span className="bext-eyebrow">Inspected hosts</span>
                 {!loading && totalCount > 0 && (
-                    <Box className="bext-filter">
-                        <TextField
-                            labelHidden label="Filter hosts" value={cfgFilter} onChange={setCfgFilter}
-                            placeholder="Filter hosts…" prefix={<Icon source={SearchMinor} color="subdued" />}
-                            autoComplete="off" clearButton onClearButtonClick={() => setCfgFilter("")}
-                        />
+                    <Box className="bext-summary">
+                        <span className="k"><b>{totalCount}</b> host{totalCount !== 1 ? "s" : ""}</span>
+                        <span className="k"><span className="d on" /><b>{activeCount}</b> Active</span>
+                        {offCount > 0 && <span className="k"><span className="d off" /><b>{offCount}</b> Inactive</span>}
                     </Box>
-                )}
-            </HorizontalStack>
-            <Box paddingBlockStart="3">
-                {loading ? skeletonList : totalCount === 0 ? (
-                    <Box background="bg-surface" borderColor="border" borderWidth="1" borderRadius="300" padding="10">
-                        <VerticalStack gap="4" inlineAlign="center">
-                            <Box background="bg-subdued" borderRadius="300" padding="3">
-                                <Icon source={SearchMinor} color="subdued" />
-                            </Box>
-                            <VerticalStack gap="1" inlineAlign="center">
-                                <Text variant="headingSm">No hosts yet</Text>
-                                <Text alignment="center" color="subdued">
-                                    Akto's supported hosts load here automatically. You can also add your own custom host.
-                                </Text>
-                            </VerticalStack>
-                            <Button primary onClick={openCustom}>Add custom host</Button>
-                        </VerticalStack>
-                    </Box>
-                ) : (
-                    <VerticalStack gap="3">
-                        <Box className="bext-list">
-                            {visibleConfigured.length === 0
-                                ? <Box className="bext-row"><Text color="subdued">No hosts match “{cfgFilter}”.</Text></Box>
-                                : pagedConfigured.map(configuredRow)}
-                        </Box>
-                        {visibleConfigured.length > CONFIG_PAGE_SIZE && (
-                            <Box paddingBlockStart="1">
-                                <HorizontalStack align="center" blockAlign="center" gap="4">
-                                    <Pagination
-                                        hasPrevious={cfgPageSafe > 0}
-                                        onPrevious={() => setCfgPage((p) => Math.max(0, p - 1))}
-                                        hasNext={cfgPageSafe < cfgTotalPages - 1}
-                                        onNext={() => setCfgPage((p) => Math.min(cfgTotalPages - 1, p + 1))}
-                                        label={`${cfgStart + 1}–${Math.min(cfgStart + CONFIG_PAGE_SIZE, visibleConfigured.length)} of ${visibleConfigured.length}`}
-                                    />
-                                </HorizontalStack>
-                            </Box>
-                        )}
-                    </VerticalStack>
                 )}
             </Box>
+            <GithubSimpleTable
+                key={`bext-table-${refreshCounter}`}
+                resourceName={HOST_RESOURCE_NAME}
+                useNewRow={true}
+                headers={hostHeaders}
+                headings={hostHeaders}
+                data={tableRows}
+                loading={loading}
+                loadingText="Loading inspected hosts..."
+                selectable={true}
+                promotedBulkActions={promotedBulkActions}
+                hasRowActions={true}
+                getActions={getActions}
+                emptyStateMarkup={emptyHostsMarkup}
+                searchKeys={["host", "name"]}
+                disambiguateLabel={disambiguateLabel}
+                contentAwareFilterCache={true}
+                filterStateUrl="/dashboard/settings/browser-extension/"
+            />
         </Box>
     );
 
