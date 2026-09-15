@@ -37,25 +37,26 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
     private static final String BEARER_PREFIX = "Bearer ";
 
     // Metrics config is resolved once at class load: env vars are fixed for the process
-    // lifetime, so there is no point re-reading them on every /metrics request.
-    //   METRICS_ENABLED      - "true" exposes /metrics (a configured token also implies
-    //                          exposed, for backward compatibility).
-    //   METRICS_AUTH_ENABLED - "true"/unset enforces Bearer auth (default); "false" disables it.
-    //   METRICS_AUTH_TOKEN   - the expected Bearer credential; required when auth is enabled.
+    // lifetime, so there is no point re-reading them on every /metrics request. Names match
+    // the platform-wide convention used by the other services (writes-producer/consumer etc).
+    //   PROMETHEUS_METRICS_ENABLED - "true" exposes /metrics (a configured token also implies
+    //                                exposed, for backward compatibility).
+    //   METRICS_AUTH_ENABLED       - "true"/unset enforces Bearer auth (default); "false" disables it.
+    //   METRICS_AUTH_TOKEN         - the expected Bearer credential; required when auth is enabled.
     private static final String METRICS_AUTH_TOKEN = System.getenv("METRICS_AUTH_TOKEN");
     private static final boolean HAS_TOKEN = METRICS_AUTH_TOKEN != null && !METRICS_AUTH_TOKEN.trim().isEmpty();
-    private static final boolean METRICS_EXPOSED = isTrue(System.getenv("METRICS_ENABLED")) || HAS_TOKEN;
+    private static final boolean METRICS_EXPOSED = isTrue(System.getenv("PROMETHEUS_METRICS_ENABLED")) || HAS_TOKEN;
     private static final boolean METRICS_AUTH_ENABLED = !isFalse(System.getenv("METRICS_AUTH_ENABLED"));
 
     /**
      * Prometheus scrape endpoint (/metrics). Emits pure Prometheus text exposition.
      *
-     * Controls:
-     *   METRICS_ENABLED     - "true" serves the endpoint. Backward compatible: a configured
-     *                         METRICS_AUTH_TOKEN also implies exposed, so existing setups that
-     *                         only set the token keep working unchanged.
-     *   METRICS_AUTH_ENABLED - "true"/unset enforces Bearer auth (default); "false" disables it.
-     *   METRICS_AUTH_TOKEN  - required when auth is enabled; the expected Bearer credential.
+     * Controls (names match the platform-wide convention):
+     *   PROMETHEUS_METRICS_ENABLED - "true" serves the endpoint. Backward compatible: a configured
+     *                                METRICS_AUTH_TOKEN also implies exposed, so existing setups
+     *                                that only set the token keep working unchanged.
+     *   METRICS_AUTH_ENABLED       - "true"/unset enforces Bearer auth (default); "false" disables it.
+     *   METRICS_AUTH_TOKEN         - required when auth is enabled; the expected Bearer credential.
      *
      * When auth is enabled but no token is configured the endpoint fails closed (404)
      * rather than exposing metrics unauthenticated.
