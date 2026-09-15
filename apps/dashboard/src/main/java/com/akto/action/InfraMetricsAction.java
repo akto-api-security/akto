@@ -47,8 +47,10 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
     /**
      * Prometheus scrape endpoint (/metrics). Emits pure Prometheus text exposition.
      *
-     * Two independent controls:
-     *   METRICS_ENABLED     - must be "true" to serve the endpoint at all (default: off -> 404).
+     * Controls:
+     *   METRICS_ENABLED     - "true" serves the endpoint. Backward compatible: a configured
+     *                         METRICS_AUTH_TOKEN also implies exposed, so existing setups that
+     *                         only set the token keep working unchanged.
      *   METRICS_AUTH_ENABLED - "true"/unset enforces Bearer auth (default); "false" disables it.
      *   METRICS_AUTH_TOKEN  - required when auth is enabled; the expected Bearer credential.
      *
@@ -57,8 +59,14 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
      */
     @Override
     public String execute() throws Exception {
-        // 1) endpoint must be explicitly exposed
-        if (!isTrue(System.getenv(METRICS_EXPOSED_ENV))) {
+        String configuredToken = System.getenv(METRICS_AUTH_TOKEN_ENV);
+        boolean hasToken = configuredToken != null && !configuredToken.trim().isEmpty();
+
+        // 1) endpoint must be exposed. Backward compatible: an explicit METRICS_ENABLED=true
+        //    OR a configured token (the previous gating) exposes it. Nothing that worked
+        //    before starts returning 404.
+        boolean exposed = isTrue(System.getenv(METRICS_EXPOSED_ENV)) || hasToken;
+        if (!exposed) {
             servletResponse.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return null;
         }
@@ -66,8 +74,7 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
         // 2) auth is enforced unless explicitly disabled
         boolean authEnabled = !isFalse(System.getenv(METRICS_AUTH_ENABLED_ENV));
         if (authEnabled) {
-            String configuredToken = System.getenv(METRICS_AUTH_TOKEN_ENV);
-            if (configuredToken == null || configuredToken.trim().isEmpty()) {
+            if (!hasToken) {
                 // auth on but nothing to check against -> fail closed, never serve open
                 loggerMaker.errorAndAddToDb(METRICS_AUTH_ENABLED_ENV + " is on but " + METRICS_AUTH_TOKEN_ENV
                         + " is unset; refusing to expose /metrics", LogDb.DASHBOARD);
