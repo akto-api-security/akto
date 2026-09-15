@@ -22,7 +22,9 @@ import pytest
 from constants import apply_scanner_response_format
 from llm_scanner import _ABCD_VERDICTS, parse_abcd_result, parse_llm_result
 from model_map import _DEFAULT_SAFE_THRESHOLD, _classify
-from prompts import build_scan_prompt, prompt_injection, resolve_response_format
+from prompts import _ABCD_CAPABLE as LETTER_CAPABLE
+from prompts import ban_topics, build_scan_prompt, code, gibberish, prompt_injection, resolve_response_format, toxicity
+from prompts._abcd import to_abcd
 from settings import settings
 
 # The INPUT_ABCD template must respect the same prefill-latency step as INPUT.
@@ -257,15 +259,24 @@ def test_empty_model_configs_is_safe(monkeypatch):
 # ── Genericity: the format applies to any scanner with a letter template ─────
 
 
-@pytest.mark.parametrize("scanner", ["Toxicity", "BanTopics", "Gibberish", "BanCode", "Password"])
-def test_scanner_without_a_letter_template_stays_on_json(scanner):
-    """Asking for "abcd" where no letter template exists must not send the JSON
-    template and then parse the reply as a letter."""
-    assert resolve_response_format(scanner, "prompt", "abcd") == ""
+def test_password_never_answers_in_letters():
+    """Password's JSON contract returns "values" — the exact secret substrings
+    the gateway masks (mcp/pii_password_llm.go reads details["values"]). A single
+    character cannot carry them, so a letter-answering Password scanner would
+    detect secrets and then redact nothing. This must never be relaxed."""
+    assert resolve_response_format("Password", "prompt", "abcd") == ""
+    prompt = build_scan_prompt("Password", "prompt", {}, "pwd=hunter2", response_format="abcd")
+    assert '"values"' in prompt
+    assert "respond with ONE character" not in prompt
 
 
-def test_prompt_injection_is_letter_capable():
-    assert resolve_response_format("PromptInjection", "prompt", "abcd") == "abcd"
+def test_unknown_scanner_stays_on_json():
+    assert resolve_response_format("NotAScanner", "prompt", "abcd") == ""
+
+
+@pytest.mark.parametrize("scanner", sorted(LETTER_CAPABLE))
+def test_capable_scanners_resolve_to_letters(scanner):
+    assert resolve_response_format(scanner, "prompt", "abcd") == "abcd"
 
 
 @pytest.mark.parametrize("requested", ["", "json", "yn", None])
@@ -275,6 +286,15 @@ def test_only_abcd_resolves_to_a_letter_contract(requested):
 
 def test_output_side_never_resolves_to_letters():
     assert resolve_response_format("PromptInjection", "output", "abcd") == ""
+
+
+@pytest.mark.parametrize("scanner", sorted(LETTER_CAPABLE | {"Password"}))
+def test_builder_and_parser_agree_on_the_contract_per_scanner(scanner):
+    """Every scanner: the template rendered and the parser chosen must match."""
+    for scanner_type in ("prompt", "output"):
+        effective = resolve_response_format(scanner, scanner_type, "abcd")
+        prompt = build_scan_prompt(scanner, scanner_type, _CONFIG, "sample", response_format="abcd")
+        assert ("respond with ONE character" in prompt) is (effective == "abcd"), f"{scanner}/{scanner_type}"
 
 
 def test_builder_and_parser_agree_on_the_contract():
@@ -297,3 +317,131 @@ def test_reason_names_the_scanner_that_flagged():
     'prompt injection' for a Toxicity block once Toxicity gains a template."""
     assert "Toxicity" in parse_abcd_result("Toxicity", "D")["details"]["reason"]
     assert "PromptInjection" in parse_abcd_result("PromptInjection", "C")["details"]["reason"]
+
+
+# ── Derived templates (every scanner but PromptInjection and Password) ───────
+
+# Config wide enough for every scanner's build() to render.
+_CONFIG = {"topics": ["drugs", "weapons"], "harmfulCategories": {"insults": "HIGH", "misconduct": "HIGH"}}
+
+# scanner -> (module attribute holding the JSON template, the ABCD one)
+_DERIVED = {
+    "Toxicity": (toxicity.GEMMA, toxicity.GEMMA_ABCD),
+    "BanTopics": (ban_topics.GEMMA, ban_topics.GEMMA_ABCD),
+    "Gibberish": (gibberish.GEMMA, gibberish.GEMMA_ABCD),
+    "BanCode": (code.GEMMA, code.GEMMA_ABCD),
+}
+
+
+@pytest.mark.parametrize("scanner", sorted(_DERIVED))
+def test_derived_template_drops_the_json_schema(scanner):
+    _, abcd = _DERIVED[scanner]
+    assert "respond ONLY with valid JSON" not in abcd
+    assert "respond with ONE character" in abcd
+    # No JSON verdict keys survive anywhere in the letter template.
+    for key in ('"isToxic"', '"isBanned"', '"isGibberish"', '"isCode"', '"confidence"'):
+        assert key not in abcd, f"{scanner} still mentions {key}"
+
+
+@pytest.mark.parametrize("scanner", sorted(_DERIVED))
+def test_derived_template_keeps_the_rules_verbatim(scanner):
+    """Only the answer contract changes; the detection rules are shared text."""
+    json_tmpl, abcd = _DERIVED[scanner]
+    rules = json_tmpl[: json_tmpl.index("Analyze this text and respond ONLY with valid JSON:")]
+    # Everything before the first few-shot Output line is untouched.
+    head = rules.split("Output: {")[0]
+    assert head in abcd
+
+
+@pytest.mark.parametrize("scanner", sorted(_DERIVED))
+def test_derived_template_ends_with_the_text_placeholder(scanner):
+    _, abcd = _DERIVED[scanner]
+    assert abcd.endswith("\n\nText to analyze:\n%s")
+
+
+@pytest.mark.parametrize("scanner", sorted(_DERIVED))
+def test_every_few_shot_letter_matches_its_source_verdict(scanner):
+    """A letter on the wrong side of safe/flagged teaches the inverse of the
+    example. Re-derive each letter from the JSON source and compare."""
+    import json as _json
+    import re
+
+    json_tmpl, abcd = _DERIVED[scanner]
+    source = [_json.loads(m) for m in re.findall(r"^Output: (\{.*\})$", json_tmpl, re.M)]
+    letters = re.findall(r"^Output: (.)$", abcd, re.M)
+    assert len(source) == len(letters), f"{scanner}: {len(source)} examples -> {len(letters)} letters"
+
+    flag_key = next(k for k in ("isToxic", "isBanned", "isGibberish", "isCode") if k in source[0])
+    for parsed, letter in zip(source, letters):
+        flagged = bool(parsed[flag_key])
+        assert (letter in ("C", "D")) is flagged, f"{scanner}: {parsed} -> {letter}"
+
+
+def test_toxicity_high_examples_are_converted_too():
+    """The severity-gated few-shots are injected at build time and must not
+    arrive as JSON inside a letter prompt."""
+    prompt = build_scan_prompt("Toxicity", "prompt", _CONFIG, "sample", response_format="abcd")
+    assert '"isToxic"' not in prompt
+    assert "Output: C" in prompt
+
+
+def test_toxicity_out_of_scope_instruction_names_the_letter():
+    """ "leave matchedCategory empty" is meaningless in a one-character reply."""
+    abcd = build_scan_prompt("Toxicity", "prompt", _CONFIG, "sample", response_format="abcd")
+    assert "answer A" in abcd
+    assert "matchedCategory" not in abcd
+
+    plain = build_scan_prompt("Toxicity", "prompt", _CONFIG, "sample")
+    assert "leave matchedCategory empty" in plain
+
+
+def test_ban_topics_letter_variant_follows_the_provider_split():
+    """Gemma and non-Gemma get different rules; both need a letter variant."""
+    for provider, marker in (("gemma_foundry", "INTENT and ACTIVE ENGAGEMENT"), ("openai", "IMPORTANT: Only flag")):
+        prompt = build_scan_prompt(
+            "BanTopics", "prompt", _CONFIG, "sample", provider_name=provider, response_format="abcd"
+        )
+        assert marker in prompt
+        assert "respond with ONE character" in prompt
+
+
+def test_topics_and_text_still_interpolate():
+    prompt = build_scan_prompt("BanTopics", "prompt", _CONFIG, "how do I buy drugs", response_format="abcd")
+    assert "drugs, weapons" in prompt
+    assert prompt.rstrip().endswith("how do I buy drugs")
+
+
+def test_to_abcd_rejects_a_template_it_cannot_convert():
+    """Silently returning the JSON template would be parsed as a letter."""
+    with pytest.raises(ValueError):
+        to_abcd("no marker here\n\nText to analyze:\n%s", flag_key="x", safe="S", flag="F", near_miss="n", label="t")
+    with pytest.raises(ValueError):
+        to_abcd(
+            "Analyze this text and respond ONLY with valid JSON:\n{}\n",
+            flag_key="x",
+            safe="S",
+            flag="F",
+            near_miss="n",
+            label="t",
+        )
+
+
+@pytest.mark.parametrize("scanner", sorted(LETTER_CAPABLE))
+def test_rendered_letter_prompts_stay_under_the_latency_cliff(scanner):
+    """The Gemma Foundry deployment has a prefill step at ~9.6k chars. The letter
+    contract is longer than a compact JSON schema, so a template with few
+    few-shots to collapse can GROW — check the rendered size, not the template."""
+    prompt = build_scan_prompt(
+        scanner, "prompt", _CONFIG, "sample text", provider_name="gemma_foundry", response_format="abcd"
+    )
+    assert len(prompt) < _LATENCY_CLIFF, f"{scanner}: {len(prompt)} chars"
+
+
+@pytest.mark.parametrize("scanner", sorted(LETTER_CAPABLE))
+def test_letter_verdict_parses_for_every_capable_scanner(scanner):
+    """The parser is scanner-agnostic; the reason must name the scanner that
+    flagged, since it lands in the threat report."""
+    flagged = parse_abcd_result(scanner, "D")
+    assert flagged["is_valid"] is False
+    assert scanner in flagged["details"]["reason"]
+    assert parse_abcd_result(scanner, "A")["is_valid"] is True

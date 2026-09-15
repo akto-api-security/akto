@@ -105,6 +105,42 @@ def parse_abcd_result(scanner_name: str, raw: str) -> dict[str, Any]:
     raise ValueError(f"expected one of A/B/C/D for {scanner_name}, got {(raw or '').strip()[:60]!r}")
 
 
+# ── Values-only verdict (Password) ───────────────────────────────────────────
+
+
+def parse_values_result(scanner_name: str, raw: str) -> dict[str, Any]:
+    """Read the values-only contract: the secret substrings and nothing else.
+
+    isPassword and riskScore are derived rather than asked for — a verdict is
+    "flagged" exactly when it names at least one value, so sending those fields
+    only gave the model a way to contradict itself.
+
+    The reason is synthesised and deliberately does NOT quote the values. The
+    JSON contract required it to, which put raw credentials in the threat
+    report; the values still reach it structurally through the gateway's
+    piiValueSchemaErrors, where masking is applied.
+    """
+    parsed = json.loads(_clean_json(raw))
+    raw_values = parsed.get("values")
+    if raw_values is None:
+        raise ValueError(f"no 'values' key in {scanner_name} response: {raw[:120]!r}")
+    if not isinstance(raw_values, list):
+        raise ValueError(f"'values' is not a list in {scanner_name} response: {type(raw_values).__name__}")
+
+    values = [v for v in raw_values if isinstance(v, str) and v]
+    flagged = bool(values)
+    details: dict[str, Any] = {"response_format": "values"}
+    if flagged:
+        details["values"] = values
+        details["reason"] = f"{scanner_name}: {len(values)} real secret value(s) detected."
+    return {
+        "is_valid": not flagged,
+        "risk_score": 0.95 if flagged else 0.02,
+        "decision_confidence": 0.95,
+        "details": details,
+    }
+
+
 def parse_llm_result(scanner_name: str, raw: str) -> dict[str, Any]:
     parsed = json.loads(_clean_json(raw))
 
@@ -145,6 +181,15 @@ def parse_llm_result(scanner_name: str, raw: str) -> dict[str, Any]:
     }
 
 
+# Compact answer contract -> its parser. Anything not listed (including "") is
+# the JSON verdict. Keep the keys in step with prompts._FORMAT_CAPABLE: a format
+# with a template but no parser here would be rendered and then misread.
+_FORMAT_PARSERS = {
+    "abcd": parse_abcd_result,
+    "values": parse_values_result,
+}
+
+
 class LLMScanner:
     """Evaluates one of LLM_SUPPORTED_SCANNERS against a single provider.
 
@@ -179,12 +224,10 @@ class LLMScanner:
                 raise ValueError(f"Scanner {scanner_name} not supported by LLM path")
             raw = await self.provider.complete(prompt)
             # Parse whatever build_scan_prompt actually rendered: a scanner with
-            # no letter template, or an output-side scan, was sent the JSON
-            # template no matter what this model's responseFormat asked for.
-            if resolve_response_format(scanner_name, scanner_type, self.response_format) == "abcd":
-                result = parse_abcd_result(scanner_name, raw)
-            else:
-                result = parse_llm_result(scanner_name, raw)
+            # no template in the requested format, or an output-side scan, was
+            # sent the JSON template no matter what responseFormat asked for.
+            effective = resolve_response_format(scanner_name, scanner_type, self.response_format)
+            result = _FORMAT_PARSERS.get(effective, parse_llm_result)(scanner_name, raw)
 
         elapsed_ms = (time.time() - start) * 1000
         result["details"]["llm_provider"] = self.provider.name

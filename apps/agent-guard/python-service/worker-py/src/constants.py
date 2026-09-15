@@ -95,46 +95,85 @@ def force_gemma_only(_model_configs):
 
 
 # Cascade roles whose answer contract the env var may override.
-# FINAL_ARBITER is deliberately absent: the letter contract returns no reason
-# string, and the arbiter's verdict is the one that reaches the threat report,
-# the remediation prompt's BLOCK REASON and the evidence-line prompt. An operator
-# who really wants a letter-answering arbiter must say so per-model in the
-# policy, where the consequence is visible.
+# FINAL_ARBITER is normally absent: the letter contract returns no reason string,
+# and the arbiter's verdict is the one that reaches the threat report, the
+# remediation prompt's BLOCK REASON and the evidence-line prompt. An operator who
+# really wants a letter-answering arbiter must say so per-model in the policy,
+# where the consequence is visible.
 _OVERRIDABLE_ROLES = {"FAST_THREAT_FILTER", "FAST_FALLBACK_SAFE_FILTER"}
+
+# Formats that MAY also be stamped on the FINAL_ARBITER. "values" qualifies for
+# two reasons: the gateway falls back to the policy reason when the model returns
+# none (pii_password_llm.go:226) and the values still reach the report through
+# piiValueSchemaErrors; and Password runs arbiter-only (force_gemma_only strips
+# the fast tiers), so restricting it to the fast tiers would mean the override
+# never reached Password at all.
+_ARBITER_SAFE_FORMATS = {"values"}
 
 # "json" is spelled as the empty responseFormat internally (see llm_scanner);
 # accepting it as a word gives operators an explicit kill switch that beats a
-# per-model responseFormat="abcd" without editing the policy.
-_RESPONSE_FORMAT_ALIASES = {"json": "", "abcd": "abcd"}
+# per-model responseFormat without editing the policy.
+_JSON_ALIAS = "json"
+
+
+def _requested_formats() -> list[str] | None:
+    """Parse SCANNER_RESPONSE_FORMAT into the formats to stamp.
+
+    Returns None for "no override", [] for the "json" kill switch, else the
+    requested formats in order. Several may be named ("abcd,values") so one
+    deployment-wide setting can ask every scanner for its own compact contract;
+    each scanner takes the first it supports (prompts.resolve_response_format).
+    """
+    from prompts import known_formats
+
+    raw = (settings.SCANNER_RESPONSE_FORMAT or "").strip().lower()
+    if not raw:
+        return None
+    if raw == _JSON_ALIAS:
+        return []
+    formats = [part.strip() for part in raw.split(",") if part.strip()]
+    unknown = [f for f in formats if f not in known_formats()]
+    if unknown:
+        logger.warning(
+            f"[constants] SCANNER_RESPONSE_FORMAT names unknown format(s) {unknown}; "
+            f"known: {sorted(known_formats())} (plus '{_JSON_ALIAS}'). "
+            "Leaving per-model responseFormat untouched"
+        )
+        return None
+    return formats
 
 
 def apply_scanner_response_format(model_configs):
-    """Stamp SCANNER_RESPONSE_FORMAT onto the fast cascade tiers.
+    """Stamp SCANNER_RESPONSE_FORMAT onto the cascade entries.
 
     Scanner-agnostic: it sets responseFormat on the entries, and which scanners
-    actually honour a given format is decided later by prompts._ABCD_CAPABLE, so
-    a scanner with no letter template quietly stays on JSON.
+    actually honour a given format is decided later by prompts._FORMAT_CAPABLE,
+    so a scanner with no template in that format quietly stays on JSON.
 
     Empty env var (the default) returns the configs untouched, so the per-model
     ModelConfig.responseFormat set in the policy still decides. An unrecognised
     value is logged and ignored rather than guessed at — silently falling back to
     a format the operator did not ask for is how a rollback looks like a no-op.
     """
-    requested = (settings.SCANNER_RESPONSE_FORMAT or "").strip().lower()
-    if not requested:
-        return list(model_configs or [])
-    if requested not in _RESPONSE_FORMAT_ALIASES:
-        logger.warning(
-            f"[constants] SCANNER_RESPONSE_FORMAT={requested!r} is not one of "
-            f"{sorted(_RESPONSE_FORMAT_ALIASES)}; leaving per-model responseFormat untouched"
-        )
+    formats = _requested_formats()
+    if formats is None:
         return list(model_configs or [])
 
-    response_format = _RESPONSE_FORMAT_ALIASES[requested]
-    return [
-        {**entry, "responseFormat": response_format} if str(entry.get("modelRole", "")) in _OVERRIDABLE_ROLES else entry
-        for entry in (model_configs or [])
-    ]
+    fast = ",".join(formats)
+    arbiter = ",".join(f for f in formats if f in _ARBITER_SAFE_FORMATS)
+
+    stamped = []
+    for entry in model_configs or []:
+        role = str(entry.get("modelRole", ""))
+        if not formats:  # kill switch: clear every role, including the arbiter
+            stamped.append({**entry, "responseFormat": ""})
+        elif role in _OVERRIDABLE_ROLES:
+            stamped.append({**entry, "responseFormat": fast})
+        elif arbiter:
+            stamped.append({**entry, "responseFormat": arbiter})
+        else:
+            stamped.append(entry)
+    return stamped
 
 
 # Scanners that proxy to a sibling Worker which in turn owns a Cloudflare
