@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/models"
 	"go.uber.org/zap"
 )
@@ -82,7 +83,9 @@ func matchesBrowserAttachmentAgent(tag string, agents []string) bool {
 // Only the enforcement action changes — detection is untouched, because the inlined content
 // already reaches the engine as part of the request payload. See BrowserAttachmentConfig for
 // why mask and alert are unenforceable on this shape.
-func (s *Service) upgradeBrowserAttachmentVerdict(result *mcp.ValidationResult, params *models.ValidateRequestParams, sessionID string) {
+// scannedPayload is what the verdict was measured against — the baseline Modified compares
+// to — and supplies the coordinate system for locating the detection.
+func (s *Service) upgradeBrowserAttachmentVerdict(result *mcp.ValidationResult, params *models.ValidateRequestParams, scannedPayload, sessionID string) {
 	if result == nil {
 		return
 	}
@@ -101,6 +104,19 @@ func (s *Service) upgradeBrowserAttachmentVerdict(result *mcp.ValidationResult, 
 	}
 
 	if !s.carriesBrowserAttachment(params) {
+		return
+	}
+
+	// A detection confined to the prompt keeps the engine's own verdict: the extension can
+	// rewrite the prompt it owns, so a mask there is still enforceable. Only the attachment
+	// half has no writable counterpart in claude.ai's request.
+	markerIdx := strings.Index(scannedPayload, s.config.BrowserAttachment.Marker)
+	if promptOnlyViolation(scannedPayload, result.ModifiedPayload, result.Metadata, markerIdx) {
+		s.logger.Info("Browser attachment guardrail - detection is prompt-only, keeping engine verdict",
+			zap.String("path", params.Path),
+			zap.String("sessionID", sessionID),
+			zap.Bool("allowed", result.Allowed),
+			zap.String("behaviour", result.Behaviour))
 		return
 	}
 
@@ -129,4 +145,79 @@ func (s *Service) upgradeBrowserAttachmentVerdict(result *mcp.ValidationResult, 
 		zap.String("previousBehaviour", previousBehaviour),
 		zap.String("reason", result.Reason),
 		zap.String("policyName", result.Metadata.PolicyName))
+}
+
+// promptOnlyViolation reports whether every detection provably landed in the user's own
+// prompt rather than in attachment content.
+//
+// The prompt and the attachments arrive merged into one flattened payload, so the engine
+// answers with a single verdict for both. Upgrading that verdict unconditionally turns a
+// redactable prompt detection — "my ssn is 123-45-6789" typed next to a clean text file —
+// into a hard block, which is not what the attachment guardrail is for. A prompt detection
+// stays maskable because the extension owns the prompt field and can rewrite it; only the
+// attachment half is unmappable.
+//
+// scanned is the payload the verdict was measured against, and markerIdx the offset where
+// attachment content begins within it. Localisation uses whichever evidence the verdict
+// carries:
+//
+//   - A mask verdict carries no SchemaErrors at all (the processor's redaction branch sets
+//     ModifiedPayload and Behaviour but never Metadata), so its masked payload is diffed
+//     against the original and the hull of the changes is what gets located.
+//   - A block or alert verdict carries Metadata lifted off the enforced violation, whose
+//     SchemaErrors hold byte offsets into the scanned payload.
+//
+// Returns false whenever neither is usable: with no evidence of where a detection landed,
+// the verdict keeps the upgrade rather than silently letting attachment content through.
+func promptOnlyViolation(scanned, modified string, meta types.ThreatMetadata, markerIdx int) bool {
+	if markerIdx < 0 {
+		return false // no attachment boundary in the scanned payload; nothing to localise against
+	}
+
+	if modified != "" && modified != scanned {
+		_, end := changedSpan(scanned, modified)
+		return end <= markerIdx
+	}
+
+	localizable := 0
+	for _, se := range meta.SchemaErrors {
+		// valueSchemaErrors emits a zero-offset entry when it cannot find the value in the
+		// payload; it carries a message but no position, so it localises nothing.
+		if se.End <= 0 {
+			continue
+		}
+		localizable++
+		if se.End > markerIdx {
+			return false
+		}
+	}
+	return localizable > 0
+}
+
+// changedSpan returns the half-open byte range [start, end) of original that differs from
+// modified, as the hull of every change. Equal strings give (0, 0).
+//
+// The hull, not each individual edit: masking rewrites spans to placeholders of a different
+// length, so positions after the first edit no longer line up between the two strings and
+// per-edit alignment would need a real diff. The hull spans from the first change to the
+// last, which errs toward treating a detection as attachment-side — the safe direction for
+// a guardrail, and exact for the case that matters, where every change sits on one side.
+func changedSpan(original, modified string) (int, int) {
+	if original == modified {
+		return 0, 0
+	}
+	shortest := len(original)
+	if len(modified) < shortest {
+		shortest = len(modified)
+	}
+
+	prefix := 0
+	for prefix < shortest && original[prefix] == modified[prefix] {
+		prefix++
+	}
+	suffix := 0
+	for suffix < shortest-prefix && original[len(original)-1-suffix] == modified[len(modified)-1-suffix] {
+		suffix++
+	}
+	return prefix, len(original) - suffix
 }

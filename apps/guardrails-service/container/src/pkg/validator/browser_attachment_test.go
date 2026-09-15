@@ -1,9 +1,11 @@
 package validator
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"go.uber.org/zap"
@@ -33,8 +35,20 @@ func browserAttachmentService(enabled bool) *Service {
 // payloadWithAttachment mirrors the flattened body the extension sends: the prompt, then the
 // marker ahead of each attachment's extracted text.
 func payloadWithAttachment(attachment string) string {
-	return `{"body":"prompt Hello this is nayan ` + marker + ` ` + attachment + `"}`
+	return promptAndAttachment("Hello this is nayan", attachment)
 }
+
+func promptAndAttachment(prompt, attachment string) string {
+	return `{"body":"prompt ` + prompt + ` ` + marker + ` ` + attachment + `"}`
+}
+
+// scanned is the payload the verdict was measured against for the shared verdict tests, and
+// masked is the same payload with the attachment-side value redacted — so the change the
+// upgrade locates falls after the marker.
+var (
+	scanned = promptAndAttachment("a clean prompt", "my ssn is 123-45-6789")
+	masked  = promptAndAttachment("a clean prompt", "my ssn is [REDACTED]")
+)
 
 func TestCarriesBrowserAttachment(t *testing.T) {
 	cases := []struct {
@@ -119,7 +133,7 @@ func TestUpgradeBrowserAttachmentVerdict(t *testing.T) {
 			// The case this exists for: masked content would otherwise be reported as an
 			// allow, with a rewritten payload the extension cannot apply.
 			name:          "mask upgraded to block",
-			in:            &mcp.ValidationResult{Allowed: true, Modified: true, ModifiedPayload: "redacted", Behaviour: "mask"},
+			in:            &mcp.ValidationResult{Allowed: true, Modified: true, ModifiedPayload: masked, Behaviour: "mask"},
 			tag:           browserExtensionTag,
 			wantAllowed:   false,
 			wantBehaviour: "block",
@@ -168,7 +182,7 @@ func TestUpgradeBrowserAttachmentVerdict(t *testing.T) {
 		{
 			// Same mask verdict, non-extension traffic: redaction stays enforceable there.
 			name:          "mask left alone for non-extension traffic",
-			in:            &mcp.ValidationResult{Allowed: true, Modified: true, ModifiedPayload: "redacted", Behaviour: "mask"},
+			in:            &mcp.ValidationResult{Allowed: true, Modified: true, ModifiedPayload: masked, Behaviour: "mask"},
 			tag:           cliAgentTag,
 			wantAllowed:   true,
 			wantBehaviour: "mask",
@@ -178,7 +192,7 @@ func TestUpgradeBrowserAttachmentVerdict(t *testing.T) {
 			// chatgpt still reaches the upload endpoint /api/validate/file intercepts, so its
 			// redaction verdict must survive.
 			name:          "mask left alone for a browser agent outside the list",
-			in:            &mcp.ValidationResult{Allowed: true, Modified: true, ModifiedPayload: "redacted", Behaviour: "mask"},
+			in:            &mcp.ValidationResult{Allowed: true, Modified: true, ModifiedPayload: masked, Behaviour: "mask"},
 			tag:           chatgptExtensionTag,
 			wantAllowed:   true,
 			wantBehaviour: "mask",
@@ -191,7 +205,7 @@ func TestUpgradeBrowserAttachmentVerdict(t *testing.T) {
 			s := browserAttachmentService(true)
 			params := &models.ValidateRequestParams{Tag: c.tag, RequestPayload: payloadWithAttachment("nayan@gmail.com")}
 
-			s.upgradeBrowserAttachmentVerdict(c.in, params, "session-1")
+			s.upgradeBrowserAttachmentVerdict(c.in, params, scanned, "session-1")
 
 			if c.in.Allowed != c.wantAllowed {
 				t.Errorf("Allowed = %v, want %v", c.in.Allowed, c.wantAllowed)
@@ -210,10 +224,10 @@ func TestUpgradeBrowserAttachmentVerdict(t *testing.T) {
 // extension's flattened shape, not claude.ai's real request body.
 func TestUpgradeBrowserAttachmentVerdictClearsModifiedPayload(t *testing.T) {
 	s := browserAttachmentService(true)
-	result := &mcp.ValidationResult{Allowed: true, Modified: true, ModifiedPayload: "redacted", Behaviour: "mask"}
+	result := &mcp.ValidationResult{Allowed: true, Modified: true, ModifiedPayload: masked, Behaviour: "mask"}
 	params := &models.ValidateRequestParams{Tag: browserExtensionTag, RequestPayload: payloadWithAttachment("nayan@gmail.com")}
 
-	s.upgradeBrowserAttachmentVerdict(result, params, "session-1")
+	s.upgradeBrowserAttachmentVerdict(result, params, scanned, "session-1")
 
 	if result.ModifiedPayload != "" {
 		t.Errorf("ModifiedPayload = %q, want empty", result.ModifiedPayload)
@@ -225,12 +239,12 @@ func TestUpgradeBrowserAttachmentVerdictClearsModifiedPayload(t *testing.T) {
 
 func TestUpgradeBrowserAttachmentVerdictDisabled(t *testing.T) {
 	s := browserAttachmentService(false)
-	result := &mcp.ValidationResult{Allowed: true, Modified: true, ModifiedPayload: "redacted", Behaviour: "mask"}
+	result := &mcp.ValidationResult{Allowed: true, Modified: true, ModifiedPayload: masked, Behaviour: "mask"}
 	params := &models.ValidateRequestParams{Tag: browserExtensionTag, RequestPayload: payloadWithAttachment("nayan@gmail.com")}
 
-	s.upgradeBrowserAttachmentVerdict(result, params, "session-1")
+	s.upgradeBrowserAttachmentVerdict(result, params, scanned, "session-1")
 
-	if !result.Allowed || result.ModifiedPayload != "redacted" {
+	if !result.Allowed || result.ModifiedPayload != masked {
 		t.Error("GUARDRAILS_BROWSER_ATTACHMENT_BLOCK=false must leave the verdict untouched")
 	}
 }
@@ -238,7 +252,7 @@ func TestUpgradeBrowserAttachmentVerdictDisabled(t *testing.T) {
 func TestUpgradeBrowserAttachmentVerdictNilResult(t *testing.T) {
 	s := browserAttachmentService(true)
 	params := &models.ValidateRequestParams{Tag: browserExtensionTag, RequestPayload: payloadWithAttachment("x")}
-	s.upgradeBrowserAttachmentVerdict(nil, params, "session-1") // must not panic
+	s.upgradeBrowserAttachmentVerdict(nil, params, "", "session-1") // must not panic
 }
 
 // Pinned to the wire format the extension actually sends for a claude.ai completion: the
@@ -265,13 +279,180 @@ func TestUpgradeBrowserAttachmentVerdictRealExtensionPayload(t *testing.T) {
 	}
 
 	// A PII rule on this content masks rather than blocks; that is the verdict to upgrade.
-	result := &mcp.ValidationResult{Allowed: true, Modified: true, ModifiedPayload: "masked", Behaviour: "mask"}
-	s.upgradeBrowserAttachmentVerdict(result, params, "5e185480-85d4-42fd-a85f-50cf1480cf1d")
+	result := &mcp.ValidationResult{
+		Allowed: true, Modified: true, Behaviour: "mask",
+		ModifiedPayload: strings.Replace(payload, "nayan@gmail.com", "[REDACTED]", 1),
+	}
+	s.upgradeBrowserAttachmentVerdict(result, params, payload, "5e185480-85d4-42fd-a85f-50cf1480cf1d")
 
 	if result.Allowed {
 		t.Error("Allowed = true, want false")
 	}
 	if result.Behaviour != "block" {
 		t.Errorf("Behaviour = %q, want %q", result.Behaviour, "block")
+	}
+}
+
+// The reported bug: an SSN typed into the prompt alongside a clean text file. The detection
+// is the prompt's, the attachment is untouched, so the mask verdict must survive.
+func TestUpgradeBrowserAttachmentVerdictPromptOnlyPII(t *testing.T) {
+	original := promptAndAttachment("my ssn is 123-45-6789", "just some ordinary file text")
+	redacted := promptAndAttachment("my ssn is [REDACTED]", "just some ordinary file text")
+
+	s := browserAttachmentService(true)
+	params := &models.ValidateRequestParams{Tag: browserExtensionTag, RequestPayload: original}
+	result := &mcp.ValidationResult{Allowed: true, Modified: true, ModifiedPayload: redacted, Behaviour: "mask"}
+
+	s.upgradeBrowserAttachmentVerdict(result, params, original, "session-1")
+
+	if !result.Allowed {
+		t.Error("a prompt-only detection must not be upgraded to a block")
+	}
+	if result.Behaviour != "mask" {
+		t.Errorf("Behaviour = %q, want %q", result.Behaviour, "mask")
+	}
+	if result.ModifiedPayload != redacted {
+		t.Error("the masked payload must survive: the extension can rewrite the prompt it owns")
+	}
+}
+
+// The same prompt SSN, but the attachment carries one too — the attachment half is
+// unmappable, so the upgrade still has to fire.
+func TestUpgradeBrowserAttachmentVerdictPIIInBothHalves(t *testing.T) {
+	original := promptAndAttachment("my ssn is 123-45-6789", "and the file says 987-65-4321")
+	redacted := promptAndAttachment("my ssn is [REDACTED]", "and the file says [REDACTED]")
+
+	s := browserAttachmentService(true)
+	params := &models.ValidateRequestParams{Tag: browserExtensionTag, RequestPayload: original}
+	result := &mcp.ValidationResult{Allowed: true, Modified: true, ModifiedPayload: redacted, Behaviour: "mask"}
+
+	s.upgradeBrowserAttachmentVerdict(result, params, original, "session-1")
+
+	if result.Allowed || result.Behaviour != "block" {
+		t.Errorf("Allowed=%v Behaviour=%q, want false/block", result.Allowed, result.Behaviour)
+	}
+}
+
+func TestPromptOnlyViolation(t *testing.T) {
+	const (
+		clean  = `{"body":"prompt aaa MARK bbb"}`
+		markAt = 19 // byte offset of MARK in clean
+	)
+
+	cases := []struct {
+		name     string
+		scanned  string
+		modified string
+		meta     types.ThreatMetadata
+		marker   int
+		want     bool
+	}{
+		{
+			name:     "mask before the marker",
+			scanned:  clean,
+			modified: `{"body":"prompt XXX MARK bbb"}`,
+			marker:   markAt,
+			want:     true,
+		},
+		{
+			name:     "mask after the marker",
+			scanned:  clean,
+			modified: `{"body":"prompt aaa MARK XXX"}`,
+			marker:   markAt,
+			want:     false,
+		},
+		{
+			// The hull spans both edits, so it reaches past the marker.
+			name:     "mask on both sides",
+			scanned:  clean,
+			modified: `{"body":"prompt XXX MARK XXX"}`,
+			marker:   markAt,
+			want:     false,
+		},
+		{
+			// Masks change length, so the span must survive a shifted tail.
+			name:     "mask of a different length before the marker",
+			scanned:  clean,
+			modified: `{"body":"prompt [REDACTED] MARK bbb"}`,
+			marker:   markAt,
+			want:     true,
+		},
+		{
+			name:    "schema error before the marker",
+			scanned: clean,
+			meta:    types.ThreatMetadata{SchemaErrors: []types.SchemaError{{Start: 16, End: 19}}},
+			marker:  markAt,
+			want:    true,
+		},
+		{
+			name:    "schema error after the marker",
+			scanned: clean,
+			meta:    types.ThreatMetadata{SchemaErrors: []types.SchemaError{{Start: 25, End: 28}}},
+			marker:  markAt,
+			want:    false,
+		},
+		{
+			name:    "one of several schema errors reaches the attachment",
+			scanned: clean,
+			meta: types.ThreatMetadata{SchemaErrors: []types.SchemaError{
+				{Start: 16, End: 19}, {Start: 25, End: 28},
+			}},
+			marker: markAt,
+			want:   false,
+		},
+		{
+			// valueSchemaErrors' zero-offset fallback localises nothing.
+			name:    "zero-offset schema errors localise nothing",
+			scanned: clean,
+			meta:    types.ThreatMetadata{SchemaErrors: []types.SchemaError{{Phrase: "[REDACTED]"}}},
+			marker:  markAt,
+			want:    false,
+		},
+		{
+			name:    "no evidence at all keeps the upgrade",
+			scanned: clean,
+			marker:  markAt,
+			want:    false,
+		},
+		{
+			name:     "marker absent from the scanned payload keeps the upgrade",
+			scanned:  clean,
+			modified: `{"body":"prompt XXX MARK bbb"}`,
+			marker:   -1,
+			want:     false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := promptOnlyViolation(c.scanned, c.modified, c.meta, c.marker); got != c.want {
+				t.Errorf("promptOnlyViolation() = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
+func TestChangedSpan(t *testing.T) {
+	cases := []struct {
+		name               string
+		original, modified string
+		wantStart, wantEnd int
+	}{
+		{"identical", "abcdef", "abcdef", 0, 0},
+		{"middle same length", "abcdef", "abXXef", 2, 4},
+		{"replacement is longer", "abcdef", "abXXXXef", 2, 4},
+		{"replacement is shorter", "abcdef", "abXef", 2, 4},
+		{"change at the start", "abcdef", "Xbcdef", 0, 1},
+		{"change at the end", "abcdef", "abcdeX", 5, 6},
+		{"everything replaced", "abcdef", "XYZ", 0, 6},
+		{"original emptied", "abcdef", "", 0, 6},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			start, end := changedSpan(c.original, c.modified)
+			if start != c.wantStart || end != c.wantEnd {
+				t.Errorf("changedSpan() = (%d, %d), want (%d, %d)", start, end, c.wantStart, c.wantEnd)
+			}
+		})
 	}
 }
