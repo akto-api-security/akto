@@ -189,3 +189,118 @@ func TestClaudeSurfaceMappingMatchesIngestion(t *testing.T) {
 		}
 	}
 }
+
+// An org-scoped row must never match by email. Its UserEmail is the person's ordinary address,
+// identical across every org they belong to, so matching it would fire the policy in all of their
+// orgs — and on non-Claude hosts, which never reach the org check at all — defeating the scoping
+// the author chose by picking that org row.
+func TestFindUserMetadataByEmailSkipsOrgScopedRows(t *testing.T) {
+	const org = "b1553cda-0a23-414d-b7d0-be9d7657add9"
+	const email = "shubham@akto.io"
+
+	orgRow := types.AgenticUsers{UserName: "shubham", UserEmail: email, UserId: email + "_" + org}
+	plainRow := types.AgenticUsers{UserName: "shubham", UserEmail: email, UserId: email}
+
+	if got := findUserMetadataByEmail([]types.AgenticUsers{orgRow}, email); got != nil {
+		t.Errorf("org-scoped row matched by email: %+v", got)
+	}
+
+	// The plain row is what "this person, any org" means, and it must keep matching exactly as
+	// it did before org scoping existed.
+	if got := findUserMetadataByEmail([]types.AgenticUsers{plainRow}, email); got == nil {
+		t.Error("plain row did not match by email")
+	}
+
+	// Picking the person AND one of their orgs writes both rows; the plain one still matches.
+	if got := findUserMetadataByEmail([]types.AgenticUsers{orgRow, plainRow}, email); got == nil {
+		t.Error("plain row alongside an org row did not match by email")
+	}
+
+	// A row with no UserId at all (module_info-only identity: browser extension / Claude Desktop)
+	// carries no org and must still match.
+	bare := types.AgenticUsers{UserName: "aanchal", UserEmail: "aanchal@akto.io"}
+	if got := findUserMetadataByEmail([]types.AgenticUsers{bare}, "aanchal@akto.io"); got == nil {
+		t.Error("row with no userId did not match by email")
+	}
+}
+
+// Reproduces the two requests from the production logs verbatim. Same person, same device, same
+// surface, one policy — the only thing that differs is the org in the request path. A policy built
+// on org f52d9c27 must apply in f52d9c27 and must NOT apply in e68d326b.
+func TestPolicyOnOneOrgDoesNotApplyInAnother(t *testing.T) {
+	const (
+		policyOrg = "f52d9c27-708c-465e-9f81-531864e3df21"
+		otherOrg  = "e68d326b-0acb-4573-85a6-4ed867827c96"
+	)
+
+	// Exactly what the dashboard saves for a policy scoped to one Claude org: the shared userName
+	// and ordinary email, with the org carried only in UserId.
+	rows := []types.AgenticUsers{{
+		UserName:  "shubham",
+		UserEmail: "shubham@akto.io",
+		UserId:    "shubham@akto.io_" + policyOrg,
+	}}
+
+	samePath := "/api/organizations/" + policyOrg + "/chat_conversations/67e8b2f3-9e78-423e-8ca2-f82c769ef6f0/completion"
+	otherPath := "/api/organizations/" + otherOrg + "/chat_conversations/adb8f332-41f0-4d26-97f5-1e4c3bb4aade/completion"
+
+	if got := orgUUIDFromPath(samePath); got != policyOrg {
+		t.Fatalf("orgUUIDFromPath(same) = %q, want %q", got, policyOrg)
+	}
+	if got := orgUUIDFromPath(otherPath); got != otherOrg {
+		t.Fatalf("orgUUIDFromPath(other) = %q, want %q", got, otherOrg)
+	}
+
+	if !rowsMatchOrg(rows, orgUUIDFromPath(samePath)) {
+		t.Error("policy did not apply in its own org")
+	}
+	if rowsMatchOrg(rows, orgUUIDFromPath(otherPath)) {
+		t.Error("policy applied in a different org")
+	}
+
+	// The email route must not resurrect it in the other org. This row's email is the person's
+	// ordinary address, so before the skip it matched everywhere regardless of org.
+	if got := findUserMetadataByEmail(rows, "shubham@akto.io"); got != nil {
+		t.Errorf("org-scoped row matched by email, which would apply the policy in every org: %+v", got)
+	}
+}
+
+// The org in the path is per-request and authoritative; the device map only knows what the machine
+// last reported. They agree in the steady state, so this only bites right after an org switch —
+// which is exactly when a user is most likely to be testing the policy.
+func TestPathOrgIsPreferredOverStaleDeviceMap(t *testing.T) {
+	const (
+		pathOrg  = "f52d9c27-708c-465e-9f81-531864e3df21"
+		staleOrg = "e68d326b-0acb-4573-85a6-4ed867827c96"
+		device   = "shubham-s-macbook-pro--3--1aefa0eb"
+	)
+	rows := []types.AgenticUsers{{UserId: "shubham@akto.io_" + pathOrg}}
+
+	// Device map still reporting the org the user just left.
+	stale := map[string]map[string]dbabstractor.ClaudeDesktopInfo{
+		device: {"claude-desktop": {OrganizationUUID: staleOrg}},
+	}
+	if claudeOrgForHost(device+".ai-agent.claude-desktop.akto.io", device, stale) != staleOrg {
+		t.Fatal("fixture is not exercising the stale case")
+	}
+
+	// The path names the org the request is actually in, and that is what must decide.
+	if !rowsMatchOrg(rows, orgUUIDFromPath("/api/organizations/"+pathOrg+"/chat_conversations/x/completion")) {
+		t.Error("path org did not match the policy org")
+	}
+}
+
+// A path segment sitting where an org would be is not automatically an org.
+func TestOrgUUIDFromPathRejectsNonUUID(t *testing.T) {
+	for _, path := range []string{
+		"",
+		"/api/organizations/",
+		"/api/organizations/not-a-uuid/chat_conversations/x",
+		"/api/chat_conversations/x/completion",
+		"/v1/messages",
+	} {
+		if got := orgUUIDFromPath(path); got != "" {
+			t.Errorf("orgUUIDFromPath(%q) = %q, want \"\"", path, got)
+		}
+	}
+}

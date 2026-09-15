@@ -12,10 +12,13 @@ import (
 
 // Org-scoped guardrail targeting for Claude surfaces.
 //
-// A policy's UserMetadata rows are matched by email, but one person's email is the same in every
-// org they belong to — so an email-only match fires a policy scoped to their work org while they
-// are using a personal one, and vice versa. Where the row's UserId encodes an org, this narrows
-// the match to requests actually coming from that org.
+// A policy's UserMetadata rows are ordinarily matched by email, but one person's email is the same
+// in every org they belong to — so an email match fires a policy scoped to their work org while
+// they are using a personal one, and vice versa.
+//
+// So a row whose UserId encodes an org is matched HERE INSTEAD OF by email, never as well as:
+// findUserMetadataByEmail skips those rows (see service.go), making this their only route. Rows
+// carrying no org are untouched and keep matching purely by email, as they always did.
 
 // claudeSurfaces maps a host substring to the agentType key holding that surface's login.
 //
@@ -76,6 +79,21 @@ func orgUUIDFromUserID(userID string) string {
 	return candidate
 }
 
+// orgPathRE captures the segment after "/organizations/" in a Claude API path, e.g.
+// "/api/organizations/<orgUuid>/chat_conversations/<id>/completion".
+var orgPathRE = regexp.MustCompile(`/organizations/([^/?#]+)`)
+
+// orgUUIDFromPath pulls the org uuid out of the request path, returning "" when the path names no
+// org. The captured segment is shape-checked against uuidRE for the same reason orgUUIDFromUserID
+// does it: a path segment that merely sits in that position is not automatically an org.
+func orgUUIDFromPath(path string) string {
+	m := orgPathRE.FindStringSubmatch(path)
+	if len(m) < 2 || !uuidRE.MatchString(m[1]) {
+		return ""
+	}
+	return m[1]
+}
+
 // claudeOrgForHost returns the org the given device is currently working in on whichever Claude
 // surface the host names, or "" when that cannot be determined.
 func claudeOrgForHost(host, deviceLabel string, infoMap map[string]map[string]dbabstractor.ClaudeDesktopInfo) string {
@@ -109,17 +127,19 @@ func rowsMatchOrg(rows []types.AgenticUsers, liveOrg string) bool {
 }
 
 // orgMatchesAny reports whether the request's live Claude org is one of the orgs this policy's
-// UserMetadata rows name — an independent way for a policy to match, ORed alongside device label
-// and user email.
+// UserMetadata rows name — an independent way for a policy to match, ORed alongside the device
+// label, and the ONLY route for the org-carrying rows that findUserMetadataByEmail skips.
 //
 // Note the polarity, which is the opposite of a narrowing check: as an OR term, an undeterminable
 // org must return false. Returning true would make every policy match every request the moment the
 // device map went missing — so a non-Claude host, an unresolvable device and a failed fetch all
-// contribute nothing here, leaving device and email to decide on their own.
+// contribute nothing here. For a policy whose rows all carry an org that means it simply does not
+// apply, with only device-label targeting left to match on; email cannot stand in for it, which is
+// the whole point of scoping to an org.
 //
 // Because this ORs rather than narrows, a policy naming one user in an org applies to that whole
 // org's Claude traffic, not only to that person.
-func (s *Service) orgMatchesAny(rows []types.AgenticUsers, host, deviceLabel string) bool {
+func (s *Service) orgMatchesAny(rows []types.AgenticUsers, host, deviceLabel, path string) bool {
 	// Gate on the host first. Every other agent (Cursor, Copilot, Codex, ...) has one identity per
 	// account with no org dimension, so there is nothing to scope by — and checking here means a
 	// non-Claude request never parses an id or touches the device-info cache at all.
@@ -127,17 +147,29 @@ func (s *Service) orgMatchesAny(rows []types.AgenticUsers, host, deviceLabel str
 		return false
 	}
 
-	infoMap, err := s.getDeviceClaudeInfoMap()
-	if err != nil {
-		s.logger.Warn("claude org match: device info map unavailable, org term contributes no match",
-			zap.String("deviceLabel", deviceLabel), zap.Error(err))
-		return false
+	// Two sources name the live org and they should agree, but only one of them is about THIS
+	// request. The path carries the org the request is actually addressed to; the device map
+	// carries whichever org the machine last reported logging into, on a refresh timer
+	// (CLAUDE_INFO_REFRESH_INTERVAL_SEC). Switching org in Claude changes the path immediately and
+	// the map only at the next refresh, so for that window the map names the previous org — and
+	// scoping against it would apply the policy in the org the user just left while withholding it
+	// in the one they just entered. Prefer the path wherever it carries an org; fall back to the
+	// map for surfaces whose paths have no org segment (the CLI, api.anthropic.com).
+	liveOrg := orgUUIDFromPath(path)
+	orgSource := "path"
+	if liveOrg == "" {
+		orgSource = "deviceMap"
+		infoMap, err := s.getDeviceClaudeInfoMap()
+		if err != nil {
+			s.logger.Warn("claude org match: device info map unavailable, org term contributes no match",
+				zap.String("deviceLabel", deviceLabel), zap.Error(err))
+			return false
+		}
+		liveOrg = claudeOrgForHost(host, deviceLabel, infoMap)
 	}
-
-	liveOrg := claudeOrgForHost(host, deviceLabel, infoMap)
 	if liveOrg == "" {
 		s.logger.Debug("claude org match: no live org for device/surface",
-			zap.String("deviceLabel", deviceLabel), zap.String("host", host))
+			zap.String("deviceLabel", deviceLabel), zap.String("host", host), zap.String("path", path))
 		return false
 	}
 
@@ -146,6 +178,7 @@ func (s *Service) orgMatchesAny(rows []types.AgenticUsers, host, deviceLabel str
 		zap.String("deviceLabel", deviceLabel),
 		zap.String("host", host),
 		zap.String("liveOrg", liveOrg),
+		zap.String("orgSource", orgSource),
 		zap.Bool("matched", matched))
 	return matched
 }
