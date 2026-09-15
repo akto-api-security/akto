@@ -342,8 +342,17 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         // duplicates, silently inflating anything downstream that counts this result (e.g.
         // GuardrailPolicies#userMetadata). Dedupe by username (falling back to userId), merging
         // devices/deviceTags across duplicates — same convention as ModuleInfoAction#mergeInto.
+        Set<String> pickedIds = new HashSet<>(ids);
         Map<String, AgenticUsers> byIdentity = new LinkedHashMap<>();
         for (AgenticUsers u : instance.findAll(filter)) {
+            // A doc reached by its own userId is its own identity, kept whole under that id. A
+            // Claude login writes one doc per org, all sharing one userName, so folding those by
+            // username would collapse every org the caller asked for into a single arbitrary one —
+            // exactly the distinction the picker sends this id to preserve.
+            if (u.getUserId() != null && pickedIds.contains(u.getUserId())) {
+                byIdentity.putIfAbsent("i:" + u.getUserId(), u);
+                continue;
+            }
             String key = (u.getUserName() != null && !u.getUserName().trim().isEmpty()) ? "n:" + u.getUserName() : "i:" + u.getUserId();
             AgenticUsers existing = byIdentity.get(key);
             if (existing == null) {
@@ -351,6 +360,16 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
             } else {
                 if (existing.getUserEmail() == null) existing.setUserEmail(u.getUserEmail());
                 if (existing.getUserId() == null) existing.setUserId(u.getUserId());
+            }
+        }
+        // A username-keyed row stands for the person in every org, so it must not carry an
+        // org-scoped userId picked up from whichever duplicate doc happened to land in the slot:
+        // the validator ORs the org term (orgMatchesAny), so that id would widen the policy to the
+        // whole org rather than narrowing it. Rows kept by explicit id above are left untouched —
+        // there, the org is the point. Mirrors the same clearing in ModuleInfoAction#fetchAgenticUsers.
+        for (Map.Entry<String, AgenticUsers> e : byIdentity.entrySet()) {
+            if (e.getKey().startsWith("n:") && AgenticUsers.orgUuidFromUserId(e.getValue().getUserId()) != null) {
+                e.getValue().setUserId(null);
             }
         }
         return new ArrayList<>(byIdentity.values());
