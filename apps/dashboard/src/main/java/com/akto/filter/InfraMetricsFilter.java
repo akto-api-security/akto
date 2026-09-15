@@ -73,10 +73,10 @@ public class InfraMetricsFilter implements Filter {
             Timer.builder("http.server.request.duration")
                     .description("HTTP server request duration")
                     .tags(tags)
+                    // Bucket boundaries: 100ms, 600ms, 1s, 3s, 6s, 10s (plus +Inf).
                     .serviceLevelObjectives(
-                            Duration.ofMillis(25), Duration.ofMillis(50), Duration.ofMillis(100),
-                            Duration.ofMillis(250), Duration.ofMillis(500), Duration.ofMillis(1000),
-                            Duration.ofMillis(2500), Duration.ofMillis(5000), Duration.ofMillis(10000))
+                            Duration.ofMillis(100), Duration.ofMillis(600), Duration.ofMillis(1000),
+                            Duration.ofMillis(3000), Duration.ofMillis(6000), Duration.ofMillis(10000))
                     .register(InfraMetricsListener.registry)
                     .record(duration, TimeUnit.MILLISECONDS);
         } catch (Exception e) {

@@ -34,33 +34,57 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsAction.class, LogDb.DASHBOARD);;
 
+    // Whether the /metrics endpoint is served at all. Off by default so metrics are
+    // never exposed unless explicitly turned on.
+    private static final String METRICS_EXPOSED_ENV = "METRICS_ENABLED";
+    // Whether Bearer-token auth is enforced on /metrics. On by default; set to "false"
+    // to serve metrics without auth (e.g. a private network where the scraper cannot
+    // send a token).
+    private static final String METRICS_AUTH_ENABLED_ENV = "METRICS_AUTH_ENABLED";
     private static final String METRICS_AUTH_TOKEN_ENV = "METRICS_AUTH_TOKEN";
     private static final String BEARER_PREFIX = "Bearer ";
 
     /**
      * Prometheus scrape endpoint (/metrics). Emits pure Prometheus text exposition.
      *
-     * Gated purely by the METRICS_AUTH_TOKEN env var: if it is unset the endpoint is
-     * disabled (404) so metrics are never publicly exposed by default; if set, callers
-     * must present a matching "Authorization: Bearer <token>" header.
+     * Two independent controls:
+     *   METRICS_ENABLED     - must be "true" to serve the endpoint at all (default: off -> 404).
+     *   METRICS_AUTH_ENABLED - "true"/unset enforces Bearer auth (default); "false" disables it.
+     *   METRICS_AUTH_TOKEN  - required when auth is enabled; the expected Bearer credential.
+     *
+     * When auth is enabled but no token is configured the endpoint fails closed (404)
+     * rather than exposing metrics unauthenticated.
      */
     @Override
     public String execute() throws Exception {
-        String configuredToken = System.getenv(METRICS_AUTH_TOKEN_ENV);
-        if (configuredToken == null || configuredToken.trim().isEmpty()) {
+        // 1) endpoint must be explicitly exposed
+        if (!isTrue(System.getenv(METRICS_EXPOSED_ENV))) {
             servletResponse.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return null;
         }
 
-        String presentedToken = null;
-        String authHeader = servletRequest.getHeader("Authorization");
-        if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
-            presentedToken = authHeader.substring(BEARER_PREFIX.length()).trim();
-        }
+        // 2) auth is enforced unless explicitly disabled
+        boolean authEnabled = !isFalse(System.getenv(METRICS_AUTH_ENABLED_ENV));
+        if (authEnabled) {
+            String configuredToken = System.getenv(METRICS_AUTH_TOKEN_ENV);
+            if (configuredToken == null || configuredToken.trim().isEmpty()) {
+                // auth on but nothing to check against -> fail closed, never serve open
+                loggerMaker.errorAndAddToDb(METRICS_AUTH_ENABLED_ENV + " is on but " + METRICS_AUTH_TOKEN_ENV
+                        + " is unset; refusing to expose /metrics", LogDb.DASHBOARD);
+                servletResponse.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                return null;
+            }
 
-        if (presentedToken == null || !constantTimeEquals(configuredToken, presentedToken)) {
-            servletResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            return null;
+            String presentedToken = null;
+            String authHeader = servletRequest.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
+                presentedToken = authHeader.substring(BEARER_PREFIX.length()).trim();
+            }
+
+            if (presentedToken == null || !constantTimeEquals(configuredToken, presentedToken)) {
+                servletResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                return null;
+            }
         }
 
         servletResponse.setContentType("text/plain; version=0.0.4; charset=utf-8");
@@ -69,6 +93,14 @@ public class InfraMetricsAction implements Action,ServletResponseAware, ServletR
         out.flush();
         out.close();
         return null;
+    }
+
+    private static boolean isTrue(String v) {
+        return v != null && "true".equalsIgnoreCase(v.trim());
+    }
+
+    private static boolean isFalse(String v) {
+        return v != null && "false".equalsIgnoreCase(v.trim());
     }
 
     private static boolean constantTimeEquals(String a, String b) {
