@@ -43,7 +43,8 @@ _CONNECTOR_TAG: Dict[str, str] = {
     "github": "github",
     "github_cli": "copilot",
     "codex_cli": "codexcli",
-    "kiro_cli": "kirocli"
+    "kiro_cli": "kirocli",
+    "pi": "pi",
 }
 TAG_NAME = _CONNECTOR_TAG.get(AKTO_CONNECTOR, AKTO_CONNECTOR)
 
@@ -66,6 +67,7 @@ _CONNECTOR_LOG_DIR: Dict[str, str] = {
     "github":           "~/akto/.github/akto/vscode/logs",
     "opencode":         "~/.config/opencode/akto/logs",
     "kiro_cli":         "~/.kiro/akto/logs",
+    "pi":               "~/.pi/akto/logs",
     "amp":              "~/.config/amp/akto/logs",
 }
 _default_log_dir = _CONNECTOR_LOG_DIR.get(AKTO_CONNECTOR, f"~/akto/{AKTO_CONNECTOR}-hooks/logs")
@@ -191,6 +193,16 @@ _SESSION_FIELD_MAP: Dict[str, Dict[str, Any]] = {
         # user_email never arrives on Claude's stdin — it is resolved locally from
         # ~/.claude.json (see _LOCAL_IDENTITY_CONNECTORS). Declared here so it is
         # also picked up should the CLI ever start sending it.
+        "extra_fields": ("transcript_path", "cwd", "permission_mode",
+                         "hook_event_name", "user_email"),
+    },
+    # pi.dev: Claude Code-compatible hook payload via @hsingjui/pi-hooks extension.
+    "pi": {
+        "session_id_field": "session_id",
+        "conversation_field": None,
+        "message_id_field": None,
+        "message_id_strategy": "transcript_uuid",
+        "state_key": "session_id",
         "extra_fields": ("transcript_path", "cwd", "permission_mode",
                          "hook_event_name", "user_email"),
     },
@@ -364,7 +376,7 @@ _PROFILE_READERS = {
     "codex_cli": _codex_user_email,
 }
 
-_LOCAL_IDENTITY_CONNECTORS = {"claude_code_cli"} | set(_PROFILE_READERS)
+_LOCAL_IDENTITY_CONNECTORS = {"claude_code_cli", "pi"} | set(_PROFILE_READERS)
 
 
 def _local_user_email() -> str:

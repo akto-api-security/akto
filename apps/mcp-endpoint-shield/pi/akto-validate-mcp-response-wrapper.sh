@@ -1,0 +1,12 @@
+#!/bin/bash
+export MODE="atlas"
+export AKTO_DATA_INGESTION_URL="{{AKTO_DATA_INGESTION_URL}}"
+export AKTO_API_TOKEN="{{AKTO_API_TOKEN}}"
+export AKTO_SYNC_MODE="true"
+export AKTO_TIMEOUT="5"
+export AKTO_CONNECTOR="pi"
+export AKTO_CONNECTOR_VALUE="pi"
+export CONTEXT_SOURCE="ENDPOINT"
+export DEVICE_ID="{{DEVICE_ID}}"
+export LOG_DIR="$HOME/.pi/akto/logs"
+exec python3 "$HOME/.pi/hooks/akto/akto-validate-mcp-response.py"
