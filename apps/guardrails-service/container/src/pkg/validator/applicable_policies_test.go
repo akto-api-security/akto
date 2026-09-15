@@ -61,6 +61,43 @@ func TestApplicablePolicies(t *testing.T) {
 	})
 }
 
+// An Exclude ("negated") user list is a deny-list: the policy covers everyone EXCEPT the listed
+// people. The request that most needs covering is the one carrying no identity at all — a client
+// that sends no x-akto-installer-user_email (Claude Desktop, mirrored traffic) is not one of the
+// excluded people, so the policy must still apply to it. Resolving the negation only when an email
+// happened to resolve would silently drop the policy for every such request, and a dropped policy
+// is never enforced: its detectors don't run and nothing is reported.
+func TestFilterPoliciesByDeviceNegatedUserList(t *testing.T) {
+	s := &Service{logger: zap.NewNop()}
+	excluded := types.Policy{
+		Info:                   types.PolicyInfo{Name: "exclude-two-people"},
+		NegatedTargetUserNames: true,
+		UserMetadata: []types.AgenticUsers{
+			{UserName: "Tim.Elkins", UserEmail: "tim.elkins@example.com"},
+			{UserName: "Jim.Mihalik", UserEmail: "jim.mihalik@example.com"},
+		},
+	}
+
+	for _, tc := range []struct {
+		name    string
+		headers map[string]string
+		applies bool
+	}{
+		{"an excluded user is skipped", map[string]string{"X-Akto-Installer-User_email": "tim.elkins@example.com"}, false},
+		{"an excluded user is skipped whatever the casing", map[string]string{"X-Akto-Installer-User_email": "Tim.Elkins@Example.com"}, false},
+		{"everyone else is covered", map[string]string{"X-Akto-Installer-User_email": "luca.didio@example.com"}, true},
+		{"a request with no identity header is covered", nil, true},
+		{"a request with an empty identity header is covered", map[string]string{"X-Akto-Installer-User_email": ""}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := s.filterPoliciesByDevice([]types.Policy{excluded}, "device1.ai-agent.claude-desktop", tc.headers)
+			if (len(got) == 1) != tc.applies {
+				t.Fatalf("policy applies = %v, want %v", len(got) == 1, tc.applies)
+			}
+		})
+	}
+}
+
 // applyToDeviceIds carries whatever casing module_info.name was created with, while the device
 // label on the wire is re-derived from the current login — the same person reaches us as
 // "AlexTaylor" in the policy and "alextaylor" on the request. Compared exactly, the policy is

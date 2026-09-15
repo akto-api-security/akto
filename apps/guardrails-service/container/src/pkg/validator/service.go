@@ -464,9 +464,14 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 			}
 			if email != "" {
 				emailMatched = findUserMetadataByEmail(p.UserMetadata, email) != nil
-				if p.NegatedTargetUserNames {
-					emailMatched = !emailMatched
-				}
+			}
+			// Negate OUTSIDE the email guard: an unidentified request is, by definition, not one
+			// of the excluded people, so an Exclude list must still cover it. Negating only when
+			// an email resolved would drop the policy for every client that sends no
+			// x-akto-installer-user_email header (Claude Desktop, mirrored traffic) — failing
+			// open on exactly the requests nobody has vouched for.
+			if p.NegatedTargetUserNames {
+				emailMatched = !emailMatched
 			}
 		}
 
@@ -479,6 +484,9 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 			zap.String("email", email),
 			zap.Bool("labelMatched", labelMatched),
 			zap.Bool("emailMatched", emailMatched),
+			// Without this, an emailMatched=true on a policy whose user list does NOT contain the
+			// request's email is indistinguishable from a bug — it's the Exclude list working.
+			zap.Bool("negatedTargetUserNames", p.NegatedTargetUserNames),
 			zap.Bool("matched", matched))
 		if matched {
 			filtered = append(filtered, p)
