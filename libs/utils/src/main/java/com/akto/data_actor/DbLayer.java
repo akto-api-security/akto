@@ -320,8 +320,9 @@ public class DbLayer {
     private static final Set<String> CLAUDE_AGENT_LOGIN_TYPES =
             new HashSet<>(Arrays.asList(CLAUDE_DESKTOP_AGENT_TYPE, CLAUDE_CLI_USER_AGENT_TYPE));
     private static final String CLAUDE_AGENT_LOGIN_SOURCE = "claude-agent-login";
-    // Rollout gate: only this account creates agent users from Claude logins for now.
-    private static final int CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_ID = 1726615470;
+    // Rollout gate: only these accounts create agent users from Claude logins for now.
+    private static final Set<Integer> CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_IDS =
+            new HashSet<>(Arrays.asList(1726615470, 1785654409));
 
     private static void syncAgentUserFromModuleInfo(ModuleInfo moduleInfo) {
         if (moduleInfo == null) {
@@ -372,12 +373,12 @@ public class DbLayer {
      * already writes (see upsertFromEmailTag) — so those converge onto one row instead of
      * duplicating. Re-reporting a known pair only updates it; an unseen one inserts.
      *
-     * Gated to CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_ID while this rolls out — every other account
+     * Gated to CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_IDS while this rolls out — every other account
      * heartbeats through here untouched.
      */
     private static void syncClaudeAgentUsersFromModuleInfo(ModuleInfo moduleInfo) {
         Integer accountId = Context.accountId.get();
-        if (accountId == null || accountId != CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_ID) {
+        if (accountId == null || !CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_IDS.contains(accountId)) {
             return;
         }
         Object agentLoginsObj = moduleInfo.getAdditionalData().get(AGENT_LOGINS_KEY);
