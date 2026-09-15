@@ -1,37 +1,29 @@
 # Akto Guardrails for Pi.dev
 
-Validate prompts and MCP tool calls against Akto AI Guardrails in [pi.dev](https://pi.dev) via the [@hsingjui/pi-hooks](https://github.com/hsingjui/pi-hooks) extension.
+Validate prompts and MCP tool calls against Akto AI Guardrails in [pi.dev](https://pi.dev).
 
-Pi uses Claude Code-compatible command hooks in `~/.pi/agent/settings.json`. Install the hook runner first:
-
-```bash
-pi install npm:@hsingjui/pi-hooks
-```
+Pi does **not** run Claude Code-style `hooks` from `settings.json` natively. Akto ships a local Pi extension (`akto-guardrails.ts`) that Pi auto-loads from `~/.pi/agent/extensions/` — **no `pi install` required**.
 
 ## Setup
 
-### 1. Copy hook scripts
+Use the Akto Endpoint Shield installer (`install_pi_hooks.sh`), which:
 
-```bash
-mkdir -p ~/.pi/hooks/akto
-```
+1. Copies Python hooks + wrappers to `~/.pi/hooks/akto/`
+2. Installs `akto-guardrails.ts` to `~/.pi/agent/extensions/`
+3. Removes legacy unused `settings.json` hook entries from older installers
 
-Copy the following files to `~/.pi/hooks/akto/`:
+After install, restart Pi or run `/reload`.
 
-- `akto-validate-prompt.py`
-- `akto-validate-response.py`
-- `akto-validate-mcp-request.py`
-- `akto-validate-mcp-response.py`
-- `akto_machine_id.py`
-- `akto_ingestion_utility.py` (from `../shared/`)
+### Manual layout
 
-Also copy and configure the wrapper shell scripts, or use the Akto Endpoint Shield installer.
+| Path | Purpose |
+|------|---------|
+| `~/.pi/agent/extensions/akto-guardrails.ts` | Pi extension (bridges events → Python hooks) |
+| `~/.pi/hooks/akto/*.py` | Guardrail validators |
+| `~/.pi/hooks/akto/*-wrapper.sh` | Env + connector wrappers |
+| `~/.pi/akto/logs/` | Hook logs (`validate-prompt.log`, etc.) |
 
-### 2. Merge hooks into settings
-
-Merge the `hooks` block from `settings.json` in this directory into `~/.pi/agent/settings.json`.
-
-### 3. Configure environment
+### Configure environment
 
 ```bash
 export AKTO_DATA_INGESTION_URL="ingestion-service-url"
