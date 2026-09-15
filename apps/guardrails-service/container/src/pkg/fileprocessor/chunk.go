@@ -19,11 +19,16 @@ func SanitizeText(text string) string {
 	}, text)
 }
 
+// FallbackChunkSize is used when a caller passes a non-positive chunkSize. It matches the
+// configured default (config.defaultChunkSize): small enough that one chunk's LLM
+// adjudication completes inside the upstream proxy's 60s ceiling.
+const FallbackChunkSize = 6000
+
 // ChunkWordBoundary splits text into chunks of at most chunkSize characters on word boundaries.
 // overlap repeats chars between adjacent chunks to catch boundary-spanning patterns.
 func ChunkWordBoundary(text string, chunkSize, overlap int) []string {
 	if chunkSize <= 0 {
-		chunkSize = 32000
+		chunkSize = FallbackChunkSize
 	}
 	if overlap < 0 || overlap >= chunkSize {
 		overlap = 0
