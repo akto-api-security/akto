@@ -73,22 +73,32 @@ type mcpListCache struct {
 	mu             sync.RWMutex
 }
 
+// claudeInfoCache caches deviceLabel -> agentType -> that surface's Claude login, used to scope
+// user-targeted policies to the org a request actually came from. See claude_org_match.go.
+type claudeInfoCache struct {
+	byDevice    map[string]map[string]dbabstractor.ClaudeDesktopInfo
+	lastFetched time.Time
+	mu          sync.RWMutex
+}
+
 // Service handles payload validation using akto-gateway library
 type Service struct {
-	config                *config.Config
-	dbClient              *dbabstractor.Client
-	processor             mcp.RequestProcessor // Default processor (skipThreat=false)
-	logger                *zap.Logger
-	cache                 *policyCache
-	mcpListCache          *mcpListCache
-	collectionTagsCache   *collectionTagsCache
-	sessionMgr            *session.SessionManager // Our session manager implementation for session tracking
-	anomalyDetector       *session.AnomalyDetector
-	schemaFetcher         *SchemaFetcher
-	skipPaths             *pathSkipper
-	policyRefreshGroup    singleflight.Group
-	allowlistRefreshGroup singleflight.Group
-	threatAPIClient       *threatapi.Client
+	config                 *config.Config
+	dbClient               *dbabstractor.Client
+	processor              mcp.RequestProcessor // Default processor (skipThreat=false)
+	logger                 *zap.Logger
+	cache                  *policyCache
+	mcpListCache           *mcpListCache
+	claudeInfoCache        *claudeInfoCache
+	collectionTagsCache    *collectionTagsCache
+	sessionMgr             *session.SessionManager // Our session manager implementation for session tracking
+	anomalyDetector        *session.AnomalyDetector
+	schemaFetcher          *SchemaFetcher
+	skipPaths              *pathSkipper
+	policyRefreshGroup     singleflight.Group
+	allowlistRefreshGroup  singleflight.Group
+	claudeInfoRefreshGroup singleflight.Group
+	threatAPIClient        *threatapi.Client
 }
 
 // NewService creates a new validator service
@@ -163,6 +173,7 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		logger:              logger,
 		cache:               &policyCache{},
 		mcpListCache:        &mcpListCache{},
+		claudeInfoCache:     &claudeInfoCache{},
 		collectionTagsCache: &collectionTagsCache{byHostName: make(map[string]map[string]string)},
 		sessionMgr:          sessionManager,
 		anomalyDetector:     anomalyDetector,
@@ -427,6 +438,7 @@ func deviceIDsContain(ids []string, label string) bool {
 // applied here instead, against the actual request's email.
 func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName string, headers map[string]string) []types.Policy {
 	deviceLabel := deviceLabelFromMcpServerName(mcpServerName)
+	host := extractHostHeader(headers)
 	email := ""
 	emailResolved := false
 
@@ -447,7 +459,13 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 				emailResolved = true
 			}
 			if email != "" {
-				emailMatched = findUserMetadataByEmail(p.UserMetadata, email) != nil
+				// Email alone cannot separate orgs — one person carries the same address in every
+				// org they belong to. Where the matched row's UserId encodes an org, narrow to
+				// requests actually coming from it; see orgMatches for the fallbacks.
+				row := findUserMetadataByEmail(p.UserMetadata, email)
+				emailMatched = row != nil && s.orgMatches(row.UserId, host, deviceLabel)
+				// Negation wraps the whole user predicate, not just the email half: "exclude user
+				// X in org A" has to stay false for X in org B.
 				if p.NegatedTargetUserNames {
 					emailMatched = !emailMatched
 				}
