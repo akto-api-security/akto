@@ -98,7 +98,7 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
                 ModuleInfo.ADDITIONAL_DATA + ".mcpServers")));
     }
 
-    // Split from the query above so TestModuleInfoUsernameLookup can pin the key shapes without Mongo.
+    // Pure transform split from the query above; key shapes must match the JS builder exactly.
     public static Map<String, String> buildUsernameLookupMap(List<ModuleInfo> modules) {
         Map<String, String> result = new HashMap<>();
         for (ModuleInfo m : modules) {
@@ -156,7 +156,7 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
                 ModuleInfo.ADDITIONAL_DATA + ".browserName")));
     }
 
-    // Split from the query above so TestModuleInfoUsernameLookup can pin the shape without Mongo.
+    // Pure transform split from the query above; shape must match the JS builder exactly.
     public static Map<String, Map<String, String>> buildDeviceMetadataMap(List<ModuleInfo> modules) {
         Map<String, Map<String, String>> result = new HashMap<>();
         for (ModuleInfo m : modules) {
