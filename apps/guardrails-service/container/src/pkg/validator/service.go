@@ -459,16 +459,17 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 				emailResolved = true
 			}
 			if email != "" {
-				// Email alone cannot separate orgs — one person carries the same address in every
-				// org they belong to. Where the matched row's UserId encodes an org, narrow to
-				// requests actually coming from it; see orgMatches for the fallbacks.
-				row := findUserMetadataByEmail(p.UserMetadata, email)
-				emailMatched = row != nil && s.orgMatches(row.UserId, host, deviceLabel)
-				// Negation wraps the whole user predicate, not just the email half: "exclude user
-				// X in org A" has to stay false for X in org B.
-				if p.NegatedTargetUserNames {
-					emailMatched = !emailMatched
-				}
+				emailMatched = findUserMetadataByEmail(p.UserMetadata, email) != nil
+			}
+			// Org is a third independent way to match, not a narrowing of the email match: a
+			// policy naming a user in an org applies to that org's Claude traffic even when the
+			// request's own email is not one of the listed rows.
+			orgMatched := s.orgMatchesAny(p.UserMetadata, host, deviceLabel)
+			// Negation wraps the whole user predicate. Excluding a user means excluding them by
+			// either route, so a request must not slip past by matching only one of the two.
+			emailMatched = emailMatched || orgMatched
+			if p.NegatedTargetUserNames {
+				emailMatched = !emailMatched
 			}
 		}
 

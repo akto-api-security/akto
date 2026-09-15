@@ -1,8 +1,10 @@
 package validator
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 )
 
@@ -96,6 +98,45 @@ func TestSurfacesResolveToDifferentOrgs(t *testing.T) {
 func TestClaudeOrgForHostNilMap(t *testing.T) {
 	if got := claudeOrgForHost("d.ai-agent.claude-desktop.akto.io", "d", nil); got != "" {
 		t.Errorf("nil map should yield empty, got %q", got)
+	}
+}
+
+func TestRowsMatchOrg(t *testing.T) {
+	const orgA = "b1553cda-0a23-414d-b7d0-be9d7657add9"
+	const orgB = "e68d326b-1111-1111-1111-111111111111"
+
+	withOrgA := []types.AgenticUsers{{UserId: "shubhamgoyal2259@gmail.com_" + orgA}}
+	noOrg := []types.AgenticUsers{{UserId: "shubhamgoyal2259@gmail.com"}}
+	mixed := []types.AgenticUsers{
+		{UserId: "someone@corp.com"},
+		{UserId: "other@corp.com_" + orgB},
+	}
+
+	cases := map[string]struct {
+		rows    []types.AgenticUsers
+		liveOrg string
+		want    bool
+	}{
+		"same org":                {withOrgA, orgA, true},
+		"different org":           {withOrgA, orgB, false},
+		"case insensitive":        {withOrgA, strings.ToUpper(orgA), true},
+		"row carries no org":      {noOrg, orgA, false},
+		"one of several rows":     {mixed, orgB, true},
+		"no row carries live org": {mixed, orgA, false},
+		"empty rows":              {nil, orgA, false},
+
+		// The polarity that matters: as an OR term an unknown live org must contribute nothing.
+		// Returning true here would make every policy match every request whenever the device
+		// map is unavailable.
+		"unknown live org": {withOrgA, "", false},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := rowsMatchOrg(tc.rows, tc.liveOrg); got != tc.want {
+				t.Errorf("rowsMatchOrg(%v, %q) = %v, want %v", tc.rows, tc.liveOrg, got, tc.want)
+			}
+		})
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 	"go.uber.org/zap"
 )
@@ -89,45 +90,61 @@ func claudeOrgForHost(host, deviceLabel string, infoMap map[string]map[string]db
 	return byAgentType[loginKey].OrganizationUUID
 }
 
-// orgMatches reports whether a UserMetadata row that already matched on email also matches on org.
+// rowsMatchOrg reports whether any UserMetadata row encodes liveOrg.
 //
-// Returns true in both undeterminable cases, which is deliberate. Under-enforcing a guardrail is
-// silent and leaves traffic unchecked; over-enforcing is visible and gets reported. So a row with
-// no org encoded (every policy written before org scoping, and every identity that exists only via
-// module_info reporting) and a device whose org cannot be resolved both keep the pre-existing
-// email-only behaviour rather than dropping the policy.
-func (s *Service) orgMatches(userID, host, deviceLabel string) bool {
+// Split out from orgMatchesAny so the comparison is testable without standing up a Service and its
+// caches. Rows carrying no org (every policy written before org scoping, and every identity that
+// exists only via module_info reporting) simply do not contribute a match.
+func rowsMatchOrg(rows []types.AgenticUsers, liveOrg string) bool {
+	if liveOrg == "" {
+		return false
+	}
+	for i := range rows {
+		if policyOrg := orgUUIDFromUserID(rows[i].UserId); policyOrg != "" &&
+			strings.EqualFold(policyOrg, liveOrg) {
+			return true
+		}
+	}
+	return false
+}
+
+// orgMatchesAny reports whether the request's live Claude org is one of the orgs this policy's
+// UserMetadata rows name — an independent way for a policy to match, ORed alongside device label
+// and user email.
+//
+// Note the polarity, which is the opposite of a narrowing check: as an OR term, an undeterminable
+// org must return false. Returning true would make every policy match every request the moment the
+// device map went missing — so a non-Claude host, an unresolvable device and a failed fetch all
+// contribute nothing here, leaving device and email to decide on their own.
+//
+// Because this ORs rather than narrows, a policy naming one user in an org applies to that whole
+// org's Claude traffic, not only to that person.
+func (s *Service) orgMatchesAny(rows []types.AgenticUsers, host, deviceLabel string) bool {
 	// Gate on the host first. Every other agent (Cursor, Copilot, Codex, ...) has one identity per
 	// account with no org dimension, so there is nothing to scope by — and checking here means a
 	// non-Claude request never parses an id or touches the device-info cache at all.
 	if claudeLoginKeyForHost(host) == "" {
-		return true
-	}
-
-	policyOrg := orgUUIDFromUserID(userID)
-	if policyOrg == "" {
-		return true
+		return false
 	}
 
 	infoMap, err := s.getDeviceClaudeInfoMap()
 	if err != nil {
-		s.logger.Warn("claude org match: device info map unavailable, falling back to email-only",
+		s.logger.Warn("claude org match: device info map unavailable, org term contributes no match",
 			zap.String("deviceLabel", deviceLabel), zap.Error(err))
-		return true
+		return false
 	}
 
 	liveOrg := claudeOrgForHost(host, deviceLabel, infoMap)
 	if liveOrg == "" {
-		s.logger.Debug("claude org match: no live org for device/surface, falling back to email-only",
+		s.logger.Debug("claude org match: no live org for device/surface",
 			zap.String("deviceLabel", deviceLabel), zap.String("host", host))
-		return true
+		return false
 	}
 
-	matched := strings.EqualFold(policyOrg, liveOrg)
+	matched := rowsMatchOrg(rows, liveOrg)
 	s.logger.Debug("claude org match",
 		zap.String("deviceLabel", deviceLabel),
 		zap.String("host", host),
-		zap.String("policyOrg", policyOrg),
 		zap.String("liveOrg", liveOrg),
 		zap.Bool("matched", matched))
 	return matched
