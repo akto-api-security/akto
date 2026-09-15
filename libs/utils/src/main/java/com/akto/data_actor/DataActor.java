@@ -381,5 +381,5 @@ public abstract class DataActor {
     public abstract List<AgentQueryRecord> fetchAgentQueryRecords(String messageId);
     public abstract Map<String, String> fetchDeviceUserMap();
 
-    public abstract Map<String, ClaudeDesktopInfo> fetchDeviceClaudeDesktopInfoMap();
+    public abstract Map<String, Map<String, ClaudeDesktopInfo>> fetchDeviceClaudeDesktopInfoMap();
 }

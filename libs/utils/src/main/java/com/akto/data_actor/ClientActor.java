@@ -5047,7 +5047,7 @@ public class ClientActor extends DataActor {
      * email). Refreshed far more often than the device->user map because a user can switch org
      * inside Desktop at any moment, while the user behind a device effectively never changes.
      */
-    public Map<String, ClaudeDesktopInfo> fetchDeviceClaudeDesktopInfoMap() {
+    public Map<String, Map<String, ClaudeDesktopInfo>> fetchDeviceClaudeDesktopInfoMap() {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDeviceClaudeDesktopInfoMap", "", "POST", null, headers, "");
         try {
@@ -5056,8 +5056,8 @@ public class ClientActor extends DataActor {
             if (response.getStatusCode() != 200 || body == null) {
                 return new HashMap<>();
             }
-            Map<String, ClaudeDesktopInfo> result = gson.fromJson(
-                    body, new TypeToken<Map<String, ClaudeDesktopInfo>>() {}.getType());
+            Map<String, Map<String, ClaudeDesktopInfo>> result = gson.fromJson(
+                    body, new TypeToken<Map<String, Map<String, ClaudeDesktopInfo>>>() {}.getType());
             return result != null ? result : new HashMap<>();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in fetchDeviceClaudeDesktopInfoMap: " + e, LoggerMaker.LogDb.RUNTIME);

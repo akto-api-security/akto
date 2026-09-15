@@ -66,7 +66,27 @@ public class AgentQueryRecord {
     private static final int ATLAS_SESSION_TTL = Constants.ONE_DAY_TIMESTAMP;
     private static final Map<String, Integer> ATLAS_SESSION_LAST_SEEN = new ConcurrentHashMap<>();
 
-    private static final String CLAUDE_DESKTOP_SERVICE_ID = "claude-desktop";
+    /**
+     * Claude surfaces that report one shared serviceId across every install, as
+     * {host substring, agentLogins key} pairs.
+     *
+     * The columns are not a rename of each other — three host labels resolve to two logins:
+     *
+     *   claude-desktop -> claude-desktop    the Desktop app's own login
+     *   claude-cowork  -> claude-desktop    Cowork runs inside Desktop and shares its session;
+     *                                       the agent reports no separate claude-cowork login
+     *   claude-cli     -> claude-cli-user   the CLI's login (claude-cli-local / -project /
+     *                                       -enterprise are config scopes, not logins)
+     *
+     * Which login we read matters: Desktop and the CLI authenticate through separate token stores
+     * and can be signed into different orgs on one machine, so CLI traffic must never be stamped
+     * with Desktop's org or the reverse.
+     */
+    private static final String[][] CLAUDE_SHARED_SURFACES = {
+        { "claude-desktop", "claude-desktop"  },
+        { "claude-cowork",  "claude-desktop"  },
+        { "claude-cli",     "claude-cli-user" },
+    };
 
     public AgentQueryRecord(String docId, int accountId, String serviceId, String deviceId,
                             String userName, String sessionIdentifier,
@@ -140,7 +160,7 @@ public class AgentQueryRecord {
             HttpResponseParams p,
             Map<String, String> tagsMap,
             Map<String, String> deviceUserMap,
-            Map<String, ClaudeDesktopInfo> deviceClaudeDesktopInfoMap) {
+            Map<String, Map<String, ClaudeDesktopInfo>> deviceClaudeDesktopInfoMap) {
 
         if (p == null || p.getRequestParams() == null) {
             return null;
@@ -198,9 +218,10 @@ public class AgentQueryRecord {
                 }    
             }
 
-            // Claude Desktop reports one serviceId for every install on the planet, so on its own
-            // it collapses every org's traffic into a single service. Qualifying it with the org
-            // keeps them apart. Only for Claude Desktop: everything else is already org-specific.
+            // Claude Desktop and Claude Cowork each report one serviceId for every install on the
+            // planet, so on their own they collapse every org's traffic into a single service.
+            // Qualifying with the org keeps them apart. Only these two: everything else already
+            // carries an org-specific serviceId.
             //
             // The org is folded into serviceId rather than carried as its own field: serviceId is
             // already the dimension every downstream consumer groups and filters by, so the split
@@ -209,13 +230,9 @@ public class AgentQueryRecord {
             // Matched against the raw host, not the parsed serviceId. The split above caps at three
             // parts, so a host like "<device>.ai-agent.claude-desktop.akto.io" leaves serviceId as
             // "claude-desktop.akto.io" — an equality check on serviceId silently never fires there.
-            if (host != null && host.contains(CLAUDE_DESKTOP_SERVICE_ID)) {
-                ClaudeDesktopInfo desktopInfo = (deviceId != null && deviceClaudeDesktopInfoMap != null)
-                        ? deviceClaudeDesktopInfoMap.get(deviceId) : null;
-                String orgId = desktopInfo != null ? desktopInfo.getOrganizationUuid() : null;
-                if (orgId != null && !orgId.isEmpty()) {
-                    serviceId = serviceId + "-" + orgId;
-                }
+            String orgId = claudeOrgUuidForHost(host, deviceId, deviceClaudeDesktopInfoMap);
+            if (orgId != null && !orgId.isEmpty()) {
+                serviceId = serviceId + "-" + orgId;
             }
         } else if (isBrowserExtensionTraffic) {
             // Host id is <heartbeat name>.<browser>.<site>, so its first label keys deviceUserMap.
@@ -355,6 +372,31 @@ public class AgentQueryRecord {
         } catch (Exception ignored) {
             return -1;
         }
+    }
+
+    /**
+     * Org uuid to qualify serviceId with, or null when the host is not a shared-serviceId Claude
+     * surface, the device is unknown, or that surface has no resolved login on it.
+     *
+     * The surface named in the host picks which login to read — see {@link #CLAUDE_SHARED_SURFACES}
+     * for why reading the wrong one would misattribute the traffic.
+     */
+    private static String claudeOrgUuidForHost(String host, String deviceId,
+            Map<String, Map<String, ClaudeDesktopInfo>> deviceClaudeDesktopInfoMap) {
+        if (host == null || deviceId == null || deviceClaudeDesktopInfoMap == null) {
+            return null;
+        }
+        Map<String, ClaudeDesktopInfo> byAgentType = deviceClaudeDesktopInfoMap.get(deviceId);
+        if (byAgentType == null) {
+            return null;
+        }
+        for (String[] surface : CLAUDE_SHARED_SURFACES) {
+            if (host.contains(surface[0])) {
+                ClaudeDesktopInfo info = byAgentType.get(surface[1]);
+                return info != null ? info.getOrganizationUuid() : null;
+            }
+        }
+        return null;
     }
 
     private static int readTokenField(JSONObject obj, boolean input) throws JSONException{

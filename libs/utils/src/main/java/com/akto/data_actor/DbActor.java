@@ -870,7 +870,7 @@ public class DbActor extends DataActor {
         return new HashMap<>();
     }
 
-    public Map<String, ClaudeDesktopInfo> fetchDeviceClaudeDesktopInfoMap() {
+    public Map<String, Map<String, ClaudeDesktopInfo>> fetchDeviceClaudeDesktopInfoMap() {
         return new HashMap<>();
     }
 }

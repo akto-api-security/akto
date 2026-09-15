@@ -109,7 +109,7 @@ public class HttpCallParser {
     private int deviceUserMapLastFetchTs = 0;
     private static final int DEVICE_USER_MAP_REFRESH_INTERVAL = 60 * 10;
 
-    private Map<String, ClaudeDesktopInfo> deviceClaudeDesktopInfoMapCache = new HashMap<>();
+    private Map<String, Map<String, ClaudeDesktopInfo>> deviceClaudeDesktopInfoMapCache = new HashMap<>();
     private int deviceClaudeDesktopInfoMapLastFetchTs = 0;
     private static final int DEVICE_CLAUDE_DESKTOP_INFO_MAP_REFRESH_INTERVAL = 60;
 
@@ -2095,7 +2095,7 @@ public class HttpCallParser {
      * minutes like the device->user map: the org a device reports follows whichever org the user
      * last worked in, so a stale entry attributes traffic to the wrong org.
      */
-    private Map<String, ClaudeDesktopInfo> getDeviceClaudeDesktopInfoMap() {
+    private Map<String, Map<String, ClaudeDesktopInfo>> getDeviceClaudeDesktopInfoMap() {
         if (Context.now() - deviceClaudeDesktopInfoMapLastFetchTs > DEVICE_CLAUDE_DESKTOP_INFO_MAP_REFRESH_INTERVAL) {
             deviceClaudeDesktopInfoMapCache = dataActor.fetchDeviceClaudeDesktopInfoMap();
             deviceClaudeDesktopInfoMapLastFetchTs = Context.now();
