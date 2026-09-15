@@ -32,10 +32,19 @@ import MisconfiguredBadge from "./MisconfiguredBadge";
 
 const CHILD_COL_WIDTH = { name: "200px", riskScore: "80px", sensitive: "160px", traffic: "80px", discovered: "80px" };
 
-const PARENT_HEADERS = [
+// "unknown"/unset reads as disabled — an unreported status isn't proof a plugin is active.
+const isPluginEnabled = (status) => String(status).toLowerCase() === "enabled";
+
+// Plugin rows only — lets you tell a device's plugin status at a glance without expanding the row.
+const PLUGIN_STATUS_HEADER = {
+    title: "Status", text: "Status", value: "pluginStatusComp", textValue: "pluginStatus", boxWidth: "90px",
+};
+
+const getParentHeaders = (rowType) => [
     { title: "", text: "", value: "collapsibleIcon", type: CellType.COLLAPSIBLE, boxWidth: "32px" },
     { title: "Endpoint ID", text: "Endpoint ID", value: "displayNameComp", textValue: "endpointId" },
     { title: "Username", text: "Username", value: "usernameComp", textValue: "username", boxWidth: "100px" },
+    ...(rowType === "plugin" ? [PLUGIN_STATUS_HEADER] : []),
     {
         title: <HeadingWithTooltip content={<Text variant="bodySm">Risk score of this device is the maximum risk score across its own collections</Text>} title="Risk score" />,
         text: "Risk score", value: "riskScoreComp", textValue: "riskScore", numericValue: "riskScore",
@@ -173,6 +182,11 @@ function ChildrenTable({ children, rowType, misconfiguredChildId, onOpenBundle }
                 <HorizontalStack gap="1" align="start" wrap={false}>
                     <Box maxWidth="200px"><TooltipText tooltip={displayValue} text={displayValue} /></Box>
                     {child.type && <Badge size="small">{child.type}</Badge>}
+                    {rowType === "plugin" && (
+                        <Badge size="small" status={isPluginEnabled(child.pluginStatus) ? "success" : "warning"}>
+                            {isPluginEnabled(child.pluginStatus) ? "enabled" : "disabled"}
+                        </Badge>
+                    )}
                     {(child.skillCount || 0) > 0 && (
                         <Badge size="small" status="info">{`${child.skillCount} ${child.skillCount === 1 ? "skill" : "skills"}`}</Badge>
                     )}
@@ -198,12 +212,12 @@ function ChildrenTable({ children, rowType, misconfiguredChildId, onOpenBundle }
                 {func.prettifyEpoch(child.startTs || 0)}
             </div>,
         ];
-    }), [children, handleChildClick]);
+    }), [children, handleChildClick, rowType]);
 
     const columnContentTypes = useMemo(() => ["text", "text", "text", "text", "text", "text"], []);
 
     return (
-        <td colSpan={PARENT_HEADERS.length} style={{ padding: "0px !important" }} className="control-row">
+        <td colSpan={getParentHeaders(rowType).length} style={{ padding: "0px !important" }} className="control-row">
             <Box width="100%">
                 <DataTable
                     rows={configRow ? [configRow, ...rows] : rows}
@@ -323,6 +337,11 @@ function shapeEndpointRow(row, { rowType, onOpenBundle }) {
                 <TooltipText tooltip={row.username || "-"} text={row.username || "-"} />
             </Box>
         ),
+        pluginStatusComp: rowType === "plugin" ? (
+            <Badge size="small" status={isPluginEnabled(row.pluginStatus) ? "success" : "warning"}>
+                {isPluginEnabled(row.pluginStatus) ? "enabled" : "disabled"}
+            </Badge>
+        ) : "-",
         riskScoreComp: transform.wrapRiskScoreTooltip(
             <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
             riskScore, row.baseRiskScore, row.baseRiskScoreReason
@@ -488,6 +507,7 @@ export default function AgenticAssetDevicesPage() {
     }, [filterChoices, rowType, groupKey]);
 
     const disambiguateLabel = useCallback((key, value) => func.convertToDisambiguateLabelObj(value, null, 2), []);
+    const parentHeaders = useMemo(() => getParentHeaders(rowType), [rowType]);
 
     if (loading) {
         return (
@@ -520,9 +540,9 @@ export default function AgenticAssetDevicesPage() {
                         sortOptions={SORT_OPTIONS}
                         resourceName={resourceName}
                         filters={filtersDef}
-                        headers={PARENT_HEADERS}
+                        headers={parentHeaders}
                         selectable={false}
-                        headings={PARENT_HEADERS}
+                        headings={parentHeaders}
                         useNewRow={true}
                         condensedHeight={true}
                         disambiguateLabel={disambiguateLabel}

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Tabs, Box, VerticalStack, Text, Divider, Spinner } from "@shopify/polaris";
+import { Tabs, Box, VerticalStack, Text, Divider, Spinner, Badge } from "@shopify/polaris";
 import AgGridTable from "@/apps/dashboard/components/tables/AgGridTable";
 import FlyoutBreadcrumb from "./FlyoutBreadcrumb";
 import AgenticFlyoutShell from "./AgenticFlyoutShell";
@@ -19,11 +19,28 @@ import "../../../components/layouts/style.css";
 
 // ─── Devices tab (small, kept inline) ────────────────────────────────────────
 
-const DEVICES_COL_DEFS = [
+const DEVICES_BASE_COL_DEFS = [
     { field: "username", headerName: "User",       flex: 1,  minWidth: 120, cellStyle: { display: "flex", alignItems: "center" }, valueFormatter: p => p.value || "-" },
     { field: "riskScore", headerName: "Risk Score", width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: RiskScoreCellRenderer, cellStyle: { display: "flex", alignItems: "center" } },
     { field: "lastSeen", headerName: "Last Seen",  width: 130, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { display: "flex", alignItems: "center", color: "#6D7175" }, valueFormatter: p => p.value || "-", comparator: (a, b, nodeA, nodeB) => (nodeA?.data?.lastSeenEpoch || 0) - (nodeB?.data?.lastSeenEpoch || 0) },
 ];
+
+// "unknown"/unset reads as disabled — an unreported status isn't proof a plugin is active.
+const isPluginEnabled = (status) => String(status).toLowerCase() === "enabled";
+
+const PLUGIN_STATUS_COL_DEF = {
+    field: "pluginStatus", headerName: "Plugin Status", width: 130,
+    suppressHeaderMenuButton: true, suppressHeaderFilterButton: true,
+    cellStyle: { display: "flex", alignItems: "center" },
+    cellRenderer: (p) => (
+        <Badge size="small" status={isPluginEnabled(p.value) ? "success" : "warning"}>
+            {isPluginEnabled(p.value) ? "enabled" : "disabled"}
+        </Badge>
+    ),
+};
+
+const getDevicesColDefs = (assetType) =>
+    assetType === "Plugin" ? [...DEVICES_BASE_COL_DEFS, PLUGIN_STATUS_COL_DEF] : DEVICES_BASE_COL_DEFS;
 
 const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 
@@ -58,7 +75,7 @@ function DevicesTab({ asset, enrichMaps = {}, startTimestamp, endTimestamp }) {
     return (
         <AgGridTable
             key={asset.id}
-            columnDefs={DEVICES_COL_DEFS}
+            columnDefs={getDevicesColDefs(asset.type)}
             defaultColDef={GRID_DEFAULT_COL}
             onServerFetch={onServerFetch}
             serverSideRowModel
