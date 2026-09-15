@@ -78,7 +78,10 @@ class ModelMapScanner:
         for entry in model_map:
             provider = build_provider_from_config(entry)
             if provider is not None:
-                scanners.append((LLMScanner(provider), entry))
+                # responseFormat is per-model: a fast tier can answer in single
+                # letters while the arbiter stays on JSON and keeps the reason
+                # string that the threat report and remediation prompt need.
+                scanners.append((LLMScanner(provider, entry.get("responseFormat", "")), entry))
             else:
                 # build_provider_from_config already logged which env var was
                 # missing (see the "[Providers] ... skipping" warning); this

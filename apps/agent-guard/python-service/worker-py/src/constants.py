@@ -94,6 +94,49 @@ def force_gemma_only(_model_configs):
     return [{"provider": _gemma_arbiter_provider(), "modelRole": "FINAL_ARBITER", "timeoutMs": 30000}]
 
 
+# Cascade roles whose answer contract the env var may override.
+# FINAL_ARBITER is deliberately absent: the letter contract returns no reason
+# string, and the arbiter's verdict is the one that reaches the threat report,
+# the remediation prompt's BLOCK REASON and the evidence-line prompt. An operator
+# who really wants a letter-answering arbiter must say so per-model in the
+# policy, where the consequence is visible.
+_OVERRIDABLE_ROLES = {"FAST_THREAT_FILTER", "FAST_FALLBACK_SAFE_FILTER"}
+
+# "json" is spelled as the empty responseFormat internally (see llm_scanner);
+# accepting it as a word gives operators an explicit kill switch that beats a
+# per-model responseFormat="abcd" without editing the policy.
+_RESPONSE_FORMAT_ALIASES = {"json": "", "abcd": "abcd"}
+
+
+def apply_scanner_response_format(model_configs):
+    """Stamp SCANNER_RESPONSE_FORMAT onto the fast cascade tiers.
+
+    Scanner-agnostic: it sets responseFormat on the entries, and which scanners
+    actually honour a given format is decided later by prompts._ABCD_CAPABLE, so
+    a scanner with no letter template quietly stays on JSON.
+
+    Empty env var (the default) returns the configs untouched, so the per-model
+    ModelConfig.responseFormat set in the policy still decides. An unrecognised
+    value is logged and ignored rather than guessed at — silently falling back to
+    a format the operator did not ask for is how a rollback looks like a no-op.
+    """
+    requested = (settings.SCANNER_RESPONSE_FORMAT or "").strip().lower()
+    if not requested:
+        return list(model_configs or [])
+    if requested not in _RESPONSE_FORMAT_ALIASES:
+        logger.warning(
+            f"[constants] SCANNER_RESPONSE_FORMAT={requested!r} is not one of "
+            f"{sorted(_RESPONSE_FORMAT_ALIASES)}; leaving per-model responseFormat untouched"
+        )
+        return list(model_configs or [])
+
+    response_format = _RESPONSE_FORMAT_ALIASES[requested]
+    return [
+        {**entry, "responseFormat": response_format} if str(entry.get("modelRole", "")) in _OVERRIDABLE_ROLES else entry
+        for entry in (model_configs or [])
+    ]
+
+
 # Scanners that proxy to a sibling Worker which in turn owns a Cloudflare
 # Container. Used for any scanner that needs a real Python runtime (spaCy,
 # torch, etc.) which Pyodide can't host.
