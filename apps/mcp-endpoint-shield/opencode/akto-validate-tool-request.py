@@ -39,6 +39,7 @@ AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "opencode")
+AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "opencode")
 AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 
@@ -51,7 +52,7 @@ SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
 # Configure API URL based on mode
 if MODE == "atlas":
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    OPENCODE_API_URL = f"https://{device_id}.opencode.local" if device_id else "https://api.opencode.ai"
+    OPENCODE_API_URL = f"https://{device_id}.ai-agent.{AKTO_CONNECTOR_VALUE}" if device_id else "https://api.opencode.ai"
     logger.info(f"MODE: {MODE}, Device ID: {device_id}, OPENCODE_API_URL: {OPENCODE_API_URL}")
 else:
     OPENCODE_API_URL = os.getenv("OPENCODE_API_URL", "https://api.opencode.ai")
