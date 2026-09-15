@@ -1,9 +1,18 @@
 package com.akto.data_actor;
 
 import com.akto.MongoBasedTest;
+import com.akto.dao.AgentUsersDao;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dto.AgenticUsers;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.util.Constants;
+import com.mongodb.client.model.Filters;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -119,5 +128,112 @@ public class TestDbLayer extends MongoBasedTest {
         assertEquals(host, collection.getHostName());
         // Verify the original VPC ID is preserved
         assertEquals(existingVpcId, collection.getUserSetEnvType());
+    }
+
+    private static Map<String, Object> claudeLogin(String agentType, String email, String organizationUuid) {
+        Map<String, Object> login = new HashMap<>();
+        login.put("agentType", agentType);
+        login.put("email", email);
+        login.put("loggedIn", !email.isEmpty());
+        if (!organizationUuid.isEmpty()) login.put("organizationUuid", organizationUuid);
+        return login;
+    }
+
+    private static void heartbeat(String moduleId, String deviceName, Map<String, Object> agentLogins) {
+        ModuleInfo moduleInfo = new ModuleInfo();
+        moduleInfo.setId(moduleId);
+        moduleInfo.setName(deviceName);
+        moduleInfo.setModuleType(ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD);
+        Map<String, Object> additionalData = new HashMap<>();
+        additionalData.put("agentLogins", agentLogins);
+        moduleInfo.setAdditionalData(additionalData);
+        DbLayer.updateModuleInfo(moduleInfo);
+    }
+
+    @Test
+    public void testSyncClaudeAgentUsers_desktopAndCliCollapseToOneUser() {
+        String email = "collapse@akto.io";
+        String orgUuid = "e68d326b-0acb-4573-85a6-4ed867827c96";
+        Map<String, Object> agentLogins = new HashMap<>();
+        agentLogins.put("claude-desktop", claudeLogin("claude-desktop", email, orgUuid));
+        agentLogins.put("claude-cli-user", claudeLogin("claude-cli-user", email, orgUuid));
+        // Neither of these should ever produce an agent user.
+        agentLogins.put("cursor", claudeLogin("cursor", "cursor-user@akto.io", orgUuid));
+        agentLogins.put("claude-plugin", claudeLogin("claude-plugin", "plugin-user@akto.io", orgUuid));
+
+        heartbeat("module-collapse-1", "device-collapse-1", agentLogins);
+
+        List<AgenticUsers> users = AgentUsersDao.instance.findAll(Filters.eq(AgenticUsers.USER_EMAIL, email));
+        assertEquals(1, users.size());
+        AgenticUsers user = users.get(0);
+        assertEquals(email + "_" + orgUuid, user.getUserId());
+        assertEquals("collapse", user.getUserName());
+        assertEquals(1, user.getDevices().size());
+        assertEquals("device-collapse-1", user.getDevices().get(0));
+
+        assertTrue(AgentUsersDao.instance.findAll(Filters.eq(AgenticUsers.USER_EMAIL, "cursor-user@akto.io")).isEmpty());
+        assertTrue(AgentUsersDao.instance.findAll(Filters.eq(AgenticUsers.USER_EMAIL, "plugin-user@akto.io")).isEmpty());
+    }
+
+    @Test
+    public void testSyncClaudeAgentUsers_sameUuidReusesRowAndAccumulatesDevices() {
+        String email = "repeat@akto.io";
+        String orgUuid = "11111111-1111-1111-1111-111111111111";
+        Map<String, Object> agentLogins = new HashMap<>();
+        agentLogins.put("claude-desktop", claudeLogin("claude-desktop", email, orgUuid));
+
+        heartbeat("module-repeat-1", "device-repeat-1", agentLogins);
+        heartbeat("module-repeat-1", "device-repeat-1", agentLogins);
+        heartbeat("module-repeat-2", "device-repeat-2", agentLogins);
+
+        List<AgenticUsers> users = AgentUsersDao.instance.findAll(Filters.eq(AgenticUsers.USER_EMAIL, email));
+        assertEquals(1, users.size());
+        assertEquals(2, users.get(0).getDevices().size());
+        assertTrue(users.get(0).getDevices().contains("device-repeat-1"));
+        assertTrue(users.get(0).getDevices().contains("device-repeat-2"));
+    }
+
+    @Test
+    public void testSyncClaudeAgentUsers_newOrgUuidCreatesNewUser() {
+        String email = "multiorg@akto.io";
+        String firstOrg = "22222222-2222-2222-2222-222222222222";
+        String secondOrg = "33333333-3333-3333-3333-333333333333";
+
+        Map<String, Object> firstLogins = new HashMap<>();
+        firstLogins.put("claude-desktop", claudeLogin("claude-desktop", email, firstOrg));
+        heartbeat("module-multiorg-1", "device-multiorg-1", firstLogins);
+
+        Map<String, Object> secondLogins = new HashMap<>();
+        secondLogins.put("claude-desktop", claudeLogin("claude-desktop", email, secondOrg));
+        heartbeat("module-multiorg-1", "device-multiorg-1", secondLogins);
+
+        assertEquals(2, AgentUsersDao.instance.findAll(Filters.eq(AgenticUsers.USER_EMAIL, email)).size());
+        assertNotNull(AgentUsersDao.instance.findOne(Filters.eq(AgenticUsers.USER_ID, email + "_" + firstOrg)));
+        assertNotNull(AgentUsersDao.instance.findOne(Filters.eq(AgenticUsers.USER_ID, email + "_" + secondOrg)));
+    }
+
+    @Test
+    public void testSyncClaudeAgentUsers_noOrgUuidKeysOnEmailAlone() {
+        String email = "personal@gmail.com";
+        Map<String, Object> agentLogins = new HashMap<>();
+        agentLogins.put("claude-desktop", claudeLogin("claude-desktop", email, ""));
+
+        heartbeat("module-personal-1", "device-personal-1", agentLogins);
+
+        AgenticUsers user = AgentUsersDao.instance.findOne(Filters.eq(AgenticUsers.USER_EMAIL, email));
+        assertNotNull(user);
+        assertEquals(email, user.getUserId());
+        assertEquals("personal", user.getUserName());
+    }
+
+    @Test
+    public void testSyncClaudeAgentUsers_loggedOutAgentCreatesNothing() {
+        Map<String, Object> agentLogins = new HashMap<>();
+        agentLogins.put("claude-desktop", claudeLogin("claude-desktop", "", ""));
+        agentLogins.put("claude-cli-user", claudeLogin("claude-cli-user", "", ""));
+
+        long before = AgentUsersDao.instance.getMCollection().countDocuments();
+        heartbeat("module-loggedout-1", "device-loggedout-1", agentLogins);
+        assertEquals(before, AgentUsersDao.instance.getMCollection().countDocuments());
     }
 }

@@ -312,12 +312,31 @@ public class DbLayer {
         return updates;
     }
 
+    private static final String AGENT_LOGINS_KEY = "agentLogins";
+    private static final String CLAUDE_DESKTOP_AGENT_TYPE = "claude-desktop";
+    // The CLI reports itself once per config scope it found a login in
+    // (claude-cli-user/project/local/enterprise); only the user scope is read.
+    private static final String CLAUDE_CLI_USER_AGENT_TYPE = "claude-cli-user";
+    private static final Set<String> CLAUDE_AGENT_LOGIN_TYPES =
+            new HashSet<>(Arrays.asList(CLAUDE_DESKTOP_AGENT_TYPE, CLAUDE_CLI_USER_AGENT_TYPE));
+    private static final String CLAUDE_AGENT_LOGIN_SOURCE = "claude-agent-login";
+
     private static void syncAgentUserFromModuleInfo(ModuleInfo moduleInfo) {
         if (moduleInfo == null) {
             return;
         }
         Map<String, Object> additionalData = moduleInfo.getAdditionalData();
-        if (additionalData == null || !additionalData.containsKey("username")) {
+        if (additionalData == null) {
+            return;
+        }
+        // Independent of the username/tag sync below — a device reports its Claude logins whether
+        // or not it reports an OS username, and one path failing must not skip the other.
+        try {
+            syncClaudeAgentUsersFromModuleInfo(moduleInfo);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error syncing claude agent users from module info: " + e.getMessage(), LogDb.DB_ABS);
+        }
+        if (!additionalData.containsKey("username")) {
             return;
         }
         try {
@@ -339,6 +358,47 @@ public class DbLayer {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error syncing agent user from module info: " + e.getMessage(), LogDb.DB_ABS);
         }
+    }
+
+    /**
+     * Creates/refreshes an agent user for each Claude login the device reports under
+     * additionalData.agentLogins — only the "claude-desktop" and "claude-cli-user" entries.
+     *
+     * Identity is (email, organizationUuid): the same email under a different Claude org is a
+     * different user, so it gets its own row. Personal accounts report no organizationUuid and
+     * key on the email alone, which is the same userId the "ai-agent-email" collection tag
+     * already writes (see upsertFromEmailTag) — so those converge onto one row instead of
+     * duplicating. Re-reporting a known pair only updates it; an unseen one inserts.
+     */
+    private static void syncClaudeAgentUsersFromModuleInfo(ModuleInfo moduleInfo) {
+        Object agentLoginsObj = moduleInfo.getAdditionalData().get(AGENT_LOGINS_KEY);
+        if (!(agentLoginsObj instanceof Map)) {
+            return;
+        }
+        String deviceId = StringUtils.trimToNull(moduleInfo.getName());
+        // Both keys are read out of the same ~/.claude.json, so one heartbeat usually carries the
+        // same identity twice — collapse before writing.
+        Set<String> syncedUserIds = new HashSet<>();
+        for (String agentType : CLAUDE_AGENT_LOGIN_TYPES) {
+            Object loginObj = ((Map<?, ?>) agentLoginsObj).get(agentType);
+            if (!(loginObj instanceof Map)) continue;
+            Map<?, ?> login = (Map<?, ?>) loginObj;
+
+            // A logged-out agent reports a blank email and has no identity to create.
+            String email = StringUtils.trimToEmpty(stringValueOf(login.get("email")));
+            if (email.isEmpty()) continue;
+
+            String organizationUuid = StringUtils.trimToEmpty(stringValueOf(login.get("organizationUuid")));
+            String userId = organizationUuid.isEmpty() ? email : email + "_" + organizationUuid;
+            if (!syncedUserIds.add(userId)) continue;
+
+            AgentUsersDao.instance.upsertAgentUserIdentity(userId, AgentUsersDao.deriveUsernameFromEmail(email),
+                    email, deviceId, CLAUDE_AGENT_LOGIN_SOURCE);
+        }
+    }
+
+    private static String stringValueOf(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 
     private static void putIfPresent(Map<String, List<String>> deviceTagUpdates, String tagKey, Object rawValue) {
@@ -450,7 +510,7 @@ public class DbLayer {
             Filters.eq(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType())
         );
 
-        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(filter,
+        ModuleInfo result = ModuleInfoDao.instance.getMCollection().findOneAndUpdate(filter,
                 Updates.combine(
                         //putting class name because findOneAndUpdate doesn't put class name by default
                         Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
@@ -462,6 +522,12 @@ public class DbLayer {
                         Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
                         Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
                 ), updateOptions);
+
+        // Same agent user sync updateModuleInfo/bulkUpdateModuleInfo do — a device heartbeating
+        // through V2 reports the same agentLogins and must produce the same identities.
+        syncAgentUserFromModuleInfo(moduleInfo);
+
+        return result;
     }
 
     public static void updateDeviceDomainListDelta(String deviceId, String domainKey,
@@ -3667,10 +3733,6 @@ public class DbLayer {
         }
         return result;
     }
-
-    private static final String AGENT_LOGINS_KEY = "agentLogins";
-    private static final String CLAUDE_DESKTOP_AGENT_TYPE = "claude-desktop";
-    private static final String CLAUDE_CLI_USER_AGENT_TYPE = "claude-cli-user";
 
     /**
      * device name -> agent type -> that agent's login block from additionalData.agentLogins
