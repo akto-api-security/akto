@@ -211,7 +211,8 @@ public class InsightDataLoader {
                 boolean hasTagTargeting = p.getTargetTags() != null && !p.getTargetTags().isEmpty();
                 boolean hasTargeting = hasTagTargeting || (p.getTargetDeviceIds() != null && !p.getTargetDeviceIds().isEmpty());
                 if (hasTargeting) {
-                    p.setApplyToDeviceIds(AgentUsersDao.instance.findDeviceIdsByTags(p.getTargetTags(), p.getTargetDeviceIds()));
+                    p.setApplyToDeviceIds(AgentUsersDao.instance.findDeviceIdsByTags(
+                            p.getTargetTags(), p.getNegatedTargetTags(), p.getTargetDeviceIds(), p.isNegatedTargetDeviceIds()));
                 }
                 active.add(p);
             }
