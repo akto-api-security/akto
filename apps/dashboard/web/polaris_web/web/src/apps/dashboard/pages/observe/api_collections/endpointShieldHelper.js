@@ -6,6 +6,11 @@ const MODULE_TYPE = {
 };
 const DEFAULT_VALUE = '-';
 
+// Installer device IDs are raw hex (no hyphens); extension IDs are hyphenated UUIDs or missing ("-").
+// Newer extension builds also suffix their version with "-extension"
+const isExtensionAgent = (deviceId, agentVersion) =>
+    !deviceId || deviceId.includes('-') || !!agentVersion?.toLowerCase().includes('extension');
+
 const USERNAME_TAG_KEYS = new Set([
     'username',
     'user',
@@ -242,5 +247,6 @@ export {
     getUsernameForCollection,
     getResolvedUsernameForCollection,
     MODULE_TYPE,
-    DEFAULT_VALUE
+    DEFAULT_VALUE,
+    isExtensionAgent
 };
