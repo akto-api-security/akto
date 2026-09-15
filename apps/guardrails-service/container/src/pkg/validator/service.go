@@ -2012,7 +2012,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// blocking — a mask or alert verdict is unenforceable on that payload shape. Skipped for a
 	// pending approval, which owns its own response. See upgradeBrowserAttachmentVerdict.
 	if activityID == "" {
-		s.upgradeBrowserAttachmentVerdict(result, params, preRedactionPayload, sessionID)
+		s.upgradeBrowserAttachmentVerdict(result, params, sessionID)
 	}
 	return result, activityID, nil
 }
