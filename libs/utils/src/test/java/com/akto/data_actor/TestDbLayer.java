@@ -3,6 +3,7 @@ package com.akto.data_actor;
 import com.akto.MongoBasedTest;
 import com.akto.dao.AgentUsersDao;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.monitoring.ModuleInfo;
@@ -13,6 +14,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -128,6 +131,20 @@ public class TestDbLayer extends MongoBasedTest {
         assertEquals(host, collection.getHostName());
         // Verify the original VPC ID is preserved
         assertEquals(existingVpcId, collection.getUserSetEnvType());
+    }
+
+    // Mirrors DbLayer.CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_ID — the sync is gated to this account, so
+    // every Claude test below runs (and asserts) inside its account context.
+    private static final int CLAUDE_SYNC_ACCOUNT_ID = 1726615470;
+
+    @Before
+    public void useClaudeSyncAccount() {
+        Context.accountId.set(CLAUDE_SYNC_ACCOUNT_ID);
+    }
+
+    @After
+    public void restoreDefaultAccount() {
+        Context.accountId.set(ACCOUNT_ID);
     }
 
     private static Map<String, Object> claudeLogin(String agentType, String email, String organizationUuid) {
