@@ -185,4 +185,17 @@ func TestFilterPoliciesByMcpServer_Negation(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("agent server underscore and hyphen are equivalent", func(t *testing.T) {
+		p := types.Policy{
+			SelectedAgentServers: map[string]struct{}{
+				"asl_demo_agent_demo": {},
+			},
+		}
+		// Host header normalized by HttpProxyAction: underscores become hyphens.
+		got := s.filterPoliciesByMcpServer([]types.Policy{p}, "asl-demo-agent-demo")
+		if len(got) != 1 {
+			t.Fatalf("expected policy to match hyphenated host, got %d policies", len(got))
+		}
+	})
 }

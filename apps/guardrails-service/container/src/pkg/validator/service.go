@@ -333,8 +333,18 @@ func rawBucketContains(mcpServerNameLower string, servers map[string]struct{}, s
 	return false
 }
 
+// canonicalServerToken normalizes agent/server identifiers for policy matching.
+// HttpProxyAction lowercases Host and maps underscores to hyphens before
+// guardrails sees them; inventory and policy UI often keep AWS/runtime
+// underscores. Treat the two spellings as equivalent at match time.
+func canonicalServerToken(s string) string {
+	return strings.ReplaceAll(strings.ToLower(s), "_", "-")
+}
+
 // looseServerMatch is the pre-type-scoping exact/suffix/contains match, kept as a fallback for legacy compound keys.
 func looseServerMatch(nameLower, storedLower string) bool {
+	nameLower = canonicalServerToken(nameLower)
+	storedLower = canonicalServerToken(storedLower)
 	if storedLower == nameLower {
 		return true
 	}
@@ -349,6 +359,8 @@ func looseServerMatch(nameLower, storedLower string) bool {
 
 // agentSegmentMatch checks storedLower against the clientType segment of "{deviceLabel}.{clientType}.{host}".
 func agentSegmentMatch(nameLower, storedLower string) bool {
+	nameLower = canonicalServerToken(nameLower)
+	storedLower = canonicalServerToken(storedLower)
 	if nameLower == storedLower {
 		return true
 	}
@@ -367,6 +379,8 @@ func agentSegmentMatch(nameLower, storedLower string) bool {
 
 // hostSegmentMatch checks storedLower against the trailing host segment of "{deviceLabel}.{clientType}.{host}".
 func hostSegmentMatch(nameLower, storedLower string) bool {
+	nameLower = canonicalServerToken(nameLower)
+	storedLower = canonicalServerToken(storedLower)
 	if nameLower == storedLower {
 		return true
 	}
@@ -423,6 +437,10 @@ func deviceIDsContain(ids []string, label string) bool {
 // these are the two independent picks the dashboard offers ("Devices" vs. "Users"), so a match on
 // either is sufficient. A policy is targeted when either ApplyToDeviceIds is non-nil or UserMetadata
 // is non-empty; when neither is configured, the policy applies to everyone.
+//
+// ApplyToDeviceIds already has device/tag Include-vs-Exclude baked in server-side, so labelMatched
+// needs no further negation. UserMetadata has no such resolution, so NegatedTargetUserNames is
+// applied here instead, against the actual request's email.
 func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName string, headers map[string]string) []types.Policy {
 	deviceLabel := deviceLabelFromMcpServerName(mcpServerName)
 	email := ""
@@ -447,6 +465,14 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 			if email != "" {
 				emailMatched = findUserMetadataByEmail(p.UserMetadata, email) != nil
 			}
+			// Negate OUTSIDE the email guard: an unidentified request is, by definition, not one
+			// of the excluded people, so an Exclude list must still cover it. Negating only when
+			// an email resolved would drop the policy for every client that sends no
+			// x-akto-installer-user_email header (Claude Desktop, mirrored traffic) — failing
+			// open on exactly the requests nobody has vouched for.
+			if p.NegatedTargetUserNames {
+				emailMatched = !emailMatched
+			}
 		}
 
 		matched := labelMatched || emailMatched
@@ -458,6 +484,9 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 			zap.String("email", email),
 			zap.Bool("labelMatched", labelMatched),
 			zap.Bool("emailMatched", emailMatched),
+			// Without this, an emailMatched=true on a policy whose user list does NOT contain the
+			// request's email is indistinguishable from a bug — it's the Exclude list working.
+			zap.Bool("negatedTargetUserNames", p.NegatedTargetUserNames),
 			zap.Bool("matched", matched))
 		if matched {
 			filtered = append(filtered, p)
@@ -466,11 +495,25 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 	return filtered
 }
 
-// findUserMetadataByEmail returns the first UserMetadata row whose UserEmail matches email
-// case-insensitively, or nil if none match.
+// findUserMetadataByEmail returns the first UserMetadata row matching email case-insensitively,
+// or nil if none match. UserEmail is the field to match on, but a row whose pick never resolved
+// to an identity doc carries no email at all: GuardrailPoliciesAction synthesizes it with
+// setUserEmail(moduleInfoEmailsByUsername.get(userName)), which is null whenever module_info has
+// no entry under that exact username — and the dashboard offers email-shaped usernames as picks,
+// so the address is often sitting in UserName instead.
+//
+// Such a row can never match on UserEmail, which silently inverts the policy: an Include list
+// matches nobody and enforces nothing, while an Exclude list turns "matched nobody" into "matches
+// everybody" and exempts nobody. Both leave the targeted people getting the opposite of what was
+// configured, with the dashboard still showing the selection (it reads back UserName, which is
+// present). Falling back to UserName only when UserEmail is empty recovers those rows without
+// widening a row that does carry an email — there, UserEmail stays the single source of truth.
 func findUserMetadataByEmail(rows []types.AgenticUsers, email string) *types.AgenticUsers {
 	for i := range rows {
 		if strings.EqualFold(rows[i].UserEmail, email) {
+			return &rows[i]
+		}
+		if rows[i].UserEmail == "" && strings.EqualFold(rows[i].UserName, email) {
 			return &rows[i]
 		}
 	}
@@ -2008,6 +2051,12 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	}
 
 	result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, payloadToValidate, sessionID)
+	// Browser-extension traffic that inlined file-attachment content can only be enforced by
+	// blocking — a mask or alert verdict is unenforceable on that payload shape. Skipped for a
+	// pending approval, which owns its own response. See upgradeBrowserAttachmentVerdict.
+	if activityID == "" {
+		s.upgradeBrowserAttachmentVerdict(result, params, sessionID)
+	}
 	return result, activityID, nil
 }
 

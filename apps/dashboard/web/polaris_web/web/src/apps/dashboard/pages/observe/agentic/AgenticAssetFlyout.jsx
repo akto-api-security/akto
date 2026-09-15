@@ -27,7 +27,7 @@ const DEVICES_COL_DEFS = [
 
 const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 
-function DevicesTab({ asset, enrichMaps = {} }) {
+function DevicesTab({ asset, enrichMaps = {}, startTimestamp, endTimestamp }) {
     const handleRowClick = useCallback((e) => {
         if (!e.data) return;
         const deviceId = e.data.deviceId || e.data.endpoint;
@@ -37,7 +37,7 @@ function DevicesTab({ asset, enrichMaps = {} }) {
     // Server-side paginated — scoped to this one asset's own apiCollectionIds (cheap), never the
     // whole account. See AgenticObserveAction.fetchAgenticAssetDevicesPage.
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
-        const { trafficMap, riskScoreMap, userAnalysisFlatMap, usernameMap } = enrichMaps;
+        const { trafficMap, riskScoreMap } = enrichMaps;
         return api.fetchAgenticAssetDevicesPage({
             apiCollectionIds: asset.collectionIds || [],
             skip,
@@ -45,7 +45,7 @@ function DevicesTab({ asset, enrichMaps = {} }) {
             sortKey,
             sortOrder: sortOrder ? -sortOrder : -1,
             queryValue: searchString || undefined,
-            trafficMap, riskScoreMap, userAnalysisFlatMap, usernameMap,
+            trafficMap, riskScoreMap, startTimestamp, endTimestamp,
         }).then((res) => ({
             value: (res.devices || []).map((d) => ({
                 ...d,
@@ -53,7 +53,7 @@ function DevicesTab({ asset, enrichMaps = {} }) {
             })),
             total: res.total || 0,
         }));
-    }, [asset.collectionIds, enrichMaps]);
+    }, [asset.collectionIds, enrichMaps, startTimestamp, endTimestamp]);
 
     return (
         <AgGridTable
@@ -128,10 +128,10 @@ export default function AgenticAssetFlyout({
         let cancelled = false;
         (async () => {
             try {
-                const { trafficMap, riskScoreMap, userAnalysisFlatMap } = enrichMaps;
+                const { trafficMap, riskScoreMap } = enrichMaps;
                 const detail = await api.fetchAgenticAssetDetail({
                     groupKey: rawAsset.groupKey, rowType: rawAsset.rowType,
-                    trafficMap, riskScoreMap, userAnalysisFlatMap,
+                    trafficMap, riskScoreMap, startTimestamp, endTimestamp,
                 });
                 if (!cancelled) setAssetDetail(detail);
             } catch {
@@ -305,7 +305,7 @@ export default function AgenticAssetFlyout({
                             </div>
                         )}
                         {selectedTab === 2 && <ViolationsTab asset={asset} startTimestamp={startTimestamp} endTimestamp={endTimestamp} onViolationClick={asset?.type === "Skill" ? () => handleTabSelect(1) : undefined} onTotalChange={setViolationsTotal} />}
-                        {selectedTab === 3 && <DevicesTab asset={asset} enrichMaps={enrichMaps} />}
+                        {selectedTab === 3 && <DevicesTab asset={asset} enrichMaps={enrichMaps} startTimestamp={startTimestamp} endTimestamp={endTimestamp} />}
                     </>
                 )}
             </Box>

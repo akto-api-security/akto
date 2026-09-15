@@ -1,6 +1,6 @@
 import { Text, HorizontalStack, Icon, Tooltip } from "@shopify/polaris"
 import { StatusActiveMajor, DiamondAlertMinor, RefreshMinor, ClockMinor } from "@shopify/polaris-icons"
-import { useEffect, useReducer, useState, useCallback } from "react"
+import { useEffect, useReducer, useState, useCallback, useRef } from "react"
 import values from "@/util/values";
 import { produce } from "immer"
 import func from "@/util/func"
@@ -12,7 +12,7 @@ import settingRequests from "../../settings/api";
 import PersistStore from "../../../../main/PersistStore";
 import { mapLabel } from "../../../../main/labelHelper";
 import AgentDetails from "./AgentDetails";
-import { DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
+import { DEFAULT_VALUE, isExtensionAgent } from "../api_collections/endpointShieldHelper";
 
 const createHeading = (text, value = null, sortKey = null) => ({
     text,
@@ -82,11 +82,6 @@ const getIconFromMap = (value, map) => {
     }
     return null;
 };
-
-// Installer device IDs are raw hex (no hyphens); extension IDs are hyphenated UUIDs or missing ("-").
-// Newer extension builds also suffix their version with "-extension" 
-const isExtensionAgent = (deviceId, agentVersion) =>
-    !deviceId || deviceId.includes('-') || !!agentVersion?.toLowerCase().includes('extension');
 
 const getOsOrBrowserComp = (agentData) => {
     if (agentData?.provider === 'claude' && agentData?.orgName) {
@@ -217,6 +212,7 @@ function EndpointShieldMetadata() {
     const [showFlyout, setShowFlyout] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
     const [allowedEnvFields, setAllowedEnvFields] = useState([]);
+    const agentsCacheRef = useRef({});
     const [filters, setFilters] = useState([
         createFilter('username', 'Username'),
         createFilter('hostname', 'Hostname'),
@@ -281,6 +277,7 @@ function EndpointShieldMetadata() {
             const agents = (resp?.moduleInfos || []).map(mapModuleToAgent);
             total = resp?.total || 0;
             ret = agents.map(convertDataIntoTableFormat);
+            ret.forEach((agent) => { agentsCacheRef.current[agent.agentId] = agent; });
         } catch (error) {
             console.error("Error fetching MCP Endpoint Shield metadata:", error);
         } finally {
@@ -289,19 +286,97 @@ function EndpointShieldMetadata() {
         return { value: ret, total };
     }, [startTimestamp, endTimestamp]);
 
+    // Delete stays restricted to internal akto.io users (destructive — removes agent info entries
+    // outright). Enable/Disable System Proxy is reversible (just flips an env flag and reboots the
+    // agent, same as the single-device Configure tab's toggle) and available to anyone who can
+    // reach this page — the backend still enforces ADMIN_ACTIONS regardless.
     const allowBulkActions = window.USER_NAME && window.USER_NAME.endsWith("@akto.io");
 
     const promotedBulkActions = (selectedAgents) => {
         const actions = [];
+        const agentCount = selectedAgents.length;
+        const agentWord = `agent${agentCount > 1 ? "s" : ""}`;
+
+        const selectedAgentsMeta = selectedAgents.map((id) => agentsCacheRef.current[id]).filter(Boolean);
+        const allInstallers = selectedAgentsMeta.length === agentCount &&
+            selectedAgentsMeta.every((a) => !isExtensionAgent(a.deviceId, a.agentVersion));
+
+        const bulkToggleSystemProxy = (enable) => () => {
+            const verb = enable ? "enable" : "disable";
+            const msg = `Are you sure you want to ${verb} system proxy for ${agentCount} ${agentWord}? They will pick up the change on their next reboot.`;
+            func.showConfirmationModal(msg, enable ? "Enable" : "Disable", async () => {
+                try {
+                    await settingRequests.bulkUpdateModuleEnvAndReboot(selectedAgents, { ENABLE_SYSTEM_PROXY: enable ? "true" : "false" });
+                    func.setToast(true, false, `System proxy ${enable ? "enabled" : "disabled"} for ${agentCount} ${agentWord}. Agents will pick up changes shortly.`);
+                    setRefreshKey(k => k + 1);
+                } catch (error) {
+                    console.error("Error updating system proxy:", error);
+                    func.setToast(true, true, "Failed to update system proxy");
+                }
+            });
+        };
+
+        actions.push({
+            content: `Enable system proxy for ${agentCount} ${agentWord}`,
+            onAction: bulkToggleSystemProxy(true),
+        });
+        actions.push({
+            content: `Disable system proxy for ${agentCount} ${agentWord}`,
+            onAction: bulkToggleSystemProxy(false),
+        });
+
+        if (allInstallers) {
+            const bulkToggleAutoUpdate = (enable) => () => {
+                const verb = enable ? "enable" : "disable";
+                const msg = `Are you sure you want to ${verb} auto update for ${agentCount} ${agentWord}? They will pick up the change on their next reboot.`;
+                func.showConfirmationModal(msg, enable ? "Enable" : "Disable", async () => {
+                    try {
+                        await settingRequests.bulkUpdateModuleEnvAndReboot(selectedAgents, { ENABLE_AUTO_UPDATE: enable ? "true" : "false" });
+                        func.setToast(true, false, `Auto update ${enable ? "enabled" : "disabled"} for ${agentCount} ${agentWord}. Agents will pick up changes shortly.`);
+                        setRefreshKey(k => k + 1);
+                    } catch (error) {
+                        console.error("Error updating auto update flag:", error);
+                        func.setToast(true, true, "Failed to update auto update setting");
+                    }
+                });
+            };
+
+            actions.push({
+                content: `Enable auto update for ${agentCount} ${agentWord}`,
+                onAction: bulkToggleAutoUpdate(true),
+            });
+            actions.push({
+                content: `Disable auto update for ${agentCount} ${agentWord}`,
+                onAction: bulkToggleAutoUpdate(false),
+            });
+
+            actions.push({
+                content: `Update ${agentCount} ${agentWord} to latest version`,
+                onAction: () => {
+                    const msg = `Are you sure you want to update ${agentCount} ${agentWord} to the latest version? They will pick up the change on their next reboot.`;
+                    func.showConfirmationModal(msg, "Update", async () => {
+                        try {
+                            await settingRequests.bulkUpdateModuleEnvAndReboot(selectedAgents, { UPDATE_TO_LATEST_VERSION: "true" });
+                            func.setToast(true, false, `${agentCount} ${agentWord} queued to update to the latest version.`);
+                            setRefreshKey(k => k + 1);
+                        } catch (error) {
+                            console.error("Error triggering update to latest version:", error);
+                            func.setToast(true, true, "Failed to trigger update to latest version");
+                        }
+                    });
+                },
+            });
+        }
+
         if (allowBulkActions) {
             actions.push({
-                content: `Delete ${selectedAgents.length} agent info entr${selectedAgents.length > 1 ? "ies" : "y"}`,
+                content: `Delete ${agentCount} agent info entr${agentCount > 1 ? "ies" : "y"}`,
                 onAction: async () => {
-                    const msg = `Are you sure you want to delete ${selectedAgents.length} agent info entr${selectedAgents.length > 1 ? "ies" : "y"}?`;
+                    const msg = `Are you sure you want to delete ${agentCount} agent info entr${agentCount > 1 ? "ies" : "y"}?`;
                     func.showConfirmationModal(msg, "Delete", async () => {
                         try {
                             await settingRequests.deleteModuleInfo(selectedAgents);
-                            func.setToast(true, false, `${selectedAgents.length} agent info entr${selectedAgents.length > 1 ? "ies" : "y"} deleted successfully`);
+                            func.setToast(true, false, `${agentCount} agent info entr${agentCount > 1 ? "ies" : "y"} deleted successfully`);
                             window.location.reload();
                         } catch (error) {
                             console.error("Error deleting agent info:", error);
@@ -363,7 +438,7 @@ function EndpointShieldMetadata() {
                         headings={headings}
                         onRowClick={handleRowClick}
                         rowClickable={true}
-                        selectable={allowBulkActions}
+                        selectable={true}
                         promotedBulkActions={promotedBulkActions}
                     />
                 ]}
