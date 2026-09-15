@@ -300,8 +300,6 @@ function EndpointShieldMetadata() {
         const selectedAgentsMeta = selectedAgents.map((id) => agentsCacheRef.current[id]).filter(Boolean);
         const allInstallers = selectedAgentsMeta.length === agentCount &&
             selectedAgentsMeta.every((a) => !isExtensionAgent(a.deviceId, a.agentVersion));
-        const allAutoUpdateDisabled = allInstallers &&
-            selectedAgentsMeta.every((a) => a._moduleData?.additionalData?.env?.ENABLE_AUTO_UPDATE !== "true");
 
         const bulkToggleSystemProxy = (enable) => () => {
             const verb = enable ? "enable" : "disable";
@@ -354,7 +352,6 @@ function EndpointShieldMetadata() {
 
             actions.push({
                 content: `Update ${agentCount} ${agentWord} to latest version`,
-                disabled: !allAutoUpdateDisabled,
                 onAction: () => {
                     const msg = `Are you sure you want to update ${agentCount} ${agentWord} to the latest version? They will pick up the change on their next reboot.`;
                     func.showConfirmationModal(msg, "Update", async () => {
