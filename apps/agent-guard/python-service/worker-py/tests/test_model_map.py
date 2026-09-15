@@ -23,13 +23,21 @@ class FakeProvider:
 
 
 class FakeScanner:
-    """Stands in for LLMScanner; returns scripted[provider] and records calls."""
+    """Stands in for LLMScanner; returns scripted[provider] and records calls.
+
+    Mirrors the real LLMScanner(provider, response_format) signature so the
+    cascade's per-model format plumbing is exercised rather than stubbed away;
+    formats records what each provider was constructed with.
+    """
 
     script = {}
     calls = []
+    formats = {}
 
-    def __init__(self, provider):
+    def __init__(self, provider, response_format=""):
         self.provider = provider
+        self.response_format = response_format
+        FakeScanner.formats[provider.name] = response_format
 
     async def scan(self, scanner_name, scanner_type, text, config):
         FakeScanner.calls.append(self.provider.name)
@@ -44,6 +52,7 @@ class FakeScanner:
 @pytest.fixture(autouse=True)
 def patch_providers(monkeypatch):
     FakeScanner.calls = []
+    FakeScanner.formats = {}
     FakeScanner.script = {}
     monkeypatch.setattr(model_map, "build_provider_from_config", lambda entry: FakeProvider(entry["provider"]))
     # run() does `from llm_scanner import LLMScanner`; patch it there.
@@ -274,3 +283,17 @@ async def test_arbiter_reason_priority_follows_modelconfigs_order():
     r = await _run(cfg, {"anthropic": anthropic_unsafe, "gemma_vertexai": gemma_unsafe})
     assert r["details"]["llm_provider"] == "anthropic"
     assert r["details"]["reason"] == "anthropic reason"
+
+
+async def test_response_format_is_per_model_not_global():
+    """A fast tier may answer in letters while the arbiter stays on JSON.
+
+    The arbiter's verdict is the one reported, and the letter contract carries
+    no reason string — so responseFormat must reach each scanner individually.
+    """
+    cfg = [
+        _entry("gemma_foundry", "FAST_THREAT_FILTER", responseFormat="abcd"),
+        _entry("gemma_vertexai", "FINAL_ARBITER"),
+    ]
+    await _run(cfg, {"gemma_foundry": UNSAFE, "gemma_vertexai": UNSAFE})
+    assert FakeScanner.formats == {"gemma_foundry": "abcd", "gemma_vertexai": ""}

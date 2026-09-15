@@ -55,15 +55,6 @@ WORKED EXAMPLES (snippet -> verdict):
   "apiKey": "sk-Abc9XyZ0qP"                         -> isPassword=true,  values=["sk-Abc9XyZ0qP"]  (credential key AND known format)
   region = "AKIA5XYZ12ABCD34EFGH"                   -> isPassword=true,  values=["AKIA5XYZ12ABCD34EFGH"]  (non-credential key, but AWS format is self-identifying)
 
-ASSIGNMENT TRAP - the most common mistake: in `key = "X"` or `"password": "X"`, judge X, NOT the key. If X is a reference (env|NAME, $NAME, ${{ secrets.NAME }}) or an ALL_CAPS name, it is NOT a value even though the key is literally called "password". `password = "env|CHARGE_COLLECTIONS_WDA_PASSWORD"` loads the secret from elsewhere - the text holds no credential.
-
-WORKED EXAMPLES (snippet -> verdict):
-  password = "env|CHARGE_COLLECTIONS_WDA_PASSWORD"  -> isPassword=false, values=[]   (value is an env reference; the ALL_CAPS name is not a value)
-  DB_PASSWORD: ${{ secrets.DB_PASSWORD }}           -> isPassword=false, values=[]   (CI secret reference)
-  TOKEN=$(gh auth token)                            -> isPassword=false, values=[]   (command substitution, produces a token at runtime)
-  export DB_PASS=Hunter2024#                        -> isPassword=true,  values=["Hunter2024#"]   (a literal credential string)
-  "apiKey": "sk-Abc9XyZ0qP"                         -> isPassword=true,  values=["sk-Abc9XyZ0qP"]  (a literal credential string)
-
 When uncertain, output isPassword=false.
 
 "values" = the exact real secret substring(s), copied verbatim; empty when isPassword=false. NEVER put a NAME (ALL_CAPS_WITH_UNDERSCORES), a reference wrapper, or a shell command/variable ($(...), `...`, $VAR, "$VAR") into "values".
@@ -81,5 +72,62 @@ Respond with ONLY valid JSON:
 }"""
 
 
-def build(text: str) -> str:
-    return GEMMA % text
+# Values-only variant: same rules, minimal answer.
+#
+# Password cannot use the single-letter (ABCD) contract — its verdict must carry
+# the exact secret substrings the gateway masks (mcp/pii_password_llm.go reads
+# details["values"]), and a letter cannot. What it CAN drop is everything else:
+#
+#   * "reason", which the JSON contract requires to quote every secret verbatim.
+#     That is output tokens proportional to the secrets found, and it is
+#     redundant — the values already reach the threat report through
+#     piiValueSchemaErrors, and Go falls back to the policy reason when the
+#     model returns none (pii_password_llm.go:226).
+#   * "isPassword" and "riskScore", both derivable from whether values is empty.
+#
+# Derived from GEMMA rather than written out again, so the detection rules stay
+# in one place. The transform rewrites the verdict vocabulary too: a prompt that
+# answers only with values must not talk about an isPassword field that is no
+# longer in its contract.
+_VALUES_CONTRACT = """When uncertain, return no values.
+
+"values" = the exact real secret substring(s), copied verbatim; empty when none is present. NEVER put a NAME (ALL_CAPS_WITH_UNDERSCORES), a reference wrapper, or a shell command/variable ($(...), `...`, $VAR, "$VAR") into "values".
+
+PAYLOAD:
+%s
+
+Respond with ONLY this JSON object and nothing else - no explanation, no reason, no other fields:
+{"values": ["<each REAL secret substring, copied byte-for-byte from the payload; never a NAME, reference, placeholder, or a fragment clipped at a ... boundary>"]}
+
+Return {"values": []} when no real secret VALUE is present."""
+
+# (old phrasing, new phrasing) — applied in order; every isPassword mention must go.
+_VALUES_REWRITES = (
+    ("isPassword=false, values=[]", "values=[]"),
+    ("isPassword=true,  values=", "values="),
+    ("isPassword=true, values=", "values="),
+    ("If BOTH hold -> isPassword=true with that string.", "If BOTH hold -> return that string in values."),
+    ("-> isPassword=false.", "-> return no values."),
+    ("output isPassword=false", "return no values"),
+    ("the answer is isPassword=false", "the answer is no values"),
+    ("The default answer is still isPassword=false unless", "The default answer is still no values unless"),
+)
+
+
+def _to_values_only(template: str) -> str:
+    head = template[: template.index("When uncertain, output isPassword=false.")]
+    for old, new in _VALUES_REWRITES:
+        head = head.replace(old, new)
+    out = head + _VALUES_CONTRACT
+    if "isPassword" in out or "riskScore" in out:
+        leftover = [line.strip() for line in out.splitlines() if "isPassword" in line or "riskScore" in line]
+        raise ValueError(f"password values-only template still names a dropped field: {leftover[:2]}")
+    return out
+
+
+GEMMA_VALUES = _to_values_only(GEMMA)
+
+
+def build(text: str, response_format: str = "") -> str:
+    template = GEMMA_VALUES if response_format == "values" else GEMMA
+    return template % text

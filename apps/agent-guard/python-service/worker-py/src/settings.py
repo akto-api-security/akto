@@ -57,6 +57,14 @@ _FIELDS = (
     "DATABASE_ABSTRACTOR_SERVICE_URL",
     # Per-deployment cascade default modelMap (JSON). Empty → built-in default.
     "DEFAULT_MODEL_CONFIG_JSON",
+    # Answer contract for the FAST cascade tiers, across every cascade scanner:
+    #   ""      → no override; each ModelConfig.responseFormat decides (default)
+    #   "json"  → force the JSON verdict everywhere (kill switch for "abcd")
+    #   "abcd"  → force the single-letter contract on the fast tiers
+    # Applies to whichever scanners have a letter template (prompts._ABCD_CAPABLE);
+    # the rest stay on JSON. The FINAL_ARBITER is never overridden: its verdict is
+    # the one reported, and the letter contract carries no reason. See constants.py.
+    "SCANNER_RESPONSE_FORMAT",
     # Portable anonymizer service URL (e.g. http://anonymizer:8093).
     "ANONYMIZER_URL",
     # --- Per-scanner semantic cache (Redis vector store + embedder service) ---
@@ -131,6 +139,7 @@ class Settings:
     SLACK_WEBHOOK_URL: str
     DATABASE_ABSTRACTOR_SERVICE_URL: str
     DEFAULT_MODEL_CONFIG_JSON: str
+    SCANNER_RESPONSE_FORMAT: str
     ANONYMIZER_URL: str
     DATABASE_ABSTRACTOR_SERVICE_TOKEN: str
     METRICS_PUSH_INTERVAL_SEC: str

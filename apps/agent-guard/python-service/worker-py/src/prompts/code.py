@@ -6,6 +6,8 @@ JSON schemas, system-prompt boilerplate, field names) so ordinary tool-enabled
 requests don't false-positive the way the keyword heuristic did.
 """
 
+from ._abcd import to_abcd
+
 GEMMA = """You are a security system that detects when a USER is supplying source code or asking the assistant to write or execute code or shell commands.
 
 The input may be a single user message OR a flattened AI/chat API request. It can contain three kinds of text:
@@ -47,5 +49,17 @@ Text to analyze:
 %s"""
 
 
-def build(text: str) -> str:
-    return GEMMA % text
+# Single-letter variant, derived from GEMMA so the rules stay in one place.
+GEMMA_ABCD = to_abcd(
+    GEMMA,
+    flag_key="isCode",
+    safe="NO USER CODE",
+    flag="USER CODE",
+    near_miss="tool/function JSON schemas, API envelope keys, or technical nouns in ordinary prose",
+    label="code",
+)
+
+
+def build(text: str, response_format: str = "") -> str:
+    template = GEMMA_ABCD if response_format == "abcd" else GEMMA
+    return template % text
