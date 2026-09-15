@@ -133,8 +133,8 @@ public class TestDbLayer extends MongoBasedTest {
         assertEquals(existingVpcId, collection.getUserSetEnvType());
     }
 
-    // Mirrors DbLayer.CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_ID — the sync is gated to this account, so
-    // every Claude test below runs (and asserts) inside its account context.
+    // One of DbLayer.CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_IDS — the sync is gated to those accounts, so
+    // every Claude test below runs (and asserts) inside one of their account contexts.
     private static final int CLAUDE_SYNC_ACCOUNT_ID = 1726615470;
 
     @Before
