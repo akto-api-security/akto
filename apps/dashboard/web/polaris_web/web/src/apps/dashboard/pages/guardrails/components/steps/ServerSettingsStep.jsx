@@ -81,13 +81,18 @@ const deviceIdSuffix = (deviceId) => {
     return idx >= 0 ? deviceId.slice(idx + 1) : deviceId.slice(0, 8);
 };
 
-const CountPopover = ({ count, label, items }) => {
+const CountPopover = ({ count, label, items, text }) => {
     const [active, setActive] = useState(false);
+    const [pinned, setPinned] = useState(false);
     const [search, setSearch] = useState('');
     const closeTimer = useRef(null);
 
     const open = () => { if (closeTimer.current) clearTimeout(closeTimer.current); setActive(true); };
-    const scheduleClose = () => { closeTimer.current = setTimeout(() => { setActive(false); setSearch(''); }, 150); };
+    const scheduleClose = () => {
+        if (pinned) return;
+        closeTimer.current = setTimeout(() => setActive(false), 200);
+    };
+    const pin = () => { open(); setPinned(true); };
 
     const filtered = (items || []).filter(item =>
         (item.label || '').toLowerCase().includes(search.toLowerCase())
@@ -97,10 +102,10 @@ const CountPopover = ({ count, label, items }) => {
             active={active}
             activator={
                 <span onMouseEnter={open} onMouseLeave={scheduleClose} style={{ cursor: 'pointer' }}>
-                    <Link>{count} {label}</Link>
+                    <Link>{text || `${count} ${label}`}</Link>
                 </span>
             }
-            onClose={() => { setActive(false); setSearch(''); }}
+            onClose={() => { setActive(false); setPinned(false); setSearch(''); }}
         >
             <div onMouseEnter={open} onMouseLeave={scheduleClose}>
                 <Popover.Pane fixed>
@@ -109,6 +114,7 @@ const CountPopover = ({ count, label, items }) => {
                             placeholder={`Search ${label}...`}
                             value={search}
                             onChange={setSearch}
+                            onFocus={pin}
                             autoComplete="off"
                         />
                     </Box>
@@ -429,6 +435,27 @@ const ServerSettingsStep = ({
         </div>
     );
 
+    const typeLabel = (typeOptions, type) => (typeOptions.find(o => o.value === type)?.label || type)
+        .replace(/\s*\[\d+\]/, '')
+        .replace(/\s*\(Beta\)/i, '')
+        .trim();
+
+    const rowCaption = (typeOptions, condition, negated) => {
+        const opts = getOptionsForType(condition.type);
+        const label = typeLabel(typeOptions, condition.type);
+        const values = condition.values || [];
+        const isIncludeAll = !negated && values.length === 1 && values[0] === ALL_VALUES_SENTINEL;
+        const isExcludeNone = negated && values.length === 0;
+        if (isIncludeAll || isExcludeNone) {
+            return { text: `All ${label}`, items: opts, label };
+        }
+        if (values.length === 0) return null;
+        const items = values.map(v => ({ value: v, label: opts.find(o => o.value === v)?.label || v }));
+        return negated
+            ? { text: `All ${label} except ${values.length}`, items, label }
+            : { text: `${values.length} ${label}`, items, label };
+    };
+
     const renderConditionRows = (conditions, typeOptions, dispatch, operator = 'OR', showError = false, getNegationProps = null) => {
         const usedTypes = new Set(conditions.map(c => c.type));
         const availableTypeOptions = typeOptions.filter(o => !o.disabled);
@@ -507,12 +534,29 @@ const ServerSettingsStep = ({
                                     negationProps?.onToggle(false);
                                 }} />
                             </HorizontalStack>
-                            {condition.type === 'USER' && (
-                                <Banner tone="info">{USER_BETA_BANNER_TEXT}</Banner>
-                            )}
                         </VerticalStack>
                     );
                 })}
+                {(() => {
+                    const segments = conditions
+                        .map(c => rowCaption(typeOptions, c, !!getNegationProps?.(c.type)?.negated))
+                        .filter(Boolean);
+                    if (segments.length === 0) return null;
+                    return (
+                        <HorizontalStack gap="1" blockAlign="center" wrap>
+                            <Text variant="bodyMd" color="subdued">This includes</Text>
+                            {segments.flatMap((seg, i) => [
+                                <CountPopover key={`seg-${i}`} text={seg.text} label={seg.label} items={seg.items} />,
+                                i < segments.length - 1 && (
+                                    <Text key={`sep-${i}`} variant="bodyMd" color="subdued">
+                                        {i === segments.length - 2 ? '&' : ','}
+                                    </Text>
+                                )
+                            ]).filter(Boolean)}
+                            <Text variant="bodyMd" color="subdued">.</Text>
+                        </HorizontalStack>
+                    );
+                })()}
                 <HorizontalStack gap="4" blockAlign="center">
                     {!allTypesFilled && <Button onClick={() => dispatch({ type: 'add', obj: { type: nextUnusedType, values: [] } })}>Add condition</Button>}
                     {conditions.length > 0 && (
@@ -524,6 +568,9 @@ const ServerSettingsStep = ({
                 </HorizontalStack>
                 {showError && isDirty && (
                     <InlineError message='Add at least one condition, or switch to "Apply to all".' fieldID="" />
+                )}
+                {conditions.some(c => c.type === 'USER') && (
+                    <Banner tone="info">{USER_BETA_BANNER_TEXT}</Banner>
                 )}
             </VerticalStack>
         );
