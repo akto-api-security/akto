@@ -9,7 +9,7 @@ import func from "@/util/func"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
-import { DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
+import { DEFAULT_VALUE, isExtensionAgent } from "../api_collections/endpointShieldHelper";
 import ModuleEnvConfigComponent from "../../settings/health_logs/ModuleEnvConfig";
 import settingRequests from "../../settings/api";
 import DetailGrid from "../agentic/DetailGrid";
@@ -606,6 +606,17 @@ function AgentDetails({
         panelID: 'agent-logs-panel',
     };
 
+    const configureEnvFields = useMemo(() => {
+        if (!selectedAgent) return allowedEnvFields;
+        const isExtension = isExtensionAgent(selectedAgent.deviceId, selectedAgent.agentVersion);
+        const autoUpdateDisabled = selectedAgent._moduleData?.additionalData?.env?.ENABLE_AUTO_UPDATE !== "true";
+        return (allowedEnvFields || []).filter((field) => {
+            if (isExtension && (field.key === "ENABLE_AUTO_UPDATE" || field.key === "UPDATE_TO_LATEST_VERSION")) return false;
+            if (field.key === "UPDATE_TO_LATEST_VERSION" && !autoUpdateDisabled) return false;
+            return true;
+        });
+    }, [allowedEnvFields, selectedAgent]);
+
     const ConfigureTab = {
         id: 'configure',
         content: 'Configure',
@@ -615,7 +626,7 @@ function AgentDetails({
                     title="Environment Variables"
                     description="Configure environment variables for this agent. Changes will be picked up on the next poll cycle."
                     module={selectedAgent?._moduleData}
-                    allowedEnvFields={allowedEnvFields}
+                    allowedEnvFields={configureEnvFields}
                     onSaveEnv={onSaveEnv}
                 />
             </Box>
