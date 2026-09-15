@@ -38,8 +38,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 
@@ -252,24 +254,34 @@ public class GuardrailPoliciesAction extends UserAction {
             }
             List<AgenticUsers> resolvedUserMetadata = new ArrayList<>();
             if (!pickedUserNames.isEmpty()) {
-                resolvedUserMetadata.addAll(AgentUsersDao.instance.findByUserIdsOrUserNames(new ArrayList<>(), pickedUserNames));
+                // Each pick is resolved as EITHER a userId or a userName — the picker sends the
+                // full userId for an org-scoped Claude identity (one doc per org, all sharing one
+                // userName, so the username alone cannot say which org was meant) and the username
+                // for everything else. The DAO ORs the two fields, and the shapes don't collide, so
+                // handing it the same list twice resolves both kinds in one query.
+                resolvedUserMetadata.addAll(AgentUsersDao.instance.findByUserIdsOrUserNames(pickedUserNames, pickedUserNames));
 
                 // A pick whose only source is module_info reporting (browser extension / Claude
                 // Desktop app) has no agent_users doc at all, so the lookup above can't find it —
                 // re-verify against module_info directly (never trust a client-supplied email) and
                 // always keep the username, attaching an email when module_info actually has one.
-                List<String> resolvedNames = new ArrayList<>();
+                // Track the PICK each resolved row answered, not just its username: an org-scoped
+                // identity is picked by userId while its row still carries the plain shared
+                // username, so matching on username alone would call that pick unresolved and
+                // synthesize a junk row whose userName is really a userId.
+                Set<String> resolvedPicks = new HashSet<>();
                 for (AgenticUsers u : resolvedUserMetadata) {
-                    if (u.getUserName() != null) resolvedNames.add(u.getUserName());
+                    if (u.getUserName() != null) resolvedPicks.add(u.getUserName());
+                    if (u.getUserId() != null) resolvedPicks.add(u.getUserId());
                 }
                 Map<String, String> moduleInfoEmailsByUsername = ModuleInfoDao.instance.fetchUsernameToEmailForEndpointShield();
                 for (String userName : pickedUserNames) {
-                    if (resolvedNames.contains(userName)) continue;
+                    if (resolvedPicks.contains(userName)) continue;
                     AgenticUsers snapshot = new AgenticUsers();
                     snapshot.setUserName(userName);
                     snapshot.setUserEmail(moduleInfoEmailsByUsername.get(userName));
                     resolvedUserMetadata.add(snapshot);
-                    resolvedNames.add(userName);
+                    resolvedPicks.add(userName);
                 }
             }
             policy.setUserMetadata(resolvedUserMetadata);

@@ -133,6 +133,12 @@ const fetchEndpointShieldUserMetadata = async (force = false) => {
             const agenticUsers = agenticUsersResp?.agenticUsers || [];
             agenticUsers.forEach((u) => {
                 if (!u?.userName) return;
+                // First row wins. fetchAgenticUsers emits the username-deduped row — the one whose
+                // deviceTags are the union across that identity's docs — before appending any
+                // org-scoped Claude rows, which deliberately share its userName. Overwriting here
+                // would hand this map one org's doc instead, and a doc created after the last tag
+                // write carries no tags at all, silently blanking that user's team/role/department.
+                if (userMetadataMap[u.userName]) return;
                 userMetadataMap[u.userName] = {
                     userEmail: u.userEmail || '',
                     tags: u.deviceTags || [],
