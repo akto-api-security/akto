@@ -31,6 +31,9 @@ public class AgentConversationDao extends AccountsContextDao<GenericAgentConvers
 
         fieldNames = new String[] { GenericAgentConversation.CONTEXT_SOURCE, "lastUpdatedAt" };
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[] { GenericAgentConversation.USER_ID, "lastUpdatedAt" };
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
     public Bson getContextSourceFilter() {
@@ -42,6 +45,20 @@ public class AgentConversationDao extends AccountsContextDao<GenericAgentConvers
             Filters.eq(GenericAgentConversation.CONTEXT_SOURCE, contextSource.name()),
             Filters.exists(GenericAgentConversation.CONTEXT_SOURCE, false)
         );
+    }
+
+    /**
+     * Strict match on the requesting user, unlike getContextSourceFilter(): a chat's
+     * content is private to the user who had it, so conversations from before this
+     * field existed (userId missing) are intentionally excluded rather than shown to
+     * everyone, to avoid leaking one user's chat history to another.
+     */
+    public Bson getUserFilter() {
+        Integer userId = Context.userId.get();
+        if (userId == null) {
+            return Filters.exists(GenericAgentConversation.USER_ID, false);
+        }
+        return Filters.eq(GenericAgentConversation.USER_ID, userId);
     }
 
 }
