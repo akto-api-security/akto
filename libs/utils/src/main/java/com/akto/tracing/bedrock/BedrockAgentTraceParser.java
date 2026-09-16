@@ -5,6 +5,7 @@ import com.akto.dto.tracing.Trace;
 import com.akto.dto.tracing.Span;
 import com.akto.dto.tracing.TracingConstants;
 import com.akto.tracing.*;
+import com.akto.util.Constants;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -214,27 +215,41 @@ public class BedrockAgentTraceParser implements TraceParser {
 
     @Override
     public Map<String, ServiceGraphEdgeInfo> extractServiceGraph(Object input) throws Exception {
-        return extractServiceGraph(input, null, null, null);
+        return extractServiceGraph(input, null, null);
     }
 
     public Map<String, ServiceGraphEdgeInfo> extractServiceGraph(Object input, String botName) throws Exception {
-        return extractServiceGraph(input, botName, null, null);
+        return extractServiceGraph(input, botName, null);
     }
 
     /**
      * @param botName see {@link #parse(Object, String)}.
-     * @param gatewayName the HTTP-level "gateway-name" tag; when present alongside gatewayRole, an
-     *        extra Gateway node is spliced into the chain between User and the agent node.
-     * @param gatewayRole the HTTP-level "gateway-role" tag, shown as the Gateway node's role.
+     * @param tagsMap the HTTP-level tags map. Reads, all optional:
+     *        <ul>
+     *        <li>"gateway-name" + "gateway-role-resources" — when both present, an extra Gateway
+     *        node is spliced into the chain between User and the agent node, showing the latter
+     *        as the Gateway node's role.</li>
+     *        <li>AKTO_MCP_SERVER_TAG ("mcp-server") — marks that a Gateway fronts an MCP server
+     *        routed straight to it rather than to a distinct orchestrating agent, so the node
+     *        after the gateway should read as an MCP Server, not an AI Agent.</li>
+     *        <li>"mcp-server-host" — the MCP server's real host, used as that node's identity/name
+     *        in place of the bot-name fallback, since a Gateway-fronted MCP target has no "bot" of
+     *        its own.</li>
+     *        </ul>
      */
     public Map<String, ServiceGraphEdgeInfo> extractServiceGraph(Object input, String botName,
-            String gatewayName, String gatewayRole) throws Exception {
+            Map<String, String> tagsMap) throws Exception {
         try {
             JsonNode awsMetadata = parseToJsonNode(input);
 
             if (!isValidBedrockTrace(awsMetadata)) {
                 throw new Exception("Invalid Bedrock Agent trace for service graph extraction");
             }
+
+            String gatewayName = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_GATEWAY_NAME) : null;
+            String gatewayRole = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_GATEWAY_ROLE) : null;
+            boolean isMcpServer = tagsMap != null && tagsMap.containsKey(Constants.AKTO_MCP_SERVER_TAG);
+            String mcpServerHost = tagsMap != null ? tagsMap.get(Constants.AKTO_MCP_SERVER_HOST_TAG) : null;
 
             String agentType = resolveAgentType(awsMetadata);
 
@@ -249,18 +264,26 @@ public class BedrockAgentTraceParser implements TraceParser {
             // metadata below. The map key IS the node id, so folding text that changes (a policy
             // attached to the role, a reordered list) into the name forks a second node for the
             // same agent, and the merge in ServiceGraphBuilder never removes the old one.
-            String sourceService = extractBotName(botName);
+            // A Gateway-fronted MCP target has no "bot" of its own, so it's named after its real
+            // host instead — falling back to the bot-name/"Bedrock Agent" default only when even
+            // that tag is missing.
+            String trimmedMcpServerHost = mcpServerHost != null ? mcpServerHost.trim() : "";
+            boolean hasMcpServerHost = !trimmedMcpServerHost.isEmpty();
+            String sourceService = (isMcpServer && hasMcpServerHost) ? trimmedMcpServerHost : extractBotName(botName);
 
             // Keyed and targeted by the same name — the "User -> agent" edge is what gives the
-            // node its "AI Agent" type; a node that is only ever a source has no type and the UI
-            // falls back to "Internal Service" (same pattern as buildServiceGraphFromSpans in
+            // node its type; a node that is only ever a source has no type and the UI falls
+            // back to "Internal Service" (same pattern as buildServiceGraphFromSpans in
             // HttpCallParser, used by Copilot/Snowflake).
             Map<String, Object> agentMetadata = new HashMap<>();
-            agentMetadata.put("type", TracingConstants.SpanKind.AGENT);
-            agentMetadata.put("edgeParam", "AI Agent");
+            agentMetadata.put("type", isMcpServer ? TracingConstants.SpanKind.MCP_SERVER : TracingConstants.SpanKind.AGENT);
+            agentMetadata.put("edgeParam", isMcpServer ? "MCP Server" : "AI Agent");
             agentMetadata.put("role", executionRole);
             if (!rolePolicies.isEmpty()) {
                 agentMetadata.put("policies", rolePolicies);
+            }
+            if (isMcpServer && hasMcpServerHost) {
+                agentMetadata.put("host", trimmedMcpServerHost);
             }
 
             // Only known when both tags are present — a gateway node with no role to show
@@ -302,8 +325,8 @@ public class BedrockAgentTraceParser implements TraceParser {
                     for (JsonNode toolNameNode : toolsActuallyUsed) {
                         String toolName = toolNameNode.asText("unknown");
                         Map<String, Object> toolsMetadata = new HashMap<>();
-                        toolsMetadata.put("type", "tool");
-                        toolsMetadata.put("edgeParam", "tool call");
+                        toolsMetadata.put("type", isMcpServer ? TracingConstants.SpanKind.MCP_TOOL : TracingConstants.SpanKind.TOOL);
+                        toolsMetadata.put("edgeParam", isMcpServer ? "MCP tool call" : "tool call");
                         toolsMetadata.put("totalToolCalls", totalToolCalls);
                         edges.put(toolName, new ServiceGraphEdgeInfo(sourceService, toolName, toolsMetadata));
                     }
@@ -313,8 +336,8 @@ public class BedrockAgentTraceParser implements TraceParser {
                     String tools = awsMetadata.path("harness-configured-tools").asText("unknown");
                     if (!tools.isEmpty() && !tools.equals("unknown")) {
                         Map<String, Object> toolsMetadata = new HashMap<>();
-                        toolsMetadata.put("type", "tool");
-                        toolsMetadata.put("edgeParam", "configured tools");
+                        toolsMetadata.put("type", isMcpServer ? TracingConstants.SpanKind.MCP_TOOL : TracingConstants.SpanKind.TOOL);
+                        toolsMetadata.put("edgeParam", isMcpServer ? "configured MCP tools" : "configured tools");
                         edges.put(tools, new ServiceGraphEdgeInfo(sourceService, tools, toolsMetadata));
                     }
                 }

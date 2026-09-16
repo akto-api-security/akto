@@ -80,6 +80,10 @@ public class Constants {
 
     public final static String _AKTO = "AKTO";
     public static final String AKTO_MCP_SERVER_TAG = "mcp-server";
+    // The actual MCP server host behind a Gateway — distinct from "gateway-name" (the
+    // gateway's own host), needed because a Gateway-fronted MCP server node otherwise has
+    // no name of its own to fall back on besides the generic bot-name/"Bedrock Agent" default.
+    public static final String AKTO_MCP_SERVER_HOST_TAG = "mcp-server-host";
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
     /**
      * Marks a collection whose service was seen CALLING an AI agent / LLM endpoint.
