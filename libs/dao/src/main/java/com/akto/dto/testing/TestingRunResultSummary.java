@@ -115,12 +115,6 @@ public class TestingRunResultSummary {
         this.testingRunId = testingRunId;
     }
 
-    // Falls back to computing from testingRunId only when testingRunHexId itself was never set -
-    // same fallback shape as getOriginalTestingRunResultSummaryHexId() below and
-    // TestingRunResult.getTestRunHexId(). See getHexId()'s comment for why the fallback matters:
-    // an ObjectId field can come back silently fabricated after crossing a Struts2 JSON response
-    // into a plain-Jackson client, so a client-side caller must be able to trust the plain-String
-    // mirror field over recomputing from the ObjectId.
     public String getTestingRunHexId() {
         if (testingRunHexId == null && this.testingRunId != null) {
             return this.testingRunId.toHexString();
@@ -140,14 +134,6 @@ public class TestingRunResultSummary {
         this.state = state;
     }
 
-    // Prefer the separately-transmitted hexId string over recomputing from id. See the identical
-    // comment on TestingRun.getHexId() for the full root-cause explanation: id is an ObjectId, which
-    // neither Struts2's server-side JSON writer nor plain Jackson on the client special-cases, so it
-    // can come back silently fabricated (a fresh, valid, but unrelated ObjectId) after a round trip
-    // through a Struts2 JSON response into a ClientActor caller - with no exception and no null to
-    // signal it happened. hexId is a plain String and round-trips correctly through both, so once
-    // deserialized, this.hexId is trustworthy even when this.id is not. Matches the pattern already
-    // used by TestingRunResult's three hex getters and getOriginalTestingRunResultSummaryHexId().
     public String getHexId() {
         if (hexId == null) return this.id.toHexString();
         return this.hexId;
