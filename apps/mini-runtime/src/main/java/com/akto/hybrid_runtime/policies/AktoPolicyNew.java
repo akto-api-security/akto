@@ -58,7 +58,7 @@ public class AktoPolicyNew {
     private Map<String, Map<String, Set<String>>> outboundEdgesByService = new HashMap<>();
 
     // Guards against one pathological caller bloating a single document.
-    private static final int MAX_CALLEES_PER_SERVICE = 500;
+    private static final int MAX_CALLEES_PER_SERVICE = 100;
     private static final int MAX_ENDPOINTS_PER_CALLEE = 100;
 
     private DataActor dataActor = DataActorFactory.fetchInstance();
