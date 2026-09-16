@@ -3,6 +3,8 @@ FROM amazoncorretto:8
 
 WORKDIR /app
 
+RUN dnf install -y procps-ng && dnf clean all
+
 # Copy the JAR file
 COPY ./target/account-job-executor-1.0-SNAPSHOT-jar-with-dependencies.jar /app/account-job-executor.jar
 
