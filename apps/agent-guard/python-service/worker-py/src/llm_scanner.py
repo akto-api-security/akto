@@ -63,16 +63,11 @@ _ABCD_VERDICTS = {
     "D": (True, 0.95, 0.95),
 }
 
-# The letter contract carries no reason string, but details.reason feeds the
-# threat report, the remediation prompt's BLOCK REASON and the evidence-line
-# prompt. These name the scanner and what the letter means, and nothing more —
-# inventing a per-sample explanation here would put words in the model's mouth.
-# Safe letters get no reason: an allowed scan is never reported.
 _ABCD_REASONS = {
     "A": "",
     "B": "",
-    "C": "{scanner}: flagged by the single-letter scanner (C — low confidence).",
-    "D": "{scanner}: flagged by the single-letter scanner (D — high confidence).",
+    "C": "",
+    "D": "",
 }
 
 
@@ -93,9 +88,11 @@ def parse_abcd_result(scanner_name: str, raw: str) -> dict[str, Any]:
     if len(cleaned) == 1 and cleaned.upper() in _ABCD_VERDICTS:
         letter = cleaned.upper()
         flagged, risk, confidence = _ABCD_VERDICTS[letter]
-        details: dict[str, Any] = {"letter": letter, "response_format": "abcd"}
-        if _ABCD_REASONS[letter]:
-            details["reason"] = _ABCD_REASONS[letter].format(scanner=scanner_name)
+        details: dict[str, Any] = {
+            "letter": letter,
+            "response_format": "abcd",
+            "reason": _ABCD_REASONS[letter],
+        }
         return {
             "is_valid": not flagged,
             "risk_score": risk,
@@ -115,10 +112,10 @@ def parse_values_result(scanner_name: str, raw: str) -> dict[str, Any]:
     "flagged" exactly when it names at least one value, so sending those fields
     only gave the model a way to contradict itself.
 
-    The reason is synthesised and deliberately does NOT quote the values. The
-    JSON contract required it to, which put raw credentials in the threat
-    report; the values still reach it structurally through the gateway's
-    piiValueSchemaErrors, where masking is applied.
+    The reason is emitted empty and filled asynchronously. The JSON contract
+    required one that quoted every value verbatim, which put raw credentials in
+    the threat report; the values still reach it structurally through the
+    gateway's piiValueSchemaErrors, where masking is applied.
     """
     parsed = json.loads(_clean_json(raw))
     raw_values = parsed.get("values")
@@ -129,10 +126,9 @@ def parse_values_result(scanner_name: str, raw: str) -> dict[str, Any]:
 
     values = [v for v in raw_values if isinstance(v, str) and v]
     flagged = bool(values)
-    details: dict[str, Any] = {"response_format": "values"}
+    details: dict[str, Any] = {"response_format": "values", "reason": ""}
     if flagged:
         details["values"] = values
-        details["reason"] = f"{scanner_name}: {len(values)} real secret value(s) detected."
     return {
         "is_valid": not flagged,
         "risk_score": 0.95 if flagged else 0.02,
@@ -197,9 +193,9 @@ class LLMScanner:
     the single-letter contract, "values" for Password's, anything else (the
     default) for JSON. It stays per-model so a cascade can mix contracts, but
     SCANNER_RESPONSE_FORMAT applies to every role including FINAL_ARBITER: a
-    compact verdict then reaches the threat report with only the synthesised
-    reason and risk_score below, on the understanding that those metadata fields
-    are regenerated asynchronously afterwards rather than on the blocking path.
+    compact verdict then reaches the threat report with a derived risk_score and
+    NO reason at all, on the understanding that the missing metadata is
+    regenerated asynchronously rather than on the blocking path.
     """
 
     def __init__(self, provider: LLMProvider, response_format: str = ""):
