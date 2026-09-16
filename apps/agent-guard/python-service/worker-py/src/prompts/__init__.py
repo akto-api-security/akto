@@ -4,24 +4,6 @@ from typing import Any
 
 from . import ban_topics, code, gibberish, password, prompt_injection, toxicity
 
-# Which compact answer contracts each scanner has a template for. This is the ONE
-# switch: listing a format here makes responseFormat=<fmt> and
-# SCANNER_RESPONSE_FORMAT=<fmt> take effect for that scanner, for both the prompt
-# and the parser, because llm_scanner picks its parser from
-# resolve_response_format too. A scanner that does not list a format silently
-# stays on JSON rather than being asked for an answer it has no rules for.
-#
-# "abcd"   — one letter, A/B/C/D. No reason string, 4-valued risk_score.
-# "values" — Password only: the secret substrings and nothing else.
-#
-# Password can never be "abcd": its verdict must carry the exact substrings the
-# gateway masks (mcp/pii_password_llm.go reads details["values"]), and a single
-# character cannot. "values" is its compact contract instead — same substrings,
-# without the isPassword/riskScore/reason fields that are derivable or redundant.
-#
-# Both contracts drop the per-sample reason, and SCANNER_RESPONSE_FORMAT applies
-# them to the FINAL_ARBITER as well as the fast tiers, so a reported block can
-# carry only llm_scanner's synthesised metadata.
 _FORMAT_CAPABLE: dict[str, frozenset[str]] = {
     "PromptInjection": frozenset({"abcd"}),
     "Toxicity": frozenset({"abcd"}),
