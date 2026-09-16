@@ -2153,10 +2153,6 @@ public class ClientActor extends DataActor {
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/markTestRunResultSummaryFailed", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
-            if (response.getStatusCode() == 404) {
-                loggerMaker.errorAndAddToDb("No summary found for markTestRunResultSummaryFailed, testingRunResultSummaryId=" + testingRunResultSummaryId, LoggerMaker.LogDb.RUNTIME);
-                return null;
-            }
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in markTestRunResultSummaryFailed", LoggerMaker.LogDb.RUNTIME);
