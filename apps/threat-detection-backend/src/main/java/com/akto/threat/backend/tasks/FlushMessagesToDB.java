@@ -211,7 +211,11 @@ public class FlushMessagesToDB {
         return;
       }
 
-      if ("skill_evaluation".equals(event.getFilterId())) {
+      String filterId = event.getFilterId();
+      String skillEndpoint = event.getLatestApiEndpoint();
+      boolean isSkillFilterId = "skill_evaluation".equals(filterId) || "malicious_skill_detected".equals(filterId);
+      boolean isSkillEndpoint = skillEndpoint != null && skillEndpoint.startsWith("/skills/");
+      if (isSkillFilterId || isSkillEndpoint) {
         return;
       }
 
