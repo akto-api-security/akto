@@ -4,6 +4,7 @@ import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.ApiCollection.ServiceGraphEdgeInfo;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.runtime.RuntimeUtil;
@@ -39,6 +40,34 @@ public class AktoPolicyNew {
     boolean redact = false;
 
     boolean mergeUrlsOnVersions = false;
+
+    /*
+     * Outbound call graph: which APIs each service calls.
+     *
+     * On outbound traffic the mirroring daemonset resolves the labels of the pod that MADE the
+     * call, so the request carries the caller's service while the URL/method/collection describe
+     * the callee. process() already computes the merged (templatised) URL, so the pair is free to
+     * capture here - raw URLs would make every path parameter a separate edge.
+     *
+     * Keyed by callee host because AgentDiscoverGraph registers a node only when the edge key
+     * equals targetService; the endpoints themselves go in metadata.endpointUrl, which that
+     * component already renders. Accumulated in memory, flushed on the existing sync cycle.
+     *
+     * callerService -> calleeHost -> set of "METHOD /merged/url"
+     */
+    private Map<String, Map<String, Set<String>>> outboundEdgesByService = new HashMap<>();
+
+    // Guards against one pathological caller bloating a single document.
+    private static final int MAX_CALLEES_PER_SERVICE = 100;
+    private static final int MAX_ENDPOINTS_PER_CALLEE = 100;
+
+    // Accounts allowed to build the outbound call graph. Kept separate from
+    // AI_AGENT_CALLER_TAGGING_ACCOUNTS so the two features can be rolled out independently, even
+    // though the ids currently match. Without this the graph is written for every account: the
+    // service tag key below happens to be Agoda-specific, but any deployment injecting that key
+    // via AKTO_INJECT_TAGS would silently start writing serviceGraphEdges.
+    private static final List<Integer> OUTBOUND_GRAPH_ACCOUNTS = Arrays.asList(
+            1736798101, 1718042191, 1662680463);
 
     private DataActor dataActor = DataActorFactory.fetchInstance();
 
@@ -109,6 +138,7 @@ public class AktoPolicyNew {
 
     public void syncWithDb() {
         loggerMaker.infoAndAddToDb("Syncing with db");
+        flushOutboundEdges();
         List<ApiInfo> apiInfoList = getUpdates(apiInfoCatalogMap);
         loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+ apiInfoList.size());
         
@@ -231,6 +261,9 @@ public class AktoPolicyNew {
         apiInfo.setParentMcpToolNames(httpResponseParams.getParentMcpToolNames());
 
         Map<String, String> tagsMap = HttpCallParser.parseTagsMap(httpResponseParams.getTags());
+
+        recordOutboundCall(httpResponseParams, apiInfoKey, tagsMap);
+
         String contextSource = tagsMap != null ? tagsMap.get(Constants.AI_AGENT_TAG_SOURCE) : null;
 
         if (CONTEXT_SOURCE.ENDPOINT.name().equals(contextSource)){
@@ -284,6 +317,114 @@ public class AktoPolicyNew {
         }
         // lastUpdatedTs=0 so the object is stable across runs — MongoDB addEachToSet deduplicates by full equality
         existingTags.add(new CollectionTags(0, headerKey, category, CollectionTags.TagSource.AKTO));
+    }
+
+    /**
+     * Remembers that the calling service reached this endpoint. apiInfoKey is the CALLEE's
+     * collection plus the merged URL, so the recorded endpoint matches a real ApiInfo row.
+     */
+    private void recordOutboundCall(HttpResponseParams httpResponseParams, ApiInfo.ApiInfoKey apiInfoKey,
+            Map<String, String> tagsMap) {
+        // Gate first so a non-enabled account accumulates nothing at all - neither the in-memory
+        // map nor the per-caller db-abstractor round-trips flushOutboundEdges would then make.
+        if (!OUTBOUND_GRAPH_ACCOUNTS.contains(Context.getActualAccountId())) {
+            return;
+        }
+        // Only outbound traffic carries the caller's identity; inbound labels describe the callee.
+        if (!HttpCallParser.DIRECTION_OUTBOUND.equals(httpResponseParams.getDirection())) {
+            return;
+        }
+        String callerService = tagsMap == null ? null : tagsMap.get(HttpCallParser.SERVICE_TAG_KEY);
+        if (callerService == null || callerService.isEmpty()) {
+            return;
+        }
+        String calleeHost = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
+        if (calleeHost == null || calleeHost.isEmpty()) {
+            return;
+        }
+        calleeHost = calleeHost.toLowerCase().trim();
+
+        Map<String, Set<String>> callees =
+                outboundEdgesByService.computeIfAbsent(callerService, k -> new HashMap<>());
+        if (!callees.containsKey(calleeHost) && callees.size() >= MAX_CALLEES_PER_SERVICE) {
+            return;
+        }
+        Set<String> endpoints = callees.computeIfAbsent(calleeHost, k -> new HashSet<>());
+        if (endpoints.size() < MAX_ENDPOINTS_PER_CALLEE) {
+            endpoints.add(apiInfoKey.getMethod().name() + " " + apiInfoKey.getUrl());
+        }
+    }
+
+    /**
+     * Writes the accumulated edges onto each CALLER's collection, once per sync cycle.
+     *
+     * updateServiceGraphEdges replaces the whole map and ServiceGraphBuilder keeps whichever edge
+     * it already has, so neither would grow an endpoint list - the merge has to happen here.
+     */
+    private void flushOutboundEdges() {
+        if (outboundEdgesByService.isEmpty()) {
+            return;
+        }
+        Map<String, Map<String, Set<String>>> snapshot = outboundEdgesByService;
+        outboundEdgesByService = new HashMap<>();
+
+        for (Map.Entry<String, Map<String, Set<String>>> entry : snapshot.entrySet()) {
+            String callerService = entry.getKey();
+            try {
+                int callerCollectionId = ApiCollection.generateServiceTagCollectionId(callerService);
+                ApiCollection caller = dataActor.fetchApiCollectionMeta(callerCollectionId);
+                if (caller == null) {
+                    // Caller has no collection of its own - nothing calls it, so its inbound
+                    // traffic never created one. Don't materialise an empty collection.
+                    loggerMaker.infoAndAddToDb("outbound-graph: no collection for " + callerService
+                            + ", skipping " + entry.getValue().size() + " edges");
+                    continue;
+                }
+
+                Map<String, ServiceGraphEdgeInfo> merged = caller.getServiceGraphEdges() == null
+                        ? new HashMap<>()
+                        : new HashMap<>(caller.getServiceGraphEdges());
+
+                for (Map.Entry<String, Set<String>> calleeEntry : entry.getValue().entrySet()) {
+                    String calleeHost = calleeEntry.getKey();
+                    Set<String> endpoints = new TreeSet<>(calleeEntry.getValue());
+
+                    ServiceGraphEdgeInfo existing = merged.get(calleeHost);
+                    if (existing == null && merged.size() >= MAX_CALLEES_PER_SERVICE) {
+                        continue;
+                    }
+                    if (existing != null && existing.getMetadata() != null) {
+                        Object prior = existing.getMetadata().get("endpointUrl");
+                        if (prior != null) {
+                            for (String e : String.valueOf(prior).split(",")) {
+                                if (!e.trim().isEmpty()) endpoints.add(e.trim());
+                            }
+                        }
+                    }
+                    if (endpoints.size() > MAX_ENDPOINTS_PER_CALLEE) {
+                        Set<String> capped = new TreeSet<>();
+                        for (String e : endpoints) {
+                            if (capped.size() >= MAX_ENDPOINTS_PER_CALLEE) break;
+                            capped.add(e);
+                        }
+                        endpoints = capped;
+                    }
+
+                    Map<String, Object> metadata = new HashMap<>();
+                    metadata.put("endpointUrl", String.join(", ", endpoints));
+                    metadata.put("endpointCount", endpoints.size());
+                    metadata.put("lastSeen", Context.now());
+                    // key == targetService so AgentDiscoverGraph registers this as a node.
+                    merged.put(calleeHost, new ServiceGraphEdgeInfo(callerService, calleeHost, metadata));
+                }
+
+                dataActor.updateServiceGraphEdges(callerCollectionId, merged);
+                loggerMaker.infoAndAddToDb("outbound-graph: " + callerService + " calls "
+                        + merged.size() + " hosts (collection " + callerCollectionId + ")");
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "outbound-graph: failed to write edges for " + callerService);
+            }
+        }
     }
 
     public PolicyCatalog getApiInfoFromMap(ApiInfo.ApiInfoKey apiInfoKey) {
