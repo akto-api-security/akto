@@ -195,7 +195,7 @@ func TestFileChunkFailuresDoNotHidePolicyBlocks(t *testing.T) {
 			if results[1] == nil || results[1].Result != tc.verdict {
 				t.Fatal("inspection failure must not cancel the remaining policy checks")
 			}
-			fr := h.applyFileChunkResults(&fileResult{Filename: "sample.txt", Allowed: true}, results)
+			fr := h.applyFileChunkResults(&fileResult{Filename: "sample.txt", Allowed: true}, results, "")
 			if fr.Allowed != tc.allowed {
 				t.Fatalf("allowed = %v, want %v; reason = %q", fr.Allowed, tc.allowed, fr.Reason)
 			}
@@ -217,7 +217,7 @@ func TestFileChunkRetriesFailOpen(t *testing.T) {
 	if calls != 2 || result.Err == nil {
 		t.Fatalf("expected error after 2 attempts, got %d attempts and %+v", calls, result)
 	}
-	if fr := h.applyFileChunkResults(&fileResult{Allowed: true}, []*chunkResult{result}); !fr.Allowed {
+	if fr := h.applyFileChunkResults(&fileResult{Allowed: true}, []*chunkResult{result}, ""); !fr.Allowed {
 		t.Fatal("exhausted retries must allow the file")
 	}
 
@@ -227,7 +227,7 @@ func TestFileChunkRetriesFailOpen(t *testing.T) {
 	if !errors.Is(result.Err, context.Canceled) {
 		t.Fatalf("expected cancellation error, got %v", result.Err)
 	}
-	if fr := h.applyFileChunkResults(&fileResult{Allowed: true}, []*chunkResult{result}); !fr.Allowed {
+	if fr := h.applyFileChunkResults(&fileResult{Allowed: true}, []*chunkResult{result}, ""); !fr.Allowed {
 		t.Fatal("cancellation must allow the file")
 	}
 }

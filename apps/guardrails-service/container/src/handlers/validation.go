@@ -38,10 +38,10 @@ func applyAuthenticatedAccount(c *gin.Context, params *models.ValidateRequestPar
 
 // ValidationHandler handles validation requests
 type ValidationHandler struct {
-	validatorService *validator.Service
-	logger           *zap.Logger
-	cfg              *config.Config
-	fileRegistry     *fileprocessor.Registry
+	validatorService  *validator.Service
+	logger            *zap.Logger
+	cfg               *config.Config
+	fileRegistry      *fileprocessor.Registry
 	metrics           *metrics.Accumulator
 	policyGate        policyGate
 	policyIsAlertMode alertModeLookup
