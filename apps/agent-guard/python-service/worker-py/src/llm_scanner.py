@@ -156,9 +156,6 @@ def parse_llm_result(scanner_name: str, raw: str) -> dict[str, Any]:
     }
 
 
-# Compact answer contract -> its parser. Anything not listed (including "") is
-# the JSON verdict. Keep the keys in step with prompts._FORMAT_CAPABLE: a format
-# with a template but no parser here would be rendered and then misread.
 _FORMAT_PARSERS = {
     "abcd": parse_abcd_result,
     "values": parse_values_result,
