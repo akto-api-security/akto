@@ -211,6 +211,10 @@ public class FlushMessagesToDB {
         return;
       }
 
+      if ("skill_evaluation".equals(event.getFilterId())) {
+        return;
+      }
+
       // Get contextSource, default to "API" if null or empty
       String contextSource = event.getContextSource();
       if (contextSource == null || contextSource.isEmpty()) {
