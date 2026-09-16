@@ -2856,6 +2856,16 @@ public class DbAction extends ActionSupport {
             }
 
             trrs = DbLayer.markTestRunResultSummaryFailed(testingRunResultSummaryId);
+            if (trrs == null) {
+                // DbLayer.markTestRunResultSummaryFailed's conditional update (state == RUNNING) matched
+                // nothing - the summary was already not RUNNING (e.g. already failed/completed by someone
+                // else, a genuinely benign race the caller already treats as "some other thread picked it
+                // up") or the caller handed in an id that doesn't correspond to a real document (seen in
+                // production: a client-side ObjectId deserialization bug could hand in a fabricated id -
+                // see PR #6444). Either way this is an expected, non-exceptional outcome, not a bug in this
+                // method - previously this unconditionally NPE'd on the next line instead.
+                return Action.ERROR.toUpperCase();
+            }
             trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
             int accountId = Context.accountId.get();
             String runHex = trrs.getTestingRunId() != null ? trrs.getTestingRunId().toHexString() : null;
