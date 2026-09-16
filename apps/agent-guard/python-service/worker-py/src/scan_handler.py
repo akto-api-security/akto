@@ -103,9 +103,6 @@ async def scan_payload(
             config = {**config, "modelConfigs": force_gemma_only(config.get("modelConfigs"))}
         elif scanner_name in GEMMA_ONLY_SCANNERS:
             config = {**config, "modelConfigs": strip_qwen_tier(config.get("modelConfigs"))}
-        # Env-level override of the fast tiers' answer contract, for every
-        # cascade scanner; a no-op unless SCANNER_RESPONSE_FORMAT is set, and
-        # inert for scanners that have no template in that format.
         config = {**config, "modelConfigs": apply_scanner_response_format(config.get("modelConfigs"))}
         store_fn = None
         if config.get("storeAllResults"):
