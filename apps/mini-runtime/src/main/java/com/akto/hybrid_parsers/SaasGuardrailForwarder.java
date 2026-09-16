@@ -3,6 +3,7 @@ package com.akto.hybrid_parsers;
 import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.SecretUtils;
 
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -121,10 +122,27 @@ public class SaasGuardrailForwarder {
 
     private static void post(String body) {
         try {
-            Request request = new Request.Builder()
+            Request.Builder builder = new Request.Builder()
                     .url(GUARDRAIL_URL)
-                    .post(RequestBody.create(body, JSON))
-                    .build();
+                    .post(RequestBody.create(body, JSON));
+
+            /*
+             * The raw provisioned token, deliberately NOT the module-scoped one ClientActor
+             * exchanges for - that exchange is scoped to the database abstractor, and the
+             * guardrail service is a different audience.
+             *
+             * Read per call rather than cached: readSecret only touches disk when the _FILE
+             * variant is set, so this is a map lookup in the common case, and it keeps a rotated
+             * token from needing a pod restart.
+             */
+            String token = SecretUtils.readSecret("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+            if (token != null && !token.isEmpty()) {
+                builder.header("Authorization", token);
+            } else {
+                loggerMaker.debug("saas-guardrail: no DATABASE_ABSTRACTOR_SERVICE_TOKEN, sending unauthenticated");
+            }
+
+            Request request = builder.build();
             try (Response response = CLIENT.newCall(request).execute()) {
                 if (!response.isSuccessful()) {
                     loggerMaker.debug("saas-guardrail: non-2xx " + response.code());
