@@ -61,6 +61,14 @@ public class AktoPolicyNew {
     private static final int MAX_CALLEES_PER_SERVICE = 100;
     private static final int MAX_ENDPOINTS_PER_CALLEE = 100;
 
+    // Accounts allowed to build the outbound call graph. Kept separate from
+    // AI_AGENT_CALLER_TAGGING_ACCOUNTS so the two features can be rolled out independently, even
+    // though the ids currently match. Without this the graph is written for every account: the
+    // service tag key below happens to be Agoda-specific, but any deployment injecting that key
+    // via AKTO_INJECT_TAGS would silently start writing serviceGraphEdges.
+    private static final List<Integer> OUTBOUND_GRAPH_ACCOUNTS = Arrays.asList(
+            1736798101, 1718042191, 1662680463);
+
     private DataActor dataActor = DataActorFactory.fetchInstance();
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoPolicyNew.class, LogDb.RUNTIME);
@@ -317,6 +325,11 @@ public class AktoPolicyNew {
      */
     private void recordOutboundCall(HttpResponseParams httpResponseParams, ApiInfo.ApiInfoKey apiInfoKey,
             Map<String, String> tagsMap) {
+        // Gate first so a non-enabled account accumulates nothing at all - neither the in-memory
+        // map nor the per-caller db-abstractor round-trips flushOutboundEdges would then make.
+        if (!OUTBOUND_GRAPH_ACCOUNTS.contains(Context.getActualAccountId())) {
+            return;
+        }
         // Only outbound traffic carries the caller's identity; inbound labels describe the callee.
         if (!HttpCallParser.DIRECTION_OUTBOUND.equals(httpResponseParams.getDirection())) {
             return;
