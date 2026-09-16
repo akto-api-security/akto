@@ -39,6 +39,24 @@ func TestChunkStopsFileOnRedaction(t *testing.T) {
 			true,
 		},
 		{"nil result is not a stop", true, nil, false},
+		{
+			"alert-mode match passes",
+			true,
+			&mcp.ValidationResult{Allowed: false, Reason: "ssn", Behaviour: "alert"},
+			false,
+		},
+		{
+			"alert-mode match passes regardless of case/whitespace",
+			true,
+			&mcp.ValidationResult{Allowed: false, Reason: "ssn", Behaviour: " Alert "},
+			false,
+		},
+		{
+			"warn-mode match still stops",
+			true,
+			&mcp.ValidationResult{Allowed: false, Reason: "ssn", Behaviour: "warn"},
+			true,
+		},
 	}
 
 	for _, tc := range cases {

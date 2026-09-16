@@ -261,12 +261,18 @@ func (h *ValidationHandler) applyFileChunkResults(fr *fileResult, results []*chu
 
 // chunkStopsFile reports whether a chunk's verdict fails the whole upload.
 //
+// An alert-mode match does not count: "alert" means raise an alert for review, do not
+// block, so a chunk that only tripped an alert-behaviour policy passes through.
+//
 // A masked chunk counts. This endpoint answers with a verdict and nothing else — it
 // discards ModifiedPayload — so allowing a "mask" verdict hands the caller a green light
 // on the original file with the sensitive spans still in it. Blocking is the only
 // enforcement the response shape can express; see FileConfig.BlockOnRedaction to opt out.
 func (h *ValidationHandler) chunkStopsFile(r *mcp.ValidationResult) bool {
 	if r == nil {
+		return false
+	}
+	if !r.Allowed && mcp.ParseBehaviour(r.Behaviour) == mcp.BehaviourAlert {
 		return false
 	}
 	return !r.Allowed || (h.cfg.File.BlockOnRedaction && r.Modified)
