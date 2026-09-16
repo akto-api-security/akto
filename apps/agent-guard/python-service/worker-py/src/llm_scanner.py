@@ -65,12 +65,6 @@ def parse_abcd_result(scanner_name: str, raw: str) -> dict[str, Any]:
     scanner exception as unsafe, so a model that ignores the one-character
     contract escalates to the arbiter instead of being read as "safe".
     """
-    # The whole answer must BE the letter, modulo the wrappers small models put
-    # around it ("**D**", "`D`", "D."). Reading the first letter out of a longer
-    # string instead would let prose decide the verdict: "An injection attempt
-    # was detected" begins with A and would be served as a confident ALLOW.
-    # Prose means the model ignored the contract, so raise and let the arbiter
-    # answer — that costs one escalation, where a wrong letter costs a miss.
     cleaned = (raw or "").strip().strip("*_`'\"([{)]}<> \t\r\n.,:;!")
     if len(cleaned) == 1 and cleaned.upper() in _ABCD_VERDICTS:
         letter = cleaned.upper()
