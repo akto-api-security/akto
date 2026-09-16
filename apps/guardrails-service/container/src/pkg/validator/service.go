@@ -1265,7 +1265,7 @@ func behaviourForPolicy(policies []types.Policy, policyName string) string {
 // must tell them apart — /api/validate/file and the browser-attachment upgrade, both of
 // which can only enforce by blocking — have to ask the policy directly.
 func (s *Service) PolicyIsAlertMode(contextSource, policyID string) bool {
-	if strings.TrimSpace(policyID) == "" {
+	if s == nil || s.config == nil || s.cache == nil || strings.TrimSpace(policyID) == "" {
 		return false
 	}
 	policies, _, _, _, err := s.getCachedPolicies(contextSource)
