@@ -104,22 +104,25 @@ func (s *Service) upgradeBrowserAttachmentVerdict(result *mcp.ValidationResult, 
 		return
 	}
 
-	// Alert-mode match with no rewritten payload: "alert" means the matched rule would
-	// have blocked but the policy is set to alert instead — raise the alert, do not
-	// block. Gated on !Modified rather than Allowed: mcp-endpoint-shield also reports
-	// "alert" for an already-allowed mask/redact match (see piiReportBehaviour), which
-	// always carries Modified=true and must still fall through to the block escalation
-	// below — its ModifiedPayload is the one thing this shape genuinely cannot enforce.
-	if !result.Modified && mcp.ParseBehaviour(result.Behaviour) == mcp.BehaviourAlert {
-		if !result.Allowed {
-			s.logger.Info("Browser attachment guardrail - alert-mode match allowed",
-				zap.String("path", params.Path),
-				zap.String("method", params.Method),
-				zap.String("account", params.AktoAccountID),
-				zap.String("sessionID", sessionID),
-				zap.String("policyName", result.Metadata.PolicyName))
-			result.Allowed = true
-		}
+	// An alert-mode policy never blocks, whatever its rules asked for, so it is never
+	// upgraded. Behaviour alone settles that for a block/warn rule, which reports the
+	// policy's mode; a redact/mask rule always reports "alert" to describe what it did to
+	// the payload (piiReportBehaviour) and never consults policy.Behaviour, so the policy
+	// itself is asked whenever a rewritten payload is present.
+	if mcp.ParseBehaviour(result.Behaviour) == mcp.BehaviourAlert &&
+		(!result.Modified || s.PolicyIsAlertMode(params.ContextSource, result.Metadata.PolicyName)) {
+		s.logger.Info("Browser attachment guardrail - alert-mode policy allowed",
+			zap.String("path", params.Path),
+			zap.String("method", params.Method),
+			zap.String("account", params.AktoAccountID),
+			zap.String("sessionID", sessionID),
+			zap.Bool("modified", result.Modified),
+			zap.String("policyName", result.Metadata.PolicyName))
+		result.Allowed = true
+		// The masked text is in the extension's flattened shape, not claude.ai's real
+		// request body, so it can never be applied here — drop it rather than hand the
+		// caller something it would map onto the wrong payload.
+		result.ModifiedPayload = ""
 		return
 	}
 

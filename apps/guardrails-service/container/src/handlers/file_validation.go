@@ -233,10 +233,10 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 	}
 
 	results := h.validateChunks(ctx, chunks, meta, sessionID, requestID, h.validatorService.ValidateRequest)
-	return h.applyFileChunkResults(fr, results)
+	return h.applyFileChunkResults(fr, results, meta.ContextSource)
 }
 
-func (h *ValidationHandler) applyFileChunkResults(fr *fileResult, results []*chunkResult) *fileResult {
+func (h *ValidationHandler) applyFileChunkResults(fr *fileResult, results []*chunkResult, contextSource string) *fileResult {
 	fr.TotalChunks = len(results)
 	fr.ChunkResults = results
 
@@ -248,7 +248,7 @@ func (h *ValidationHandler) applyFileChunkResults(fr *fileResult, results []*chu
 			h.logger.Warn("Chunk validation failed after retries; allowing chunk", zap.Error(r.Err), zap.String("file", fr.Filename), zap.Int("chunk", i+1))
 			continue
 		}
-		if h.chunkStopsFile(r.Result) {
+		if h.chunkStopsFile(r.Result, contextSource) {
 			fr.Allowed = false
 			fr.Reason = chunkBlockReason(r.Result)
 			fr.FailedChunkIndex = i + 1
@@ -261,21 +261,38 @@ func (h *ValidationHandler) applyFileChunkResults(fr *fileResult, results []*chu
 
 // chunkStopsFile reports whether a chunk's verdict fails the whole upload.
 //
-// An alert-mode match does not count: "alert" means raise an alert for review, do not
-// block, so a chunk that only tripped an alert-behaviour policy passes through.
+// An alert-mode policy never stops a file, whatever its rules asked for. That is direct to
+// read off the verdict for a block/warn rule, whose Behaviour carries the policy's mode.
+// It is not for a redact/mask rule: mcp-endpoint-shield hardcodes Behaviour "alert" on
+// every successful redaction to describe what it did to the payload and never consults
+// policy.Behaviour there, so an alert-mode redaction and a block-mode one look identical.
+// Those are told apart by asking the policy itself (see Service.PolicyIsAlertMode).
 //
-// A masked chunk counts. This endpoint answers with a verdict and nothing else — it
-// discards ModifiedPayload — so allowing a "mask" verdict hands the caller a green light
-// on the original file with the sensitive spans still in it. Blocking is the only
-// enforcement the response shape can express; see FileConfig.BlockOnRedaction to opt out.
-func (h *ValidationHandler) chunkStopsFile(r *mcp.ValidationResult) bool {
+// A block-mode policy's redaction does stop the file, even though the rule only asked to
+// mask: this endpoint answers with a verdict and nothing else — it discards
+// ModifiedPayload — so allowing it would hand the caller a green light on the original
+// file with the sensitive spans still in it. Blocking is the only enforcement the response
+// shape can express; see FileConfig.BlockOnRedaction to opt out.
+func (h *ValidationHandler) chunkStopsFile(r *mcp.ValidationResult, contextSource string) bool {
 	if r == nil {
 		return false
 	}
 	if !r.Allowed && mcp.ParseBehaviour(r.Behaviour) == mcp.BehaviourAlert {
 		return false
 	}
-	return !r.Allowed || (h.cfg.File.BlockOnRedaction && r.Modified)
+	if !r.Allowed {
+		return true
+	}
+	if !(h.cfg.File.BlockOnRedaction && r.Modified) {
+		return false
+	}
+	return !h.alertModePolicy(contextSource, r.Metadata.PolicyName)
+}
+
+// alertModePolicy reports whether the named policy is in alert mode, answering false when
+// no lookup is wired so an unresolvable policy keeps the enforcing behaviour.
+func (h *ValidationHandler) alertModePolicy(contextSource, policyName string) bool {
+	return h.policyIsAlertMode != nil && h.policyIsAlertMode(contextSource, policyName)
 }
 
 // chunkBlockReason describes why a chunk failed the upload. A masked chunk carries no
@@ -510,7 +527,7 @@ func (h *ValidationHandler) validateChunks(ctx context.Context, chunks []string,
 			}
 			payload := marshalPromptPayload(chunk)
 			results[i] = h.validateWithRetry(gCtx, payload, meta, sessionID, requestID, validate)
-			if h.chunkStopsFile(results[i].Result) {
+			if h.chunkStopsFile(results[i].Result, meta.ContextSource) {
 				return errChunkBlocked
 			}
 			return nil

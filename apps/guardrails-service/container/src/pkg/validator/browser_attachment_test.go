@@ -136,11 +136,10 @@ func TestUpgradeBrowserAttachmentVerdict(t *testing.T) {
 			wantReason:    "PII detected",
 		},
 		{
-			// mcp-endpoint-shield labels an already-allowed mask/redact match "alert" too
-			// (piiReportBehaviour), but it carries Modified=true and a rewritten payload —
-			// exactly what this upgrade exists to stop, so it must still escalate to block
-			// even though its Behaviour string matches the alert carve-out above.
-			name:          "alert-labelled mask still upgraded to block",
+			// A redaction reports Behaviour "alert" whatever mode its policy is in
+			// (piiReportBehaviour), so the policy is consulted: this one is not in the
+			// cache, which answers "not alert mode" and keeps the upgrade.
+			name:          "redaction from an unresolved policy is upgraded to block",
 			in:            &mcp.ValidationResult{Allowed: true, Modified: true, ModifiedPayload: "redacted", Behaviour: "alert"},
 			tag:           browserExtensionTag,
 			wantAllowed:   false,

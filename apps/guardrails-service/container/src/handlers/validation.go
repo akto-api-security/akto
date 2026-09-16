@@ -42,12 +42,16 @@ type ValidationHandler struct {
 	logger           *zap.Logger
 	cfg              *config.Config
 	fileRegistry     *fileprocessor.Registry
-	metrics          *metrics.Accumulator
-	policyGate       policyGate
+	metrics           *metrics.Accumulator
+	policyGate        policyGate
+	policyIsAlertMode alertModeLookup
 }
 
 // policyGate mirrors validator.Service.HasApplicablePolicies.
 type policyGate func(contextSource, requestHeaders string) (bool, error)
+
+// alertModeLookup mirrors validator.Service.PolicyIsAlertMode.
+type alertModeLookup func(contextSource, policyID string) bool
 
 // NewValidationHandler creates a new validation handler
 func NewValidationHandler(validatorService *validator.Service, logger *zap.Logger, cfg *config.Config, fileRegistry *fileprocessor.Registry, acc *metrics.Accumulator) *ValidationHandler {
@@ -60,6 +64,7 @@ func NewValidationHandler(validatorService *validator.Service, logger *zap.Logge
 	}
 	if validatorService != nil {
 		h.policyGate = validatorService.HasApplicablePolicies
+		h.policyIsAlertMode = validatorService.PolicyIsAlertMode
 	}
 	return h
 }

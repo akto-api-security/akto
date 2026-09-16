@@ -1251,6 +1251,35 @@ func behaviourForPolicy(policies []types.Policy, policyName string) string {
 	return "block"
 }
 
+// PolicyIsAlertMode reports whether the policy identified by policyID is in alert mode.
+// policyID is matched against Policy.ActualPolicyID, the join key a ValidationResult's
+// Metadata.PolicyName is populated from (the mcp library joins the same way). An
+// unresolvable policy answers false, so a verdict that cannot be traced back to its policy
+// keeps whatever enforcement it already carried.
+//
+// A verdict's own Behaviour is enough to spot alert mode for a block/warn rule, but not for
+// a redact/mask one: mcp-endpoint-shield hardcodes Behaviour "alert" for every successful
+// redaction (piiReportBehaviour, and the regex-redact path) to describe what it did to the
+// payload, and never consults policy.Behaviour there. So an alert-mode policy's redaction
+// and a block-mode policy's redaction are indistinguishable on the wire, and callers that
+// must tell them apart — /api/validate/file and the browser-attachment upgrade, both of
+// which can only enforce by blocking — have to ask the policy directly.
+func (s *Service) PolicyIsAlertMode(contextSource, policyID string) bool {
+	if strings.TrimSpace(policyID) == "" {
+		return false
+	}
+	policies, _, _, _, err := s.getCachedPolicies(contextSource)
+	if err != nil {
+		return false
+	}
+	for _, p := range policies {
+		if p.ActualPolicyID == policyID {
+			return mcp.ParseBehaviour(p.Behaviour) == mcp.BehaviourAlert
+		}
+	}
+	return false
+}
+
 func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID, policyName, matchedPattern, behaviour string) *mcp.ValidationResult {
 	reason := "Request blocked by guardrail policy (blocked host pattern: " + matchedPattern + ")"
 	metadata := types.ThreatMetadata{

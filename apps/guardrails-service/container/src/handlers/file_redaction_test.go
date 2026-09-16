@@ -4,11 +4,19 @@ import (
 	"testing"
 
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 )
 
 func handlerWithBlockOnRedaction(v bool) *ValidationHandler {
 	return &ValidationHandler{cfg: &config.Config{File: config.FileConfig{BlockOnRedaction: v}}}
+}
+
+func handlerWithAlertModeLookup(v bool, lookup alertModeLookup) *ValidationHandler {
+	return &ValidationHandler{
+		cfg:               &config.Config{File: config.FileConfig{BlockOnRedaction: v}},
+		policyIsAlertMode: lookup,
+	}
 }
 
 func TestChunkStopsFileOnRedaction(t *testing.T) {
@@ -61,11 +69,73 @@ func TestChunkStopsFileOnRedaction(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := handlerWithBlockOnRedaction(tc.blockOnRedaction).chunkStopsFile(tc.result); got != tc.want {
+			if got := handlerWithBlockOnRedaction(tc.blockOnRedaction).chunkStopsFile(tc.result, ""); got != tc.want {
 				t.Fatalf("chunkStopsFile = %v, want %v", got, tc.want)
 			}
 		})
 	}
+}
+
+// The contract for files: an alert-mode policy never stops an upload, a block-mode policy
+// always does — even when its rule only asked to redact, since this endpoint cannot return
+// the redacted file. A redaction reports Behaviour "alert" whatever mode its policy is in
+// (piiReportBehaviour hardcodes it), so the policy has to be consulted by name.
+func TestChunkStopsFileRedactionFollowsPolicyMode(t *testing.T) {
+	masked := func() *mcp.ValidationResult {
+		return &mcp.ValidationResult{
+			Allowed: true, Modified: true, Behaviour: "alert",
+			Metadata: types.ThreatMetadata{PolicyName: "pii-policy"},
+		}
+	}
+
+	t.Run("alert-mode policy allows its redaction through", func(t *testing.T) {
+		h := handlerWithAlertModeLookup(true, func(contextSource, policyID string) bool {
+			if policyID != "pii-policy" || contextSource != "ctx" {
+				t.Fatalf("lookup got (%q, %q), want (%q, %q)", contextSource, policyID, "ctx", "pii-policy")
+			}
+			return true
+		})
+		if h.chunkStopsFile(masked(), "ctx") {
+			t.Fatal("chunkStopsFile = true, want false: alert-mode policy must never block")
+		}
+	})
+
+	t.Run("block-mode policy stops its redaction", func(t *testing.T) {
+		h := handlerWithAlertModeLookup(true, func(contextSource, policyID string) bool { return false })
+		if !h.chunkStopsFile(masked(), "ctx") {
+			t.Fatal("chunkStopsFile = false, want true: block mode blocks even a redact rule")
+		}
+	})
+
+	t.Run("no lookup wired keeps the enforcing behaviour", func(t *testing.T) {
+		if !handlerWithBlockOnRedaction(true).chunkStopsFile(masked(), "ctx") {
+			t.Fatal("chunkStopsFile = false, want true: unresolved policy must not fail open")
+		}
+	})
+
+	t.Run("BlockOnRedaction opted out never reaches the lookup", func(t *testing.T) {
+		h := handlerWithAlertModeLookup(false, func(contextSource, policyID string) bool {
+			t.Fatal("lookup must not run when BlockOnRedaction is off")
+			return false
+		})
+		if h.chunkStopsFile(masked(), "ctx") {
+			t.Fatal("chunkStopsFile = true, want false: BlockOnRedaction is opted out")
+		}
+	})
+
+	// An alert-mode policy whose rule action was block/warn needs no lookup at all: that
+	// verdict carries the policy's mode on Behaviour, and allowAlertBehaviour has already
+	// turned it into an allow upstream.
+	t.Run("alert-mode block rule needs no lookup", func(t *testing.T) {
+		h := handlerWithAlertModeLookup(true, func(contextSource, policyID string) bool {
+			t.Fatal("lookup must not run for a non-redaction verdict")
+			return false
+		})
+		blocked := &mcp.ValidationResult{Allowed: false, Behaviour: "alert", Reason: "ssn"}
+		if h.chunkStopsFile(blocked, "ctx") {
+			t.Fatal("chunkStopsFile = true, want false: alert-mode policy must never block")
+		}
+	})
 }
 
 // A mask never builds a blocked response, so Reason is empty and the caller would
