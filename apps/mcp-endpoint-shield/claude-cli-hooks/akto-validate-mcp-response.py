@@ -278,6 +278,25 @@ def _is_alert_behaviour(behaviour: Any) -> bool:
     return _guardrails_behaviour_value(behaviour) == "alert"
 
 
+def should_ingest(is_mcp: bool) -> bool:
+    """Non-MCP tool results stay off by default; the flag re-enables them."""
+    return is_mcp or AKTO_INGEST_NON_MCP_TOOLS
+
+
+def ingest_without_verdict(request_body: Dict[str, Any], is_mcp: bool) -> None:
+    """
+    Fallback for when the verdict call fails. That call also carries the ingestion, so
+    without this a guardrails timeout would drop the trace as well as the verdict.
+    """
+    if not should_ingest(is_mcp):
+        return
+    try:
+        post_payload_json(build_http_proxy_url(ingest_data=True), request_body)
+        logger.info("Fallback ingestion successful (no guardrail verdict on the span)")
+    except Exception as e:
+        logger.error(f"Fallback ingestion error: {e}")
+
+
 def call_guardrails(
     tool_name: str,
     tool_input: Any,
@@ -305,6 +324,7 @@ def call_guardrails(
         logger.debug(f"Tool input: {json.dumps(tool_input)}")
         logger.debug(f"Tool response: {json.dumps(tool_response)}")
 
+    request_body = None
     try:
         request_body = build_ingestion_payload(
             tool_name,
@@ -315,11 +335,15 @@ def call_guardrails(
             mcp_tool_name=mcp_tool_name,
             session_info=session_info,
         )
+        # Evaluate and ingest in the same call. Gateway.recordGuardrailVerdict only stamps
+        # guardrailViolated / guardrailAction / guardrailPolicy on traffic it ingests while
+        # guardrails run, so splitting these leaves the span with no verdict at all - a
+        # blocked result then looks exactly like traffic that was never checked.
         result = post_payload_json(
             build_http_proxy_url(
                 guardrails=False,
                 response_guardrails=True,
-                ingest_data=False,
+                ingest_data=should_ingest(is_mcp),
             ),
             request_body,
         )
@@ -341,6 +365,8 @@ def call_guardrails(
 
     except Exception as e:
         logger.error(f"Guardrails validation error: {e}")
+        if request_body is not None:
+            ingest_without_verdict(request_body, is_mcp)
         return True, "", ""
 
 
@@ -413,65 +439,6 @@ def apply_warn_resubmit_flow(
     pending.add(fingerprint)
     save_warn_pending(pending)
     return False, reason
-
-
-def ingest_blocked_request(
-    tool_name: str,
-    tool_input: Any,
-    tool_response: Any,
-    reason: str,
-    *,
-    is_mcp: bool,
-    mcp_server_name: str,
-    mcp_tool_name: str,
-    session_info: dict = None,
-):
-    if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
-        return
-
-    if not is_mcp and not AKTO_INGEST_NON_MCP_TOOLS:
-        logger.info(
-            "Skipping non-MCP blocked-request ingestion (set AKTO_INGEST_NON_MCP_TOOLS=true to re-enable)"
-        )
-        return
-
-    logger.info("Ingesting blocked request data")
-    try:
-        request_body = build_ingestion_payload(
-            tool_name,
-            tool_input,
-            tool_response,
-            is_mcp=is_mcp,
-            mcp_server_name=mcp_server_name,
-            mcp_tool_name=mcp_tool_name,
-            session_info=session_info,
-        )
-        request_body["responseHeaders"] = json.dumps(
-            {
-                "x-claude-hook": "PostToolUse",
-                "x-blocked-by": "Akto Proxy",
-                "content-type": "application/json",
-            }
-        )
-        request_body["responsePayload"] = json.dumps(
-            {
-                "body": json.dumps(
-                    {
-                        "x-blocked-by": "Akto Proxy",
-                        "reason": reason or "Policy violation",
-                    }
-                )
-            }
-        )
-        request_body["statusCode"] = "403"
-        request_body["status"] = "403"
-        post_payload_json(
-            build_http_proxy_url(guardrails=False, ingest_data=True),
-            request_body,
-        )
-        logger.info("Blocked request ingestion successful")
-    except Exception as e:
-        logger.error(f"Ingestion error: {e}")
 
 
 def send_ingestion_data(
@@ -595,17 +562,12 @@ def main():
                 f"BLOCKING tool result - Tool: {tool_name}, Reason: {gr_reason}"
             )
             print(json.dumps(output))
-            ingest_blocked_request(
-                tool_name,
-                tool_input,
-                tool_response,
-                gr_reason,
-                is_mcp=is_mcp,
-                mcp_server_name=mcp_server_name,
-                mcp_tool_name=mcp_tool_name,
-                session_info=session_info,
-            )
             sys.exit(0)
+
+        # Allowed: call_guardrails() already ingested this result on the call that
+        # evaluated it, so the span carries the verdict. Ingesting again here would
+        # duplicate it.
+        sys.exit(0)
 
     send_ingestion_data(
         tool_name,

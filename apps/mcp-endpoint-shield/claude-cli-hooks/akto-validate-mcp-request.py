@@ -38,8 +38,6 @@ MODE = os.getenv("MODE", "argus").lower()
 AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
-# Non-MCP blocked-request ingestion is off by default; set AKTO_INGEST_NON_MCP_TOOLS=true to send it.
-AKTO_INGEST_NON_MCP_TOOLS = os.getenv("AKTO_INGEST_NON_MCP_TOOLS", "false").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
 AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "claudecli")
 AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
@@ -454,56 +452,6 @@ def apply_warn_resubmit_flow(
     return False, reason
 
 
-def ingest_blocked_request(
-    tool_name: str,
-    tool_input: Any,
-    reason: str,
-    *,
-    is_mcp: bool,
-    mcp_server_name: str,
-    mcp_tool_name: str,
-    session_info: dict = None,
-):
-    if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
-        return
-
-    if not is_mcp and not AKTO_INGEST_NON_MCP_TOOLS:
-        logger.info(
-            "Skipping non-MCP blocked-request ingestion (set AKTO_INGEST_NON_MCP_TOOLS=true to re-enable)"
-        )
-        return
-
-    logger.info("Ingesting blocked request data")
-    try:
-        request_body = build_validation_request(
-            tool_name,
-            tool_input,
-            is_mcp=is_mcp,
-            mcp_server_name=mcp_server_name,
-            mcp_tool_name=mcp_tool_name,
-            session_info=session_info,
-        )
-        request_body["responseHeaders"] = json.dumps(
-            {
-                "x-claude-hook": "PreToolUse",
-                "x-blocked-by": "Akto Proxy",
-                "content-type": "application/json",
-            }
-        )
-        request_body["responsePayload"] = json.dumps(
-            {"body": {"x-blocked-by": "Akto Proxy", "reason": reason or "Policy violation"}}
-        )
-        request_body["statusCode"] = "403"
-        request_body["status"] = "403"
-        post_payload_json(
-            build_http_proxy_url(guardrails=False, ingest_data=True),
-            request_body,
-        )
-        logger.info("Blocked request ingestion successful")
-    except Exception as e:
-        logger.error(f"Ingestion error: {e}")
-
-
 def main():
     logger.info(f"=== Hook execution started - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
 
@@ -559,15 +507,9 @@ def main():
             }
             logger.warning(f"BLOCKING tool request - Tool: {tool_name}, Reason: {gr_reason}")
             print(json.dumps(output))
-            ingest_blocked_request(
-                tool_name,
-                tool_input,
-                gr_reason,
-                is_mcp=is_mcp,
-                mcp_server_name=mcp_server_name,
-                mcp_tool_name=mcp_tool_name,
-                session_info=session_info,
-            )
+            # call_guardrails() already ingested this request on the same call that
+            # evaluated it, so the span carries the verdict and renders as a block.
+            # A second, guardrail-free record here would only duplicate the span.
             sys.exit(0)
 
     if modified and modified_payload:

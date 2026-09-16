@@ -290,35 +290,6 @@ def apply_warn_resubmit_flow(
     save_warn_pending(pending)
     return False, reason
 
-def ingest_blocked_request(user_prompt: str, reason: str, session_info: dict = None):
-    if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
-        return
-
-    logger.info("Ingesting blocked request data")
-    try:
-        request_body = build_validation_request(user_prompt, session_info)
-        request_body["responseHeaders"] = json.dumps({
-            "x-claude-hook": "UserPromptSubmit",
-            "x-blocked-by": "Akto Proxy",
-            "content-type": "application/json"
-        })
-        request_body["responsePayload"] = json.dumps({
-            "body": json.dumps({
-                "x-blocked-by": "Akto Proxy",
-                "reason": reason or "Policy violation"
-            })
-        })
-        request_body["statusCode"] = "403"
-        request_body["status"] = "403"
-        post_payload_json(
-            build_http_proxy_url(guardrails=False, ingest_data=True),
-            request_body,
-        )
-        logger.info("Blocked request ingestion successful")
-    except Exception as e:
-        logger.error(f"Ingestion error: {e}")
-
-
 def main():
     logger.info(f"=== Hook execution started - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
 
@@ -362,7 +333,11 @@ def main():
             }
             logger.warning(f"BLOCKING prompt - Reason: {gr_reason}")
             print(json.dumps(output))
-            ingest_blocked_request(prompt, gr_reason, session_info)
+            # call_guardrails() already ingested this prompt on the same call that
+            # evaluated it, so the span carries guardrailViolated / guardrailAction and
+            # renders as a block. Posting a second, guardrail-free record here would
+            # only add a duplicate span that the dashboard cannot tell apart from
+            # traffic guardrails never saw.
             sys.exit(0)
 
     logger.info("Prompt allowed")
