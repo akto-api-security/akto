@@ -377,6 +377,9 @@ public class AktoPolicyNew {
                     Set<String> endpoints = new TreeSet<>(calleeEntry.getValue());
 
                     ServiceGraphEdgeInfo existing = merged.get(calleeHost);
+                    if (existing == null && merged.size() >= MAX_CALLEES_PER_SERVICE) {
+                        continue;
+                    }
                     if (existing != null && existing.getMetadata() != null) {
                         Object prior = existing.getMetadata().get("endpointUrl");
                         if (prior != null) {
@@ -384,6 +387,14 @@ public class AktoPolicyNew {
                                 if (!e.trim().isEmpty()) endpoints.add(e.trim());
                             }
                         }
+                    }
+                    if (endpoints.size() > MAX_ENDPOINTS_PER_CALLEE) {
+                        Set<String> capped = new TreeSet<>();
+                        for (String e : endpoints) {
+                            if (capped.size() >= MAX_ENDPOINTS_PER_CALLEE) break;
+                            capped.add(e);
+                        }
+                        endpoints = capped;
                     }
 
                     Map<String, Object> metadata = new HashMap<>();
