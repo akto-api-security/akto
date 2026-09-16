@@ -207,8 +207,18 @@ public class TestingRun {
         this.state = state;
     }
 
+    // Prefer the separately-transmitted hexId string over recomputing from id: id is an ObjectId,
+    // and ObjectId has no special case in either Struts2's JSON writer (falls back to bean-introspecting
+    // it into {"timestamp":N,"date":"..."}) or in plain Jackson on the client (which then can't bind
+    // that shape back onto an ObjectId field and silently constructs a brand-new, unrelated one via
+    // ObjectId's no-arg constructor - no exception, no null). hexId is a plain String, which both
+    // serializers round-trip correctly, so once a client has deserialized a response, this.hexId is
+    // trustworthy even though this.id may not be. Matches the pattern already used by
+    // TestingRunResult.getHexId()/getTestRunHexId()/getTestRunResultSummaryHexId() and
+    // TestingRunResultSummary.getOriginalTestingRunResultSummaryHexId().
     public String getHexId() {
-        return this.id.toHexString();
+        if (hexId == null) return this.id.toHexString();
+        return this.hexId;
     }
 
     public String getName() {
