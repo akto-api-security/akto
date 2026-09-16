@@ -1839,6 +1839,9 @@ public class HttpCallParser {
                 continue;
             }
 
+            // Fire and forget, no-op unless AKTO_SAAS_GUARDRAIL_ENABLED is set.
+            SaasGuardrailForwarder.offer(httpResponseParam);
+
             // check for garbage points here
             if(!redundantList.isEmpty()){
                 if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(),regexPattern)){
