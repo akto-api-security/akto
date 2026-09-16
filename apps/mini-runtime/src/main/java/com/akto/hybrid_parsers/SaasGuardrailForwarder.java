@@ -39,7 +39,7 @@ public class SaasGuardrailForwarder {
     static final String DEFAULT_GUARDRAIL_HOST = "https://1726615470-guardrails.akto.io";
 
     private static final String GUARDRAIL_PATH =
-            "/api/http-proxy?guardrails=true&ingest_data=true&response_guardrails=false";
+            "/api/http-proxy?guardrails=true&ingest_data=true&response_guardrails=true";
 
     private static final String GUARDRAIL_URL =
             normaliseHost(System.getenv("AKTO_SAAS_GUARDRAIL_HOST")) + GUARDRAIL_PATH;
