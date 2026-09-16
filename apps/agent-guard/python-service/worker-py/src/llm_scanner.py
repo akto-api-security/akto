@@ -43,19 +43,6 @@ def _clean_json(raw: str) -> str:
     return raw
 
 
-# ── Single-letter (ABCD) verdict — any scanner with a letter template ────────
-
-# letter -> (flagged, risk_score, decision_confidence).
-#
-# risk_score is kept on the SAME 0-1 scale the JSON prompt produces, using the
-# confidence bands that prompt already calibrates (A <=0.09, B 0.10-0.49,
-# C 0.50-0.89, D >=0.90), so a configured FilterRuleConfig.Threshold behaves the
-# same whichever format the model answers in — only the granularity changes.
-#
-# decision_confidence is what model_map._classify compares against
-# safeDecisionThreshold (default 0.8) to decide whether a fast tier may settle
-# the call. B is deliberately below that line: "safe but unsure" is the one
-# letter that must escalate to the arbiter rather than allow.
 _ABCD_VERDICTS = {
     "A": (False, 0.02, 0.95),
     "B": (False, 0.35, 0.50),
