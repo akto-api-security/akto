@@ -2,7 +2,6 @@ package com.akto.utils;
 
 import com.akto.config.GuardrailsConfig;
 import com.akto.kafka.Kafka;
-import com.akto.action.IngestionAction;
 
 /**
  * Handles publishing messages to multiple Kafka topics based on configuration.
@@ -18,13 +17,24 @@ public class TopicPublisher implements TrafficPublisher {
         this.config = config;
     }
 
+    @Override
     public void publish(String message, String primaryTopic, boolean publishToGuardrails) {
-        kafkaProducer.send(message, primaryTopic);
-        IngestionAction.printLogs("Inserted to kafka: " + message);
+        send(message, primaryTopic);
 
         if (publishToGuardrails && config.isEnabled()) {
-            kafkaProducer.send(message, config.getTopicName());
-            IngestionAction.printLogs("Inserted to guardrails kafka: " + message);
+            send(message, config.getTopicName());
         }
+    }
+
+    private void send(String message, String topic) {
+        final String account = OperationalAlerts.deploymentAccountId();
+        kafkaProducer.send(message, topic, (metadata, error) -> {
+            if (error != null) {
+                OperationalAlerts.send("kafka:" + account + ":" + topic,
+                        "Kafka message delivery failed\nAccount: " + account
+                        + "\nTopic: " + OperationalAlerts.label(topic)
+                        + "\nError type: " + error.getClass().getSimpleName());
+            }
+        });
     }
 }
