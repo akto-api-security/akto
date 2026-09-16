@@ -126,11 +126,13 @@ func TestUpgradeBrowserAttachmentVerdict(t *testing.T) {
 			wantReason:    browserAttachmentBlockReason,
 		},
 		{
-			name:          "alert upgraded to block",
+			// Alert never blocks, on this shape or any other: raise the alert, let the
+			// request through. Mirrors chunkStopsFile's carve-out for /api/validate/file.
+			name:          "alert-mode match allowed",
 			in:            &mcp.ValidationResult{Allowed: false, Behaviour: "alert", Reason: "PII detected"},
 			tag:           browserExtensionTag,
-			wantAllowed:   false,
-			wantBehaviour: "block",
+			wantAllowed:   true,
+			wantBehaviour: "alert",
 			wantReason:    "PII detected",
 		},
 		{

@@ -104,6 +104,24 @@ func (s *Service) upgradeBrowserAttachmentVerdict(result *mcp.ValidationResult, 
 		return
 	}
 
+	// Alert-mode match: "alert" means raise an alert for review, do not block. Unlike
+	// mask/warn/block, alert was never meant to block in the first place, so there is
+	// nothing unenforceable about it on this payload shape — the engine's Allowed=false
+	// is overridden here the same way chunkStopsFile carves alert out of
+	// /api/validate/file's block decision.
+	if mcp.ParseBehaviour(result.Behaviour) == mcp.BehaviourAlert {
+		if !result.Allowed {
+			s.logger.Info("Browser attachment guardrail - alert-mode match allowed",
+				zap.String("path", params.Path),
+				zap.String("method", params.Method),
+				zap.String("account", params.AktoAccountID),
+				zap.String("sessionID", sessionID),
+				zap.String("policyName", result.Metadata.PolicyName))
+			result.Allowed = true
+		}
+		return
+	}
+
 	previousAllowed, previousBehaviour := result.Allowed, result.Behaviour
 	if mcp.ParseBehaviour(previousBehaviour) == mcp.BehaviourBlock && !previousAllowed {
 		return // already the verdict this upgrade produces
