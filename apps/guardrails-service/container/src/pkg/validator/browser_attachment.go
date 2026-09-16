@@ -104,12 +104,13 @@ func (s *Service) upgradeBrowserAttachmentVerdict(result *mcp.ValidationResult, 
 		return
 	}
 
-	// Alert-mode match: "alert" means raise an alert for review, do not block. Unlike
-	// mask/warn/block, alert was never meant to block in the first place, so there is
-	// nothing unenforceable about it on this payload shape — the engine's Allowed=false
-	// is overridden here the same way chunkStopsFile carves alert out of
-	// /api/validate/file's block decision.
-	if mcp.ParseBehaviour(result.Behaviour) == mcp.BehaviourAlert {
+	// Alert-mode match with no rewritten payload: "alert" means the matched rule would
+	// have blocked but the policy is set to alert instead — raise the alert, do not
+	// block. Gated on !Modified rather than Allowed: mcp-endpoint-shield also reports
+	// "alert" for an already-allowed mask/redact match (see piiReportBehaviour), which
+	// always carries Modified=true and must still fall through to the block escalation
+	// below — its ModifiedPayload is the one thing this shape genuinely cannot enforce.
+	if !result.Modified && mcp.ParseBehaviour(result.Behaviour) == mcp.BehaviourAlert {
 		if !result.Allowed {
 			s.logger.Info("Browser attachment guardrail - alert-mode match allowed",
 				zap.String("path", params.Path),

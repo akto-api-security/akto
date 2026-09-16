@@ -2020,6 +2020,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		Metadata:        processResult.Metadata,
 		Behaviour:       processResult.Behaviour,
 	}
+	allowAlertBehaviour(result)
 
 	s.logger.Info("ValidateRequest - completed",
 		zap.String("path", params.Path),
@@ -2199,6 +2200,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		Metadata:        processResult.Metadata,
 		Behaviour:       processResult.Behaviour,
 	}
+	allowAlertBehaviour(result)
 
 	s.logger.Info("ValidateResponse - completed",
 		zap.String("path", params.Path),
@@ -2690,4 +2692,18 @@ func extractReasonFromBlockedResponse(blocked map[string]any) string {
 		return reason
 	}
 	return ""
+}
+
+// allowAlertBehaviour clears Allowed=false when the verdict's behaviour is alert.
+//
+// mcp-endpoint-shield derives Allowed from the matched rule's own action ("block"/"warn"),
+// not from the policy's Behaviour override — a policy set to alert mode still comes back
+// Allowed=false, with "alert" carried only as a metadata label. "Alert" means raise an
+// alert for review, do not block, so this is the one place both ValidateRequest and
+// ValidateResponse make that true regardless of caller, instead of leaving every caller to
+// reinterpret Behaviour itself (as e.g. the MCP proxy's client-side override does today).
+func allowAlertBehaviour(result *mcp.ValidationResult) {
+	if result != nil && !result.Allowed && mcp.ParseBehaviour(result.Behaviour) == mcp.BehaviourAlert {
+		result.Allowed = true
+	}
 }
