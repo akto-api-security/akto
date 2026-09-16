@@ -208,7 +208,8 @@ public class TestingRun {
     }
 
     public String getHexId() {
-        return this.id.toHexString();
+        if (hexId == null) return this.id.toHexString();
+        return this.hexId;
     }
 
     public String getName() {

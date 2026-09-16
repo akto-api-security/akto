@@ -116,6 +116,9 @@ public class TestingRunResultSummary {
     }
 
     public String getTestingRunHexId() {
+        if (testingRunHexId == null && this.testingRunId != null) {
+            return this.testingRunId.toHexString();
+        }
         return this.testingRunHexId;
     }
 
@@ -132,7 +135,8 @@ public class TestingRunResultSummary {
     }
 
     public String getHexId() {
-        return this.id.toHexString();
+        if (hexId == null) return this.id.toHexString();
+        return this.hexId;
     }
 
     public int getTestResultsCount() {

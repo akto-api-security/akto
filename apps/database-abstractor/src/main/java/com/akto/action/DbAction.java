@@ -2856,7 +2856,11 @@ public class DbAction extends ActionSupport {
             }
 
             trrs = DbLayer.markTestRunResultSummaryFailed(testingRunResultSummaryId);
-            trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+            if (trrs == null) {
+                loggerMaker.errorAndAddToDb("No matching RUNNING summary found for markTestRunResultSummaryFailed, testingRunResultSummaryId=" + testingRunResultSummaryId);
+                return Action.ERROR.toUpperCase();
+            }
+            trrs.setTestingRunHexId(trrs.getTestingRunHexId());
             int accountId = Context.accountId.get();
             String runHex = trrs.getTestingRunId() != null ? trrs.getTestingRunId().toHexString() : null;
             TestingFailureSlackCopy.TitleAndDetail slack = TestingFailureSlackCopy.forMarkTestRunSummaryFailed(
