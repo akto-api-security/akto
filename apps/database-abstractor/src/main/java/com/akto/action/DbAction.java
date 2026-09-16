@@ -2858,7 +2858,7 @@ public class DbAction extends ActionSupport {
             trrs = DbLayer.markTestRunResultSummaryFailed(testingRunResultSummaryId);
             if (trrs == null) {
                 loggerMaker.errorAndAddToDb("No matching RUNNING summary found for markTestRunResultSummaryFailed, testingRunResultSummaryId=" + testingRunResultSummaryId);
-                return "NOT_FOUND";
+                return Action.ERROR.toUpperCase();
             }
             trrs.setTestingRunHexId(trrs.getTestingRunHexId());
             int accountId = Context.accountId.get();
