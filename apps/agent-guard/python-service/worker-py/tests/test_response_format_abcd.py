@@ -129,13 +129,15 @@ def test_unreadable_answers_raise_rather_than_guess(raw):
         parse_abcd_result("PromptInjection", raw)
 
 
-def test_blocked_letters_carry_a_reason_for_the_threat_report():
-    """details.reason feeds the threat report and the remediation prompt."""
-    for letter in ("C", "D"):
-        assert parse_abcd_result("PromptInjection", letter)["details"]["reason"]
-    # Safe verdicts are never reported, so they need no reason.
-    for letter in ("A", "B"):
-        assert "reason" not in parse_abcd_result("PromptInjection", letter)["details"]
+def test_every_letter_reports_an_empty_reason():
+    """The letter contract carries no explanation, so reason is emitted empty.
+
+    A fixed stand-in would be the same sentence every time — it would read as a
+    real explanation in the threat report while saying nothing about the payload.
+    The key is still present so the asynchronous fill has a place to land, and
+    consumers fall back to the policy-level reason meanwhile."""
+    for letter in ("A", "B", "C", "D"):
+        assert parse_abcd_result("PromptInjection", letter)["details"]["reason"] == ""
 
 
 def test_risk_scores_share_the_json_prompt_scale():
@@ -313,11 +315,10 @@ def test_builder_and_parser_agree_on_the_contract():
             assert is_letter_prompt is (effective == "abcd"), f"{scanner}/{scanner_type}"
 
 
-def test_reason_names_the_scanner_that_flagged():
-    """details.reason reaches the threat report, so it must not say
-    'prompt injection' for a Toxicity block once Toxicity gains a template."""
-    assert "Toxicity" in parse_abcd_result("Toxicity", "D")["details"]["reason"]
-    assert "PromptInjection" in parse_abcd_result("PromptInjection", "C")["details"]["reason"]
+def test_no_scanner_produces_a_reason():
+    for scanner in ("Toxicity", "PromptInjection", "BanTopics", "Gibberish", "BanCode"):
+        for letter in ("C", "D"):
+            assert parse_abcd_result(scanner, letter)["details"]["reason"] == ""
 
 
 # ── Derived templates (every scanner but PromptInjection and Password) ───────
@@ -440,9 +441,8 @@ def test_rendered_letter_prompts_stay_under_the_latency_cliff(scanner):
 
 @pytest.mark.parametrize("scanner", sorted(LETTER_CAPABLE))
 def test_letter_verdict_parses_for_every_capable_scanner(scanner):
-    """The parser is scanner-agnostic; the reason must name the scanner that
-    flagged, since it lands in the threat report."""
+    """The parser is scanner-agnostic: the same letters mean the same thing."""
     flagged = parse_abcd_result(scanner, "D")
     assert flagged["is_valid"] is False
-    assert scanner in flagged["details"]["reason"]
+    assert flagged["details"]["letter"] == "D"
     assert parse_abcd_result(scanner, "A")["is_valid"] is True

@@ -92,15 +92,16 @@ def test_empty_values_is_a_clean_allow():
     assert r["is_valid"] is True
     assert r["risk_score"] <= 0.09
     assert "values" not in r["details"]
+    assert r["details"]["reason"] == ""
 
 
-def test_reason_never_quotes_the_secret():
+def test_reason_is_emitted_empty():
     """The JSON contract required the reason to quote every value verbatim,
-    which put raw credentials in the threat report."""
-    secret = "Hunter2024#"
-    r = parse_values_result("Password", f'{{"values": ["{secret}"]}}')
-    assert secret not in r["details"]["reason"]
-    assert "1 real secret value(s)" in r["details"]["reason"]
+    which put raw credentials in the threat report. The compact contract emits
+    it empty and it is filled asynchronously."""
+    r = parse_values_result("Password", '{"values": ["Hunter2024#"]}')
+    assert r["details"]["reason"] == ""
+    assert r["details"]["values"] == ["Hunter2024#"]
 
 
 def test_non_string_and_empty_entries_are_dropped():
