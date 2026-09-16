@@ -94,22 +94,6 @@ def force_gemma_only(_model_configs):
     return [{"provider": _gemma_arbiter_provider(), "modelRole": "FINAL_ARBITER", "timeoutMs": 30000}]
 
 
-# Cascade roles whose answer contract the env var may override.
-# FINAL_ARBITER is normally absent: the letter contract returns no reason string,
-# and the arbiter's verdict is the one that reaches the threat report, the
-# remediation prompt's BLOCK REASON and the evidence-line prompt. An operator who
-# really wants a letter-answering arbiter must say so per-model in the policy,
-# where the consequence is visible.
-_OVERRIDABLE_ROLES = {"FAST_THREAT_FILTER", "FAST_FALLBACK_SAFE_FILTER"}
-
-# Formats that MAY also be stamped on the FINAL_ARBITER. "values" qualifies for
-# two reasons: the gateway falls back to the policy reason when the model returns
-# none (pii_password_llm.go:226) and the values still reach the report through
-# piiValueSchemaErrors; and Password runs arbiter-only (force_gemma_only strips
-# the fast tiers), so restricting it to the fast tiers would mean the override
-# never reached Password at all.
-_ARBITER_SAFE_FORMATS = {"values"}
-
 # "json" is spelled as the empty responseFormat internally (see llm_scanner);
 # accepting it as a word gives operators an explicit kill switch that beats a
 # per-model responseFormat without editing the policy.
@@ -144,7 +128,15 @@ def _requested_formats() -> list[str] | None:
 
 
 def apply_scanner_response_format(model_configs):
-    """Stamp SCANNER_RESPONSE_FORMAT onto the cascade entries.
+    """Stamp SCANNER_RESPONSE_FORMAT onto EVERY cascade entry, all roles.
+
+    The FINAL_ARBITER is included deliberately. A compact contract returns no
+    reason string and a coarse risk_score, so the verdict that reaches the threat
+    report carries only the synthesised metadata from llm_scanner — the
+    per-sample explanation is given up in exchange for the tokens, on the
+    understanding that those metadata fields are regenerated asynchronously
+    afterwards rather than inline on the blocking path. Nothing in this service
+    performs that regeneration today.
 
     Scanner-agnostic: it sets responseFormat on the entries, and which scanners
     actually honour a given format is decided later by prompts._FORMAT_CAPABLE,
@@ -158,22 +150,9 @@ def apply_scanner_response_format(model_configs):
     formats = _requested_formats()
     if formats is None:
         return list(model_configs or [])
-
-    fast = ",".join(formats)
-    arbiter = ",".join(f for f in formats if f in _ARBITER_SAFE_FORMATS)
-
-    stamped = []
-    for entry in model_configs or []:
-        role = str(entry.get("modelRole", ""))
-        if not formats:  # kill switch: clear every role, including the arbiter
-            stamped.append({**entry, "responseFormat": ""})
-        elif role in _OVERRIDABLE_ROLES:
-            stamped.append({**entry, "responseFormat": fast})
-        elif arbiter:
-            stamped.append({**entry, "responseFormat": arbiter})
-        else:
-            stamped.append(entry)
-    return stamped
+    # [] is the kill switch and correctly stamps "" (back to the JSON verdict).
+    response_format = ",".join(formats)
+    return [{**entry, "responseFormat": response_format} for entry in (model_configs or [])]
 
 
 # Scanners that proxy to a sibling Worker which in turn owns a Cloudflare

@@ -35,6 +35,7 @@ cp .env.example .env   # edit once — never commit .env
 | `AGENT_GUARD_EXECUTOR_TAG` | yes (legacy ONNX only) | no |
 | `FORCE_LLM_MODE` / `SCANNER_LLM_PROVIDER` | legacy ONNX only | no |
 | `SCANNER_RESPONSE_FORMAT` | yes | yes |
+| `LLM_VALIDATOR_RESPONSE_FORMAT` | gateway-side (akto-gateway), not agent-guard | no |
 | `VERTEX_AI_*` | legacy ONNX (generic Vertex provider) | rarely |
 | `ANONYMIZER_URL` | set in compose | leave empty |
 | Vertex / Slack / model map keys | yes | yes |

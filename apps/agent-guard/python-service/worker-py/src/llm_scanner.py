@@ -194,9 +194,12 @@ class LLMScanner:
     """Evaluates one of LLM_SUPPORTED_SCANNERS against a single provider.
 
     response_format is that model's ModelConfig.responseFormat: "abcd" asks for
-    the single-letter contract, anything else (the default) for JSON. It is
-    per-model on purpose — a fast tier can answer in letters while the arbiter
-    stays on JSON and keeps producing the reason string the threat report needs.
+    the single-letter contract, "values" for Password's, anything else (the
+    default) for JSON. It stays per-model so a cascade can mix contracts, but
+    SCANNER_RESPONSE_FORMAT applies to every role including FINAL_ARBITER: a
+    compact verdict then reaches the threat report with only the synthesised
+    reason and risk_score below, on the understanding that those metadata fields
+    are regenerated asynchronously afterwards rather than on the blocking path.
     """
 
     def __init__(self, provider: LLMProvider, response_format: str = ""):

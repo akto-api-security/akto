@@ -206,14 +206,15 @@ def test_env_unset_leaves_per_model_config_alone(monkeypatch):
 
 
 @pytest.mark.parametrize("value", ["abcd", "ABCD", "  abcd  "])
-def test_env_abcd_stamps_fast_tiers_only(monkeypatch, value):
+def test_env_abcd_stamps_every_role_including_the_arbiter(monkeypatch, value):
+    """The arbiter is included deliberately: its reported verdict then carries
+    only llm_scanner's synthesised reason/risk_score, which the deployment
+    regenerates asynchronously rather than on the blocking path."""
     monkeypatch.setattr(settings, "SCANNER_RESPONSE_FORMAT", value)
     assert _formats(apply_scanner_response_format(_cascade())) == {
         "FAST_THREAT_FILTER": "abcd",
         "FAST_FALLBACK_SAFE_FILTER": "abcd",
-        # Never the arbiter: its verdict is the one reported, and the letter
-        # contract carries no reason string.
-        "FINAL_ARBITER": "",
+        "FINAL_ARBITER": "abcd",
     }
 
 

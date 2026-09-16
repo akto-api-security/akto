@@ -18,6 +18,10 @@ from . import ban_topics, code, gibberish, password, prompt_injection, toxicity
 # gateway masks (mcp/pii_password_llm.go reads details["values"]), and a single
 # character cannot. "values" is its compact contract instead — same substrings,
 # without the isPassword/riskScore/reason fields that are derivable or redundant.
+#
+# Both contracts drop the per-sample reason, and SCANNER_RESPONSE_FORMAT applies
+# them to the FINAL_ARBITER as well as the fast tiers, so a reported block can
+# carry only llm_scanner's synthesised metadata.
 _FORMAT_CAPABLE: dict[str, frozenset[str]] = {
     "PromptInjection": frozenset({"abcd"}),
     "Toxicity": frozenset({"abcd"}),

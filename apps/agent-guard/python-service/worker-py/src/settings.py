@@ -61,9 +61,11 @@ _FIELDS = (
     #   ""      → no override; each ModelConfig.responseFormat decides (default)
     #   "json"  → force the JSON verdict everywhere (kill switch for "abcd")
     #   "abcd"  → force the single-letter contract on the fast tiers
-    # Applies to whichever scanners have a letter template (prompts._ABCD_CAPABLE);
-    # the rest stay on JSON. The FINAL_ARBITER is never overridden: its verdict is
-    # the one reported, and the letter contract carries no reason. See constants.py.
+    # Applies to whichever scanners have a template in that format
+    # (prompts._FORMAT_CAPABLE); the rest stay on JSON. Several may be named at
+    # once ("abcd,values"). It sets EVERY cascade role, FINAL_ARBITER included, so
+    # a reported verdict may carry only synthesised reason/risk_score. See
+    # constants.py.
     "SCANNER_RESPONSE_FORMAT",
     # Portable anonymizer service URL (e.g. http://anonymizer:8093).
     "ANONYMIZER_URL",

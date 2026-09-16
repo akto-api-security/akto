@@ -122,8 +122,9 @@ Text to analyze:
 #   * No reason string. A block carries only the generic per-letter text from
 #     llm_scanner._ABCD_REASONS, so the threat report, the remediation prompt's
 #     BLOCK REASON and the evidence-line prompt all lose their per-sample
-#     explanation. Keep the FINAL_ARBITER on the JSON format — its verdict is the
-#     one that gets reported.
+#     explanation. This applies to the FINAL_ARBITER too when the deployment
+#     enables it there: the reported verdict then carries synthesised metadata,
+#     to be regenerated asynchronously afterwards.
 #   * risk_score becomes 4-valued, so FilterRuleConfig.Threshold cannot tune
 #     sensitivity finely on a model running this format.
 #   * On gemma-4-e2b-it the model answers only A/D in practice: across 160 calls

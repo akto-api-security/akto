@@ -155,15 +155,19 @@ def test_values_reaches_password_despite_it_being_arbiter_only(monkeypatch):
     assert configs[0]["responseFormat"] == "values"
 
 
-def test_abcd_never_reaches_an_arbiter(monkeypatch):
-    """The letter contract has no reason string, and the arbiter's verdict is
-    the one reported — so it stays off the arbiter even deployment-wide."""
+def test_abcd_on_an_arbiter_still_leaves_password_on_json(monkeypatch):
+    """The env var now stamps the arbiter too, but Password has no letter
+    template — so it falls back to JSON rather than answering a letter and
+    losing the substrings the gateway masks."""
     monkeypatch.setattr(settings, "SCANNER_RESPONSE_FORMAT", "abcd")
     configs = apply_scanner_response_format(force_gemma_only(None))
-    assert configs[0].get("responseFormat", "") == ""
+    assert configs[0]["responseFormat"] == "abcd"
+    assert resolve_response_format("Password", "prompt", configs[0]["responseFormat"]) == ""
 
 
-def test_combined_setting_splits_by_role(monkeypatch):
+def test_combined_setting_applies_uniformly(monkeypatch):
+    """Every role gets the full list; each SCANNER then takes the first format
+    it supports, so the split is by scanner, not by role."""
     monkeypatch.setattr(settings, "SCANNER_RESPONSE_FORMAT", "abcd,values")
     configs = apply_scanner_response_format(
         [
@@ -172,9 +176,9 @@ def test_combined_setting_splits_by_role(monkeypatch):
         ]
     )
     formats = {e["modelRole"]: e["responseFormat"] for e in configs}
-    # Fast tiers get both and pick per scanner; the arbiter gets only the
-    # arbiter-safe one, so a letter can never decide a reported verdict.
-    assert formats == {"FAST_THREAT_FILTER": "abcd,values", "FINAL_ARBITER": "values"}
+    assert formats == {"FAST_THREAT_FILTER": "abcd,values", "FINAL_ARBITER": "abcd,values"}
+    assert resolve_response_format("PromptInjection", "prompt", "abcd,values") == "abcd"
+    assert resolve_response_format("Password", "prompt", "abcd,values") == "values"
 
 
 def test_kill_switch_clears_every_role(monkeypatch):

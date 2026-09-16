@@ -123,10 +123,10 @@ async def _scan_prompt_injection():
     )
 
 
-async def test_env_abcd_reaches_the_fast_tier_but_not_the_arbiter(monkeypatch):
+async def test_env_abcd_reaches_every_role_including_the_arbiter(monkeypatch):
     monkeypatch.setattr(settings, "SCANNER_RESPONSE_FORMAT", "abcd")
     await _scan_prompt_injection()
-    assert FakeScanner.formats == {"gemma_foundry": "abcd", "gemma_vertexai": ""}
+    assert FakeScanner.formats == {"gemma_foundry": "abcd", "gemma_vertexai": "abcd"}
 
 
 async def test_env_unset_keeps_every_tier_on_json(monkeypatch):
@@ -146,4 +146,4 @@ async def test_env_reaches_every_cascade_scanner(monkeypatch):
     await scan_handler.scan_payload(
         {"scanner_name": "Toxicity", "scanner_type": "prompt", "text": "hello", "config": _PI_CONFIG}
     )
-    assert FakeScanner.formats == {"gemma_foundry": "abcd", "gemma_vertexai": ""}
+    assert FakeScanner.formats == {"gemma_foundry": "abcd", "gemma_vertexai": "abcd"}
