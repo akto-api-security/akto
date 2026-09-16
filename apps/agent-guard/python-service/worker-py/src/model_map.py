@@ -78,9 +78,6 @@ class ModelMapScanner:
         for entry in model_map:
             provider = build_provider_from_config(entry)
             if provider is not None:
-                # responseFormat is per-model, so a cascade can mix contracts —
-                # though SCANNER_RESPONSE_FORMAT sets every role at once,
-                # arbiter included.
                 scanners.append((LLMScanner(provider, entry.get("responseFormat", "")), entry))
             else:
                 # build_provider_from_config already logged which env var was
