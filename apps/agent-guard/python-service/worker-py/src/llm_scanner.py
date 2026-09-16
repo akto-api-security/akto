@@ -222,9 +222,6 @@ class LLMScanner:
             if prompt is None:
                 raise ValueError(f"Scanner {scanner_name} not supported by LLM path")
             raw = await self.provider.complete(prompt)
-            # Parse whatever build_scan_prompt actually rendered: a scanner with
-            # no template in the requested format, or an output-side scan, was
-            # sent the JSON template no matter what responseFormat asked for.
             effective = resolve_response_format(scanner_name, scanner_type, self.response_format)
             result = _FORMAT_PARSERS.get(effective, parse_llm_result)(scanner_name, raw)
 

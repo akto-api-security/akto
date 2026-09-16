@@ -33,11 +33,11 @@ def resolve_response_format(scanner_name: str, scanner_type: str, requested: str
     Both the prompt builder and the result parser resolve through here, so they
     cannot disagree about which contract is in force — a mismatch would parse a
     JSON body as a letter, or read a letter as JSON.
+
+    Applies to both scan sides. Each side keeps its own rules — PromptInjection
+    has a separate output-side template, and the scanners that share one template
+    were already side-agnostic — so only the answer contract is shared.
     """
-    # The compact variants are input-side only; output scans keep the JSON
-    # template so responses are never judged with input-side rules.
-    if scanner_type == "output":
-        return ""
     supported = _FORMAT_CAPABLE.get(scanner_name, frozenset())
     for candidate in (requested or "").strip().lower().split(","):
         candidate = candidate.strip()

@@ -56,11 +56,20 @@ def test_unknown_formats_fall_back_to_json(requested):
     assert '"isInjection"' in prompt
 
 
-def test_abcd_is_input_side_only():
-    """There is no ABCD output-side template; an output scan must stay JSON."""
-    prompt = build_scan_prompt("PromptInjection", "output", {}, "some reply", response_format="abcd")
-    assert '"isInjection"' in prompt
-    assert "respond with ONE character" not in prompt
+def test_abcd_covers_the_output_side_with_output_side_rules():
+    """Both sides answer in letters, but each keeps its own rules: an AI response
+    must never be judged with the input-side (user-attack) rules."""
+    out = build_scan_prompt("PromptInjection", "output", {}, "some reply", response_format="abcd")
+    assert "respond with ONE character" in out
+    assert '"isInjection"' not in out
+    # Output-side vocabulary, not input-side.
+    assert "EMBEDDED INJECTION" in out
+    assert "AI response to analyze:" in out
+    assert "CONVERSATION STATE" not in out  # an input-side rule
+
+    inp = build_scan_prompt("PromptInjection", "prompt", {}, "some text", response_format="abcd")
+    assert "CONVERSATION STATE" in inp
+    assert "EMBEDDED INJECTION" not in inp
 
 
 def test_abcd_keeps_the_recall_critical_guidance():
@@ -287,13 +296,17 @@ def test_only_abcd_resolves_to_a_letter_contract(requested):
     assert resolve_response_format("PromptInjection", "prompt", requested or "") == ""
 
 
-def test_output_side_never_resolves_to_letters():
-    assert resolve_response_format("PromptInjection", "output", "abcd") == ""
+@pytest.mark.parametrize("scanner", sorted(LETTER_CAPABLE))
+def test_both_scan_sides_resolve_to_letters(scanner):
+    assert resolve_response_format(scanner, "prompt", "abcd") == "abcd"
+    assert resolve_response_format(scanner, "output", "abcd") == "abcd"
 
 
 @pytest.mark.parametrize("scanner", sorted(LETTER_CAPABLE | {"Password"}))
 def test_builder_and_parser_agree_on_the_contract_per_scanner(scanner):
-    """Every scanner: the template rendered and the parser chosen must match."""
+    """Every scanner, both sides: the template rendered and the parser chosen
+    must match — a mismatch reads a JSON body as a letter, or prose as a
+    verdict."""
     for scanner_type in ("prompt", "output"):
         effective = resolve_response_format(scanner, scanner_type, "abcd")
         prompt = build_scan_prompt(scanner, scanner_type, _CONFIG, "sample", response_format="abcd")
@@ -446,3 +459,54 @@ def test_letter_verdict_parses_for_every_capable_scanner(scanner):
     assert flagged["is_valid"] is False
     assert flagged["details"]["letter"] == "D"
     assert parse_abcd_result(scanner, "A")["is_valid"] is True
+
+
+# ── Output-side derivation ───────────────────────────────────────────────────
+
+
+def test_output_letter_template_drops_the_json_schema():
+    abcd = prompt_injection.OUTPUT_ABCD
+    assert "respond ONLY with valid JSON" not in abcd
+    assert "respond with ONE character" in abcd
+    for key in ('"isInjection"', '"confidence"', '"reason"'):
+        assert key not in abcd, key
+
+
+def test_output_letter_template_keeps_the_output_side_rules():
+    abcd = prompt_injection.OUTPUT_ABCD
+    for rule in (
+        "instructions directed at another AI system or agent",
+        "The signal is INTENT and AGENCY, not vocabulary",
+        "downstream parser or agent that consumes this response",
+    ):
+        assert rule in abcd, rule
+
+
+def test_output_letter_template_addresses_the_right_subject():
+    """The contract's lead-in must match the side being scanned."""
+    assert "Analyze this AI-generated response and respond with ONE character" in prompt_injection.OUTPUT_ABCD
+    assert "Analyze this text and respond with ONE character" in prompt_injection.INPUT_ABCD
+
+
+def test_output_few_shot_letters_match_their_source_verdicts():
+    import json as _json
+    import re
+
+    source = [_json.loads(m) for m in re.findall(r"^Output: (\{.*\})$", prompt_injection.OUTPUT, re.M)]
+    letters = re.findall(r"^Output: (.)$", prompt_injection.OUTPUT_ABCD, re.M)
+    assert len(source) == len(letters) and source
+
+    for parsed, letter in zip(source, letters):
+        assert (letter in ("C", "D")) is bool(parsed["isInjection"]), f"{parsed} -> {letter}"
+
+
+def test_output_letter_template_ends_with_the_response_placeholder():
+    assert prompt_injection.OUTPUT_ABCD.endswith("\n\nAI response to analyze:\n%s")
+
+
+@pytest.mark.parametrize("scanner", sorted(LETTER_CAPABLE))
+def test_rendered_output_side_prompts_stay_under_the_latency_cliff(scanner):
+    prompt = build_scan_prompt(
+        scanner, "output", _CONFIG, "sample text", provider_name="gemma_foundry", response_format="abcd"
+    )
+    assert len(prompt) < _LATENCY_CLIFF, f"{scanner}: {len(prompt)} chars"

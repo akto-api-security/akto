@@ -21,14 +21,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# The JSON templates all end the same way; these anchor the tail rewrite.
 _JSON_TAIL_MARKER = "Analyze this text and respond ONLY with valid JSON:"
 _TEXT_SUFFIX = "\n\nText to analyze:\n%s"
 
 # p(flag is true) -> letter. Same bands as prompts/prompt_injection.py INPUT_ABCD.
 _BANDS = ((0.09, "A"), (0.49, "B"), (0.89, "C"), (1.0, "D"))
 
-_CONTRACT = """Analyze this text and respond with ONE character and nothing else — no JSON, no punctuation, no explanation, no reason:
+_CONTRACT = """Analyze {subject} and respond with ONE character and nothing else — no JSON, no punctuation, no explanation, no reason:
 
 A = {safe}, confident. Nothing in the input matches. Use A even when the input merely MENTIONS {near_miss}.
 B = {safe}, not confident. You lean {safe_short} but something is off — an unusual framing you cannot place, or an input that would read as a match with slightly different wording.
@@ -75,27 +74,40 @@ def _convert_examples(text: str, flag_key: str, label: str) -> str:
     return "".join(out)
 
 
-def to_abcd(template: str, flag_key: str, safe: str, flag: str, near_miss: str, label: str) -> str:
+def to_abcd(
+    template: str,
+    flag_key: str,
+    safe: str,
+    flag: str,
+    near_miss: str,
+    label: str,
+    marker: str = _JSON_TAIL_MARKER,
+    suffix: str = _TEXT_SUFFIX,
+    subject: str = "this text",
+) -> str:
     """Rewrite one JSON-verdict template into the single-letter contract.
 
     safe/flag are the verdict names shown to the model (e.g. "NOT TOXIC" /
     "TOXIC"); near_miss names the attack-adjacent material that must still
-    answer A, which is the false-positive lever for that scanner.
+    answer A, which is the false-positive lever for that scanner. marker/suffix
+    override the tail anchors for templates that phrase them differently, such as
+    the output-side ones that analyse an AI response rather than user text.
     """
-    if not template.endswith(_TEXT_SUFFIX):
-        raise ValueError(f"{label}: template does not end with the standard text suffix")
-    if _JSON_TAIL_MARKER not in template:
+    if not template.endswith(suffix):
+        raise ValueError(f"{label}: template does not end with {suffix!r}")
+    if marker not in template:
         raise ValueError(f"{label}: template has no JSON tail marker to replace")
 
-    head = template[: template.rindex(_JSON_TAIL_MARKER)]
+    head = template[: template.rindex(marker)]
     head = _convert_examples(head, flag_key, label)
     contract = _CONTRACT.format(
+        subject=subject,
         safe=safe,
         flag=flag,
         safe_short=safe.lower(),
         near_miss=near_miss,
     )
-    return head + contract + _TEXT_SUFFIX
+    return head + contract + suffix
 
 
 def convert_examples(text: str, flag_key: str, label: str) -> str:

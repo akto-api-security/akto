@@ -135,8 +135,12 @@ def test_one_setting_can_ask_every_scanner_for_its_own_contract():
     assert resolve_response_format("Password", "prompt", "abcd,values") == "values"
 
 
-def test_output_side_stays_on_json():
-    assert resolve_response_format("Password", "output", "values") == ""
+def test_values_covers_both_scan_sides():
+    """An output scan looks for secrets leaked in a response; the contract is
+    the same and must carry the substrings to mask either way."""
+    assert resolve_response_format("Password", "output", "values") == "values"
+    out = build_scan_prompt("Password", "output", {}, "pwd=hunter2", response_format="values")
+    assert '{"values"' in out
 
 
 def test_every_known_format_has_a_parser():
