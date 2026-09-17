@@ -222,7 +222,7 @@ func (promptStringInjector) Inject(body map[string]interface{}, summary string) 
 	if !ok {
 		return false
 	}
-	body["prompt"] = summary + "\n\n" + originalPrompt
+	body["prompt"] = composeWithSessionContext(summary, originalPrompt)
 	return true
 }
 
@@ -237,7 +237,7 @@ func (bodyStringInjector) Inject(body map[string]interface{}, summary string) bo
 	if !ok {
 		return false
 	}
-	body["body"] = summary + "\n\n" + original
+	body["body"] = composeWithSessionContext(summary, original)
 	return true
 }
 
@@ -263,7 +263,7 @@ func (chatMessagesInjector) Inject(body map[string]interface{}, summary string) 
 			// Non-string content (multi-modal arrays) — skip and keep searching.
 			continue
 		}
-		msg["content"] = summary + "\n\n" + content
+		msg["content"] = composeWithSessionContext(summary, content)
 		return true
 	}
 	return false
