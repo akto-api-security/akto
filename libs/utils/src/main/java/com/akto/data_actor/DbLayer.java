@@ -1811,7 +1811,9 @@ public class DbLayer {
     private static TestingRunResultSummary findPendingTestingRunResultSummaryBasedOnPriority(Bson filter, String miniTestingName) {
 
         Bson testingRunsProjections = Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, ID);
-        Bson trrsProjections = Projections.include(TestingRunResultSummary.TESTING_RUN_ID, ID, TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID);
+        Bson trrsProjections = Projections.include(TestingRunResultSummary.TESTING_RUN_ID, ID,
+                TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID, TestingRunResultSummary.PRODUCER_DONE,
+                TestingRunResultSummary.LEASE_EXPIRY_TS, TestingRunResultSummary.LEASE_TOKEN);
         List<TestingRun> testingRuns = TestingRunDao.instance.findAll(
                 Filters.or(
                     Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName),
@@ -1854,7 +1856,58 @@ public class DbLayer {
         return trrs;
     }
 
+    private static final int DEFAULT_LEASE_SECONDS = 90;
+
+    /**
+     * Claims a summary for the caller. When leaseToken is null the caller is an older mini-testing
+     * that does not participate in leasing, so this stays exactly what it has always been: an
+     * unconditional state flip returning the pre-update document.
+     *
+     * With a token, the lease itself provides exclusivity - two pods racing here both match on
+     * state, but only the first to stamp leaseExpiryTs leaves the other's filter unsatisfied.
+     * The pre-update document is still what's returned, because callers branch on the state the
+     * summary had before the claim (see the SCHEDULED github-status branch in mini-testing's Main).
+     * The lease fields are attached to that pre-image afterwards so the caller learns its token.
+     */
+    private static TestingRunResultSummary claimTestingRunResultSummary(ObjectId summaryId, String leaseToken, int leaseSeconds) {
+        Bson stateGuard = Filters.in(TestingRunResultSummary.STATE,
+                TestingRun.State.SCHEDULED, TestingRun.State.RUNNING);
+
+        if (StringUtils.isEmpty(leaseToken)) {
+            return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                    Filters.and(Filters.eq(ID, summaryId), stateGuard),
+                    Updates.set(TestingRun.STATE, TestingRun.State.RUNNING));
+        }
+
+        int now = Context.now();
+        int ttl = leaseSeconds > 0 ? leaseSeconds : DEFAULT_LEASE_SECONDS;
+        int expiry = now + ttl;
+
+        TestingRunResultSummary claimed = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                Filters.and(
+                        Filters.eq(ID, summaryId),
+                        stateGuard,
+                        Filters.or(
+                                Filters.exists(TestingRunResultSummary.LEASE_EXPIRY_TS, false),
+                                Filters.lt(TestingRunResultSummary.LEASE_EXPIRY_TS, now))),
+                Updates.combine(
+                        Updates.set(TestingRun.STATE, TestingRun.State.RUNNING),
+                        Updates.set(TestingRunResultSummary.LEASE_TOKEN, leaseToken),
+                        Updates.set(TestingRunResultSummary.LEASE_EXPIRY_TS, expiry)));
+
+        if (claimed != null) {
+            claimed.setLeaseToken(leaseToken);
+            claimed.setLeaseExpiryTs(expiry);
+        }
+        return claimed;
+    }
+
     public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
+        return findPendingTestingRunResultSummary(now, delta, miniTestingName, null, 0);
+    }
+
+    public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName,
+            String leaseToken, int leaseSeconds) {
         try {
 
             Bson filter = Filters.or(
@@ -1880,10 +1933,21 @@ public class DbLayer {
             TestingRunResultSummary trrs = findPendingTestingRunResultSummaryBasedOnPriority(filterScheduled, miniTestingName);
 
             if (trrs == null) {
+                /*
+                 * Two ways a RUNNING summary becomes reclaimable, and the wall-clock one has to stay:
+                 * older mini-testing modules never stamp a lease, so their summaries have no
+                 * leaseExpiryTs field at all - and a mongo range predicate does not match a missing
+                 * field, which would make every pre-existing summary permanently invisible here.
+                 * The lease branch is therefore additive, and unlike the window it has no upper age
+                 * bound, so an abandoned attempt stays reclaimable however long it has been stuck.
+                 */
                 Bson filterRunning = Filters.and(
                         Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-                        Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 5 * 60),
-                        Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
+                        Filters.or(
+                                Filters.and(
+                                        Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 5 * 60),
+                                        Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)),
+                                Filters.lt(TestingRunResultSummary.LEASE_EXPIRY_TS, now))
                 );
 
                 trrs = findPendingTestingRunResultSummaryBasedOnPriority(filterRunning, miniTestingName);
@@ -1902,11 +1966,7 @@ public class DbLayer {
             if (StringUtils.isEmpty(miniTestingName)) {
                 List<String> allowedListLegacy = testingRun.getAllowedMiniTestingServiceNames();
                 if (StringUtils.isEmpty(testingRun.getMiniTestingServiceName()) && (allowedListLegacy == null || allowedListLegacy.isEmpty())) {
-                    return TestingRunResultSummariesDao.instance.getMCollection()
-                            .findOneAndUpdate(
-                                    Filters.eq(ID, trrs.getId()),
-                                    Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
-                            );
+                    return claimTestingRunResultSummary(trrs.getId(), leaseToken, leaseSeconds);
                 } else {
                     return null;
                 }
@@ -1924,11 +1984,7 @@ public class DbLayer {
                     Filters.eq(ID, trrs.getTestingRunId()),
                     Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName)
                 );
-                return TestingRunResultSummariesDao.instance.getMCollection()
-                    .findOneAndUpdate(
-                        Filters.eq(ID, trrs.getId()),
-                        Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
-                    );
+                return claimTestingRunResultSummary(trrs.getId(), leaseToken, leaseSeconds);
             }
 
             // Backward compat: old runs with only single miniTestingServiceName field
@@ -1957,11 +2013,7 @@ public class DbLayer {
                 }
             }
 
-            return TestingRunResultSummariesDao.instance.getMCollection()
-                .findOneAndUpdate(
-                    Filters.eq(ID, trrs.getId()),
-                    Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
-                );
+            return claimTestingRunResultSummary(trrs.getId(), leaseToken, leaseSeconds);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error in findPendingTestingRunResultSummary: " + e.getMessage());
             return null;
@@ -2243,9 +2295,52 @@ public class DbLayer {
     }
 
     public static void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount) {
+        updateTestResultsCountInTestSummary(summaryId, testResultsCount, null, 0);
+    }
+
+    /**
+     * Also renews the caller's lease when it supplies a token, which is why leasing needs no
+     * separate heartbeat: this already runs once per result, on both the legacy path and the
+     * batched one (bulkRecordTestingRunResults loops through here per summary).
+     *
+     * Returns whether the write applied. With a token that is the answer to "do I still own this
+     * attempt" - false means another pod has taken over and the caller must stop. Without a token
+     * it is simply whether the summary still exists.
+     */
+    public static boolean updateTestResultsCountInTestSummary(String summaryId, int testResultsCount,
+            String leaseToken, int leaseSeconds) {
         ObjectId summaryObjectId = new ObjectId(summaryId);
-        TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, summaryObjectId),
-            Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, testResultsCount));
+
+        if (StringUtils.isEmpty(leaseToken)) {
+            return TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, summaryObjectId),
+                Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, testResultsCount)) != null;
+        }
+
+        int ttl = leaseSeconds > 0 ? leaseSeconds : DEFAULT_LEASE_SECONDS;
+        return TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+            Filters.and(
+                Filters.eq(Constants.ID, summaryObjectId),
+                Filters.eq(TestingRunResultSummary.LEASE_TOKEN, leaseToken)),
+            Updates.combine(
+                Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, testResultsCount),
+                Updates.set(TestingRunResultSummary.LEASE_EXPIRY_TS, Context.now() + ttl))) != null;
+    }
+
+    /**
+     * Marks the attempt's message set complete in Kafka. Until this is set a summary picked up by
+     * any pod has to re-produce from scratch, because a partial topic cannot be told apart from a
+     * complete one. Fenced on the lease so a superseded pod cannot mark it for the new owner.
+     */
+    public static boolean markProducerDone(String summaryId, String leaseToken) {
+        ObjectId summaryObjectId = new ObjectId(summaryId);
+        Bson filter = StringUtils.isEmpty(leaseToken)
+                ? Filters.eq(Constants.ID, summaryObjectId)
+                : Filters.and(
+                        Filters.eq(Constants.ID, summaryObjectId),
+                        Filters.eq(TestingRunResultSummary.LEASE_TOKEN, leaseToken));
+
+        return TestingRunResultSummariesDao.instance.updateOneNoUpsert(filter,
+            Updates.set(TestingRunResultSummary.PRODUCER_DONE, true)) != null;
     }
 
     public static void updateLastTestedField(int apiCollectionId, String url, String method) {
@@ -2301,6 +2396,16 @@ public class DbLayer {
      *                               also client/run config the server doesn't otherwise have
      */
     public static void bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed) {
+        bulkRecordTestingRunResults(testingRunResults, rerunDeleteIds, doNotMarkIssuesAsFixed, null, 0);
+    }
+
+    /**
+     * @return whether the caller still holds the lease, i.e. the same signal
+     *         updateTestResultsCountInTestSummary returns - the count update below is the renewal.
+     *         Always true when no token is supplied.
+     */
+    public static boolean bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds,
+            boolean doNotMarkIssuesAsFixed, String leaseToken, int leaseSeconds) {
         if (rerunDeleteIds != null) {
             for (String id : rerunDeleteIds) {
                 deleteTestingRunResults(id);
@@ -2308,7 +2413,7 @@ public class DbLayer {
         }
 
         if (testingRunResults == null || testingRunResults.isEmpty()) {
-            return;
+            return true;
         }
 
         bulkWriteTestingRunResults(testingRunResults);
@@ -2317,11 +2422,14 @@ public class DbLayer {
         for (TestingRunResult trr : testingRunResults) {
             countBySummary.merge(trr.getTestRunResultSummaryId(), 1, Integer::sum);
         }
+        boolean leaseHeld = true;
         for (Map.Entry<ObjectId, Integer> entry : countBySummary.entrySet()) {
-            updateTestResultsCountInTestSummary(entry.getKey().toHexString(), entry.getValue());
+            leaseHeld &= updateTestResultsCountInTestSummary(entry.getKey().toHexString(), entry.getValue(),
+                    leaseToken, leaseSeconds);
         }
 
         recordIssuesForTestingRunResults(testingRunResults, doNotMarkIssuesAsFixed);
+        return leaseHeld;
     }
 
     private static final String SET_OPERATION = "set";
