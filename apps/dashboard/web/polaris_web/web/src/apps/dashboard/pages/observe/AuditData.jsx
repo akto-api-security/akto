@@ -24,9 +24,9 @@ import settingsApi from "../settings/api";
 import { intersectServerActionFlags, getRegistryOverride } from "./auditServerActionFlags";
 import "../../components/shared/style.css";
 
-const TAB_IDS = { ALL: 'all', MCP_SERVERS: 'mcp_servers', SKILLS: 'skills' };
+const TAB_IDS = { ALL: 'all', MCP_SERVERS: 'mcp_servers', SKILLS: 'skills', VENDORS: 'vendors' };
 const TABS_DEFAULT = ['All', 'MCP Servers', 'Skills'];
-const TABS_ENDPOINT_SECURITY = ['MCP Servers', 'Skills'];
+const TABS_ENDPOINT_SECURITY = ['MCP Servers', 'Skills', 'Vendors'];
 const MCP_TYPES = ['mcp-tool', 'mcp-resource', 'mcp-prompt', 'mcp-server'];
 
 const headingsEndpointSecurity = [
@@ -174,6 +174,26 @@ const headingsSkills = [
         value: "markedBy",
         type: CellType.TEXT,
         filterKey: 'markedBy',
+    },
+]
+
+const headingsVendors = [
+    {
+        text: "Vendor",
+        value: "vendorComp",
+        title: "Vendor",
+        type: CellType.TEXT,
+    },
+    {
+        title: 'Traffic',
+        text: "Traffic",
+        value: "countComp",
+        type: CellType.TEXT,
+    },
+    {
+        title: 'Status',
+        text: "Status",
+        value: "statusComp",
     },
 ]
 
@@ -440,23 +460,27 @@ function AuditData() {
     const [selected, setSelected] = useState(
         func.getTableTabIndexById(0, definedTableTabs, initialSelectedTab)
     );
-    const [tabCounts, setTabCounts] = useState({ all: 0, mcp_servers: 0, skills: 0 });
+    const [tabCounts, setTabCounts] = useState({ all: 0, mcp_servers: 0, skills: 0, vendors: 0 });
 
     // Skills are flat AGENT_SKILL records in both modes; only the MCP tab differs
-    // between endpoint-security (merged) and default (flat).
+    // between endpoint-security (merged) and default (flat). Vendors are neither —
+    // they're derived from endpoint-shield traffic, not mcp_audit_info/api_info rows.
     const isSkillsTab = selectedTab === TAB_IDS.SKILLS;
-    const useEndpointMergedView = isEndpointSecurity && !isSkillsTab;
+    const isVendorsTab = selectedTab === TAB_IDS.VENDORS;
+    const useEndpointMergedView = isEndpointSecurity && !isSkillsTab && !isVendorsTab;
 
     const filters = useMemo(() => {
         if (useEndpointMergedView) return filtersEndpointSecurity;
+        if (isVendorsTab) return [];
         return getTabFilters(selectedTab);
-    }, [useEndpointMergedView, selectedTab]);
+    }, [useEndpointMergedView, isVendorsTab, selectedTab]);
 
     const headings = useMemo(() => {
         if (useEndpointMergedView) return headingsEndpointSecurity;
         if (isSkillsTab) return headingsSkills;
+        if (isVendorsTab) return headingsVendors;
         return headingsDefault;
-    }, [useEndpointMergedView, isSkillsTab]);
+    }, [useEndpointMergedView, isSkillsTab, isVendorsTab]);
 
     const handleSelectedTab = (selectedIndex) => {
         setSelected(selectedIndex);
@@ -596,6 +620,58 @@ function AuditData() {
             const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to add to MCP allowed list";
             func.setToast(true, true, errorMsg);
         }
+    };
+
+    // Bulk approve/remove for selected vendor rows — same selectable-checkbox +
+    // promotedBulkActions pattern as the Skills tab (bulkUpdateSkills/skillPromotedBulkActions)
+    // rather than a per-row "..." menu, since approving a vendor is the same one-shot action
+    // regardless of which row it came from.
+    const bulkUpdateVendors = async (approve, selectedIds) => {
+        const rows = getRowsForSelectedIds(selectedIds);
+        const validRows = rows.filter(r => r && r.vendor);
+        if (!validRows.length) {
+            func.setToast(true, true, "Could not resolve selected vendors");
+            return;
+        }
+        try {
+            if (approve) {
+                await api.addVendorAllowlistEntries(validRows.map((r) => r.vendor));
+            } else {
+                await Promise.all(validRows.map((r) => api.removeVendorAllowlistEntry(r.vendor)));
+            }
+            func.setToast(true, false, approve ? "Added selected vendors to the allowed list" : "Removed selected vendors from the allowed list");
+            window.location.reload();
+        } catch (e) {
+            func.setToast(true, true, "Bulk update failed");
+        }
+    };
+
+    const vendorPromotedBulkActions = (selectedIds) => {
+        if (selectedIds === "All" || !Array.isArray(selectedIds) || selectedIds.length === 0) {
+            return [];
+        }
+        const n = selectedIds.length;
+        const rows = getRowsForSelectedIds(selectedIds);
+        const allApproved = rows.length > 0 && rows.every(r => r?.approved);
+        const allUnapproved = rows.length > 0 && rows.every(r => !r?.approved);
+        const countPhrase = `${n} selected vendor${n === 1 ? "" : "s"}`;
+        const approveLabel = n === 1 ? "Add this vendor to allowed list" : `Add ${countPhrase} to allowed list`;
+        const removeLabel = n === 1 ? "Remove this vendor from allowed list" : `Remove ${countPhrase} from allowed list`;
+        const actions = [];
+        if (!allApproved) {
+            actions.push({
+                content: approveLabel,
+                onAction: () => bulkUpdateVendors(true, selectedIds),
+            });
+        }
+        if (!allUnapproved) {
+            actions.push({
+                content: removeLabel,
+                destructive: true,
+                onAction: () => bulkUpdateVendors(false, selectedIds),
+            });
+        }
+        return actions;
     };
 
     const getActionsList = (item) => {
@@ -799,6 +875,53 @@ function AuditData() {
         setLoading(true);
         let ret = []
         let total = 0;
+
+        // Vendors tab reads the full vendor-audit list in one call (it's derived from
+        // endpoint-shield traffic, not a paginated Mongo query, and vendor counts are small —
+        // dozens, not thousands) and paginates/searches client-side.
+        if (isVendorsTab) {
+            try {
+                const rows = await api.fetchVendorAudit();
+                const q = (queryValue || '').trim().toLowerCase();
+                const filtered = q ? rows.filter((r) => String(r?.vendor || '').toLowerCase().includes(q)) : rows;
+
+                endpointRowCacheRef.current = {};
+                const page = filtered.slice(skip, skip + limit);
+                page.forEach((r) => {
+                    const dataObj = {
+                        id: r.vendor,
+                        hexId: r.vendor,
+                        vendor: r.vendor,
+                        approved: !!r.approved,
+                        count: r.count || 0,
+                        vendorComp: (
+                            <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                                <Box className="audit-table-icon">
+                                    <CollectionIcon
+                                        hostName={r.vendor}
+                                        assetTagValue={r.vendor}
+                                        displayName={r.vendor}
+                                    />
+                                </Box>
+                                <Text>{r.vendor}</Text>
+                            </HorizontalStack>
+                        ),
+                        countComp: <Text>{r.count || 0}</Text>,
+                        statusComp: r.approved ? <AllowlistBadge /> : (
+                            <Text variant="bodyMd" color="subdued">Not approved</Text>
+                        ),
+                        isTerminal: false,
+                        name: r.vendor,
+                    };
+                    ret.push(dataObj);
+                    endpointRowCacheRef.current[String(dataObj.id)] = dataObj;
+                });
+                total = filtered.length;
+            } catch (e) {}
+            setTabCounts((prev) => ({ ...prev, [selectedTab]: total }));
+            setLoading(false);
+            return { value: ret, total };
+        }
 
         // Skills tab reads raw AGENT_SKILL audit rows from /api/fetchSkillsData
         // (mcp_audit_info backed). One row per detection record — no client-side
@@ -1020,6 +1143,15 @@ function AuditData() {
             }
         };
 
+        const countVendors = async () => {
+            try {
+                const rows = await api.fetchVendorAudit();
+                return Array.isArray(rows) ? rows.length : 0;
+            } catch {
+                return 0;
+            }
+        };
+
         (async () => {
             const targets = [];
             // [tabId, typeFilter, merge, scopeByCollection]
@@ -1043,6 +1175,11 @@ function AuditData() {
                 const skillsTotal = await countSkills();
                 if (cancelled) return;
                 setTabCounts((prev) => ({ ...prev, [TAB_IDS.SKILLS]: skillsTotal }));
+            }
+            if (isEndpointSecurity && selectedTab !== TAB_IDS.VENDORS) {
+                const vendorsTotal = await countVendors();
+                if (cancelled) return;
+                setTabCounts((prev) => ({ ...prev, [TAB_IDS.VENDORS]: vendorsTotal }));
             }
         })();
 
@@ -1108,7 +1245,9 @@ function AuditData() {
                                     selectable: true,
                                     promotedBulkActions: skillPromotedBulkActions,
                                 }
-                                : { getActions: (item) => getActionsList(item), hasRowActions: true }
+                                : isVendorsTab
+                                    ? { selectable: true, promotedBulkActions: vendorPromotedBulkActions}
+                                    : { getActions: (item) => getActionsList(item), hasRowActions: true }
                         )}
                 />,
             ]}

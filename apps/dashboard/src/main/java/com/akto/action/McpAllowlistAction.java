@@ -1,15 +1,19 @@
 package com.akto.action;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.McpAllowlistDao;
 import com.akto.dao.McpRegistryConfigDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.McpAllowlist;
 import com.akto.dto.McpRegistryConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.service.insights.InsightUtil;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -29,8 +33,11 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -127,7 +134,8 @@ public class McpAllowlistAction extends UserAction {
                 if (entryUrl.isEmpty()) continue;
                 String name = extractHost(entryUrl);
                 loggerMaker.infoAndAddToDb("Parsed MCP entry url=" + entryUrl + " name=" + name);
-                entries.add(new McpAllowlist(name, entryUrl, id, addedBy, now, false, McpAllowlist.Source.REGISTRY));
+                entries.add(new McpAllowlist(name, entryUrl, id, addedBy, now, false, McpAllowlist.Source.REGISTRY,
+                        McpAllowlist.ENTRY_TYPE_MCP_SERVER));
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Failed to parse CSV for registry id=" + id + " error=" + e.getMessage());
@@ -274,6 +282,111 @@ public class McpAllowlistAction extends UserAction {
                 Filters.eq(McpAllowlist.REGISTRY_ID, registryId.trim()));
         return Action.SUCCESS.toUpperCase();
     }
+
+    // ── Vendors tab ───────────────────────────────────────────────────────────────
+    //
+    // Vendors share the same mcp_allowlist collection as MCP servers (loadAllowlistNames()
+    // already flattens the whole collection into one Set<String>, so a vendor approved here
+    // is immediately usable by RiskScoreCalculator.vendorRiskAnalysis's
+    // allowlistNamesLower.contains(vendor) check — no loader change needed). They don't belong
+    // to any CSV registry, though, so they get their own synthetic registryId to satisfy the
+    // (NAME, REGISTRY_ID) unique index without colliding with a real registry's rows.
+    private static final String VENDOR_REGISTRY_ID = "__vendor__";
+
+    private List<String> vendorNames;
+    private String vendorName;
+    private List<BasicDBObject> vendorAudit;
+
+    public String addVendorEntries() {
+        Set<String> nameSet = new LinkedHashSet<>();
+        if (vendorNames != null) {
+            for (String v : vendorNames) {
+                if (v != null && !v.trim().isEmpty()) {
+                    nameSet.add(v.trim().toLowerCase(Locale.ROOT));
+                }
+            }
+        }
+        if (nameSet.isEmpty()) {
+            addActionError("vendorNames is required");
+            return Action.ERROR.toUpperCase();
+        }
+
+        String addedBy = getSUser().getLogin();
+        int now = Context.now();
+        List<WriteModel<McpAllowlist>> bulkOps = new ArrayList<>();
+        for (String vendor : nameSet) {
+            bulkOps.add(new UpdateOneModel<>(
+                    Filters.and(Filters.eq(McpAllowlist.NAME, vendor), Filters.eq(McpAllowlist.REGISTRY_ID, VENDOR_REGISTRY_ID)),
+                    Updates.combine(
+                            Updates.setOnInsert(McpAllowlist.REGISTRY_ID, VENDOR_REGISTRY_ID),
+                            Updates.setOnInsert(McpAllowlist.ADDED_BY, addedBy),
+                            Updates.setOnInsert(McpAllowlist.MANUALLY_ADDED, true),
+                            Updates.setOnInsert(McpAllowlist.CREATED_AT, now),
+                            Updates.setOnInsert(McpAllowlist.SOURCE, McpAllowlist.Source.AUDIT_DATA.name()),
+                            Updates.setOnInsert(McpAllowlist.ENTRY_TYPE, McpAllowlist.ENTRY_TYPE_VENDOR)
+                    ),
+                    new UpdateOptions().upsert(true)
+            ));
+        }
+        McpAllowlistDao.instance.getMCollection().bulkWrite(bulkOps);
+        loggerMaker.infoAndAddToDb("Upserted " + nameSet.size() + " vendor allowlist entries");
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String removeVendorEntry() {
+        if (vendorName == null || vendorName.trim().isEmpty()) {
+            addActionError("vendorName is required");
+            return Action.ERROR.toUpperCase();
+        }
+        McpAllowlistDao.instance.getMCollection().deleteOne(Filters.and(
+                Filters.eq(McpAllowlist.NAME, vendorName.trim().toLowerCase(Locale.ROOT)),
+                Filters.eq(McpAllowlist.REGISTRY_ID, VENDOR_REGISTRY_ID)));
+        loggerMaker.infoAndAddToDb("Removed vendor allowlist entry: " + vendorName);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    /** Vendor names actually seen in endpoint-shield traffic (same hostName parsing rule as
+     *  RiskScoreCalculator's vendor-risk sub-score, via the shared InsightUtil helper), each
+     *  with its traffic count and current approval state — the Vendors tab's row source. */
+    public String fetchVendorAudit() {
+        List<ApiCollection> endpointCollections = ApiCollectionsDao.instance.findAll(
+                Filters.and(Filters.exists(ApiCollection.HOST_NAME, true), Filters.ne(ApiCollection._DEACTIVATED, true)),
+                Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED));
+
+        Map<String, Long> countByVendor = new LinkedHashMap<>();
+        for (ApiCollection c : endpointCollections) {
+            if (c == null || !c.isEndpointCollection()) continue;
+            String vendor = InsightUtil.endpointVendorName(c);
+            if (vendor == null) continue;
+            countByVendor.merge(vendor, 1L, Long::sum);
+        }
+
+        Set<String> allowlistNamesLower = new HashSet<>();
+        for (McpAllowlist a : McpAllowlistDao.instance.findAll(Filters.empty(), Projections.include(McpAllowlist.NAME))) {
+            if (a.getName() != null) allowlistNamesLower.add(a.getName().toLowerCase(Locale.ROOT));
+        }
+
+        vendorAudit = new ArrayList<>();
+        for (Map.Entry<String, Long> e : countByVendor.entrySet()) {
+            BasicDBObject row = new BasicDBObject();
+            row.put("vendor", e.getKey());
+            row.put("count", e.getValue());
+            row.put("approved", allowlistNamesLower.contains(e.getKey()));
+            vendorAudit.add(row);
+        }
+        vendorAudit.sort((a, b) -> Long.compare(b.getLong("count"), a.getLong("count")));
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public List<String> getVendorNames() { return vendorNames; }
+    public void setVendorNames(List<String> vendorNames) { this.vendorNames = vendorNames; }
+
+    public String getVendorName() { return vendorName; }
+    public void setVendorName(String vendorName) { this.vendorName = vendorName; }
+
+    public List<BasicDBObject> getVendorAudit() { return vendorAudit; }
 
     public String getRegistryUrl() { return registryUrl; }
     public void setRegistryUrl(String registryUrl) { this.registryUrl = registryUrl; }
