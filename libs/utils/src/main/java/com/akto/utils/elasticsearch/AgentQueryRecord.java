@@ -12,6 +12,7 @@ import com.akto.util.JSONUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -153,7 +154,7 @@ public class AgentQueryRecord {
             Map<String, String> tagsMap,
             Map<String, String> deviceUserMap) {
 
-        return fromHttpResponseParams(p, tagsMap, deviceUserMap, null);
+        return fromHttpResponseParams(p, tagsMap, deviceUserMap, null, null);
     }
 
     public static AgentQueryRecord fromHttpResponseParams(
@@ -161,6 +162,16 @@ public class AgentQueryRecord {
             Map<String, String> tagsMap,
             Map<String, String> deviceUserMap,
             Map<String, Map<String, ClaudeDesktopInfo>> deviceClaudeDesktopInfoMap) {
+
+        return fromHttpResponseParams(p, tagsMap, deviceUserMap, deviceClaudeDesktopInfoMap, null);
+    }
+
+    public static AgentQueryRecord fromHttpResponseParams(
+            HttpResponseParams p,
+            Map<String, String> tagsMap,
+            Map<String, String> deviceUserMap,
+            Map<String, Map<String, ClaudeDesktopInfo>> deviceClaudeDesktopInfoMap,
+            Map<String, String> claudeOrganizations) {
 
         if (p == null || p.getRequestParams() == null) {
             return null;
@@ -232,7 +243,7 @@ public class AgentQueryRecord {
             // "claude-desktop.akto.io" — an equality check on serviceId silently never fires there.
             String orgId = claudeOrgUuidForHost(host, deviceId, deviceClaudeDesktopInfoMap);
             if (orgId != null && !orgId.isEmpty()) {
-                serviceId = serviceId + "-" + orgId;
+                serviceId = serviceId + "-" + claudeOrgLabel(orgId, claudeOrganizations);
             }
         } else if (isBrowserExtensionTraffic) {
             // Host id is <heartbeat name>.<browser>.<site>, so its first label keys deviceUserMap.
@@ -375,28 +386,90 @@ public class AgentQueryRecord {
     }
 
     /**
+     * Hardcoded org for devices whose Claude login reports none. A stopgap, not a mechanism: these
+     * installs report no organizationUuid, so their traffic would otherwise land on the unqualified
+     * shared serviceId together with every other org's — the exact collapse qualifying by org
+     * exists to prevent. Remove an entry once the device reports its own org.
+     *
+     * Only consulted when the device map yields nothing; a reported org always wins, so a stale
+     * entry here can never override the truth.
+     */
+    private static final Map<String, String> ORG_UUID_FALLBACK_BY_DEVICE = Collections.singletonMap(
+            "lt-jarce2-it-a524fa1d", "84daf869-6de0-47c7-b91a-ba9e426f4c8b");
+
+    /**
      * Org uuid to qualify serviceId with, or null when the host is not a shared-serviceId Claude
-     * surface, the device is unknown, or that surface has no resolved login on it.
+     * surface, the device is unknown, or that surface has no resolved login on it and the device has
+     * no {@link #ORG_UUID_FALLBACK_BY_DEVICE} entry.
      *
      * The surface named in the host picks which login to read — see {@link #CLAUDE_SHARED_SURFACES}
      * for why reading the wrong one would misattribute the traffic.
      */
     private static String claudeOrgUuidForHost(String host, String deviceId,
             Map<String, Map<String, ClaudeDesktopInfo>> deviceClaudeDesktopInfoMap) {
-        if (host == null || deviceId == null || deviceClaudeDesktopInfoMap == null) {
+        if (host == null || deviceId == null) {
             return null;
         }
-        Map<String, ClaudeDesktopInfo> byAgentType = deviceClaudeDesktopInfoMap.get(deviceId);
-        if (byAgentType == null) {
-            return null;
-        }
+
+        // Resolve the surface first, and bail before the fallback when the host names none: a
+        // non-shared surface already carries an org-specific serviceId, so stamping an org onto it
+        // would be wrong for an overridden device just as it is for every other one.
+        String loginKey = null;
         for (String[] surface : CLAUDE_SHARED_SURFACES) {
             if (host.contains(surface[0])) {
-                ClaudeDesktopInfo info = byAgentType.get(surface[1]);
-                return info != null ? info.getOrganizationUuid() : null;
+                loginKey = surface[1];
+                break;
             }
         }
-        return null;
+        if (loginKey == null) {
+            return null;
+        }
+
+        String orgUuid = null;
+        Map<String, ClaudeDesktopInfo> byAgentType =
+                deviceClaudeDesktopInfoMap != null ? deviceClaudeDesktopInfoMap.get(deviceId) : null;
+        if (byAgentType != null) {
+            ClaudeDesktopInfo info = byAgentType.get(loginKey);
+            if (info != null) {
+                orgUuid = info.getOrganizationUuid();
+            }
+        }
+
+        if (orgUuid == null || orgUuid.isEmpty()) {
+            return ORG_UUID_FALLBACK_BY_DEVICE.get(deviceId);
+        }
+        return orgUuid;
+    }
+
+    /**
+     * Org uuid rendered as "&lt;orgName&gt;__&lt;orgType&gt;" when the directory knows the org, else
+     * the uuid unchanged.
+     *
+     * The label exists because a raw uuid tells a reader nothing about whose traffic a service is.
+     * The fallback is not just for a failed fetch: the directory answers "__unknown" for orgs it
+     * cannot name, and every such org would render identically — silently merging distinct orgs
+     * into one service, which is the exact collapse qualifying serviceId by org set out to prevent.
+     * Falling back to the uuid keeps them apart, at the cost of staying unreadable until the
+     * directory learns the org.
+     *
+     * Note this makes serviceId follow the org's NAME. Renaming an org in Claude changes the
+     * serviceId its traffic lands under, so history before the rename stays under the old label —
+     * the same trade-off any human-readable key carries.
+     */
+    private static String claudeOrgLabel(String orgId, Map<String, String> claudeOrganizations) {
+        if (claudeOrganizations == null) {
+            return orgId;
+        }
+        String label = claudeOrganizations.get(orgId);
+        if (label == null) {
+            return orgId;
+        }
+        label = label.trim();
+        // "__unknown" (and anything else with no name half) identifies no org — see above.
+        if (label.isEmpty() || label.startsWith("__")) {
+            return orgId;
+        }
+        return label;
     }
 
     private static int readTokenField(JSONObject obj, boolean input) throws JSONException{
