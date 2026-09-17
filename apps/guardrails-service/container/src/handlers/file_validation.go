@@ -91,7 +91,7 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 
 	requestHeaders := h.fileRequestHeaders(c)
 
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, requestHeaders)
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, requestHeaders, "")
 
 	// Pre-flight policy gate: with no policy applicable to this caller there is nothing
 	// to enforce, so skip fetching, extracting and inspecting the content entirely.

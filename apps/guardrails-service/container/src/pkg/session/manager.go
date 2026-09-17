@@ -571,7 +571,15 @@ func (sm *SessionManager) UpdateSessionSummary(sessionID, summary string) {
 		session.LastSummary = summary
 		session.LastUpdated = time.Now().Unix()
 		session.mu.Unlock()
+		return
 	}
+
+	// The summary generator runs unconditionally, so it can produce a summary for
+	// a session TrackRequest never recorded. Dropping it silently here is what
+	// made a fully disabled session feature look healthy in the logs.
+	sm.logger.Warn("Session summary generated but session is not tracked, summary discarded",
+		zap.String("sessionID", sessionID),
+		zap.Int("summaryLength", len(summary)))
 }
 
 // UpdateBlockedReason updates the blocked reason for a session
