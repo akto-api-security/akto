@@ -4270,6 +4270,24 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    // organizationUuid -> "<organizationName>__<organizationType>"
+    @Getter @Setter
+    private Map<String, String> endpointAgentOrganizationsMap;
+
+    // Optional filter, eg "claude-cli". Left out, every agent's orgs are returned.
+    @Getter @Setter
+    private String agentType;
+
+    public String fetchEndpointAgentOrganizations() {
+        try {
+            endpointAgentOrganizationsMap = DbLayer.fetchEndpointAgentOrganizations(agentType);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchEndpointAgentOrganizations " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     private TestingRunWebhook testingRunWebhook;
 
     public TestingRunWebhook getTestingRunWebhook() {

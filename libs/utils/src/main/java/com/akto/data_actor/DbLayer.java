@@ -322,7 +322,17 @@ public class DbLayer {
     private static final String CLAUDE_AGENT_LOGIN_SOURCE = "claude-agent-login";
     // Rollout gate: only these accounts create agent users from Claude logins for now.
     private static final Set<Integer> CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_IDS =
-            new HashSet<>(Arrays.asList(1726615470, 1785654409));
+            new HashSet<>(Arrays.asList(1726615470, 1785654409, 1760639774));
+
+    // Stamped on each org row: the agent the org was learned from, not the config scope key
+    // ("claude-cli-user") the CLI reports itself under.
+    private static final String CLAUDE_CLI_AGENT_TYPE = "claude-cli";
+
+    private static final String ORGANIZATION_UUID_KEY = "organizationUuid";
+    private static final String ORGANIZATION_NAME_KEY = "organizationName";
+    private static final String ORGANIZATION_TYPE_KEY = "organizationType";
+    // Agents that predate organizationType report the same plan string as accountType.
+    private static final String ACCOUNT_TYPE_KEY = "accountType";
 
     private static void syncAgentUserFromModuleInfo(ModuleInfo moduleInfo) {
         if (moduleInfo == null) {
@@ -338,6 +348,13 @@ public class DbLayer {
             syncClaudeAgentUsersFromModuleInfo(moduleInfo);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error syncing claude agent users from module info: " + e.getMessage(), LogDb.DB_ABS);
+        }
+        // Isolated for the same reason: an org write failing must not cost us the agent user
+        // sync, or the heartbeat itself.
+        try {
+            syncEndpointAgentOrganizationsFromModuleInfo(moduleInfo);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error syncing endpoint agent organizations from module info: " + e.getMessage(), LogDb.DB_ABS);
         }
         if (!additionalData.containsKey("username")) {
             return;
@@ -373,6 +390,10 @@ public class DbLayer {
      * already writes (see upsertFromEmailTag) — so those converge onto one row instead of
      * duplicating. Re-reporting a known pair only updates it; an unseen one inserts.
      *
+     * organizationName/organizationType are recorded only for identities that actually carry an
+     * organizationUuid — a personal account has no org to name — and are read from the
+     * "claude-cli-user" login alone, the same source the org table is built from.
+     *
      * Gated to CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_IDS while this rolls out — every other account
      * heartbeats through here untouched.
      */
@@ -386,6 +407,14 @@ public class DbLayer {
             return;
         }
         String deviceId = StringUtils.trimToNull(moduleInfo.getName());
+
+        // Resolved once, outside the loop: whichever login produced a given identity, the org it
+        // belongs to is taken from the CLI's block only.
+        Object cliLoginObj = ((Map<?, ?>) agentLoginsObj).get(CLAUDE_CLI_USER_AGENT_TYPE);
+        Map<?, ?> cliLogin = cliLoginObj instanceof Map ? (Map<?, ?>) cliLoginObj : null;
+        String organizationName = cliLogin == null ? "" : claudeLoginField(cliLogin, ORGANIZATION_NAME_KEY);
+        String organizationType = cliLogin == null ? "" : claudeOrganizationType(cliLogin);
+
         // Both keys are read out of the same ~/.claude.json, so one heartbeat usually carries the
         // same identity twice — collapse before writing.
         Set<String> syncedUserIds = new HashSet<>();
@@ -402,9 +431,132 @@ public class DbLayer {
             String userId = organizationUuid.isEmpty() ? email : email + "_" + organizationUuid;
             if (!syncedUserIds.add(userId)) continue;
 
+            // No org uuid means a personal account: leave both org fields unset.
+            boolean hasOrg = !organizationUuid.isEmpty();
             AgentUsersDao.instance.upsertAgentUserIdentity(userId, AgentUsersDao.deriveUsernameFromEmail(email),
-                    email, deviceId, CLAUDE_AGENT_LOGIN_SOURCE);
+                    email, deviceId, CLAUDE_AGENT_LOGIN_SOURCE,
+                    hasOrg ? organizationName : null, hasOrg ? organizationType : null);
         }
+    }
+
+    /**
+     * Records the org a device reports as organizationUuid -> "name__type", eg
+     * "e68d326b-...": "cburns@vetpartners.com's Organization__claude_max", stamped with the
+     * agent that reported it.
+     *
+     * Reads the "claude-cli-user" login only. Desktop reports the same ~/.claude.json identity,
+     * but only one source is needed to learn the org and the CLI is the one we're mapping —
+     * other agent types get their own entry here when they're added.
+     *
+     * Insert-only: an org we have already stored is left exactly as it was, so a later rename
+     * on Claude's side doesn't rewrite the row. Personal accounts report no organizationUuid
+     * and are skipped.
+     *
+     * Gated to CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_IDS alongside the agent user sync.
+     */
+    private static void syncEndpointAgentOrganizationsFromModuleInfo(ModuleInfo moduleInfo) {
+        Integer accountId = Context.accountId.get();
+        if (accountId == null || !CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_IDS.contains(accountId)) {
+            return;
+        }
+        Object agentLoginsObj = moduleInfo.getAdditionalData().get(AGENT_LOGINS_KEY);
+        if (!(agentLoginsObj instanceof Map)) {
+            return;
+        }
+        Object loginObj = ((Map<?, ?>) agentLoginsObj).get(CLAUDE_CLI_USER_AGENT_TYPE);
+        if (!(loginObj instanceof Map)) {
+            return;
+        }
+        Map<?, ?> login = (Map<?, ?>) loginObj;
+
+        String organizationUuid = StringUtils.trimToEmpty(stringValueOf(login.get(ORGANIZATION_UUID_KEY)));
+        if (organizationUuid.isEmpty()) {
+            return;
+        }
+
+        EndpointAgentOrganizationDao.instance.insertIfAbsent(organizationUuid,
+                buildOrganizationInfo(login), CLAUDE_CLI_AGENT_TYPE);
+    }
+
+    private static String buildOrganizationInfo(Map<?, ?> login) {
+        return claudeLoginField(login, ORGANIZATION_NAME_KEY)
+                + EndpointAgentOrganization.SEPARATOR
+                + claudeOrganizationType(login);
+    }
+
+    private static String claudeOrganizationType(Map<?, ?> login) {
+        String type = claudeLoginField(login, ORGANIZATION_TYPE_KEY);
+        return type.isEmpty() ? claudeLoginField(login, ACCOUNT_TYPE_KEY) : type;
+    }
+
+    private static String claudeLoginField(Map<?, ?> login, String key) {
+        return decodeJsonEscapes(StringUtils.trimToEmpty(stringValueOf(login.get(key))));
+    }
+
+    /**
+     * The agent forwards ~/.claude.json values without decoding their JSON escapes, so an org name
+     * reaches us as the literal six characters "\\u0027" where an apostrophe belongs
+     * ("cburns@vetpartners.com\\u0027s Organization"). Decode them once here, on the way in, so the
+     * stored value and every reader of it see real characters.
+     *
+     * Single pass rather than chained replaces, so a decoded backslash can't be re-read as the
+     * start of another escape. Anything that isn't a valid escape is left untouched.
+     */
+    static String decodeJsonEscapes(String value) {
+        if (value == null || value.indexOf('\\') < 0) return value;
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c != '\\' || i + 1 >= value.length()) {
+                out.append(c);
+                continue;
+            }
+            char escape = value.charAt(++i);
+            switch (escape) {
+                case 'u':
+                    // \\uXXXX needs 4 hex digits; a malformed tail stays as written
+                    if (i + 5 <= value.length()) {
+                        try {
+                            out.append((char) Integer.parseInt(value.substring(i + 1, i + 5), 16));
+                            i += 4;
+                        } catch (NumberFormatException e) {
+                            out.append('\\').append(escape);
+                        }
+                    } else {
+                        out.append('\\').append(escape);
+                    }
+                    break;
+                case '\'': case '"': case '\\': case '/': out.append(escape); break;
+                case 'n': out.append('\n'); break;
+                case 't': out.append('\t'); break;
+                case 'r': out.append('\r'); break;
+                case 'b': out.append('\b'); break;
+                case 'f': out.append('\f'); break;
+                default: out.append('\\').append(escape);
+            }
+        }
+        return out.toString();
+    }
+
+    /**
+     * organizationUuid -> "<organizationName>__<organizationType>" for the orgs endpoint agents
+     * have reported so far. A blank agentType returns every agent's orgs; otherwise only the ones
+     * that agent reported.
+     */
+    public static Map<String, String> fetchEndpointAgentOrganizations(String agentType) {
+        Map<String, String> result = new HashMap<>();
+        String trimmedAgentType = StringUtils.trimToEmpty(agentType);
+        Bson filter = trimmedAgentType.isEmpty()
+                ? new BasicDBObject()
+                : Filters.eq(EndpointAgentOrganization.AGENT_TYPE, trimmedAgentType);
+        List<EndpointAgentOrganization> organizations = EndpointAgentOrganizationDao.instance.findAll(filter);
+        if (organizations == null) return result;
+        for (EndpointAgentOrganization organization : organizations) {
+            if (organization.getOrganizationUuid() == null) continue;
+            result.put(organization.getOrganizationUuid(),
+                    StringUtils.trimToEmpty(organization.getOrganizationInfo()));
+        }
+        return result;
     }
 
     private static String stringValueOf(Object value) {

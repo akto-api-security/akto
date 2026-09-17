@@ -301,6 +301,7 @@ public class DaoInit {
         ClassModel<EndpointRemoteCommand> endpointRemoteCommandClassModel = ClassModel.builder(EndpointRemoteCommand.class).enableDiscriminator(true).build();
         ClassModel<EndpointRemoteCommandExecution> endpointRemoteCommandExecutionClassModel = ClassModel.builder(EndpointRemoteCommandExecution.class).enableDiscriminator(true).build();
         ClassModel<CopilotStudioIntegration> copilotStudioIntegrationClassModel = ClassModel.builder(CopilotStudioIntegration.class).enableDiscriminator(true).build();
+        ClassModel<EndpointAgentOrganization> endpointAgentOrganizationClassModel = ClassModel.builder(EndpointAgentOrganization.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -334,7 +335,7 @@ public class DaoInit {
                 RuntimeMetricsClassModel, jobsParam, ModuleInfoClassModel,fileClassModel, tlsAuthClassModel, apiHitCountInfoClassModel, collectionTagsModel, hostRegexTestingEndpointsClassModel, tagsTestingEndpointsClassModel
                 , authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, logsEndpointShieldClassModel, proxyPatternInfoClassModel, apiSequencesClassModel, endpointMcpConfigClassModel, deviceDomainConfigClassModel
                 , newRelicIntegrationClassModel, openTelemetryIntegrationClassModel, endpointShieldSettingsClassModel, platformShieldConfigClassModel, modelConfigClassModel, blockedTokenClassModel, agentModelClassModel
-                , endpointRemoteCommandClassModel, endpointRemoteCommandExecutionClassModel, copilotStudioIntegrationClassModel).automatic(true).build());
+                , endpointRemoteCommandClassModel, endpointRemoteCommandExecutionClassModel, copilotStudioIntegrationClassModel, endpointAgentOrganizationClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
