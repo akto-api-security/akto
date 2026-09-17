@@ -74,7 +74,12 @@ public class SecretUtils {
         String spec = env.get(pathEnvName);
 
         if (spec == null || spec.trim().isEmpty()) {
-            return env.get(envName);
+            String value = env.get(envName);
+            // Report the delivery mode, never the value, so a misconfiguration is
+            // diagnosable from the logs without leaking the secret.
+            logger.info("{} resolved from the environment variable (length {})",
+                    envName, value == null ? "<unset>" : String.valueOf(value.length()));
+            return value;
         }
         spec = spec.trim();
 
@@ -132,6 +137,8 @@ public class SecretUtils {
             logger.error("{} is set to {} but that resolved to an empty secret", pathEnvName, spec);
             return null;
         }
+        logger.info("{} resolved from file {}{} (length {})", envName, path,
+                field == null ? "" : " field " + field, secret.length());
         return secret;
     }
 }

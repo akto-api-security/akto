@@ -93,10 +93,33 @@ public class Main {
             }
             logger.info("reusing existing postgres connection isConnected: " + postgresConnected + " lastPing: " + lastPing + " now: " + now );
         } catch (Exception e) {
-            e.printStackTrace();
-            logger.error("error establishing postgres connection now: " + now + " error: " + e.getMessage());
+            // "The connection attempt failed." is pgjdbc's generic wrapper; the real
+            // reason (unknown host, refused, timeout) is only on the cause chain, and
+            // the target is only in the URL. Log both, so this is self-diagnosing.
+            Throwable root = e;
+            while (root.getCause() != null && root.getCause() != root) {
+                root = root.getCause();
+            }
+            logger.error("error establishing postgres connection now: " + now
+                    + " url: " + describeUrl()
+                    + " error: " + e.getMessage()
+                    + " cause: " + root.getClass().getName() + ": " + root.getMessage());
         }
         return postgresConnected;
+    }
+
+    /**
+     * The connection URL with any credentials or query string removed, for logging.
+     * A JDBC URL may carry "?user=..&password=..", so it is never logged verbatim.
+     */
+    private static String describeUrl() {
+        if (connectionUri == null) {
+            return "<POSTGRES_URL not set>";
+        }
+        int q = connectionUri.indexOf('?');
+        String bare = q < 0 ? connectionUri : connectionUri.substring(0, q);
+        int at = bare.lastIndexOf('@');
+        return at < 0 ? bare : "jdbc:postgresql://<redacted>@" + bare.substring(at + 1);
     }
 
     public static String extractDatabaseName() {
