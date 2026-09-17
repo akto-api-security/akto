@@ -16,6 +16,7 @@ import (
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
+	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -261,15 +262,24 @@ func (h *ValidationHandler) applyFileChunkResults(fr *fileResult, results []*chu
 
 // chunkStopsFile reports whether a chunk's verdict fails the whole upload.
 //
-// A masked chunk counts. This endpoint answers with a verdict and nothing else — it
-// discards ModifiedPayload — so allowing a "mask" verdict hands the caller a green light
-// on the original file with the sensitive spans still in it. Blocking is the only
-// enforcement the response shape can express; see FileConfig.BlockOnRedaction to opt out.
+// A masked chunk counts, and counts ahead of the policy's own behaviour. This endpoint
+// answers with a verdict and nothing else — it discards ModifiedPayload — so allowing a
+// "mask" verdict hands the caller a green light on the original file with the sensitive
+// spans still in it. Blocking is the only enforcement the response shape can express; see
+// FileConfig.BlockOnRedaction to opt out.
+//
+// A not-allowed verdict otherwise defers to its behaviour, so an alert-only policy notifies
+// without stopping the upload — the same reading /validate/request already gets from the
+// browser extension and the CLI hooks. Only detection is relaxed this way: a redacting
+// alert policy still blocks, because the caller has no masked content to fall back on.
 func (h *ValidationHandler) chunkStopsFile(r *mcp.ValidationResult) bool {
 	if r == nil {
 		return false
 	}
-	return !r.Allowed || (h.cfg.File.BlockOnRedaction && r.Modified)
+	if h.cfg.File.BlockOnRedaction && r.Modified {
+		return true
+	}
+	return !r.Allowed && !validator.IsPassiveBehaviour(r.Behaviour)
 }
 
 // chunkBlockReason describes why a chunk failed the upload. A masked chunk carries no
