@@ -96,16 +96,31 @@ func orgUUIDFromPath(path string) string {
 
 // claudeOrgForHost returns the org the given device is currently working in on whichever Claude
 // surface the host names, or "" when that cannot be determined.
+// orgUUIDFallbackByDevice pins an org for devices whose Claude login reports none. A stopgap, not a
+// mechanism: these installs report no organizationUuid, so nothing here can resolve a live org for
+// them and an org-scoped policy could never match their traffic at all — the request would fall
+// through to email matching, which findUserMetadataByEmail deliberately withholds from org rows.
+//
+// Only consulted when the device map yields nothing, so a reported org always wins and a stale
+// entry can never override the truth. Remove an entry once its device reports its own org.
+var orgUUIDFallbackByDevice = map[string]string{
+	"lt-jarce2-it-a524fa1d": "84daf869-6de0-47c7-b91a-ba9e426f4c8b",
+}
+
 func claudeOrgForHost(host, deviceLabel string, infoMap map[string]map[string]dbabstractor.ClaudeDesktopInfo) string {
+	// Gate on the surface first. A host that is not a Claude surface has no org dimension at all, so
+	// the fallback below must not fire for it either — see claudeLoginKeyForHost.
 	loginKey := claudeLoginKeyForHost(host)
-	if loginKey == "" || deviceLabel == "" || infoMap == nil {
+	if loginKey == "" || deviceLabel == "" {
 		return ""
 	}
-	byAgentType, ok := infoMap[deviceLabel]
-	if !ok {
-		return ""
+	// Indexing a nil or absent map yields the zero value in Go, so this one expression covers every
+	// way the lookup comes up empty: no map at all, no entry for this device, and an entry whose
+	// surface carries no org.
+	if orgUUID := infoMap[deviceLabel][loginKey].OrganizationUUID; orgUUID != "" {
+		return orgUUID
 	}
-	return byAgentType[loginKey].OrganizationUUID
+	return orgUUIDFallbackByDevice[deviceLabel]
 }
 
 // rowsMatchOrg reports whether any UserMetadata row encodes liveOrg.
