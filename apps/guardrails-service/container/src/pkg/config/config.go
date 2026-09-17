@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -69,6 +70,40 @@ type Config struct {
 	GuardrailRemediationGenerate bool
 	GuardrailAverageSeverity     bool
 	File                         FileConfig
+	BrowserAttachment            BrowserAttachmentConfig
+}
+
+// defaultBrowserAttachmentMarker is the separator the browser extension writes ahead of
+// each attachment's extracted text. It is the JSON path that content occupies in
+// claude.ai's own request body, reused as a literal label — it is NOT resolved as a path
+// by this service (the field-mapping engine does not support [*]; see field_mapping.go).
+const defaultBrowserAttachmentMarker = "attachments[*].extracted_content"
+
+// defaultBrowserAttachmentAgents lists the browser-llm-agent values this guardrail applies
+// to. Only claude.ai is known to bypass the upload endpoint the extension intercepts for
+// /api/validate/file; other agents still reach that endpoint, where redaction remains
+// enforceable, so they must not be force-blocked here.
+const defaultBrowserAttachmentAgents = "claude"
+
+// BrowserAttachmentConfig governs the attachment guardrail for browser-extension traffic.
+//
+// claude.ai never calls the upload endpoint the extension intercepts for
+// /api/validate/file, so the extension inlines each attachment's extracted text into the
+// chat request payload, separated by Marker. Those requests arrive at
+// /api/validate/request looking like any other prompt.
+//
+// A mask or alert verdict cannot be enforced on that shape: ModifiedPayload comes back in
+// the flattened form the extension synthesised, and the extension cannot map it back onto
+// claude.ai's real request body (a structured attachments array whose content claude.ai
+// extracted server-side). Blocking is the only enforcement the response can express — the
+// same constraint FileConfig.BlockOnRedaction solves for /api/validate/file.
+type BrowserAttachmentConfig struct {
+	Enabled bool
+	Marker  string
+	// Agents restricts the guardrail to these browser-llm-agent tag values (case-insensitive).
+	// Empty means every browser-extension agent, which widens enforcement — the agent list is a
+	// narrowing filter, unlike Marker, whose absence disables the guardrail outright.
+	Agents []string
 }
 
 // ThreatKafkaConfig is the producer half of the malicious-event buffer, read by
@@ -93,7 +128,15 @@ type FileConfig struct {
 	MaxRetries       int
 	MaxConcurrent    int
 	URLTimeoutSec    int
-	Media            MediaConfig
+
+	// BlockOnRedaction fails an upload whose content a policy masked, instead of
+	// letting it through. /api/validate/file answers with a verdict only — it has no
+	// field to hand the masked text back in — so a "mask" verdict that does not block
+	// means the original, unmasked file is what actually gets used. Defaults to true;
+	// set FILE_VALIDATE_BLOCK_ON_REDACTION=false to go back to allowing them.
+	BlockOnRedaction bool
+
+	Media MediaConfig
 }
 
 // MediaConfig holds configuration for external media processing APIs.
@@ -109,8 +152,37 @@ type MediaConfig struct {
 	MaxVideoBytes int
 }
 
+// defaultChunkSize keeps one chunk small enough that its LLM adjudication finishes well
+// inside the upstream ceiling. The LLM proxy (cyborg's LLMAction) has a hardcoded 60s read
+// timeout and answers 422 past it, and a measured 9.3KB payload already cost 8-10s — so a
+// 32000-char chunk could not reliably complete. Cost is per value enumerated, not just per
+// byte, so a dense PII table is the worst case and this is sized for it.
+const defaultChunkSize = 6000
+
+// defaultMaxChunks derives the chunk ceiling from the byte cap so shrinking ChunkSize can
+// never start leaving content uninspected in files that used to be covered end to end
+// (chunks past the cap are dropped uninspected, not rejected — see ValidateFile).
+// FILE_VALIDATE_MAX_CHUNKS still wins.
+//
+// Chunks advance by chunkSize-overlap, not chunkSize, so the overlap has to be in the
+// divisor: at 5MB/6000 the naive figure is 874 but the real count is 904.
+func defaultMaxChunks(maxTextFileBytes, chunkSize, overlap int) int {
+	if chunkSize <= 0 {
+		chunkSize = defaultChunkSize
+	}
+	advance := chunkSize - overlap
+	if advance < 1 {
+		advance = chunkSize
+	}
+	// +2 for the first chunk and the trailing partial one.
+	return (maxTextFileBytes / advance) + 2
+}
+
 func LoadConfig() *Config {
 	dbAbstractorToken := getEnv("DATABASE_ABSTRACTOR_SERVICE_TOKEN", "")
+	maxTextFileBytes := getEnvAsInt("FILE_VALIDATE_MAX_TEXT_FILE_BYTES", 5*1024*1024)
+	chunkSize := getEnvAsInt("FILE_VALIDATE_CHUNK_SIZE", defaultChunkSize)
+	chunkOverlap := getEnvAsInt("FILE_VALIDATE_CHUNK_OVERLAP", 200)
 	return &Config{
 		ServerPort:                       getEnvAsInt("SERVER_PORT", 8080),
 		DatabaseAbstractorURL:            getEnv("DATABASE_ABSTRACTOR_SERVICE_URL", "https://ultron.akto.io"),
@@ -146,16 +218,22 @@ func LoadConfig() *Config {
 		ThreatKafka:                      loadThreatKafkaConfig(),
 		GuardrailRemediationGenerate:     getEnvAsBool("GUARDRAILS_GENERATE_REMEDIATION", false),
 		GuardrailAverageSeverity:         getEnvAsBool("GUARDRAILS_AVERAGE_SEVERITY", false),
+		BrowserAttachment: BrowserAttachmentConfig{
+			Enabled: getEnvAsBool("GUARDRAILS_BROWSER_ATTACHMENT_BLOCK", true),
+			Marker:  getEnv("GUARDRAILS_BROWSER_ATTACHMENT_MARKER", defaultBrowserAttachmentMarker),
+			Agents:  getEnvAsList("GUARDRAILS_BROWSER_ATTACHMENT_AGENTS", defaultBrowserAttachmentAgents),
+		},
 		File: FileConfig{
 			Enabled:          getEnvAsBool("FILE_VALIDATION_ENABLED", false),
 			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
-			MaxTextFileBytes: getEnvAsInt("FILE_VALIDATE_MAX_TEXT_FILE_BYTES", 5*1024*1024),
-			ChunkSize:        getEnvAsInt("FILE_VALIDATE_CHUNK_SIZE", 32000),
-			ChunkOverlap:     getEnvAsInt("FILE_VALIDATE_CHUNK_OVERLAP", 200),
-			MaxChunks:        getEnvAsInt("FILE_VALIDATE_MAX_CHUNKS", 500),
+			MaxTextFileBytes: maxTextFileBytes,
+			ChunkSize:        chunkSize,
+			ChunkOverlap:     chunkOverlap,
+			MaxChunks:        getEnvAsInt("FILE_VALIDATE_MAX_CHUNKS", defaultMaxChunks(maxTextFileBytes, chunkSize, chunkOverlap)),
 			MaxRetries:       getEnvAsInt("FILE_VALIDATE_MAX_RETRIES", 2),
 			MaxConcurrent:    getEnvAsInt("FILE_VALIDATE_MAX_CONCURRENT", 5),
 			URLTimeoutSec:    getEnvAsInt("FILE_VALIDATE_URL_TIMEOUT_SEC", 30),
+			BlockOnRedaction: getEnvAsBool("FILE_VALIDATE_BLOCK_ON_REDACTION", true),
 			Media: MediaConfig{
 				Provider:      getEnv("MEDIA_PROVIDER", ""),
 				VisionAPIKey:  getEnv("MEDIA_VISION_API_KEY", ""),
@@ -196,6 +274,19 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// getEnvAsList splits a comma-separated env var, trimming blanks. An env var set to the empty
+// string yields an empty list, so a caller can clear a non-empty default.
+func getEnvAsList(key, defaultValue string) []string {
+	raw := getEnv(key, defaultValue)
+	var out []string
+	for _, part := range strings.Split(raw, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }
 
 func getEnvAsInt(key string, defaultValue int) int {

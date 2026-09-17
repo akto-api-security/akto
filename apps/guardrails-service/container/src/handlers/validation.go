@@ -43,17 +43,25 @@ type ValidationHandler struct {
 	cfg              *config.Config
 	fileRegistry     *fileprocessor.Registry
 	metrics          *metrics.Accumulator
+	policyGate       policyGate
 }
+
+// policyGate mirrors validator.Service.HasApplicablePolicies.
+type policyGate func(contextSource, requestHeaders string) (bool, error)
 
 // NewValidationHandler creates a new validation handler
 func NewValidationHandler(validatorService *validator.Service, logger *zap.Logger, cfg *config.Config, fileRegistry *fileprocessor.Registry, acc *metrics.Accumulator) *ValidationHandler {
-	return &ValidationHandler{
+	h := &ValidationHandler{
 		validatorService: validatorService,
 		logger:           logger,
 		cfg:              cfg,
 		fileRegistry:     fileRegistry,
 		metrics:          acc,
 	}
+	if validatorService != nil {
+		h.policyGate = validatorService.HasApplicablePolicies
+	}
+	return h
 }
 
 // IngestData handles batch data ingestion and validation
