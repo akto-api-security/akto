@@ -43,8 +43,7 @@ public class TestRunMetrics {
         /** Queue drained, idle grace elapsed, nothing left to recover -> completed. */
         IDLE_COMPLETE,
         /** Polling/processing threw. */
-        ERROR
-    }
+        ERROR, LEASE_LOST }
 
     /**
      * Pipeline stages timed per test. LOOKUP is config/sample resolution; RUN_TEST is the full

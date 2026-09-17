@@ -31,7 +31,6 @@ import com.akto.test_editor.execution.Executor;
 import com.akto.testing.kafka_utils.ConsumerUtil;
 import com.akto.testing.kafka_utils.Producer;
 import com.akto.testing.kafka_utils.TestingConfigurations;
-import com.akto.testing.kafka_utils.TestingStateStore;
 import com.akto.utility.UtilityServer;
 import com.akto.usage.OrgUtils;
 import com.akto.util.Constants;
@@ -323,39 +322,6 @@ public class Main {
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
     private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
 
-    private static BasicDBObject checkIfAlreadyTestIsRunningOnMachine(){
-        // this will return true if consumer is running and this the latest summary of the testing run
-        // and also the summary should be in running state
-        try {
-            BasicDBObject currentTestInfo = TestingStateStore.read();
-            if(currentTestInfo == null){
-                return null;
-            }
-            if(!currentTestInfo.getBoolean(TestingStateStore.CONSUMER_RUNNING, false)){
-                return null;
-            }
-            String testingRunId = currentTestInfo.getString(TestingStateStore.TESTING_RUN_ID);
-            String testingRunSummaryId = currentTestInfo.getString(TestingStateStore.SUMMARY_ID);
-
-            int accountID = currentTestInfo.getInt(TestingStateStore.ACCOUNT_ID);
-            Context.accountId.set(accountID);
-
-            TestingRunResultSummary testingRunResultSummary = dataActor.fetchTestingRunResultSummary(testingRunSummaryId);
-            if(testingRunResultSummary == null || testingRunResultSummary.getState() == null ||  testingRunResultSummary.getState() != State.RUNNING){
-                return null;
-            }
-            TestingRunResultSummary latestSummary = dataActor.findLatestTestingRunResultSummary(testingRunId);
-            if(latestSummary.getHexId().equals(testingRunSummaryId)){
-                return currentTestInfo;
-            }else{
-                return null;
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in reading the testing state file: " + e.getMessage());
-            return null;
-        }
-    }
-
     private static void setTestingRunConfig(TestingRun testingRun, TestingRunResultSummary trrs) {
         long timestamp = testingRun.getId().getTimestamp();
         long seconds = Context.now() - timestamp;
@@ -507,11 +473,6 @@ public class Main {
         LoggerMaker.setModuleId(customMiniTestingServiceName);
         loggerMaker.warnAndAddToDb("Starting.......");
 
-        if(Constants.IS_NEW_TESTING_ENABLED){
-            boolean val = Utils.createFolder(Constants.TESTING_STATE_FOLDER_PATH);
-            loggerMaker.info("Testing info folder status: " + val);
-        }
-
         schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 if (matrixAnalyzerRunning) {
@@ -542,47 +503,7 @@ public class Main {
         loggerMaker.infoAndAddToDb("Fetched account settings for account " + Context.getActualAccountId());
         GetRunningTestsStatus.getRunningTests().getStatusOfRunningTests();
 
-          BasicDBObject currentTestInfo = null;
-        if(Constants.IS_NEW_TESTING_ENABLED){
-            currentTestInfo = checkIfAlreadyTestIsRunningOnMachine();
-        }
-        
         AllMetrics.instance.init(LogDb.TESTING, false, dataActor, Context.getActualAccountId(), customMiniTestingServiceName, ModuleInfo.ModuleType.MINI_TESTING.name());
-
-        if(currentTestInfo != null){
-            try {
-                loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId);
-                Organization organization = OrgUtils.getOrganizationCached(accountId);
-                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);
-                SyncLimit syncLimit = featureAccess.fetchSyncLimit();
-                String testingRunSummaryId = currentTestInfo.getString(TestingStateStore.SUMMARY_ID);
-                String testingRunId = currentTestInfo.getString(TestingStateStore.TESTING_RUN_ID);
-                //check if currently running testrun is part of rerun
-                ObjectId summaryId = new ObjectId(testingRunSummaryId);
-
-                TestingRunResultSummary rerunTestingRunResultSummary = dataActor.fetchRerunTestingRunResultSummary(testingRunSummaryId);
-                //fill testingRunResult in TestingConfigurations
-                if(!handleRerunTestingRunResult(rerunTestingRunResultSummary)) {
-                    loggerMaker.infoAndAddToDb("Resuming test for account: " + accountId + " testingRunId: " + testingRunId + " testingRunSummaryId: " + testingRunSummaryId);
-                    TestingRun testingRun = dataActor.findTestingRun(testingRunId);
-                    TestingRunConfig baseConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
-                    testingRun.setTestingRunConfig(baseConfig);
-                    testingProducer.initProducer(testingRun, summaryId, true, syncLimit);
-                    int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
-                    // When resuming, use remaining time so total run doesn't exceed original maxRunTime (e.g. restart after 2h of 3h run → run 1h more, not 3h more)
-                    TestingRunResultSummary currentSummary = dataActor.fetchTestingRunResultSummary(testingRunSummaryId);
-                    int elapsedSinceStart = Context.now() - currentSummary.getStartTimestamp();
-                    int remainingRunTime = Math.max(0, maxRunTime - elapsedSinceStart);
-                    loggerMaker.infoAndAddToDb("Resume run time: maxRunTime=" + maxRunTime + "s elapsed=" + elapsedSinceStart + "s remaining=" + remainingRunTime + "s");
-                    testingConsumer.init(remainingRunTime);
-
-                    // mark the test completed here
-                    testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId, System.currentTimeMillis());
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error in running failed tests from file.");
-            }
-        }
 
         singleTypeInfoInit(accountId);
 
@@ -599,8 +520,27 @@ public class Main {
             }
 
             TestingConfigurations config = TestingConfigurations.getInstance();
-            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta, customMiniTestingServiceName);
+            /*
+             * Minted per claim rather than per pod: a module that restarts and re-claims the same
+             * summary gets a new token, so anything still running from its previous incarnation is
+             * fenced out by the same check that fences a different module.
+             */
+            String leaseToken = TestingLease.getInstance().mintToken();
+            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta,
+                    customMiniTestingServiceName, leaseToken, TestingLease.LEASE_SECONDS);
+            if (trrs != null) {
+                TestingLease.getInstance().adopt(leaseToken);
+            } else {
+                TestingLease.getInstance().clear();
+            }
             boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
+            /*
+             * producerDone says the message set in kafka is complete, so this attempt can be
+             * drained where it left off instead of being failed and re-fanned-out. This is the
+             * resume that used to depend on a file on the previous pod's disk - and because the
+             * flag lives with the summary, the module resuming need not be the one that died.
+             */
+            boolean isResumeCase = trrs != null && trrs.getProducerDone();
             boolean isTestingRunResultRerunCase = trrs != null && trrs.getOriginalTestingRunResultSummaryId() != null;
             if (isTestingRunResultRerunCase) {
                 trrs.setOriginalTestingRunResultSummaryId(new ObjectId(trrs.getOriginalTestingRunResultSummaryHexId()));
@@ -695,7 +635,10 @@ public class Main {
 
                 boolean maxRetriesReached = false;
 
-                if (isSummaryRunning || isTestingRunRunning) {
+                if (isResumeCase) {
+                    loggerMaker.infoAndAddToDb("Resuming summary " + trrs.getHexId()
+                            + ": production already complete, draining remaining messages");
+                } else if (isSummaryRunning || isTestingRunRunning) {
                     loggerMaker.infoAndAddToDb("TRRS or TR is in running state, checking if it should run it or not");
                     TestingRunResultSummary testingRunResultSummary;
                     if (trrs != null) {
@@ -815,8 +758,19 @@ public class Main {
                     int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
                     TestExecutor.initRunDeadline(trrs, maxRunTime);
                     if(Constants.IS_NEW_TESTING_ENABLED){
-                        testingProducer.initProducer(testingRun, summaryId, false, syncLimit);
-                        testingConsumer.init(maxRunTime);
+                        // doInitOnly rebuilds the in-memory test configuration without re-producing,
+                        // and notably skips initProducer's delete of the topic we came back for
+                        testingProducer.initProducer(testingRun, summaryId, isResumeCase, syncLimit);
+                        int runTime = maxRunTime;
+                        int pickedUpTimestamp = trrs != null ? trrs.getStartTimestamp() : Context.now();
+                        if (isResumeCase && trrs != null) {
+                            // keep the original deadline rather than restarting the clock
+                            int elapsed = Context.now() - trrs.getStartTimestamp();
+                            runTime = Math.max(0, maxRunTime - elapsed);
+                            loggerMaker.infoAndAddToDb("Resume run time: maxRunTime=" + maxRunTime
+                                    + "s elapsed=" + elapsed + "s remaining=" + runTime + "s");
+                        }
+                        testingConsumer.init(runTime, summaryId.toHexString(), pickedUpTimestamp);
                     }else{
                         testExecutor.init(testingRun, summaryId, syncLimit, false);
                     }
@@ -828,7 +782,19 @@ public class Main {
                 loggerMaker.errorAndAddToDb(e, "Error in init " + e);
             }
 
-            testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId, startDetailed);
+            /*
+             * Marking the run complete is the other mutation a superseded module must not perform:
+             * it would close out a run that the new owner is still executing. Sits outside the try
+             * above, so it is reached even when init threw - which is exactly when the lease is
+             * most likely to have been lost.
+             */
+            if (TestingLease.getInstance().isLost()) {
+                loggerMaker.errorAndAddToDb("Not marking run complete for summary "
+                        + (summaryId == null ? "null" : summaryId.toHexString()) + ": lease no longer held.");
+            } else {
+                testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId, startDetailed);
+            }
+            TestingLease.getInstance().clear();
 
             Thread.sleep(1000);
         }

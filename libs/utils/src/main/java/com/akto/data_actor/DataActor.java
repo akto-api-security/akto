@@ -138,7 +138,7 @@ public abstract class DataActor {
     public abstract void ingestMetricData(List<MetricData> metricData);
     public abstract TestingRun findPendingTestingRun(int delta, String miniTestingName);
 
-    public abstract TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName);
+    public abstract TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName, String leaseToken, int leaseSeconds);
 
     public abstract TestingRun findTestingRun(String testingRunId);
 
@@ -204,7 +204,9 @@ public abstract class DataActor {
 
     public abstract List<YamlTemplate> fetchYamlTemplatesWithIds(List<String> ids, boolean fetchOnlyActive);
 
-    public abstract void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount);
+    public abstract LeaseStatus updateTestResultsCountInTestSummary(String summaryId, int testResultsCount, String leaseToken, int leaseSeconds);
+
+    public abstract LeaseStatus markProducerDone(String summaryId, String leaseToken);
 
     public abstract void updateLastTestedField(int apiCollectionId, String url, String method);
 
@@ -212,7 +214,7 @@ public abstract class DataActor {
 
     public abstract void insertTestingRunResults(TestingRunResult testingRunResults);
 
-    public abstract void bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed);
+    public abstract LeaseStatus bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed, String leaseToken, int leaseSeconds);
 
     public abstract void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount);
 
