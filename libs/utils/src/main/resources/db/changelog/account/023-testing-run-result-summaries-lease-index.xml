@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Mirrors the index added to TestingRunResultSummariesDao.createIndicesIfAbsent.
+
+        mini-testing discovers test run attempts whose ownership lease has lapsed, so
+        findPendingTestingRunResultSummary filters on leaseExpiryTs on a polling loop. Sparse
+        because only summaries currently owned by a module carry the field, which keeps the index
+        to the handful of in-flight runs rather than every summary ever recorded.
+
+        No backfill accompanies this. Summaries written before the lease existed have no
+        leaseExpiryTs, and a mongo range predicate does not match a missing field - which is
+        deliberate: those runs belong to modules that never renew a lease, so making them match
+        would let a module reclaim its own still-running work.
+    -->
+
+    <changeSet id="023-account-testing-run-result-summaries-lease-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="testing_run_result_summaries"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="testing_run_result_summaries">
+            <mongodb:keys>{ "leaseExpiryTs": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "leaseExpiryTs_1", "sparse": true }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="testing_run_result_summaries">
+                <mongodb:keys>{ "leaseExpiryTs": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
