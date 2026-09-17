@@ -1,22 +1,21 @@
 package com.akto.utils.elasticsearch;
 
-import com.akto.dao.context.Context;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.claude_identity.ClaudeDesktopInfo;
-import com.akto.dto.billing.Organization;
-import com.akto.log.LoggerMaker;
-import com.akto.usage.OrgUtils;
-import com.akto.util.Constants;
-import com.akto.util.JSONUtils;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import com.akto.dao.context.Context;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.billing.Organization;
+import com.akto.dto.claude_identity.ClaudeDesktopInfo;
+import com.akto.log.LoggerMaker;
+import com.akto.usage.OrgUtils;
+import com.akto.util.Constants;
+import com.akto.util.JSONUtils;
 
 public class AgentQueryRecord {
 
@@ -71,11 +70,14 @@ public class AgentQueryRecord {
      * Claude surfaces that report one shared serviceId across every install, as
      * {host substring, agentLogins key} pairs.
      *
-     * The columns are not a rename of each other — three host labels resolve to two logins:
+     * The columns are not a rename of each other — several host labels resolve to two logins:
      *
      *   claude-desktop -> claude-desktop    the Desktop app's own login
      *   claude-cowork  -> claude-desktop    Cowork runs inside Desktop and shares its session;
-     *                                       the agent reports no separate claude-cowork login
+     *   claude_cowork  -> claude-desktop    the agent reports no separate cowork login. Both
+     *                                       separators occur, depending on how the collection was
+     *                                       registered; neither spelling contains the other, so a
+     *                                       missing variant silently stamps no org at all.
      *   claude-cli     -> claude-cli-user   the CLI's login (claude-cli-local / -project /
      *                                       -enterprise are config scopes, not logins)
      *
@@ -86,6 +88,7 @@ public class AgentQueryRecord {
     private static final String[][] CLAUDE_SHARED_SURFACES = {
         { "claude-desktop", "claude-desktop"  },
         { "claude-cowork",  "claude-desktop"  },
+        { "claude_cowork",  "claude-desktop"  },
         { "claude-cli",     "claude-cli-user" },
     };
 
@@ -386,59 +389,28 @@ public class AgentQueryRecord {
     }
 
     /**
-     * Hardcoded org for devices whose Claude login reports none. A stopgap, not a mechanism: these
-     * installs report no organizationUuid, so their traffic would otherwise land on the unqualified
-     * shared serviceId together with every other org's — the exact collapse qualifying by org
-     * exists to prevent. Remove an entry once the device reports its own org.
-     *
-     * Only consulted when the device map yields nothing; a reported org always wins, so a stale
-     * entry here can never override the truth.
-     */
-    private static final Map<String, String> ORG_UUID_FALLBACK_BY_DEVICE = Collections.singletonMap(
-            "lt-jarce2-it-a524fa1d", "84daf869-6de0-47c7-b91a-ba9e426f4c8b");
-
-    /**
      * Org uuid to qualify serviceId with, or null when the host is not a shared-serviceId Claude
-     * surface, the device is unknown, or that surface has no resolved login on it and the device has
-     * no {@link #ORG_UUID_FALLBACK_BY_DEVICE} entry.
+     * surface, the device is unknown, or that surface has no resolved login on it.
      *
      * The surface named in the host picks which login to read — see {@link #CLAUDE_SHARED_SURFACES}
      * for why reading the wrong one would misattribute the traffic.
      */
     private static String claudeOrgUuidForHost(String host, String deviceId,
             Map<String, Map<String, ClaudeDesktopInfo>> deviceClaudeDesktopInfoMap) {
-        if (host == null || deviceId == null) {
+        if (host == null || deviceId == null || deviceClaudeDesktopInfoMap == null) {
             return null;
         }
-
-        // Resolve the surface first, and bail before the fallback when the host names none: a
-        // non-shared surface already carries an org-specific serviceId, so stamping an org onto it
-        // would be wrong for an overridden device just as it is for every other one.
-        String loginKey = null;
+        Map<String, ClaudeDesktopInfo> byAgentType = deviceClaudeDesktopInfoMap.get(deviceId);
+        if (byAgentType == null) {
+            return null;
+        }
         for (String[] surface : CLAUDE_SHARED_SURFACES) {
             if (host.contains(surface[0])) {
-                loginKey = surface[1];
-                break;
+                ClaudeDesktopInfo info = byAgentType.get(surface[1]);
+                return info != null ? info.getOrganizationUuid() : null;
             }
         }
-        if (loginKey == null) {
-            return null;
-        }
-
-        String orgUuid = null;
-        Map<String, ClaudeDesktopInfo> byAgentType =
-                deviceClaudeDesktopInfoMap != null ? deviceClaudeDesktopInfoMap.get(deviceId) : null;
-        if (byAgentType != null) {
-            ClaudeDesktopInfo info = byAgentType.get(loginKey);
-            if (info != null) {
-                orgUuid = info.getOrganizationUuid();
-            }
-        }
-
-        if (orgUuid == null || orgUuid.isEmpty()) {
-            return ORG_UUID_FALLBACK_BY_DEVICE.get(deviceId);
-        }
-        return orgUuid;
+        return null;
     }
 
     /**
