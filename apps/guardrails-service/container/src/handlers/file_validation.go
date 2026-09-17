@@ -261,15 +261,41 @@ func (h *ValidationHandler) applyFileChunkResults(fr *fileResult, results []*chu
 
 // chunkStopsFile reports whether a chunk's verdict fails the whole upload.
 //
-// A masked chunk counts. This endpoint answers with a verdict and nothing else — it
-// discards ModifiedPayload — so allowing a "mask" verdict hands the caller a green light
-// on the original file with the sensitive spans still in it. Blocking is the only
-// enforcement the response shape can express; see FileConfig.BlockOnRedaction to opt out.
+// A masked chunk counts, and counts ahead of the policy's own behaviour. This endpoint
+// answers with a verdict and nothing else — it discards ModifiedPayload — so allowing a
+// "mask" verdict hands the caller a green light on the original file with the sensitive
+// spans still in it. Blocking is the only enforcement the response shape can express; see
+// FileConfig.BlockOnRedaction to opt out.
+//
+// A not-allowed verdict otherwise defers to its behaviour, so an alert-only policy notifies
+// without stopping the upload — the same reading /validate/request already gets from the
+// browser extension and the CLI hooks. Only detection is relaxed this way: a redacting
+// alert policy still blocks, because the caller has no masked content to fall back on.
 func (h *ValidationHandler) chunkStopsFile(r *mcp.ValidationResult) bool {
 	if r == nil {
 		return false
 	}
-	return !r.Allowed || (h.cfg.File.BlockOnRedaction && r.Modified)
+	if h.cfg.File.BlockOnRedaction && r.Modified {
+		return true
+	}
+	return !r.Allowed && !passiveVerdict(r.Behaviour)
+}
+
+// passiveVerdict reports whether a not-allowed verdict only asks to be recorded rather than
+// enforced. The engine reports the threat itself during validation, so allowing here loses
+// the upload's block, not its alert.
+//
+// Listed explicitly rather than derived from Behaviour.Enforces(): that predicate also ranks
+// "warn" and the approval behaviours below blocking, and neither is safe to wave through on
+// this endpoint. Everything unlisted — including an empty or unknown behaviour — keeps
+// blocking.
+func passiveVerdict(behaviour string) bool {
+	switch mcp.ParseBehaviour(behaviour) {
+	case mcp.BehaviourAlert, mcp.BehaviourMask:
+		return true
+	default:
+		return false
+	}
 }
 
 // chunkBlockReason describes why a chunk failed the upload. A masked chunk carries no
