@@ -6,14 +6,28 @@ Uses the flat HTTP proxy payload format consistent with other Akto connectors
 (github-cli-hooks, cursor-hooks, etc.).
 
 Usage:
-    from akto_middleware import AktoGuardrailsMiddleware
+    from akto_middleware import AktoGuardrailsMiddleware, resolve_interrupts
     from langchain.agents import create_agent
+    from langgraph.checkpoint.memory import InMemorySaver
 
     agent = create_agent(
         model="gpt-4.1",
         tools=[...],
         middleware=[AktoGuardrailsMiddleware()],
+        checkpointer=InMemorySaver(),  # required — "warn"/"approval" verdicts pause via interrupt()
     )
+
+    # You still call agent.invoke() yourself. resolve_interrupts() just handles
+    # any "warn"/"approval" pause on the result: it checks for "__interrupt__",
+    # asks (ask_human callback, defaults to a terminal y/N prompt), and resumes
+    # with Command(resume=...) — looping since a turn can pause more than once
+    # (request phase, then response phase). "block" still just raises ValueError.
+    config = {"configurable": {"thread_id": "conversation-1"}}
+    try:
+        result = agent.invoke({"messages": [{"role": "user", "content": user_input}]}, config=config)
+        result = resolve_interrupts(agent, result, config)
+    except ValueError as e:
+        print(f"Blocked by Akto Guardrails: {e}")
 
 Environment variables:
     AKTO_DATA_INGESTION_URL  Akto service base URL (required)
@@ -34,7 +48,9 @@ from typing import Any, Optional, Tuple
 import httpx
 
 from langchain.agents.middleware import AgentMiddleware, AgentState
+from langgraph.errors import GraphBubbleUp
 from langgraph.runtime import Runtime
+from langgraph.types import Command, interrupt
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -83,6 +99,50 @@ def _get_instance_ip() -> str:
     except OSError:
         _instance_ip = "127.0.0.1"
         return _instance_ip
+
+
+def _guardrails_behaviour_value(behaviour: Any) -> str:
+    return str(behaviour or "").strip().lower()
+
+
+def _is_warn_behaviour(behaviour: str) -> bool:
+    return behaviour in ("warn", "approval")
+
+
+def _is_alert_behaviour(behaviour: str) -> bool:
+    return behaviour == "alert"
+
+
+def _default_ask_human(payload: dict) -> bool:
+    reason = payload.get("reason", "")
+    behaviour = payload.get("behaviour", "")
+    answer = input(f"  -> guardrails interrupt: behaviour={behaviour} reason={reason}\n     Proceed anyway? [y/N]: ")
+    return answer.strip().lower() == "y"
+
+
+def resolve_interrupts(agent, result: dict, config: dict, ask_human=None) -> dict:
+    """
+    Given a result already obtained from agent.invoke(), resolve any pending
+    "__interrupt__" (a "warn"/"approval" guardrails pause) by asking and
+    resuming with Command(resume=...), looping since a turn can pause more
+    than once (request phase, then response phase). Returns the final result
+    dict once no interrupt remains.
+
+    ask_human(payload) -> bool decides whether to proceed past a pause; payload
+    has phase/behaviour/reason/message keys. Defaults to a terminal y/N prompt.
+    Raises ValueError if guardrails end up blocking (declined, or a hard
+    "block" verdict on the resumed call) — same exception a hard block raises
+    from agent.invoke() itself.
+    """
+    if ask_human is None:
+        ask_human = _default_ask_human
+
+    while "__interrupt__" in result:
+        payload = result["__interrupt__"][0].value
+        decision = ask_human(payload)
+        result = agent.invoke(Command(resume=decision), config=config)
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -137,8 +197,8 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
         if AKTO_SYNC_MODE:
             try:
                 self._validate_request_and_maybe_block_sync(messages, model)
-            except ValueError:
-                raise
+            except (ValueError, GraphBubbleUp):
+                raise  # GraphBubbleUp covers interrupt()'s pause signal — must propagate, not fail open
             except Exception as e:
                 logger.error(f"before_model guardrails error (fail-open): {e}")
 
@@ -165,7 +225,7 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
                     status_code="200",
                 )
                 self._ingest_sync(payload)
-        except ValueError:
+        except (ValueError, GraphBubbleUp):
             raise
         except Exception as e:
             logger.error(f"after_model guardrails error (fail-open): {e}")
@@ -187,7 +247,7 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
         if AKTO_SYNC_MODE:
             try:
                 await self._validate_request_and_maybe_block(messages, model)
-            except ValueError:
+            except (ValueError, GraphBubbleUp):
                 raise
             except Exception as e:
                 logger.error(f"abefore_model guardrails error (fail-open): {e}")
@@ -213,7 +273,7 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
                     status_code="200",
                 )
                 await self._ingest(payload)
-        except ValueError:
+        except (ValueError, GraphBubbleUp):
             raise
         except Exception as e:
             logger.error(f"aafter_model guardrails error (fail-open): {e}")
@@ -223,47 +283,90 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
     # Core validation / ingestion helpers
     # ------------------------------------------------------------------
 
+    def _resolve_guardrails_verdict(
+        self,
+        allowed: bool,
+        reason: str,
+        behaviour: str,
+        *,
+        phase: str,
+        messages: list,
+        model: str,
+        ingest,
+    ) -> bool:
+        """
+        Apply the guardrails verdict. Returns True if the call should proceed.
+
+        - allowed: proceed.
+        - behaviour="alert": proceed anyway (server-side alert only, no client-side gate).
+        - behaviour="warn"/"approval": pause the graph via interrupt() and ask whoever is
+          driving the agent to decide. Requires the agent to be compiled with a checkpointer;
+          the caller resumes with Command(resume=True) to proceed or Command(resume=False) to block.
+        - anything else (e.g. "block", ""): block.
+        """
+        if allowed:
+            return True
+
+        if _is_alert_behaviour(behaviour):
+            logger.info(f"Alert behaviour ({phase}): allowing despite violation. Reason: {reason}")
+            return True
+
+        if _is_warn_behaviour(behaviour):
+            decision = interrupt({
+                "type": "akto_guardrails_warning",
+                "phase": phase,
+                "behaviour": behaviour,
+                "reason": reason or "Policy violation",
+                "message": (
+                    "Akto guardrails flagged this interaction. Resume with Command(resume=True) "
+                    "to proceed anyway, or Command(resume=False) to block it."
+                ),
+            })
+            if decision:
+                logger.warning(f"Warn behaviour ({phase}): human approved override — proceeding. Reason: {reason}")
+                return True
+            logger.warning(f"Warn behaviour ({phase}): human declined — blocking. Reason: {reason}")
+
+        blocked_payload = self._build_model_payload(
+            messages=messages,
+            model=model,
+            response_body={"x-blocked-by": "Akto Proxy", "reason": reason},
+            status_code="403",
+        )
+        ingest(blocked_payload)
+        return False
+
     def _validate_request_and_maybe_block_sync(self, messages: list, model: str) -> None:
-        """Validate prompt synchronously; raise ValueError if guardrails block."""
+        """Validate prompt synchronously; raise ValueError if guardrails end up blocking."""
         payload = self._build_model_payload(
             messages=messages,
             model=model,
             response_body=None,
             status_code="200",
         )
-        allowed, reason = self._validate_guardrails_sync(payload, phase="request")
-        if not allowed:
-            blocked_payload = self._build_model_payload(
-                messages=messages,
-                model=model,
-                response_body={"x-blocked-by": "Akto Proxy", "reason": reason},
-                status_code="403",
-            )
-            self._ingest_sync(blocked_payload)
+        allowed, reason, behaviour = self._validate_guardrails_sync(payload, phase="request")
+        if not self._resolve_guardrails_verdict(
+            allowed, reason, behaviour, phase="request", messages=messages, model=model, ingest=self._ingest_sync
+        ):
             raise ValueError(f"Blocked by Akto Guardrails: {reason or 'Policy violation'}")
 
     def _validate_response_and_maybe_block_sync(self, messages: list, model: str) -> None:
-        """Validate LLM response synchronously; raise ValueError if guardrails block."""
+        """Validate LLM response synchronously; raise ValueError if guardrails end up blocking."""
         payload = self._build_model_payload(
             messages=messages,
             model=model,
             response_body=None,
             status_code="200",
         )
-        allowed, reason = self._validate_guardrails_sync(payload, phase="response")
-        if not allowed:
-            blocked_payload = self._build_model_payload(
-                messages=messages,
-                model=model,
-                response_body={"x-blocked-by": "Akto Proxy", "reason": reason},
-                status_code="403",
-            )
-            self._ingest_sync(blocked_payload)
+        allowed, reason, behaviour = self._validate_guardrails_sync(payload, phase="response")
+        if not self._resolve_guardrails_verdict(
+            allowed, reason, behaviour, phase="response", messages=messages, model=model, ingest=self._ingest_sync
+        ):
             raise ValueError(f"Blocked by Akto Guardrails: {reason or 'Policy violation'}")
         self._ingest_sync(payload)
 
-    def _validate_guardrails_sync(self, payload: dict, phase: str = "request") -> Tuple[bool, str]:
-        """POST to Akto guardrails endpoint. Returns (allowed, reason). Fail-open."""
+    def _validate_guardrails_sync(self, payload: dict, phase: str = "request") -> Tuple[bool, str, str]:
+        """POST to Akto guardrails endpoint. Returns (allowed, reason, behaviour). Fail-open."""
         try:
             url = self._build_http_proxy_url(
                 guardrails=phase == "request",
@@ -274,7 +377,7 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
             return self._parse_guardrails_result(result, phase=phase)
         except Exception as e:
             logger.error(f"Guardrails validation error ({phase}, fail-open): {e}")
-            return True, ""
+            return True, "", ""
 
     def _ingest_sync(self, payload: dict) -> None:
         """POST to Akto with ingest_data=true. Swallows errors."""
@@ -298,46 +401,36 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
             return {}
 
     async def _validate_request_and_maybe_block(self, messages: list, model: str) -> None:
-        """Validate prompt; raise ValueError if guardrails block."""
+        """Validate prompt; raise ValueError if guardrails end up blocking."""
         payload = self._build_model_payload(
             messages=messages,
             model=model,
             response_body=None,
             status_code="200",
         )
-        allowed, reason = await self._validate_guardrails(payload, phase="request")
-        if not allowed:
-            blocked_payload = self._build_model_payload(
-                messages=messages,
-                model=model,
-                response_body={"x-blocked-by": "Akto Proxy", "reason": reason},
-                status_code="403",
-            )
-            await self._ingest(blocked_payload)
+        allowed, reason, behaviour = await self._validate_guardrails(payload, phase="request")
+        if not self._resolve_guardrails_verdict(
+            allowed, reason, behaviour, phase="request", messages=messages, model=model, ingest=self._ingest_sync
+        ):
             raise ValueError(f"Blocked by Akto Guardrails: {reason or 'Policy violation'}")
 
     async def _validate_response_and_maybe_block(self, messages: list, model: str) -> None:
-        """Validate LLM response; raise ValueError if guardrails block."""
+        """Validate LLM response; raise ValueError if guardrails end up blocking."""
         payload = self._build_model_payload(
             messages=messages,
             model=model,
             response_body=None,
             status_code="200",
         )
-        allowed, reason = await self._validate_guardrails(payload, phase="response")
-        if not allowed:
-            blocked_payload = self._build_model_payload(
-                messages=messages,
-                model=model,
-                response_body={"x-blocked-by": "Akto Proxy", "reason": reason},
-                status_code="403",
-            )
-            await self._ingest(blocked_payload)
+        allowed, reason, behaviour = await self._validate_guardrails(payload, phase="response")
+        if not self._resolve_guardrails_verdict(
+            allowed, reason, behaviour, phase="response", messages=messages, model=model, ingest=self._ingest_sync
+        ):
             raise ValueError(f"Blocked by Akto Guardrails: {reason or 'Policy violation'}")
         await self._ingest(payload)
 
-    async def _validate_guardrails(self, payload: dict, phase: str = "request") -> Tuple[bool, str]:
-        """POST to Akto guardrails endpoint. Returns (allowed, reason). Fail-open."""
+    async def _validate_guardrails(self, payload: dict, phase: str = "request") -> Tuple[bool, str, str]:
+        """POST to Akto guardrails endpoint. Returns (allowed, reason, behaviour). Fail-open."""
         try:
             url = self._build_http_proxy_url(
                 guardrails=phase == "request",
@@ -348,7 +441,7 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
             return self._parse_guardrails_result(result, phase=phase)
         except Exception as e:
             logger.error(f"Guardrails validation error ({phase}, fail-open): {e}")
-            return True, ""
+            return True, "", ""
 
     async def _ingest(self, payload: dict) -> None:
         """POST to Akto with ingest_data=true. Swallows errors."""
@@ -503,26 +596,33 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
     # Result parsing
     # ------------------------------------------------------------------
 
-    def _parse_guardrails_result(self, result: Any, phase: str = "request") -> Tuple[bool, str]:
+    def _parse_guardrails_result(self, result: Any, phase: str = "request") -> Tuple[bool, str, str]:
+        """Returns (allowed, reason, behaviour). behaviour is one of "block"/"warn"/"alert"/"approval"/""."""
         if not isinstance(result, dict):
-            return True, ""
+            return True, "", ""
 
         error = result.get("error")
         if isinstance(error, dict):
             error_data = error.get("data", {}) or {}
-            if error_data.get("behaviour") == "block":
+            behaviour = _guardrails_behaviour_value(
+                error_data.get("behaviour") or error_data.get("Behaviour")
+            )
+            if behaviour:
                 reason = error.get("message") or error_data.get("reason") or "Policy violation"
-                logger.warning(f"✗ DENIED by guardrails ({phase}): {reason}")
-                return False, reason
+                logger.warning(f"✗ DENIED by guardrails ({phase}): {reason} (behaviour={behaviour})")
+                return False, reason, behaviour
 
         guardrails_result = result.get("data", {}).get("guardrailsResult", {}) or {}
         allowed = guardrails_result.get("Allowed", True)
         reason = guardrails_result.get("Reason", "")
+        behaviour = _guardrails_behaviour_value(
+            guardrails_result.get("behaviour") or guardrails_result.get("Behaviour")
+        )
         if allowed:
             logger.info(f"✓ ALLOWED by guardrails ({phase})")
         else:
-            logger.warning(f"✗ DENIED by guardrails ({phase}): {reason}")
-        return allowed, reason
+            logger.warning(f"✗ DENIED by guardrails ({phase}): {reason} (behaviour={behaviour})")
+        return allowed, reason, behaviour
 
     # ------------------------------------------------------------------
     # State extraction helpers
