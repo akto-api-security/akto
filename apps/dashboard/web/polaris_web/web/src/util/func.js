@@ -2812,6 +2812,13 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
         mcpSecurityGranted,
         stiggFeatures
       }
+    },
+    isUserAdmin(){
+      if(window?.SCOPE_ROLE_MAPPING){
+        const scopeRole = window.SCOPE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]]
+        return (scopeRole || window.USER_ROLE) === 'ADMIN'
+      }
+      return window.USER_ROLE === 'ADMIN'
     }
 }
 
