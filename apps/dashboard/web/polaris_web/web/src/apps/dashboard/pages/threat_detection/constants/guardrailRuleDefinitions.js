@@ -582,6 +582,34 @@ This event means the guardrail **successfully protected** the data - the sensiti
 `
     },
 
+    // ─── Overpowered Agent ──────────────────────────────────────────────────────
+    {
+        prefixes: ["OverpoweredAgent", "overpowered_agent", "Overpowered Agent", "ExcessiveAgency", "excessive_agency"],
+        heading: "Overpowered Agent Detected",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "The agent has standing access to a high-risk tool (destructive, financial, or otherwise irreversible) that has never actually been invoked in observed traffic. The capability is provisioned but unused - pure exposure with no offsetting business value."
+            },
+            {
+                heading: "Why is it dangerous?",
+                body: "An unused, high-risk tool is a standing liability rather than a working feature: it still counts as attack surface for prompt injection, compromised credentials, or a model that decides on its own to call it, but there's no legitimate traffic pattern to distinguish an authorised call from an abusive one. The broader the agent's permissions relative to its actual task, the larger the blast radius of a single manipulated turn."
+            }
+        ],
+        remediation: `## What to do
+
+### Immediate
+- Confirm the tool is genuinely unused by checking traffic/audit logs over a representative window (not just the sample that triggered this alert).
+- Identify who registered this tool for the agent and why - most "unused high-risk tool" cases trace back to a broad default toolset rather than a deliberate decision.
+
+### Structural fixes
+1. **Apply least privilege** - grant only the tools the agent's task actually requires. Remove this tool from the agent's toolset if it serves no purpose the agent needs.
+2. **Require human-in-the-loop for high-risk tools** - if the tool must stay available for occasional legitimate use, add an approval step before execution instead of leaving it directly callable.
+3. **Re-review the toolset periodically** - as agents and their prompts evolve, tools that were once needed can become dead weight. Treat an unused high-risk tool the same as an unused IAM permission: revoke it.
+4. **Log all tool invocations** - so the next review can tell "unused" from "used but not yet sampled" with confidence.
+`
+    },
+
     // ─── MCP Server Not in Allowed List ────────────────────────────────────────
     {
         prefixes: ["McpServerNotInAllowedList", "McpServer", "mcp_server"],
