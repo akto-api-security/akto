@@ -343,10 +343,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             // these alongside the username-deduped row, never instead of it — see
             // ModuleInfoAction#fetchAgenticUsers — so the person is still targetable across all orgs.
             if (orgUuidFromUserId(u.userId)) {
-                // Shown as email_orgName_orgType for readability; the submitted/stored value stays
+                // Shown as email-orgName__orgType for readability; the submitted/stored value stays
                 // the raw userId (email_orgUuid) the validator matches on — see orgUuidFromUserId.
                 const label = (u.userEmail && u.organizationName && u.organizationType)
-                    ? `${u.userEmail}_${u.organizationName}_${u.organizationType}`
+                    ? `${u.userEmail}-${u.organizationName}__${u.organizationType}`
                     : u.userId;
                 options.push({ label, value: u.userId });
                 return;
