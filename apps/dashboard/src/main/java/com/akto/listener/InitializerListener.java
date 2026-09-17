@@ -233,6 +233,7 @@ import com.akto.utils.crons.AgentBasePromptDetectionCron;
 import com.akto.utils.jobs.ApiInfoBackfillJob;
 import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
+import com.akto.utils.jobs.DiscoveredTimestampBackfillJob;
 import com.akto.utils.jobs.JobUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -2758,6 +2759,7 @@ public class InitializerListener implements ServletContextListener {
                     syncCronInfo.setUpMcpMaliciousnessCronScheduler();
                     setUpGuardrailServiceUrlLatencyScheduler();
                     ApiInfoBackfillJob.apiInfoBackfillScheduler();
+                    DiscoveredTimestampBackfillJob.discoveredTimestampBackfillScheduler();
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
 //                        crons.insertHistoricalDataJob();
