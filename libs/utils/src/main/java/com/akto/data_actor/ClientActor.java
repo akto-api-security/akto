@@ -48,7 +48,6 @@ import com.akto.util.Constants;
 import com.akto.util.SecretUtils;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.akto.dto.claude_identity.ClaudeDesktopInfo;
@@ -1658,17 +1657,26 @@ public class ClientActor extends DataActor {
 
     // testing queries
 
+    // ObjectId fields (id, testingRunId) don't survive a Struts2 JSON response -> plain Jackson round
+    // trip intact: Struts2 bean-introspects ObjectId into {"timestamp":N,"date":"..."}, and Jackson
+    // can't bind that shape back onto an ObjectId field, so it silently constructs a brand-new,
+    // unrelated one via ObjectId's no-arg constructor instead of throwing or leaving it null. Strip
+    // the raw field before Jackson sees it, then rebuild it from the plain-String hex mirror field
+    // (hexId/testingRunHexId), which round-trips correctly.
+    private TestingRunResultSummary parseTestingRunResultSummary(BasicDBObject raw) throws Exception {
+        if (raw == null) return null;
+        raw.remove("id");
+        raw.remove("testingRunId");
+        TestingRunResultSummary res = objectMapper.readValue(raw.toJson(), TestingRunResultSummary.class);
+        res.setId(new ObjectId(raw.getString("hexId")));
+        res.setTestingRunId(new ObjectId(raw.getString("testingRunHexId")));
+        return res;
+    }
+
     private TestingRunResultSummary parseTestingRunResultSummaryFromResponsePayload(String responsePayload) {
         try {
             BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
-            BasicDBObject testingRunResultSummary = (BasicDBObject) payloadObj.get("trrs");
-            if (testingRunResultSummary == null) return null;
-            testingRunResultSummary.remove("id");
-            testingRunResultSummary.remove("testingRunId");
-            TestingRunResultSummary res = objectMapper.readValue(testingRunResultSummary.toJson(), TestingRunResultSummary.class);
-            res.setId(new ObjectId(testingRunResultSummary.getString("hexId")));
-            res.setTestingRunId(new ObjectId(testingRunResultSummary.getString("testingRunHexId")));
-            return res;
+            return parseTestingRunResultSummary((BasicDBObject) payloadObj.get("trrs"));
         } catch (Exception e) {
             return null;
         }
@@ -2053,11 +2061,10 @@ public class ClientActor extends DataActor {
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
                 BasicDBObject testingRunResultSummaryMap = (BasicDBObject) payloadObj.get("testingRunResultSummaryMap");
-                Map<String, TestingRunResultSummary> rawMap = objectMapper.readValue(testingRunResultSummaryMap.toJson(),
-                        new TypeReference<Map<String, TestingRunResultSummary>>() {});
                 Map<ObjectId, TestingRunResultSummary> summaryMap = new HashMap<>();
-                for (Map.Entry<String, TestingRunResultSummary> entry : rawMap.entrySet()) {
-                    summaryMap.put(new ObjectId(entry.getKey()), entry.getValue());
+                for (String key : testingRunResultSummaryMap.keySet()) {
+                    BasicDBObject rawSummary = (BasicDBObject) testingRunResultSummaryMap.get(key);
+                    summaryMap.put(new ObjectId(key), parseTestingRunResultSummary(rawSummary));
                 }
                 return summaryMap;
             } catch(Exception e) {
