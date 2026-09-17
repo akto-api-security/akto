@@ -113,9 +113,12 @@ export function PluginAgentCellRenderer({ value }) {
     );
 }
 
-export function RiskScoreCellRenderer({ value }) {
+export function RiskScoreCellRenderer({ value, data }) {
     if (value == null) return null;
-    return <RiskPill score={value} />;
+    // Same hover-explanation tooltip Atlas shows on its risk badges (transform.wrapRiskScoreTooltip)
+    // - baseRiskScore/baseRiskScoreReason are already on every row (AgenticObserveAction's
+    // GroupSummary.toSummaryResponse), just weren't wired up here yet.
+    return observeFunc.wrapRiskScoreTooltip(<RiskPill score={value} />, value, data?.baseRiskScore, data?.baseRiskScoreReason);
 }
 
 export function ViolationsCellRenderer({ value }) {
