@@ -50,7 +50,7 @@ public class AgentBaseRiskScoreCron {
     private static final int CONCURRENCY = 1;
 
     private static final java.util.Set<Integer> ALLOWED_ACCOUNT_IDS = new java.util.HashSet<>(
-        java.util.Arrays.asList(1_783_981_503, 1_000_000)
+        java.util.Arrays.asList(1_786_332_101, 1_783_981_503, 1_000_000)
     );
 
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
