@@ -658,6 +658,8 @@ public class ModuleInfoAction extends UserAction {
         copy.setUserId(u.getUserId());
         copy.setLastUpdatedAt(u.getLastUpdatedAt());
         copy.setLastUpdatedBy(u.getLastUpdatedBy());
+        copy.setOrganizationName(u.getOrganizationName());
+        copy.setOrganizationType(u.getOrganizationType());
         copy.setDevices(u.getDevices() == null ? new ArrayList<>() : new ArrayList<>(u.getDevices()));
         copy.setDeviceTags(u.getDeviceTags() == null ? null : new ArrayList<>(u.getDeviceTags()));
         return copy;

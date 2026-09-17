@@ -19,6 +19,8 @@ public class AgenticUsers {
     public static final String USER_ID = "userId";
     public static final String LAST_UPDATED_AT = "lastUpdatedAt";
     public static final String LAST_UPDATED_BY = "lastUpdatedBy";
+    public static final String ORGANIZATION_NAME = "organizationName";
+    public static final String ORGANIZATION_TYPE = "organizationType";
 
     public static final String DEVICE_TAGS = "deviceTags";
 
@@ -31,6 +33,11 @@ public class AgenticUsers {
     private int lastUpdatedAt;
     private String lastUpdatedBy;
     private List<String> devices;
+    // Display-only, populated for org-scoped rows (e.g. a Claude login); never part of userId,
+    // which stays <email>_<orgUuid> for storage/matching. Used to render a friendlier label
+    // (email_orgName_orgType) in the guardrail policy Users picker.
+    private String organizationName;
+    private String organizationType;
 
     // Generic key-value tags (team, role, department, arbitrary Okta groups, ...).
     private List<DeviceTag> deviceTags;
