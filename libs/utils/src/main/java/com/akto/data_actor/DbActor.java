@@ -310,7 +310,7 @@ public class DbActor extends DataActor {
         return DbLayer.findPendingTestingRun(delta);
     }
 
-    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
+    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName, String leaseToken, int leaseSeconds) {
         return DbLayer.findPendingTestingRunResultSummary(now, delta);
     }
 
@@ -498,7 +498,7 @@ public class DbActor extends DataActor {
     }
 
     // mini-testing always talks to DB via cyborg (ClientActor); direct-Mongo path intentionally unimplemented.
-    public void bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed) {
+    public LeaseStatus bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed, String leaseToken, int leaseSeconds) {
         throw new UnsupportedOperationException("bulkRecordTestingRunResults is not supported via DbActor");
     }
 
@@ -559,8 +559,14 @@ public class DbActor extends DataActor {
         DbLayer.updateTestInitiatedCountInTestSummary(summaryId, testInitiatedCount);
     }
 
-    public void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount) {
+    public LeaseStatus updateTestResultsCountInTestSummary(String summaryId, int testResultsCount, String leaseToken, int leaseSeconds) {
         DbLayer.updateTestResultsCountInTestSummary(summaryId, testResultsCount);
+        // direct-mongo path is single-process by definition, so there is no lease to lose
+        return LeaseStatus.APPLIED;
+    }
+
+    public LeaseStatus markProducerDone(String summaryId, String leaseToken) {
+        return LeaseStatus.APPLIED;
     }
 
     public void updateTestRunResultSummary(String summaryId) {

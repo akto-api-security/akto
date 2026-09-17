@@ -1797,12 +1797,14 @@ public class ClientActor extends DataActor {
         return codec.decode(bsonReader, DecoderContext.builder().build());
     }
 
-    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
+    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName, String leaseToken, int leaseSeconds) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("now", now);
         obj.put("delta", delta);
         obj.put("miniTestingName", miniTestingName);
+        obj.put("leaseToken", leaseToken);
+        obj.put("leaseSeconds", leaseSeconds);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findPendingTestingRunResultSummary", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -2553,22 +2555,71 @@ public class ClientActor extends DataActor {
         return templates;
     }
 
-    public void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount) {
+    /**
+     * Doubles as the lease renewal - the server extends leaseExpiryTs in the same write that
+     * increments the count, which is why leasing needs no separate heartbeat.
+     */
+    public LeaseStatus updateTestResultsCountInTestSummary(String summaryId, int testResultsCount, String leaseToken, int leaseSeconds) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("summaryId", summaryId);
         obj.put("testResultsCount", testResultsCount);
+        obj.put("leaseToken", leaseToken);
+        obj.put("leaseSeconds", leaseSeconds);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestResultsCountInTestSummary", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
+            String responsePayload = response == null ? null : response.getBody();
+            if (response == null || response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in updateTestResultsCountInTestSummary", LoggerMaker.LogDb.RUNTIME);
-                return;
+                return LeaseStatus.UNKNOWN;
             }
+            return parseLeaseStatus(responsePayload, "updateTestResultsCountInTestSummary");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in updateTestResultsCountInTestSummary" + e, LoggerMaker.LogDb.RUNTIME);
-            return;
+            return LeaseStatus.UNKNOWN;
+        }
+    }
+
+    /**
+     * Reads the leaseHeld flag the abstractor carries in the response body. It is deliberately not
+     * an HTTP status: a lost lease is a domain outcome, and treating a non-2xx as one would make a
+     * sick abstractor indistinguishable from a real takeover.
+     *
+     * An old abstractor that does not send the flag yields APPLIED, which keeps a new client
+     * working against it exactly as it works today.
+     */
+    private LeaseStatus parseLeaseStatus(String responsePayload, String caller) {
+        try {
+            BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+            Object leaseHeld = payloadObj.get("leaseHeld");
+            if (leaseHeld == null) {
+                return LeaseStatus.APPLIED;
+            }
+            return Boolean.parseBoolean(leaseHeld.toString()) ? LeaseStatus.APPLIED : LeaseStatus.REJECTED;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error parsing leaseHeld in " + caller + ": " + e, LoggerMaker.LogDb.RUNTIME);
+            return LeaseStatus.UNKNOWN;
+        }
+    }
+
+    public LeaseStatus markProducerDone(String summaryId, String leaseToken) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("summaryId", summaryId);
+        obj.put("leaseToken", leaseToken);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/markProducerDone", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response == null ? null : response.getBody();
+            if (response == null || response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in markProducerDone", LoggerMaker.LogDb.TESTING);
+                return LeaseStatus.UNKNOWN;
+            }
+            return parseLeaseStatus(responsePayload, "markProducerDone");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in markProducerDone" + e, LoggerMaker.LogDb.TESTING);
+            return LeaseStatus.UNKNOWN;
         }
     }
 
@@ -2639,28 +2690,31 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed) {
+    public LeaseStatus bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed, String leaseToken, int leaseSeconds) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunResultsForRecord", testingRunResults);
         obj.put("rerunDeleteIds", rerunDeleteIds);
         obj.put("doNotMarkIssuesAsFixed", doNotMarkIssuesAsFixed);
+        obj.put("leaseToken", leaseToken);
+        obj.put("leaseSeconds", leaseSeconds);
         String objString = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkRecordTestingRunResults", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             if (response == null) {
                 loggerMaker.errorAndAddToDb("null response (all retries failed) in bulkRecordTestingRunResults", LoggerMaker.LogDb.TESTING);
-                return;
+                return LeaseStatus.UNKNOWN;
             }
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in bulkRecordTestingRunResults: status=" + response.getStatusCode() + " body=" + responsePayload, LoggerMaker.LogDb.TESTING);
-                return;
+                return LeaseStatus.UNKNOWN;
             }
+            return parseLeaseStatus(responsePayload, "bulkRecordTestingRunResults");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in bulkRecordTestingRunResults" + e, LoggerMaker.LogDb.TESTING);
-            return;
+            return LeaseStatus.UNKNOWN;
         }
     }
 

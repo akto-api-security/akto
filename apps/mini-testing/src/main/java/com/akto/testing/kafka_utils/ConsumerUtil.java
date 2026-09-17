@@ -37,6 +37,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.execution.TestPhaseTimer;
 import com.akto.testing.TestExecutor;
+import com.akto.testing.TestingLease;
 import com.akto.testing.Utils;
 import com.akto.testing.kafka_utils.TestRunMetrics.Stage;
 import com.akto.util.Constants;
@@ -239,13 +240,15 @@ public class ConsumerUtil {
         }
     }
 
-    public void init(int maxRunTimeInSeconds) {
-        BasicDBObject currentTestInfo = TestingStateStore.read();
-        final String summaryIdForTest = currentTestInfo != null
-                ? currentTestInfo.getString(TestingStateStore.SUMMARY_ID)
-                : null;
+    /**
+     * @param summaryIdForTest the attempt being drained - supplied by the caller now rather than
+     *                         read back from a file, which is what lets a different pod resume it
+     * @param pickedUpTimestamp when the attempt started, so a resumed drain inherits the original
+     *                          deadline instead of restarting the clock
+     */
+    public void init(int maxRunTimeInSeconds, String summaryIdForTest, int pickedUpTimestamp) {
         if (summaryIdForTest == null) {
-            loggerMaker.errorAndAddToDb("No testing state available, skipping consumer init.");
+            loggerMaker.errorAndAddToDb("No summary id supplied, skipping consumer init.");
             return;
         }
 
@@ -255,35 +258,25 @@ public class ConsumerUtil {
         executor = Executors.newFixedThreadPool(concurrency, workerThreadFactory);
 
         final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
-        int startTime = Context.now();
+        int startTime = pickedUpTimestamp > 0 ? pickedUpTimestamp : Context.now();
         int effectiveMaxRunTime = maxRunTimeInSeconds;
-        if (currentTestInfo.containsField(TestingRun.PICKED_UP_TIMESTAMP)) {
-            startTime = currentTestInfo.getInt(TestingRun.PICKED_UP_TIMESTAMP, startTime);
-        }
-        if (currentTestInfo.containsField(TestingStateStore.TEST_RUN_MAX_TIME_SECONDS)) {
-            effectiveMaxRunTime = currentTestInfo.getInt(TestingStateStore.TEST_RUN_MAX_TIME_SECONDS, maxRunTimeInSeconds);
-        }
-        final int expectedRecords = currentTestInfo.containsField(TestingStateStore.EXPECTED_RECORDS)
-                ? currentTestInfo.getInt(TestingStateStore.EXPECTED_RECORDS)
-                : -1;
-        final int accountId = currentTestInfo.containsField(TestingStateStore.ACCOUNT_ID)
-                ? currentTestInfo.getInt(TestingStateStore.ACCOUNT_ID)
-                : (Context.accountId.get() != null ? Context.accountId.get() : -1);
-        if (accountId > 0) {
-            Context.accountId.set(accountId);
-        }
+        final int accountId = Context.accountId.get() != null ? Context.accountId.get() : -1;
+        final String topicName = Constants.getTestResultsTopicName(summaryIdForTest);
+        final String groupId = Constants.getKafkaGroupIdConfig(summaryIdForTest);
         AtomicBoolean firstRecordRead = new AtomicBoolean(false);
         AtomicInteger processedRecords = new AtomicInteger(0);
 
         // Fresh observability for this run (replaces any previous run's state).
-        metrics = new TestRunMetrics(summaryIdForTest, startTime, expectedRecords, executor);
+        metrics = new TestRunMetrics(summaryIdForTest, startTime, -1, executor);
         int apiCount = (instance.getTestingUtil() != null && instance.getTestingUtil().getSampleMessages() != null)
                 ? instance.getTestingUtil().getSampleMessages().size() : -1;
         int testCount = instance.getTestConfigMap() != null ? instance.getTestConfigMap().size() : -1;
         metrics.logStart(accountId, apiCount, testCount, concurrency,
                 maxRunTimeForTests, effectiveMaxRunTime);
 
-        boolean isConsumerRunning = currentTestInfo.getBoolean(TestingStateStore.CONSUMER_RUNNING, false);
+        // reaching init() at all means production is done for this attempt - the caller checks
+        // producerDone before getting here, so there is no separate in-band flag to consult
+        boolean isConsumerRunning = true;
 
         ParallelStreamProcessor<String, String> parallelConsumer = null;
 
@@ -421,32 +414,51 @@ public class ConsumerUtil {
                 long workRemaining = parallelConsumer.workRemaining();
                 metrics.tick(processed, workRemaining);
 
-                boolean locallyEmpty = firstRecordRead.get() && workRemaining == 0;
-                    if (locallyEmpty) {
-                        if (expectedRecords > 0 && processed >= expectedRecords) {
-                            stopReason = TestRunMetrics.StopReason.ALL_PROCESSED;
-                            int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
-                            shutdownExecutorQuietly(Math.min(remainingTime, 5), true);
-                            break;
-                        }
-
-                        if (drainIdleSinceMs < 0) {
-                            drainIdleSinceMs = nowMs;
-                        } else if (nowMs - drainIdleSinceMs >= DRAIN_IDLE_GRACE_MS) {
-                            if (expectedRecords > 0 && processed < expectedRecords) {
-                                stopReason = TestRunMetrics.StopReason.IDLE_RESTART;
-                                metrics.logRestart(DRAIN_IDLE_GRACE_MS, processed, workRemaining);
-                                restartConsumer = true;
-                                break;
-                            }
-                            stopReason = TestRunMetrics.StopReason.IDLE_COMPLETE;
-                            int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
-                            shutdownExecutorQuietly(Math.min(remainingTime, 5), true);
-                            break;
-                        }
-                    } else {
-                        drainIdleSinceMs = -1L;
+                /*
+                 * Completion is decided by kafka, not by counting locally. The old check compared
+                 * processedRecords - which restarts at zero on every init() - against a total that
+                 * does not, so a resumed drain could never satisfy it and simply spun until max
+                 * runtime. Lag is absolute: whoever produced the messages and whoever consumed
+                 * them, zero means every record has been processed and committed.
+                 */
+                boolean locallyEmpty = workRemaining == 0;
+                if (locallyEmpty) {
+                    long lag = Producer.getConsumerLag(topicName, groupId);
+                    if (lag == 0) {
+                        stopReason = TestRunMetrics.StopReason.ALL_PROCESSED;
+                        int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
+                        shutdownExecutorQuietly(Math.min(remainingTime, 5), true);
+                        break;
                     }
+
+                    if (drainIdleSinceMs < 0) {
+                        drainIdleSinceMs = nowMs;
+                    } else if (nowMs - drainIdleSinceMs >= DRAIN_IDLE_GRACE_MS) {
+                        if (lag > 0) {
+                            // work is still outstanding but none is arriving - re-subscribe
+                            stopReason = TestRunMetrics.StopReason.IDLE_RESTART;
+                            metrics.logRestart(DRAIN_IDLE_GRACE_MS, processed, workRemaining);
+                            restartConsumer = true;
+                            break;
+                        }
+                        // lag unreadable (-1) for a full idle grace: stop rather than spin, but
+                        // never treat unreadable as zero - a broker hiccup is not completion
+                        stopReason = TestRunMetrics.StopReason.IDLE_COMPLETE;
+                        int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
+                        shutdownExecutorQuietly(Math.min(remainingTime, 5), true);
+                        break;
+                    }
+                } else {
+                    drainIdleSinceMs = -1L;
+                }
+
+                if (TestingLease.getInstance().isLost()) {
+                    stopReason = TestRunMetrics.StopReason.LEASE_LOST;
+                    loggerMaker.errorAndAddToDb("Lease lost while draining summary " + summaryIdForTest
+                            + "; another module owns it now. Stopping without touching its topic.");
+                    executor.shutdownNow();
+                    break;
+                }
                     Thread.sleep(100);
                 }
             }
@@ -457,7 +469,6 @@ public class ConsumerUtil {
             String errMsg = "Error in polling records summaryId=" + summaryIdForTest
                     + " polled=" + metrics.polled()
                     + " executed=" + processedRecords.get()
-                    + " expected=" + expectedRecords
                     + " errorType=" + e.getClass().getName()
                     + " cause=" + (e.getCause() != null ? e.getCause().getClass().getName() + ": " + e.getCause().getMessage() : e.getMessage());
             loggerMaker.errorAndAddToDb(e, errMsg);
@@ -487,8 +498,18 @@ public class ConsumerUtil {
                     loggerMaker.errorAndAddToDb(e,"Error closing kafka consumer: " + e.getMessage());
                 }
             }
-            Producer.deleteTestResultsTopic(summaryIdForTest);
-            TestingStateStore.clear();
+            /*
+             * Only the current owner may destroy the work set. A pod that stalled long enough to
+             * lose its lease can wake up inside this block while the new owner is mid-drain, and
+             * deleting the topic there would take the run down with it - the very failure the
+             * lease exists to prevent, arriving through the cleanup path instead of the work path.
+             */
+            if (stopReason == TestRunMetrics.StopReason.LEASE_LOST || TestingLease.getInstance().isLost()) {
+                loggerMaker.errorAndAddToDb("Not deleting topic for summary " + summaryIdForTest
+                        + ": lease no longer held.");
+            } else {
+                Producer.deleteTestResultsTopic(summaryIdForTest);
+            }
         }
     }
 }

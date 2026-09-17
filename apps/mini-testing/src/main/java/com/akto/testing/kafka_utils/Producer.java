@@ -1,7 +1,9 @@
 package com.akto.testing.kafka_utils;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -9,9 +11,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.DeleteTopicsResult;
+import org.apache.kafka.clients.admin.ListOffsetsResult;
 import org.apache.kafka.clients.admin.ListTopicsResult;
+import org.apache.kafka.clients.admin.OffsetSpec;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
 import org.bson.types.ObjectId;
 
 import com.akto.dao.context.Context;
@@ -153,6 +159,57 @@ public class Producer {
                     new IllegalStateException("Missing Kafka username/password"));
         }
         return adminProps;
+    }
+
+    /**
+     * Messages produced to this attempt's topic that its consumer group has not yet committed.
+     *
+     * This is what tells a resumed process that the run is finished. The in-process counter it
+     * replaces starts at zero on every init(), so after a restart it can never reach the expected
+     * total however much work is genuinely left; lag is absolute rather than a delta from process
+     * start, so a fresh process reads the same truth as the one that died.
+     *
+     * A committed offset here means the test actually ran: the parallel consumer only advances an
+     * offset once the record's handler has returned, and the handler blocks on the test future.
+     *
+     * @return the lag, or -1 when it cannot be determined - callers must treat that as "unknown",
+     *         never as zero, or a broker hiccup would look like completion.
+     */
+    public static long getConsumerLag(String topicName, String groupId) {
+        try {
+            Properties adminProps = buildAdminProperties(Constants.LOCAL_KAFKA_BROKER_URL);
+            try (AdminClient adminClient = AdminClient.create(adminProps)) {
+                Map<TopicPartition, OffsetAndMetadata> committed = adminClient
+                        .listConsumerGroupOffsets(groupId)
+                        .partitionsToOffsetAndMetadata()
+                        .get(10, java.util.concurrent.TimeUnit.SECONDS);
+
+                Map<TopicPartition, OffsetSpec> endSpecs = new HashMap<>();
+                for (TopicPartition tp : committed.keySet()) {
+                    if (topicName.equals(tp.topic())) {
+                        endSpecs.put(tp, OffsetSpec.latest());
+                    }
+                }
+                if (endSpecs.isEmpty()) {
+                    // group has committed nothing for this topic yet - not the same as drained
+                    return -1;
+                }
+
+                Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> endOffsets = adminClient
+                        .listOffsets(endSpecs).all().get(10, java.util.concurrent.TimeUnit.SECONDS);
+
+                long lag = 0;
+                for (Map.Entry<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> entry : endOffsets.entrySet()) {
+                    OffsetAndMetadata offsetAndMetadata = committed.get(entry.getKey());
+                    long committedOffset = offsetAndMetadata == null ? 0 : offsetAndMetadata.offset();
+                    lag += Math.max(0, entry.getValue().offset() - committedOffset);
+                }
+                return lag;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error reading consumer lag for topic " + topicName + " group " + groupId);
+            return -1;
+        }
     }
 
     private static void deleteTopic(String bootstrapServers, String topicName) 

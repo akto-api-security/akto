@@ -6,6 +6,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.data_actor.LeaseStatus;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -56,7 +57,6 @@ import com.mongodb.BasicDBList;
 import static com.akto.test_editor.execution.Build.modifyRequest;
 import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.testing.kafka_utils.Producer;
-import com.akto.testing.kafka_utils.TestingStateStore;
 import com.akto.dto.testing.info.SingleTestPayload;
 
 import org.apache.commons.lang3.StringUtils;
@@ -266,15 +266,7 @@ public class TestExecutor {
         // write producer running here as producer has been initiated now
         int accountId = Context.accountId.get();
 
-        BasicDBObject dbObject = new BasicDBObject();
-        if(!shouldInitOnly && Constants.IS_NEW_TESTING_ENABLED){
-            dbObject.put(TestingStateStore.PRODUCER_RUNNING, true);
-            dbObject.put(TestingStateStore.CONSUMER_RUNNING, false);
-            dbObject.put(TestingStateStore.ACCOUNT_ID, accountId);
-            dbObject.put(TestingStateStore.SUMMARY_ID, summaryId.toHexString());
-            dbObject.put(TestingStateStore.TESTING_RUN_ID, testingRun.getId().toHexString());
-            TestingStateStore.update(dbObject);
-        }
+
 
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
@@ -476,6 +468,16 @@ public class TestExecutor {
                 if (Constants.IS_NEW_TESTING_ENABLED && !shouldContinueTestExecution(summaryId)) {
                     break;
                 }
+                /*
+                 * Fan-out produces no results, so this is the only thing keeping the lease alive
+                 * across it. Without it a long fan-out would lapse and another module would
+                 * reclaim a run that is actively being produced.
+                 */
+                TestingLease.getInstance().renewIfDue(summaryId.toHexString());
+                if (TestingLease.getInstance().isLost()) {
+                    loggerMaker.errorAndAddToDb("Lost lease during kafka production, abandoning fan-out for summary " + summaryId.toHexString());
+                    break;
+                }
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
                 if (messages == null || messages.isEmpty()) {
                     countDownLatch(latch);
@@ -560,7 +562,6 @@ public class TestExecutor {
                     if (!shouldContinueTestExecution(summaryId)) {
                         loggerMaker.infoAndAddToDb("Test run time expired during Kafka production; deleting topic and skipping consumer.");
                         Producer.deleteTestResultsTopic(summaryId.toHexString());
-                        TestingStateStore.clear();
                     } else if (unsentRecords == totalRecords.get()) {
                         // Check producer status
                         loggerMaker.infoAndAddToDb("Producer status: " + Producer.getProducerStatus());
@@ -577,15 +578,27 @@ public class TestExecutor {
                         loggerMaker.infoAndAddToDb("All records sent successfully to Kafka");
                         
                         // Normal Kafka completion - start consumer
-                        dbObject.put(TestingStateStore.PRODUCER_RUNNING, false);
-                        dbObject.put(TestingStateStore.CONSUMER_RUNNING, true);
-                        dbObject.put(TestingRun.PICKED_UP_TIMESTAMP, runPickedUp);
-                        dbObject.put(TestingStateStore.TEST_RUN_MAX_TIME_SECONDS, runMaxSec);
-                        // Successfully sent = total - still-throttled/unacked. Consumer waits for this many.
+                        /*
+                         * The commit point of the whole attempt. Before this flag lands the message
+                         * set in kafka is indistinguishable from a partial one, so any pod picking
+                         * the summary up must re-produce from scratch; after it, the set is known
+                         * complete and consumption can be resumed instead. Consumption has not
+                         * started yet at this point, so a crash on either side of the write is
+                         * safe - the worst case is a finished fan-out being redone.
+                         *
+                         * Deliberately non-fatal: a failed write costs resumability, not the run,
+                         * which is the same trade the local file made before it.
+                         */
                         int expectedRecords = Math.max(0, totalRecords.get() - unsentRecords);
-                        dbObject.put(TestingStateStore.EXPECTED_RECORDS, expectedRecords);
-                        loggerMaker.insertImportantTestingLog("Writing expectedRecords=" + expectedRecords + " for consumer completion check");
-                        TestingStateStore.update(dbObject);
+                        loggerMaker.insertImportantTestingLog("Kafka production complete, marking producerDone. records=" + expectedRecords);
+                        LeaseStatus producerDoneStatus = dataActor.markProducerDone(summaryId.toHexString(),
+                                TestingLease.getInstance().getToken());
+                        TestingLease.getInstance().record(producerDoneStatus);
+                        if (producerDoneStatus != LeaseStatus.APPLIED) {
+                            loggerMaker.errorAndAddToDb("Could not mark producerDone (" + producerDoneStatus
+                                    + ") for summary " + summaryId.toHexString()
+                                    + "; the run continues but cannot be resumed if this module restarts.");
+                        }
 
                     }
                 }
@@ -1069,7 +1082,9 @@ public class TestExecutor {
             ObjectId testRunResultSummaryId, int resultSize) {
         dataActor.insertTestingRunResults(trr);
         loggerMaker.infoAndAddToDb("Inserted testing results");
-        dataActor.updateTestResultsCountInTestSummary(testRunResultSummaryId.toHexString(), resultSize);
+        TestingLease.getInstance().record(dataActor.updateTestResultsCountInTestSummary(
+                testRunResultSummaryId.toHexString(), resultSize,
+                TestingLease.getInstance().getToken(), TestingLease.LEASE_SECONDS));
         loggerMaker.infoAndAddToDb("Updated count in summary");
 
         TestingIssuesHandler handler = new TestingIssuesHandler();
@@ -1089,8 +1104,12 @@ public class TestExecutor {
         if (originalTestingRunResultForRerun != null) {
             rerunDeleteIds.add(originalTestingRunResultForRerun.getHexId());
         }
-        dataActor.bulkRecordTestingRunResults(Collections.singletonList(trr), rerunDeleteIds,
-                TestingConfigurations.getInstance().getDoNotMarkIssuesAsFixed());
+        // the server updates the result count inside this call, and renews the lease in that same
+        // write - so the bulk path is fenced and renewed exactly like the legacy one
+        TestingLease.getInstance().record(dataActor.bulkRecordTestingRunResults(
+                Collections.singletonList(trr), rerunDeleteIds,
+                TestingConfigurations.getInstance().getDoNotMarkIssuesAsFixed(),
+                TestingLease.getInstance().getToken(), TestingLease.LEASE_SECONDS));
         loggerMaker.infoAndAddToDb("Recorded testing run result via bulk API");
     }
 

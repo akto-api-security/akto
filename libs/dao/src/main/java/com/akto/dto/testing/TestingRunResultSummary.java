@@ -17,6 +17,9 @@ public class TestingRunResultSummary {
     public static final String TEST_RESULTS_COUNT = "testResultsCount";
     public static final String METADATA_STRING = "metadata";
     public static final String TESTS_INITIATED_COUNT = "testInitiatedCount";
+    public static final String PRODUCER_DONE = "producerDone";
+    public static final String LEASE_EXPIRY_TS = "leaseExpiryTs";
+    public static final String LEASE_TOKEN = "leaseToken";
 
     private ObjectId id;
     private int startTimestamp;
@@ -32,6 +35,21 @@ public class TestingRunResultSummary {
     private int testInitiatedCount;
 
     private int testIdConfig;
+
+    /*
+     * Set once the producer has written every message for this attempt to kafka. Until then the
+     * message set is partial, so a module picking this summary up must re-produce rather than
+     * resume consuming.
+     */
+    private boolean producerDone;
+
+    /*
+     * Ownership lease. leaseToken is minted per claim, not per pod, so a module that restarts and
+     * re-claims fences out its own previous threads. leaseExpiryTs is what lets another module
+     * take over an attempt whose owner died.
+     */
+    private int leaseExpiryTs;
+    private String leaseToken;
     /*
      * originalTestingRunResultSummaryId this will be used to trigger running testingRunResults
      *
@@ -200,5 +218,29 @@ public class TestingRunResultSummary {
 
     public void setOriginalTestingRunResultSummaryHexId(String originalTestingRunResultSummaryHexId) {
         this.originalTestingRunResultSummaryHexId = originalTestingRunResultSummaryHexId;
+    }
+
+    public boolean getProducerDone() {
+        return producerDone;
+    }
+
+    public void setProducerDone(boolean producerDone) {
+        this.producerDone = producerDone;
+    }
+
+    public int getLeaseExpiryTs() {
+        return leaseExpiryTs;
+    }
+
+    public void setLeaseExpiryTs(int leaseExpiryTs) {
+        this.leaseExpiryTs = leaseExpiryTs;
+    }
+
+    public String getLeaseToken() {
+        return leaseToken;
+    }
+
+    public void setLeaseToken(String leaseToken) {
+        this.leaseToken = leaseToken;
     }
 }
