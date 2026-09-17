@@ -126,12 +126,27 @@ func TestUpgradeBrowserAttachmentVerdict(t *testing.T) {
 			wantReason:    browserAttachmentBlockReason,
 		},
 		{
-			name:          "alert upgraded to block",
+			// Detection under an alert policy keeps its verdict: nothing was rewritten, so
+			// there is nothing the extension would fail to apply. The caller reads the
+			// passive behaviour and lets the request through, the same answer a file gets
+			// from chunkStopsFile.
+			name:          "alert detection left alone",
 			in:            &mcp.ValidationResult{Allowed: false, Behaviour: "alert", Reason: "PII detected"},
 			tag:           browserExtensionTag,
 			wantAllowed:   false,
-			wantBehaviour: "block",
+			wantBehaviour: "alert",
 			wantReason:    "PII detected",
+		},
+		{
+			// Redaction under the same alert policy still upgrades: ModifiedPayload is in
+			// the flattened shape the extension synthesised, so blocking is the only
+			// enforcement left. Modified is what separates this row from the one above.
+			name:          "alert redaction upgraded to block",
+			in:            &mcp.ValidationResult{Allowed: true, Modified: true, ModifiedPayload: "redacted", Behaviour: "alert"},
+			tag:           browserExtensionTag,
+			wantAllowed:   false,
+			wantBehaviour: "block",
+			wantReason:    browserAttachmentBlockReason,
 		},
 		{
 			name:          "existing block untouched",

@@ -100,6 +100,15 @@ func (s *Service) upgradeBrowserAttachmentVerdict(result *mcp.ValidationResult, 
 		return
 	}
 
+	// Detection under a passive behaviour has nothing that needs rewriting, and "record it
+	// and let it through" is enforceable on any payload shape — which is the whole reason
+	// this upgrade exists. Only an unapplicable redaction is upgraded, so an alert-only
+	// policy alerts on an attachment exactly as it does on a file (chunkStopsFile makes the
+	// same split for /api/validate/file).
+	if !result.Modified && IsPassiveBehaviour(result.Behaviour) {
+		return
+	}
+
 	if !s.carriesBrowserAttachment(params) {
 		return
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
+	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -278,24 +279,7 @@ func (h *ValidationHandler) chunkStopsFile(r *mcp.ValidationResult) bool {
 	if h.cfg.File.BlockOnRedaction && r.Modified {
 		return true
 	}
-	return !r.Allowed && !passiveVerdict(r.Behaviour)
-}
-
-// passiveVerdict reports whether a not-allowed verdict only asks to be recorded rather than
-// enforced. The engine reports the threat itself during validation, so allowing here loses
-// the upload's block, not its alert.
-//
-// Listed explicitly rather than derived from Behaviour.Enforces(): that predicate also ranks
-// "warn" and the approval behaviours below blocking, and neither is safe to wave through on
-// this endpoint. Everything unlisted — including an empty or unknown behaviour — keeps
-// blocking.
-func passiveVerdict(behaviour string) bool {
-	switch mcp.ParseBehaviour(behaviour) {
-	case mcp.BehaviourAlert, mcp.BehaviourMask:
-		return true
-	default:
-		return false
-	}
+	return !r.Allowed && !validator.IsPassiveBehaviour(r.Behaviour)
 }
 
 // chunkBlockReason describes why a chunk failed the upload. A masked chunk carries no
