@@ -53,8 +53,6 @@ public class AgentBaseRiskScoreCron {
         java.util.Arrays.asList(1_786_332_101, 1_783_981_503, 1_000_000)
     );
 
-    private static final int PRIORITY_ACCOUNT_ID = 1_786_332_101;
-
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void setUpAgentBaseRiskScoreCronScheduler() {
@@ -68,18 +66,7 @@ public class AgentBaseRiskScoreCron {
                 loggerMaker.debugAndAddToDb("Agent base risk score cron dibs not acquired, thus skipping cron");
                 return;
             }
-
-            Account priorityAccount = AccountsDao.instance.findOne(Filters.eq(Constants.ID, PRIORITY_ACCOUNT_ID));
-            if (priorityAccount != null) {
-                processAccount(priorityAccount);
-            }
-
-            AccountTask.instance.executeTask(account -> {
-                if (account.getId() == PRIORITY_ACCOUNT_ID) {
-                    return;
-                }
-                processAccount(account);
-            }, "agent-base-risk-score-cron");
+            AccountTask.instance.executeTask(this::processAccount, "agent-base-risk-score-cron");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in agent base risk score cron: " + e.getMessage());
         }
