@@ -453,6 +453,9 @@ public class DbAction extends ActionSupport {
     Map<String, Integer> totalCountIssues;
     int testInitiatedCount;
     int testResultsCount;
+    String leaseToken;
+    int leaseSeconds;
+    boolean leaseHeld;
     Map<String, String> metadata;
     Bson completedUpdate;
     int totalApiCount;
@@ -2233,7 +2236,7 @@ public class DbAction extends ActionSupport {
 
     public String findPendingTestingRunResultSummary() {
         try {
-            trrs = DbLayer.findPendingTestingRunResultSummary(now, delta, miniTestingName);
+            trrs = DbLayer.findPendingTestingRunResultSummary(now, delta, miniTestingName, leaseToken, leaseSeconds);
             if (trrs != null) {
                 trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
             }
@@ -2822,7 +2825,7 @@ public class DbAction extends ActionSupport {
             for (BasicDBObject raw : testingRunResultsForRecord) {
                 results.add(buildTestingRunResultFromPayload(raw));
             }
-            DbLayer.bulkRecordTestingRunResults(results, rerunDeleteIds, doNotMarkIssuesAsFixed);
+            leaseHeld = DbLayer.bulkRecordTestingRunResults(results, rerunDeleteIds, doNotMarkIssuesAsFixed, leaseToken, leaseSeconds);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in bulkRecordTestingRunResults " + e.toString());
             if (kafkaUtils.isWriteEnabled()) {
@@ -2990,9 +2993,25 @@ public class DbAction extends ActionSupport {
 
     public String updateTestResultsCountInTestSummary() {
         try {
-            DbLayer.updateTestResultsCountInTestSummary(summaryId, testResultsCount);
+            leaseHeld = DbLayer.updateTestResultsCountInTestSummary(summaryId, testResultsCount, leaseToken, leaseSeconds);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateTestResultsCountInTestSummary " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    /*
+     * leaseHeld is deliberately carried in the response body rather than signalled with a non-2xx.
+     * Losing a lease is a normal domain outcome, not a transport failure, and struts maps an action
+     * ERROR to 422 - a client cannot tell that apart from the abstractor being unwell, which is
+     * exactly the conflation that turned an earlier NPE here into an indefinitely stuck test run.
+     */
+    public String markProducerDone() {
+        try {
+            leaseHeld = DbLayer.markProducerDone(summaryId, leaseToken);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in markProducerDone " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -5386,6 +5405,30 @@ public class DbAction extends ActionSupport {
 
     public void setTestResultsCount(int testResultsCount) {
         this.testResultsCount = testResultsCount;
+    }
+
+    public String getLeaseToken() {
+        return leaseToken;
+    }
+
+    public void setLeaseToken(String leaseToken) {
+        this.leaseToken = leaseToken;
+    }
+
+    public int getLeaseSeconds() {
+        return leaseSeconds;
+    }
+
+    public void setLeaseSeconds(int leaseSeconds) {
+        this.leaseSeconds = leaseSeconds;
+    }
+
+    public boolean getLeaseHeld() {
+        return leaseHeld;
+    }
+
+    public void setLeaseHeld(boolean leaseHeld) {
+        this.leaseHeld = leaseHeld;
     }
 
     public Bson getCompletedUpdate() {
