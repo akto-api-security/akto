@@ -1,6 +1,6 @@
 import { VerticalStack, HorizontalStack, Text, FormLayout, Box, Checkbox, RadioButton, Popover, TextField, Link, Tag, Banner, Badge, Button, InlineError } from "@shopify/polaris";
 import { DeleteMinor } from "@shopify/polaris-icons";
-import { useState, useEffect, useRef, useReducer } from "react";
+import { useState, useEffect, useRef, useReducer, useMemo } from "react";
 import DropdownSearch, { ALL_VALUES_SENTINEL } from "../../../../components/shared/DropdownSearch";
 import Dropdown from "../../../../components/layouts/Dropdown";
 import AssetIcon from "../../../observe/agentic/AssetIcon";
@@ -275,19 +275,34 @@ const ServerSettingsStep = ({
             return { ...opt, label: formatDisplayName(svc), media: <AssetIcon type={assetType} assetTagValue={svc} size={16} /> };
         }).sort((a, b) => a.label.localeCompare(b.label));
 
+    const deviceOptionsSorted = useMemo(
+        () => (availableDevices || []).slice().sort((a, b) => a.label.localeCompare(b.label)),
+        [availableDevices]
+    );
+    const userOptionsSorted = useMemo(
+        () => (availableUsers || []).slice().sort((a, b) => a.label.localeCompare(b.label)),
+        [availableUsers]
+    );
+    const tagOptionsSortedByKey = useMemo(() => {
+        const map = {};
+        (availableTagKeyValues || []).forEach(({ key, values }) => {
+            map[key] = (values || []).map(v => ({ label: v, value: v })).sort((a, b) => a.label.localeCompare(b.label));
+        });
+        return map;
+    }, [availableTagKeyValues]);
+
     const getOptionsForType = (type) => {
         switch (type) {
             case 'AGENT': return enrichOptions(agentOptions, 'AI Agent');
             case 'MCP_SERVER': return enrichOptions(mcpOptions, 'MCP Server');
             case 'LLM': return enrichOptions(llmOptions, 'LLM');
-            case 'DEVICE': return (availableDevices || []).slice().sort((a, b) => a.label.localeCompare(b.label));
-            case 'USER': return (availableUsers || []).slice().sort((a, b) => a.label.localeCompare(b.label));
-            default: {
-                const entry = (availableTagKeyValues || []).find(k => k.key === type);
-                return (entry?.values || []).map(v => ({ label: v, value: v })).sort((a, b) => a.label.localeCompare(b.label));
-            }
+            case 'DEVICE': return deviceOptionsSorted;
+            case 'USER': return userOptionsSorted;
+            default: return tagOptionsSortedByKey[type] || [];
         }
     };
+
+    const DISPLAY_CAP = 1000;
 
     const compatibleMcpServers = isBlockMode ? (mcpServers || []).filter(s => s.isInline) : (mcpServers || []);
     const compatibleAgentServers = isBlockMode ? (agentServers || []).filter(s => s.isInline) : (agentServers || []);
@@ -525,7 +540,7 @@ const ServerSettingsStep = ({
                                             ? ((condition.values || []).length > 0 ? `All except ${condition.values.length}` : 'All selected')
                                             : ((condition.values || []).length === 1 && condition.values[0] === ALL_VALUES_SENTINEL ? 'All selected'
                                                 : (condition.values || []).length > 0 ? `${condition.values.length} selected` : undefined)}
-                                        sliceMaxVal={getOptionsForType(condition.type).length || 20}
+                                        sliceMaxVal={DISPLAY_CAP}
                                     />
                                 </div>
                                 <Button icon={DeleteMinor} onClick={() => {
@@ -703,8 +718,11 @@ const ServerSettingsStep = ({
                                         id="select_users_teams"
                                         name="userTargeting"
                                         onChange={() => setApplyToAllUsers(false)}
-                                        disabled={(availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0 && (availableUsers || []).length === 0}
+                                        disabled={!usersLoading && (availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0 && (availableUsers || []).length === 0}
                                         helpText={(() => {
+                                            if (usersLoading) {
+                                                return "Loading device tags and users…";
+                                            }
                                             const noOptions = (availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0 && (availableUsers || []).length === 0;
                                             if (noOptions) {
                                                 return "No device tags or users found. Devices must report in before you can target them here.";
