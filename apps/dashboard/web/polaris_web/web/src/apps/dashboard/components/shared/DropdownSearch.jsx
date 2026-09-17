@@ -19,7 +19,6 @@ function DropdownSearch(props) {
     const [inputValue, setInputValue] = useState(value ? value : undefined);
     const [options, setOptions] = useState(deselectedOptions);
     const [loading, setLoading] = useState(false);
-    const updateTextTimeoutRef = useRef(null);
     const revealCountRef = useRef(sliceMaxVal || 20);
     const [checked,setChecked] = useState(false)
     // Used only by the headerContent branch below (self-managed popover, see there)
@@ -84,8 +83,7 @@ function DropdownSearch(props) {
             revealCountRef.current = revealMore ? revealCountRef.current + batchSize : batchSize
             const defaultSliceValue = revealCountRef.current
 
-            if (updateTextTimeoutRef.current) clearTimeout(updateTextTimeoutRef.current);
-            updateTextTimeoutRef.current = setTimeout(() => {
+            setTimeout(() => {
                 if (value === '' && selectedOptions.length === 0) {
                     const options = deselectedOptions.slice(0, defaultSliceValue);
                     const title = deselectedOptions.length != defaultSliceValue && options.length >= defaultSliceValue
@@ -99,7 +97,7 @@ function DropdownSearch(props) {
                     setLoading(false);
                     return;
                 }
-                const filterRegex = new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+                const filterRegex = new RegExp(value, 'i');
                 const searchKey = dropdownSearchKey ? dropdownSearchKey : "label"
                 let resultOptions = []
                 if(isNested){
