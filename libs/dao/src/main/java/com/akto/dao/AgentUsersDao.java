@@ -103,6 +103,16 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
      * device is added via addToSet so devices accumulate across calls instead of being clobbered.
      */
     public void upsertAgentUserIdentity(String userId, String userName, String userEmail, String deviceId, String lastUpdatedBy) {
+        upsertAgentUserIdentity(userId, userName, userEmail, deviceId, lastUpdatedBy, null, null);
+    }
+
+    /**
+     * As above, additionally recording the org the identity belongs to. Both org fields follow the
+     * same blank-skip rule as name/email: a caller that doesn't know them (or a report that omits
+     * them) leaves whatever is already stored rather than blanking it.
+     */
+    public void upsertAgentUserIdentity(String userId, String userName, String userEmail, String deviceId,
+            String lastUpdatedBy, String organizationName, String organizationType) {
         if (userId == null || userId.trim().isEmpty()) return;
 
         List<Bson> fieldUpdates = new ArrayList<>();
@@ -115,6 +125,12 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         }
         if (deviceId != null && !deviceId.trim().isEmpty()) {
             fieldUpdates.add(Updates.addToSet(AgenticUsers.DEVICES, deviceId.trim()));
+        }
+        if (organizationName != null && !organizationName.trim().isEmpty()) {
+            fieldUpdates.add(Updates.set(AgenticUsers.ORGANIZATION_NAME, organizationName.trim()));
+        }
+        if (organizationType != null && !organizationType.trim().isEmpty()) {
+            fieldUpdates.add(Updates.set(AgenticUsers.ORGANIZATION_TYPE, organizationType.trim()));
         }
         fieldUpdates.add(Updates.set(AgenticUsers.LAST_UPDATED_AT, Context.now()));
         fieldUpdates.add(Updates.set(AgenticUsers.LAST_UPDATED_BY, lastUpdatedBy));

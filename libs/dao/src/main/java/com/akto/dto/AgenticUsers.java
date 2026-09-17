@@ -22,6 +22,9 @@ public class AgenticUsers {
     public static final String DEVICE_TAGS = "deviceTags";
     public static final String DEVICES = "devices";
 
+    public static final String ORGANIZATION_NAME = "organizationName";
+    public static final String ORGANIZATION_TYPE = "organizationType";
+
     private String userName;
     private String userEmail;
     // Raw id from whatever external identity source populated this row (e.g. the Microsoft
@@ -34,4 +37,9 @@ public class AgenticUsers {
 
     // Generic key-value tags (team, role, department, arbitrary Okta groups, ...).
     private List<DeviceTag> deviceTags;
+
+    // Only set for users whose identity carries an organizationUuid — a personal account has no
+    // org to name. Populated from the agent's reported login, name already unescaped.
+    private String organizationName;
+    private String organizationType;
 }
