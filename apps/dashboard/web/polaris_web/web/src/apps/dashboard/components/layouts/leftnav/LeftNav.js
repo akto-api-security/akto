@@ -180,7 +180,7 @@ export default function LeftNav() {
                 icon: ReportFilledMinor,
                 onClick: () => {
                     handleSelect("dashboard_endpoint_posture");
-                    navigate("/dashboard/endpoint-dashboard");
+                    navigate("/dashboard/security-posture");
                     setActive("normal");
                 },
                 selected: leftNavSelected === "dashboard_endpoint_posture",

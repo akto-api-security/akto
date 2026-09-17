@@ -294,6 +294,17 @@ const api = {
                 endTimestamp
             }
         })
+    },
+
+    fetchPostureSummary: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchPostureSummary',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
     }
 }
 

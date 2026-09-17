@@ -7,6 +7,11 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.utils.threat_detection.ThreatDetectionBackendClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import okhttp3.*;
 
 import java.util.ArrayList;
@@ -57,7 +62,13 @@ public class AbstractThreatDetectionAction extends UserAction {
       int endTimestamp,
       int limit,
       Map<String, Object> additionalFilters) {
-    return fetchAllMaliciousEvents(startTimestamp, endTimestamp, limit, additionalFilters, null);
+      MaliciousEventResponse dbObject = fetchAllMaliciousReq(startTimestamp, endTimestamp, limit, additionalFilters, null);
+      return dbObject.getEvents();
+  }
+
+  public long getTotalEvents(int startTimestamp,int endTimestamp, Map<String, Object> additionalFilters){
+    MaliciousEventResponse dbObject = fetchAllMaliciousReq(startTimestamp, endTimestamp, 1, additionalFilters, null);
+    return dbObject.getTotalEvent();
   }
 
   /**
@@ -67,13 +78,35 @@ public class AbstractThreatDetectionAction extends UserAction {
    * additionalFilters. "only" narrows to just /skills/&lt;name&gt; events; "exclude" (or null)
    * behaves like the header was never sent.
    */
+
+  @Getter 
+  @Setter 
+  @AllArgsConstructor 
+  @NoArgsConstructor 
+  private class MaliciousEventResponse {
+    private List<DashboardMaliciousEvent> events;
+    private long totalEvent;
+  }
+
   public List<DashboardMaliciousEvent> fetchAllMaliciousEvents(
+    int startTimestamp,
+    int endTimestamp,
+    int limit,
+    Map<String, Object> additionalFilters,
+    String skillEvalMode
+  ){
+    MaliciousEventResponse res = fetchAllMaliciousReq(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode);
+    return res.getEvents();
+  }
+
+  public MaliciousEventResponse fetchAllMaliciousReq(
       int startTimestamp,
       int endTimestamp,
       int limit,
       Map<String, Object> additionalFilters,
       String skillEvalMode) {
     final List<DashboardMaliciousEvent> result = new ArrayList<>();
+    long total = 0;
     try {
       String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
       ListMaliciousRequestsResponse m = ThreatDetectionBackendClient.listMaliciousRequests(
@@ -81,6 +114,7 @@ public class AbstractThreatDetectionAction extends UserAction {
           contextSourceValue, skillEvalMode);
 
       if (m != null) {
+        total = m.getTotal();
         result.addAll(m.getMaliciousEventsList().stream()
             .map(smr -> {
               DashboardMaliciousEvent event = new DashboardMaliciousEvent(
@@ -119,9 +153,8 @@ public class AbstractThreatDetectionAction extends UserAction {
     } catch (Exception e) {
       // Error handling is left to the caller - return empty list on error
     }
-    return result;
+    return new MaliciousEventResponse(result, total);
   }
-
   /**
    * Per-month violation totals, bucketed server-side by the threat-detection-backend (a single
    * cheap $bucket aggregation, not a raw-event fetch) — lets a caller build a trend sparkline
