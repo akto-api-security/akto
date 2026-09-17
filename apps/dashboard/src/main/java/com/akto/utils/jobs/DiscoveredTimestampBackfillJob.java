@@ -70,6 +70,12 @@ public class DiscoveredTimestampBackfillJob {
 
     /** On by default: every account is drained. Set to "false" to switch the job off entirely. */
     private static final String ENABLED_ENV = "DISCOVERED_TS_BACKFILL_ENABLED";
+
+    /** Optional comma separated account ids. Unset (the default) means every account; set means
+     *  only those, so a risky account can be drained on its own before the fleet follows. Read once
+     *  at scheduling, so changing it needs a restart. */
+    private static final String ENABLED_ACCOUNTS_ENV = "DISCOVERED_TS_BACKFILL_ACCOUNTS";
+
     private static final String LIMIT_ENV = "DISCOVERED_TS_BACKFILL_LIMIT";
 
     /** Endpoints fixed per account per run. Throughput is this times the runs per day, so raising
@@ -108,7 +114,10 @@ public class DiscoveredTimestampBackfillJob {
             return;
         }
 
-        loggerMaker.infoAndAddToDb("Scheduling discovered timestamp backfill job for all accounts"
+        final List<Integer> onlyAccounts = parseEnabledAccounts();
+        final String scope = onlyAccounts.isEmpty() ? "all accounts" : "accounts " + onlyAccounts;
+
+        loggerMaker.infoAndAddToDb("Scheduling discovered timestamp backfill job for " + scope
                 + " limitPerAccount=" + limitPerRun());
 
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -118,15 +127,21 @@ public class DiscoveredTimestampBackfillJob {
                 // AccountTask runs the consumer per account, so cycle totals have to accumulate in
                 // something the anonymous class can reach
                 AtomicInteger accountsRun = new AtomicInteger();
+                AtomicInteger accountsSkipped = new AtomicInteger();
                 AtomicInteger accountsFailed = new AtomicInteger();
                 AtomicInteger totalFixed = new AtomicInteger();
 
                 loggerMaker.warnAndAddToDb("Discovered timestamp backfill CYCLE START at=" + cycleStart
-                        + " limitPerAccount=" + limitPerRun());
+                        + " scope=" + scope + " limitPerAccount=" + limitPerRun());
 
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account account) {
+                        // empty list means no filter at all, so the default stays fleet wide
+                        if (!onlyAccounts.isEmpty() && !onlyAccounts.contains(account.getId())) {
+                            accountsSkipped.incrementAndGet();
+                            return;
+                        }
                         accountsRun.incrementAndGet();
                         try {
                             totalFixed.addAndGet(backfillForAccount());
@@ -141,6 +156,7 @@ public class DiscoveredTimestampBackfillJob {
                 loggerMaker.warnAndAddToDb("Discovered timestamp backfill CYCLE END at=" + Context.now()
                         + " durationSeconds=" + (Context.now() - cycleStart)
                         + " accountsRun=" + accountsRun.get()
+                        + " accountsSkipped=" + accountsSkipped.get()
                         + " accountsFailed=" + accountsFailed.get()
                         + " totalFixed=" + totalFixed.get());
             }
@@ -430,6 +446,27 @@ public class DiscoveredTimestampBackfillJob {
             loggerMaker.errorAndAddToDb("Ignoring bad value for " + name + ": " + raw);
             return fallback;
         }
+    }
+
+    /**
+     * Account ids from {@link #ENABLED_ACCOUNTS_ENV}. An empty list means "no filter" — every
+     * account runs — so the job stays fleet wide unless someone deliberately narrows it.
+     */
+    private static List<Integer> parseEnabledAccounts() {
+        List<Integer> accounts = new ArrayList<>();
+        String raw = System.getenv(ENABLED_ACCOUNTS_ENV);
+        if (raw == null || raw.trim().isEmpty()) return accounts;
+
+        for (String token: raw.split(",")) {
+            String trimmed = token.trim();
+            if (trimmed.isEmpty()) continue;
+            try {
+                accounts.add(Integer.parseInt(trimmed));
+            } catch (NumberFormatException e) {
+                loggerMaker.errorAndAddToDb("Ignoring bad account id in " + ENABLED_ACCOUNTS_ENV + ": " + trimmed);
+            }
+        }
+        return accounts;
     }
 
     /** Defaults to on, so a fresh deployment starts draining without anyone setting anything. */
