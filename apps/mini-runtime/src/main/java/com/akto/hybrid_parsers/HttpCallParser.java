@@ -111,6 +111,8 @@ public class HttpCallParser {
 
     private Map<String, Map<String, ClaudeDesktopInfo>> deviceClaudeDesktopInfoMapCache = new HashMap<>();
     private int deviceClaudeDesktopInfoMapLastFetchTs = 0;
+    private Map<String, String> claudeOrganizationsCache = new HashMap<>();
+    private int claudeOrganizationsLastFetchTs = 0;
     private static final int DEVICE_CLAUDE_DESKTOP_INFO_MAP_REFRESH_INTERVAL = 60;
 
     // Track which hostnames have been added to each service-tag collection to avoid redundant DB calls
@@ -1764,7 +1766,8 @@ public class HttpCallParser {
         }
 
         AgentQueryRecord record = AgentQueryRecord.fromHttpResponseParams(
-                httpResponseParam, tagsMap, getDeviceUserMap(), getDeviceClaudeDesktopInfoMap());
+                httpResponseParam, tagsMap, getDeviceUserMap(), getDeviceClaudeDesktopInfoMap(),
+                getClaudeOrganizations());
         if (record == null) {
             return;
         }
@@ -2103,6 +2106,20 @@ public class HttpCallParser {
             deviceClaudeDesktopInfoMapLastFetchTs = Context.now();
         }
         return deviceClaudeDesktopInfoMapCache;
+    }
+
+    /**
+     * Claude org uuid -> "&lt;orgName&gt;__&lt;orgType&gt;", used to label the org that
+     * getDeviceClaudeDesktopInfoMap resolves. Shares that map's refresh interval: the two are read
+     * together on the same request, so a slower clock here would leave a newly-seen org unlabelled
+     * (and stamped by uuid) for however long the two cadences differed.
+     */
+    private Map<String, String> getClaudeOrganizations() {
+        if (Context.now() - claudeOrganizationsLastFetchTs > DEVICE_CLAUDE_DESKTOP_INFO_MAP_REFRESH_INTERVAL) {
+            claudeOrganizationsCache = dataActor.fetchClaudeOrganizations();
+            claudeOrganizationsLastFetchTs = Context.now();
+        }
+        return claudeOrganizationsCache;
     }
 
     private boolean hasAtlasOrArgusTag(ApiCollection collection) {

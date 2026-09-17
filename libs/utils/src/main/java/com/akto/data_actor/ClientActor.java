@@ -5072,6 +5072,31 @@ public class ClientActor extends DataActor {
         }
     }
 
+    // The directory is served per agent type. Claude Desktop and the CLI authenticate separately
+    // and an org one of them knows the other may not, so this value decides which orgs come back
+    // labelled — anything outside this agent's directory falls back to its uuid in serviceId (see
+    // AgentQueryRecord#claudeOrgLabel).
+    private static final String CLAUDE_ORGANIZATIONS_AGENT_TYPE = "claude-cli";
+
+    public Map<String, String> fetchClaudeOrganizations() {
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(
+                url + "/fetchEndpointAgentOrganizations?agentType=" + CLAUDE_ORGANIZATIONS_AGENT_TYPE,
+                "", "GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String body = response.getBody();
+            if (response.getStatusCode() != 200 || body == null) {
+                return new HashMap<>();
+            }
+            Map<String, String> result = gson.fromJson(body, new TypeToken<Map<String, String>>() {}.getType());
+            return result != null ? result : new HashMap<>();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchEndpointAgentOrganizations: " + e, LoggerMaker.LogDb.RUNTIME);
+            return new HashMap<>();
+        }
+    }
+
     public void storeAgentQueryData(AgentQueryRecord agentQueryRecord) {
         boolean shouldFlush;
         synchronized (agentQueryRecordBuffer) {

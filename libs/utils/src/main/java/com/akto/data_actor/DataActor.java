@@ -382,4 +382,7 @@ public abstract class DataActor {
     public abstract Map<String, String> fetchDeviceUserMap();
 
     public abstract Map<String, Map<String, ClaudeDesktopInfo>> fetchDeviceClaudeDesktopInfoMap();
+
+    /** Claude org uuid -> "&lt;orgName&gt;__&lt;orgType&gt;" (e.g. "Akto-Team__claude_team"). */
+    public abstract Map<String, String> fetchClaudeOrganizations();
 }

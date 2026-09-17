@@ -1,21 +1,21 @@
 package com.akto.utils.elasticsearch;
 
-import com.akto.dao.context.Context;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.claude_identity.ClaudeDesktopInfo;
-import com.akto.dto.billing.Organization;
-import com.akto.log.LoggerMaker;
-import com.akto.usage.OrgUtils;
-import com.akto.util.Constants;
-import com.akto.util.JSONUtils;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import com.akto.dao.context.Context;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.billing.Organization;
+import com.akto.dto.claude_identity.ClaudeDesktopInfo;
+import com.akto.log.LoggerMaker;
+import com.akto.usage.OrgUtils;
+import com.akto.util.Constants;
+import com.akto.util.JSONUtils;
 
 public class AgentQueryRecord {
 
@@ -70,11 +70,14 @@ public class AgentQueryRecord {
      * Claude surfaces that report one shared serviceId across every install, as
      * {host substring, agentLogins key} pairs.
      *
-     * The columns are not a rename of each other — three host labels resolve to two logins:
+     * The columns are not a rename of each other — several host labels resolve to two logins:
      *
      *   claude-desktop -> claude-desktop    the Desktop app's own login
      *   claude-cowork  -> claude-desktop    Cowork runs inside Desktop and shares its session;
-     *                                       the agent reports no separate claude-cowork login
+     *   claude_cowork  -> claude-desktop    the agent reports no separate cowork login. Both
+     *                                       separators occur, depending on how the collection was
+     *                                       registered; neither spelling contains the other, so a
+     *                                       missing variant silently stamps no org at all.
      *   claude-cli     -> claude-cli-user   the CLI's login (claude-cli-local / -project /
      *                                       -enterprise are config scopes, not logins)
      *
@@ -85,6 +88,7 @@ public class AgentQueryRecord {
     private static final String[][] CLAUDE_SHARED_SURFACES = {
         { "claude-desktop", "claude-desktop"  },
         { "claude-cowork",  "claude-desktop"  },
+        { "claude_cowork",  "claude-desktop"  },
         { "claude-cli",     "claude-cli-user" },
     };
 
@@ -153,7 +157,7 @@ public class AgentQueryRecord {
             Map<String, String> tagsMap,
             Map<String, String> deviceUserMap) {
 
-        return fromHttpResponseParams(p, tagsMap, deviceUserMap, null);
+        return fromHttpResponseParams(p, tagsMap, deviceUserMap, null, null);
     }
 
     public static AgentQueryRecord fromHttpResponseParams(
@@ -161,6 +165,16 @@ public class AgentQueryRecord {
             Map<String, String> tagsMap,
             Map<String, String> deviceUserMap,
             Map<String, Map<String, ClaudeDesktopInfo>> deviceClaudeDesktopInfoMap) {
+
+        return fromHttpResponseParams(p, tagsMap, deviceUserMap, deviceClaudeDesktopInfoMap, null);
+    }
+
+    public static AgentQueryRecord fromHttpResponseParams(
+            HttpResponseParams p,
+            Map<String, String> tagsMap,
+            Map<String, String> deviceUserMap,
+            Map<String, Map<String, ClaudeDesktopInfo>> deviceClaudeDesktopInfoMap,
+            Map<String, String> claudeOrganizations) {
 
         if (p == null || p.getRequestParams() == null) {
             return null;
@@ -232,7 +246,7 @@ public class AgentQueryRecord {
             // "claude-desktop.akto.io" — an equality check on serviceId silently never fires there.
             String orgId = claudeOrgUuidForHost(host, deviceId, deviceClaudeDesktopInfoMap);
             if (orgId != null && !orgId.isEmpty()) {
-                serviceId = serviceId + "-" + orgId;
+                serviceId = serviceId + "-" + claudeOrgLabel(orgId, claudeOrganizations);
             }
         } else if (isBrowserExtensionTraffic) {
             // Host id is <heartbeat name>.<browser>.<site>, so its first label keys deviceUserMap.
@@ -397,6 +411,37 @@ public class AgentQueryRecord {
             }
         }
         return null;
+    }
+
+    /**
+     * Org uuid rendered as "&lt;orgName&gt;__&lt;orgType&gt;" when the directory knows the org, else
+     * the uuid unchanged.
+     *
+     * The label exists because a raw uuid tells a reader nothing about whose traffic a service is.
+     * The fallback is not just for a failed fetch: the directory answers "__unknown" for orgs it
+     * cannot name, and every such org would render identically — silently merging distinct orgs
+     * into one service, which is the exact collapse qualifying serviceId by org set out to prevent.
+     * Falling back to the uuid keeps them apart, at the cost of staying unreadable until the
+     * directory learns the org.
+     *
+     * Note this makes serviceId follow the org's NAME. Renaming an org in Claude changes the
+     * serviceId its traffic lands under, so history before the rename stays under the old label —
+     * the same trade-off any human-readable key carries.
+     */
+    private static String claudeOrgLabel(String orgId, Map<String, String> claudeOrganizations) {
+        if (claudeOrganizations == null) {
+            return orgId;
+        }
+        String label = claudeOrganizations.get(orgId);
+        if (label == null) {
+            return orgId;
+        }
+        label = label.trim();
+        // "__unknown" (and anything else with no name half) identifies no org — see above.
+        if (label.isEmpty() || label.startsWith("__")) {
+            return orgId;
+        }
+        return label;
     }
 
     private static int readTokenField(JSONObject obj, boolean input) throws JSONException{

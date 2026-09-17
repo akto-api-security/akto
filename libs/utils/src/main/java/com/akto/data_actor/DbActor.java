@@ -873,4 +873,8 @@ public class DbActor extends DataActor {
     public Map<String, Map<String, ClaudeDesktopInfo>> fetchDeviceClaudeDesktopInfoMap() {
         return new HashMap<>();
     }
+
+    public Map<String, String> fetchClaudeOrganizations() {
+        return new HashMap<>();
+    }
 }
