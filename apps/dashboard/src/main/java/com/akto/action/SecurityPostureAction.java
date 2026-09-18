@@ -6,7 +6,6 @@ import com.akto.action.threat_detection.HostSeverityCount;
 import com.akto.action.threat_detection.ThreatCategoryCount;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
-import com.akto.dto.threat_detection.ThreatComplianceInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.service.insights.InsightContext;
@@ -15,8 +14,9 @@ import com.akto.service.insights.InsightId;
 import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightService;
 import com.akto.service.posture.PostureService;
-import com.akto.util.GuardrailMetricsProcessor;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.dao.GuardrailPoliciesDao;
+import com.akto.dto.GuardrailPolicies;
 import com.akto.utils.search.SearchClient;
 import com.akto.utils.search.SearchClientFactory;
 import com.mongodb.BasicDBObject;
@@ -50,7 +50,8 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(SecurityPostureAction.class, LogDb.DASHBOARD);
     // Matches AgenticDashboardAction's own MAX_THREAT_FETCH_LIMIT — large enough to be
-    // effectively "all events in the window" for the compliance-gaps sub-score.
+    // effectively "all events in the window" for the raw-event fetches below (biggest movers,
+    // and the risk-score breakdown's DLP device-movements).
     private static final int MAX_THREAT_FETCH_LIMIT = 100000;
     private static final int EXTERNAL_CALL_TIMEOUT_SECONDS = 15;
     // Every fetch this action makes (bundle load, threat-backend aggregations, the search-backend
@@ -119,21 +120,12 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                     ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
                             () -> fetchSubcategoryWiseCounts(priorStart, startTimestamp, null, null)))
                     : null;
-            // Raw events (not the pre-aggregated subCategoryCounts the KPIs above use) — the risk
-            // score's compliance-gaps sub-score needs a filterId per event, for this window and
-            // (for its own week-over-week delta) the preceding one.
-            Future<List<DashboardMaliciousEvent>> priorAllThreatsFuture = hasPriorWindow
-                    ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
-                            () -> fetchAllMaliciousEvents(priorStart, startTimestamp, MAX_THREAT_FETCH_LIMIT, null, null, true)))
-                    : null;
-            Future<List<DashboardMaliciousEvent>> allThreatsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
-                    () -> fetchAllMaliciousEvents(startTimestamp, endTimestamp, MAX_THREAT_FETCH_LIMIT, null, null, true)));
-            Future<Map<String, ThreatComplianceInfo>> threatComplianceMapFuture = EXECUTOR.submit(withContext(
-                    accountId, userId, contextSource, GuardrailMetricsProcessor::fetchThreatComplianceMap));
             Future<Long> totalInspectedActionsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
                     () -> fetchTotalInspectedActions(accountId, startTimestamp, endTimestamp)));
             Future<List<Integer>> weeklyAttackCountsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
                     () -> fetchViolationsMonthlyTotals(attackTrendStartTs, attackTrendEndTs, attackTrendBoundaries, null)));
+            Future<List<GuardrailPolicies>> allPoliciesFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                    () -> GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(0, 5000)));
             Future<List<DashboardMaliciousEvent>> recentAttackEventsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
                     () -> fetchAllMaliciousEvents(biggestMoversStartTs, attackTrendEndTs, MAX_THREAT_FETCH_LIMIT, null, null, true)));
 
@@ -146,15 +138,11 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                     ? timedGet("priorHostSeverityFuture", priorHostSeverityFuture) : null;
             List<ThreatCategoryCount> priorSubCategory = hasPriorWindow
                     ? timedGet("priorSubCategoryFuture", priorSubCategoryFuture) : null;
-            List<DashboardMaliciousEvent> priorAllThreats = hasPriorWindow
-                    ? timedGet("priorAllThreatsFuture (limit " + MAX_THREAT_FETCH_LIMIT + ")", priorAllThreatsFuture) : null;
-            List<DashboardMaliciousEvent> allThreats =
-                    timedGet("allThreatsFuture (limit " + MAX_THREAT_FETCH_LIMIT + ")", allThreatsFuture);
-            Map<String, ThreatComplianceInfo> threatComplianceMap = timedGet("threatComplianceMapFuture", threatComplianceMapFuture);
             Long totalInspectedActions = timedGet("totalInspectedActionsFuture (SearchClient)", totalInspectedActionsFuture);
             List<Integer> weeklyAttackCounts = timedGet("weeklyAttackCountsFuture", weeklyAttackCountsFuture);
             List<DashboardMaliciousEvent> recentAttackEvents =
                     timedGet("recentAttackEventsFuture (limit " + MAX_THREAT_FETCH_LIMIT + ")", recentAttackEventsFuture);
+            List<GuardrailPolicies> allPoliciesIncludingInactive = timedGet("allPoliciesFuture", allPoliciesFuture);
 
             // bundle.collections, not bundle.activeCollections: the latter is loaded via a
             // narrow projection (id/hostName/startTs only, for PolicyHygieneProvider's cheap
@@ -166,8 +154,8 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                     .collect(Collectors.toList());
 
             response = postureService.buildSummary(bundle, priorHostSeverity, priorSubCategory,
-                    endpointCollections, allThreats, priorAllThreats, threatComplianceMap, totalInspectedActions,
-                    weeklyAttackCounts, recentAttackEvents);
+                    endpointCollections, totalInspectedActions,
+                    weeklyAttackCounts, recentAttackEvents, allPoliciesIncludingInactive);
 
             // "Act now" — reuses the Insights feature wholesale rather than a parallel action
             // list: same bundle (already cached above under this exact ctx), same worst-first/
@@ -197,7 +185,8 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
      * the composite KPI (value + delta), but the row-by-row breakdown is only needed once someone
      * actually opens the flyout, so it's fetched then instead of on every load. bundle is the same
      * 60s-cached bundle fetchPostureSummary already populated for this ctx, so this call is just
-     * the two fetches (endpointCollections/allThreats/complianceMap) unique to the breakdown.
+     * the raw-event fetches (endpointCollections/allThreats/priorAllThreats) unique to the
+     * breakdown's per-device DLP movements.
      */
     public String fetchRiskScoreBreakdown() {
         long callStart = System.currentTimeMillis();
@@ -223,8 +212,6 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                     () -> insightService.getOrLoadBundle(ctx)));
             Future<List<DashboardMaliciousEvent>> allThreatsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
                     () -> fetchAllMaliciousEvents(startTimestamp, endTimestamp, MAX_THREAT_FETCH_LIMIT, null, null, true)));
-            Future<Map<String, ThreatComplianceInfo>> threatComplianceMapFuture = EXECUTOR.submit(withContext(
-                    accountId, userId, contextSource, GuardrailMetricsProcessor::fetchThreatComplianceMap));
             Future<List<HostSeverityCount>> priorHostSeverityFuture = hasPriorWindow
                     ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
                             () -> fetchHostSeverityCounts(priorStart, startTimestamp)))
@@ -239,8 +226,6 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
             InsightDataBundle bundle = timedGet("fetchRiskScoreBreakdown: bundleFuture", bundleFuture);
             List<DashboardMaliciousEvent> allThreats =
                     timedGet("fetchRiskScoreBreakdown: allThreatsFuture (limit " + MAX_THREAT_FETCH_LIMIT + ")", allThreatsFuture);
-            Map<String, ThreatComplianceInfo> threatComplianceMap =
-                    timedGet("fetchRiskScoreBreakdown: threatComplianceMapFuture", threatComplianceMapFuture);
             List<HostSeverityCount> priorHostSeverity = hasPriorWindow
                     ? timedGet("fetchRiskScoreBreakdown: priorHostSeverityFuture", priorHostSeverityFuture) : null;
             List<DashboardMaliciousEvent> priorAllThreats = hasPriorWindow
@@ -253,7 +238,7 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                     .collect(Collectors.toList());
 
             riskScoreBreakdown = postureService.buildRiskScoreBreakdown(bundle, endpointCollections, allThreats,
-                    priorAllThreats, threatComplianceMap, priorHostSeverity);
+                    priorAllThreats, priorHostSeverity);
             loggerMaker.infoAndAddToDb("SecurityPostureAction: fetchRiskScoreBreakdown total "
                     + (System.currentTimeMillis() - callStart) + "ms");
             return SUCCESS.toUpperCase();
