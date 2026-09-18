@@ -49,6 +49,7 @@ public class PostureService {
     public static final String KEY_DATA_LEAVING      = "dataLeaving";
     public static final String KEY_ENFORCEMENT_FUNNEL = "enforcementFunnel";
     public static final String KEY_ATTACK_ATTEMPTS   = "attackAttempts";
+    public static final String KEY_BIGGEST_MOVERS    = "biggestMovers";
 
     // KPI ids, also what the frontend keys its cards off.
     public static final String KPI_RISK_SCORE         = "riskScore";
@@ -64,6 +65,16 @@ public class PostureService {
     /** Also the number of boundaries SecurityPostureAction must request via
      *  {@link #attackTrendWeekBoundaries}. */
     static final int ATTACK_TREND_WEEKS = 8;
+
+    // "Biggest movers" — a fixed lookback window (independent of the page's own date-range
+    // filter, same convention ATTACK_TREND_WEEKS already uses), not the page's selected range:
+    // a mover is about "did this cross a threshold recently", which should read the same
+    // regardless of what range someone happens to have the page filtered to.
+    public static final int BIGGEST_MOVERS_WINDOW_DAYS = 14;
+    private static final int BIGGEST_MOVERS_DEVICE_THRESHOLD = 20;
+    private static final int BIGGEST_MOVERS_ATTACK_THRESHOLD = 1000;
+    private static final int BIGGEST_MOVERS_MAX_PER_CONDITION = 3;
+    private static final int BIGGEST_MOVERS_MAX_TOTAL = 5;
 
     /**
      * Posture history doesn't exist yet, so any figure that is a comparison against an earlier
@@ -130,6 +141,9 @@ public class PostureService {
      *                             boundary from {@link #attackTrendWeekBoundaries}, ascending
      *                             (oldest week first). Null/short when the threat backend didn't
      *                             return a full set — see attackAttemptsTrend's own gap handling.
+     * @param recentAttackEvents   malicious events over BIGGEST_MOVERS_WINDOW_DAYS ending at
+     *                             bundle.ctx's end — needed only for "Biggest movers"' attack-count
+     *                             condition, a fixed lookback independent of the page's own range.
      */
     public BasicDBObject buildSummary(InsightDataBundle bundle,
                                        List<HostSeverityCount> priorHostSeverity,
@@ -139,7 +153,8 @@ public class PostureService {
                                        List<DashboardMaliciousEvent> priorAllThreatsForCompliance,
                                        Map<String, ThreatComplianceInfo> threatComplianceMap,
                                        Long totalInspectedActions,
-                                       List<Integer> weeklyAttackCounts) {
+                                       List<Integer> weeklyAttackCounts,
+                                       List<DashboardMaliciousEvent> recentAttackEvents) {
         BasicDBObject response = new BasicDBObject();
 
         List<BasicDBObject> kpis = new ArrayList<>();
@@ -156,6 +171,10 @@ public class PostureService {
 
         int attackTrendEndTs = bundle.ctx.getEndTs() > 0 ? bundle.ctx.getEndTs() : (int) (System.currentTimeMillis() / 1000);
         response.put(KEY_ATTACK_ATTEMPTS, attackAttemptsTrend(weeklyAttackCounts, attackTrendEndTs));
+
+        int biggestMoversWindowStartTs = attackTrendEndTs - (BIGGEST_MOVERS_WINDOW_DAYS * 86400);
+        response.put(KEY_BIGGEST_MOVERS, biggestMovers(endpointCollections, bundle.collectionLastTrafficSeen,
+                recentAttackEvents, biggestMoversWindowStartTs));
 
         return response;
     }
@@ -615,6 +634,92 @@ public class PostureService {
                         + "ElasticSearchClient/AzureDataExplorerClient don't query it."));
         panel.put("dataGaps", gaps);
         return panel;
+    }
+
+    // ── Biggest movers ───────────────────────────────────────────────────────────
+    //
+    // Two independent conditions, evaluated over the same fixed BIGGEST_MOVERS_WINDOW_DAYS
+    // lookback: (1) a vendor's device count (collections active within the window) crossed the
+    // device threshold, (2) a vendor's malicious-event count within the window crossed the attack
+    // threshold. Each condition contributes at most BIGGEST_MOVERS_MAX_PER_CONDITION rows; the
+    // combined list is capped at BIGGEST_MOVERS_MAX_TOTAL, ranked by how far over its OWN
+    // threshold each row is (a ratio, not the raw value) so the attack condition's much larger
+    // numbers don't always crowd out the device condition's.
+
+    private BasicDBObject biggestMovers(List<ApiCollection> endpointCollections, Map<Integer, Integer> collectionLastTrafficSeen,
+                                         List<DashboardMaliciousEvent> recentAttackEvents, int windowStartTs) {
+        Map<String, Set<String>> devicesByVendor = new HashMap<>();
+        Map<Integer, String> vendorByCollectionId = new HashMap<>();
+        for (ApiCollection c : safe(endpointCollections)) {
+            if (c == null || c.isDeactivated()) continue;
+            String vendor = InsightUtil.endpointVendorName(c);
+            if (vendor == null) continue;
+            vendorByCollectionId.put(c.getId(), vendor);
+            Integer lastSeen = collectionLastTrafficSeen != null ? collectionLastTrafficSeen.get(c.getId()) : null;
+            if (lastSeen == null || lastSeen < windowStartTs) continue; // not active within the window
+            String deviceId = InsightUtil.deviceIdOf(c);
+            devicesByVendor.computeIfAbsent(vendor, k -> new HashSet<>()).add(deviceId != null ? deviceId : "unknown");
+        }
+
+        List<BasicDBObject> deviceMovers = new ArrayList<>();
+        for (Map.Entry<String, Set<String>> e : devicesByVendor.entrySet()) {
+            int count = e.getValue().size();
+            if (count > BIGGEST_MOVERS_DEVICE_THRESHOLD) {
+                deviceMovers.add(moverRow("devices", e.getKey(), count, BIGGEST_MOVERS_DEVICE_THRESHOLD,
+                        e.getKey() + " crossed " + BIGGEST_MOVERS_DEVICE_THRESHOLD + " devices in the last "
+                                + BIGGEST_MOVERS_WINDOW_DAYS + " days"));
+            }
+        }
+        List<BasicDBObject> topDeviceMovers = topByRatio(deviceMovers, BIGGEST_MOVERS_MAX_PER_CONDITION);
+
+        Map<String, Long> attacksByVendor = new HashMap<>();
+        for (DashboardMaliciousEvent event : safe(recentAttackEvents)) {
+            if (event == null) continue;
+            String vendor = vendorByCollectionId.get(event.getApiCollectionId());
+            if (vendor == null) continue;
+            attacksByVendor.merge(vendor, 1L, Long::sum);
+        }
+        List<BasicDBObject> attackMovers = new ArrayList<>();
+        for (Map.Entry<String, Long> e : attacksByVendor.entrySet()) {
+            if (e.getValue() > BIGGEST_MOVERS_ATTACK_THRESHOLD) {
+                attackMovers.add(moverRow("attacks", e.getKey(), e.getValue(), BIGGEST_MOVERS_ATTACK_THRESHOLD,
+                        e.getKey() + " crossed " + BIGGEST_MOVERS_ATTACK_THRESHOLD + " attack attempts in the last "
+                                + BIGGEST_MOVERS_WINDOW_DAYS + " days"));
+            }
+        }
+        List<BasicDBObject> topAttackMovers = topByRatio(attackMovers, BIGGEST_MOVERS_MAX_PER_CONDITION);
+
+        List<BasicDBObject> combined = new ArrayList<>();
+        combined.addAll(topDeviceMovers);
+        combined.addAll(topAttackMovers);
+        List<BasicDBObject> top = topByRatio(combined, BIGGEST_MOVERS_MAX_TOTAL);
+
+        BasicDBObject panel = new BasicDBObject();
+        panel.put("movers", top);
+        return panel;
+    }
+
+    private static BasicDBObject moverRow(String condition, String vendor, long value, long threshold, String headline) {
+        BasicDBObject row = new BasicDBObject();
+        row.put("condition", condition);
+        row.put("vendor", vendor);
+        row.put("value", value);
+        row.put("threshold", threshold);
+        row.put("headline", headline);
+        return row;
+    }
+
+    /** Sorted by value/threshold descending (not raw value) so two conditions with very different
+     *  units — a device count in the tens, an attack count in the thousands — rank fairly against
+     *  each other, then trimmed to topN. */
+    private static List<BasicDBObject> topByRatio(List<BasicDBObject> rows, int topN) {
+        rows.sort((a, b) -> Double.compare(overThresholdRatio(b), overThresholdRatio(a)));
+        return rows.subList(0, Math.min(topN, rows.size()));
+    }
+
+    private static double overThresholdRatio(BasicDBObject row) {
+        long threshold = row.getLong("threshold");
+        return threshold == 0 ? 0 : ((Number) row.get("value")).doubleValue() / threshold;
     }
 
     // ── Shared policy-name join ──────────────────────────────────────────────────

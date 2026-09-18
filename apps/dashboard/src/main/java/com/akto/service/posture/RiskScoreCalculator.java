@@ -387,7 +387,10 @@ final class RiskScoreCalculator {
             if (c == null || c.isDeactivated() || c.getHostName() == null) continue;
             GovernanceBucket bucket = InsightUtil.governanceBucket(c, bundle.allowlistNamesLower, remarksByService);
             if (bucket == GovernanceBucket.SANCTIONED) continue;
-            String serviceName = InsightUtil.serviceNameOf(c);
+            // Same grouping name governanceBucket's own allowlist check uses — merges
+            // "chatgpt.com"/"codex"/etc into "openai" the same way vendor risk's table does,
+            // instead of showing every raw alias as its own row.
+            String serviceName = InsightUtil.governanceGroupingName(c);
             if (serviceName == null) continue;
             String deviceId = InsightUtil.deviceIdOf(c);
             devicesByService.computeIfAbsent(serviceName, k -> new HashSet<>()).add(deviceId != null ? deviceId : "unknown");

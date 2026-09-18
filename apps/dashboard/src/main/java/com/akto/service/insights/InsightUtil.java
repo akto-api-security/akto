@@ -266,6 +266,17 @@ public final class InsightUtil {
     public static String deviceIdOf(ApiCollection c) { return com.akto.util.AgenticObserveUtil.extractEndpointId(c.getHostName()); }
     public static String serviceNameOf(ApiCollection c) { return com.akto.util.AgenticObserveUtil.extractServiceName(c.getHostName()); }
 
+    /** The name governance/approval grouping should actually key on: the canonicalized vendor
+     *  name for an endpoint-shield collection (matches how vendor-type allowlist entries are
+     *  stored — see loadAllowlistNames), falling back to the MCP-server-shaped serviceNameOf for
+     *  everything else. Shared by governanceBucket's allowlist check and
+     *  RiskScoreCalculator#shadowAiTopUnapprovedServices' own grouping, so shadow AI's breakdown
+     *  merges the same aliases ("chatgpt.com"/"codex" -> "openai") vendor risk's table already does. */
+    public static String governanceGroupingName(ApiCollection c) {
+        String vendorName = endpointVendorName(c);
+        return vendorName != null ? vendorName : serviceNameOf(c);
+    }
+
     // ── Endpoint-shield vendor parsing ───────────────────────────────────────────
     //
     // Endpoint-shield/browser-extension collections (isEndpointCollection()) name their
@@ -286,7 +297,10 @@ public final class InsightUtil {
      *  name (native app vs. CLI vs. web domain) — collapsed to one canonical name by substring
      *  match so vendor-risk counting/grouping isn't split across near-duplicates. vendor is
      *  already lowercased by the caller. Falls through to the raw token when nothing matches. */
-    private static String canonicalVendorName(String vendor) {
+    /** Package-private (not private): InsightDataLoader#loadAllowlistNames applies this same
+     *  canonicalization to VENDOR-typed allowlist entries, so an approval stored under a raw alias
+     *  ("chatgpt.com") still matches traffic resolved to the canonical name ("openai"). */
+    static String canonicalVendorName(String vendor) {
         if (vendor.contains("claude") || vendor.contains("anthropic")) return "Anthropic";
         if (vendor.contains("codex") || vendor.contains("chatgpt") || vendor.contains("openai")) return "OpenAI";
         if (vendor.contains("copilot") || vendor.contains("github")) return "Github-Copilot";
@@ -384,12 +398,20 @@ public final class InsightUtil {
     public static GovernanceBucket governanceBucket(ApiCollection c, Set<String> allowlistNamesLower,
                                                       Map<String, String> remarksByServiceNameLower) {
         if (isMaliciousMcpServer(c)) return GovernanceBucket.MALICIOUS;
+        // Audit remarks (approved/rejected via the MCP Servers/Skills review flow) are keyed by
+        // the MCP-server-shaped service name regardless of collection type — a vendor-type
+        // endpoint collection was never going to have an audit row anyway, so this lookup just
+        // misses harmlessly for those.
         String serviceName = serviceNameOf(c);
         String remarks = serviceName != null ? remarksByServiceNameLower.get(serviceName.toLowerCase(Locale.ROOT)) : null;
         if (McpAuditInfo.REMARKS_REJECTED.equals(remarks)) return GovernanceBucket.REJECTED;
         if (isPersonalAccount(c)) return GovernanceBucket.PERSONAL;
         if (isLocalMcp(c)) return GovernanceBucket.LOCAL;
-        boolean inAllowlist = serviceName != null && allowlistNamesLower.contains(serviceName.toLowerCase(Locale.ROOT));
+        // The allowlist check itself uses governanceGroupingName — the canonicalized vendor name
+        // for an endpoint-shield collection — since that's the name a VENDOR-typed allowlist entry
+        // is actually stored under (see loadAllowlistNames).
+        String groupingName = governanceGroupingName(c);
+        boolean inAllowlist = groupingName != null && allowlistNamesLower.contains(groupingName.toLowerCase(Locale.ROOT));
         if (inAllowlist || McpAuditInfo.REMARKS_APPROVED.equals(remarks)) return GovernanceBucket.SANCTIONED;
         if (remarks == null) return GovernanceBucket.SHADOW; // no allowlist entry, no audit row at all
         return GovernanceBucket.UNAPPROVED; // audit row exists with blank remarks -> pending

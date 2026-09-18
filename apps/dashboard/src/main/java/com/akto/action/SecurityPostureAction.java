@@ -103,6 +103,10 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
             List<Integer> attackTrendBoundaries = PostureService.attackTrendWeekBoundaries(attackTrendEndTs);
             int attackTrendStartTs = attackTrendBoundaries.get(0) - (attackTrendBoundaries.get(1) - attackTrendBoundaries.get(0));
 
+            // "Biggest movers" — same fixed-lookback convention as the attack trend above, not
+            // the page's selected range (see PostureService#biggestMovers).
+            int biggestMoversStartTs = attackTrendEndTs - (PostureService.BIGGEST_MOVERS_WINDOW_DAYS * 86400);
+
             // Shared with the Insights feature rather than loaded again: the same page renders
             // "Act now" from insights, so one bundle serves both.
             Future<InsightDataBundle> bundleFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
@@ -130,6 +134,8 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                     () -> fetchTotalInspectedActions(accountId, startTimestamp, endTimestamp)));
             Future<List<Integer>> weeklyAttackCountsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
                     () -> fetchViolationsMonthlyTotals(attackTrendStartTs, attackTrendEndTs, attackTrendBoundaries, null)));
+            Future<List<DashboardMaliciousEvent>> recentAttackEventsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                    () -> fetchAllMaliciousEvents(biggestMoversStartTs, attackTrendEndTs, MAX_THREAT_FETCH_LIMIT, null, null, true)));
 
             // Each .get() below only blocks on ITS OWN future (all were submitted above and are
             // already running), so its timing is that call's real duration, not a sum of the
@@ -147,6 +153,8 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
             Map<String, ThreatComplianceInfo> threatComplianceMap = timedGet("threatComplianceMapFuture", threatComplianceMapFuture);
             Long totalInspectedActions = timedGet("totalInspectedActionsFuture (SearchClient)", totalInspectedActionsFuture);
             List<Integer> weeklyAttackCounts = timedGet("weeklyAttackCountsFuture", weeklyAttackCountsFuture);
+            List<DashboardMaliciousEvent> recentAttackEvents =
+                    timedGet("recentAttackEventsFuture (limit " + MAX_THREAT_FETCH_LIMIT + ")", recentAttackEventsFuture);
 
             // bundle.collections, not bundle.activeCollections: the latter is loaded via a
             // narrow projection (id/hostName/startTs only, for PolicyHygieneProvider's cheap
@@ -159,7 +167,7 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
 
             response = postureService.buildSummary(bundle, priorHostSeverity, priorSubCategory,
                     endpointCollections, allThreats, priorAllThreats, threatComplianceMap, totalInspectedActions,
-                    weeklyAttackCounts);
+                    weeklyAttackCounts, recentAttackEvents);
 
             // "Act now" — reuses the Insights feature wholesale rather than a parallel action
             // list: same bundle (already cached above under this exact ctx), same worst-first/

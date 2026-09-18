@@ -319,13 +319,20 @@ function VendorRiskBubbleCard({ vendorTable }) {
             <div style={{ position: 'relative', height: '180px', border: '1px solid #e5e7eb', borderRadius: '4px' }}>
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '35%', background: 'rgba(220,38,38,0.08)' }} />
                 {points.map((p) => (
-                    <Tooltip key={p.id} content={p.label || ''}>
-                        <div style={{
+                    // Plain title, not Polaris <Tooltip>: Tooltip wraps its child in its own
+                    // positioned span, which becomes the nearest positioned ancestor for this
+                    // div's position:absolute instead of the chart container above — every bubble
+                    // collapsed to roughly the same spot (only the last one, topmost in z-order,
+                    // looked like it rendered at all).
+                    <div
+                        key={p.id}
+                        title={p.label || ''}
+                        style={{
                             position: 'absolute', left: `${p.x}%`, top: `${100 - p.y}%`,
                             transform: 'translate(-50%, -50%)', width: 14, height: 14, borderRadius: '50%',
                             background: p.color,
-                        }} />
-                    </Tooltip>
+                        }}
+                    />
                 ))}
             </div>
             <HorizontalStack align="space-between">
@@ -595,6 +602,36 @@ function ActNowRow({ insight, onOpen }) {
                 </VerticalStack>
             </Box>
         </Box>
+    )
+}
+
+// Real, not illustrative — PostureService#biggestMovers: a vendor whose device count or
+// malicious-event count crossed a fixed threshold within the last 2 weeks (independent of the
+// page's own date filter), top 5 combined across both conditions (max 3 each).
+function BiggestMoversCard({ biggestMovers }) {
+    const movers = (biggestMovers && biggestMovers.movers) || []
+    if (movers.length === 0) {
+        return (
+            <CardWithHeader title="Biggest movers" hasData={false}
+                emptyMessage="No vendor crossed a threshold in the last 2 weeks." minHeight="160px" />
+        )
+    }
+    return (
+        <CardWithHeader title="Biggest movers" hasData={true} minHeight="160px">
+            <VerticalStack gap="3">
+                {movers.map((m) => (
+                    <VerticalStack key={`${m.condition}-${m.vendor}`} gap="05">
+                        <HorizontalStack align="space-between" blockAlign="center">
+                            <Text variant="bodyMd" fontWeight="semibold">{m.vendor}</Text>
+                            <Badge status={m.condition === 'attacks' ? 'critical' : 'warning'}>
+                                {m.condition === 'attacks' ? `${m.value.toLocaleString()} attacks` : `${m.value} devices`}
+                            </Badge>
+                        </HorizontalStack>
+                        <Text variant="bodySm" color="subdued">{m.headline}</Text>
+                    </VerticalStack>
+                ))}
+            </VerticalStack>
+        </CardWithHeader>
     )
 }
 
@@ -981,13 +1018,10 @@ function SecurityPosture() {
         </VerticalStack>
     )
 
-    // "Biggest movers" has no backend/component yet (unlike everything else on this page, which
-    // is at minimum wired to a real or dummy panel) — a plain ComingSoonTile stub here rather
-    // than fabricating numbers, since this pass is a layout rearrangement, not a new feature.
     const rightRail = (
         <VerticalStack gap="3">
             <ActNowCard actNow={pageData.actNow} onOpenInsight={openInsight} />
-            <ComingSoonTile label="Biggest movers" />
+            <BiggestMoversCard biggestMovers={pageData.biggestMovers} />
         </VerticalStack>
     )
 

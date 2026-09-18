@@ -372,7 +372,7 @@ public class McpAllowlistAction extends UserAction {
             BasicDBObject row = new BasicDBObject();
             row.put("vendor", e.getKey());
             row.put("count", e.getValue());
-            row.put("approved", allowlistNamesLower.contains(e.getKey()));
+            row.put("approved", allowlistNamesLower.contains(e.getKey().toLowerCase()));
             vendorAudit.add(row);
         }
         vendorAudit.sort((a, b) -> Long.compare(b.getLong("count"), a.getLong("count")));

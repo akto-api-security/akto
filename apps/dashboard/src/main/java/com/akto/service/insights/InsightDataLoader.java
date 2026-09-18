@@ -293,12 +293,25 @@ public class InsightDataLoader {
         }
     }
 
+    /**
+     * VENDOR-typed entries are canonicalized the same way InsightUtil#endpointVendorName
+     * canonicalizes observed traffic (claude/claude-desktop/... -> anthropic, etc.) — otherwise an
+     * approval saved under a raw alias ("chatgpt.com") would never match traffic that resolves to
+     * the merged canonical name ("openai"), and would silently read back as still-unapproved.
+     * MCP_SERVER-typed entries are left as-is: that alias map is vendor-specific and would
+     * misclassify an unrelated MCP server whose name happens to contain one of those substrings
+     * (e.g. "claude-mcp-server").
+     */
     private Set<String> loadAllowlistNames() {
         try {
-            List<McpAllowlist> rows = McpAllowlistDao.instance.findAll(Filters.empty(), Projections.include(McpAllowlist.NAME));
+            List<McpAllowlist> rows = McpAllowlistDao.instance.findAll(Filters.empty(),
+                    Projections.include(McpAllowlist.NAME, McpAllowlist.ENTRY_TYPE));
             Set<String> names = new HashSet<>();
             for (McpAllowlist a : rows) {
-                if (a.getName() != null) names.add(a.getName().toLowerCase(Locale.ROOT));
+                if (a.getName() == null) continue;
+                String nameLower = a.getName().toLowerCase(Locale.ROOT);
+                boolean isVendor = McpAllowlist.ENTRY_TYPE_VENDOR.equals(a.getEntryType());
+                names.add(isVendor ? InsightUtil.canonicalVendorName(nameLower) : nameLower);
             }
             return names;
         } catch (Exception e) {
