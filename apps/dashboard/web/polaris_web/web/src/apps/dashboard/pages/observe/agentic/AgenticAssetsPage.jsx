@@ -157,16 +157,9 @@ const COL_DEFS = [
     filterParams: { values: ["Contains personal account", "Local MCP Server", "Misconfigured", "Malicious Skill"] },
     sortable: false,
   },
-  // Plugin-only, hidden by default (empty for every other row type) — opt in via the columns panel.
-  {
-    field: "pluginStatus",
-    headerName: "Plugin Status",
-    width: 130,
-    hide: true,
-    filter: "agSetColumnFilter",
-    filterParams: { values: ["enabled", "disabled"] },
-    sortable: false,
-  },
+  // Status deliberately not shown here — a plugin row rolls up one collection per device, so a
+  // single blended value would misrepresent devices that disagree; see the flyout's Devices tab for
+  // the real per-device breakdown instead.
   { field: "pluginVersion", headerName: "Plugin Version", width: 130, hide: true, filter: false, sortable: false },
   { field: "pluginScope", headerName: "Plugin Scope", width: 120, hide: true, filter: false, sortable: false },
   { field: "pluginMarketplace", headerName: "Marketplace", width: 170, hide: true, filter: false, sortable: false },
@@ -216,10 +209,6 @@ function shapeRow(row) {
     lastSeen: row.lastSeenEpoch > 0 ? func.prettifyEpoch(row.lastSeenEpoch) : "",
     assetTagValue: row.groupKey,
     tags: tags.length ? tags : undefined,
-    // "unknown" reads as disabled — an unreported status isn't proof a plugin is active.
-    pluginStatus: row.pluginStatus
-      ? (String(row.pluginStatus).toLowerCase() === "enabled" ? "enabled" : "disabled")
-      : undefined,
   };
 }
 

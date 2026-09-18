@@ -27,17 +27,19 @@ import MisconfiguredBadge from "./MisconfiguredBadge";
 
 const definedTableTabs = ['All', 'AI Agents', 'SaaS Agents', 'MCP Servers', 'LLMs', 'Skills', 'Plugins'];
 
-// "unknown" is treated as disabled — an unreported status is not proof a plugin is active.
-const isPluginEnabled = (status) => String(status).toLowerCase() === 'enabled';
-
 // Plugins have no endpoints, risk score, or sensitive data of their own — show which agent they
 // belong to instead (the parent/child relationship other rows show via the tree/dropdown), plus
 // their reported metadata.
 const pluginParentAgentHeader = {
     title: 'AI Agent', text: 'AI Agent', value: 'pluginParentAgentComp', textValue: 'pluginParentAgent', boxWidth: '160px',
 };
+// Replaces Risk score/Sensitive data for plugin rows — plugins have neither of their own.
+const pluginDiscoveredHeader = {
+    title: 'Discovered', text: 'Discovered', value: 'discovered', numericValue: 'discoveredAt', boxWidth: '120px',
+};
+// Status deliberately not shown here — a plugin row rolls up one collection per device, so a
+// single blended value would misrepresent devices that disagree; see the Devices page instead.
 const pluginMetadataHeaders = [
-    { title: 'Status', text: 'Status', value: 'pluginStatusComp', textValue: 'pluginStatus', boxWidth: '90px' },
     { title: 'Scope', text: 'Scope', value: 'pluginScope', boxWidth: '80px' },
     { title: 'Marketplace', text: 'Marketplace', value: 'pluginMarketplace', boxWidth: '160px' },
 ];
@@ -130,6 +132,7 @@ function shapeRow(row, { skillScoreMap = {} } = {}) {
         sensitiveSubTypes: transform.prettifySubtypes(row.sensitiveInRespTypes || [], false),
         lastTraffic: row.lastSeenEpoch > 0 ? func.prettifyEpoch(row.lastSeenEpoch) : "-",
         detectedTimestamp: row.lastSeenEpoch,
+        discovered: row.discoveredAt > 0 ? func.prettifyEpoch(row.discoveredAt) : "-",
         iconComp: (
             <Box>
                 <CollectionIcon assetTagValue={row.groupKey} displayName={row.name} />
@@ -138,12 +141,6 @@ function shapeRow(row, { skillScoreMap = {} } = {}) {
         pluginVersion: row.pluginVersion || "-",
         pluginScope: row.pluginScope || "-",
         pluginMarketplace: row.pluginMarketplace || "-",
-        pluginStatus: row.pluginStatus || "",
-        pluginStatusComp: isPlugin ? (
-            <Badge size="small" status={isPluginEnabled(row.pluginStatus) ? "success" : "warning"}>
-                {isPluginEnabled(row.pluginStatus) ? "enabled" : "disabled"}
-            </Badge>
-        ) : "-",
         // Already formatted server-side (McpClientRegistry.formatDisplayName) — e.g. "Claude", not
         // the raw "claude"/"claudecli" tag value.
         pluginParentAgent: row.pluginParentAgent || "-",
@@ -203,8 +200,9 @@ function Endpoints() {
         h[1] = { ...h[1], value: "groupNameDisplay" };
         if (selectedTab === "plugins") {
             return [
-                ...h.filter((col) => col.value !== "lastTraffic"),
+                ...h.filter((col) => !["lastTraffic", "riskScoreComp", "sensitiveSubTypes"].includes(col.value)),
                 pluginParentAgentHeader,
+                pluginDiscoveredHeader,
                 ...pluginMetadataHeaders,
             ];
         }
@@ -230,7 +228,9 @@ function Endpoints() {
     }, [usernameChoices]);
 
     const activeSortOptions = useMemo(
-        () => (selectedTab === "plugins" ? sortOptions.filter((o) => o.sortKey !== "lastSeenEpoch") : sortOptions),
+        () => (selectedTab === "plugins"
+            ? sortOptions.filter((o) => !["lastSeenEpoch", "riskScore"].includes(o.sortKey))
+            : sortOptions),
         [selectedTab],
     );
 
