@@ -277,14 +277,36 @@ public final class InsightUtil {
 
     public static final Set<String> ENDPOINT_AGENT_HOST_MARKERS = new HashSet<>(Arrays.asList("ai-agent", "chrome"));
 
-    /** Null when the host doesn't match the "<device>.<ai-agent|chrome>.<vendor>..." shape —
-     *  nothing to classify from it. */
+    // "not-attached" is a real value the endpoint-shield client reports when it captured a
+    // session before the vendor's own client identified itself (e.g. very first launch) — it
+    // names no actual vendor, so it's excluded rather than counted as one.
+    private static final String VENDOR_NOT_ATTACHED = "not-attached";
+
+    // Multiple raw hostname vendor tokens are really the same vendor under a different app/client
+    // name (native app vs. CLI vs. web domain) — collapsed to one canonical name so vendor-risk
+    // counting/grouping isn't split across near-duplicates. Keys must already be lowercase (the
+    // caller lowercases the raw token before this lookup).
+    private static final Map<String, String> VENDOR_CANONICAL_NAME = new HashMap<>();
+    static {
+        for (String alias : Arrays.asList("claude", "claude-desktop", "claudecli", "claude-cli-user", "anthropic.com", "claude.ai")) {
+            VENDOR_CANONICAL_NAME.put(alias, "anthropic");
+        }
+        for (String alias : Arrays.asList("codex", "codexcli", "chatgpt.com", "chatgpt", "openai.com")) {
+            VENDOR_CANONICAL_NAME.put(alias, "openai");
+        }
+        VENDOR_CANONICAL_NAME.put("kiro", "aws");
+    }
+
+    /** Null when the host doesn't match the "<device>.<ai-agent|chrome>.<vendor>..." shape, or
+     *  the parsed token isn't a real vendor ("not-attached") — nothing to classify from it. */
     public static String endpointVendorName(ApiCollection c) {
         if (c == null || c.getHostName() == null) return null;
         String[] parts = c.getHostName().split("\\.");
         if (parts.length < 3 || !ENDPOINT_AGENT_HOST_MARKERS.contains(parts[1])) return null;
         String vendor = parts[2].trim().toLowerCase(Locale.ROOT);
-        return vendor.isEmpty() ? null : vendor;
+        if (vendor.isEmpty() || vendor.equals(VENDOR_NOT_ATTACHED)) return null;
+        if (vendor.startsWith("copilot")) return "copilot";
+        return VENDOR_CANONICAL_NAME.getOrDefault(vendor, vendor);
     }
 
     public static final String TAG_LOCAL_MCP_SERVER = "local-mcp-server";

@@ -293,32 +293,62 @@ function AdoptionGapCard() {
     )
 }
 
-// "Vendor risk vs. exposure" — no backend yet, always blurred dummy content. A plain
-// absolutely-positioned scatter (no chart library needed — it's static and always blurred),
-// with the "act first" zone shaded top-left, matching the design's bubble-chart reference.
-function VendorRiskBubbleCard() {
+// "Vendor risk vs. exposure" — real once vendorTable has rows (the same table RiskScoreSubScoreRow
+// shows for the vendorRisk sub-score, now also on the main summary — see RiskScoreCalculator#compute).
+// x = this vendor's device count relative to the busiest vendor (exposure); y = its 0-5 risk weight
+// (KNOWN_RISKY_VENDORS/UNAPPROVED_VENDOR_WEIGHT — unapproved is a flat 3, a known-risky-but-approved
+// vendor is 5, everything else is 0). A plain absolutely-positioned scatter, not a chart library —
+// static-shaped data (a handful of vendors), so there's nothing a real chart engine buys here.
+function VendorRiskBubbleCard({ vendorTable }) {
+    const navigate = useNavigate()
+    const rows = vendorTable || []
+    const hasData = rows.length > 0
+    const maxCount = hasData ? Math.max(...rows.map((r) => r.count)) : 0
+    const points = hasData
+        ? rows.map((r) => ({
+            id: r.vendor,
+            x: maxCount > 0 ? Math.round((r.count / maxCount) * 85) + 5 : 5,
+            y: Math.round((r.weight / 5) * 80) + 10,
+            color: r.weight >= 4 ? '#dc2626' : r.weight >= 3 ? '#ca8a04' : '#16a34a',
+            label: `${r.vendor} — ${r.approved ? 'approved' : 'unapproved'}, ${r.count} device${r.count === 1 ? '' : 's'}`,
+        }))
+        : DUMMY_VENDOR_RISK_BUBBLE.map((p) => ({ ...p, color: p.actFirst ? '#dc2626' : (p.y > 50 ? '#16a34a' : '#ca8a04') }))
+
     const body = (
         <VerticalStack gap="2">
             <div style={{ position: 'relative', height: '180px', border: '1px solid #e5e7eb', borderRadius: '4px' }}>
-                <div style={{ position: 'absolute', top: 0, left: 0, right: '55%', height: '45%', background: 'rgba(220,38,38,0.08)' }} />
-                {DUMMY_VENDOR_RISK_BUBBLE.map((p) => (
-                    <div key={p.id} style={{
-                        position: 'absolute', left: `${p.x}%`, top: `${100 - p.y}%`,
-                        transform: 'translate(-50%, -50%)', width: 14, height: 14, borderRadius: '50%',
-                        background: p.actFirst ? '#dc2626' : (p.y > 50 ? '#16a34a' : '#ca8a04'),
-                    }} />
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '35%', background: 'rgba(220,38,38,0.08)' }} />
+                {points.map((p) => (
+                    <Tooltip key={p.id} content={p.label || ''}>
+                        <div style={{
+                            position: 'absolute', left: `${p.x}%`, top: `${100 - p.y}%`,
+                            transform: 'translate(-50%, -50%)', width: 14, height: 14, borderRadius: '50%',
+                            background: p.color,
+                        }} />
+                    </Tooltip>
                 ))}
             </div>
             <HorizontalStack align="space-between">
-                <Text variant="bodySm" color="subdued">Employees exposed, left to right</Text>
+                <Text variant="bodySm" color="subdued">Devices exposed, left to right</Text>
                 <Text variant="bodySm" color="critical">Above the line: act first</Text>
             </HorizontalStack>
         </VerticalStack>
     )
+
     return (
-        <CardWithHeader title="Vendor risk vs. exposure" hasData={true} minHeight="220px">
-            <DummyDataOverlay panelId="vendorRiskExposure">{body}</DummyDataOverlay>
-        </CardWithHeader>
+        <Card>
+            <Box padding="4">
+                <VerticalStack gap="4">
+                    <HorizontalStack align="space-between" blockAlign="center">
+                        <Text variant="headingSm">Vendor risk vs. exposure</Text>
+                        <Box onClick={() => navigate('/dashboard/observe/audit')} style={{ cursor: 'pointer' }}>
+                            <Text variant="bodySm" color="interactive">Registry</Text>
+                        </Box>
+                    </HorizontalStack>
+                    {hasData ? body : <DummyDataOverlay panelId="vendorRiskExposure">{body}</DummyDataOverlay>}
+                </VerticalStack>
+            </Box>
+        </Card>
     )
 }
 
@@ -705,44 +735,34 @@ function RiskScoreTrendSection() {
     )
 }
 
-// One row from any of the 5 breakdowns into a common {category, item, detail, impactPoints}
-// shape — each breakdown has a different subject (a device for threat activity/DLP, a service for
-// shadow AI, a vendor for vendor risk, a policy for compliance gaps), so there's no single field
-// name to read the "item"/"detail" off; this is the one place that knows all 5 shapes.
-function formatMovedRow(row) {
-    if (row.deviceId !== undefined) {
-        return { ...row, item: row.username || row.deviceId, detail: `${row.prior} → ${row.current}` }
+// Supporting "who/what drove it" text for one whatMoved category row — pulled from the
+// breakdown's own top-2 device/policy lists (kpi.threatActivityMovements/dlpDeviceMovements/
+// complianceGapsByPolicy), which only exist once the flyout's own fetch resolves. Shadow AI
+// exposure and Vendor risk never appear here: they aren't time-windowed (see RiskScoreCalculator's
+// addWhatMovedRow comment), so they cannot show up in kpi.whatMoved in the first place.
+function movedRowDetail(category, kpi) {
+    if (category === 'Threat activity' || category === 'DLP incidents') {
+        const rows = (category === 'Threat activity' ? kpi.threatActivityMovements : kpi.dlpDeviceMovements) || []
+        return rows.map((r) => `${r.username || r.deviceId} (${r.diff > 0 ? '+' : ''}${r.diff})`).join(', ')
     }
-    if (row.service !== undefined) {
-        return { ...row, item: row.service, detail: `${row.status.toLowerCase()} · ${row.deviceCount} device${row.deviceCount === 1 ? '' : 's'}` }
+    if (category === 'Compliance gaps') {
+        return (kpi.complianceGapsByPolicy || []).map((r) => `${r.policy} (${r.count})`).join(', ')
     }
-    if (row.vendor !== undefined) {
-        return { ...row, item: row.vendor, detail: `${row.deviceCount} device${row.deviceCount === 1 ? '' : 's'}` }
-    }
-    return { ...row, item: row.policy, detail: `${row.count} event${row.count === 1 ? '' : 's'}` }
+    return ''
 }
 
-// Real, not illustrative — top 2 from each of the 5 sub-score breakdowns (RiskScoreCalculator's
-// threatActivityDeviceMovements/dlpDeviceMovements/shadowAiTopUnapprovedServices/
-// vendorRiskTopUnapprovedDevices/complianceGapsByPolicy), combined into one table. impactPoints is
-// each row's share of its own category's total (movement for threat activity/DLP, snapshot count
-// for the other three), scaled by that sub-score's actual weight (30/25/20/15/10) — bounded by
-// that weight, so it reads against the composite's 0-100 scale instead of as a raw, unbounded count.
+// Real, not illustrative — one row per sub-score that actually moved between this window and the
+// immediately preceding one (RiskScoreCalculator#compute's whatMoved). Each row's points are
+// computed the exact same way the composite's own delta is (this sub-score's weight over the
+// composite's coveredWeight, times its own current-minus-prior) — summing every row here reproduces
+// the composite delta exactly, not approximately, because it's that same weighted-average formula
+// decomposed back into its terms.
 function RiskScoreAnnotationsSection({ kpi, loading }) {
-    const rows = [
-        ...(kpi.shadowAiTopServices || []),
-        ...(kpi.dlpDeviceMovements || []),
-        ...(kpi.vendorRiskTopUnapproved || []),
-        ...(kpi.complianceGapsByPolicy || []),
-        ...(kpi.threatActivityMovements || []),
-    ]
-        .map(formatMovedRow)
-        .sort((a, b) => Math.abs(b.impactPoints) - Math.abs(a.impactPoints))
+    const rows = (kpi.whatMoved || []).slice().sort((a, b) => Math.abs(b.impactPoints) - Math.abs(a.impactPoints))
 
     const tableRows = rows.map((row) => [
         row.category,
-        row.item,
-        row.detail,
+        movedRowDetail(row.category, kpi),
         <Text variant="bodyMd" fontWeight="semibold" color={row.impactPoints > 0 ? 'critical' : 'success'}>
             {row.impactPoints > 0 ? `+${row.impactPoints}` : row.impactPoints} pts
         </Text>,
@@ -754,7 +774,7 @@ function RiskScoreAnnotationsSection({ kpi, loading }) {
                 <VerticalStack gap="1">
                     <Text variant="headingSm">What moved the score</Text>
                     <Text variant="bodySm" color="subdued">
-                        Top items by weighted impact this period, across every sub-score
+                        Each sub-score's own contribution to this period's change — adds up to the delta above
                     </Text>
                 </VerticalStack>
                 {loading ? (
@@ -764,11 +784,11 @@ function RiskScoreAnnotationsSection({ kpi, loading }) {
                         No prior-window comparison available, or nothing changed this period.
                     </Text>
                 ) : (
-                    <Box maxWidth="620px">
+                    <Box maxWidth="480px">
                         <Card padding="0">
                             <DataTable
-                                columnContentTypes={['text', 'text', 'text', 'numeric']}
-                                headings={['Category', 'Item', 'Detail', 'Impact']}
+                                columnContentTypes={['text', 'text', 'numeric']}
+                                headings={['Category', 'Detail', 'Impact']}
                                 rows={tableRows}
                                 hideScrollIndicator
                                 increasedTableDensity
@@ -943,7 +963,7 @@ function SecurityPosture() {
         <HorizontalGrid columns={3} gap="3">
             <EnforcementFunnelCard panel={pageData.enforcementFunnel} onOpen={openPanel} />
             <AttackAttemptsCard panel={pageData.attackAttempts} onOpen={openPanel} />
-            <VendorRiskBubbleCard />
+            <VendorRiskBubbleCard vendorTable={kpiById(KPI_RISK_SCORE)?.vendorTable} />
         </HorizontalGrid>
     )
 

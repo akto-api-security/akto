@@ -110,6 +110,10 @@ final class RiskScoreCalculator {
 
         BasicDBObject kpi = PostureService.kpi(PostureService.KPI_RISK_SCORE, "AI risk score", null, null, null);
         kpi.put("unit", "score");
+        // Also needed on the main page (not just this KPI's own flyout breakdown): the Vendor risk
+        // vs. exposure card reads this directly off the summary response — vendorAnalysis is
+        // already computed above for the composite's own vendor-risk sub-score, so this is free.
+        kpi.put("vendorTable", vendorAnalysis.rows);
 
         int weightCoveredPercent = (int) Math.round(coveredWeight * 100);
         kpi.put("weightCovered", weightCoveredPercent);
@@ -149,6 +153,21 @@ final class RiskScoreCalculator {
                 // Higher is worse for this score, so a positive delta (score went up) is a bad trend.
                 kpi.put("deltaTone", current > prior ? "critical" : current < prior ? "success" : "neutral");
             }
+
+            // "What moved the score" — one row per sub-score that actually moved between windows,
+            // each row's points computed the same way the composite delta itself is: this
+            // sub-score's weight over the SAME coveredWeight, times its own (current - prior). Sum
+            // these rows and you get exactly the composite delta above — not an approximation,
+            // because it's the same renormalized-weighted-average arithmetic decomposed back out
+            // per term. shadowAiExposure/vendorRisk are deliberately absent: their "prior" value
+            // above is the current value reused (see the comment on this whole block), so their
+            // term is always exactly 0 — they cannot have moved the score this window, whatever
+            // their own snapshot breakdown (RiskScoreCalculator#computeBreakdown) shows.
+            List<BasicDBObject> whatMoved = new ArrayList<>();
+            addWhatMovedRow(whatMoved, "DLP incidents", WEIGHT_DLP, coveredWeight, dlpSubScore, priorDlpSubScore);
+            addWhatMovedRow(whatMoved, "Compliance gaps", WEIGHT_COMPLIANCE, coveredWeight, complianceSubScore, priorComplianceSubScore);
+            addWhatMovedRow(whatMoved, "Threat activity", WEIGHT_THREAT, coveredWeight, threatSubScore, priorThreatSubScore);
+            kpi.put("whatMoved", whatMoved);
         }
 
         if (shadowAiSubScore == null) {
@@ -177,6 +196,19 @@ final class RiskScoreCalculator {
                         + "score\" annotations aren't available — only a prior-window comparison is.");
 
         return kpi;
+    }
+
+    /** One "what moved" row — skipped when either side is null (sub-score not computable in one
+     *  of the two windows) or the sub-score didn't actually change. */
+    private static void addWhatMovedRow(List<BasicDBObject> whatMoved, String category, double weightFraction,
+                                         double coveredWeight, Double current, Double prior) {
+        if (current == null || prior == null || coveredWeight == 0) return;
+        double points = Math.round(((weightFraction / coveredWeight) * (current - prior)) * 10.0) / 10.0;
+        if (points == 0) return;
+        BasicDBObject row = new BasicDBObject();
+        row.put("category", category);
+        row.put("impactPoints", points);
+        whatMoved.add(row);
     }
 
     /**
@@ -282,30 +314,7 @@ final class RiskScoreCalculator {
         }
         movements.sort((a, b) -> Long.compare(
                 Math.abs(((Number) b.get("diff")).longValue()), Math.abs(((Number) a.get("diff")).longValue())));
-        return withPointsImpact(movements, WEIGHT_THREAT, "Threat activity", 2);
-    }
-
-    /**
-     * Converts a sorted (by |diff| desc) device-movements list into "what moved the score" rows:
-     * adds impactPoints — this device's share of the TOTAL movement across every device in this
-     * category (sum of |diff|), scaled by the sub-score's own weight (e.g. 10 points for Threat
-     * activity, 25 for DLP) — and a category label, then trims to topN. impactPoints is what makes
-     * the number meaningful against the composite's 0-100 scale instead of a raw, unbounded event
-     * count: no single device's row can ever show more than ±weight points, the same ceiling that
-     * sub-score has on the composite itself.
-     */
-    private static List<BasicDBObject> withPointsImpact(List<BasicDBObject> movements, double weightFraction,
-                                                          String category, int topN) {
-        long totalAbsDiff = 0;
-        for (BasicDBObject m : movements) totalAbsDiff += Math.abs(((Number) m.get("diff")).longValue());
-        double weightPoints = weightFraction * 100;
-        for (BasicDBObject m : movements) {
-            long diff = ((Number) m.get("diff")).longValue();
-            double impactPoints = totalAbsDiff == 0 ? 0 : Math.round((diff * weightPoints / totalAbsDiff) * 10.0) / 10.0;
-            m.put("impactPoints", impactPoints);
-            m.put("category", category);
-        }
-        return movements.subList(0, Math.min(topN, movements.size()));
+        return movements.subList(0, Math.min(2, movements.size()));
     }
 
     /** deviceId -> total (critical+high+medium+low) violation count, summed across every host
@@ -394,30 +403,7 @@ final class RiskScoreCalculator {
             rows.add(row);
         }
         rows.sort((a, b) -> Integer.compare(b.getInt("deviceCount"), a.getInt("deviceCount")));
-        return withCountSharePoints(rows, "deviceCount", WEIGHT_SHADOW_AI, "Shadow AI exposure", 2);
-    }
-
-    /**
-     * Same idea as {@link #withPointsImpact} but for a snapshot count (deviceCount/count) instead
-     * of a before/after diff, for the sub-scores that don't have a "movement": shadow AI exposure
-     * and vendor risk aren't time-windowed at all (see their own sub-score methods' notes), and
-     * compliance gaps is a per-policy count, not a per-device one. impactPoints here is this row's
-     * share of the TOTAL count across every row in this category (not just the top N), scaled by
-     * the sub-score's weight — the snapshot-data analog of "how much of this weight's 100-point
-     * ceiling does this one item account for".
-     */
-    private static List<BasicDBObject> withCountSharePoints(List<BasicDBObject> rows, String countField,
-                                                              double weightFraction, String category, int topN) {
-        long total = 0;
-        for (BasicDBObject r : rows) total += r.getLong(countField);
-        double weightPoints = weightFraction * 100;
-        for (BasicDBObject r : rows) {
-            double impactPoints = total == 0 ? 0
-                    : Math.round((r.getLong(countField) * weightPoints / total) * 10.0) / 10.0;
-            r.put("impactPoints", impactPoints);
-            r.put("category", category);
-        }
-        return rows.subList(0, Math.min(topN, rows.size()));
+        return rows.subList(0, Math.min(2, rows.size()));
     }
 
     /** Null only when no policy has PII detection configured at all. Zero matches with at least
@@ -477,7 +463,7 @@ final class RiskScoreCalculator {
         }
         movements.sort((a, b) -> Long.compare(
                 Math.abs(((Number) b.get("diff")).longValue()), Math.abs(((Number) a.get("diff")).longValue())));
-        return withPointsImpact(movements, WEIGHT_DLP, "DLP incidents", 2);
+        return movements.subList(0, Math.min(2, movements.size()));
     }
 
     /** deviceId -> count of events whose category resolves to a still-active, PII-detecting
@@ -565,20 +551,24 @@ final class RiskScoreCalculator {
      *  resolves to a vendor at all — nothing to build a table from, not a real 0. */
     private static VendorRiskAnalysis vendorRiskAnalysis(List<ApiCollection> endpointCollections,
                                                           Set<String> allowlistNamesLower) {
-        Map<String, Long> countByVendor = new LinkedHashMap<>();
+        // Devices, not collections: "high users" is what actually makes a vendor risky (per-user
+        // exposure), and one device can carry several collections for the same vendor across
+        // sessions — counting collections would inflate a vendor's apparent reach.
+        Map<String, Set<String>> devicesByVendor = new LinkedHashMap<>();
         for (ApiCollection c : PostureService.safe(endpointCollections)) {
             if (c == null || c.isDeactivated()) continue;
             String vendor = InsightUtil.endpointVendorName(c);
             if (vendor == null) continue;
-            countByVendor.merge(vendor, 1L, Long::sum);
+            String deviceId = InsightUtil.deviceIdOf(c);
+            devicesByVendor.computeIfAbsent(vendor, k -> new HashSet<>()).add(deviceId != null ? deviceId : "unknown");
         }
-        if (countByVendor.isEmpty()) return new VendorRiskAnalysis(new ArrayList<>(), null);
+        if (devicesByVendor.isEmpty()) return new VendorRiskAnalysis(new ArrayList<>(), null);
 
         long total = 0, unapprovedCount = 0, riskyApprovedCount = 0;
         List<BasicDBObject> rows = new ArrayList<>();
-        for (Map.Entry<String, Long> e : countByVendor.entrySet()) {
+        for (Map.Entry<String, Set<String>> e : devicesByVendor.entrySet()) {
             String vendor = e.getKey();
-            long count = e.getValue();
+            long count = e.getValue().size();
             total += count;
             boolean approved = allowlistNamesLower.contains(vendor);
             int weight = approved ? KNOWN_RISKY_VENDORS.getOrDefault(vendor, 0) : UNAPPROVED_VENDOR_WEIGHT;
@@ -626,7 +616,7 @@ final class RiskScoreCalculator {
             rows.add(row);
         }
         rows.sort((a, b) -> Integer.compare(b.getInt("deviceCount"), a.getInt("deviceCount")));
-        return withCountSharePoints(rows, "deviceCount", WEIGHT_VENDOR, "Vendor risk", 2);
+        return rows.subList(0, Math.min(2, rows.size()));
     }
 
     // ── Compliance gaps ──────────────────────────────────────────────────────────
@@ -693,6 +683,6 @@ final class RiskScoreCalculator {
             rows.add(row);
         }
         rows.sort((a, b) -> Long.compare(b.getLong("count"), a.getLong("count")));
-        return withCountSharePoints(rows, "count", WEIGHT_COMPLIANCE, "Compliance gaps", 2);
+        return rows.subList(0, Math.min(2, rows.size()));
     }
 }
