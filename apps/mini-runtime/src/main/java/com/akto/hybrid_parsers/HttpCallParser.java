@@ -357,6 +357,25 @@ public class HttpCallParser {
         return getHostnameForCollection(responseParam, parseTagsMap(responseParam.getTags()));
     }
 
+    /**
+     * Sources whose traffic getHostnameForCollection keys by bot-name instead of the raw Host
+     * header - each one gets its own dedicated, per-bot collection that no unrelated real host
+     * ever shares. isDedicatedBotCollection() relies on this same list to know when the -agentic
+     * fork is unnecessary.
+     */
+    private static boolean isRecognizedAiAgentSource(String source) {
+        return source != null && (source.equals(Constants.AI_AGENT_SOURCE_N8N)
+                || source.equals(Constants.AI_AGENT_SOURCE_LANGCHAIN)
+                || source.equals(Constants.AI_AGENT_SOURCE_COPILOT_STUDIO)
+                || source.equals(Constants.AI_AGENT_SOURCE_DATABRICS)
+                || source.equals(Constants.AI_AGENT_SOURCE_VERTEX)
+                || source.equals(Constants.AI_AGENT_SOURCE_SNOWFLAKE)
+                || source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)
+                || source.equals(Constants.AI_AGENT_SOURCE_ENDPOINT)
+                || source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK)
+                || source.equals(Constants.AI_AGENT_SOURCE_AWS_QUICK));
+    }
+
     public static String getHostnameForCollection(HttpResponseParams responseParam, Map<String, String> tagsMap) {
         // Get base hostname from headers
         String baseHostname = getHeaderValue(responseParam.getRequestParams().getHeaders(), "host");
@@ -372,17 +391,7 @@ public class HttpCallParser {
 
             // Check if this is an AI agent source
             String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
-            if (source == null || (!source.equals(Constants.AI_AGENT_SOURCE_N8N)
-                    && !source.equals(Constants.AI_AGENT_SOURCE_LANGCHAIN)
-                    && !source.equals(Constants.AI_AGENT_SOURCE_COPILOT_STUDIO)
-                    && !source.equals(Constants.AI_AGENT_SOURCE_DATABRICS)
-                    && !source.equals(Constants.AI_AGENT_SOURCE_VERTEX)
-                    && !source.equals(Constants.AI_AGENT_SOURCE_SNOWFLAKE)
-                    && !source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)
-                    && !source.equals(Constants.AI_AGENT_SOURCE_ENDPOINT)
-                    && !source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK)
-                    && !source.equals(Constants.AI_AGENT_SOURCE_AWS_QUICK)
-                    )) {
+            if (!isRecognizedAiAgentSource(source)) {
                 // Not AI agent traffic, return base hostname
                 return baseHostname;
             }
@@ -838,7 +847,7 @@ public class HttpCallParser {
     }
 
     private boolean isAgenticTraffic(Map<String, String> tagsMap) {
-        return isArgusTraffic(tagsMap) || isAtlasTraffic(tagsMap);
+        return isArgusTraffic(tagsMap) || isAtlasTraffic(tagsMap) || isBedrockAgentTraffic(tagsMap);
     }
 
     /**
@@ -1490,8 +1499,14 @@ public class HttpCallParser {
                     || GenAiCollectionUtils.checkAndTagLLMCollection(httpResponseParam).getFirst()) {
                 markAiAgentCaller(httpResponseParam, tagsMap, direction, hostName);
             }
+
             String contextSource = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+            String contextBotName = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_BOT_NAME);
             boolean isEndpointSource = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(contextSource);
+            boolean isBedrockSource = Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(contextSource)
+                    || Constants.AI_AGENT_SOURCE_AWS_QUICK.equals(contextSource);
+            boolean isDedicatedBotCollection = isEndpointSource
+                    || (isBedrockSource && contextBotName != null && !contextBotName.isEmpty());
 
             String realHostName = hostName;
 
@@ -1499,7 +1514,7 @@ public class HttpCallParser {
             ApiCollection realHostCollection = realHostCollectionId != null ? apiCollectionsMap.get(realHostCollectionId) : null;
 
             if (realHostCollection != null && !hasAtlasOrArgusTag(realHostCollection)
-                    && isAgenticEndpoint && !isEndpointSource) {
+                    && isAgenticEndpoint && !isDedicatedBotCollection) {
                 hostName = hostName + AGENTIC_COLLECTION_PREFIX;
             }
 
