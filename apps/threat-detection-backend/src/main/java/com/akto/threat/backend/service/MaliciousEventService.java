@@ -494,6 +494,11 @@ public class MaliciousEventService {
     int skip = request.hasSkip() ? request.getSkip() : 0;
     Map<String, Integer> sort = request.getSortMap();
     ListMaliciousRequestsRequest.Filter filter = request.getFilter();
+    boolean minimalFields = request.hasMinimalFields() && request.getMinimalFields();
+    List<String> excludedFields = new ArrayList<>();
+    if (minimalFields) {
+      excludedFields.addAll(Arrays.asList("metadata","latestApiOrig","payload","remediation", "evidenceLine", "humanResponse", "owaspCategories"));
+    }
 
     Document query = new Document();
     if (!filter.getActorsList().isEmpty()) {
@@ -708,7 +713,7 @@ public class MaliciousEventService {
 
       List<Document> pipeline = new ArrayList<>(Arrays.asList(
           new Document("$match", query),
-          new Document("$unset", "latestApiOrig"),
+          new Document("$unset", excludedFields),
           new Document("$sort", new Document("detectedAt", -1)),
           new Document("$group", new Document("_id", dedupeGroupKey).append("doc", new Document("$first", "$$ROOT"))),
           new Document("$replaceRoot", new Document("newRoot", "$doc"))
@@ -728,7 +733,7 @@ public class MaliciousEventService {
       cursor = maliciousEventDao.getCollection(accountId)
           .aggregate(Arrays.asList(
               new Document("$match", query),
-              new Document("$unset", "latestApiOrig"),
+              new Document("$unset", excludedFields),
               new Document("$addFields", new Document("severityRank",
                   new Document("$switch", new Document()
                       .append("branches", Arrays.asList(
@@ -750,7 +755,7 @@ public class MaliciousEventService {
       cursor = maliciousEventDao.getCollection(accountId)
           .aggregate(Arrays.asList(
               new Document("$match", query),
-              new Document("$unset", "latestApiOrig"),
+              new Document("$unset", excludedFields),
               new Document("$addFields", riskScoreSortAddFields()),
               new Document("$sort", new Document("riskScoreNum", riskScoreDir).append("detectedAt", -1)),
               new Document("$skip", skip),
@@ -761,7 +766,7 @@ public class MaliciousEventService {
       total = maliciousEventDao.countDocuments(accountId, query);
       cursor = maliciousEventDao.getCollection(accountId)
           .find(query)
-          .projection(Projections.exclude("latestApiOrig"))
+          .projection(Projections.exclude(excludedFields))
           .sort(new Document("detectedAt", sort.getOrDefault("detectedAt", -1)))
           .skip(skip)
           .limit(limit)
@@ -774,23 +779,27 @@ public class MaliciousEventService {
         pageEvents.add(cursor.next());
       }
 
-      Set<String> sessionIdsOnPage = pageEvents.stream()
-          .map(MaliciousEventDto::getSessionId)
-          .filter(id -> id != null && !id.isEmpty())
-          .collect(Collectors.toSet());
-      Set<String> validSessionIds = AgenticSessionContextDao.instance
-          .findExistingSessionIdentifiers(accountId, sessionIdsOnPage);
+      // Session-id resolution is its own extra DB round trip (findExistingSessionIdentifiers) —
+      // skipped entirely under minimal_fields, same reasoning as the metadata/owasp/etc. fields
+      // below: a caller that only needs filterId/category/host has no use for it either.
+      Set<String> validSessionIds = Collections.emptySet();
+      if (!minimalFields) {
+        Set<String> sessionIdsOnPage = pageEvents.stream()
+            .map(MaliciousEventDto::getSessionId)
+            .filter(id -> id != null && !id.isEmpty())
+            .collect(Collectors.toSet());
+        validSessionIds = AgenticSessionContextDao.instance.findExistingSessionIdentifiers(accountId, sessionIdsOnPage);
+      }
 
       List<ListMaliciousRequestsResponse.MaliciousEvent> maliciousEvents = new ArrayList<>();
       for (MaliciousEventDto evt : pageEvents) {
-        String metadata = ThreatUtils.fetchMetadataString(evt.getMetadata() != null ? evt.getMetadata() : "");
-        String resolvedSessionId = (evt.getSessionId() != null && validSessionIds.contains(evt.getSessionId()))
+        String metadata = minimalFields ? "" : ThreatUtils.fetchMetadataString(evt.getMetadata() != null ? evt.getMetadata() : "");
+        String resolvedSessionId = (!minimalFields && evt.getSessionId() != null && validSessionIds.contains(evt.getSessionId()))
             ? evt.getSessionId() : "";
 
-        maliciousEvents.add(
+        ListMaliciousRequestsResponse.MaliciousEvent.Builder builder =
             ListMaliciousRequestsResponse.MaliciousEvent.newBuilder()
                 .setActor(evt.getActor())
-                .setFilterId(evt.getFilterId())
                 .setFilterId(evt.getFilterId())
                 .setId(evt.getId())
                 .setIp(evt.getLatestApiIp())
@@ -813,21 +822,23 @@ public class MaliciousEventService {
                 .setHost(evt.getHost() != null ? evt.getHost() : "")
                 .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
                 .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
-                .setSessionId(resolvedSessionId)
-                .setRemediation(evt.getRemediation() != null ? evt.getRemediation() : "")
-                .setEvidenceLine(evt.getEvidenceLine() != null ? evt.getEvidenceLine() : "")
-                .setHumanResponse(evt.getHumanResponse() != null ? evt.getHumanResponse() : "")
-                .addAllOwaspCategories(evt.getOwaspCategories() != null
-                    ? evt.getOwaspCategories().stream()
-                        .map(o -> OwaspCategory.newBuilder()
-                            .setId(o.getId() != null ? o.getId() : "")
-                            .setName(o.getName() != null ? o.getName() : "")
-                            .setSeverity(o.getSeverity() != null ? o.getSeverity() : "")
-                            .setConfidence(o.getConfidence() != null ? o.getConfidence() : "")
-                            .build())
-                        .collect(Collectors.toList())
-                    : Collections.emptyList())
-                .build());
+                .setSessionId(resolvedSessionId);
+        if (!minimalFields) {
+          builder.setRemediation(evt.getRemediation() != null ? evt.getRemediation() : "")
+              .setEvidenceLine(evt.getEvidenceLine() != null ? evt.getEvidenceLine() : "")
+              .setHumanResponse(evt.getHumanResponse() != null ? evt.getHumanResponse() : "")
+              .addAllOwaspCategories(evt.getOwaspCategories() != null
+                  ? evt.getOwaspCategories().stream()
+                      .map(o -> OwaspCategory.newBuilder()
+                          .setId(o.getId() != null ? o.getId() : "")
+                          .setName(o.getName() != null ? o.getName() : "")
+                          .setSeverity(o.getSeverity() != null ? o.getSeverity() : "")
+                          .setConfidence(o.getConfidence() != null ? o.getConfidence() : "")
+                          .build())
+                      .collect(Collectors.toList())
+                  : Collections.emptyList());
+        }
+        maliciousEvents.add(builder.build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
           .setTotal(total)

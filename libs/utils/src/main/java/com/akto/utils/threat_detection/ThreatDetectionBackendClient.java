@@ -118,6 +118,18 @@ public final class ThreatDetectionBackendClient {
             Map<String, Object> additionalFilters,
             String contextSourceValue,
             String skillEvalMode) throws Exception {
+        return listMaliciousRequests(accountId, startTimestamp, endTimestamp, limit, additionalFilters,
+                contextSourceValue, skillEvalMode, false);
+    }
+    public static ListMaliciousRequestsResponse listMaliciousRequests(
+            int accountId,
+            int startTimestamp,
+            int endTimestamp,
+            int limit,
+            Map<String, Object> additionalFilters,
+            String contextSourceValue,
+            String skillEvalMode,
+            boolean minimalFields) throws Exception {
         String url = backendUrl() + LIST_MALICIOUS_REQUESTS_PATH;
 
         Map<String, Object> filter = new HashMap<>();
@@ -140,6 +152,9 @@ public final class ThreatDetectionBackendClient {
         sort.put("detectedAt", -1);
         body.put("sort", sort);
         body.put("filter", filter);
+        if (minimalFields) {
+            body.put("minimalFields", true);
+        }
 
         String msg = objectMapper.valueToTree(body).toString();
 

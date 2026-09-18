@@ -3,15 +3,19 @@ package com.akto.service.insights;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.GuardrailPolicies.SelectedServer;
+import com.akto.dto.McpAuditInfo;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.Constants;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Static helpers shared across insight providers — number formatting, agent-description
@@ -262,6 +266,60 @@ public final class InsightUtil {
     public static String deviceIdOf(ApiCollection c) { return com.akto.util.AgenticObserveUtil.extractEndpointId(c.getHostName()); }
     public static String serviceNameOf(ApiCollection c) { return com.akto.util.AgenticObserveUtil.extractServiceName(c.getHostName()); }
 
+    /** The name governance/approval grouping should actually key on: the canonicalized vendor
+     *  name for an endpoint-shield collection (matches how vendor-type allowlist entries are
+     *  stored — see loadAllowlistNames), falling back to the MCP-server-shaped serviceNameOf for
+     *  everything else. Shared by governanceBucket's allowlist check and
+     *  RiskScoreCalculator#shadowAiTopUnapprovedServices' own grouping, so shadow AI's breakdown
+     *  merges the same aliases ("chatgpt.com"/"codex" -> "openai") vendor risk's table already does. */
+    public static String governanceGroupingName(ApiCollection c) {
+        String vendorName = endpointVendorName(c);
+        return vendorName != null ? vendorName : serviceNameOf(c);
+    }
+
+    // ── Endpoint-shield vendor parsing ───────────────────────────────────────────
+    //
+    // Endpoint-shield/browser-extension collections (isEndpointCollection()) name their
+    // hostName "<device>.<ai-agent|chrome>.<vendor>...", where <vendor> is the AI provider
+    // itself (claude, deepseek, chatgpt, ...) — a different signal from serviceNameOf above,
+    // which is for MCP-server-shaped hosts. Shared by RiskScoreCalculator's vendor-risk
+    // sub-score/table and the Vendors allowlist tab's audit list — both need the identical
+    // parsing rule, so it lives here rather than being copied twice.
+
+    public static final Set<String> ENDPOINT_AGENT_HOST_MARKERS = new HashSet<>(Arrays.asList("ai-agent", "chrome"));
+
+    // "not-attached" is a real value the endpoint-shield client reports when it captured a
+    // session before the vendor's own client identified itself (e.g. very first launch) — it
+    // names no actual vendor, so it's excluded rather than counted as one.
+    private static final String VENDOR_NOT_ATTACHED = "not-attached";
+
+    /** Multiple raw hostname vendor tokens are really the same vendor under a different app/client
+     *  name (native app vs. CLI vs. web domain) — collapsed to one canonical name by substring
+     *  match so vendor-risk counting/grouping isn't split across near-duplicates. vendor is
+     *  already lowercased by the caller. Falls through to the raw token when nothing matches. */
+    /** Package-private (not private): InsightDataLoader#loadAllowlistNames applies this same
+     *  canonicalization to VENDOR-typed allowlist entries, so an approval stored under a raw alias
+     *  ("chatgpt.com") still matches traffic resolved to the canonical name ("openai"). */
+    static String canonicalVendorName(String vendor) {
+        if (vendor.contains("claude") || vendor.contains("anthropic")) return "Anthropic";
+        if (vendor.contains("codex") || vendor.contains("chatgpt") || vendor.contains("openai")) return "OpenAI";
+        if (vendor.contains("copilot") || vendor.contains("github")) return "Github-Copilot";
+        if (vendor.contains("kiro")) return "AWS";
+        if (vendor.contains("antigravity")) return "Antrigravity";
+        return vendor;
+    }
+
+    /** Null when the host doesn't match the "<device>.<ai-agent|chrome>.<vendor>..." shape, or
+     *  the parsed token isn't a real vendor ("not-attached") — nothing to classify from it. */
+    public static String endpointVendorName(ApiCollection c) {
+        if (c == null || c.getHostName() == null) return null;
+        String[] parts = c.getHostName().split("\\.");
+        if (parts.length < 3 || !ENDPOINT_AGENT_HOST_MARKERS.contains(parts[1])) return null;
+        String vendor = parts[2].trim().toLowerCase(Locale.ROOT);
+        if (vendor.isEmpty() || vendor.equals(VENDOR_NOT_ATTACHED)) return null;
+        return canonicalVendorName(vendor);
+    }
+
     public static final String TAG_LOCAL_MCP_SERVER = "local-mcp-server";
     public static final String TAG_BROWSER_LLM_ACCOUNT_TYPE = "browser-llm-account-type";
     public static final String TAG_LOGIN_USER_EMAIL_TYPE = "login-user-email-type";
@@ -315,5 +373,47 @@ public final class InsightUtil {
 
     public static boolean everSeenObserve(ApiCollection c) {
         return tagValues(c, Constants.AKTO_GUARDRAIL_MODE).contains(Constants.AKTO_GUARDRAIL_MODE_OBSERVE);
+    }
+
+    // ── Governance classification — sanctioned vs shadow AI ────────────────────────────
+    // Extracted from UngovernedAiRatioProvider so every caller that needs "is this tool
+    // sanctioned or shadow" (the KPI banner's sanctioned-share figure, the Shadow AI panel, the
+    // Adoption panel's per-team breakdown) shares one classifier instead of three copies quietly
+    // drifting apart. UngovernedAiRatioProvider itself now calls this rather than owning the logic.
+
+    public enum GovernanceBucket {
+        MALICIOUS, REJECTED, PERSONAL, LOCAL, SANCTIONED, UNAPPROVED, SHADOW
+    }
+
+    public static Map<String, String> remarksByServiceName(List<McpAuditInfo> auditRows) {
+        Map<String, String> remarksByServiceName = new HashMap<>();
+        if (auditRows == null) return remarksByServiceName;
+        for (McpAuditInfo a : auditRows) {
+            if (a.getMcpHost() != null && a.getRemarks() != null && !a.getRemarks().isEmpty()) {
+                remarksByServiceName.put(a.getMcpHost().toLowerCase(Locale.ROOT), a.getRemarks());
+            }
+        }
+        return remarksByServiceName;
+    }
+    public static GovernanceBucket governanceBucket(ApiCollection c, Set<String> allowlistNamesLower,
+                                                      Map<String, String> remarksByServiceNameLower) {
+        if (isMaliciousMcpServer(c)) return GovernanceBucket.MALICIOUS;
+        // Audit remarks (approved/rejected via the MCP Servers/Skills review flow) are keyed by
+        // the MCP-server-shaped service name regardless of collection type — a vendor-type
+        // endpoint collection was never going to have an audit row anyway, so this lookup just
+        // misses harmlessly for those.
+        String serviceName = serviceNameOf(c);
+        String remarks = serviceName != null ? remarksByServiceNameLower.get(serviceName.toLowerCase(Locale.ROOT)) : null;
+        if (McpAuditInfo.REMARKS_REJECTED.equals(remarks)) return GovernanceBucket.REJECTED;
+        if (isPersonalAccount(c)) return GovernanceBucket.PERSONAL;
+        if (isLocalMcp(c)) return GovernanceBucket.LOCAL;
+        // The allowlist check itself uses governanceGroupingName — the canonicalized vendor name
+        // for an endpoint-shield collection — since that's the name a VENDOR-typed allowlist entry
+        // is actually stored under (see loadAllowlistNames).
+        String groupingName = governanceGroupingName(c);
+        boolean inAllowlist = groupingName != null && allowlistNamesLower.contains(groupingName.toLowerCase(Locale.ROOT));
+        if (inAllowlist || McpAuditInfo.REMARKS_APPROVED.equals(remarks)) return GovernanceBucket.SANCTIONED;
+        if (remarks == null) return GovernanceBucket.SHADOW; // no allowlist entry, no audit row at all
+        return GovernanceBucket.UNAPPROVED; // audit row exists with blank remarks -> pending
     }
 }

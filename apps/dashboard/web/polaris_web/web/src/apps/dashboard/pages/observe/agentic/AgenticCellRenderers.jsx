@@ -6,6 +6,7 @@ import AssetIcon from "./AssetIcon";
 import { TypeBadge } from "@/apps/dashboard/components/tables/rows/AgGridRow";
 import MisconfiguredBadge from "./MisconfiguredBadge";
 import "../../../components/layouts/style.css";
+import { LegendDot } from "./AgenticStatsCard";
 
 // ─── Shared badges ────────────────────────────────────────────────────────────
 // All badges are Polaris <Badge>. Where the colour isn't in Polaris' status set
@@ -23,15 +24,12 @@ export function RiskPill({ score }) {
 // Severity badge — same pattern as TestRunResultFlyout: a .badge-wrapper-<SEVERITY>
 // wrapper colours the Polaris <Badge>, and status comes from observeFunc.getColor.
 // `children` lets callers show a count instead of the severity label (violation pills).
-export function SeverityBadge({ severity, children }) {
+export function SeverityBadge({ severity, children, useDot=false }) {
     const sev = String(severity || "").toUpperCase();
     if (!sev) return null;
     const label = children != null ? children : (sev.charAt(0) + sev.slice(1).toLowerCase());
-    return (
-        <Box as="span" className={`badge-wrapper-${sev}`}>
-            <Badge size="small" status={observeFunc.getColor(sev)}>{label}</Badge>
-        </Box>
-    );
+    const Comp = useDot ? <LegendDot color={observeFunc.getColorForSensitiveData(sev)} /> : <Box as="span" className={`badge-wrapper-${sev}`}><Badge size="small" status={observeFunc.getColor(sev)}>{label}</Badge></Box>
+    return Comp;
 }
 
 // ─── Shared schema / param cell renderers ─────────────────────────────────────

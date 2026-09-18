@@ -36,9 +36,11 @@ const ComponentHeader = ({ title, itemId, onRemove, tooltipContent }) => {
                             <Text variant='headingMd'>{title}</Text>
                         )}
                     </HorizontalStack>
-                    <div className="component-header-close-button">
-                        <Button monochrome plain icon={CancelMinor} onClick={() => onRemove(itemId)} />
-                    </div>
+                    {onRemove && (
+                        <div className="component-header-close-button">
+                            <Button monochrome plain icon={CancelMinor} onClick={() => onRemove(itemId)} />
+                        </div>
+                    )}
                 </HorizontalStack>
             </Box>
         </Box>
