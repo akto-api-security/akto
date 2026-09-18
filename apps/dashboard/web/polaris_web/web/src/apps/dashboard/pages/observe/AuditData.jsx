@@ -13,6 +13,7 @@ import GithubServerTable from "../../components/tables/GithubServerTable";
 import { MethodBox } from "./GetPrettifyEndpoint";
 import { CellType } from "../../components/tables/rows/GithubRow";
 import PersistStore from "../../../main/PersistStore";
+import Store from "../../store";
 import ConditionalApprovalModal from "../../components/modals/ConditionalApprovalModal";
 import RegistryBadge from "../../components/shared/RegistryBadge";
 import AllowlistBadge from "../../components/shared/AllowlistBadge";
@@ -26,7 +27,11 @@ import "../../components/shared/style.css";
 
 const TAB_IDS = { ALL: 'all', MCP_SERVERS: 'mcp_servers', SKILLS: 'skills', VENDORS: 'vendors' };
 const TABS_DEFAULT = ['All', 'MCP Servers', 'Skills'];
-const TABS_ENDPOINT_SECURITY = ['MCP Servers', 'Skills', 'Vendors'];
+const TABS_ENDPOINT_SECURITY_BASE = ['MCP Servers', 'Skills'];
+// Vendors is still only for the internal test account — see LeftNav's same gate on the AI
+// Security Posture nav item, which this tab was built to support.
+const VENDORS_TAB_ACCOUNT_ID = 1779231193;
+const TABS_ENDPOINT_SECURITY = [...TABS_ENDPOINT_SECURITY_BASE, 'Vendors'];
 const MCP_TYPES = ['mcp-tool', 'mcp-resource', 'mcp-prompt', 'mcp-server'];
 
 const headingsEndpointSecurity = [
@@ -447,7 +452,10 @@ function AuditData() {
     const collectionsRegistryStatusMap = PersistStore(state => state.collectionsRegistryStatusMap)
 
     const isEndpointSecurity = isEndpointSecurityCategory();
-    const definedTableTabs = isEndpointSecurity ? TABS_ENDPOINT_SECURITY : TABS_DEFAULT;
+    const activeAccount = Store(state => state.activeAccount);
+    const definedTableTabs = isEndpointSecurity
+        ? (activeAccount === VENDORS_TAB_ACCOUNT_ID ? TABS_ENDPOINT_SECURITY : TABS_ENDPOINT_SECURITY_BASE)
+        : TABS_DEFAULT;
 
     const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
     const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
@@ -1176,7 +1184,7 @@ function AuditData() {
                 if (cancelled) return;
                 setTabCounts((prev) => ({ ...prev, [TAB_IDS.SKILLS]: skillsTotal }));
             }
-            if (isEndpointSecurity && selectedTab !== TAB_IDS.VENDORS) {
+            if (isEndpointSecurity && activeAccount === VENDORS_TAB_ACCOUNT_ID && selectedTab !== TAB_IDS.VENDORS) {
                 const vendorsTotal = await countVendors();
                 if (cancelled) return;
                 setTabCounts((prev) => ({ ...prev, [TAB_IDS.VENDORS]: vendorsTotal }));
@@ -1184,7 +1192,7 @@ function AuditData() {
         })();
 
         return () => { cancelled = true; };
-    }, [isEndpointSecurity, collectionsMap, startTimestamp, endTimestamp, selectedTab])
+    }, [isEndpointSecurity, activeAccount, collectionsMap, startTimestamp, endTimestamp, selectedTab])
 
     const primaryActions = (
         <HorizontalStack gap={"2"}>
