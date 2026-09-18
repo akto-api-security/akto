@@ -5,14 +5,14 @@
 // explaining why. PANEL_EMPTY_STATE_COPY is a stub map, not final text — copy the product side
 // still owns.
 export const PANEL_EMPTY_STATE_COPY = {
-    shadowAiTrend: 'Fill me in',
-    dataLeaving: 'Fill me in',
-    enforcementFunnel: 'Fill me in',
-    attackAttempts: 'Fill me in',
-    frameworkReadiness: 'Fill me in',
-    vendorRiskExposure: 'Fill me in',
-    adoptionGap: 'Fill me in',
-    riskScoreTrend: 'Fill me in',
+    shadowAiTrend: 'All data is approved',
+    dataLeaving: 'Create policies having PII-types for detecting Data leaks',
+    enforcementFunnel: 'Create guardrail policies in Block, Alert mode.',
+    attackAttempts: 'Coming Soon',
+    frameworkReadiness: 'Attach compliances to the guardrail policies',
+    vendorRiskExposure: 'All data is safe',
+    adoptionGap: 'Coming soon',
+    riskScoreTrend: 'Coming soon',
 }
 
 // Static week-ending-now timestamps for a dummy N-week series — same [ms, value] point shape

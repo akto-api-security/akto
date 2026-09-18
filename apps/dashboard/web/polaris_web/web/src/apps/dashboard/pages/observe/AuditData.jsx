@@ -452,9 +452,9 @@ function AuditData() {
     const collectionsRegistryStatusMap = PersistStore(state => state.collectionsRegistryStatusMap)
 
     const isEndpointSecurity = isEndpointSecurityCategory();
-    const activeAccount = Store(state => state.activeAccount);
+    const activeAccount = window?.ACTIVE_ACCOUNT
     const definedTableTabs = isEndpointSecurity
-        ? (activeAccount === VENDORS_TAB_ACCOUNT_ID ? TABS_ENDPOINT_SECURITY : TABS_ENDPOINT_SECURITY_BASE)
+        ? ((activeAccount === VENDORS_TAB_ACCOUNT_ID  && window?.USER_NAME === "aryan@akto.io" )? TABS_ENDPOINT_SECURITY : TABS_ENDPOINT_SECURITY_BASE)
         : TABS_DEFAULT;
 
     const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
