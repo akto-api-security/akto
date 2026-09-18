@@ -9,6 +9,7 @@ export const PANEL_EMPTY_STATE_COPY = {
     dataLeaving: 'Create policies having PII-types for detecting Data leaks',
     enforcementFunnel: 'Create guardrail policies in Block, Alert mode.',
     attackAttempts: 'Coming Soon',
+    frameworkReadiness: 'Attach compliances to the guardrail policies',
     vendorRiskExposure: 'All data is safe',
     adoptionGap: 'Coming soon',
     riskScoreTrend: 'Coming soon',
@@ -67,6 +68,12 @@ export const DUMMY_ATTACK_ATTEMPTS = {
 
 // These panels have no backend yet at all (not "empty data" — the feature itself isn't built),
 // so unlike the conditionally-real ones above they're ALWAYS shown blurred.
+export const DUMMY_FRAMEWORK_READINESS = [
+    { id: 'nist', label: 'NIST AI RMF', value: 78, target: 85, color: '#F2B322' },
+    { id: 'iso', label: 'ISO/IEC 42001', value: 64, target: 72, color: '#F2B322' },
+    { id: 'euai', label: 'EU AI Act (GPAI)', value: 51, target: 65, color: '#F24122' },
+    { id: 'soc2', label: 'SOC 2 · AI addendum', value: 92, target: 90, color: '#23C48C' },
+]
 export const DUMMY_ADOPTION_GAP = [
     { department: 'Engineering', shadowPct: 30, approvedPct: 60, shadowSharePct: 41 },
     { department: 'Sales', shadowPct: 24, approvedPct: 68, shadowSharePct: 28 },
