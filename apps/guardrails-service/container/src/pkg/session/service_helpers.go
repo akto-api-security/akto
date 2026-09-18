@@ -150,7 +150,19 @@ func GetModifiedPayloadWithSummary(sessionMgr *SessionManager, logger *zap.Logge
 	}
 
 	sessionSummary, err := sessionMgr.GetSessionSummary(sessionID)
-	if err != nil || sessionSummary == "" {
+	if err != nil {
+		// Warn, not silence: a failed read here disables session guardrails for
+		// this turn just as completely as a failed injection does.
+		logger.Warn("Failed to read session summary, skipping injection",
+			zap.String("sessionID", sessionID),
+			zap.Error(err))
+		return payload
+	}
+	if sessionSummary == "" {
+		// Expected on the first turn of a session; anything later means the
+		// summary was generated but never stored against this session.
+		logger.Info("No session summary available, skipping injection",
+			zap.String("sessionID", sessionID))
 		return payload
 	}
 
@@ -210,7 +222,22 @@ func (promptStringInjector) Inject(body map[string]interface{}, summary string) 
 	if !ok {
 		return false
 	}
-	body["prompt"] = summary + "\n\n" + originalPrompt
+	body["prompt"] = composeWithSessionContext(summary, originalPrompt)
+	return true
+}
+
+// bodyStringInjector handles the flattened endpoint-agent shape:
+// {"body": "<user text>"}. The agent pulls the user turn out of the provider
+// request before calling us, so there is no messages array left to walk — the
+// whole user-visible payload is this one string field.
+type bodyStringInjector struct{}
+
+func (bodyStringInjector) Inject(body map[string]interface{}, summary string) bool {
+	original, ok := body["body"].(string)
+	if !ok {
+		return false
+	}
+	body["body"] = composeWithSessionContext(summary, original)
 	return true
 }
 
@@ -236,7 +263,7 @@ func (chatMessagesInjector) Inject(body map[string]interface{}, summary string) 
 			// Non-string content (multi-modal arrays) — skip and keep searching.
 			continue
 		}
-		msg["content"] = summary + "\n\n" + content
+		msg["content"] = composeWithSessionContext(summary, content)
 		return true
 	}
 	return false
@@ -245,6 +272,7 @@ func (chatMessagesInjector) Inject(body map[string]interface{}, summary string) 
 // summaryInjectors is the ordered registry of body-shape strategies.
 var summaryInjectors = []summaryInjector{
 	promptStringInjector{},
+	bodyStringInjector{},
 	chatMessagesInjector{},
 }
 
