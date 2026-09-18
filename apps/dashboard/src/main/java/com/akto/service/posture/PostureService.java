@@ -70,7 +70,7 @@ public class PostureService {
     // filter, same convention ATTACK_TREND_WEEKS already uses), not the page's selected range:
     // a mover is about "did this cross a threshold recently", which should read the same
     // regardless of what range someone happens to have the page filtered to.
-    public static final int BIGGEST_MOVERS_WINDOW_DAYS = 14;
+    public static final int BIGGEST_MOVERS_WINDOW_DAYS = 30;
     private static final int BIGGEST_MOVERS_DEVICE_THRESHOLD = 20;
     private static final int BIGGEST_MOVERS_ATTACK_THRESHOLD = 1000;
     private static final int BIGGEST_MOVERS_MAX_PER_CONDITION = 3;

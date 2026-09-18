@@ -613,7 +613,7 @@ function BiggestMoversCard({ biggestMovers }) {
     if (movers.length === 0) {
         return (
             <CardWithHeader title="Biggest movers" hasData={false}
-                emptyMessage="No vendor crossed a threshold in the last 2 weeks." minHeight="160px" />
+                emptyMessage="No vendor crossed a threshold in the last 1 month." minHeight="160px" />
         )
     }
     return (
