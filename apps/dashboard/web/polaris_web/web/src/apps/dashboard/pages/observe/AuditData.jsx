@@ -29,7 +29,7 @@ const TABS_DEFAULT = ['All', 'MCP Servers', 'Skills'];
 const TABS_ENDPOINT_SECURITY_BASE = ['MCP Servers', 'Skills'];
 // Vendors is still only for the internal test account — see LeftNav's same gate on the AI
 // Security Posture nav item, which this tab was built to support.
-const VENDORS_TAB_ACCOUNT_ID = 1000000;
+const VENDORS_TAB_ACCOUNT_ID = 1779231193;
 const TABS_ENDPOINT_SECURITY = [...TABS_ENDPOINT_SECURITY_BASE, 'Vendors'];
 const MCP_TYPES = ['mcp-tool', 'mcp-resource', 'mcp-prompt', 'mcp-server'];
 
@@ -453,7 +453,7 @@ function AuditData() {
     const isEndpointSecurity = isEndpointSecurityCategory();
     const activeAccount = window?.ACTIVE_ACCOUNT
     const definedTableTabs = isEndpointSecurity
-        ? ((activeAccount === VENDORS_TAB_ACCOUNT_ID  && window?.USER_NAME === "aryan@akto.io" )? TABS_ENDPOINT_SECURITY : TABS_ENDPOINT_SECURITY_BASE)
+        ? (activeAccount === VENDORS_TAB_ACCOUNT_ID ? TABS_ENDPOINT_SECURITY : TABS_ENDPOINT_SECURITY_BASE)
         : TABS_DEFAULT;
 
     const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
