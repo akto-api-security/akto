@@ -66,7 +66,10 @@ import java.util.concurrent.TimeUnit;
 public class InsightDataLoader {
 
     private static final LoggerMaker logger = new LoggerMaker(InsightDataLoader.class, LogDb.DASHBOARD);
-    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
+    // Up to 13 tasks can be in flight at once from a single load() call (10 Mongo reads + 3
+    // threat-backend calls, see below) — sized to fit that without queueing, since every one of
+    // them is I/O-bound (waiting on Mongo/HTTP, not CPU), not the "one thread per CPU core" case.
+    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(16);
     private static final int EXTERNAL_CALL_TIMEOUT_SECONDS = 8;
 
     public InsightDataBundle load(InsightContext ctx) {
@@ -79,16 +82,17 @@ public class InsightDataLoader {
         final CONTEXT_SOURCE contextSource = ctx.getContextSource();
         InsightsThreatBackendAccess threatAccess = new InsightsThreatBackendAccess();
 
-        Future<List<HostSeverityCount>> hostSeverityFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
-                () -> threatAccess.hostSeverityCounts(ctx.getStartTs(), ctx.getEndTs())));
-        Future<List<ThreatCategoryCount>> subCategoryFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
-                () -> threatAccess.subcategoryWiseCounts(ctx.getStartTs(), ctx.getEndTs())));
-        Future<List<SkillSeverityCount>> skillSeverityFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
-                () -> threatAccess.skillSeverityCounts(ctx.getStartTs(), ctx.getEndTs())));
+        Future<List<HostSeverityCount>> hostSeverityFuture = submitTimed(accountId, userId, contextSource,
+                "hostSeverityFuture (threat backend)", () -> threatAccess.hostSeverityCounts(ctx.getStartTs(), ctx.getEndTs()), List::size);
+        Future<List<ThreatCategoryCount>> subCategoryFuture = submitTimed(accountId, userId, contextSource,
+                "subCategoryFuture (threat backend)", () -> threatAccess.subcategoryWiseCounts(ctx.getStartTs(), ctx.getEndTs()), List::size);
+        Future<List<SkillSeverityCount>> skillSeverityFuture = submitTimed(accountId, userId, contextSource,
+                "skillSeverityFuture (threat backend)", () -> threatAccess.skillSeverityCounts(ctx.getStartTs(), ctx.getEndTs()), List::size);
 
-        // Every step below runs sequentially (only the three threat-backend futures above are
-        // concurrent) — each is timed individually so a slow one is visible in the logs instead of
-        // only seeing the total. See logStep's own note on what to do with these numbers.
+        // collections/activeCollections run first and synchronously — cheap on their own (tens of
+        // ms), but sensitiveByCollection/collectionLastTrafficSeen below need their results, so
+        // they can't be dispatched until these two resolve. Every other step here is independent
+        // of every other one, so all nine go out as futures together right after.
         long t0 = System.currentTimeMillis();
         List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                 Filters.empty(),
@@ -99,50 +103,43 @@ public class InsightDataLoader {
         Map<String, List<ApiCollection>> collectionsByServiceName = indexByServiceName(collections);
 
         t0 = System.currentTimeMillis();
-        Map<String, String> deviceIdToUsername = loadDeviceIdToUsername();
-        logStep("deviceIdToUsername", t0, deviceIdToUsername.size());
-
-        t0 = System.currentTimeMillis();
-        Map<String, List<DeviceTag>> userTags = loadUserTags();
-        logStep("userTags (AgentUsersDao.findAll, unbounded)", t0, userTags.size());
-
-        t0 = System.currentTimeMillis();
-        List<McpAuditInfo> auditRows = loadAuditRows(contextSource);
-        logStep("auditRows (limit 5000)", t0, auditRows.size());
-
-        t0 = System.currentTimeMillis();
-        List<GuardrailPolicies> policies = loadPolicies();
-        logStep("policies (limit 5000 + per-policy device-tag resolution)", t0, policies.size());
-
-        t0 = System.currentTimeMillis();
-        Set<String> allowlistNamesLower = loadAllowlistNames();
-        logStep("allowlistNamesLower (McpAllowlistDao.findAll, unbounded)", t0, allowlistNamesLower.size());
-
-        t0 = System.currentTimeMillis();
-        Map<Integer, List<String>> sensitiveByCollection = loadSensitiveByCollection(collections);
-        logStep("sensitiveByCollection (3x SingleTypeInfoDao scans + per-collection lookup)", t0, sensitiveByCollection.size());
-
-        t0 = System.currentTimeMillis();
-        List<UserAnalysisData> userAnalysis = loadUserAnalysis();
-        logStep("userAnalysis (UserAnalysisDataDao.findAll, unbounded)", t0, userAnalysis.size());
-
-        t0 = System.currentTimeMillis();
-        List<NhiIdentity> nhiIdentities = loadNhiIdentities();
-        logStep("nhiIdentities (NhiIdentityDao.findAll, unbounded)", t0, nhiIdentities.size());
-
-        t0 = System.currentTimeMillis();
         List<ApiCollection> activeCollections = loadActiveCollections();
         logStep("activeCollections", t0, activeCollections.size());
 
-        t0 = System.currentTimeMillis();
-        Map<Integer, Integer> collectionLastTrafficSeen = loadCollectionLastTrafficSeen(activeCollections);
-        logStep("collectionLastTrafficSeen", t0, collectionLastTrafficSeen.size());
+        Future<Map<String, String>> deviceIdToUsernameFuture =
+                submitTimed(accountId, userId, contextSource, "deviceIdToUsername", this::loadDeviceIdToUsername, Map::size);
+        Future<Map<String, List<DeviceTag>>> userTagsFuture =
+                submitTimed(accountId, userId, contextSource, "userTags (AgentUsersDao.findAll, unbounded)", this::loadUserTags, Map::size);
+        Future<List<McpAuditInfo>> auditRowsFuture = submitTimed(accountId, userId, contextSource,
+                "auditRows (limit 5000)", () -> loadAuditRows(contextSource), List::size);
+        Future<List<GuardrailPolicies>> policiesFuture = submitTimed(accountId, userId, contextSource,
+                "policies (limit 5000 + per-policy device-tag resolution)", this::loadPolicies, List::size);
+        Future<Set<String>> allowlistNamesLowerFuture = submitTimed(accountId, userId, contextSource,
+                "allowlistNamesLower (McpAllowlistDao.findAll, unbounded)", this::loadAllowlistNames, Set::size);
+        Future<Map<Integer, List<String>>> sensitiveByCollectionFuture = submitTimed(accountId, userId, contextSource,
+                "sensitiveByCollection (3x SingleTypeInfoDao scans + per-collection lookup)",
+                () -> loadSensitiveByCollection(collections), Map::size);
+        Future<List<UserAnalysisData>> userAnalysisFuture = submitTimed(accountId, userId, contextSource,
+                "userAnalysis (UserAnalysisDataDao.findAll, unbounded)", this::loadUserAnalysis, List::size);
+        Future<List<NhiIdentity>> nhiIdentitiesFuture = submitTimed(accountId, userId, contextSource,
+                "nhiIdentities (NhiIdentityDao.findAll, unbounded)", this::loadNhiIdentities, List::size);
+        Future<Map<Integer, Integer>> collectionLastTrafficSeenFuture = submitTimed(accountId, userId, contextSource,
+                "collectionLastTrafficSeen", () -> loadCollectionLastTrafficSeen(activeCollections), Map::size);
+
+        Map<String, String> deviceIdToUsername = getOrEmpty(deviceIdToUsernameFuture, new HashMap<>(), "deviceIdToUsername");
+        Map<String, List<DeviceTag>> userTags = getOrEmpty(userTagsFuture, new HashMap<>(), "userTags");
+        List<McpAuditInfo> auditRows = getOrEmpty(auditRowsFuture, Collections.emptyList(), "auditRows");
+        List<GuardrailPolicies> policies = getOrEmpty(policiesFuture, Collections.emptyList(), "policies");
+        Set<String> allowlistNamesLower = getOrEmpty(allowlistNamesLowerFuture, Collections.emptySet(), "allowlistNamesLower");
+        Map<Integer, List<String>> sensitiveByCollection = getOrEmpty(sensitiveByCollectionFuture, Collections.emptyMap(), "sensitiveByCollection");
+        List<UserAnalysisData> userAnalysis = getOrEmpty(userAnalysisFuture, Collections.emptyList(), "userAnalysis");
+        List<NhiIdentity> nhiIdentities = getOrEmpty(nhiIdentitiesFuture, Collections.emptyList(), "nhiIdentities");
+        Map<Integer, Integer> collectionLastTrafficSeen = getOrEmpty(collectionLastTrafficSeenFuture, Collections.emptyMap(), "collectionLastTrafficSeen");
 
         boolean threatBackendAvailable = true;
         List<HostSeverityCount> hostSeverityCounts;
         List<ThreatCategoryCount> subCategoryCounts;
         List<SkillSeverityCount> skillSeverityCounts;
-        t0 = System.currentTimeMillis();
         try {
             hostSeverityCounts = hostSeverityFuture.get(EXTERNAL_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (Exception e) {
@@ -150,8 +147,6 @@ public class InsightDataLoader {
             hostSeverityCounts = Collections.emptyList();
             threatBackendAvailable = false;
         }
-        logStep("hostSeverityFuture.get (threat backend)", t0, hostSeverityCounts.size());
-        t0 = System.currentTimeMillis();
         try {
             subCategoryCounts = subCategoryFuture.get(EXTERNAL_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (Exception e) {
@@ -159,8 +154,6 @@ public class InsightDataLoader {
             subCategoryCounts = Collections.emptyList();
             threatBackendAvailable = false;
         }
-        logStep("subCategoryFuture.get (threat backend)", t0, subCategoryCounts.size());
-        t0 = System.currentTimeMillis();
         try {
             skillSeverityCounts = skillSeverityFuture.get(EXTERNAL_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (Exception e) {
@@ -168,7 +161,6 @@ public class InsightDataLoader {
             skillSeverityCounts = Collections.emptyList();
             threatBackendAvailable = false;
         }
-        logStep("skillSeverityFuture.get (threat backend)", t0, skillSeverityCounts.size());
 
         logger.info("InsightDataLoader: load() total " + (System.currentTimeMillis() - loadStart)
                 + "ms for accountId=" + accountId);
@@ -179,9 +171,35 @@ public class InsightDataLoader {
                 activeCollections, collectionLastTrafficSeen, threatAccess);
     }
 
-    /** Logs how long one load() step took plus the row count it produced — the row count is what
-     *  tells "slow because unindexed" apart from "slow because genuinely large", which is exactly
-     *  what decides whether the fix is an index/projection or a limit/skip-based page size. */
+    /** Submits one load() step to run concurrently with every other one, timing its actual work
+     *  (not the caller's wait for it, since these are all dispatched together) and logging the row
+     *  count it produced — the row count is what tells "slow because unindexed" apart from "slow
+     *  because genuinely large", which is exactly what decides whether the fix is an index/
+     *  projection or a limit/skip-based page size. Context ThreadLocals are re-set the same way
+     *  the three threat-backend futures already do. */
+    private <T> Future<T> submitTimed(int accountId, Integer userId, CONTEXT_SOURCE contextSource, String label,
+                                       Callable<T> body, java.util.function.ToIntFunction<T> rowCount) {
+        return EXECUTOR.submit(withContext(accountId, userId, contextSource, () -> {
+            long t0 = System.currentTimeMillis();
+            T result = body.call();
+            logStep(label, t0, rowCount.applyAsInt(result));
+            return result;
+        }));
+    }
+
+    /** Every one of submitTimed's own callables already catches its own exceptions and returns an
+     *  empty collection (same "log and return empty" convention as the rest of this class) — this
+     *  only guards the future itself timing out or being interrupted, which would otherwise fail
+     *  the whole bundle for one slow/stuck Mongo call. */
+    private <T> T getOrEmpty(Future<T> future, T empty, String label) {
+        try {
+            return future.get(EXTERNAL_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            logger.error("InsightDataLoader: " + label + " future failed/timed out: " + e.getMessage());
+            return empty;
+        }
+    }
+
     private void logStep(String label, long startMs, int rowCount) {
         logger.info("InsightDataLoader: " + label + " took " + (System.currentTimeMillis() - startMs)
                 + "ms, " + rowCount + " rows");

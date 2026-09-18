@@ -120,10 +120,10 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
             // (for its own week-over-week delta) the preceding one.
             Future<List<DashboardMaliciousEvent>> priorAllThreatsFuture = hasPriorWindow
                     ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
-                            () -> fetchAllMaliciousEvents(priorStart, startTimestamp, MAX_THREAT_FETCH_LIMIT, null)))
+                            () -> fetchAllMaliciousEvents(priorStart, startTimestamp, MAX_THREAT_FETCH_LIMIT, null, null, true)))
                     : null;
             Future<List<DashboardMaliciousEvent>> allThreatsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
-                    () -> fetchAllMaliciousEvents(startTimestamp, endTimestamp, MAX_THREAT_FETCH_LIMIT, null)));
+                    () -> fetchAllMaliciousEvents(startTimestamp, endTimestamp, MAX_THREAT_FETCH_LIMIT, null, null, true)));
             Future<Map<String, ThreatComplianceInfo>> threatComplianceMapFuture = EXECUTOR.submit(withContext(
                     accountId, userId, contextSource, GuardrailMetricsProcessor::fetchThreatComplianceMap));
             Future<Long> totalInspectedActionsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
@@ -214,7 +214,7 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
             Future<InsightDataBundle> bundleFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
                     () -> insightService.getOrLoadBundle(ctx)));
             Future<List<DashboardMaliciousEvent>> allThreatsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
-                    () -> fetchAllMaliciousEvents(startTimestamp, endTimestamp, MAX_THREAT_FETCH_LIMIT, null)));
+                    () -> fetchAllMaliciousEvents(startTimestamp, endTimestamp, MAX_THREAT_FETCH_LIMIT, null, null, true)));
             Future<Map<String, ThreatComplianceInfo>> threatComplianceMapFuture = EXECUTOR.submit(withContext(
                     accountId, userId, contextSource, GuardrailMetricsProcessor::fetchThreatComplianceMap));
             Future<List<HostSeverityCount>> priorHostSeverityFuture = hasPriorWindow
@@ -225,7 +225,7 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
             // per-event host, which bundle.subCategoryCounts doesn't carry).
             Future<List<DashboardMaliciousEvent>> priorAllThreatsFuture = hasPriorWindow
                     ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
-                            () -> fetchAllMaliciousEvents(priorStart, startTimestamp, MAX_THREAT_FETCH_LIMIT, null)))
+                            () -> fetchAllMaliciousEvents(priorStart, startTimestamp, MAX_THREAT_FETCH_LIMIT, null, null, true)))
                     : null;
 
             InsightDataBundle bundle = timedGet("fetchRiskScoreBreakdown: bundleFuture", bundleFuture);
