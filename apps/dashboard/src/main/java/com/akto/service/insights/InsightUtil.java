@@ -282,19 +282,17 @@ public final class InsightUtil {
     // names no actual vendor, so it's excluded rather than counted as one.
     private static final String VENDOR_NOT_ATTACHED = "not-attached";
 
-    // Multiple raw hostname vendor tokens are really the same vendor under a different app/client
-    // name (native app vs. CLI vs. web domain) — collapsed to one canonical name so vendor-risk
-    // counting/grouping isn't split across near-duplicates. Keys must already be lowercase (the
-    // caller lowercases the raw token before this lookup).
-    private static final Map<String, String> VENDOR_CANONICAL_NAME = new HashMap<>();
-    static {
-        for (String alias : Arrays.asList("claude", "claude-desktop", "claudecli", "claude-cli-user", "anthropic.com", "claude.ai")) {
-            VENDOR_CANONICAL_NAME.put(alias, "anthropic");
-        }
-        for (String alias : Arrays.asList("codex", "codexcli", "chatgpt.com", "chatgpt", "openai.com")) {
-            VENDOR_CANONICAL_NAME.put(alias, "openai");
-        }
-        VENDOR_CANONICAL_NAME.put("kiro", "aws");
+    /** Multiple raw hostname vendor tokens are really the same vendor under a different app/client
+     *  name (native app vs. CLI vs. web domain) — collapsed to one canonical name by substring
+     *  match so vendor-risk counting/grouping isn't split across near-duplicates. vendor is
+     *  already lowercased by the caller. Falls through to the raw token when nothing matches. */
+    private static String canonicalVendorName(String vendor) {
+        if (vendor.contains("claude") || vendor.contains("anthropic")) return "Anthropic";
+        if (vendor.contains("codex") || vendor.contains("chatgpt") || vendor.contains("openai")) return "OpenAI";
+        if (vendor.contains("copilot") || vendor.contains("github")) return "Github-Copilot";
+        if (vendor.contains("kiro")) return "AWS";
+        if (vendor.contains("antigravity")) return "Antrigravity";
+        return vendor;
     }
 
     /** Null when the host doesn't match the "<device>.<ai-agent|chrome>.<vendor>..." shape, or
@@ -305,8 +303,7 @@ public final class InsightUtil {
         if (parts.length < 3 || !ENDPOINT_AGENT_HOST_MARKERS.contains(parts[1])) return null;
         String vendor = parts[2].trim().toLowerCase(Locale.ROOT);
         if (vendor.isEmpty() || vendor.equals(VENDOR_NOT_ATTACHED)) return null;
-        if (vendor.startsWith("copilot")) return "copilot";
-        return VENDOR_CANONICAL_NAME.getOrDefault(vendor, vendor);
+        return canonicalVendorName(vendor);
     }
 
     public static final String TAG_LOCAL_MCP_SERVER = "local-mcp-server";

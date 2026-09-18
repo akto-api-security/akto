@@ -784,17 +784,15 @@ function RiskScoreAnnotationsSection({ kpi, loading }) {
                         No prior-window comparison available, or nothing changed this period.
                     </Text>
                 ) : (
-                    <Box maxWidth="480px">
-                        <Card padding="0">
-                            <DataTable
-                                columnContentTypes={['text', 'text', 'numeric']}
-                                headings={['Category', 'Detail', 'Impact']}
-                                rows={tableRows}
-                                hideScrollIndicator
-                                increasedTableDensity
-                            />
-                        </Card>
-                    </Box>
+                    <Card padding="0">
+                        <DataTable
+                            columnContentTypes={['text', 'text', 'numeric']}
+                            headings={['Category', 'Detail', 'Impact']}
+                            rows={tableRows}
+                            hideScrollIndicator
+                            increasedTableDensity
+                        />
+                    </Card>
                 )}
             </VerticalStack>
         </Box>
