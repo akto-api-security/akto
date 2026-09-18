@@ -73,22 +73,32 @@ type mcpListCache struct {
 	mu             sync.RWMutex
 }
 
+// claudeInfoCache caches deviceLabel -> agentType -> that surface's Claude login, used to scope
+// user-targeted policies to the org a request actually came from. See claude_org_match.go.
+type claudeInfoCache struct {
+	byDevice    map[string]map[string]dbabstractor.ClaudeDesktopInfo
+	lastFetched time.Time
+	mu          sync.RWMutex
+}
+
 // Service handles payload validation using akto-gateway library
 type Service struct {
-	config                *config.Config
-	dbClient              *dbabstractor.Client
-	processor             mcp.RequestProcessor // Default processor (skipThreat=false)
-	logger                *zap.Logger
-	cache                 *policyCache
-	mcpListCache          *mcpListCache
-	collectionTagsCache   *collectionTagsCache
-	sessionMgr            *session.SessionManager // Our session manager implementation for session tracking
-	anomalyDetector       *session.AnomalyDetector
-	schemaFetcher         *SchemaFetcher
-	skipPaths             *pathSkipper
-	policyRefreshGroup    singleflight.Group
-	allowlistRefreshGroup singleflight.Group
-	threatAPIClient       *threatapi.Client
+	config                 *config.Config
+	dbClient               *dbabstractor.Client
+	processor              mcp.RequestProcessor // Default processor (skipThreat=false)
+	logger                 *zap.Logger
+	cache                  *policyCache
+	mcpListCache           *mcpListCache
+	claudeInfoCache        *claudeInfoCache
+	collectionTagsCache    *collectionTagsCache
+	sessionMgr             *session.SessionManager // Our session manager implementation for session tracking
+	anomalyDetector        *session.AnomalyDetector
+	schemaFetcher          *SchemaFetcher
+	skipPaths              *pathSkipper
+	policyRefreshGroup     singleflight.Group
+	allowlistRefreshGroup  singleflight.Group
+	claudeInfoRefreshGroup singleflight.Group
+	threatAPIClient        *threatapi.Client
 }
 
 // NewService creates a new validator service
@@ -163,6 +173,7 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		logger:              logger,
 		cache:               &policyCache{},
 		mcpListCache:        &mcpListCache{},
+		claudeInfoCache:     &claudeInfoCache{},
 		collectionTagsCache: &collectionTagsCache{byHostName: make(map[string]map[string]string)},
 		sessionMgr:          sessionManager,
 		anomalyDetector:     anomalyDetector,
@@ -400,14 +411,30 @@ func deviceLabelFromMcpServerName(mcpServerName string) string {
 	return ""
 }
 
-// deviceIDsContain reports whether ids contains label (exact match — device labels embedded in
-// MCP server names are not user-supplied free text, unlike UserMetadata email/device matching).
+// deviceIDsContain reports whether ids contains label, compared case-insensitively.
+//
+// Whole-string still: no prefix, suffix or substring matching, so a device label lifted off a
+// Host header can never widen its own scope. Only the casing is forgiven, because the two
+// sides of this comparison are minted independently and their casing drifts:
+//
+//   - applyToDeviceIds comes from module_info.name, which is frozen when the document is
+//     created (the heartbeat upsert keys on it) — so it preserves the email casing of that
+//     moment, e.g. "AlexTaylor" from Alex.Taylor@corp.com.
+//   - The label is re-derived from the CURRENT login on every session, and the browser
+//     extension prefers the page-detected account over the Chrome profile one — so the same
+//     person now sends "alextaylor" from alex.taylor@corp.com.
+//
+// Compared exactly, that mismatch silently drops a targeted policy: it is filtered out before
+// any detector runs, so the traffic is never inspected and nothing is reported. Matching the
+// way every other identity comparison here already does (findUserMetadataByEmail,
+// isServerApproved, and the dashboard's lowercased device tags) keeps the same person matched
+// across a casing change.
 func deviceIDsContain(ids []string, label string) bool {
 	if label == "" {
 		return false
 	}
 	for _, id := range ids {
-		if id == label {
+		if strings.EqualFold(id, label) {
 			return true
 		}
 	}
@@ -425,8 +452,9 @@ func deviceIDsContain(ids []string, label string) bool {
 // ApplyToDeviceIds already has device/tag Include-vs-Exclude baked in server-side, so labelMatched
 // needs no further negation. UserMetadata has no such resolution, so NegatedTargetUserNames is
 // applied here instead, against the actual request's email.
-func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName string, headers map[string]string) []types.Policy {
+func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName string, headers map[string]string, path string) []types.Policy {
 	deviceLabel := deviceLabelFromMcpServerName(mcpServerName)
+	host := extractHostHeader(headers)
 	email := ""
 	emailResolved := false
 
@@ -448,9 +476,22 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 			}
 			if email != "" {
 				emailMatched = findUserMetadataByEmail(p.UserMetadata, email) != nil
-				if p.NegatedTargetUserNames {
-					emailMatched = !emailMatched
-				}
+			}
+			// Org is a second independent way to match: a policy naming a user in an org applies
+			// to that org's Claude traffic even when the request's own email is not one of the
+			// listed rows. The two routes read disjoint rows — findUserMetadataByEmail skips
+			// org-carrying rows precisely so an org pick cannot also match by its plain email —
+			// so this OR widens across rows, never re-widens a row the author scoped down.
+			orgMatched := s.orgMatchesAny(p.UserMetadata, host, deviceLabel, path)
+			emailMatched = emailMatched || orgMatched
+			// Negate OUTSIDE the email guard: an unidentified request is, by definition, not one
+			// of the excluded people, so an Exclude list must still cover it. Negating only when
+			// an email resolved would drop the policy for every client that sends no
+			// x-akto-installer-user_email header (Claude Desktop, mirrored traffic) — failing
+			// open on exactly the requests nobody has vouched for. Negation also wraps the whole
+			// user predicate (email OR org), so excluding a user excludes them by either route.
+			if p.NegatedTargetUserNames {
+				emailMatched = !emailMatched
 			}
 		}
 
@@ -463,6 +504,9 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 			zap.String("email", email),
 			zap.Bool("labelMatched", labelMatched),
 			zap.Bool("emailMatched", emailMatched),
+			// Without this, an emailMatched=true on a policy whose user list does NOT contain the
+			// request's email is indistinguishable from a bug — it's the Exclude list working.
+			zap.Bool("negatedTargetUserNames", p.NegatedTargetUserNames),
 			zap.Bool("matched", matched))
 		if matched {
 			filtered = append(filtered, p)
@@ -471,11 +515,38 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 	return filtered
 }
 
-// findUserMetadataByEmail returns the first UserMetadata row whose UserEmail matches email
-// case-insensitively, or nil if none match.
+// findUserMetadataByEmail returns the first UserMetadata row matching email case-insensitively,
+// or nil if none match.
+//
+// Rows carrying an org in their UserId are deliberately skipped. Such a row is what the dashboard
+// writes when the policy author picked one specific Claude org for a person, and its UserEmail is
+// that person's ordinary email — identical in every org they belong to. Matching it here would fire
+// the policy for that person everywhere, on every org and on non-Claude hosts too, which is the
+// exact scoping the author picked the org row to avoid. These rows match only via orgMatchesAny.
+// Picking the person AND one of their orgs writes both rows, so the plain row still matches by
+// email and the union behaves as "everywhere" — which is what picking both means.
+//
+// UserEmail is the field to match on, but a row whose pick never resolved to an identity doc
+// carries no email at all: GuardrailPoliciesAction synthesizes it with
+// setUserEmail(moduleInfoEmailsByUsername.get(userName)), which is null whenever module_info has
+// no entry under that exact username — and the dashboard offers email-shaped usernames as picks,
+// so the address is often sitting in UserName instead.
+//
+// Such a row can never match on UserEmail, which silently inverts the policy: an Include list
+// matches nobody and enforces nothing, while an Exclude list turns "matched nobody" into "matches
+// everybody" and exempts nobody. Both leave the targeted people getting the opposite of what was
+// configured, with the dashboard still showing the selection (it reads back UserName, which is
+// present). Falling back to UserName only when UserEmail is empty recovers those rows without
+// widening a row that does carry an email — there, UserEmail stays the single source of truth.
 func findUserMetadataByEmail(rows []types.AgenticUsers, email string) *types.AgenticUsers {
 	for i := range rows {
+		if orgUUIDFromUserID(rows[i].UserId) != "" {
+			continue
+		}
 		if strings.EqualFold(rows[i].UserEmail, email) {
+			return &rows[i]
+		}
+		if rows[i].UserEmail == "" && strings.EqualFold(rows[i].UserName, email) {
 			return &rows[i]
 		}
 	}
@@ -503,6 +574,38 @@ func (s *Service) filterApprovedServers(policies []types.Policy, mcpServerName s
 		filtered = append(filtered, p)
 	}
 	return filtered
+}
+
+func (s *Service) applicablePolicies(policies []types.Policy, valCtx *mcp.ValidationContext) []types.Policy {
+	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
+	// Endpoint is valCtx's copy of the request path — see validationContextFromParams — which
+	// filterPoliciesByDevice needs for org matching (orgMatchesAny).
+	policies = s.filterPoliciesByDevice(policies, valCtx.McpServerName, valCtx.RequestHeaders, valCtx.Endpoint)
+	// Bypass "approval" policies whose server is already approved (allow, no threat).
+	return s.filterApprovedServers(policies, valCtx.McpServerName)
+}
+
+func (s *Service) HasApplicablePolicies(contextSource, requestHeaders string) (bool, error) {
+	policies, _, compiledRules, _, err := s.getCachedPolicies(contextSource)
+	if err != nil {
+		return false, fmt.Errorf("failed to load policies: %w", err)
+	}
+
+	// Only McpServerName and RequestHeaders are read by the filters; the rest of the
+	// context is irrelevant to which policies apply.
+	valCtx := s.validationContextFromParams(&models.ValidateRequestParams{
+		ContextSource:  contextSource,
+		RequestHeaders: requestHeaders,
+	}, "", "", "", "HasApplicablePolicies", nil, compiledRules)
+
+	applicable := s.applicablePolicies(policies, valCtx)
+	s.logger.Debug("HasApplicablePolicies - resolved",
+		zap.String("contextSource", contextSource),
+		zap.String("mcpServerName", valCtx.McpServerName),
+		zap.Int("candidateCount", len(policies)),
+		zap.Int("applicableCount", len(applicable)),
+		zap.Strings("applicablePolicies", policyNames(applicable)))
+	return len(applicable) > 0, nil
 }
 
 // isServerApproved reports whether mcpServerName has a currently-valid approval entry.
@@ -1840,12 +1943,9 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Create validation context with full request metadata (matching batch flow)
 	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList, compiledRules)
 
-	// Filter policies by MCP server name so all subsequent checks only fire for
-	// rules that belong to policies applicable to this server.
-	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
-	policies = s.filterPoliciesByDevice(policies, valCtx.McpServerName, valCtx.RequestHeaders)
-	// Bypass "approval" policies whose server is already approved (allow, no threat).
-	policies = s.filterApprovedServers(policies, valCtx.McpServerName)
+	// Narrow to the policies that apply to this server/device/user so all subsequent
+	// checks only fire for rules that belong to them.
+	policies = s.applicablePolicies(policies, valCtx)
 
 	// [GUARDRAIL_FLOW] 2/3 — policies that APPLY to this request after server/device/approval filtering.
 	s.logger.Info("[GUARDRAIL_FLOW] policies applied to request",
@@ -1942,8 +2042,14 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// with any ignore-phrase placeholders reconciled back to real text (or discarded in
 	// favor of the untouched pre-redaction payload) — see reconciliation above.
 	result := &mcp.ValidationResult{
-		Allowed:         !processResult.IsBlocked,
-		Modified:        finalPayload != "" && finalPayload != payload,
+		Allowed: !processResult.IsBlocked,
+		// Compared against preRedactionPayload, not the caller's raw payload: what the
+		// processor scanned already differs from it by session-summary injection and
+		// payload extraction, and neither is a detection. Comparing against the raw
+		// payload reported Modified=true for a clean request whose only change was an
+		// ignore-phrase reconcile — and /api/validate/file now blocks on Modified.
+		// Matches ValidateRequestWithPolicy, which already compares this way.
+		Modified:        finalPayload != "" && finalPayload != preRedactionPayload,
 		ModifiedPayload: finalPayload,
 		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
 		Metadata:        processResult.Metadata,
@@ -1980,6 +2086,12 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	}
 
 	result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, payloadToValidate, sessionID)
+	// Browser-extension traffic that inlined file-attachment content can only be enforced by
+	// blocking — a mask or alert verdict is unenforceable on that payload shape. Skipped for a
+	// pending approval, which owns its own response. See upgradeBrowserAttachmentVerdict.
+	if activityID == "" {
+		s.upgradeBrowserAttachmentVerdict(result, params, sessionID)
+	}
 	return result, activityID, nil
 }
 
@@ -2052,11 +2164,8 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	// Create validation context with full request metadata (matching batch flow)
 	valCtx := s.validationContextFromParams(params, sessionID, params.RequestPayload, responseBody, "ValidateResponse", mcpAllowedHostList, compiledRules)
 
-	// Filter policies by MCP server name — policies with no server configured are skipped
-	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
-	policies = s.filterPoliciesByDevice(policies, valCtx.McpServerName, valCtx.RequestHeaders)
-	// Bypass "approval" policies whose server is already approved (allow, no threat).
-	policies = s.filterApprovedServers(policies, valCtx.McpServerName)
+	// Narrow to the policies that apply to this server/device/user.
+	policies = s.applicablePolicies(policies, valCtx)
 
 	s.logger.Info("ValidateResponse - calling ProcessResponse",
 		zap.String("path", params.Path),
@@ -2402,7 +2511,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 		// Filter policies by MCP server name for this specific batch item
 		itemPolicies := s.filterPoliciesByMcpServer(policies, mcpServerName)
-		itemPolicies = s.filterPoliciesByDevice(itemPolicies, mcpServerName, reqHeaders)
+		itemPolicies = s.filterPoliciesByDevice(itemPolicies, mcpServerName, reqHeaders, data.Path)
 		// Bypass "approval" policies whose server is already approved (allow, no threat).
 		itemPolicies = s.filterApprovedServers(itemPolicies, mcpServerName)
 		s.logger.Debug("ValidateBatch - applicable policies for server",
