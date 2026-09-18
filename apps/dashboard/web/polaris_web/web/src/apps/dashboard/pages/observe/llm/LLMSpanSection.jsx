@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Badge, Box, Collapsible, Divider, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
-import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons";
+import { ChevronDownMinor, ChevronUpMinor, MagicMinor } from "@shopify/polaris-icons";
 import { ModelChip } from "./LLMCellRenderers";
 import GuardrailVerdict, { GuardrailVerdictBadge } from "./GuardrailVerdict";
 import { formatDurationMs, truncate } from "./constants";
@@ -188,7 +188,9 @@ export default function SpanSection({ span, index, id }) {
                 <HorizontalStack align="space-between" blockAlign="center" wrap={false} gap="3">
                     {/* left: badge + title — allowed to shrink/truncate */}
                     <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                        <Badge status="success" size="small">LLM</Badge>
+                        <Box>
+                            <Icon source={MagicMinor} color="base" />
+                        </Box>
                         <Tooltip content={spanName} dismissOnMouseOut>
                             <Text variant="bodySm" fontWeight="semibold" truncate>{truncate(spanName, 45)}</Text>
                         </Tooltip>
