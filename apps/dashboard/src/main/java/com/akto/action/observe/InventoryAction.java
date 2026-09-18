@@ -452,10 +452,8 @@ public class InventoryAction extends UserAction {
         // in single_type_info. the view itself is built by the dashboard running master.
         long countEndpoints;
         if (AccountSettingsDao.isEndpointInfoViewEnabled()) {
-            countEndpoints = EndpointInfoViewDao.instance.getMCollection().countDocuments(
-                    Filters.and(
-                            Filters.gt(EndpointInfoView.DISCOVERED_TIMESTAMP, startTimestamp),
-                            Filters.lt(EndpointInfoView.DISCOVERED_TIMESTAMP, endTimestamp)));
+            countEndpoints = EndpointInfoViewDao.instance.getMCollection()
+                    .countDocuments(endpointInfoViewWindowFilter());
         } else {
             countEndpoints = SingleTypeInfoDao.instance.fetchEndpointsCount(startTimestamp, endTimestamp, deactivatedCollections);
         }
@@ -490,11 +488,33 @@ public class InventoryAction extends UserAction {
         return AccountSettingsDao.isEndpointInfoViewEnabled();
     }
 
-    /** Same discoveredTimestamp window the count above the table uses, plus the table's filters. */
-    private Bson prepareEndpointInfoViewFilters() {
+    /**
+     * The window the card counts and the table pages, including the rbac collection scope.
+     *
+     * Both callers must use this: the card counting a wider set than the table can reach is exactly
+     * how the two numbers drifted apart before, just in the other direction — a user scoped to a
+     * subset of collections saw a count that included rows the table below it filtered out.
+     */
+    private Bson endpointInfoViewWindowFilter() {
         List<Bson> filterList = new ArrayList<>();
         filterList.add(Filters.gt(EndpointInfoView.DISCOVERED_TIMESTAMP, startTimestamp));
         filterList.add(Filters.lt(EndpointInfoView.DISCOVERED_TIMESTAMP, endTimestamp));
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if (collectionIds != null) {
+                filterList.add(Filters.in(EndpointInfoView.API_COLLECTION_ID, collectionIds));
+            }
+        } catch (Exception e) {
+        }
+
+        return Filters.and(filterList);
+    }
+
+    /** The window filter above, plus the search box and the table's own filters. */
+    private Bson prepareEndpointInfoViewFilters() {
+        List<Bson> filterList = new ArrayList<>();
+        filterList.add(endpointInfoViewWindowFilter());
 
         String regexPattern = getRegexPattern();
         if (!regexPattern.isEmpty()) {
@@ -517,14 +537,6 @@ public class InventoryAction extends UserAction {
                 default:
                     break;
             }
-        }
-
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if (collectionIds != null) {
-                filterList.add(Filters.in(EndpointInfoView.API_COLLECTION_ID, collectionIds));
-            }
-        } catch (Exception e) {
         }
 
         return Filters.and(filterList);
