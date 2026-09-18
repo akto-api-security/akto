@@ -1845,14 +1845,14 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		}
 	}
 
-	if result, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, requestID, payload); isMalicious {
-		s.logger.Info("ValidateRequest - session already malicious, blocking request",
-			zap.String("path", params.Path),
-			zap.String("method", params.Method),
-			zap.String("sessionID", sessionID),
-			zap.String("requestID", requestID))
-		return result, "", nil
-	}
+	// if result, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, requestID, payload); isMalicious {
+	// 	s.logger.Info("ValidateRequest - session already malicious, blocking request",
+	// 		zap.String("path", params.Path),
+	// 		zap.String("method", params.Method),
+	// 		zap.String("sessionID", sessionID),
+	// 		zap.String("requestID", requestID))
+	// 	return result, "", nil
+	// }
 
 	// Track request and generate summary asynchronously
 	session.TrackRequestAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, payload)
@@ -2232,12 +2232,12 @@ func (s *Service) ValidateRequestWithPolicy(
 		zap.String("requestID", requestID),
 		zap.String("policyName", providedPolicy.Name))
 
-	if result, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, requestID, payload); isMalicious {
-		s.logger.Info("ValidateRequestWithPolicy - session already malicious, blocking request",
-			zap.String("sessionID", sessionID),
-			zap.String("requestID", requestID))
-		return result, nil
-	}
+	// if result, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, requestID, payload); isMalicious {
+	// 	s.logger.Info("ValidateRequestWithPolicy - session already malicious, blocking request",
+	// 		zap.String("sessionID", sessionID),
+	// 		zap.String("requestID", requestID))
+	// 	return result, nil
+	// }
 
 	// Track request and generate summary asynchronously
 	session.TrackRequestAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, payload)
