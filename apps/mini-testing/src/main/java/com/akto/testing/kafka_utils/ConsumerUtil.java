@@ -62,7 +62,8 @@ public class ConsumerUtil {
         loggerMaker.warnAndAddToDb("Kafka consumer config broker=" + Constants.LOCAL_KAFKA_BROKER_URL
                 + " groupId=" + Constants.AKTO_KAFKA_GROUP_ID_CONFIG
                 + " maxPollIntervalMs=" + Constants.MAX_POLL_INTERVAL_MS
-                + " maxPollRecords=" + Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
+                + " maxPollRecords=" + Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG
+                + " perTestTimeoutSec=" + Constants.MINI_TESTING_TASK_TIMEOUT_SECONDS);
     }
     private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null;
 
@@ -73,7 +74,7 @@ public class ConsumerUtil {
             r -> new Thread(r, "mini-test-worker-" + workerThreadCounter.incrementAndGet());
 
     public static ExecutorService executor = Executors.newFixedThreadPool(150, workerThreadFactory);
-    private static final int maxRunTimeForTests = 5 * 60;
+    private static final int maxRunTimeForTests = Constants.MINI_TESTING_TASK_TIMEOUT_SECONDS;
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     private static final ConcurrentHashMap<ApiInfoKey, Integer> testedApisMap = new ConcurrentHashMap<>();

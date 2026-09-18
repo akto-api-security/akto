@@ -81,7 +81,8 @@ public class ExecuteApiHandler implements HttpHandler {
                         testingRunConfig,
                         false,
                         Collections.emptyList(),
-                        true
+                        false,
+                        true  // useHighTimeout: agentic target replays can be slow
                 );
                 jobStore.update(jobId, ApiExecutionJobStore.JobEntry.completed(response, conversationId, request));
             } catch (Throwable t) {

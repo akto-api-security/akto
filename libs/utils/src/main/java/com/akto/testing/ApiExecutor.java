@@ -43,7 +43,7 @@ public class ApiExecutor {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
 
-    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol, TLSAuthParam authParam) throws Exception {
+    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol, TLSAuthParam authParam, boolean useHighTimeout) throws Exception {
 
 
         boolean isSaasDeployment = "true".equals(System.getenv("IS_SAAS"));
@@ -55,7 +55,7 @@ public class ApiExecutor {
         boolean isHttps = request.url().isHttps();
         OkHttpClient client = debug ?
                 HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs, requestProtocol, isHttps) :
-                HTTPClientHandler.instance.getHTTPClient(isHttps, followRedirects, requestProtocol);
+                HTTPClientHandler.instance.getHTTPClient(isHttps, followRedirects, requestProtocol, useHighTimeout);
 
         if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
@@ -282,14 +282,24 @@ public class ApiExecutor {
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects,
         TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
         boolean skipSSRFCheck) throws Exception {
-        return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false);
+        return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false, false);
     }
 
-    private static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean jsonRpcCheck) throws Exception {
+    /**
+     * Same as the 6-arg variant but lets the call site use the pre-built high-timeout client for this
+     * request only (e.g. slow agentic target replays). false keeps the shared default client.
+     */
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects,
+        TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
+        boolean skipSSRFCheck, boolean useHighTimeout) throws Exception {
+        return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false, useHighTimeout);
+    }
+
+    private static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean jsonRpcCheck, boolean useHighTimeout) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
 
         if (!jsonRpcCheck && shouldInitiateSSEStream(request)) {
-            return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false);
+            return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false, useHighTimeout);
         }
 
         if(testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
@@ -380,7 +390,7 @@ public class ApiExecutor {
         switch (method) {
             case GET:
             case HEAD:
-                response = getRequest(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext);
+                response = getRequest(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, useHighTimeout);
                 break;
             case POST:
             case PUT:
@@ -389,7 +399,7 @@ public class ApiExecutor {
             case PATCH:
             case TRACK:
             case TRACE:
-                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, type);
+                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, type, useHighTimeout);
                 break;
             case OTHER:
                 throw new Exception("Invalid method name");
@@ -453,9 +463,9 @@ public class ApiExecutor {
         return response;
     }
 
-    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext)  throws Exception{
+    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, boolean useHighTimeout)  throws Exception{
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, "application/json", request.getTlsAuthParam());
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, "application/json", request.getTlsAuthParam(), useHighTimeout);
     }
 
     public static RequestBody getFileRequestBody(String fileUrl){
@@ -662,7 +672,7 @@ public class ApiExecutor {
         }
     }
 
-    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol) throws Exception {
+    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol, boolean useHighTimeout) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
         if (headers == null) {
             headers = new HashMap<>();
@@ -694,7 +704,7 @@ public class ApiExecutor {
             builder.removeHeader(Constants.AKTO_ATTACH_FILE);
             Request updatedRequest = builder.build();
 
-            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol, request.getTlsAuthParam());
+            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol, request.getTlsAuthParam(), useHighTimeout);
         }
 
         String payload = request.getBody();
@@ -823,7 +833,7 @@ public class ApiExecutor {
         }
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol, request.getTlsAuthParam());
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol, request.getTlsAuthParam(), useHighTimeout);
     }
 
     private static boolean isJsonRpcRequest(OriginalHttpRequest request) {
@@ -920,12 +930,19 @@ public class ApiExecutor {
             boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug,
             List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
         return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs,
-                skipSSRFCheck, true);
+                skipSSRFCheck, true, false);
     }
 
     public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects,
         TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
         boolean skipSSRFCheck, boolean overrideMessageEndpoint) throws Exception {
+        return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs,
+                skipSSRFCheck, overrideMessageEndpoint, false);
+    }
+
+    public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects,
+        TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
+        boolean skipSSRFCheck, boolean overrideMessageEndpoint, boolean useHighTimeout) throws Exception {
         // Always use prepareUrl to get the absolute URL
         String url = prepareUrl(request, testingRunConfig);
         URI uri = new URI(url);
@@ -966,7 +983,7 @@ public class ApiExecutor {
         }
 
         // Send actual request
-        OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, true);
+        OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, true, useHighTimeout);
 
         if (resp.getStatusCode() >= 400) {
             closeSseSession(session);
