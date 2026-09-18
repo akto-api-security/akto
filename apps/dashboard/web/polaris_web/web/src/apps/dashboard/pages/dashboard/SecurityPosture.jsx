@@ -9,8 +9,8 @@ import PageWithMultipleCards from '../../components/layouts/PageWithMultipleCard
 import DateRangeFilter from '../../components/layouts/DateRangeFilter'
 import FlyLayout from '../../components/layouts/FlyLayout'
 import CardWithHeader from './new_components/CardWithHeader'
-import CustomPieChart from './new_components/CustomPieChart'
 import CustomProgressBar from './new_components/CustomProgressBar'
+import DonutChart from '../../components/shared/DonutChart'
 import StackedAreaChart from '../../components/charts/StackedAreaChart'
 import StackedChart from '../../components/charts/StackedChart'
 import { SeverityBadge } from '../observe/agentic/AgenticCellRenderers'
@@ -311,6 +311,7 @@ function ShadowAiTrendCard({ panel, onOpen }) {
                     data={data}
                     yAxisTitle="Share of tools"
                     showGridLines={false}
+                    exportingDisabled={true}
                 />
             </div>
         </VerticalStack>
@@ -329,6 +330,22 @@ function ShadowAiTrendCard({ panel, onOpen }) {
 }
 
 // "What data is leaving" — donut of PII-detecting-policy matches by policy/data-type name.
+// Same donut+legend layout ViolationsPage.jsx's DonutCard uses — a side-by-side chart and count
+// list, rather than CustomPieChart's stacked-below-the-donut labels.
+function ChartLegend({ items }) {
+    return (
+        <VerticalStack gap="2">
+            {items.map(({ label, color, count }) => (
+                <HorizontalStack key={label} gap="2" blockAlign="center">
+                    <Box style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                    <Text variant="bodyMd" color="subdued">{label}</Text>
+                    <Text variant="bodyMd" fontWeight="semibold">{count.toLocaleString()}</Text>
+                </HorizontalStack>
+            ))}
+        </VerticalStack>
+    )
+}
+
 function DataLeavingCard({ panel, onOpen }) {
     if (!panel) return null
     const hasData = panel.total > 0
@@ -341,14 +358,19 @@ function DataLeavingCard({ panel, onOpen }) {
             filterValue: seg.filterId || seg.label,
         }
     })
+    const legendItems = Object.entries(graphData).map(([label, { text, color }]) => ({ label, color, count: text }))
 
     const body = (
-        <CustomPieChart
-            subtitle="incidents"
-            graphData={graphData}
-            onSegmentClick={hasData ? () => onOpen(panel) : undefined}
-            showHorizontal={true}
-        />
+        <HorizontalStack gap="4" blockAlign="center" wrap={false}>
+            <DonutChart
+                data={graphData}
+                title=""
+                size={150}
+                pieInnerSize="55%"
+                onSegmentClick={hasData ? () => onOpen(panel) : undefined}
+            />
+            <ChartLegend items={legendItems} />
+        </HorizontalStack>
     )
 
     return (
