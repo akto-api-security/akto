@@ -301,14 +301,151 @@ public final class InsightUtil {
      *  canonicalization to VENDOR-typed allowlist entries, so an approval stored under a raw alias
      *  ("chatgpt.com") still matches traffic resolved to the canonical name ("openai"). */
     static String canonicalVendorName(String vendor) {
-        if (vendor.contains("claude") || vendor.contains("anthropic")) return "Anthropic";
-        if (vendor.contains("codex") || vendor.contains("chatgpt") || vendor.contains("openai")) return "OpenAI";
-        if (vendor.contains("copilot") || vendor.contains("github")) return "Github-Copilot";
-        if (vendor.contains("kiro")) return "AWS";
-        if (vendor.contains("antigravity")) return "Antrigravity";
-        return vendor;
+        if (vendor == null || vendor.isEmpty()) {
+            return "unknown";
+        }
+    
+        String v = vendor.toLowerCase();
+    
+        // Anthropic
+        if (v.contains("claude") ||
+            v.contains("anthropic")) {
+            return "Anthropic";
+        }
+    
+        // OpenAI
+        if (v.contains("codex") ||
+            v.contains("chatgpt") ||
+            v.contains("openai") ||
+            v.contains("gpt")) {
+            return "OpenAI";
+        }
+    
+        // GitHub Copilot
+        if (v.contains("copilot") ||
+            v.contains("github")) {
+            return "Github-Copilot";
+        }
+    
+        // Google
+        if (v.contains("gemini") ||
+            v.contains("google-ai") ||
+            v.contains("google ai") ||
+            v.contains("vertex-ai") ||
+            v.contains("vertex ai")) {
+            return "Google";
+        }
+    
+        // AWS
+        if (v.contains("kiro") ||
+            v.contains("bedrock") ||
+            v.contains("amazon-q") ||
+            v.contains("amazon q")) {
+            return "AWS";
+        }
+    
+        // Cursor
+        if (v.contains("cursor")) {
+            return "Cursor";
+        }
+    
+        // Windsurf / Codeium
+        if (v.contains("windsurf") ||
+            v.contains("codeium")) {
+            return "Codeium-Windsurf";
+        }
+    
+        // Aider
+        if (v.contains("aider")) {
+            return "Aider";
+        }
+    
+        // OpenCode
+        if (v.contains("opencode") ||
+            v.contains("open-code")) {
+            return "OpenCode";
+        }
+    
+        // Goose
+        if (v.contains("goose") ||
+            v.contains("block-goose")) {
+            return "Goose";
+        }
+    
+        // Meta
+        if (v.contains("llama") ||
+            v.contains("meta-ai") ||
+            v.contains("meta ai")) {
+            return "Meta";
+        }
+    
+        // Mistral
+        if (v.contains("mistral") ||
+            v.contains("codestral")) {
+            return "Mistral";
+        }
+    
+        // Cohere
+        if (v.contains("cohere") ||
+            v.contains("command-r")) {
+            return "Cohere";
+        }
+    
+        // xAI
+        if (v.contains("grok") ||
+            v.contains("xai") ||
+            v.contains("x-ai")) {
+            return "xAI";
+        }
+    
+        // DeepSeek
+        if (v.contains("deepseek")) {
+            return "DeepSeek";
+        }
+    
+        // Alibaba
+        if (v.contains("qwen") ||
+            v.contains("tongyi")) {
+            return "Alibaba";
+        }
+    
+        // Perplexity
+        if (v.contains("perplexity") ||
+            v.contains("pplx")) {
+            return "Perplexity";
+        }
+    
+        // Groq
+        if (v.contains("groq")) {
+            return "Groq";
+        }
+    
+        // Together AI
+        if (v.contains("together-ai") ||
+            v.contains("together ai") ||
+            v.contains("togetherai")) {
+            return "Together-AI";
+        }
+    
+        // Ollama
+        if (v.contains("ollama")) {
+            return "Ollama";
+        }
+    
+        // LM Studio
+        if (v.contains("lmstudio") ||
+            v.contains("lm-studio") ||
+            v.contains("lm studio")) {
+            return "LM-Studio";
+        }
+    
+        // Antigravity
+        if (v.contains("antigravity")) {
+            return "Antigravity";
+        }
+    
+        return "unknown";
     }
-
     /** Null when the host doesn't match the "<device>.<ai-agent|chrome>.<vendor>..." shape, or
      *  the parsed token isn't a real vendor ("not-attached") — nothing to classify from it. */
     public static String endpointVendorName(ApiCollection c) {
