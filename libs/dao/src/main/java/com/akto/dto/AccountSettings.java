@@ -528,4 +528,29 @@ public class AccountSettings {
     public void setCompulsoryDescription(Map<String, Boolean> compulsoryDescription) {
         this.compulsoryDescription = compulsoryDescription;
     }
+
+    // read-only on this branch: the view and these flags are written by the dashboard deployment
+    // running master. we only need to decode them so the endpoint info view can gate the api
+    // changes page here the same way it does there.
+    public static final String ENABLE_ENDPOINT_INFO_VIEW = "enableEndpointInfoView";
+    private boolean enableEndpointInfoView;
+
+    public static final String VIEW_REFRESH_THRESHOLD_SECONDS = "viewRefreshThresholdSeconds";
+    private int viewRefreshThresholdSeconds;
+
+    public boolean isEnableEndpointInfoView() {
+        return enableEndpointInfoView;
+    }
+
+    public void setEnableEndpointInfoView(boolean enableEndpointInfoView) {
+        this.enableEndpointInfoView = enableEndpointInfoView;
+    }
+
+    public int getViewRefreshThresholdSeconds() {
+        return viewRefreshThresholdSeconds;
+    }
+
+    public void setViewRefreshThresholdSeconds(int viewRefreshThresholdSeconds) {
+        this.viewRefreshThresholdSeconds = viewRefreshThresholdSeconds;
+    }
 }

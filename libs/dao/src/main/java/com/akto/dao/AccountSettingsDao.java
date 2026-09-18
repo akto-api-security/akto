@@ -24,6 +24,15 @@ public class AccountSettingsDao extends AccountsContextDao<AccountSettings> {
 
     public static final AccountSettingsDao instance = new AccountSettingsDao();
 
+    public static boolean isEndpointInfoViewEnabled() {
+        try {
+            AccountSettings settings = instance.findOne(generateFilter());
+            return settings != null && settings.isEnableEndpointInfoView();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     @Override
     public String getCollName() {
         return "accounts_settings";
