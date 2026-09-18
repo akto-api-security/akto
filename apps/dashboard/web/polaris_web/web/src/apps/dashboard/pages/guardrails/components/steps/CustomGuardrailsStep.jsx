@@ -101,7 +101,7 @@ const CustomGuardrailsStep = ({
     useEffect(() => {
         if (llmCompliance && Object.keys(llmCompliance).length > 0) {
             const accepted = Object.keys(llmCompliance).reduce((acc, framework) => { acc[framework] = true; return acc; }, {});
-            setLlmRuleCompliance({ loading: false, suggested: llmCompliance, accepted });
+            setLlmRuleCompliance({ loading: false, suggested: llmCompliance, accepted, evaluated: true });
         }
     }, []);
 
@@ -136,11 +136,12 @@ const CustomGuardrailsStep = ({
                 acc[framework] = true;
                 return acc;
             }, {});
-            setLlmRuleCompliance({ loading: false, suggested, accepted });
+            setLlmRuleCompliance({ loading: false, suggested, accepted, evaluated: true });
             setLlmCompliance(buildComplianceMap(suggested, accepted));
         } catch (error) {
             if (reqId !== requestIdRef.current) return;
             console.error('Error fetching compliance suggestions:', error);
+            // Leave evaluated false: a failed call is not a finding of "nothing maps".
             setLlmRuleCompliance({ loading: false, suggested: {}, accepted: {} });
         }
     };
@@ -237,7 +238,8 @@ const CustomGuardrailsStep = ({
                                     loading={llmRuleCompliance.loading}
                                     complianceMap={buildComplianceMap(llmRuleCompliance.suggested, llmRuleCompliance.accepted)}
                                     onRemove={toggleLlmFramework}
-                                    onAdd={Object.keys(llmRuleCompliance.suggested).length > 0 ? toggleLlmFramework : undefined}
+                                    onAdd={toggleLlmFramework}
+                                    evaluated={!!llmRuleCompliance.evaluated}
                                 />
                             </FormLayout>
                         </Box>
