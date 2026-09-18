@@ -101,13 +101,6 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                     .filter(c -> c != null && !c.isDeactivated() && c.isEndpointCollection())
                     .collect(Collectors.toList());
 
-            // Enforcement funnel's "Matched a policy" bar — the RAW total of malicious/guardrail
-            // events in the window, unscoped by policy-name attribution (unlike matchedPolicyCounts,
-            // which only counts events whose subCategory happens to match a still-configured
-            // policy's name). Null (not 0) on failure so the funnel can tell "no events" apart from
-            // "couldn't check".
-            long totalMaliciousEvents = getTotalEvents(startTimestamp, endTimestamp, new HashMap<>());
-
             // The funnel's inspected-actions denominator — total gateway-inspected traffic
             // (isAtlasTraffic=true), not just the subset that matched a policy. fetchArgusStats is
             // the only existing SearchClient call that returns this as a real aggregation total;
@@ -138,7 +131,7 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                     attackTrendStartTs, attackTrendEndTs, attackTrendBoundaries, null);
 
             response = postureService.buildSummary(bundle, priorHostSeverity, priorSubCategory,
-                    endpointCollections, allThreats, threatComplianceMap, totalMaliciousEvents, totalInspectedActions,
+                    endpointCollections, allThreats, threatComplianceMap, totalInspectedActions,
                     weeklyAttackCounts);
 
             // "Act now" — reuses the Insights feature wholesale rather than a parallel action

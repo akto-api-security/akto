@@ -15,11 +15,15 @@ import StackedAreaChart from '../../components/charts/StackedAreaChart'
 import StackedChart from '../../components/charts/StackedChart'
 import { SeverityBadge } from '../observe/agentic/AgenticCellRenderers'
 import InsightsFlyout from '../observe/agentic/insights/InsightsFlyout'
-import { INSIGHT_GROUP, INSIGHT_GROUP_LABEL } from '../observe/agentic/insights/insightsHelpers'
+import { INSIGHT_GROUP } from '../observe/agentic/insights/insightsHelpers'
 import dashboardApi from './api'
 import func from '@/util/func'
 import values from '@/util/values'
 import SpinnerCentered from '../../components/progress/SpinnerCentered'
+import {
+    PANEL_EMPTY_STATE_COPY, DUMMY_SHADOW_AI_TREND, DUMMY_DATA_LEAVING, DUMMY_ENFORCEMENT_FUNNEL,
+    DUMMY_ATTACK_ATTEMPTS, DUMMY_FRAMEWORK_READINESS, DUMMY_ADOPTION_GAP, DUMMY_VENDOR_RISK_BUBBLE,
+} from './securityPostureDummyData'
 
 // KPI ids — must match PostureService.KPI_* on the backend.
 const KPI_RISK_SCORE = 'riskScore'
@@ -74,19 +78,9 @@ function formatDelta(kpi) {
 //
 // When a panel genuinely has no data (not "zero, confirmed" — no data at all), showing a bare
 // "no data" box reads as broken. Instead: render the SAME chart component with static,
-// illustrative numbers (never real account data — see each DUMMY_* constant below), blurred, and
+// illustrative numbers (never real account data — see securityPostureDummyData.js), blurred, and
 // let a click open a Popover explaining why. This is a placeholder for copy the product side
 // still owns — PANEL_EMPTY_STATE_COPY is a stub map, not final text.
-const PANEL_EMPTY_STATE_COPY = {
-    shadowAiTrend: 'Fill me in',
-    dataLeaving: 'Fill me in',
-    enforcementFunnel: 'Fill me in',
-    attackAttempts: 'Fill me in',
-    frameworkReadiness: 'Fill me in',
-    vendorRiskExposure: 'Fill me in',
-    adoptionGap: 'Fill me in',
-}
-
 function DummyDataOverlay({ panelId, children }) {
     const [active, setActive] = useState(false)
     return (
@@ -111,81 +105,6 @@ function DummyDataOverlay({ panelId, children }) {
         </div>
     )
 }
-
-// Static week-ending-now timestamps for a dummy N-week series — same [ms, value] point shape
-// the real backend series use, so the same chart component renders either one identically.
-function dummyWeeklySeries(values) {
-    const nowMs = Date.now()
-    const weekMs = 7 * 24 * 3600 * 1000
-    return values.map((v, i) => [nowMs - (values.length - 1 - i) * weekMs, v])
-}
-
-// Illustrative-only numbers, shaped exactly like each panel's real response — never real
-// account data. Same figures the original design mockup used for these cards.
-const DUMMY_SHADOW_AI_TREND = {
-    series: [
-        { name: 'Sanctioned', data: dummyWeeklySeries([48, 52, 55, 58, 61, 64, 66, 69, 71, 74, 77, 79]) },
-        { name: 'Unsanctioned', data: dummyWeeklySeries([88, 94, 99, 104, 109, 113, 117, 121, 125, 129, 132, 135]) },
-    ],
-    currentSanctioned: 79,
-    currentUnsanctioned: 135,
-    route: null,
-}
-const DUMMY_DATA_LEAVING = {
-    total: 100,
-    segments: [
-        { label: 'Source code', count: 34, percent: 34 },
-        { label: 'Customer PII', count: 26, percent: 26 },
-        { label: 'Financials', count: 18, percent: 18 },
-        { label: 'Credentials', count: 12, percent: 12 },
-        { label: 'Other', count: 10, percent: 10 },
-    ],
-    route: null,
-}
-const DUMMY_ENFORCEMENT_FUNNEL = {
-    stages: [
-        { id: 'matched', label: 'Matched a policy', count: 6914, percentOfMatched: 4.6 },
-        { id: 'hardBlocked', label: 'Hard-blocked', count: 3180, percentOfMatched: 46 },
-        { id: 'warnedOnly', label: 'Warned only', count: 2697, percentOfMatched: 39 },
-        { id: 'warningOverridden', label: 'Warning overridden', count: 620, percentOfMatched: 9 },
-    ],
-    inspectedActions: 148900,
-    route: null,
-}
-const DUMMY_ATTACK_ATTEMPTS = {
-    series: [
-        { name: 'Blocked', data: dummyWeeklySeries([58, 52, 61, 64, 69, 71, 75, 81]) },
-        { name: 'Got through', data: dummyWeeklySeries([4, 3, 5, 4, 5, 5, 6, 6]) },
-    ],
-    currentTotal: 87,
-    currentBlocked: 81,
-    currentGotThrough: 6,
-    route: null,
-}
-
-// These three panels have no backend yet at all (not "empty data" — the feature itself isn't
-// built), so unlike the four above they're ALWAYS shown blurred, never conditionally.
-const DUMMY_FRAMEWORK_READINESS = [
-    { id: 'nist', label: 'NIST AI RMF', value: 78, target: 85, color: '#ca8a04' },
-    { id: 'iso', label: 'ISO/IEC 42001', value: 64, target: 72, color: '#ca8a04' },
-    { id: 'euai', label: 'EU AI Act (GPAI)', value: 51, target: 65, color: '#dc2626' },
-    { id: 'soc2', label: 'SOC 2 · AI addendum', value: 92, target: 90, color: '#16a34a' },
-]
-const DUMMY_ADOPTION_GAP = [
-    { department: 'Engineering', shadowPct: 30, approvedPct: 60, shadowSharePct: 41 },
-    { department: 'Sales', shadowPct: 24, approvedPct: 68, shadowSharePct: 28 },
-    { department: 'Marketing', shadowPct: 16, approvedPct: 78, shadowSharePct: 19 },
-    { department: 'Finance', shadowPct: 6, approvedPct: 92, shadowSharePct: 6 },
-]
-const DUMMY_VENDOR_RISK_BUBBLE = [
-    { id: 1, x: 12, y: 18, actFirst: true },
-    { id: 2, x: 18, y: 12, actFirst: true },
-    { id: 3, x: 28, y: 22, actFirst: true },
-    { id: 4, x: 24, y: 42, actFirst: false },
-    { id: 5, x: 45, y: 30, actFirst: false },
-    { id: 6, x: 62, y: 55, actFirst: false },
-    { id: 7, x: 78, y: 68, actFirst: false },
-]
 
 // A data gap (dataGaps[0] on any panel/KPI the backend sends) — one shared renderer so a reader
 // sees the same "why is this empty / approximate" affordance everywhere on the page rather than
@@ -274,7 +193,7 @@ function FrameworkReadinessCard() {
                         <Text variant="bodyMd" fontWeight="semibold">{row.value}%</Text>
                     </HorizontalStack>
                     <div style={{ position: 'relative' }}>
-                        <CustomProgressBar progress={row.value} topColor={row.color} />
+                        <CustomProgressBar progress={row.value} topColor={row.color} height={"10px"}/>
                         <div style={{
                             position: 'absolute', top: 0, bottom: 0, left: `${row.target}%`,
                             width: '2px', background: '#1f2937',
@@ -428,6 +347,7 @@ function DataLeavingCard({ panel, onOpen }) {
             subtitle="incidents"
             graphData={graphData}
             onSegmentClick={hasData ? () => onOpen(panel) : undefined}
+            showHorizontal={true}
         />
     )
 
@@ -444,9 +364,9 @@ function DataLeavingCard({ panel, onOpen }) {
 }
 
 const FUNNEL_STAGE_COLORS = {
-    hardBlocked: '#16a34a',
-    warnedOnly: '#ca8a04',
-    warningOverridden: '#dc2626',
+    hardBlocked: '#8771F6',
+    warnedOnly: '#B6B0FE',
+    warningOverridden: '#F24122',
 }
 
 // Enforcement funnel — matched → hard-blocked → warned-only → warning-overridden. "Matched" is
@@ -484,8 +404,9 @@ function EnforcementFunnelCard({ panel, onOpen }) {
                             <Text variant="bodyMd" fontWeight="semibold">{(stage.count ?? 0).toLocaleString()}</Text>
                         </HorizontalStack>
                         <CustomProgressBar
+                            height={"12px"}
                             progress={(stage.id === 'matched' && matchedDisplayPercent != null) ? matchedDisplayPercent : (stage.percentOfMatched ?? 0)}
-                            topColor={FUNNEL_STAGE_COLORS[stage.id] || '#6b7280'}
+                            topColor={FUNNEL_STAGE_COLORS[stage.id] || '#6D3BEF'}
                         />
                         {stage.id === 'matched' && displayInspectedActions != null && (
                             <Text variant="bodySm" color="subdued">
@@ -569,24 +490,19 @@ function AttackAttemptsCard({ panel, onOpen }) {
 // summarization; the source label is what tells the two groups apart once they're merged.
 function ActNowRow({ insight, onOpen }) {
     return (
-        <Box
-            padding="3"
-            borderColor="border-subdued"
-            borderWidth="1"
-            borderRadius="2"
-            onClick={() => onOpen(insight)}
-            style={{ cursor: 'pointer' }}
-        >
-            <VerticalStack gap="1">
-                <HorizontalStack align="space-between" blockAlign="start">
-                    <Text variant="bodyMd" fontWeight="semibold">{insight.title}</Text>
-                    <HorizontalStack gap="2" blockAlign="center">
-                        <Text variant="bodySm" color="subdued">{INSIGHT_GROUP_LABEL[insight.group]}</Text>
-                        {insight.severity && <SeverityBadge severity={insight.severity} />}
+        <Box borderBlockEndWidth="1" borderColor="border">
+            <Box
+                onClick={() => onOpen(insight)}
+                style={{ cursor: 'pointer', borderRadius: '4px', padding: '8px' }}
+            >
+                <VerticalStack gap="1">
+                    <HorizontalStack gap={"2"}>
+                        {insight.severity && <SeverityBadge severity={insight.severity} useDot={true}/>}
+                        <Text variant="bodyMd" fontWeight="semibold">{insight.title}</Text>
                     </HorizontalStack>
-                </HorizontalStack>
-                <Text variant="bodySm" color="subdued">{insight.headline}</Text>
-            </VerticalStack>
+                    <Text variant="bodySm" color="subdued">{insight.headline}</Text>
+                </VerticalStack>
+            </Box>
         </Box>
     )
 }
@@ -749,46 +665,72 @@ function SecurityPosture() {
     const openInsight = (insightId, group) => setFlyout({ insightId, group })
 
     const kpiRow = (
-        <Box paddingBlockEnd="4">
-            <HorizontalGrid columns={4} gap="3">
-                {[KPI_RISK_SCORE, KPI_CRITICAL_ALERTS, KPI_MONITORING_COVERAGE, KPI_SENSITIVE_INCIDENTS].map((id) => {
-                    const kpi = kpiById(id)
-                    if (!kpi) return <ComingSoonTile key={id} label={id} />
-                    // The risk score has no route — it opens its own breakdown flyout instead of
-                    // navigating away, so it needs a different onOpen/clickability than the rest.
-                    if (id === KPI_RISK_SCORE) {
-                        return <KpiTile key={id} kpi={kpi} onOpen={() => setRiskScoreFlyoutOpen(true)} forceClickable />
-                    }
-                    return <KpiTile key={id} kpi={kpi} onOpen={openKpi} />
-                })}
-            </HorizontalGrid>
-        </Box>
-    )
-
-    const panelsGrid = (
-        <HorizontalGrid columns={2} gap="4">
-            <ShadowAiTrendCard panel={pageData.shadowAiTrend} onOpen={openPanel} />
-            <DataLeavingCard panel={pageData.dataLeaving} onOpen={openPanel} />
-            <EnforcementFunnelCard panel={pageData.enforcementFunnel} onOpen={openPanel} />
-            <AttackAttemptsCard panel={pageData.attackAttempts} onOpen={openPanel} />
-            <ActNowCard actNow={pageData.actNow} onOpenInsight={openInsight} />
+        <HorizontalGrid columns={4} gap="2">
+            {[KPI_RISK_SCORE, KPI_CRITICAL_ALERTS, KPI_MONITORING_COVERAGE, KPI_SENSITIVE_INCIDENTS].map((id) => {
+                const kpi = kpiById(id)
+                if (!kpi) return <ComingSoonTile key={id} label={id} />
+                // The risk score has no route — it opens its own breakdown flyout instead of
+                // navigating away, so it needs a different onOpen/clickability than the rest.
+                if (id === KPI_RISK_SCORE) {
+                    return <KpiTile key={id} kpi={kpi} onOpen={() => setRiskScoreFlyoutOpen(true)} forceClickable />
+                }
+                return <KpiTile key={id} kpi={kpi} onOpen={openKpi} />
+            })}
         </HorizontalGrid>
     )
 
-    // None of these three have a backend yet — always-blurred dummy content (see the DUMMY_*
-    // constants above) instead of a bare "Coming soon" stub, per the design reference.
-    const comingSoonRow = (
-        <HorizontalGrid columns={3} gap="4">
-            <FrameworkReadinessCard />
+    // Shadow AI trend gets more width than the data-leaving donut (3:2), not an even split — a
+    // ratio, so plain flex rather than Polaris's equal-width HorizontalGrid.
+    const shadowAndDataLeavingRow = (
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'stretch' }}>
+            <div style={{ flex: 3, minWidth: 0 }}><ShadowAiTrendCard panel={pageData.shadowAiTrend} onOpen={openPanel} /></div>
+            <div style={{ flex: 2, minWidth: 0 }}><DataLeavingCard panel={pageData.dataLeaving} onOpen={openPanel} /></div>
+        </div>
+    )
+
+    const funnelAttackVendorRow = (
+        <HorizontalGrid columns={3} gap="3">
+            <EnforcementFunnelCard panel={pageData.enforcementFunnel} onOpen={openPanel} />
+            <AttackAttemptsCard panel={pageData.attackAttempts} onOpen={openPanel} />
             <VendorRiskBubbleCard />
+        </HorizontalGrid>
+    )
+
+    const frameworkAndAdoptionRow = (
+        <HorizontalGrid columns={2} gap="4">
+            <FrameworkReadinessCard />
             <AdoptionGapCard />
         </HorizontalGrid>
     )
 
+    const mainColumn = (
+        <VerticalStack gap="4">
+            {kpiRow}
+            {shadowAndDataLeavingRow}
+            {funnelAttackVendorRow}
+            {frameworkAndAdoptionRow}
+        </VerticalStack>
+    )
+
+    // "Biggest movers" has no backend/component yet (unlike everything else on this page, which
+    // is at minimum wired to a real or dummy panel) — a plain ComingSoonTile stub here rather
+    // than fabricating numbers, since this pass is a layout rearrangement, not a new feature.
+    const rightRail = (
+        <VerticalStack gap="3">
+            <ActNowCard actNow={pageData.actNow} onOpenInsight={openInsight} />
+            <ComingSoonTile label="Biggest movers" />
+        </VerticalStack>
+    )
+
+    const pageBody = (
+        <div style={{ display: 'flex', gap: '16px'}}>
+            <div style={{ flex: 5, minWidth: 0 }}>{mainColumn}</div>
+            <div style={{ flex: 2, minWidth: 0 }}>{rightRail}</div>
+        </div>
+    )
+
     const pageComponents = [
-        <Box key="kpis">{kpiRow}</Box>,
-        <Box key="panels" paddingBlockEnd="4">{panelsGrid}</Box>,
-        <Box key="comingSoon">{comingSoonRow}</Box>,
+        <Box key="body">{pageBody}</Box>,
     ]
 
     return (

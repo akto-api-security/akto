@@ -102,11 +102,6 @@ public class PostureService {
      *                             needed only for the risk score's compliance-gaps sub-score
      * @param threatComplianceMap  filterId -> ThreatComplianceInfo, same map
      *                             GuardrailMetricsProcessor/AgenticDashboardAction already build
-     * @param totalMaliciousEvents the enforcement funnel's "Matched a policy" bar — every
-     *                             malicious/guardrail event in the window, unscoped by whether it
-     *                             maps to a currently-configured policy by name (unlike
-     *                             matchedPolicyCounts). Null when the threat backend didn't
-     *                             respond, not when it responded with zero.
      * @param totalInspectedActions the funnel's denominator — total gateway-inspected
      *                             (isAtlasTraffic) traffic in the window. Null when the trace
      *                             search backend isn't configured or didn't respond.
@@ -121,7 +116,6 @@ public class PostureService {
                                        List<ApiCollection> endpointCollections,
                                        List<DashboardMaliciousEvent> allThreatsForCompliance,
                                        Map<String, ThreatComplianceInfo> threatComplianceMap,
-                                       Long totalMaliciousEvents,
                                        Long totalInspectedActions,
                                        List<Integer> weeklyAttackCounts) {
         BasicDBObject response = new BasicDBObject();
@@ -135,7 +129,7 @@ public class PostureService {
 
         response.put(KEY_SHADOW_AI_TREND, shadowAiTrend(bundle));
         response.put(KEY_DATA_LEAVING, dataLeavingBreakdown(bundle));
-        response.put(KEY_ENFORCEMENT_FUNNEL, enforcementFunnel(bundle, totalMaliciousEvents, totalInspectedActions));
+        response.put(KEY_ENFORCEMENT_FUNNEL, enforcementFunnel(bundle, totalInspectedActions));
 
         int attackTrendEndTs = bundle.ctx.getEndTs() > 0 ? bundle.ctx.getEndTs() : (int) (System.currentTimeMillis() / 1000);
         response.put(KEY_ATTACK_ATTEMPTS, attackAttemptsTrend(weeklyAttackCounts, attackTrendEndTs));
@@ -467,18 +461,20 @@ public class PostureService {
     // ── Enforcement funnel ───────────────────────────────────────────────────────
 
     /**
-     * "Matched a policy" is the RAW total of malicious/guardrail events in the window
-     * (totalMaliciousEvents — unscoped by policy-name attribution), against the total
-     * gateway-inspected traffic (totalInspectedActions) as its denominator — the "N% of M
-     * inspected actions" figure the design shows. The three downstream stages
-     * (hard-blocked/warned/warning-overridden) can only be split out for the SUBSET of those
-     * events attributable to a still-configured policy by name (matchedPolicyCounts), by
-     * {@code GuardrailPolicies.behaviour}: block -> hard-blocked, warn -> warned only, alert ->
-     * warning overridden (an alert-mode policy logs and lets the action through — the same
-     * "warned but not stopped" outcome the design calls "overridden" — rather than waiting on the
-     * gateway's own per-event guardrailAction field, which nothing reads yet).
+     * "Matched a policy" is the sum of {@link #matchedPolicyCounts} — every event this window
+     * whose category attributes back to a still-active, still-configured policy by name — against
+     * the total gateway-inspected traffic (totalInspectedActions) as its denominator, the "N% of M
+     * inspected actions" figure the design shows. This used to be a separately-fetched raw total
+     * (SecurityPostureAction#getTotalEvents via ThreatDetectionBackendClient), unscoped by policy
+     * attribution; that path mints its own JWT independent of getApiToken() and wasn't reliably
+     * authenticating, so "matched" now comes from the same bundle.subCategoryCounts aggregation
+     * the three downstream stages already depend on, instead of a second, less trustworthy fetch.
+     * The stages split by {@code GuardrailPolicies.behaviour}: block -> hard-blocked, warn ->
+     * warned only, alert -> warning overridden (an alert-mode policy logs and lets the action
+     * through — the same "warned but not stopped" outcome the design calls "overridden" — rather
+     * than waiting on the gateway's own per-event guardrailAction field, which nothing reads yet).
      */
-    private BasicDBObject enforcementFunnel(InsightDataBundle bundle, Long totalMaliciousEvents, Long totalInspectedActions) {
+    private BasicDBObject enforcementFunnel(InsightDataBundle bundle, Long totalInspectedActions) {
         long hardBlocked = 0, warnedOnly = 0, warningOverridden = 0, unclassified = 0;
         for (PolicyMatch m : matchedPolicyCounts(bundle)) {
             String behaviour = m.policy.getBehaviour();
@@ -493,7 +489,7 @@ public class PostureService {
             }
         }
 
-        long matched = totalMaliciousEvents != null ? totalMaliciousEvents : 0;
+        long matched = hardBlocked + warnedOnly + warningOverridden + unclassified;
         long inspectedDenominator = totalInspectedActions != null ? totalInspectedActions : matched;
 
         BasicDBObject panel = new BasicDBObject();
@@ -507,7 +503,7 @@ public class PostureService {
         panel.put("inspectedActions", totalInspectedActions);
 
         List<Map<String, Object>> gaps = new ArrayList<>();
-        if (totalMaliciousEvents == null) {
+        if (!bundle.threatBackendAvailable) {
             gaps.add(gapRow(GAP_THREAT_BACKEND, REASON_REQUEST_FAILED, THREAT_BACKEND_DOWN_IMPACT));
         }
         if (totalInspectedActions == null) {
@@ -622,8 +618,12 @@ public class PostureService {
         }
         List<PolicyMatch> matches = new ArrayList<>();
         for (ThreatCategoryCount c : safe(bundle.subCategoryCounts)) {
-            if (c == null || c.getSubCategory() == null) continue;
-            GuardrailPolicies p = policyByNameLower.get(c.getSubCategory().toLowerCase(Locale.ROOT));
+            // category (not subCategory) is the field that actually carries the firing policy's
+            // name on real accounts — confirmed by AlertModeRealHitsProvider's own join, which
+            // this mirrors. subCategory instead carries the finer-grained detail (e.g.
+            // "PII-<type>"/"Secrets"), which is why joining on it here matched nothing.
+            if (c == null || c.getCategory() == null) continue;
+            GuardrailPolicies p = policyByNameLower.get(c.getCategory().toLowerCase(Locale.ROOT));
             if (p != null) matches.add(new PolicyMatch(p, c.getCount()));
         }
         return matches;
