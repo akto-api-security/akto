@@ -11,6 +11,7 @@ import FlyLayout from '../../components/layouts/FlyLayout'
 import CardWithHeader from './new_components/CardWithHeader'
 import CustomProgressBar from './new_components/CustomProgressBar'
 import DonutChart from '../../components/shared/DonutChart'
+import SmoothAreaChart from './new_components/SmoothChart'
 import StackedAreaChart from '../../components/charts/StackedAreaChart'
 import StackedChart from '../../components/charts/StackedChart'
 import { SeverityBadge } from '../observe/agentic/AgenticCellRenderers'
@@ -23,6 +24,7 @@ import SpinnerCentered from '../../components/progress/SpinnerCentered'
 import {
     PANEL_EMPTY_STATE_COPY, DUMMY_SHADOW_AI_TREND, DUMMY_DATA_LEAVING, DUMMY_ENFORCEMENT_FUNNEL,
     DUMMY_ATTACK_ATTEMPTS, DUMMY_FRAMEWORK_READINESS, DUMMY_ADOPTION_GAP, DUMMY_VENDOR_RISK_BUBBLE,
+    DUMMY_RISK_SCORE_TREND,
 } from './securityPostureDummyData'
 
 // KPI ids — must match PostureService.KPI_* on the backend.
@@ -59,6 +61,28 @@ function riskBand(value) {
     if (value >= 67) return { label: 'Elevated', tone: 'critical', color: '#dc2626' }
     if (value >= 34) return { label: 'Moderate', tone: 'warning', color: '#ca8a04' }
     return { label: 'Good', tone: 'success', color: '#16a34a' }
+}
+
+// A 0-100 score as a partial ring, colored by riskBand — reuses DonutChart (already used by
+// DataLeavingCard) rather than a new charting primitive. showValue draws "68"/"of 100" centered
+// in the ring (the flyout's larger ring); the compact KPI tile version omits it since the value
+// is already printed next to the ring.
+function RiskScoreRing({ value, size, showValue }) {
+    const band = riskBand(value)
+    const filled = value === null || value === undefined ? 0 : value
+    const ringData = {
+        Score: { text: filled, color: band ? band.color : '#9ca3af' },
+        Remaining: { text: Math.max(0, 100 - filled), color: '#E4E5E7' },
+    }
+    return (
+        <DonutChart
+            data={ringData}
+            size={size}
+            pieInnerSize="75%"
+            title={showValue ? String(filled) : undefined}
+            subtitle={showValue ? 'of 100' : undefined}
+        />
+    )
 }
 
 function formatValue(kpi) {
@@ -127,6 +151,25 @@ function KpiTile({ kpi, onOpen, forceClickable }) {
     // Every other KPI opens by navigating to kpi.route; the risk score has no route (item 10 in
     // the build plan gave it a flyout instead of a page), so it needs to be clickable without one.
     const clickable = hasValue && (forceClickable || !!kpi.route)
+    // Only the composite risk score is a 0-100 score with a band color — the other three KPIs
+    // (counts/percentages) have no ring to show.
+    const showRing = kpi.id === KPI_RISK_SCORE && hasValue
+
+    const valueColumn = (
+        <VerticalStack gap="1">
+            {hasValue ? (
+                <Text variant="heading2xl">{formatValue(kpi)}</Text>
+            ) : (
+                <Text variant="heading2xl" color="subdued">Not computed yet</Text>
+            )}
+
+            {deltaText && (
+                <Text variant="bodySm" fontWeight="semibold" color={DELTA_TONE_TO_COLOR[kpi.deltaTone] || 'subdued'}>
+                    {deltaText}
+                </Text>
+            )}
+        </VerticalStack>
+    )
 
     return (
         <Card>
@@ -141,17 +184,13 @@ function KpiTile({ kpi, onOpen, forceClickable }) {
                         <GapHint gaps={kpi.dataGaps} />
                     </HorizontalStack>
 
-                    {hasValue ? (
-                        <Text variant="heading2xl">{formatValue(kpi)}</Text>
-                    ) : (
-                        <Text variant="heading2xl" color="subdued">Not computed yet</Text>
-                    )}
+                    {showRing ? (
+                        <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                            <RiskScoreRing value={kpi.value} size={48} />
+                            {valueColumn}
+                        </HorizontalStack>
+                    ) : valueColumn}
 
-                    {deltaText && (
-                        <Text variant="bodySm" fontWeight="semibold" color={DELTA_TONE_TO_COLOR[kpi.deltaTone] || 'subdued'}>
-                            {deltaText}
-                        </Text>
-                    )}
                     {kpi.footnote && (
                         <Text variant="bodySm" color="subdued">{kpi.footnote}</Text>
                     )}
@@ -556,11 +595,51 @@ function ActNowCard({ actNow, onOpenInsight }) {
     )
 }
 
+// What's driving each sub-score — one line per subScore.id, built from the matching breakdown
+// field RiskScoreCalculator.computeBreakdown adds (see its own javadoc for why the shape differs
+// per sub-score: shadow AI/vendor risk are device-count snapshots, DLP mirrors threat activity's
+// per-device diff, compliance gaps groups by policy since an uncovered event isn't one device's).
+function subScoreDetailLines(subScore, kpi) {
+    switch (subScore.id) {
+        case 'shadowAiExposure': {
+            const rows = kpi.shadowAiTopServices || []
+            if (rows.length === 0) return null
+            return rows.map((r) => `${r.service} (${r.status.toLowerCase()}, ${r.deviceCount} device${r.deviceCount === 1 ? '' : 's'})`).join(' · ')
+        }
+        case 'dlpIncidents': {
+            const rows = kpi.dlpDeviceMovements || []
+            if (rows.length === 0) return null
+            return rows.map((r) => `${r.username || r.deviceId} (${r.diff > 0 ? '+' : ''}${r.diff})`).join(' · ')
+        }
+        case 'vendorRisk': {
+            const table = kpi.vendorTable || []
+            const topUnapproved = kpi.vendorRiskTopUnapproved || []
+            const lines = []
+            if (table.length > 0) {
+                lines.push(table.slice(0, 4).map((v) => `${v.vendor} (${v.approved ? 'approved' : 'unapproved'}, ${v.count})`).join(' · '))
+            }
+            if (topUnapproved.length > 0) {
+                lines.push('Top unapproved by device: ' + topUnapproved.map((v) => `${v.vendor} (${v.deviceCount} device${v.deviceCount === 1 ? '' : 's'})`).join(' · '))
+            }
+            return lines.length > 0 ? lines : null
+        }
+        case 'complianceGaps': {
+            const rows = kpi.complianceGapsByPolicy || []
+            if (rows.length === 0) return null
+            return rows.map((r) => `${r.policy} (${r.count})`).join(' · ')
+        }
+        default:
+            return null
+    }
+}
+
 // One row of the risk score drilldown — a sub-score's weight, its bar, and its value or (when
 // null) the same "why is this missing" hint every other gap on this page uses.
-function RiskScoreSubScoreRow({ subScore, vendorTable }) {
+function RiskScoreSubScoreRow({ subScore, kpi }) {
     const hasValue = subScore.value !== null && subScore.value !== undefined
     const band = riskBand(subScore.value)
+    const detail = subScoreDetailLines(subScore, kpi)
+    const detailLines = Array.isArray(detail) ? detail : (detail ? [detail] : [])
     return (
         <VerticalStack gap="2">
             <HorizontalStack align="space-between" blockAlign="center" gap={"2"}>
@@ -584,33 +663,118 @@ function RiskScoreSubScoreRow({ subScore, vendorTable }) {
                     </HorizontalStack>
                 </Box>
             </HorizontalStack>
-            
-            {subScore.id === 'vendorRisk' && vendorTable && vendorTable.length > 0 && (
+
+            {detailLines.length > 0 && (
                 <Box paddingBlockStart="1">
-                    <Text variant="bodySm" color="subdued">
-                        {vendorTable.slice(0, 4).map((v) => `${v.vendor} (${v.approved ? 'approved' : 'unapproved'}, ${v.count})`).join(' · ')}
-                    </Text>
+                    <VerticalStack gap="05">
+                        {detailLines.map((line, i) => (
+                            <Text key={i} variant="bodySm" color="subdued">{line}</Text>
+                        ))}
+                    </VerticalStack>
                 </Box>
             )}
         </VerticalStack>
     )
 }
 
-// "Risk score breakdown" flyout body — the drilldown for the composite KPI tile. No trend chart
-// and no "what moved the score" table here: both need posture_score_history, which doesn't exist
-// yet (see PostureService.GAP_POSTURE_HISTORY / the build plan's item 10). This shows exactly
-// what's computed right now: the five weighted sub-scores behind the composite.
-function RiskScoreFlyoutBody({ kpi }) {
+// Composite trend + "what moved the score" — both need posture_score_history, which doesn't
+// exist yet (see PostureService.GAP_POSTURE_HISTORY / the build plan's item 10), so both are
+// illustrative-only and blurred, same convention as every other backend-less panel on this page.
+function RiskScoreTrendSection() {
+    const latest = DUMMY_RISK_SCORE_TREND[DUMMY_RISK_SCORE_TREND.length - 1]
+    const body = (
+        <VerticalStack gap="4">
+            <HorizontalStack gap="4" blockAlign="center" wrap={false}>
+                <RiskScoreRing value={latest} size={90} showValue />
+                <VerticalStack gap="2">
+                    <Text variant="bodySm" color="subdued">Composite trend · last 12 weeks</Text>
+                    <SmoothAreaChart tickPositions={DUMMY_RISK_SCORE_TREND} color="#7C5CFC" height="60" width="260" />
+                </VerticalStack>
+            </HorizontalStack>
+            <HorizontalStack gap="2">
+                {['30 days', '90 days', '365 days'].map((label, i) => (
+                    <Badge key={label} status={i === 0 ? 'info' : undefined}>{label}</Badge>
+                ))}
+            </HorizontalStack>
+        </VerticalStack>
+    )
+    return (
+        <Box key="trend" padding="4">
+            <DummyDataOverlay panelId="riskScoreTrend">{body}</DummyDataOverlay>
+        </Box>
+    )
+}
+
+// Real, not illustrative — top 5 devices by absolute change in threat-activity detections between
+// this window and the immediately preceding one (RiskScoreCalculator#threatActivityDeviceMovements
+// on the backend). Only threat activity decomposes to a single device this way; the other four
+// sub-scores are policy/collection-level, not device-attributable from the data this page loads.
+function RiskScoreAnnotationsSection({ movements, loading }) {
+    const rows = movements || []
+    return (
+        <Box key="annotations" padding="4">
+            <VerticalStack gap="3">
+                <VerticalStack gap="1">
+                    <Text variant="headingSm">What moved the score</Text>
+                    <Text variant="bodySm" color="subdued">
+                        Threat activity — devices with the biggest change in detections this period vs. the one before
+                    </Text>
+                </VerticalStack>
+                {loading ? (
+                    <SpinnerCentered />
+                ) : rows.length === 0 ? (
+                    <Text variant="bodySm" color="subdued">
+                        No prior-window comparison available, or no device's threat activity changed this period.
+                    </Text>
+                ) : (
+                    <VerticalStack gap="4">
+                        {rows.map((row) => (
+                            <HorizontalStack key={row.deviceId} align="space-between" blockAlign="start" wrap={false} gap="4">
+                                <Box width="100%">
+                                    <VerticalStack gap="05">
+                                        <Text variant="bodyMd" fontWeight="semibold">{row.username || row.deviceId}</Text>
+                                        <Text variant="bodySm" color="subdued">{row.prior} → {row.current} detections this period</Text>
+                                    </VerticalStack>
+                                </Box>
+                                <Box minWidth="70px">
+                                    <Text variant="bodyMd" fontWeight="semibold" color={row.diff > 0 ? 'critical' : 'success'}>
+                                        {row.diff > 0 ? `+${row.diff}` : row.diff}
+                                    </Text>
+                                </Box>
+                            </HorizontalStack>
+                        ))}
+                    </VerticalStack>
+                )}
+            </VerticalStack>
+        </Box>
+    )
+}
+
+// "Risk score breakdown" flyout body — the drilldown for the composite KPI tile. Shows the real
+// composite (with its now-real week-over-week delta) and the five weighted sub-scores, plus the
+// two always-blurred illustrative sections above.
+function RiskScoreFlyoutBody({ kpi, breakdownLoading }) {
     if (!kpi) return null
     const band = riskBand(kpi.value)
     const historyGap = (kpi.dataGaps || []).find((g) => g.source === 'POSTURE_HISTORY')
+    const deltaText = formatDelta(kpi)
 
     return [
         <Box key="summary" padding="4">
             <VerticalStack gap="2">
                 <HorizontalStack gap="3" blockAlign="center">
-                    <Text variant="heading2xl">{kpi.value !== null && kpi.value !== undefined ? `${kpi.value} / 100` : 'Not computed yet'}</Text>
-                    {band && <Badge status={band.tone === 'critical' ? 'critical' : band.tone === 'warning' ? 'warning' : 'success'}>{band.label}</Badge>}
+                    <RiskScoreRing value={kpi.value} size={56} />
+                    <VerticalStack gap="1">
+                        <HorizontalStack gap="3" blockAlign="center">
+                            <Text variant="heading2xl">{kpi.value !== null && kpi.value !== undefined ? `${kpi.value} / 100` : 'Not computed yet'}</Text>
+                            {band && <Badge status={band.tone === 'critical' ? 'critical' : band.tone === 'warning' ? 'warning' : 'success'}>{band.label}</Badge>}
+                        </HorizontalStack>
+                        {deltaText && (
+                            <Text variant="bodySm" fontWeight="semibold" color={DELTA_TONE_TO_COLOR[kpi.deltaTone] || 'subdued'}>
+                                {deltaText}
+                            </Text>
+                        )}
+                    </VerticalStack>
                 </HorizontalStack>
                 <Text variant="bodySm" color="subdued">
                     Composite of five weighted sub-scores. Lower is better.
@@ -619,17 +783,23 @@ function RiskScoreFlyoutBody({ kpi }) {
             </VerticalStack>
         </Box>,
         <Box key="subScores" padding="4">
-            <VerticalStack gap="4">
-                <VerticalStack gap={"3"}>
-                    {(kpi.subScores || []).map((s) => (
-                        <RiskScoreSubScoreRow key={s.id} subScore={s} vendorTable={kpi.vendorTable} />
-                    ))}
+            {breakdownLoading ? (
+                <SpinnerCentered />
+            ) : (
+                <VerticalStack gap="4">
+                    <VerticalStack gap={"3"}>
+                        {(kpi.subScores || []).map((s) => (
+                            <RiskScoreSubScoreRow key={s.id} subScore={s} kpi={kpi} />
+                        ))}
+                    </VerticalStack>
+                    {historyGap && (
+                        <Text variant="bodySm" color="subdued">{historyGap.impact}</Text>
+                    )}
                 </VerticalStack>
-                {historyGap && (
-                    <Text variant="bodySm" color="subdued">{historyGap.impact}</Text>
-                )}
-            </VerticalStack>
+            )}
         </Box>,
+        RiskScoreTrendSection(),
+        RiskScoreAnnotationsSection({ movements: kpi.threatActivityMovements, loading: breakdownLoading }),
     ]
 }
 
@@ -643,6 +813,8 @@ function SecurityPosture() {
     const [loading, setLoading] = useState(true)
     const [flyout, setFlyout] = useState(null) // { insightId, group } | null
     const [riskScoreFlyoutOpen, setRiskScoreFlyoutOpen] = useState(false)
+    const [riskScoreBreakdown, setRiskScoreBreakdown] = useState(null)
+    const [riskScoreBreakdownLoading, setRiskScoreBreakdownLoading] = useState(false)
 
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000)
 
@@ -670,6 +842,32 @@ function SecurityPosture() {
         load()
         return () => { cancelled = true }
     }, [currDateRange])
+
+    // The flyout's own detail (sub-scores + vendor table) — fetched only once the flyout is
+    // actually opened, not as part of the page's main load above. Re-fetches if the date range
+    // changes while it's open, same as every other panel on this page.
+    useEffect(() => {
+        if (!riskScoreFlyoutOpen) return
+        let cancelled = false
+
+        async function loadBreakdown() {
+            setRiskScoreBreakdownLoading(true)
+            try {
+                const startTimestamp = getTimeEpoch('since')
+                const endTimestamp = getTimeEpoch('until')
+                const resp = await dashboardApi.fetchRiskScoreBreakdown(startTimestamp, endTimestamp)
+                if (!cancelled) setRiskScoreBreakdown(resp || {})
+            } catch (error) {
+                console.error('Error fetching risk score breakdown:', error)
+                if (!cancelled) setRiskScoreBreakdown({})
+            } finally {
+                if (!cancelled) setRiskScoreBreakdownLoading(false)
+            }
+        }
+
+        loadBreakdown()
+        return () => { cancelled = true }
+    }, [riskScoreFlyoutOpen, currDateRange])
 
     const kpis = pageData.kpis || []
     const kpiById = (id) => kpis.find((k) => k.id === id)
@@ -790,7 +988,10 @@ function SecurityPosture() {
                         title="Risk score breakdown"
                         show={riskScoreFlyoutOpen}
                         setShow={setRiskScoreFlyoutOpen}
-                        components={RiskScoreFlyoutBody({ kpi: kpiById(KPI_RISK_SCORE) }) || []}
+                        components={RiskScoreFlyoutBody({
+                            kpi: kpiById(KPI_RISK_SCORE) ? { ...kpiById(KPI_RISK_SCORE), ...riskScoreBreakdown } : null,
+                            breakdownLoading: riskScoreBreakdownLoading,
+                        }) || []}
                         showDivider
                     />
                 </>

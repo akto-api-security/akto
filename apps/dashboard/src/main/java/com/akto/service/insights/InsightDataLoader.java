@@ -70,6 +70,7 @@ public class InsightDataLoader {
     private static final int EXTERNAL_CALL_TIMEOUT_SECONDS = 8;
 
     public InsightDataBundle load(InsightContext ctx) {
+        long loadStart = System.currentTimeMillis();
         // Threat-backend calls run in worker threads — Context ThreadLocals must be
         // captured here and re-set inside each task, or the worker queries the wrong
         // account (see the plan's "Correctness traps": this is the single largest bug risk).
@@ -85,28 +86,63 @@ public class InsightDataLoader {
         Future<List<SkillSeverityCount>> skillSeverityFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
                 () -> threatAccess.skillSeverityCounts(ctx.getStartTs(), ctx.getEndTs())));
 
+        // Every step below runs sequentially (only the three threat-backend futures above are
+        // concurrent) — each is timed individually so a slow one is visible in the logs instead of
+        // only seeing the total. See logStep's own note on what to do with these numbers.
+        long t0 = System.currentTimeMillis();
         List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                 Filters.empty(),
                 Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING,
                         ApiCollection.SKILLS, ApiCollection.START_TS, ApiCollection.BASE_RISK_SCORE,
                         ApiCollection.BASE_RISK_SCORE_REASON, ApiCollection.DESCRIPTION, ApiCollection._DEACTIVATED));
+        logStep("collections (findAll, unbounded)", t0, collections.size());
         Map<String, List<ApiCollection>> collectionsByServiceName = indexByServiceName(collections);
 
+        t0 = System.currentTimeMillis();
         Map<String, String> deviceIdToUsername = loadDeviceIdToUsername();
+        logStep("deviceIdToUsername", t0, deviceIdToUsername.size());
+
+        t0 = System.currentTimeMillis();
         Map<String, List<DeviceTag>> userTags = loadUserTags();
+        logStep("userTags (AgentUsersDao.findAll, unbounded)", t0, userTags.size());
+
+        t0 = System.currentTimeMillis();
         List<McpAuditInfo> auditRows = loadAuditRows(contextSource);
+        logStep("auditRows (limit 5000)", t0, auditRows.size());
+
+        t0 = System.currentTimeMillis();
         List<GuardrailPolicies> policies = loadPolicies();
+        logStep("policies (limit 5000 + per-policy device-tag resolution)", t0, policies.size());
+
+        t0 = System.currentTimeMillis();
         Set<String> allowlistNamesLower = loadAllowlistNames();
+        logStep("allowlistNamesLower (McpAllowlistDao.findAll, unbounded)", t0, allowlistNamesLower.size());
+
+        t0 = System.currentTimeMillis();
         Map<Integer, List<String>> sensitiveByCollection = loadSensitiveByCollection(collections);
+        logStep("sensitiveByCollection (3x SingleTypeInfoDao scans + per-collection lookup)", t0, sensitiveByCollection.size());
+
+        t0 = System.currentTimeMillis();
         List<UserAnalysisData> userAnalysis = loadUserAnalysis();
+        logStep("userAnalysis (UserAnalysisDataDao.findAll, unbounded)", t0, userAnalysis.size());
+
+        t0 = System.currentTimeMillis();
         List<NhiIdentity> nhiIdentities = loadNhiIdentities();
+        logStep("nhiIdentities (NhiIdentityDao.findAll, unbounded)", t0, nhiIdentities.size());
+
+        t0 = System.currentTimeMillis();
         List<ApiCollection> activeCollections = loadActiveCollections();
+        logStep("activeCollections", t0, activeCollections.size());
+
+        t0 = System.currentTimeMillis();
         Map<Integer, Integer> collectionLastTrafficSeen = loadCollectionLastTrafficSeen(activeCollections);
+        logStep("collectionLastTrafficSeen", t0, collectionLastTrafficSeen.size());
 
         boolean threatBackendAvailable = true;
         List<HostSeverityCount> hostSeverityCounts;
         List<ThreatCategoryCount> subCategoryCounts;
         List<SkillSeverityCount> skillSeverityCounts;
+        t0 = System.currentTimeMillis();
         try {
             hostSeverityCounts = hostSeverityFuture.get(EXTERNAL_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (Exception e) {
@@ -114,6 +150,8 @@ public class InsightDataLoader {
             hostSeverityCounts = Collections.emptyList();
             threatBackendAvailable = false;
         }
+        logStep("hostSeverityFuture.get (threat backend)", t0, hostSeverityCounts.size());
+        t0 = System.currentTimeMillis();
         try {
             subCategoryCounts = subCategoryFuture.get(EXTERNAL_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (Exception e) {
@@ -121,6 +159,8 @@ public class InsightDataLoader {
             subCategoryCounts = Collections.emptyList();
             threatBackendAvailable = false;
         }
+        logStep("subCategoryFuture.get (threat backend)", t0, subCategoryCounts.size());
+        t0 = System.currentTimeMillis();
         try {
             skillSeverityCounts = skillSeverityFuture.get(EXTERNAL_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (Exception e) {
@@ -128,11 +168,23 @@ public class InsightDataLoader {
             skillSeverityCounts = Collections.emptyList();
             threatBackendAvailable = false;
         }
+        logStep("skillSeverityFuture.get (threat backend)", t0, skillSeverityCounts.size());
+
+        logger.info("InsightDataLoader: load() total " + (System.currentTimeMillis() - loadStart)
+                + "ms for accountId=" + accountId);
 
         return new InsightDataBundle(ctx, collections, collectionsByServiceName, deviceIdToUsername, userTags,
                 auditRows, policies, allowlistNamesLower, sensitiveByCollection, userAnalysis, nhiIdentities,
                 hostSeverityCounts, subCategoryCounts, skillSeverityCounts, threatBackendAvailable,
                 activeCollections, collectionLastTrafficSeen, threatAccess);
+    }
+
+    /** Logs how long one load() step took plus the row count it produced — the row count is what
+     *  tells "slow because unindexed" apart from "slow because genuinely large", which is exactly
+     *  what decides whether the fix is an index/projection or a limit/skip-based page size. */
+    private void logStep(String label, long startMs, int rowCount) {
+        logger.info("InsightDataLoader: " + label + " took " + (System.currentTimeMillis() - startMs)
+                + "ms, " + rowCount + " rows");
     }
 
     private <T> Callable<T> withContext(int accountId, Integer userId, CONTEXT_SOURCE contextSource, Callable<T> body) {

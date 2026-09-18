@@ -12,6 +12,7 @@ export const PANEL_EMPTY_STATE_COPY = {
     frameworkReadiness: 'Fill me in',
     vendorRiskExposure: 'Fill me in',
     adoptionGap: 'Fill me in',
+    riskScoreTrend: 'Fill me in',
 }
 
 // Static week-ending-now timestamps for a dummy N-week series — same [ms, value] point shape
@@ -88,3 +89,8 @@ export const DUMMY_VENDOR_RISK_BUBBLE = [
     { id: 6, x: 62, y: 55, actFirst: false },
     { id: 7, x: 78, y: 68, actFirst: false },
 ]
+
+// The risk score flyout's composite trend — still illustrative-only (unlike "what moved the
+// score", which is now real; see RiskScoreAnnotationsSection). Same "no posture_score_history
+// yet" gap the composite KPI already reports (see RiskScoreCalculator's GAP_POSTURE_HISTORY).
+export const DUMMY_RISK_SCORE_TREND = [74, 71, 73, 70, 68, 65, 66, 68, 70, 71, 69, 68]

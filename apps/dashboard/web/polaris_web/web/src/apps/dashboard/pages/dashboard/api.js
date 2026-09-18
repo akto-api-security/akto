@@ -305,6 +305,19 @@ const api = {
                 endTimestamp
             }
         })
+    },
+
+    // The risk score flyout's own detail (sub-scores + vendor table) — fetched only when the
+    // flyout opens, not as part of fetchPostureSummary. See SecurityPostureAction's javadoc.
+    fetchRiskScoreBreakdown: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchRiskScoreBreakdown',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
     }
 }
 

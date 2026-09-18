@@ -91,6 +91,23 @@ public class PostureService {
             "The threat backend did not respond, so this count and its change figure are unavailable.";
 
     /**
+     * The risk score flyout's own on-demand detail (five sub-score rows + vendor table + the
+     * device/vendor/policy breakdowns behind each of them) — deliberately not part of
+     * {@link #buildSummary}'s response. See RiskScoreCalculator#computeBreakdown for why this is
+     * split into its own call. priorHostSeverity/priorAllThreats are null for an unbounded
+     * "all time" range (no prior window to diff against) — same convention every other delta on
+     * this page already uses.
+     */
+    public BasicDBObject buildRiskScoreBreakdown(InsightDataBundle bundle, List<ApiCollection> endpointCollections,
+                                                  List<DashboardMaliciousEvent> allThreatsForCompliance,
+                                                  List<DashboardMaliciousEvent> priorAllThreatsForCompliance,
+                                                  Map<String, ThreatComplianceInfo> threatComplianceMap,
+                                                  List<HostSeverityCount> priorHostSeverity) {
+        return RiskScoreCalculator.computeBreakdown(bundle, endpointCollections, allThreatsForCompliance,
+                priorAllThreatsForCompliance, threatComplianceMap, priorHostSeverity);
+    }
+
+    /**
      * @param bundle               shared insights bundle, holding this window's aggregations
      * @param priorHostSeverity    hostSeverityCounts for the immediately preceding equal-length window
      * @param priorSubCategory     subcategory-wise counts for that same preceding window
@@ -100,6 +117,10 @@ public class PostureService {
      *                             for the risk score's vendor-risk sub-score/table
      * @param allThreatsForCompliance  every malicious event in this window (unfiltered by label),
      *                             needed only for the risk score's compliance-gaps sub-score
+     * @param priorAllThreatsForCompliance same, for the immediately preceding window — the risk
+     *                             score's week-over-week delta needs a prior compliance-gaps
+     *                             sub-score too. Null when priorHostSeverity/priorSubCategory are
+     *                             (unbounded "all time" range — see SecurityPostureAction).
      * @param threatComplianceMap  filterId -> ThreatComplianceInfo, same map
      *                             GuardrailMetricsProcessor/AgenticDashboardAction already build
      * @param totalInspectedActions the funnel's denominator — total gateway-inspected
@@ -115,13 +136,15 @@ public class PostureService {
                                        List<ThreatCategoryCount> priorSubCategory,
                                        List<ApiCollection> endpointCollections,
                                        List<DashboardMaliciousEvent> allThreatsForCompliance,
+                                       List<DashboardMaliciousEvent> priorAllThreatsForCompliance,
                                        Map<String, ThreatComplianceInfo> threatComplianceMap,
                                        Long totalInspectedActions,
                                        List<Integer> weeklyAttackCounts) {
         BasicDBObject response = new BasicDBObject();
 
         List<BasicDBObject> kpis = new ArrayList<>();
-        kpis.add(RiskScoreCalculator.compute(bundle, endpointCollections, allThreatsForCompliance, threatComplianceMap));
+        kpis.add(RiskScoreCalculator.compute(bundle, endpointCollections, allThreatsForCompliance,
+                threatComplianceMap, priorHostSeverity, priorSubCategory, priorAllThreatsForCompliance));
         kpis.add(criticalAlertsKpi(bundle, priorHostSeverity));
         kpis.add(monitoringCoverageKpi(bundle));
         kpis.add(sensitiveDataIncidentsKpi(bundle, priorSubCategory));
@@ -596,6 +619,19 @@ public class PostureService {
 
     // ── Shared policy-name join ──────────────────────────────────────────────────
 
+    /** Policy name (lowercased) -> policy — built once and shared by every caller that needs to
+     *  resolve an event/aggregate's category back to the policy that fired it (matchedPolicyCounts
+     *  below, and RiskScoreCalculator's DLP-by-device and compliance-gaps-by-policy breakdowns). */
+    static Map<String, GuardrailPolicies> policyByNameLower(List<GuardrailPolicies> policies) {
+        Map<String, GuardrailPolicies> byName = new HashMap<>();
+        for (GuardrailPolicies p : safe(policies)) {
+            if (p != null && p.getName() != null) {
+                byName.put(p.getName().toLowerCase(Locale.ROOT), p);
+            }
+        }
+        return byName;
+    }
+
     /**
      * Matches this window's per-subCategory counts back to the policy that produced them, by
      * name (case-insensitive) — the same taxonomy-mismatch convention InsightUtil and
@@ -610,12 +646,7 @@ public class PostureService {
      * three actually need. Package-private (not private) for that last reason.
      */
     static List<PolicyMatch> matchedPolicyCounts(InsightDataBundle bundle) {
-        Map<String, GuardrailPolicies> policyByNameLower = new HashMap<>();
-        for (GuardrailPolicies p : safe(bundle.policies)) {
-            if (p != null && p.getName() != null) {
-                policyByNameLower.put(p.getName().toLowerCase(Locale.ROOT), p);
-            }
-        }
+        Map<String, GuardrailPolicies> policyByNameLower = policyByNameLower(bundle.policies);
         List<PolicyMatch> matches = new ArrayList<>();
         for (ThreatCategoryCount c : safe(bundle.subCategoryCounts)) {
             // category (not subCategory) is the field that actually carries the firing policy's
