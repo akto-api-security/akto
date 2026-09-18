@@ -16,6 +16,7 @@ from constants import (
     LOCAL_SCANNERS,
     REMOTE_SCANNERS,
     SUPPORTED_SCANNERS,
+    apply_scanner_response_format,
     canonical_scanner,
     force_gemma_only,
     get_default_config,
@@ -102,6 +103,7 @@ async def scan_payload(
             config = {**config, "modelConfigs": force_gemma_only(config.get("modelConfigs"))}
         elif scanner_name in GEMMA_ONLY_SCANNERS:
             config = {**config, "modelConfigs": strip_qwen_tier(config.get("modelConfigs"))}
+        config = {**config, "modelConfigs": apply_scanner_response_format(config.get("modelConfigs"))}
         store_fn = None
         if config.get("storeAllResults"):
             store_fn = lambda completed, name: schedule(alerts.store_results(completed, name))
