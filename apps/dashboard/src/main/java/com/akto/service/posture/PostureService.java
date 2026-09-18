@@ -5,7 +5,6 @@ import com.akto.action.threat_detection.HostSeverityCount;
 import com.akto.action.threat_detection.ThreatCategoryCount;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.GuardrailPolicies;
-import com.akto.dto.threat_detection.ThreatComplianceInfo;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightRoutes;
@@ -50,6 +49,7 @@ public class PostureService {
     public static final String KEY_ENFORCEMENT_FUNNEL = "enforcementFunnel";
     public static final String KEY_ATTACK_ATTEMPTS   = "attackAttempts";
     public static final String KEY_BIGGEST_MOVERS    = "biggestMovers";
+    public static final String KEY_FRAMEWORK_READINESS = "frameworkReadiness";
 
     // KPI ids, also what the frontend keys its cards off.
     public static final String KPI_RISK_SCORE         = "riskScore";
@@ -110,12 +110,11 @@ public class PostureService {
      * this page already uses.
      */
     public BasicDBObject buildRiskScoreBreakdown(InsightDataBundle bundle, List<ApiCollection> endpointCollections,
-                                                  List<DashboardMaliciousEvent> allThreatsForCompliance,
-                                                  List<DashboardMaliciousEvent> priorAllThreatsForCompliance,
-                                                  Map<String, ThreatComplianceInfo> threatComplianceMap,
+                                                  List<DashboardMaliciousEvent> allThreatsForDlp,
+                                                  List<DashboardMaliciousEvent> priorAllThreatsForDlp,
                                                   List<HostSeverityCount> priorHostSeverity) {
-        return RiskScoreCalculator.computeBreakdown(bundle, endpointCollections, allThreatsForCompliance,
-                priorAllThreatsForCompliance, threatComplianceMap, priorHostSeverity);
+        return RiskScoreCalculator.computeBreakdown(bundle, endpointCollections, allThreatsForDlp,
+                priorAllThreatsForDlp, priorHostSeverity);
     }
 
     /**
@@ -126,14 +125,6 @@ public class PostureService {
      *                             separate query from bundle.collections (which is scoped to
      *                             whatever context this request is running under), needed only
      *                             for the risk score's vendor-risk sub-score/table
-     * @param allThreatsForCompliance  every malicious event in this window (unfiltered by label),
-     *                             needed only for the risk score's compliance-gaps sub-score
-     * @param priorAllThreatsForCompliance same, for the immediately preceding window — the risk
-     *                             score's week-over-week delta needs a prior compliance-gaps
-     *                             sub-score too. Null when priorHostSeverity/priorSubCategory are
-     *                             (unbounded "all time" range — see SecurityPostureAction).
-     * @param threatComplianceMap  filterId -> ThreatComplianceInfo, same map
-     *                             GuardrailMetricsProcessor/AgenticDashboardAction already build
      * @param totalInspectedActions the funnel's denominator — total gateway-inspected
      *                             (isAtlasTraffic) traffic in the window. Null when the trace
      *                             search backend isn't configured or didn't respond.
@@ -144,22 +135,25 @@ public class PostureService {
      * @param recentAttackEvents   malicious events over BIGGEST_MOVERS_WINDOW_DAYS ending at
      *                             bundle.ctx's end — needed only for "Biggest movers"' attack-count
      *                             condition, a fixed lookback independent of the page's own range.
+     * @param allPoliciesIncludingInactive every GuardrailPolicies row regardless of active status
+     *                             — needed only for Framework readiness, which measures what
+     *                             fraction of a framework's mapped policies are actually turned
+     *                             on. bundle.policies won't do: InsightDataLoader#loadPolicies
+     *                             already filters to active-only for every other feature that
+     *                             reads it.
      */
     public BasicDBObject buildSummary(InsightDataBundle bundle,
                                        List<HostSeverityCount> priorHostSeverity,
                                        List<ThreatCategoryCount> priorSubCategory,
                                        List<ApiCollection> endpointCollections,
-                                       List<DashboardMaliciousEvent> allThreatsForCompliance,
-                                       List<DashboardMaliciousEvent> priorAllThreatsForCompliance,
-                                       Map<String, ThreatComplianceInfo> threatComplianceMap,
                                        Long totalInspectedActions,
                                        List<Integer> weeklyAttackCounts,
-                                       List<DashboardMaliciousEvent> recentAttackEvents) {
+                                       List<DashboardMaliciousEvent> recentAttackEvents,
+                                       List<GuardrailPolicies> allPoliciesIncludingInactive) {
         BasicDBObject response = new BasicDBObject();
 
         List<BasicDBObject> kpis = new ArrayList<>();
-        kpis.add(RiskScoreCalculator.compute(bundle, endpointCollections, allThreatsForCompliance,
-                threatComplianceMap, priorHostSeverity, priorSubCategory, priorAllThreatsForCompliance));
+        kpis.add(RiskScoreCalculator.compute(bundle, endpointCollections, priorHostSeverity, priorSubCategory));
         kpis.add(criticalAlertsKpi(bundle, priorHostSeverity));
         kpis.add(monitoringCoverageKpi(bundle));
         kpis.add(sensitiveDataIncidentsKpi(bundle, priorSubCategory));
@@ -175,6 +169,8 @@ public class PostureService {
         int biggestMoversWindowStartTs = attackTrendEndTs - (BIGGEST_MOVERS_WINDOW_DAYS * 86400);
         response.put(KEY_BIGGEST_MOVERS, biggestMovers(endpointCollections, bundle.collectionLastTrafficSeen,
                 recentAttackEvents, biggestMoversWindowStartTs));
+
+        response.put(KEY_FRAMEWORK_READINESS, frameworkReadiness(allPoliciesIncludingInactive));
 
         return response;
     }
@@ -357,12 +353,16 @@ public class PostureService {
         return names;
     }
 
-    private static long sumMatching(List<ThreatCategoryCount> counts, Set<String> subCategoryNamesLower) {
+    /** category (not subCategory) is the field that actually carries the firing policy's name on
+     *  real accounts — same join matchedPolicyCounts/AlertModeRealHitsProvider use. subCategory
+     *  carries finer-grained detail instead (e.g. "PII-<type>"/"Secrets"), which is why joining on
+     *  it here matched nothing and this KPI always read 0. */
+    private static long sumMatching(List<ThreatCategoryCount> counts, Set<String> policyNamesLower) {
         if (counts == null) return 0;
         long total = 0;
         for (ThreatCategoryCount c : counts) {
-            if (c == null || c.getSubCategory() == null) continue;
-            if (subCategoryNamesLower.contains(c.getSubCategory().toLowerCase(Locale.ROOT))) {
+            if (c == null || c.getCategory() == null) continue;
+            if (policyNamesLower.contains(c.getCategory().toLowerCase(Locale.ROOT))) {
                 total += c.getCount();
             }
         }
@@ -720,6 +720,74 @@ public class PostureService {
     private static double overThresholdRatio(BasicDBObject row) {
         long threshold = row.getLong("threshold");
         return threshold == 0 ? 0 : ((Number) row.get("value")).doubleValue() / threshold;
+    }
+
+    // ── Framework readiness ──────────────────────────────────────────────────────
+    //
+    // Real, not illustrative: a policy maps itself to a compliance framework via its own
+    // llmRule.compliance (a Map<framework name, clause ids> the policy author fills in — see
+    // GuardrailPolicies.LLMRule), not a fixed list this code invents. Readiness for a framework is
+    // the share of ITS OWN mapped policies that are actually enforcing right now (policy active
+    // AND its llmRule turned on) — "how much of what you've configured for this framework is
+    // actually live", not a claim about total regulatory coverage, since there's no source for
+    // "how many controls this framework requires" to divide by instead. Needs every policy
+    // (active and inactive) to have a real denominator — see buildSummary's own param doc.
+
+    /** A policy is "enforcing" only while it's active AND its LLM rule (which carries the
+     *  compliance mapping) is enabled — a disabled/inactive policy's compliance mapping is
+     *  configuration, not live coverage. Package-private (not private): RiskScoreCalculator's
+     *  Compliance gaps sub-score uses the same definition of "covered by a compliance
+     *  framework" so the two panels can't disagree with each other. */
+    static boolean policyEnforcing(GuardrailPolicies p) {
+        return p != null && p.isActive() && p.getLlmRule() != null && p.getLlmRule().isEnabled();
+    }
+
+    /** Same enforcing check, plus the policy must actually be mapped to at least one compliance
+     *  framework in its LLM rule. */
+    static boolean policyHasComplianceMapping(GuardrailPolicies p) {
+        return policyEnforcing(p) && p.getLlmRule().getCompliance() != null
+                && !p.getLlmRule().getCompliance().isEmpty();
+    }
+
+    private BasicDBObject frameworkReadiness(List<GuardrailPolicies> allPoliciesIncludingInactive) {
+        Map<String, Integer> totalByFramework = new LinkedHashMap<>();
+        Map<String, Integer> enforcingByFramework = new LinkedHashMap<>();
+        for (GuardrailPolicies p : safe(allPoliciesIncludingInactive)) {
+            if (p == null || p.getLlmRule() == null || p.getLlmRule().getCompliance() == null) continue;
+            boolean enforcing = policyEnforcing(p);
+            for (String framework : p.getLlmRule().getCompliance().keySet()) {
+                if (framework == null || framework.trim().isEmpty()) continue;
+                totalByFramework.merge(framework, 1, Integer::sum);
+                if (enforcing) enforcingByFramework.merge(framework, 1, Integer::sum);
+            }
+        }
+
+        List<BasicDBObject> rows = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : totalByFramework.entrySet()) {
+            String framework = e.getKey();
+            int total = e.getValue();
+            int enforcing = enforcingByFramework.getOrDefault(framework, 0);
+            BasicDBObject row = new BasicDBObject();
+            row.put("framework", framework);
+            row.put("value", (int) Math.round((enforcing * 100.0) / total));
+            row.put("enforcingPolicies", enforcing);
+            row.put("totalPolicies", total);
+            rows.add(row);
+        }
+        // Frameworks with more mapped policies first — a framework only one policy happens to
+        // mention is too noisy a sample to lead with.
+        rows.sort((a, b) -> Integer.compare(b.getInt("totalPolicies"), a.getInt("totalPolicies")));
+        List<BasicDBObject> top = rows.subList(0, Math.min(6, rows.size()));
+
+        BasicDBObject panel = new BasicDBObject();
+        panel.put("frameworks", top);
+        List<Map<String, Object>> gaps = new ArrayList<>();
+        if (rows.isEmpty()) {
+            gaps.add(gapRow(GAP_GUARDRAIL_POLICIES, REASON_NOT_CONFIGURED,
+                    "No policy has a compliance framework mapped in its LLM rule yet, so framework readiness can't be scored."));
+        }
+        panel.put("dataGaps", gaps);
+        return panel;
     }
 
     // ── Shared policy-name join ──────────────────────────────────────────────────

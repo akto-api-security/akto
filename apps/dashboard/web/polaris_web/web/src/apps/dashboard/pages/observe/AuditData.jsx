@@ -13,7 +13,6 @@ import GithubServerTable from "../../components/tables/GithubServerTable";
 import { MethodBox } from "./GetPrettifyEndpoint";
 import { CellType } from "../../components/tables/rows/GithubRow";
 import PersistStore from "../../../main/PersistStore";
-import Store from "../../store";
 import ConditionalApprovalModal from "../../components/modals/ConditionalApprovalModal";
 import RegistryBadge from "../../components/shared/RegistryBadge";
 import AllowlistBadge from "../../components/shared/AllowlistBadge";
@@ -454,7 +453,7 @@ function AuditData() {
     const isEndpointSecurity = isEndpointSecurityCategory();
     const activeAccount = window?.ACTIVE_ACCOUNT
     const definedTableTabs = isEndpointSecurity
-        ? ((activeAccount === VENDORS_TAB_ACCOUNT_ID  && window?.USER_NAME === "aryan@akto.io" )? TABS_ENDPOINT_SECURITY : TABS_ENDPOINT_SECURITY_BASE)
+        ? (activeAccount === VENDORS_TAB_ACCOUNT_ID ? TABS_ENDPOINT_SECURITY : TABS_ENDPOINT_SECURITY_BASE)
         : TABS_DEFAULT;
 
     const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);

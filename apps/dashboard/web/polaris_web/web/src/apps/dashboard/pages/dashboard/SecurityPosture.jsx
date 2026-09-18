@@ -23,7 +23,7 @@ import values from '@/util/values'
 import SpinnerCentered from '../../components/progress/SpinnerCentered'
 import {
     PANEL_EMPTY_STATE_COPY, DUMMY_SHADOW_AI_TREND, DUMMY_DATA_LEAVING, DUMMY_ENFORCEMENT_FUNNEL,
-    DUMMY_ATTACK_ATTEMPTS, DUMMY_FRAMEWORK_READINESS, DUMMY_ADOPTION_GAP, DUMMY_VENDOR_RISK_BUBBLE,
+    DUMMY_ATTACK_ATTEMPTS, DUMMY_ADOPTION_GAP, DUMMY_VENDOR_RISK_BUBBLE,
     DUMMY_RISK_SCORE_TREND,
 } from './securityPostureDummyData'
 
@@ -219,33 +219,44 @@ function ComingSoonTile({ label }) {
     )
 }
 
-// "Framework readiness" — no backend for this yet at all, so it's always the blurred dummy
-// content (see DUMMY_FRAMEWORK_READINESS). Each row's tick mark is this quarter's target,
-// positioned absolutely over the same CustomProgressBar every other bar on this page uses.
-function FrameworkReadinessCard() {
-    const body = (
-        <VerticalStack gap="3">
-            {DUMMY_FRAMEWORK_READINESS.map((row) => (
-                <VerticalStack key={row.id} gap="1">
-                    <HorizontalStack align="space-between">
-                        <Text variant="bodyMd">{row.label}</Text>
-                        <Text variant="bodyMd" fontWeight="semibold">{row.value}%</Text>
-                    </HorizontalStack>
-                    <div style={{ position: 'relative' }}>
-                        <CustomProgressBar progress={row.value} topColor={row.color} height={"10px"}/>
-                        <div style={{
-                            position: 'absolute', top: 0, bottom: 0, left: `${row.target}%`,
-                            width: '2px', background: '#1f2937',
-                        }} />
-                    </div>
-                </VerticalStack>
-            ))}
-            <Text variant="bodySm" color="subdued">Markers show the target for this quarter</Text>
-        </VerticalStack>
-    )
+// "Framework readiness" — real now: readiness% per compliance framework is
+// enforcingPolicies/totalPolicies from GuardrailPolicies.llmRule.compliance (a policy "enforces"
+// a framework it's mapped to only while both the policy and its LLM rule are active/enabled).
+// No quarterly target exists for this yet (that's a product input, not derivable from policies),
+// so real rows skip the tick-mark overlay the old dummy version drew.
+function readinessColor(value) {
+    if (value >= 80) return '#23C48C'
+    if (value >= 50) return '#F2B322'
+    return '#F24122'
+}
+
+function FrameworkReadinessCard({ panel }) {
+    const frameworks = (panel && panel.frameworks) || []
+    const hasData = frameworks.length > 0
+
+    if (!hasData) {
+        return (
+            <CardWithHeader title="Framework readiness" hasData={false}
+                emptyMessage="No guardrail policy has a compliance framework mapped yet." minHeight="220px" />
+        )
+    }
+
     return (
         <CardWithHeader title="Framework readiness" hasData={true} minHeight="220px">
-            <DummyDataOverlay panelId="frameworkReadiness">{body}</DummyDataOverlay>
+            <VerticalStack gap="3">
+                {frameworks.map((row) => (
+                    <VerticalStack key={row.framework} gap="1">
+                        <HorizontalStack align="space-between">
+                            <Text variant="bodyMd">{row.framework}</Text>
+                            <Text variant="bodyMd" fontWeight="semibold">{row.value}%</Text>
+                        </HorizontalStack>
+                        <CustomProgressBar progress={row.value} topColor={readinessColor(row.value)} height={"10px"}/>
+                        <Text variant="bodySm" color="subdued">
+                            {row.enforcingPolicies} of {row.totalPolicies} mapped {row.totalPolicies === 1 ? 'policy' : 'policies'} enforcing
+                        </Text>
+                    </VerticalStack>
+                ))}
+            </VerticalStack>
         </CardWithHeader>
     )
 }
@@ -454,7 +465,7 @@ function DataLeavingCard({ panel, onOpen }) {
             title="What data is leaving"
             tooltipContent={panel.dataGaps?.[0]?.impact}
             hasData={true}
-            minHeight="220px"
+            minHeight="180px"
         >
             {hasData ? body : <DummyDataOverlay panelId="dataLeaving">{body}</DummyDataOverlay>}
         </CardWithHeader>
@@ -1004,7 +1015,7 @@ function SecurityPosture() {
 
     const frameworkAndAdoptionRow = (
         <HorizontalGrid columns={2} gap="4">
-            <FrameworkReadinessCard />
+            <FrameworkReadinessCard panel={pageData.frameworkReadiness} />
             <AdoptionGapCard />
         </HorizontalGrid>
     )

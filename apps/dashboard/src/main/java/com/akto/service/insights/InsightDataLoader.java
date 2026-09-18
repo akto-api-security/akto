@@ -311,7 +311,12 @@ public class InsightDataLoader {
                 if (a.getName() == null) continue;
                 String nameLower = a.getName().toLowerCase(Locale.ROOT);
                 boolean isVendor = McpAllowlist.ENTRY_TYPE_VENDOR.equals(a.getEntryType());
-                names.add(isVendor ? InsightUtil.canonicalVendorName(nameLower) : nameLower);
+                // canonicalVendorName returns a display-cased name ("OpenAI", "Anthropic") for use
+                // as a UI label elsewhere (RiskScoreCalculator's vendor table) — this set is
+                // strictly lowercase (every consumer lowercases its query side before checking
+                // membership), so the canonicalized name must be lowered again here or a vendor
+                // approval would never match.
+                names.add(isVendor ? InsightUtil.canonicalVendorName(nameLower).toLowerCase(Locale.ROOT) : nameLower);
             }
             return names;
         } catch (Exception e) {

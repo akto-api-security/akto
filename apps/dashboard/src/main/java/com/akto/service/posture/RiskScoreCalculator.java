@@ -5,7 +5,6 @@ import com.akto.action.threat_detection.HostSeverityCount;
 import com.akto.action.threat_detection.ThreatCategoryCount;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.GuardrailPolicies;
-import com.akto.dto.threat_detection.ThreatComplianceInfo;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightUtil;
 import com.akto.service.insights.InsightUtil.GovernanceBucket;
@@ -52,8 +51,8 @@ import java.util.Set;
  *
  * A sub-score is null (excluded from the composite, not scored as 0) only when it is genuinely
  * undefined for this account/window — no agentic assets to classify, no PII policy configured
- * at all, no resolvable-vendor endpoint traffic, no malicious events to check compliance mapping
- * on, or the threat backend didn't respond. A confirmed zero (PII policies exist but nothing
+ * at all, no resolvable-vendor endpoint traffic, no policy mapped to a compliance framework yet,
+ * or the threat backend didn't respond. A confirmed zero (PII policies exist but nothing
  * matched; the threat backend responded with no activity) is a real, good score of 0, not an
  * exclusion.
  */
@@ -92,16 +91,13 @@ final class RiskScoreCalculator {
     }
 
     static BasicDBObject compute(InsightDataBundle bundle, List<ApiCollection> endpointCollections,
-                                  List<DashboardMaliciousEvent> allThreats,
-                                  Map<String, ThreatComplianceInfo> threatComplianceMap,
                                   List<HostSeverityCount> priorHostSeverity,
-                                  List<ThreatCategoryCount> priorSubCategory,
-                                  List<DashboardMaliciousEvent> priorAllThreats) {
+                                  List<ThreatCategoryCount> priorSubCategory) {
         Double shadowAiSubScore = shadowAiExposureSubScore(bundle);
         Double dlpSubScore = dlpIncidentsSubScore(bundle);
         Double threatSubScore = threatActivitySubScore(bundle);
         VendorRiskAnalysis vendorAnalysis = vendorRiskAnalysis(endpointCollections, bundle.allowlistNamesLower);
-        Double complianceSubScore = complianceGapsSubScore(allThreats, threatComplianceMap);
+        Double complianceSubScore = complianceGapsSubScore(bundle);
 
         Double composite = weightedComposite(shadowAiSubScore, dlpSubScore, vendorAnalysis.subScore,
                 complianceSubScore, threatSubScore);
@@ -141,7 +137,7 @@ final class RiskScoreCalculator {
                     null);
             Double priorDlpSubScore = dlpIncidentsSubScore(priorView);
             Double priorThreatSubScore = threatActivitySubScore(priorView);
-            Double priorComplianceSubScore = complianceGapsSubScore(priorAllThreats, threatComplianceMap);
+            Double priorComplianceSubScore = complianceGapsSubScore(priorView);
 
             Double priorComposite = weightedComposite(shadowAiSubScore, priorDlpSubScore, vendorAnalysis.subScore,
                     priorComplianceSubScore, priorThreatSubScore);
@@ -183,9 +179,8 @@ final class RiskScoreCalculator {
                     "No endpoint traffic resolves to a known vendor yet, so vendor risk can't be scored.");
         }
         if (complianceSubScore == null) {
-            PostureService.addGap(kpi, "COMPLIANCE_GAPS", PostureService.REASON_NO_ROWS,
-                    "No malicious events in this window (or no compliance mapping loaded), so "
-                            + "compliance gaps can't be scored.");
+            PostureService.addGap(kpi, PostureService.GAP_GUARDRAIL_POLICIES, PostureService.REASON_NOT_CONFIGURED,
+                    "No policy has a compliance framework mapped in its LLM rule yet, so compliance gaps can't be scored.");
         }
         if (threatSubScore == null) {
             PostureService.addGap(kpi, PostureService.GAP_THREAT_BACKEND, PostureService.REASON_REQUEST_FAILED,
@@ -223,13 +218,12 @@ final class RiskScoreCalculator {
     static BasicDBObject computeBreakdown(InsightDataBundle bundle, List<ApiCollection> endpointCollections,
                                            List<DashboardMaliciousEvent> allThreats,
                                            List<DashboardMaliciousEvent> priorAllThreats,
-                                           Map<String, ThreatComplianceInfo> threatComplianceMap,
                                            List<HostSeverityCount> priorHostSeverity) {
         Double shadowAiSubScore = shadowAiExposureSubScore(bundle);
         Double dlpSubScore = dlpIncidentsSubScore(bundle);
         Double threatSubScore = threatActivitySubScore(bundle);
         VendorRiskAnalysis vendorAnalysis = vendorRiskAnalysis(endpointCollections, bundle.allowlistNamesLower);
-        Double complianceSubScore = complianceGapsSubScore(allThreats, threatComplianceMap);
+        Double complianceSubScore = complianceGapsSubScore(bundle);
 
         List<BasicDBObject> subScores = new ArrayList<>();
         subScores.add(subScoreRow("shadowAiExposure", "Shadow AI exposure", 30, shadowAiSubScore,
@@ -242,9 +236,8 @@ final class RiskScoreCalculator {
                 "VENDOR_RISK", PostureService.REASON_NO_ROWS,
                 "No endpoint traffic resolves to a known vendor yet, so vendor risk can't be scored."));
         subScores.add(subScoreRow("complianceGaps", "Compliance gaps", 15, complianceSubScore,
-                "COMPLIANCE_GAPS", PostureService.REASON_NO_ROWS,
-                "No malicious events in this window (or no compliance mapping loaded), so "
-                        + "compliance gaps can't be scored."));
+                PostureService.GAP_GUARDRAIL_POLICIES, PostureService.REASON_NOT_CONFIGURED,
+                "No policy has a compliance framework mapped in its LLM rule yet, so compliance gaps can't be scored."));
         subScores.add(subScoreRow("threatActivity", "Threat activity", 10, threatSubScore,
                 PostureService.GAP_THREAT_BACKEND, PostureService.REASON_REQUEST_FAILED,
                 PostureService.THREAT_BACKEND_DOWN_IMPACT));
@@ -264,7 +257,7 @@ final class RiskScoreCalculator {
         breakdown.put("dlpDeviceMovements",
                 dlpDeviceMovements(allThreats, priorAllThreats, bundle.policies, bundle.deviceIdToUsername));
         breakdown.put("vendorRiskTopUnapproved", vendorRiskTopUnapprovedDevices(endpointCollections, bundle.allowlistNamesLower));
-        breakdown.put("complianceGapsByPolicy", complianceGapsByPolicy(allThreats, threatComplianceMap, bundle.policies));
+        breakdown.put("complianceGapsByPolicy", complianceGapsByPolicy(bundle));
         return breakdown;
     }
 
@@ -433,8 +426,8 @@ final class RiskScoreCalculator {
      * {@link #threatActivityDeviceMovements} (per-device count diff between this window and the
      * immediately preceding one, top 5 by absolute change), but scoped to events matched to a
      * PII-detecting policy rather than every event. Needs the raw event lists (not
-     * bundle.subCategoryCounts, which has no per-event host) — same reason complianceGapsSubScore
-     * takes allThreats directly instead of the bundle. Empty when there's no prior window.
+     * bundle.subCategoryCounts, which has no per-event host) — unlike complianceGapsSubScore,
+     * which is aggregate-only and has no per-device breakdown. Empty when there's no prior window.
      */
     private static List<BasicDBObject> dlpDeviceMovements(List<DashboardMaliciousEvent> current,
                                                             List<DashboardMaliciousEvent> priorEvents,
@@ -573,7 +566,10 @@ final class RiskScoreCalculator {
             String vendor = e.getKey();
             long count = e.getValue().size();
             total += count;
-            boolean approved = allowlistNamesLower.contains(vendor);
+            // vendor is endpointVendorName's display-cased form ("OpenAI") — allowlistNamesLower
+            // is strictly lowercase, so this must lower before checking membership or every
+            // canonicalized vendor reads as unapproved regardless of the actual allowlist.
+            boolean approved = allowlistNamesLower.contains(vendor.toLowerCase(Locale.ROOT));
             int weight = approved ? KNOWN_RISKY_VENDORS.getOrDefault(vendor, 0) : UNAPPROVED_VENDOR_WEIGHT;
             if (!approved) unapprovedCount += count;
             else if (weight > 0) riskyApprovedCount += count;
@@ -606,7 +602,7 @@ final class RiskScoreCalculator {
         for (ApiCollection c : PostureService.safe(endpointCollections)) {
             if (c == null || c.isDeactivated()) continue;
             String vendor = InsightUtil.endpointVendorName(c);
-            if (vendor == null || allowlistNamesLower.contains(vendor)) continue;
+            if (vendor == null || allowlistNamesLower.contains(vendor.toLowerCase(Locale.ROOT))) continue;
             String deviceId = InsightUtil.deviceIdOf(c);
             devicesByVendor.computeIfAbsent(vendor, k -> new HashSet<>()).add(deviceId != null ? deviceId : "unknown");
         }
@@ -624,58 +620,48 @@ final class RiskScoreCalculator {
 
     // ── Compliance gaps ──────────────────────────────────────────────────────────
     //
-    // Event-count-weighted mean of "did this event's policy map to any compliance standard at
-    // all", inverted to a gap (100 - coverage): for every malicious event with a filterId, look
-    // up threatComplianceMap (the same "threat_compliance/<filterId>.conf" key
-    // GuardrailMetricsProcessor already uses to build the Compliance-at-risk breakdown) and check
-    // whether it maps to at least one compliance standard. The share that do NOT is the gap.
-    // Deliberately not scoped to label=GUARDRAIL — a "guardrail policy" is read here as any
-    // filter/policy that can fire on traffic, matching how this codebase already uses the term
-    // loosely elsewhere (AgenticDashboardAction's "guardrail" dashboard mixes both labels too).
+    // Event-count-weighted mean of "did this event's policy map to a compliance framework",
+    // inverted to a gap (100 - coverage) — over the same matchedPolicyCounts join (category ->
+    // GuardrailPolicies by name) DLP/enforcementFunnel/dataLeaving already share, and the same
+    // "covered" definition Framework readiness uses (PostureService#policyHasComplianceMapping:
+    // policy active, its LLM rule enabled, and mapped to at least one framework in
+    // llmRule.compliance) — so the two panels can't disagree about what counts as covered.
+    // Previously sourced from a separate ThreatComplianceInfo/"threat_compliance/<filterId>.conf"
+    // mapping unrelated to the account's actual GuardrailPolicies compliance tags; replaced so
+    // this sub-score reflects the same real per-account data Framework readiness does.
 
-    /** Null when there are no malicious events with a filterId in this window (nothing to assess)
-     *  or the compliance map failed to load (never treat "we don't know" as "100% uncovered"). */
-    private static Double complianceGapsSubScore(List<DashboardMaliciousEvent> allThreats,
-                                                  Map<String, ThreatComplianceInfo> threatComplianceMap) {
-        if (threatComplianceMap == null || threatComplianceMap.isEmpty()) return null;
-        long total = 0, uncovered = 0;
-        for (DashboardMaliciousEvent event : PostureService.safe(allThreats)) {
-            if (event == null || event.getFilterId() == null || event.getFilterId().isEmpty()) continue;
-            total++;
-            if (!isComplianceCovered(event, threatComplianceMap)) uncovered++;
+    /** Null only when no policy maps to a compliance framework at all (nothing to assess — same
+     *  data-gap condition Framework readiness reports). Zero matched events with at least one
+     *  compliance-mapped policy configured is a real, good score — not excluded. Mirrors
+     *  dlpIncidentsSubScore's shape exactly, over the same matchedPolicyCounts join. */
+    private static Double complianceGapsSubScore(InsightDataBundle bundle) {
+        boolean anyPolicyMapsToCompliance = false;
+        for (GuardrailPolicies p : PostureService.safe(bundle.policies)) {
+            if (PostureService.policyHasComplianceMapping(p)) { anyPolicyMapsToCompliance = true; break; }
         }
-        if (total == 0) return null;
-        return (uncovered * 100.0) / total;
-    }
+        if (!anyPolicyMapsToCompliance) return null;
 
-    private static boolean isComplianceCovered(DashboardMaliciousEvent event, Map<String, ThreatComplianceInfo> threatComplianceMap) {
-        ThreatComplianceInfo info = threatComplianceMap.get("threat_compliance/" + event.getFilterId() + ".conf");
-        return info != null && info.getMapComplianceToListClauses() != null && !info.getMapComplianceToListClauses().isEmpty();
+        long matched = 0, uncovered = 0;
+        for (PostureService.PolicyMatch m : PostureService.matchedPolicyCounts(bundle)) {
+            matched += m.count;
+            if (!PostureService.policyHasComplianceMapping(m.policy)) uncovered += m.count;
+        }
+        if (matched == 0) return 0.0; // compliance-mapped policies exist and nothing matched — a real, good score
+        return (uncovered * 100.0) / matched;
     }
 
     /**
-     * "What's driving this" for the Compliance gaps sub-score above — the uncovered events
-     * (same isComplianceCovered check), grouped by policy name rather than by device: an event
+     * "What's driving this" for the Compliance gaps sub-score above — the uncovered matches
+     * (same matchedPolicyCounts join), grouped by policy name rather than by device: a match
      * with no compliance mapping isn't attributable to one device the way a threat-activity or
-     * DLP hit is, but it IS attributable to the policy that fired it (same category-join
-     * convention as matchedPolicyCounts/dlpDeviceMovements). Top 5 policies by uncovered count.
+     * DLP hit is, but it IS attributable to the policy that fired it. Top 2 policies by
+     * uncovered count.
      */
-    private static List<BasicDBObject> complianceGapsByPolicy(List<DashboardMaliciousEvent> allThreats,
-                                                                Map<String, ThreatComplianceInfo> threatComplianceMap,
-                                                                List<GuardrailPolicies> policies) {
-        if (threatComplianceMap == null || threatComplianceMap.isEmpty()) return new ArrayList<>();
-
-        Map<String, GuardrailPolicies> policyByNameLower = PostureService.policyByNameLower(policies);
+    private static List<BasicDBObject> complianceGapsByPolicy(InsightDataBundle bundle) {
         Map<String, Long> uncoveredCountByPolicy = new HashMap<>();
-        for (DashboardMaliciousEvent event : PostureService.safe(allThreats)) {
-            if (event == null || event.getFilterId() == null || event.getFilterId().isEmpty()) continue;
-            if (isComplianceCovered(event, threatComplianceMap)) continue;
-            if (event.getCategory() == null) continue;
-            GuardrailPolicies policy = policyByNameLower.get(event.getCategory().toLowerCase(Locale.ROOT));
-            // Falls back to the raw category when it doesn't resolve to a still-active policy
-            // (renamed/deleted since) — better than silently dropping a real uncovered event.
-            String policyName = policy != null ? policy.getName() : event.getCategory();
-            uncoveredCountByPolicy.merge(policyName, 1L, Long::sum);
+        for (PostureService.PolicyMatch m : PostureService.matchedPolicyCounts(bundle)) {
+            if (PostureService.policyHasComplianceMapping(m.policy)) continue;
+            uncoveredCountByPolicy.merge(m.policy.getName(), m.count, Long::sum);
         }
 
         List<BasicDBObject> rows = new ArrayList<>();
