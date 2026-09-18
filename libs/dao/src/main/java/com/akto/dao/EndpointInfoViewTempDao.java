@@ -14,6 +14,15 @@ public class EndpointInfoViewTempDao extends AccountsContextDao<EndpointInfoView
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 Indexes.ascending(EndpointInfoView.API_COLLECTION_ID, EndpointInfoView.URL, EndpointInfoView.METHOD),
                 new IndexOptions().name("merge_key_unique").unique(true));
+
+        // the api changes page filters a discoveredTimestamp range with no collection predicate;
+        // the compound above has the wrong prefix for that. these have to live here rather than on
+        // EndpointInfoViewDao: the rebuild indexes the temp collection and then renames it over
+        // live, so only what is created here survives the swap.
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[]{EndpointInfoView.HAS_HOST_HEADER, EndpointInfoView.DISCOVERED_TIMESTAMP}, true);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[]{EndpointInfoView.DISCOVERED_TIMESTAMP}, true);
     }
 
     @Override
