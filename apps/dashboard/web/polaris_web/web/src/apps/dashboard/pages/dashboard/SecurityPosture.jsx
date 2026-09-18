@@ -1,7 +1,7 @@
 import { useEffect, useReducer, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-    Badge, Box, Card, HorizontalGrid, HorizontalStack, Icon, Popover, Text, Tooltip, VerticalStack,
+    Badge, Box, Card, DataTable, HorizontalGrid, HorizontalStack, Icon, Popover, Text, Tooltip, VerticalStack,
 } from '@shopify/polaris'
 import { CircleInformationMajor } from '@shopify/polaris-icons'
 import { produce } from 'immer'
@@ -609,14 +609,14 @@ function subScoreDetailLines(subScore, kpi) {
         case 'dlpIncidents': {
             const rows = kpi.dlpDeviceMovements || []
             if (rows.length === 0) return null
-            return rows.map((r) => `${r.username || r.deviceId} (${r.diff > 0 ? '+' : ''}${r.diff})`).join(' · ')
+            return rows.map((r) => `${r.username || r.deviceId} (${r.impactPoints > 0 ? '+' : ''}${r.impactPoints} pts)`).join(' · ')
         }
         case 'vendorRisk': {
             const table = kpi.vendorTable || []
             const topUnapproved = kpi.vendorRiskTopUnapproved || []
             const lines = []
             if (table.length > 0) {
-                lines.push(table.slice(0, 4).map((v) => `${v.vendor} (${v.approved ? 'approved' : 'unapproved'}, ${v.count})`).join(' · '))
+                lines.push(table.slice(0, 2).map((v) => `${v.vendor} (${v.approved ? 'approved' : 'unapproved'}, ${v.count})`).join(' · '))
             }
             if (topUnapproved.length > 0) {
                 lines.push('Top unapproved by device: ' + topUnapproved.map((v) => `${v.vendor} (${v.deviceCount} device${v.deviceCount === 1 ? '' : 's'})`).join(' · '))
@@ -705,45 +705,76 @@ function RiskScoreTrendSection() {
     )
 }
 
-// Real, not illustrative — top 5 devices by absolute change in threat-activity detections between
-// this window and the immediately preceding one (RiskScoreCalculator#threatActivityDeviceMovements
-// on the backend). Only threat activity decomposes to a single device this way; the other four
-// sub-scores are policy/collection-level, not device-attributable from the data this page loads.
-function RiskScoreAnnotationsSection({ movements, loading }) {
-    const rows = movements || []
+// One row from any of the 5 breakdowns into a common {category, item, detail, impactPoints}
+// shape — each breakdown has a different subject (a device for threat activity/DLP, a service for
+// shadow AI, a vendor for vendor risk, a policy for compliance gaps), so there's no single field
+// name to read the "item"/"detail" off; this is the one place that knows all 5 shapes.
+function formatMovedRow(row) {
+    if (row.deviceId !== undefined) {
+        return { ...row, item: row.username || row.deviceId, detail: `${row.prior} → ${row.current}` }
+    }
+    if (row.service !== undefined) {
+        return { ...row, item: row.service, detail: `${row.status.toLowerCase()} · ${row.deviceCount} device${row.deviceCount === 1 ? '' : 's'}` }
+    }
+    if (row.vendor !== undefined) {
+        return { ...row, item: row.vendor, detail: `${row.deviceCount} device${row.deviceCount === 1 ? '' : 's'}` }
+    }
+    return { ...row, item: row.policy, detail: `${row.count} event${row.count === 1 ? '' : 's'}` }
+}
+
+// Real, not illustrative — top 2 from each of the 5 sub-score breakdowns (RiskScoreCalculator's
+// threatActivityDeviceMovements/dlpDeviceMovements/shadowAiTopUnapprovedServices/
+// vendorRiskTopUnapprovedDevices/complianceGapsByPolicy), combined into one table. impactPoints is
+// each row's share of its own category's total (movement for threat activity/DLP, snapshot count
+// for the other three), scaled by that sub-score's actual weight (30/25/20/15/10) — bounded by
+// that weight, so it reads against the composite's 0-100 scale instead of as a raw, unbounded count.
+function RiskScoreAnnotationsSection({ kpi, loading }) {
+    const rows = [
+        ...(kpi.shadowAiTopServices || []),
+        ...(kpi.dlpDeviceMovements || []),
+        ...(kpi.vendorRiskTopUnapproved || []),
+        ...(kpi.complianceGapsByPolicy || []),
+        ...(kpi.threatActivityMovements || []),
+    ]
+        .map(formatMovedRow)
+        .sort((a, b) => Math.abs(b.impactPoints) - Math.abs(a.impactPoints))
+
+    const tableRows = rows.map((row) => [
+        row.category,
+        row.item,
+        row.detail,
+        <Text variant="bodyMd" fontWeight="semibold" color={row.impactPoints > 0 ? 'critical' : 'success'}>
+            {row.impactPoints > 0 ? `+${row.impactPoints}` : row.impactPoints} pts
+        </Text>,
+    ])
+
     return (
         <Box key="annotations" padding="4">
             <VerticalStack gap="3">
                 <VerticalStack gap="1">
                     <Text variant="headingSm">What moved the score</Text>
                     <Text variant="bodySm" color="subdued">
-                        Threat activity — devices with the biggest change in detections this period vs. the one before
+                        Top items by weighted impact this period, across every sub-score
                     </Text>
                 </VerticalStack>
                 {loading ? (
                     <SpinnerCentered />
                 ) : rows.length === 0 ? (
                     <Text variant="bodySm" color="subdued">
-                        No prior-window comparison available, or no device's threat activity changed this period.
+                        No prior-window comparison available, or nothing changed this period.
                     </Text>
                 ) : (
-                    <VerticalStack gap="4">
-                        {rows.map((row) => (
-                            <HorizontalStack key={row.deviceId} align="space-between" blockAlign="start" wrap={false} gap="4">
-                                <Box width="100%">
-                                    <VerticalStack gap="05">
-                                        <Text variant="bodyMd" fontWeight="semibold">{row.username || row.deviceId}</Text>
-                                        <Text variant="bodySm" color="subdued">{row.prior} → {row.current} detections this period</Text>
-                                    </VerticalStack>
-                                </Box>
-                                <Box minWidth="70px">
-                                    <Text variant="bodyMd" fontWeight="semibold" color={row.diff > 0 ? 'critical' : 'success'}>
-                                        {row.diff > 0 ? `+${row.diff}` : row.diff}
-                                    </Text>
-                                </Box>
-                            </HorizontalStack>
-                        ))}
-                    </VerticalStack>
+                    <Box maxWidth="620px">
+                        <Card padding="0">
+                            <DataTable
+                                columnContentTypes={['text', 'text', 'text', 'numeric']}
+                                headings={['Category', 'Item', 'Detail', 'Impact']}
+                                rows={tableRows}
+                                hideScrollIndicator
+                                increasedTableDensity
+                            />
+                        </Card>
+                    </Box>
                 )}
             </VerticalStack>
         </Box>
@@ -782,6 +813,7 @@ function RiskScoreFlyoutBody({ kpi, breakdownLoading }) {
                 </Text>
             </VerticalStack>
         </Box>,
+        RiskScoreTrendSection(),
         <Box key="subScores" padding="4">
             {breakdownLoading ? (
                 <SpinnerCentered />
@@ -798,8 +830,7 @@ function RiskScoreFlyoutBody({ kpi, breakdownLoading }) {
                 </VerticalStack>
             )}
         </Box>,
-        RiskScoreTrendSection(),
-        RiskScoreAnnotationsSection({ movements: kpi.threatActivityMovements, loading: breakdownLoading }),
+        RiskScoreAnnotationsSection({ kpi, loading: breakdownLoading }),
     ]
 }
 

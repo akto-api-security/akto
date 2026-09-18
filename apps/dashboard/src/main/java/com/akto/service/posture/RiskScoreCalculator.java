@@ -282,7 +282,30 @@ final class RiskScoreCalculator {
         }
         movements.sort((a, b) -> Long.compare(
                 Math.abs(((Number) b.get("diff")).longValue()), Math.abs(((Number) a.get("diff")).longValue())));
-        return movements.subList(0, Math.min(5, movements.size()));
+        return withPointsImpact(movements, WEIGHT_THREAT, "Threat activity", 2);
+    }
+
+    /**
+     * Converts a sorted (by |diff| desc) device-movements list into "what moved the score" rows:
+     * adds impactPoints — this device's share of the TOTAL movement across every device in this
+     * category (sum of |diff|), scaled by the sub-score's own weight (e.g. 10 points for Threat
+     * activity, 25 for DLP) — and a category label, then trims to topN. impactPoints is what makes
+     * the number meaningful against the composite's 0-100 scale instead of a raw, unbounded event
+     * count: no single device's row can ever show more than ±weight points, the same ceiling that
+     * sub-score has on the composite itself.
+     */
+    private static List<BasicDBObject> withPointsImpact(List<BasicDBObject> movements, double weightFraction,
+                                                          String category, int topN) {
+        long totalAbsDiff = 0;
+        for (BasicDBObject m : movements) totalAbsDiff += Math.abs(((Number) m.get("diff")).longValue());
+        double weightPoints = weightFraction * 100;
+        for (BasicDBObject m : movements) {
+            long diff = ((Number) m.get("diff")).longValue();
+            double impactPoints = totalAbsDiff == 0 ? 0 : Math.round((diff * weightPoints / totalAbsDiff) * 10.0) / 10.0;
+            m.put("impactPoints", impactPoints);
+            m.put("category", category);
+        }
+        return movements.subList(0, Math.min(topN, movements.size()));
     }
 
     /** deviceId -> total (critical+high+medium+low) violation count, summed across every host
@@ -371,7 +394,30 @@ final class RiskScoreCalculator {
             rows.add(row);
         }
         rows.sort((a, b) -> Integer.compare(b.getInt("deviceCount"), a.getInt("deviceCount")));
-        return rows.subList(0, Math.min(5, rows.size()));
+        return withCountSharePoints(rows, "deviceCount", WEIGHT_SHADOW_AI, "Shadow AI exposure", 2);
+    }
+
+    /**
+     * Same idea as {@link #withPointsImpact} but for a snapshot count (deviceCount/count) instead
+     * of a before/after diff, for the sub-scores that don't have a "movement": shadow AI exposure
+     * and vendor risk aren't time-windowed at all (see their own sub-score methods' notes), and
+     * compliance gaps is a per-policy count, not a per-device one. impactPoints here is this row's
+     * share of the TOTAL count across every row in this category (not just the top N), scaled by
+     * the sub-score's weight — the snapshot-data analog of "how much of this weight's 100-point
+     * ceiling does this one item account for".
+     */
+    private static List<BasicDBObject> withCountSharePoints(List<BasicDBObject> rows, String countField,
+                                                              double weightFraction, String category, int topN) {
+        long total = 0;
+        for (BasicDBObject r : rows) total += r.getLong(countField);
+        double weightPoints = weightFraction * 100;
+        for (BasicDBObject r : rows) {
+            double impactPoints = total == 0 ? 0
+                    : Math.round((r.getLong(countField) * weightPoints / total) * 10.0) / 10.0;
+            r.put("impactPoints", impactPoints);
+            r.put("category", category);
+        }
+        return rows.subList(0, Math.min(topN, rows.size()));
     }
 
     /** Null only when no policy has PII detection configured at all. Zero matches with at least
@@ -431,7 +477,7 @@ final class RiskScoreCalculator {
         }
         movements.sort((a, b) -> Long.compare(
                 Math.abs(((Number) b.get("diff")).longValue()), Math.abs(((Number) a.get("diff")).longValue())));
-        return movements.subList(0, Math.min(5, movements.size()));
+        return withPointsImpact(movements, WEIGHT_DLP, "DLP incidents", 2);
     }
 
     /** deviceId -> count of events whose category resolves to a still-active, PII-detecting
@@ -580,7 +626,7 @@ final class RiskScoreCalculator {
             rows.add(row);
         }
         rows.sort((a, b) -> Integer.compare(b.getInt("deviceCount"), a.getInt("deviceCount")));
-        return rows.subList(0, Math.min(2, rows.size()));
+        return withCountSharePoints(rows, "deviceCount", WEIGHT_VENDOR, "Vendor risk", 2);
     }
 
     // ── Compliance gaps ──────────────────────────────────────────────────────────
@@ -647,6 +693,6 @@ final class RiskScoreCalculator {
             rows.add(row);
         }
         rows.sort((a, b) -> Long.compare(b.getLong("count"), a.getLong("count")));
-        return rows.subList(0, Math.min(5, rows.size()));
+        return withCountSharePoints(rows, "count", WEIGHT_COMPLIANCE, "Compliance gaps", 2);
     }
 }
