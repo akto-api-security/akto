@@ -353,12 +353,16 @@ public class PostureService {
         return names;
     }
 
-    private static long sumMatching(List<ThreatCategoryCount> counts, Set<String> subCategoryNamesLower) {
+    /** category (not subCategory) is the field that actually carries the firing policy's name on
+     *  real accounts — same join matchedPolicyCounts/AlertModeRealHitsProvider use. subCategory
+     *  carries finer-grained detail instead (e.g. "PII-<type>"/"Secrets"), which is why joining on
+     *  it here matched nothing and this KPI always read 0. */
+    private static long sumMatching(List<ThreatCategoryCount> counts, Set<String> policyNamesLower) {
         if (counts == null) return 0;
         long total = 0;
         for (ThreatCategoryCount c : counts) {
-            if (c == null || c.getSubCategory() == null) continue;
-            if (subCategoryNamesLower.contains(c.getSubCategory().toLowerCase(Locale.ROOT))) {
+            if (c == null || c.getCategory() == null) continue;
+            if (policyNamesLower.contains(c.getCategory().toLowerCase(Locale.ROOT))) {
                 total += c.getCount();
             }
         }
