@@ -86,11 +86,12 @@ public class InitializerListener implements ServletContextListener {
                             logger.info("triggering endpoint remote command cleanup cron for db abstractor " + Context.now());
                             endpointRemoteCommandCleanupCron.runCron();
                         }
-                        // Deliberately outside the TRIGGER_MERGING_CRON gate above — must run
-                        // regardless of that flag's value on this instance.
-                        SkillWatchCron skillWatchCron = new SkillWatchCron();
-                        logger.info("triggering skill watch cron for db abstractor " + Context.now());
-                        skillWatchCron.runCron();
+                        // Disabled for now — uncomment to re-enable. Deliberately outside the
+                        // TRIGGER_MERGING_CRON gate above (must run regardless of that flag's
+                        // value on this instance) when it IS enabled.
+                        // SkillWatchCron skillWatchCron = new SkillWatchCron();
+                        // logger.info("triggering skill watch cron for db abstractor " + Context.now());
+                        // skillWatchCron.runCron();
                         AllMetrics.instance.ingestTcMetrics();
                     } catch (Exception e) {
                         logger.error("error running initializer method for db abstractor", e);
