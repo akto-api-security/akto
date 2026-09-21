@@ -119,13 +119,14 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
         { label: "Last Traffic Seen", value: asset.lastSeen || "-" },
     ], [asset]);
 
-    // Plugins are discovery-only — status/version/scope/marketplace/parent-agent come straight off
-    // the plugin's own tags (no traffic-derived fields apply), so they replace assetDetails instead
-    // of sitting alongside it.
+    // Plugins are discovery-only — version/scope/marketplace/parent-agent come straight off the
+    // plugin's own tags (no traffic-derived fields apply), so they replace assetDetails instead of
+    // sitting alongside it. Status deliberately excluded — a plugin row rolls up one collection per
+    // device, so a single blended status here would misrepresent devices that disagree; see the
+    // Devices tab for the real per-device breakdown instead.
     const pluginDetails = useMemo(() => {
         if (asset.type !== "Plugin") return null;
         return [
-            { label: "Status",      value: asset.pluginStatus ? (String(asset.pluginStatus).toLowerCase() === "enabled" ? "Enabled" : "Disabled") : "-" },
             { label: "Version",     value: asset.pluginVersion },
             { label: "Scope",       value: asset.pluginScope },
             { label: "Marketplace", value: asset.pluginMarketplace },
