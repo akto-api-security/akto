@@ -52,6 +52,7 @@ import com.akto.dao.pii.PIISourceDao;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.test_editor.YamlTemplateOverrideDao;
 import com.akto.dao.testing.*;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
@@ -4430,6 +4431,10 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public static void processTemplateFilesZip(byte[] zipFile, String author, String source, String repositoryUrl) {
+        processTemplateFilesZip(zipFile, author, source, repositoryUrl, false);
+    }
+
+    public static void processTemplateFilesZip(byte[] zipFile, String author, String source, String repositoryUrl, boolean overrideSystemTemplates) {
         if (zipFile != null) {
             try (ByteArrayInputStream inputStream = new ByteArrayInputStream(zipFile);
                     ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
@@ -4437,7 +4442,17 @@ public class InitializerListener implements ServletContextListener {
                 ZipEntry entry;
 
                 Bson proj = Projections.include(YamlTemplate.HASH);
-                List<YamlTemplate> hashValueTemplates = YamlTemplateDao.instance.findAll(Filters.empty(), proj);
+                List<YamlTemplate> hashValueTemplates;
+                Set<String> aktoTemplateIds = Collections.emptySet();
+                if (overrideSystemTemplates) {
+                    hashValueTemplates = YamlTemplateOverrideDao.instance.findAll(Filters.empty(), proj);
+                    aktoTemplateIds = YamlTemplateDao.instance.findAll(
+                            Filters.eq(YamlTemplate.AUTHOR, Constants._AKTO),
+                            Projections.include(Constants.ID)
+                    ).stream().map(YamlTemplate::getId).collect(Collectors.toSet());
+                } else {
+                    hashValueTemplates = YamlTemplateDao.instance.findAll(Filters.empty(), proj);
+                }
 
                 Map<String, List<YamlTemplate>> mapIdToHash = hashValueTemplates.stream().collect(Collectors.groupingBy(YamlTemplate::getId));
 
@@ -4495,9 +4510,14 @@ public class InitializerListener implements ServletContextListener {
 
                         // new or updated template
                         if (testConfig != null) {
+                            if (overrideSystemTemplates && !aktoTemplateIds.contains(testConfig.getId())) {
+                                skipped++;
+                                continue;
+                            }
+
                             boolean hasSettings = testConfig.getAttributes() != null;
 
-                            if (hasSettings && !testConfig.getAttributes().getPlan().equals(TemplatePlan.FREE) && !DashboardMode.isMetered()) {
+                            if (!overrideSystemTemplates && hasSettings && !testConfig.getAttributes().getPlan().equals(TemplatePlan.FREE) && !DashboardMode.isMetered()) {
                                 skipped++;
                                 continue;
                             }
@@ -4506,7 +4526,7 @@ public class InitializerListener implements ServletContextListener {
                             int createdAt = Context.now();
                             int updatedAt = Context.now();
 
-                            if (TestConfig.isTestMultiNode(testConfig)) {
+                            if (!overrideSystemTemplates && TestConfig.isTestMultiNode(testConfig)) {
                                 if(existingTemplatesInDb != null && existingTemplatesInDb.size() == 1){
                                     multiNodesIds.add(id);
                                 }else if(!DashboardMode.isMetered()){
@@ -4543,7 +4563,20 @@ public class InitializerListener implements ServletContextListener {
                                 logger.errorAndAddToDb("Error parsing estimatedTokens for template " + id + ": " + e.getMessage(), LogDb.DASHBOARD);
                             }
 
-                            if (Constants._AKTO.equals(author)) {
+                            if (overrideSystemTemplates) {
+                                updates.add(Updates.set(YamlTemplate.SOURCE, source));
+                                updates.add(Updates.set(YamlTemplate.REPOSITORY_URL, repositoryUrl));
+                                try {
+                                    YamlTemplateOverrideDao.instance.getMCollection().findOneAndUpdate(
+                                        Filters.eq(Constants.ID, id),
+                                        Updates.combine(updates),
+                                        new FindOneAndUpdateOptions().upsert(true));
+                                } catch (Exception e){
+                                    logger.errorAndAddToDb(
+                                            String.format("Error while inserting override test template %s Error: %s", id, e.getMessage()),
+                                            LogDb.DASHBOARD);
+                                }
+                            } else if (Constants._AKTO.equals(author)) {
                                 YamlTemplateDao.instance.updateOne(
                                         Filters.eq(Constants.ID, id),
                                         Updates.combine(updates));
@@ -4575,11 +4608,15 @@ public class InitializerListener implements ServletContextListener {
                     zipInputStream.closeEntry();
                 }
 
-                if(!DashboardMode.isMetered()){
-                    logger.debugAndAddToDb("Deleting " + multiNodesIds.size() + " templates for local deployment", LogDb.DASHBOARD);
-                    YamlTemplateDao.instance.deleteAll(
-                        Filters.in(Constants.ID, multiNodesIds)
-                    );
+                if (!overrideSystemTemplates) {
+                    if(!DashboardMode.isMetered()){
+                        logger.debugAndAddToDb("Deleting " + multiNodesIds.size() + " templates for local deployment", LogDb.DASHBOARD);
+                        YamlTemplateDao.instance.deleteAll(
+                            Filters.in(Constants.ID, multiNodesIds)
+                        );
+                    }
+
+                    YamlTemplateDao.instance.deleteAll(Filters.in("_id", Arrays.asList("LocalFileInclusionLFIRFI", "SQLInjection", "SSRF", "SecurityMisconfig", "XSS")));
                 }
 
                 if (countTotalTemplates != countUnchangedTemplates) {
@@ -4587,8 +4624,6 @@ public class InitializerListener implements ServletContextListener {
                 }
 
                 logger.debugAndAddToDb("Skipped " + skipped + " test templates for account: " + Context.accountId.get());
-
-                YamlTemplateDao.instance.deleteAll(Filters.in("_id", Arrays.asList("LocalFileInclusionLFIRFI", "SQLInjection", "SSRF", "SecurityMisconfig", "XSS")));
 
             } catch (Exception ex) {
                 cacheLoggerMaker.errorAndAddToDb(ex,

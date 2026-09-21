@@ -8,6 +8,7 @@ import com.akto.dto.billing.OrgMetaData;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.stigg.StiggReporterClient;
 import com.akto.util.UsageUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.google.gson.Gson;
@@ -61,10 +62,7 @@ public class OrganizationUtils {
 
                 String featureLabel = "";
                 if (featureObject != null) {
-                    BasicDBObject metaData = (BasicDBObject) featureObject.get("additionalMetaData");
-                    if (metaData != null) {
-                        featureLabel = metaData.getString("key", "");
-                    }
+                    featureLabel = StiggReporterClient.extractFeatureLabel(featureObject);
                     result.put(featureLabel, new FeatureAccess(isGranted));
                 } else {
                     logger.errorAndAddToDb("unable to find feature object for this entitlement " + bO.toString(), LoggerMaker.LogDb.DASHBOARD);

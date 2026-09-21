@@ -119,6 +119,9 @@ public class AccountSettings {
     public static final String TEST_LIBRARIES = "testLibraries";
     private List<TestLibrary> testLibraries;
 
+    public static final String OVERRIDE_TEST_LIBRARIES = "overrideTestLibraries";
+    private List<TestLibrary> overrideTestLibraries;
+
     public static final String PARTNER_IP_LIST = "partnerIpList";
     private List<String> partnerIpList;
 
@@ -566,6 +569,14 @@ public class AccountSettings {
 
     public void setTestLibraries(List<TestLibrary> testLibraries) {
         this.testLibraries = testLibraries;
+    }
+
+    public List<TestLibrary> getOverrideTestLibraries() {
+        return overrideTestLibraries;
+    }
+
+    public void setOverrideTestLibraries(List<TestLibrary> overrideTestLibraries) {
+        this.overrideTestLibraries = overrideTestLibraries;
     }
 
     public LastCronRunInfo getLastUpdatedCronInfo() {
