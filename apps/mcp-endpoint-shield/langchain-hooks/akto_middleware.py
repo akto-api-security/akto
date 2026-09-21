@@ -5,7 +5,7 @@ Class-based AgentMiddleware that intercepts model calls to enforce Akto guardrai
 Uses the flat HTTP proxy payload format consistent with other Akto connectors
 (github-cli-hooks, cursor-hooks, etc.).
 
-Full usage docs, the block/alert/warn/approval behaviour table, and both the
+Full usage docs, the block/alert/warn behaviour table, and both the
 CLI (resolve_interrupts) and web-app (interrupt_payload) integration patterns
 are in README.md alongside this file. Quick reference:
 
@@ -17,13 +17,13 @@ are in README.md alongside this file. Quick reference:
         model="gpt-4.1",
         tools=[...],
         middleware=[AktoGuardrailsMiddleware()],
-        checkpointer=InMemorySaver(),  # required — "warn"/"approval" verdicts pause via interrupt()
+        checkpointer=InMemorySaver(),  # required — "warn" verdicts pause via interrupt()
     )
 
     config = {"configurable": {"thread_id": "conversation-1"}}
     try:
         result = agent.invoke({"messages": [{"role": "user", "content": user_input}]}, config=config)
-        result = resolve_interrupts(agent, result, config)  # handles "warn"/"approval" pauses
+        result = resolve_interrupts(agent, result, config)  # handles "warn" pauses
     except ValueError as e:
         print(f"Blocked by Akto Guardrails: {e}")
 
@@ -104,7 +104,7 @@ def _guardrails_behaviour_value(behaviour: Any) -> str:
 
 
 def _is_warn_behaviour(behaviour: str) -> bool:
-    return behaviour in ("warn", "approval")
+    return behaviour == "warn"
 
 
 def _is_alert_behaviour(behaviour: str) -> bool:
@@ -135,7 +135,7 @@ def _default_ask_human(payload: dict) -> bool:
 def resolve_interrupts(agent, result: dict, config: dict, ask_human=None) -> dict:
     """
     Given a result already obtained from agent.invoke(), resolve any pending
-    "warn"/"approval" guardrails pause by asking and resuming with
+    "warn" guardrails pause by asking and resuming with
     Command(resume=...), looping since a turn can pause more than once
     (request phase, then response phase). Returns the final result dict once
     no interrupt remains. Blocks the calling thread until resolved — only use
@@ -314,7 +314,7 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
 
         - allowed: proceed.
         - behaviour="alert": proceed anyway (server-side alert only, no client-side gate).
-        - behaviour="warn"/"approval": pause the graph via interrupt() and ask whoever is
+        - behaviour="warn": pause the graph via interrupt() and ask whoever is
           driving the agent to decide. Requires the agent to be compiled with a checkpointer;
           the caller resumes with Command(resume=True) to proceed or Command(resume=False) to block.
         - anything else (e.g. "block", ""): block.
@@ -328,7 +328,6 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
 
         if _is_warn_behaviour(behaviour):
             decision = interrupt({
-                "type": "akto_guardrails_warning",
                 "phase": phase,
                 "behaviour": behaviour,
                 "reason": reason or "Policy violation",
@@ -612,7 +611,7 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
     # ------------------------------------------------------------------
 
     def _parse_guardrails_result(self, result: Any, phase: str = "request") -> Tuple[bool, str, str]:
-        """Returns (allowed, reason, behaviour). behaviour is one of "block"/"warn"/"alert"/"approval"/""."""
+        """Returns (allowed, reason, behaviour). behaviour is one of "block"/"warn"/"alert"/""."""
         if not isinstance(result, dict):
             return True, "", ""
 

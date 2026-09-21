@@ -33,11 +33,11 @@ Every Akto guardrail policy has a `behaviour`, and it changes what the middlewar
 |---|---|---|
 | `block` | Raises `ValueError` immediately, before/after the model call. | `try/except ValueError` |
 | `alert` | Proceeds silently — the violation is only logged server-side. | none |
-| `warn` / `approval` | Pauses the agent (via LangGraph's `interrupt()`) and waits for a human decision. | see below |
+| `warn` | Pauses the agent (via LangGraph's `interrupt()`) and waits for a human decision. | see below |
 
 ## Quick start (block / alert only)
 
-If none of your policies use `warn`/`approval`, this is the entire integration:
+If none of your policies use `warn`, this is the entire integration:
 
 ```python
 from akto_middleware import AktoGuardrailsMiddleware
@@ -57,9 +57,9 @@ except ValueError as e:
 
 No checkpointer, no thread management, nothing else to wire up.
 
-## Adding `warn` / `approval` support
+## Adding `warn` support
 
-A `warn`/`approval` verdict means: don't just block, ask a human first. That
+A `warn` verdict means: don't just block, ask a human first. That
 requires two things `block`/`alert` don't:
 
 1. **A checkpointer** on `create_agent(..., checkpointer=...)` — LangGraph's
@@ -120,7 +120,7 @@ agent = create_agent(
 )
 
 def ask_human(payload: dict) -> bool:
-    # payload = {"phase": "request"|"response", "behaviour": "warn"|"approval", "reason": str, "message": str}
+    # payload = {"phase": "request"|"response", "behaviour": "warn", "reason": str, "message": str}
     return input(f"{payload['reason']} -- proceed anyway? [y/N]: ").strip().lower() == "y"
 
 config = {"configurable": {"thread_id": "conversation-1"}}
@@ -143,7 +143,7 @@ might take a minute, or an hour, in a completely separate request. Use
 `interrupt_payload()` directly and split the flow across two endpoints
 instead of one blocking loop:
 
-- One endpoint sends the message and returns `needs_approval` immediately
+- One endpoint sends the message and returns `needs_review` immediately
   instead of blocking, if `interrupt_payload(result)` isn't `None`.
 - A second endpoint is called whenever the human actually answers, and
   resumes with `agent.invoke(Command(resume=decision), config=config)`.

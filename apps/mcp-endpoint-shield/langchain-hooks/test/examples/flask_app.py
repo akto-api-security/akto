@@ -9,7 +9,7 @@ seconds or minutes later. So there's no single blocking ask_human() callback
 here. Instead, the flow is split across two endpoints:
 
   POST /chat         -> sends a message. If guardrails pause it, returns
-                        {"status": "needs_approval", "thread_id": ..., "reason": ...}
+                        {"status": "needs_review", "thread_id": ..., "reason": ...}
                         instead of blocking.
   POST /chat/resume  -> the frontend calls this once the human answers, with
                         {"thread_id": ..., "decision": true/false}.
@@ -24,7 +24,7 @@ Run:
 Then:
     curl -s localhost:5000/chat -X POST -H 'Content-Type: application/json' \
         -d '{"thread_id": "t1", "text": "hello, my email is nayan@gmail.com"}'
-    # if that returns status=needs_approval:
+    # if that returns status=needs_review:
     curl -s localhost:5000/chat/resume -X POST -H 'Content-Type: application/json' \
         -d '{"thread_id": "t1", "decision": true}'
 """
@@ -64,7 +64,7 @@ def _agent_result_to_response(result: dict) -> dict:
     payload = interrupt_payload(result)
     if payload is not None:
         return {
-            "status": "needs_approval",
+            "status": "needs_review",
             "phase": payload["phase"],
             "behaviour": payload["behaviour"],
             "reason": payload["reason"],

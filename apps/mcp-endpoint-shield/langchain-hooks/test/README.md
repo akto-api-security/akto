@@ -1,7 +1,7 @@
 # Testing AktoGuardrailsMiddleware
 
 See the [main README](../README.md) for how the middleware itself works
-(`block`/`alert`/`warn`/`approval`, `resolve_interrupts()`, `interrupt_payload()`).
+(`block`/`alert`/`warn`, `resolve_interrupts()`, `interrupt_payload()`).
 This folder is just for exercising it.
 
 ## Setup
@@ -19,7 +19,7 @@ python3 test_agent.py
 ```
 
 Drops you into an interactive chat against your real, configured guardrail
-policies. On a `warn`/`approval` verdict it prints `Proceed anyway? [y/N]`
+policies. On a `warn` verdict it prints `Proceed anyway? [y/N]`
 and resumes based on your answer (via `resolve_interrupts()` from
 `akto_middleware.py`). `block` raises immediately with no prompt. `alert`
 proceeds silently (logged server-side only).
@@ -35,7 +35,7 @@ python3 examples/flask_app.py
 ```bash
 curl -s localhost:5000/chat -X POST -H 'Content-Type: application/json' \
     -d '{"thread_id": "t1", "text": "hello, my email is nayan@gmail.com"}'
-# if that returns {"status": "needs_approval", ...}:
+# if that returns {"status": "needs_review", ...}:
 curl -s localhost:5000/chat/resume -X POST -H 'Content-Type: application/json' \
     -d '{"thread_id": "t1", "decision": true}'
 ```
