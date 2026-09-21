@@ -2188,7 +2188,7 @@ public class DbAction extends ActionSupport {
 
     public String createTRRSummaryIfAbsent() {
         try {
-            trrs = DbLayer.createTRRSummaryIfAbsent(testingRunHexId, start);
+            trrs = DbLayer.createTRRSummaryIfAbsent(testingRunHexId, start, leaseToken, leaseSeconds);
             trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createTRRSummaryIfAbsent " + e.toString());

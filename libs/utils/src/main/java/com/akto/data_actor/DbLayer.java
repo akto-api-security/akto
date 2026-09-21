@@ -1637,21 +1637,49 @@ public class DbLayer {
     // testing queries
 
     public static TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start) {
+        return createTRRSummaryIfAbsent(testingRunHexId, start, null, 0);
+    }
+
+    /**
+     * This upsert is the "no summary exists yet" first-pickup path - the common case for a plain
+     * UI-triggered run, since StartTestAction only pre-creates a summary for rerun/CI-CD callers
+     * who need the id in hand before mini-testing ever runs.
+     *
+     * Unlike claimTestingRunResultSummary's claim of an EXISTING document, this filter can match
+     * zero documents (nothing has been created for this testingRunId yet), and Mongo's own upsert
+     * semantics do not make that branch exclusive on their own: two concurrent callers with an
+     * identical filter that both match nothing can each independently reach the insert path and
+     * both succeed, since there is no unique index on testingRunId to make the second one collide
+     * (nor should there be - a TestingRun legitimately accumulates many summaries across retries).
+     * A stamped lease does not close that race by itself, but it does mean whichever attempt(s)
+     * result are each safely owned rather than silently unfenced, and it is the same primitive
+     * every other claim in this file now uses, so a caller downstream (renewal, producerDone,
+     * terminal state) that plumbed a token through gets real protection instead of a silent no-op.
+     */
+    public static TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start, String leaseToken, int leaseSeconds) {
         ObjectId testingRunId = new ObjectId(testingRunHexId);
 
         // since the extra field is not used in mini-testing explicitly, we can just update the summary here
         // it is only used in dashboard for querying data from new collection
+
+        Bson update = Updates.combine(
+                Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
+                Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start),
+                Updates.set(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY, true)
+        );
+        if (StringUtils.isNotEmpty(leaseToken)) {
+            int ttl = leaseSeconds > 0 ? leaseSeconds : DEFAULT_LEASE_SECONDS;
+            update = Updates.combine(update,
+                    Updates.set(TestingRunResultSummary.LEASE_TOKEN, leaseToken),
+                    Updates.set(TestingRunResultSummary.LEASE_EXPIRY_TS, Context.now() + ttl));
+        }
 
         return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.and(
                         Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId),
                         Filters.eq(TestingRunResultSummary.STATE,TestingRun.State.SCHEDULED)
                 ),
-                Updates.combine(
-                        Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
-                        Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start),
-                        Updates.set(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY, true)
-                ),
+                update,
                 new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER)
         );
     }
@@ -2303,6 +2331,11 @@ public class DbLayer {
      * separate heartbeat: this already runs once per result, on both the legacy path and the
      * batched one (bulkRecordTestingRunResults loops through here per summary).
      *
+     * A negative leaseSeconds is a voluntary release, not a renewal: the caller already knows for
+     * certain it is done (e.g. its consumer engine reported closed/failed) and would rather hand
+     * the summary back immediately than have whoever reclaims it wait out the remaining TTL.
+     * Old clients never send a negative value, so this is purely additive.
+     *
      * Returns whether the write applied. With a token that is the answer to "do I still own this
      * attempt" - false means another pod has taken over and the caller must stop. Without a token
      * it is simply whether the summary still exists.
@@ -2316,14 +2349,20 @@ public class DbLayer {
                 Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, testResultsCount)) != null;
         }
 
-        int ttl = leaseSeconds > 0 ? leaseSeconds : DEFAULT_LEASE_SECONDS;
+        int newExpiry;
+        if (leaseSeconds < 0) {
+            newExpiry = Context.now() - 1;
+        } else {
+            int ttl = leaseSeconds > 0 ? leaseSeconds : DEFAULT_LEASE_SECONDS;
+            newExpiry = Context.now() + ttl;
+        }
         return TestingRunResultSummariesDao.instance.updateOneNoUpsert(
             Filters.and(
                 Filters.eq(Constants.ID, summaryObjectId),
                 Filters.eq(TestingRunResultSummary.LEASE_TOKEN, leaseToken)),
             Updates.combine(
                 Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, testResultsCount),
-                Updates.set(TestingRunResultSummary.LEASE_EXPIRY_TS, Context.now() + ttl))) != null;
+                Updates.set(TestingRunResultSummary.LEASE_EXPIRY_TS, newExpiry))) != null;
     }
 
     /**
