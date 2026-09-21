@@ -76,6 +76,7 @@ cp hooks.json ~/.copilot/hooks/hooks.json
 | `LOG_DIR` | `~/.copilot/akto/logs` | Shared with the GitHub CLI installer's wrappers so prompt/response turns correlate |
 | `LOG_LEVEL` | `INFO` | Log verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `LOG_PAYLOADS` | `false` | Set to `true` to log full request/response payloads |
+| `AKTO_HEARTBEAT_ENABLED` | `false` | Set to `true` to register this device with the abstractor (`/api/updateModuleInfoForHeartbeat`). Required for device-to-user resolution in traces; no heartbeat is sent while it is off |
 | `ENABLE_PROMPT_HOOKS_VSCODE_COPILOT` | _(unset)_ | Set to `false` to disable the `userPromptSubmitted` hook without removing it |
 | `ENABLE_MCP_HOOKS_VSCODE_COPILOT` | _(unset)_ | Set to `false` to disable the `preToolUse`/`postToolUse` hooks without removing them |
 
