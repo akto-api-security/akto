@@ -5,6 +5,11 @@ MAX_LOG_SIZE=${MAX_LOG_SIZE:-104857600}  # Default to 10 MB if not set (10 MB = 
 CHECK_INTERVAL=60                        # Check interval in seconds
 MEMORY_RESTART_THRESHOLD=${MEMORY_RESTART_THRESHOLD:-95}  # Restart if memory usage exceeds 95%
 
+# G1 periodic GC interval in ms: every this often, an idle app runs a GC and uncommits
+# freed heap back to the OS so container RSS drops during quiet periods. Override via env
+# per deployment; 300000 (5 min) default. Set to 0 to disable the periodic GC entirely.
+G1_PERIODIC_GC_INTERVAL=${G1_PERIODIC_GC_INTERVAL:-300000}
+
 # Ensure log directory exists before first use
 mkdir -p /var/log/app
 
@@ -95,16 +100,23 @@ start_java() {
     TEE_PID=$!
 
     # Start Java (stdout+stderr → FIFO)
-    # -XX:+UseG1GC -XX:G1PeriodicGCInterval=300000: G1 runs a periodic collection every
-    # 5 min when the app is idle and uncommits the freed heap back to the OS, so container
-    # RSS drops during quiet periods instead of parking near the -Xmx high-water mark.
-    # (Java 17 already defaults to G1GC; UseG1GC is set explicitly so the periodic flag
-    # is unambiguous.) It is load-gated and skipped while the app is busy, so live traffic
-    # is unaffected; heap simply re-grows on the next burst.
+    # G1 periodic GC: when G1_PERIODIC_GC_INTERVAL > 0, G1 runs a periodic collection at
+    # that interval (ms) while the app is idle and uncommits the freed heap back to the OS,
+    # so container RSS drops during quiet periods instead of parking near the -Xmx
+    # high-water mark. (Java 17 already defaults to G1GC; UseG1GC is set explicitly so the
+    # periodic flag is unambiguous.) It is load-gated and skipped while the app is busy, so
+    # live traffic is unaffected; heap simply re-grows on the next burst. Interval is
+    # env-configurable per deployment; 0 disables it.
+    G1_OPTS="-XX:+UseG1GC"
+    if [ "$G1_PERIODIC_GC_INTERVAL" -gt 0 ] 2>/dev/null; then
+        G1_OPTS="$G1_OPTS -XX:G1PeriodicGCInterval=${G1_PERIODIC_GC_INTERVAL}"
+    fi
+    echo "G1 opts: $G1_OPTS" | tee -a "$LOG_FILE"
+
     # --add-opens: Java 17 strong-encapsulation opens needed by reflective libraries
     # (MongoDB POJO codec, etc.). Single-token "=" form.
     java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m \
-        -XX:+UseG1GC -XX:G1PeriodicGCInterval=300000 \
+        $G1_OPTS \
         --add-opens=java.base/java.lang=ALL-UNNAMED \
         --add-opens=java.base/java.util=ALL-UNNAMED \
         --add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
