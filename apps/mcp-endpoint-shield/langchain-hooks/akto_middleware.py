@@ -5,7 +5,10 @@ Class-based AgentMiddleware that intercepts model calls to enforce Akto guardrai
 Uses the flat HTTP proxy payload format consistent with other Akto connectors
 (github-cli-hooks, cursor-hooks, etc.).
 
-Usage:
+Full usage docs, the block/alert/warn/approval behaviour table, and both the
+CLI (resolve_interrupts) and web-app (interrupt_payload) integration patterns
+are in README.md alongside this file. Quick reference:
+
     from akto_middleware import AktoGuardrailsMiddleware, resolve_interrupts
     from langchain.agents import create_agent
     from langgraph.checkpoint.memory import InMemorySaver
@@ -17,19 +20,14 @@ Usage:
         checkpointer=InMemorySaver(),  # required — "warn"/"approval" verdicts pause via interrupt()
     )
 
-    # You still call agent.invoke() yourself. resolve_interrupts() just handles
-    # any "warn"/"approval" pause on the result: it checks for "__interrupt__",
-    # asks (ask_human callback, defaults to a terminal y/N prompt), and resumes
-    # with Command(resume=...) — looping since a turn can pause more than once
-    # (request phase, then response phase). "block" still just raises ValueError.
     config = {"configurable": {"thread_id": "conversation-1"}}
     try:
         result = agent.invoke({"messages": [{"role": "user", "content": user_input}]}, config=config)
-        result = resolve_interrupts(agent, result, config)
+        result = resolve_interrupts(agent, result, config)  # handles "warn"/"approval" pauses
     except ValueError as e:
         print(f"Blocked by Akto Guardrails: {e}")
 
-Environment variables:
+Environment variables (see README.md for the full table):
     AKTO_DATA_INGESTION_URL  Akto service base URL (required)
     AKTO_SYNC_MODE           "true" to block on violation, "false" to log-only (default: "true")
     AKTO_TIMEOUT             HTTP timeout in seconds (default: "5")
@@ -113,6 +111,20 @@ def _is_alert_behaviour(behaviour: str) -> bool:
     return behaviour == "alert"
 
 
+def interrupt_payload(result: dict) -> Optional[dict]:
+    """
+    Returns the pending interrupt's payload — {"phase", "behaviour", "reason",
+    "message"} — if `result` (from agent.invoke()/ainvoke()) has one, else None.
+
+    Use this directly if you're not using resolve_interrupts()'s blocking loop —
+    e.g. in a web handler that must return immediately instead of waiting for a
+    human, and resumes later from a separate request. See examples/flask_app.py.
+    """
+    if "__interrupt__" in result:
+        return result["__interrupt__"][0].value
+    return None
+
+
 def _default_ask_human(payload: dict) -> bool:
     reason = payload.get("reason", "")
     behaviour = payload.get("behaviour", "")
@@ -123,10 +135,12 @@ def _default_ask_human(payload: dict) -> bool:
 def resolve_interrupts(agent, result: dict, config: dict, ask_human=None) -> dict:
     """
     Given a result already obtained from agent.invoke(), resolve any pending
-    "__interrupt__" (a "warn"/"approval" guardrails pause) by asking and
-    resuming with Command(resume=...), looping since a turn can pause more
-    than once (request phase, then response phase). Returns the final result
-    dict once no interrupt remains.
+    "warn"/"approval" guardrails pause by asking and resuming with
+    Command(resume=...), looping since a turn can pause more than once
+    (request phase, then response phase). Returns the final result dict once
+    no interrupt remains. Blocks the calling thread until resolved — only use
+    this where that's fine (e.g. a CLI). For a web app, use interrupt_payload()
+    instead and split the ask/resume across two requests (see examples/flask_app.py).
 
     ask_human(payload) -> bool decides whether to proceed past a pause; payload
     has phase/behaviour/reason/message keys. Defaults to a terminal y/N prompt.
@@ -137,10 +151,11 @@ def resolve_interrupts(agent, result: dict, config: dict, ask_human=None) -> dic
     if ask_human is None:
         ask_human = _default_ask_human
 
-    while "__interrupt__" in result:
-        payload = result["__interrupt__"][0].value
+    payload = interrupt_payload(result)
+    while payload is not None:
         decision = ask_human(payload)
         result = agent.invoke(Command(resume=decision), config=config)
+        payload = interrupt_payload(result)
 
     return result
 
