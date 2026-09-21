@@ -67,7 +67,7 @@ WORKED EXAMPLES (snippet -> verdict):
 When uncertain, output isPassword=false.
 
 "values" = the exact real secret substring(s), copied verbatim; empty when isPassword=false. NEVER put a NAME (ALL_CAPS_WITH_UNDERSCORES), a reference wrapper, or a shell command/variable ($(...), `...`, $VAR, "$VAR") into "values".
-"reason" MUST quote every string from "values" verbatim when isPassword=true - write them out literally, never describe them vaguely as "high-entropy strings" or "credentials in the PoC". Example: "Found 2 exposed password value(s): 55vNfGQ595, 4S3Nce1UL4 - real credential strings used for authentication."
+"reason" must NEVER contain a secret value. The values belong only in "values"; in the reason, describe them by count and kind (e.g. "password", "API key"). Example: "Found 2 exposed password values on credential keys - real credential strings used for authentication."
 
 PAYLOAD:
 %s
@@ -77,7 +77,7 @@ Respond with ONLY valid JSON:
   "isPassword": <true|false>,
   "riskScore": <float 0.0-1.0, your confidence a REAL secret VALUE is present. MUST match isPassword: 0.0-0.2 when isPassword=false, 0.8-1.0 when isPassword=true - never pair isPassword=false with a high score>,
   "values": ["<each REAL secret substring, copied byte-for-byte from the payload; use [] when isPassword=false - never a NAME, reference, placeholder, or a fragment clipped at a … boundary>", ...],
-  "reason": "<1 sentence. If true, QUOTE every value from 'values' verbatim (e.g. 'Found 2 value(s): 55vNfGQ595, 4S3Nce1UL4 - real credential strings') - never say 'high-entropy strings' without naming them. If false, say no real secret value is present (only names/references/claims)."
+  "reason": "<1 sentence. If true, say how many secret value(s) were found and of what kind (e.g. 'Found 2 password values on credential keys - real credential strings'), NEVER quoting the values themselves - they belong only in 'values'. If false, say no real secret value is present (only names/references/claims)."
 }"""
 
 
