@@ -1683,10 +1683,16 @@ public class ClientActor extends DataActor {
     }
 
     public TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start) {
+        return createTRRSummaryIfAbsent(testingRunHexId, start, null, 0);
+    }
+
+    public TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start, String leaseToken, int leaseSeconds) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunHexId", testingRunHexId);
         obj.put("start", start);
+        obj.put("leaseToken", leaseToken);
+        obj.put("leaseSeconds", leaseSeconds);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createTRRSummaryIfAbsent", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);

@@ -27,9 +27,20 @@ public class TestingLease {
     /**
      * Renewal rides writes that already happen (per result while draining, and the produce loop
      * during fan-out), so the TTL only has to outlast the gap between two of those - not any
-     * particular operation. Kept short so an abandoned attempt is reclaimable quickly.
+     * particular operation.
+     *
+     * The floor for that gap is MINI_TESTING_TASK_TIMEOUT_SECONDS (ConsumerUtil's per-test
+     * timeout, 300s): a straggler test produces no renewal-eligible write until it either
+     * completes or gets force-timed-out at that mark, so a perfectly healthy pod can legitimately
+     * go up to ~300s between renewals. 90s was shorter than that floor and self-fenced healthy
+     * pods - confirmed live: a synchronized-logging contention stall (SLF4J SimpleLogger's shared
+     * PrintStream lock, contended across 100 concurrent workers) produced real 60-90s stretches
+     * with zero completions and no exception, which is indistinguishable from a dead pod under a
+     * TTL that tight. 360s clears that 300s floor with margin and comfortably covers every stall
+     * actually observed (up to ~74s) without giving up fast reclaim of a truly dead pod relative
+     * to typical run durations (30-3600s).
      */
-    public static final int LEASE_SECONDS = 90;
+    public static final int LEASE_SECONDS = 360;
     private static final int RENEW_INTERVAL_SECONDS = LEASE_SECONDS / 3;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestingLease.class, LogDb.TESTING);
@@ -39,6 +50,17 @@ public class TestingLease {
     private volatile String token;
     private volatile int lastRenewedAt;
     private volatile boolean rejected;
+
+    /**
+     * Distinct from {@link #rejected}: this is "a renewal-bearing write was attempted and the
+     * call itself threw" (network/abstractor failure), not "the server answered and said no."
+     * Without it, a failing write path and a genuinely idle consumer look identical from here -
+     * both just show as lastRenewedAt not advancing. Set by {@link #recordAttemptFailed}, called
+     * from the write call sites that would otherwise let the exception propagate uncaught past
+     * this class entirely.
+     */
+    private volatile int lastAttemptFailedAt;
+    private volatile String lastAttemptFailureSummary;
 
     private TestingLease() {}
 
@@ -56,12 +78,16 @@ public class TestingLease {
         this.token = token;
         this.lastRenewedAt = Context.now();
         this.rejected = false;
+        this.lastAttemptFailedAt = 0;
+        this.lastAttemptFailureSummary = null;
     }
 
     public void clear() {
         this.token = null;
         this.lastRenewedAt = 0;
         this.rejected = false;
+        this.lastAttemptFailedAt = 0;
+        this.lastAttemptFailureSummary = null;
     }
 
     public String getToken() {
@@ -101,6 +127,59 @@ public class TestingLease {
             return true;
         }
         return Context.now() - lastRenewedAt > LEASE_SECONDS;
+    }
+
+    /** A write attempt threw before it could reach {@link #record}, e.g. a network/abstractor
+     *  failure - called from the write call sites themselves, which still rethrow afterward. */
+    public void recordAttemptFailed(Exception e) {
+        this.lastAttemptFailedAt = Context.now();
+        this.lastAttemptFailureSummary = e.getClass().getSimpleName() + ": " + e.getMessage();
+    }
+
+    /**
+     * Best-effort classification of why {@link #isLost()} is about to be true, for the
+     * self-fencing log line - so the next incident's cause is visible from the log alone rather
+     * than requiring a live jstack. Checked in priority order: an explicit rejection means
+     * another module has already taken over, which isn't a failure at all; a recent failed write
+     * attempt points at the write path (abstractor/network); anything else is unattributed and
+     * says so rather than guessing.
+     */
+    public String describeWhyLost() {
+        if (rejected) {
+            return "another module's claim was accepted - this pod's token was rejected";
+        }
+        int secondsSinceRenewal = Context.now() - lastRenewedAt;
+        if (lastAttemptFailedAt > 0 && Context.now() - lastAttemptFailedAt < LEASE_SECONDS) {
+            return "last renewal-bearing write attempt failed " + (Context.now() - lastAttemptFailedAt)
+                    + "s ago (" + lastAttemptFailureSummary + ") - likely abstractor/network, not the consumer";
+        }
+        return "no successful renewal for " + secondsSinceRenewal
+                + "s and no failed write attempt on record - cause not attributable from here alone";
+    }
+
+    /**
+     * Voluntarily gives up the lease before it would naturally expire - for when this pod already
+     * knows for certain it is done (e.g. the consumer engine reported closed/failed on its own),
+     * so whoever reclaims the summary next doesn't have to wait out the remaining TTL first.
+     *
+     * Deliberately does not route the response through {@link #record} - a successful release
+     * still reads back as an applied write (the CAS matched), and folding that into lastRenewedAt
+     * would look like a renewal, undoing the very release this method exists to perform. Nothing
+     * about this pod's own lease state needs to reflect the outcome, since it is about to exit
+     * either way; this is purely the server-side side effect. Best-effort: if the call itself
+     * fails, isLost()'s own TTL is still there underneath as the backstop, exactly as if this
+     * method had never been called.
+     */
+    public void release(String summaryHexId) {
+        String currentToken = this.token;
+        if (currentToken == null || summaryHexId == null) {
+            return;
+        }
+        try {
+            dataActor.updateTestResultsCountInTestSummary(summaryHexId, 0, currentToken, -1);
+        } catch (Exception e) {
+            loggerMaker.warnAndAddToDb("Best-effort lease release failed for " + summaryHexId + ": " + e.getMessage());
+        }
     }
 
     /**

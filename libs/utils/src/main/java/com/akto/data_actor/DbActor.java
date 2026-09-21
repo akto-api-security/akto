@@ -301,6 +301,12 @@ public class DbActor extends DataActor {
         return DbLayer.createTRRSummaryIfAbsent(testingRunHexId, start);
     }
 
+    // direct-mongo path is single-process by definition, so there is no lease to lose; the token
+    // is accepted for interface symmetry with ClientActor but not persisted
+    public TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start, String leaseToken, int leaseSeconds) {
+        return DbLayer.createTRRSummaryIfAbsent(testingRunHexId, start);
+    }
+
     @Override
     public void ingestMetricData(List<MetricData> metricData) {
         DbLayer.ingestMetric(metricData);

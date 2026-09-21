@@ -1080,12 +1080,19 @@ public class TestExecutor {
 
     private void recordViaLegacyFlow(TestingRunResult trr, GenericTestResult testRes, List<TestingRunResult> testingRunResults,
             ObjectId testRunResultSummaryId, int resultSize) {
-        dataActor.insertTestingRunResults(trr);
-        loggerMaker.infoAndAddToDb("Inserted testing results");
-        TestingLease.getInstance().record(dataActor.updateTestResultsCountInTestSummary(
-                testRunResultSummaryId.toHexString(), resultSize,
-                TestingLease.getInstance().getToken(), TestingLease.LEASE_SECONDS));
-        loggerMaker.infoAndAddToDb("Updated count in summary");
+        try {
+            dataActor.insertTestingRunResults(trr);
+            loggerMaker.infoAndAddToDb("Inserted testing results");
+            TestingLease.getInstance().record(dataActor.updateTestResultsCountInTestSummary(
+                    testRunResultSummaryId.toHexString(), resultSize,
+                    TestingLease.getInstance().getToken(), TestingLease.LEASE_SECONDS));
+            loggerMaker.infoAndAddToDb("Updated count in summary");
+        } catch (Exception e) {
+            // Otherwise this throws past TestingLease entirely, and a failing write path looks
+            // identical to a genuinely idle consumer from isLost()'s perspective alone.
+            TestingLease.getInstance().recordAttemptFailed(e);
+            throw e;
+        }
 
         TestingIssuesHandler handler = new TestingIssuesHandler();
         boolean triggeredByTestEditor = false;
@@ -1106,11 +1113,16 @@ public class TestExecutor {
         }
         // the server updates the result count inside this call, and renews the lease in that same
         // write - so the bulk path is fenced and renewed exactly like the legacy one
-        TestingLease.getInstance().record(dataActor.bulkRecordTestingRunResults(
-                Collections.singletonList(trr), rerunDeleteIds,
-                TestingConfigurations.getInstance().getDoNotMarkIssuesAsFixed(),
-                TestingLease.getInstance().getToken(), TestingLease.LEASE_SECONDS));
-        loggerMaker.infoAndAddToDb("Recorded testing run result via bulk API");
+        try {
+            TestingLease.getInstance().record(dataActor.bulkRecordTestingRunResults(
+                    Collections.singletonList(trr), rerunDeleteIds,
+                    TestingConfigurations.getInstance().getDoNotMarkIssuesAsFixed(),
+                    TestingLease.getInstance().getToken(), TestingLease.LEASE_SECONDS));
+            loggerMaker.infoAndAddToDb("Recorded testing run result via bulk API");
+        } catch (Exception e) {
+            TestingLease.getInstance().recordAttemptFailed(e);
+            throw e;
+        }
     }
 
     private Void insertRecordInKafka(int accountId, String testSubCategory, ApiInfo.ApiInfoKey apiInfoKey,

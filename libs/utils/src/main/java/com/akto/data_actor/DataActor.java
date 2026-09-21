@@ -135,6 +135,8 @@ public abstract class DataActor {
 
     public abstract TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start);
 
+    public abstract TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start, String leaseToken, int leaseSeconds);
+
     public abstract void ingestMetricData(List<MetricData> metricData);
     public abstract TestingRun findPendingTestingRun(int delta, String miniTestingName);
 
