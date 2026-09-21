@@ -202,7 +202,7 @@ func LoadConfig() *Config {
 		FilterPath:                       getEnv("FILTER_PATH", ""),
 		SkipPaths:                        getEnv("GUARDRAILS_SKIP_PATHS", ""),
 		SessionSyncIntervalMin:           getEnvAsInt("SESSION_SYNC_INTERVAL_MIN", 5),
-		SessionEnabled:                   getEnvAsBool("SESSION_ENABLED", true),
+		SessionEnabled:                   getEnvAsBool("SESSION_ENABLED", false),
 		McpAllowedListRefreshIntervalMin: getEnvAsInt("MCP_ALLOWLIST_REFRESH_INTERVAL_MIN", 1),
 		CollectionRefreshIntervalMin:     getEnvAsInt("COLLECTION_REFRESH_INTERVAL_MIN", 5),
 		NhiEnabled:                       getEnvAsBool("NHI_ENABLED", true),

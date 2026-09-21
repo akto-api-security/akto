@@ -1,13 +1,16 @@
 package session
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ExtractSessionID extracts session ID from headers with fallback chain
@@ -97,7 +100,7 @@ func isSessionEnabled() bool {
 	return enabled
 }
 
-func ExtractSessionIDsFromRequest(r *http.Request, requestHeadersJSON string) (sessionID, requestID string) {
+func ExtractSessionIDsFromRequest(r *http.Request, requestHeadersJSON, correlationSeed string) (sessionID, requestID string) {
 	if !isSessionEnabled() {
 		return "", ""
 	}
@@ -123,7 +126,41 @@ func ExtractSessionIDsFromRequest(r *http.Request, requestHeadersJSON string) (s
 	if requestID == "" {
 		requestID = bodyRequest
 	}
+
+	// No caller in the current data path emits a request id. Kong used to inject
+	// x-kong-request-id and TrackRequest/TrackResponse still refuse to record
+	// anything without one, so an empty value here silently disables the whole
+	// session feature. Derive one instead of dropping the turn.
+	if requestID == "" && sessionID != "" {
+		requestID = deriveRequestID(sessionID, correlationSeed)
+	}
 	return sessionID, requestID
+}
+
+// deriveRequestID synthesizes a correlation id when no header carries one.
+// Request and response validation arrive as two separate calls, so the id has to
+// be derivable from something both of them hold: the request payload. Hashing it
+// together with the session id keeps the value identical across the pair (so
+// TrackResponse still finds its pending request) without putting payload text
+// into an id that gets logged.
+func deriveRequestID(sessionID, correlationSeed string) string {
+	if strings.TrimSpace(correlationSeed) == "" {
+		return randomRequestID()
+	}
+	sum := sha256.Sum256([]byte(sessionID + "\x00" + correlationSeed))
+	return "drv-" + hex.EncodeToString(sum[:])[:16]
+}
+
+// randomRequestID is the last resort for callers with no single request payload
+// to hash (file validation posts multipart form data). Tracking still works and
+// the session is still created; only request/response pairing is lost, so
+// TrackResponse records a response-only turn instead of discarding it.
+func randomRequestID() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("rnd-%d", time.Now().UnixNano())
+	}
+	return "rnd-" + hex.EncodeToString(b[:])
 }
 
 // extractSessionIDsFromHeadersJSON parses a JSON-encoded headers map (string→string,
