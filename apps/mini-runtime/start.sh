@@ -95,9 +95,16 @@ start_java() {
     TEE_PID=$!
 
     # Start Java (stdout+stderr → FIFO)
+    # -XX:+UseG1GC -XX:G1PeriodicGCInterval=300000: G1 runs a periodic collection every
+    # 5 min when the app is idle and uncommits the freed heap back to the OS, so container
+    # RSS drops during quiet periods instead of parking near the -Xmx high-water mark.
+    # (Java 17 already defaults to G1GC; UseG1GC is set explicitly so the periodic flag
+    # is unambiguous.) It is load-gated and skipped while the app is busy, so live traffic
+    # is unaffected; heap simply re-grows on the next burst.
     # --add-opens: Java 17 strong-encapsulation opens needed by reflective libraries
     # (MongoDB POJO codec, etc.). Single-token "=" form.
     java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m \
+        -XX:+UseG1GC -XX:G1PeriodicGCInterval=300000 \
         --add-opens=java.base/java.lang=ALL-UNNAMED \
         --add-opens=java.base/java.util=ALL-UNNAMED \
         --add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
