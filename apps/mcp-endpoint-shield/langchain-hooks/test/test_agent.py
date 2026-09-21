@@ -2,10 +2,10 @@
 """
 Interactive LangChain agent for testing AktoGuardrailsMiddleware against a
 real, running Akto guardrails backend (default: http://127.0.0.1:7072) —
-including the "warn"/"approval" interrupt-and-resume flow.
+including the "warn" interrupt-and-resume flow.
 
 Type real messages and see what your actual configured guardrail policies
-decide. On a "warn"/"approval" verdict, akto_middleware.resolve_interrupts()
+decide. On a "warn" verdict, akto_middleware.resolve_interrupts()
 asks you "Proceed anyway? [y/N]" and resumes with Command(resume=True/False)
 based on your answer.
 
