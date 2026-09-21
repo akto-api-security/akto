@@ -16,6 +16,8 @@ import com.akto.utils.guardrails.GuardrailsServiceClient;
 import com.akto.utils.guardrails.PromptSnippet;
 import com.akto.utils.search.SearchClientFactory;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
@@ -58,6 +60,8 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
 
     private static final LoggerMaker loggerMaker =
         new LoggerMaker(GuardrailPolicyReplayAction.class, LogDb.DASHBOARD);
+
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     /** Must not exceed maxReplayItems in the guardrails service's replay handler. */
     private static final int PAGE_SIZE = GuardrailsServiceClient.PAGE_SIZE;
@@ -489,9 +493,82 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
             if (StringUtils.isBlank(event.getPayload())) {
                 continue;
             }
-            out.add(new ReplaySample(event.getId(), event.getPayload()));
+            out.add(new ReplaySample(event.getId(), sanitizeEnvelopeHeaders(event.getPayload())));
         }
         return out;
+    }
+
+    /** Header keys whose values are always PII/identity, never anything a policy filter should
+     *  see: sessionId, every x-akto* installer/proxy header, messageId, userEmail. A recorded
+     *  violation's envelope carries the real captured requestHeaders/responseHeaders verbatim —
+     *  unlike a freshly-built {@link #traceEnvelope} sample, which never has headers at all — so
+     *  this is the only source that needs scrubbing before it reaches the guardrails service. */
+    private static boolean isSensitiveHeaderKey(String key) {
+        if (key == null) {
+            return false;
+        }
+        String normalized = key.toLowerCase().replace("-", "").replace("_", "");
+        return normalized.startsWith("akto")
+            || normalized.equals("sessionid")
+            || normalized.equals("messageid")
+            || normalized.equals("useremail");
+    }
+
+    /**
+     * Strips sensitive header keys (see {@link #isSensitiveHeaderKey}) out of an envelope's
+     * {@code requestHeaders}/{@code responseHeaders} before it is sent to the guardrails service
+     * for policy scoring. Those two fields are stored inconsistently across producers — sometimes
+     * a JSON object, sometimes that object JSON-encoded as a string (see {@code replayEnvelope}'s
+     * {@code flexString} on the guardrails-service side) — so both shapes are handled, and either
+     * field's shape is preserved on the way back out. Falls back to the original string untouched
+     * if it is not parseable JSON, rather than dropping the sample.
+     */
+    private static String sanitizeEnvelopeHeaders(String rawEnvelope) {
+        JsonNode root;
+        try {
+            root = objectMapper.readTree(rawEnvelope);
+        } catch (Exception e) {
+            return rawEnvelope;
+        }
+        if (!(root instanceof ObjectNode)) {
+            return rawEnvelope;
+        }
+        ObjectNode envelope = (ObjectNode) root;
+        for (String field : new String[]{"requestHeaders", "responseHeaders"}) {
+            JsonNode headers = envelope.get(field);
+            if (headers == null) {
+                continue;
+            }
+            if (headers.isTextual()) {
+                ObjectNode parsedHeaders = parseHeadersObject(headers.asText());
+                if (parsedHeaders != null) {
+                    stripSensitiveKeys(parsedHeaders);
+                    envelope.put(field, parsedHeaders.toString());
+                }
+            } else if (headers.isObject()) {
+                stripSensitiveKeys((ObjectNode) headers);
+            }
+        }
+        return envelope.toString();
+    }
+
+    private static ObjectNode parseHeadersObject(String headersJson) {
+        try {
+            JsonNode parsed = objectMapper.readTree(headersJson);
+            return parsed instanceof ObjectNode ? (ObjectNode) parsed : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static void stripSensitiveKeys(ObjectNode headers) {
+        List<String> toRemove = new ArrayList<>();
+        headers.fieldNames().forEachRemaining(key -> {
+            if (isSensitiveHeaderKey(key)) {
+                toRemove.add(key);
+            }
+        });
+        headers.remove(toRemove);
     }
 
     /**

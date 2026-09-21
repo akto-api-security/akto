@@ -77,6 +77,26 @@ const deviceIdSuffix = (deviceId) => {
     return idx >= 0 ? deviceId.slice(idx + 1) : deviceId.slice(0, 8);
 };
 
+// The 8-4-4-4-12 shape, so an unrelated composite id like "okta_12345" isn't read as an org.
+const ORG_UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+// Pulls the org uuid off a composite userId of the form "<email>_<orgUuid>" — the shape a Claude
+// login writes, one row per org — returning '' when the id carries no org.
+//
+// Split on the LAST underscore, never the first: email local-parts legally contain underscores
+// ("first_last@corp.com_<uuid>"), and a first-underscore split would silently yield a wrong org.
+// A uuid contains no underscore, so the last one is always the separator.
+//
+// Mirrors AgenticUsers#orgUuidFromUserId (Java) and orgUUIDFromUserID (validator/claude_org_match.go),
+// which is what actually matches these ids at request time. Keep all three in step.
+const orgUuidFromUserId = (userId) => {
+    if (!userId) return '';
+    const idx = userId.lastIndexOf('_');
+    if (idx < 0) return '';
+    const candidate = userId.slice(idx + 1);
+    return ORG_UUID_RE.test(candidate) ? candidate : '';
+};
+
 // Agents: expand each selected canonical group key (e.g. 'claude2') into every raw wire-level
 // tag value it aliases. The guardrails-service matches on the raw client-type segment the client
 // sends — it never sees this dashboard's canonical grouping key — so we must store the raw values.
@@ -272,6 +292,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // A Users pick is never written into targetDeviceIds; it's matched downstream by email via
     // userMetadata instead (see GuardrailPoliciesAction#createGuardrailPolicy).
     const [targetUserNames, setTargetUserNames] = useState([]);
+    // Include/Exclude toggles. negatedTargetTags is keyed per tag key (they AND together, so one
+    // flag can't negate just one); Device and User each have one row, so plain booleans.
+    const [negatedTargetTags, setNegatedTargetTags] = useState({});
+    const [negatedTargetDeviceIds, setNegatedTargetDeviceIds] = useState(false);
+    const [negatedTargetUserNames, setNegatedTargetUserNames] = useState(false);
     const [enterpriseLicenseComplianceCategories, setEnterpriseLicenseComplianceCategories] = useState([]);
 
     const [agenticUsers, setAgenticUsers] = useState([]);
@@ -311,6 +336,23 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         (agenticUsers || []).forEach(u => {
             const name = u.userName || u.userEmail;
             if (!name) return;
+            // An org-scoped identity is selectable in its own right, and must be SENT as its userId:
+            // a Claude login writes one row per org, all sharing one userName, so the username alone
+            // cannot say which org was meant. The validator reads the org back off this exact id
+            // (orgUUIDFromUserID), so it is both the label and the value here. The backend emits
+            // these alongside the username-deduped row, never instead of it — see
+            // ModuleInfoAction#fetchAgenticUsers — so the person is still targetable across all orgs.
+            if (orgUuidFromUserId(u.userId)) {
+                // Shown as email-orgName__orgType for readability; the submitted/stored value stays
+                // the raw userId (email_orgUuid) the validator matches on — see orgUuidFromUserId.
+                const label = (u.userEmail && u.organizationName && u.organizationType)
+                    ? `${u.userEmail}-${u.organizationName}__${u.organizationType}`
+                    : u.userId;
+                options.push({ label, value: u.userId });
+                return;
+            }
+            // Every other row is unchanged: keyed by username and labelled by email, which is what
+            // enforcement matches these rows on. Only the org rows above show a userId.
             const label = u.userEmail && u.userEmail !== name ? `${u.userEmail} · ${name}` : name;
             options.push({ label, value: name });
         });
@@ -342,17 +384,24 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         return options.sort((a, b) => a.label.localeCompare(b.label));
     }, [agenticUsers]);
 
-    // Maps each selectable value — from either availableUsers (a username) or availableDevices (a
-    // device id) — back to the identity that owns it. fetchAgenticUsers already gives us each
-    // identity's userEmail/userId — building this here lets a save send the exact identity behind
-    // a selection instead of leaving the backend to re-derive it by guessing at a raw string. Used
-    // to build userMetadata (identity snapshots) for BOTH targetDeviceIds and targetUserNames
-    // selections; it never feeds into targetDeviceIds itself.
+    // Maps each selectable value — from either availableUsers (a username, or an org-scoped userId)
+    // or availableDevices (a device id) — back to the identity that owns it. fetchAgenticUsers
+    // already gives us each identity's userEmail/userId — building this here lets a save send the
+    // exact identity behind a selection instead of leaving the backend to re-derive it by guessing
+    // at a raw string. Used to build userMetadata (identity snapshots) for BOTH targetDeviceIds and
+    // targetUserNames selections; it never feeds into targetDeviceIds itself.
     const deviceValueToIdentity = useMemo(() => {
         const map = new Map();
         (agenticUsers || []).forEach(u => {
             if (!u) return;
             const identity = { userName: u.userName || null, userEmail: u.userEmail || null, userId: u.userId || null };
+            // An org-scoped row is selected BY its userId, and several such rows share one userName —
+            // so key it on the id alone. Letting it also claim the username would have whichever org
+            // row came last overwrite the all-orgs identity that legitimately owns that key.
+            if (orgUuidFromUserId(u.userId)) {
+                map.set(u.userId, identity);
+                return;
+            }
             const name = u.userName || u.userEmail;
             if (name) map.set(name, identity);
             (u.devices || []).filter(Boolean).forEach(deviceId => map.set(deviceId, identity));
@@ -379,11 +428,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         return rows.filter(r => {
             const matchesAllTagKeys = tagKeys.every(k => {
                 const valueSet = new Set(targetTags[k]);
-                return r.tags.some(t => t.key === k && valueSet.has(t.value));
+                const hasMatch = r.tags.some(t => t.key === k && valueSet.has(t.value));
+                return negatedTargetTags?.[k] ? !hasMatch : hasMatch;
             });
-            return matchesAllTagKeys && (deviceSet.size === 0 || deviceSet.has(r.deviceId));
+            const deviceOk = deviceSet.size === 0
+                || (negatedTargetDeviceIds ? !deviceSet.has(r.deviceId) : deviceSet.has(r.deviceId));
+            return matchesAllTagKeys && deviceOk;
         });
-    }, [agenticUsers, applyToAllUsers, targetTags, targetDeviceIds]);
+    }, [agenticUsers, applyToAllUsers, targetTags, targetDeviceIds, negatedTargetTags, negatedTargetDeviceIds]);
 
     // Create validation state object
     const getStoredStateData = () => ({
@@ -464,6 +516,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         targetTags,
         targetDeviceIds,
         targetUserNames,
+        negatedTargetTags,
+        negatedTargetDeviceIds,
+        negatedTargetUserNames,
         enterpriseLicenseComplianceCategories,
         // A negated row with zero values is a deliberate "apply to everything" scope, not an unfinished one
         serverScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllServers &&
@@ -942,12 +997,20 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         const hasAnyTag = Object.values(loadedTargetTags).some(values => (values || []).length > 0);
         // targetUserNames is never persisted (backend derives userMetadata from it on save, then
         // discards it) — userMetadata is the durable record instead, so reconstruct the "Users"
-        // selection from its userNames rather than reading targetUserNames back off the policy.
-        const loadedTargetUserNames = (policy.userMetadata || []).map(u => u.userName).filter(Boolean);
+        // selection from it rather than reading targetUserNames back off the policy. The value has
+        // to be rebuilt the same way availableUsers builds it — userId for an org-scoped row, else
+        // userName — or an org pick reopens as the plain all-orgs row and silently loses its org on
+        // the next save.
+        const loadedTargetUserNames = (policy.userMetadata || [])
+            .map(u => (orgUuidFromUserId(u.userId) ? u.userId : u.userName))
+            .filter(Boolean);
         setApplyToAllUsers(!hasAnyTag && !policy.targetDeviceIds?.length && !loadedTargetUserNames.length);
         setTargetTags(loadedTargetTags);
         setTargetDeviceIds(policy.targetDeviceIds || []);
         setTargetUserNames(loadedTargetUserNames);
+        setNegatedTargetTags(policy.negatedTargetTags || {});
+        setNegatedTargetDeviceIds(policy.negatedTargetDeviceIds || false);
+        setNegatedTargetUserNames(policy.negatedTargetUserNames || false);
         setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
     };
 
@@ -1094,6 +1157,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 // resolved into applyToDeviceIds, only into userMetadata below (matched downstream
                 // by email).
                 targetUserNames: applyToAllUsers ? [] : targetUserNames,
+                // Include/Exclude toggles — filtered to the keys actually present in targetTags so
+                // a stale entry from a deleted/renamed row doesn't linger in the saved map.
+                negatedTargetTags: applyToAllUsers ? {} : Object.fromEntries(
+                    Object.entries(negatedTargetTags || {}).filter(([key]) => targetTags[key]?.length > 0)
+                ),
+                negatedTargetDeviceIds: applyToAllUsers ? false : negatedTargetDeviceIds,
+                negatedTargetUserNames: applyToAllUsers ? false : negatedTargetUserNames,
                 // Identities behind the selected targets — both the devices picked via
                 // targetDeviceIds and the identities picked directly via targetUserNames — deduped
                 // by userId (falling back to userName when an identity has no userId). Resolved
@@ -1311,6 +1381,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setTargetDeviceIds={setTargetDeviceIds}
                         targetUserNames={targetUserNames}
                         setTargetUserNames={setTargetUserNames}
+                        negatedTargetTags={negatedTargetTags}
+                        setNegatedTargetTags={setNegatedTargetTags}
+                        negatedTargetDeviceIds={negatedTargetDeviceIds}
+                        setNegatedTargetDeviceIds={setNegatedTargetDeviceIds}
+                        negatedTargetUserNames={negatedTargetUserNames}
+                        setNegatedTargetUserNames={setNegatedTargetUserNames}
                         availableTagKeyValues={availableTagKeyValues}
                         availableDevices={availableDevices}
                         availableUsers={availableUsers}

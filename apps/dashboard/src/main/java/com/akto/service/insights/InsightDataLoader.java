@@ -16,7 +16,6 @@ import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.nhi_governance.NhiIdentityDao;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.DeviceTag;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.McpAllowlist;
@@ -27,9 +26,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.AgenticObserveUtil;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
-import com.akto.usage.UsageMetricCalculator;
-import com.mongodb.BasicDBObject;
-import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import org.apache.commons.lang3.StringUtils;
@@ -70,13 +66,17 @@ import java.util.concurrent.TimeUnit;
 public class InsightDataLoader {
 
     private static final LoggerMaker logger = new LoggerMaker(InsightDataLoader.class, LogDb.DASHBOARD);
-    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
+    // Up to 13 tasks can be in flight at once from a single load() call (10 Mongo reads + 3
+    // threat-backend calls, see below) — sized to fit that without queueing, since every one of
+    // them is I/O-bound (waiting on Mongo/HTTP, not CPU), not the "one thread per CPU core" case.
+    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(16);
     private static final int EXTERNAL_CALL_TIMEOUT_SECONDS = 8;
 
     // Row caps and other constants for the lazy API_POSTURE/TESTING_POSTURE reads now live on
     // InsightLazySources itself, next to the code that uses them.
 
     public InsightDataBundle load(InsightContext ctx) {
+        long loadStart = System.currentTimeMillis();
         // Threat-backend calls run in worker threads — Context ThreadLocals must be
         // captured here and re-set inside each task, or the worker queries the wrong
         // account (see the plan's "Correctness traps": this is the single largest bug risk).
@@ -85,33 +85,59 @@ public class InsightDataLoader {
         final CONTEXT_SOURCE contextSource = ctx.getContextSource();
         InsightsThreatBackendAccess threatAccess = new InsightsThreatBackendAccess();
 
-        Future<List<HostSeverityCount>> hostSeverityFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
-                () -> threatAccess.hostSeverityCounts(ctx.getStartTs(), ctx.getEndTs())));
-        Future<List<ThreatCategoryCount>> subCategoryFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
-                () -> threatAccess.subcategoryWiseCounts(ctx.getStartTs(), ctx.getEndTs())));
-        Future<List<SkillSeverityCount>> skillSeverityFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
-                () -> threatAccess.skillSeverityCounts(ctx.getStartTs(), ctx.getEndTs())));
+        Future<List<HostSeverityCount>> hostSeverityFuture = submitTimed(accountId, userId, contextSource,
+                "hostSeverityFuture (threat backend)", () -> threatAccess.hostSeverityCounts(ctx.getStartTs(), ctx.getEndTs()), List::size);
+        Future<List<ThreatCategoryCount>> subCategoryFuture = submitTimed(accountId, userId, contextSource,
+                "subCategoryFuture (threat backend)", () -> threatAccess.subcategoryWiseCounts(ctx.getStartTs(), ctx.getEndTs()), List::size);
+        Future<List<SkillSeverityCount>> skillSeverityFuture = submitTimed(accountId, userId, contextSource,
+                "skillSeverityFuture (threat backend)", () -> threatAccess.skillSeverityCounts(ctx.getStartTs(), ctx.getEndTs()), List::size);
 
+        // collections/activeCollections run first and synchronously — cheap on their own (tens of
+        // ms), but sensitiveByCollection/collectionLastTrafficSeen below need their results, so
+        // they can't be dispatched until these two resolve. Every other step here is independent
+        // of every other one, so all nine go out as futures together right after.
+        long t0 = System.currentTimeMillis();
         List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                 Filters.empty(),
                 Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING,
                         ApiCollection.SKILLS, ApiCollection.START_TS, ApiCollection.BASE_RISK_SCORE,
-                        ApiCollection.BASE_RISK_SCORE_REASON, ApiCollection.DESCRIPTION, ApiCollection._DEACTIVATED,
-                        // IS_OUT_OF_TESTING_SCOPE: added for UntestedHighRiskApisProvider (API_POSTURE) — every
-                        // other provider is unaffected by one extra projected field.
-                        ApiCollection.IS_OUT_OF_TESTING_SCOPE));
+                        ApiCollection.BASE_RISK_SCORE_REASON, ApiCollection.DESCRIPTION, ApiCollection._DEACTIVATED));
+        logStep("collections (findAll, unbounded)", t0, collections.size());
         Map<String, List<ApiCollection>> collectionsByServiceName = indexByServiceName(collections);
 
-        Map<String, String> deviceIdToUsername = loadDeviceIdToUsername();
-        Map<String, List<DeviceTag>> userTags = loadUserTags();
-        List<McpAuditInfo> auditRows = loadAuditRows(contextSource);
-        List<GuardrailPolicies> policies = loadPolicies();
-        Set<String> allowlistNamesLower = loadAllowlistNames();
-        Map<Integer, List<String>> sensitiveByCollection = loadSensitiveByCollection(collections);
-        List<UserAnalysisData> userAnalysis = loadUserAnalysis();
-        List<NhiIdentity> nhiIdentities = loadNhiIdentities();
+        t0 = System.currentTimeMillis();
         List<ApiCollection> activeCollections = loadActiveCollections();
-        Map<Integer, Integer> collectionLastTrafficSeen = loadCollectionLastTrafficSeen(activeCollections);
+        logStep("activeCollections", t0, activeCollections.size());
+
+        Future<Map<String, String>> deviceIdToUsernameFuture =
+                submitTimed(accountId, userId, contextSource, "deviceIdToUsername", this::loadDeviceIdToUsername, Map::size);
+        Future<Map<String, List<DeviceTag>>> userTagsFuture =
+                submitTimed(accountId, userId, contextSource, "userTags (AgentUsersDao.findAll, unbounded)", this::loadUserTags, Map::size);
+        Future<List<McpAuditInfo>> auditRowsFuture = submitTimed(accountId, userId, contextSource,
+                "auditRows (limit 5000)", () -> loadAuditRows(contextSource), List::size);
+        Future<List<GuardrailPolicies>> policiesFuture = submitTimed(accountId, userId, contextSource,
+                "policies (limit 5000 + per-policy device-tag resolution)", this::loadPolicies, List::size);
+        Future<Set<String>> allowlistNamesLowerFuture = submitTimed(accountId, userId, contextSource,
+                "allowlistNamesLower (McpAllowlistDao.findAll, unbounded)", this::loadAllowlistNames, Set::size);
+        Future<Map<Integer, List<String>>> sensitiveByCollectionFuture = submitTimed(accountId, userId, contextSource,
+                "sensitiveByCollection (3x SingleTypeInfoDao scans + per-collection lookup)",
+                () -> loadSensitiveByCollection(collections), Map::size);
+        Future<List<UserAnalysisData>> userAnalysisFuture = submitTimed(accountId, userId, contextSource,
+                "userAnalysis (UserAnalysisDataDao.findAll, unbounded)", this::loadUserAnalysis, List::size);
+        Future<List<NhiIdentity>> nhiIdentitiesFuture = submitTimed(accountId, userId, contextSource,
+                "nhiIdentities (NhiIdentityDao.findAll, unbounded)", this::loadNhiIdentities, List::size);
+        Future<Map<Integer, Integer>> collectionLastTrafficSeenFuture = submitTimed(accountId, userId, contextSource,
+                "collectionLastTrafficSeen", () -> loadCollectionLastTrafficSeen(activeCollections), Map::size);
+
+        Map<String, String> deviceIdToUsername = getOrEmpty(deviceIdToUsernameFuture, new HashMap<>(), "deviceIdToUsername");
+        Map<String, List<DeviceTag>> userTags = getOrEmpty(userTagsFuture, new HashMap<>(), "userTags");
+        List<McpAuditInfo> auditRows = getOrEmpty(auditRowsFuture, Collections.emptyList(), "auditRows");
+        List<GuardrailPolicies> policies = getOrEmpty(policiesFuture, Collections.emptyList(), "policies");
+        Set<String> allowlistNamesLower = getOrEmpty(allowlistNamesLowerFuture, Collections.emptySet(), "allowlistNamesLower");
+        Map<Integer, List<String>> sensitiveByCollection = getOrEmpty(sensitiveByCollectionFuture, Collections.emptyMap(), "sensitiveByCollection");
+        List<UserAnalysisData> userAnalysis = getOrEmpty(userAnalysisFuture, Collections.emptyList(), "userAnalysis");
+        List<NhiIdentity> nhiIdentities = getOrEmpty(nhiIdentitiesFuture, Collections.emptyList(), "nhiIdentities");
+        Map<Integer, Integer> collectionLastTrafficSeen = getOrEmpty(collectionLastTrafficSeenFuture, Collections.emptyMap(), "collectionLastTrafficSeen");
 
         boolean threatBackendAvailable = true;
         List<HostSeverityCount> hostSeverityCounts;
@@ -140,11 +166,47 @@ public class InsightDataLoader {
         }
 
         InsightLazySources lazy = new InsightLazySources(ctx);
+        logger.info("InsightDataLoader: load() total " + (System.currentTimeMillis() - loadStart)
+                + "ms for accountId=" + accountId);
 
         return new InsightDataBundle(ctx, collections, collectionsByServiceName, deviceIdToUsername, userTags,
                 auditRows, policies, allowlistNamesLower, sensitiveByCollection, userAnalysis, nhiIdentities,
                 hostSeverityCounts, subCategoryCounts, skillSeverityCounts, threatBackendAvailable,
                 activeCollections, collectionLastTrafficSeen, threatAccess, lazy);
+    }
+
+    /** Submits one load() step to run concurrently with every other one, timing its actual work
+     *  (not the caller's wait for it, since these are all dispatched together) and logging the row
+     *  count it produced — the row count is what tells "slow because unindexed" apart from "slow
+     *  because genuinely large", which is exactly what decides whether the fix is an index/
+     *  projection or a limit/skip-based page size. Context ThreadLocals are re-set the same way
+     *  the three threat-backend futures already do. */
+    private <T> Future<T> submitTimed(int accountId, Integer userId, CONTEXT_SOURCE contextSource, String label,
+                                       Callable<T> body, java.util.function.ToIntFunction<T> rowCount) {
+        return EXECUTOR.submit(withContext(accountId, userId, contextSource, () -> {
+            long t0 = System.currentTimeMillis();
+            T result = body.call();
+            logStep(label, t0, rowCount.applyAsInt(result));
+            return result;
+        }));
+    }
+
+    /** Every one of submitTimed's own callables already catches its own exceptions and returns an
+     *  empty collection (same "log and return empty" convention as the rest of this class) — this
+     *  only guards the future itself timing out or being interrupted, which would otherwise fail
+     *  the whole bundle for one slow/stuck Mongo call. */
+    private <T> T getOrEmpty(Future<T> future, T empty, String label) {
+        try {
+            return future.get(EXTERNAL_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            logger.error("InsightDataLoader: " + label + " future failed/timed out: " + e.getMessage());
+            return empty;
+        }
+    }
+
+    private void logStep(String label, long startMs, int rowCount) {
+        logger.info("InsightDataLoader: " + label + " took " + (System.currentTimeMillis() - startMs)
+                + "ms, " + rowCount + " rows");
     }
 
     private <T> Callable<T> withContext(int accountId, Integer userId, CONTEXT_SOURCE contextSource, Callable<T> body) {
@@ -223,7 +285,8 @@ public class InsightDataLoader {
                 boolean hasTagTargeting = p.getTargetTags() != null && !p.getTargetTags().isEmpty();
                 boolean hasTargeting = hasTagTargeting || (p.getTargetDeviceIds() != null && !p.getTargetDeviceIds().isEmpty());
                 if (hasTargeting) {
-                    p.setApplyToDeviceIds(AgentUsersDao.instance.findDeviceIdsByTags(p.getTargetTags(), p.getTargetDeviceIds()));
+                    p.setApplyToDeviceIds(AgentUsersDao.instance.findDeviceIdsByTags(
+                            p.getTargetTags(), p.getNegatedTargetTags(), p.getTargetDeviceIds(), p.isNegatedTargetDeviceIds()));
                 }
                 active.add(p);
             }
@@ -234,12 +297,30 @@ public class InsightDataLoader {
         }
     }
 
+    /**
+     * VENDOR-typed entries are canonicalized the same way InsightUtil#endpointVendorName
+     * canonicalizes observed traffic (claude/claude-desktop/... -> anthropic, etc.) — otherwise an
+     * approval saved under a raw alias ("chatgpt.com") would never match traffic that resolves to
+     * the merged canonical name ("openai"), and would silently read back as still-unapproved.
+     * MCP_SERVER-typed entries are left as-is: that alias map is vendor-specific and would
+     * misclassify an unrelated MCP server whose name happens to contain one of those substrings
+     * (e.g. "claude-mcp-server").
+     */
     private Set<String> loadAllowlistNames() {
         try {
-            List<McpAllowlist> rows = McpAllowlistDao.instance.findAll(Filters.empty(), Projections.include(McpAllowlist.NAME));
+            List<McpAllowlist> rows = McpAllowlistDao.instance.findAll(Filters.empty(),
+                    Projections.include(McpAllowlist.NAME, McpAllowlist.ENTRY_TYPE));
             Set<String> names = new HashSet<>();
             for (McpAllowlist a : rows) {
-                if (a.getName() != null) names.add(a.getName().toLowerCase(Locale.ROOT));
+                if (a.getName() == null) continue;
+                String nameLower = a.getName().toLowerCase(Locale.ROOT);
+                boolean isVendor = McpAllowlist.ENTRY_TYPE_VENDOR.equals(a.getEntryType());
+                // canonicalVendorName returns a display-cased name ("OpenAI", "Anthropic") for use
+                // as a UI label elsewhere (RiskScoreCalculator's vendor table) — this set is
+                // strictly lowercase (every consumer lowercases its query side before checking
+                // membership), so the canonicalized name must be lowered again here or a vendor
+                // approval would never match.
+                names.add(isVendor ? InsightUtil.canonicalVendorName(nameLower).toLowerCase(Locale.ROOT) : nameLower);
             }
             return names;
         } catch (Exception e) {

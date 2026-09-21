@@ -1,5 +1,6 @@
 package com.akto.action.settings;
 
+import com.akto.action.AgenticObserveAction;
 import com.akto.action.UserAction;
 import com.akto.dao.AgentUsersDao;
 import com.akto.dao.context.Context;
@@ -428,7 +429,8 @@ public class ModuleInfoAction extends UserAction {
                 key.equals("AGGREGATION_RULES_ENABLED") ||
                 key.equals("SKIP_THREAT") ||
                 key.equals("APPLY_GUARDRAILS_TO_SSE") ||
-                key.equals("ENABLE_CLAUDE_SETTINGS_CONFIG_SCAN")) {
+                key.equals("ENABLE_CLAUDE_SETTINGS_CONFIG_SCAN") ||
+                key.equals("UPDATE_TO_LATEST_VERSION")) {
             return "boolean";
         }
         return "text";
@@ -549,6 +551,7 @@ public class ModuleInfoAction extends UserAction {
         String identityUserName = AgentUsersDao.instance.ensureDashboardIdentity(username, userEmail, getSUser().getLogin());
         AgentUsersDao.instance.mergeDeviceTags(identityUserName, DeviceTag.SOURCE_MANUAL,
                 tags != null ? tags : Collections.emptyMap(), getSUser().getLogin());
+        AgenticObserveAction.invalidateTagsByUsernameCache();
         return SUCCESS.toUpperCase();
     }
 
@@ -564,6 +567,7 @@ public class ModuleInfoAction extends UserAction {
             String identityUserName = AgentUsersDao.instance.ensureDashboardIdentity(u, null, updatedBy);
             AgentUsersDao.instance.mergeDeviceTags(identityUserName, DeviceTag.SOURCE_MANUAL, tagsToApply, updatedBy);
         }
+        AgenticObserveAction.invalidateTagsByUsernameCache();
         return SUCCESS.toUpperCase();
     }
 
@@ -575,6 +579,13 @@ public class ModuleInfoAction extends UserAction {
         // reported), never overwritten, so a source that happens to be empty can never delete a
         // user from the list.
         Map<String, AgenticUsers> byUsername = new LinkedHashMap<>();
+        // Org-scoped identities, keyed by their full userId, emitted ALONGSIDE the username-deduped
+        // rows above rather than instead of them. A Claude login writes one agent_users doc per org
+        // ("<email>_<orgUuid>"), all sharing a single userName — folding those together is the right
+        // default, but on its own it leaves no way to target one org, so the org term the validator
+        // already evaluates (orgUUIDFromUserID in validator/claude_org_match.go) is unreachable from
+        // the UI. These extra entries are what make it selectable.
+        Map<String, AgenticUsers> byOrgUserId = new LinkedHashMap<>();
         for (AgenticUsers u : AgentUsersDao.instance.findAll(Filters.empty())) {
             String username = u.getUserName() == null ? "" : u.getUserName().trim();
             // Nothing to key or display on, and its devices are pre-migration raw machine IDs that
@@ -582,6 +593,13 @@ public class ModuleInfoAction extends UserAction {
             if (username.isEmpty()) continue;
             u.setUserName(username);
             u.setDevices(u.getDevices() == null ? new ArrayList<>() : new ArrayList<>(new LinkedHashSet<>(u.getDevices())));
+
+            if (AgenticUsers.orgUuidFromUserId(u.getUserId()) != null) {
+                // A copy, never the same object: this doc may also become the byUsername slot below,
+                // where mergeInto mutates it in place — sharing it would leak every sibling org's
+                // devices and tags into what is supposed to be one org's row.
+                byOrgUserId.putIfAbsent(u.getUserId(), copyOf(u));
+            }
 
             AgenticUsers existing = byUsername.get(username);
             if (existing == null) {
@@ -615,8 +633,36 @@ public class ModuleInfoAction extends UserAction {
             }
         }
 
+        // A username row stands for the person in EVERY org they belong to, so it must not carry an
+        // org-scoped userId — whichever duplicate doc Mongo happened to return first can supply one.
+        // The validator ORs the org term rather than narrowing with it (see orgMatchesAny), so an
+        // org id here would quietly widen the policy to that entire org's Claude traffic instead of
+        // just this person. Cleared, the row matches on email alone, which is what it means.
+        for (AgenticUsers u : byUsername.values()) {
+            if (AgenticUsers.orgUuidFromUserId(u.getUserId()) != null) u.setUserId(null);
+        }
+
         agenticUsers = new ArrayList<>(byUsername.values());
+        agenticUsers.addAll(byOrgUserId.values());
         return SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Shallow copy with its own mutable collections, so folding duplicates into one row can never
+     * reach through into a copy kept elsewhere (see byOrgUserId in fetchAgenticUsers).
+     */
+    private static AgenticUsers copyOf(AgenticUsers u) {
+        AgenticUsers copy = new AgenticUsers();
+        copy.setUserName(u.getUserName());
+        copy.setUserEmail(u.getUserEmail());
+        copy.setUserId(u.getUserId());
+        copy.setLastUpdatedAt(u.getLastUpdatedAt());
+        copy.setLastUpdatedBy(u.getLastUpdatedBy());
+        copy.setOrganizationName(u.getOrganizationName());
+        copy.setOrganizationType(u.getOrganizationType());
+        copy.setDevices(u.getDevices() == null ? new ArrayList<>() : new ArrayList<>(u.getDevices()));
+        copy.setDeviceTags(u.getDeviceTags() == null ? null : new ArrayList<>(u.getDeviceTags()));
+        return copy;
     }
 
     /** Folds a duplicate agent_users row into the one already kept for that username. */

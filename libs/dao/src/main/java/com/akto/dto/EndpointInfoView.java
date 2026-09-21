@@ -163,6 +163,34 @@ public class EndpointInfoView {
         this.isOutOfTestingScope = isOutOfTestingScope;
     }
 
+    // EndpointInfoViewCron writes actualAuthType, actualAccessType and severity into the view
+    // (buildActualAuthTypeExpr / buildActualAccessTypeExpr / buildSeverityExpr), but without
+    // accessors the pojo codec treats them as non-properties and drops them on decode — so the
+    // values existed in mongo and were invisible to every java reader.
+    public List<String> getActualAuthType() {
+        return actualAuthType;
+    }
+
+    public void setActualAuthType(List<String> actualAuthType) {
+        this.actualAuthType = actualAuthType;
+    }
+
+    public List<String> getActualAccessType() {
+        return actualAccessType;
+    }
+
+    public void setActualAccessType(List<String> actualAccessType) {
+        this.actualAccessType = actualAccessType;
+    }
+
+    public String getSeverity() {
+        return severity;
+    }
+
+    public void setSeverity(String severity) {
+        this.severity = severity;
+    }
+
     public List<String> getSensitiveSubTypes() {
         return sensitiveSubTypes;
     }

@@ -40,7 +40,9 @@ AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "opencode")
+AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "opencode")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
+DEVICE_ID = os.getenv("DEVICE_ID") or get_machine_id()
 
 # MCP-specific paths
 MCP_INGEST_PATH = os.getenv("MCP_INGEST_PATH", "/mcp")
@@ -158,8 +160,7 @@ def build_tools_call_result_jsonrpc(tool_response: Any, request_id: int = 1) -> 
 
 def mcp_mirror_host(mcp_server_name: str) -> str:
     """Build host header for MCP server."""
-    device_id = get_machine_id()
-    return f"{device_id}.opencode.{mcp_server_name}"
+    return f"{DEVICE_ID}.{AKTO_CONNECTOR_VALUE}.{mcp_server_name}"
 
 
 def build_ingestion_payload(
@@ -209,7 +210,7 @@ def build_ingestion_payload(
         "type": "HTTP/1.1",
         "status": "200",
         "akto_account_id": "1000000",
-        "akto_vxlan_id": get_machine_id(),
+        "akto_vxlan_id": DEVICE_ID,
         "is_pending": "false",
         "source": "MIRRORING",
         "direction": None,

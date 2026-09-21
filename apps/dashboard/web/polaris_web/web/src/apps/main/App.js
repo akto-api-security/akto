@@ -139,6 +139,7 @@ import AgenticAssetsPage from "../dashboard/pages/observe/agentic/AgenticAssetsP
 import LLMObservability from "../dashboard/pages/observe/llm/LLMObservability.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
+import SecurityPosture from "../dashboard/pages/dashboard/SecurityPosture.jsx";
 import IdentitiesPage from "../dashboard/pages/nhi_governance/IdentitiesPage.jsx";
 import ViolationsPage from "../dashboard/pages/nhi_governance/ViolationsPage.jsx";
 import PoliciesPage from "../dashboard/pages/nhi_governance/PoliciesPage.jsx";
@@ -171,6 +172,10 @@ const router = createBrowserRouter([
                     {
                         path: "endpoint-dashboard",
                         element: <EndpointPosture/>,
+                    },
+                    {
+                        path: "security-posture",
+                        element: <SecurityPosture/>,
                     },
                     {
                         path: "view",

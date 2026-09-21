@@ -76,7 +76,7 @@ function OverviewContent({ session, traceCount, guardrailViolationCount }) {
         { label: "Application", value: session.serviceId },
         { label: "Session ID",  value: truncate(session.sessionIdentifier, 36) },
         { label: "Models",      value: session._models?.length ? session._models.join(", ") : undefined },
-        { label: "Endpoint ID", value: session.deviceId, href: session.deviceId ? `/dashboard/observe/inventory/${session.deviceId}` : undefined },
+        { label: "Endpoint ID", value: session.deviceId },
     ];
 
     return (

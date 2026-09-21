@@ -125,6 +125,15 @@ export default {
         return resp
     },
 
+    async setBrowserExtensionConfigsActive(hosts, active) {
+        const resp = await request({
+            url: '/api/setBrowserExtensionConfigsActive',
+            method: 'post',
+            data: { hosts, browserExtensionConfig: { active } }
+        })
+        return resp
+    },
+
     async saveBrowserExtensionConfig(browserExtensionConfig, hexId) {
         const resp = await request({
             url: '/api/saveBrowserExtensionConfig',
@@ -166,6 +175,15 @@ export default {
             url: '/api/deleteConfigFieldPolicies',
             method: 'post',
             data: { policyIds }
+        })
+        return resp
+    },
+
+    async suggestGuardrailCompliance(inputType, payload) {
+        const resp = await request({
+            url: '/api/ask_ai',
+            method: 'post',
+            data: { type: 'suggest_guardrail_compliance', meta: { inputType, ...payload } }
         })
         return resp
     },

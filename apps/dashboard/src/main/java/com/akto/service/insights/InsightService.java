@@ -59,7 +59,14 @@ public class InsightService {
         CachedBundle(InsightDataBundle bundle, long loadedAtMs) { this.bundle = bundle; this.loadedAtMs = loadedAtMs; }
     }
 
-    private InsightDataBundle getOrLoadBundle(InsightContext ctx) {
+    /**
+     * Public so the Security Posture page can share this cache rather than building a second,
+     * near-identical read layer: that page renders posture widgets and the "Act now" insights
+     * side by side off the same account data, so a private cache here would mean loading
+     * everything twice per page view. BUNDLE_CACHE is static, so every InsightService instance
+     * (one per action) shares the entry.
+     */
+    public InsightDataBundle getOrLoadBundle(InsightContext ctx) {
         String key = ctx.bundleCacheKey();
         CachedBundle cached = BUNDLE_CACHE.compute(key, (k, existing) -> {
             if (existing != null && System.currentTimeMillis() - existing.loadedAtMs < BUNDLE_CACHE_TTL_MS) return existing;

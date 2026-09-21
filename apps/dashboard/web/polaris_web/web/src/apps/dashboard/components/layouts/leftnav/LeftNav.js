@@ -180,7 +180,9 @@ export default function LeftNav() {
                 icon: ReportFilledMinor,
                 onClick: () => {
                     handleSelect("dashboard_endpoint_posture");
-                    navigate("/dashboard/endpoint-dashboard");
+                    // The new posture page is still only for the internal test account; every
+                    // other @akto.io account keeps landing on the older EndpointPosture page.
+                    navigate(activeAccount === 1779231193 ? "/dashboard/security-posture" : "/dashboard/endpoint-dashboard");
                     setActive("normal");
                 },
                 selected: leftNavSelected === "dashboard_endpoint_posture",

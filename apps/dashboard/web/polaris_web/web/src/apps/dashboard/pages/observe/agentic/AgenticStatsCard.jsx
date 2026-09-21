@@ -28,7 +28,7 @@ function SegmentBar({ segments }) {
     );
 }
 
-function LegendDot({ color }) {
+export function LegendDot({ color }) {
     return <Box className="agentic-dot" style={{ "--dot-color": color }} />;
 }
 

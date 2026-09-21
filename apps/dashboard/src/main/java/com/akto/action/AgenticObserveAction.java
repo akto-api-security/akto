@@ -7,9 +7,13 @@ import com.akto.dao.ApiInfoDao;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.action.monitoring.EndpointShieldAgentAction;
+import com.akto.dao.AgentUsersDao;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ComponentRiskAnalysis;
 import com.akto.dto.DeviceTag;
@@ -55,6 +59,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -106,7 +111,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Setter private String groupBy; // "user" | "device"
     @Setter private Map<String, List<String>> sensitiveMap; // collection id (string) -> sensitive types
     @Setter private Map<String, String> usernameMap; // Endpoint Shield username resolution map
-    @Setter private Map<String, Map<String, String>> userMetadataMap; // username -> {userEmail}
     // username -> that user's generic device tags (AgenticUsers.deviceTags, each {key, value, source}).
     // Device rows inherit their resolved owner's tags (see classifyHostGroupedRows).
     @Setter private Map<String, List<Map<String, String>>> tagsByUsername;
@@ -827,14 +831,15 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
-            Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
+            Map<String, Integer> userAnalysis = getOrComputeUserAnalysisFlatMap();
 
             Map<String, DeviceAcc> devices = accumulateDevices(ids, byId, traffic, risk, userAnalysis);
 
+            Map<String, String> usernames = getOrComputeUsernameMap();
             List<BasicDBObject> rows = new ArrayList<>();
             for (DeviceAcc d : devices.values()) {
                 BasicDBObject row = d.toResponse();
-                row.put("username", resolveUsernameByDeviceId(d.deviceId, usernameMap));
+                row.put("username", resolveUsernameByDeviceId(d.deviceId, usernames));
                 rows.add(row);
             }
 
@@ -1059,7 +1064,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             String effectiveRowType = StringUtils.isNotBlank(rowType) ? rowType : "agent";
 
             Map<String, EndpointGroup> groups = groupCollectionsByEndpointId(
-                    collections, traffic, risk, sensitive, maliciousSkillKeys, usernameMap, effectiveRowType);
+                    collections, traffic, risk, sensitive, maliciousSkillKeys, getOrComputeUsernameMap(), effectiveRowType);
 
             List<BasicDBObject> rows = new ArrayList<>();
             for (EndpointGroup g : groups.values()) {
@@ -1652,10 +1657,20 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     }
     private static final Map<String, ScopedMapCacheEntry<Integer>> trafficMapFallbackCache = new ConcurrentHashMap<>();
     private static final Map<String, ScopedMapCacheEntry<Double>> riskScoreMapFallbackCache = new ConcurrentHashMap<>();
+    // Both account-scoped, not RBAC-scoped: module_info/agent_users have no per-user view to leak.
+    private static final Map<String, ScopedMapCacheEntry<String>> usernameMapFallbackCache = new ConcurrentHashMap<>();
+    private static final Map<String, ScopedMapCacheEntry<List<Map<String, String>>>> tagsByUsernameFallbackCache = new ConcurrentHashMap<>();
+    private static final Map<String, ScopedMapCacheEntry<Map<String, String>>> deviceMetadataMapFallbackCache = new ConcurrentHashMap<>();
+    private static final Map<String, ScopedMapCacheEntry<Integer>> userAnalysisFlatMapFallbackCache = new ConcurrentHashMap<>();
 
     // Both underlying DAO calls RBAC-scope by (userId, accountId) — keyed on accountId alone, one user's restricted view would leak into another's.
     private static String scopedCacheKey() {
         return Context.accountId.get() + "_" + Context.userId.get();
+    }
+
+    // Account-scoped cache key, unlike scopedCacheKey()'s RBAC-scoped traffic/risk maps.
+    private static String accountCacheKey() {
+        return String.valueOf(Context.accountId.get());
     }
 
     private Map<String, Integer> getOrComputeTrafficMap() {
@@ -1717,6 +1732,89 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 return cached != null ? cached : new ScopedMapCacheEntry<>(Collections.emptyMap(), recheckNow);
             }
         }).map;
+    }
+
+    // Shared TTL-cache read used by the two resolvers below; mirrors getOrComputeTrafficMap's shape.
+    private static <V> Map<String, V> getOrComputeCachedMap(Map<String, ScopedMapCacheEntry<V>> cache, String key,
+            Supplier<Map<String, V>> compute, String what) {
+        long now = System.currentTimeMillis();
+        ScopedMapCacheEntry<V> existing = cache.get(key);
+        if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+            return existing.map;
+        }
+        if (cache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
+            cache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
+        }
+        // compute() serializes concurrent misses for the same key instead of each racing to Mongo.
+        return cache.compute(key, (k, cached) -> {
+            long recheckNow = System.currentTimeMillis();
+            if (cached != null && (recheckNow - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                return cached;
+            }
+            try {
+                return new ScopedMapCacheEntry<>(compute.get(), recheckNow);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed computing " + what + " server-side for agentic assets", LogDb.DASHBOARD);
+                return cached != null ? cached : new ScopedMapCacheEntry<>(Collections.emptyMap(), recheckNow);
+            }
+        }).map;
+    }
+
+    // Endpoint Shield hostname -> username, server-side so the client stops POSTing every device id.
+    private Map<String, String> getOrComputeUsernameMap() {
+        if (usernameMap != null && !usernameMap.isEmpty()) return usernameMap;
+        return getOrComputeCachedMap(usernameMapFallbackCache, accountCacheKey(),
+                () -> ModuleInfoDao.instance.fetchUsernameLookupMapForEndpointShield(), "username map");
+    }
+
+    // Username -> device tags, server-side so the client stops POSTing the account's identity list.
+    private Map<String, List<Map<String, String>>> getOrComputeTagsByUsername() {
+        if (tagsByUsername != null && !tagsByUsername.isEmpty()) return tagsByUsername;
+        return getOrComputeCachedMap(tagsByUsernameFallbackCache, accountCacheKey(),
+                () -> AgentUsersDao.instance.fetchDeviceTagsByUsername(), "tags-by-username map");
+    }
+
+    // deviceId -> {username, os, browserName}, server-side so the client stops POSTing device identities.
+    private Map<String, Map<String, String>> getOrComputeDeviceMetadataMap() {
+        if (deviceMetadataMap != null && !deviceMetadataMap.isEmpty()) return deviceMetadataMap;
+        return getOrComputeCachedMap(deviceMetadataMapFallbackCache, accountCacheKey(),
+                () -> ModuleInfoDao.instance.fetchDeviceMetadataMapForEndpointShield(), "device metadata map");
+    }
+
+    // "serviceId|deviceId" -> total tokens; keyed by time range too since this varies with the picker.
+    private Map<String, Integer> getOrComputeUserAnalysisFlatMap() {
+        if (userAnalysisFlatMap != null && !userAnalysisFlatMap.isEmpty()) return userAnalysisFlatMap;
+        String key = accountCacheKey() + "_" + startTimestamp + "_" + endTimestamp;
+        return getOrComputeCachedMap(userAnalysisFlatMapFallbackCache, key, this::buildUserAnalysisFlatMap, "user analysis map");
+    }
+
+    // Mirrors constants.js's buildUserAnalysisFlatMap; reuses EndpointShieldAgentAction for the ES-vs-counter branching.
+    private Map<String, Integer> buildUserAnalysisFlatMap() {
+        EndpointShieldAgentAction action = new EndpointShieldAgentAction();
+        action.setStartTime(startTimestamp);
+        action.setEndTime(endTimestamp);
+        action.fetchUserAnalysisList();
+
+        Map<String, Integer> result = new HashMap<>();
+        List<UserAnalysisData> rows = action.getUserAnalysisList();
+        if (rows == null) return result;
+        for (UserAnalysisData row : rows) {
+            if (row == null || row.getId() == null) continue;
+            String serviceId = row.getId().getServiceId();
+            String deviceId = row.getId().getDeviceId();
+            if (StringUtils.isBlank(serviceId) || StringUtils.isBlank(deviceId)) continue;
+            long total = row.getTotalInputTokens() + row.getTotalOutputTokens();
+            if (total <= 0) continue;
+            int capped = (int) Math.min(total, Integer.MAX_VALUE);
+            result.put(serviceId + "|" + deviceId, capped);
+            result.put(serviceId.toLowerCase(Locale.ROOT) + "|" + deviceId.toLowerCase(Locale.ROOT), capped);
+        }
+        return result;
+    }
+
+    // Called by ModuleInfoAction after a device-tag write so the edit shows on the next fetch, not after the TTL.
+    public static void invalidateTagsByUsernameCache() {
+        tagsByUsernameFallbackCache.remove(accountCacheKey());
     }
 
     private  ClassificationCacheEntry getOrBuildClassification(Map<String, Integer> traffic,
@@ -2224,7 +2322,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 // resolveUsernameByDeviceId's use elsewhere in this class (e.g. fetchAgenticAssetDetail).
                 if (filters.containsKey("username")) {
                     Set<String> allowedUsernames = new HashSet<>(filters.get("username"));
-                    Map<String, String> resolveMap = usernameMap != null ? usernameMap : Collections.emptyMap();
+                    Map<String, String> resolveMap = getOrComputeUsernameMap();
                     all.removeIf(g -> g.endpointIds.stream()
                             .noneMatch(id -> allowedUsernames.contains(resolveUsernameByDeviceId(id, resolveMap))));
                 }
@@ -2263,7 +2361,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<Integer, ApiCollection> byId = new HashMap<>();
             for (ApiCollection c : collections) byId.put(c.getId(), c);
 
-            Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
+            Map<String, Integer> userAnalysis = getOrComputeUserAnalysisFlatMap();
             SkillDataCacheEntry skillData = getOrBuildSkillData();
             Set<String> maliciousKeys = skillData.maliciousSkillKeys;
             List<BasicDBObject> rowsOut = new ArrayList<>();
@@ -2321,7 +2419,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // Current-page-only, same as fetchAgenticAssetEndpointsPage's distinctUsernames — the
             // client accumulates these across page turns to progressively populate the Username filter's
             // choices (see Endpoints.jsx's updateFilterChoicesIfChanged).
-            Map<String, String> resolveMapForChoices = usernameMap != null ? usernameMap : Collections.emptyMap();
+            Map<String, String> resolveMapForChoices = getOrComputeUsernameMap();
             Set<String> distinctUsernames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
             for (GroupSummary g : page) {
                 for (String id : g.endpointIds) {
@@ -2552,7 +2650,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 }
             }
 
-            Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
+            Map<String, Integer> userAnalysis = getOrComputeUserAnalysisFlatMap();
             // Count comes from the same accumulateDevices() map buildDevicesForGroup uses internally —
             // that per-collection accumulation pass can't be skipped for the count either way, but we
             // avoid the more costly per-device toResponse()/serialization step for anything past the
@@ -2825,7 +2923,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // collection's own hostname (<deviceId>.<serviceId>.<host>) — mirrors
             // analysisKeysForCollection's hostname-segment candidates, not module_info's own id/name
             // (which never actually matches UserAnalysisData's key scheme).
-            Map<String, Integer> userAnalysis = userAnalysisFlatMap != null ? userAnalysisFlatMap : Collections.emptyMap();
+            Map<String, Integer> userAnalysis = getOrComputeUserAnalysisFlatMap();
             List<BasicDBObject> topApps = new ArrayList<>();
             for (GroupSummary g : groups.values()) {
                 // Only "agent" rows get ranked here — same reasoning as the grid column above.
@@ -3062,16 +3160,16 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     private Map<String, HostGroupSummary> classifyHostGroupedRows(List<ApiCollection> collections, String groupBy,
             Map<String, Integer> traffic, Map<String, Double> risk, Map<String, List<String>> sensitive,
-            Map<String, String> usernames, Map<String, Map<String, String>> userMeta,
+            Map<String, String> usernames,
             Map<String, Map<String, String>> deviceMeta, Map<String, Map<String, Integer>> violationsByCollectionId,
             boolean excludeConnectorIngested) {
-        return classifyHostGroupedRows(collections, groupBy, traffic, risk, sensitive, usernames, userMeta,
+        return classifyHostGroupedRows(collections, groupBy, traffic, risk, sensitive, usernames,
                 deviceMeta, violationsByCollectionId, excludeConnectorIngested, Collections.emptyMap());
     }
 
     private Map<String, HostGroupSummary> classifyHostGroupedRows(List<ApiCollection> collections, String groupBy,
             Map<String, Integer> traffic, Map<String, Double> risk, Map<String, List<String>> sensitive,
-            Map<String, String> usernames, Map<String, Map<String, String>> userMeta,
+            Map<String, String> usernames,
             Map<String, Map<String, String>> deviceMeta, Map<String, Map<String, Integer>> violationsByCollectionId,
             boolean excludeConnectorIngested, Map<String, List<Map<String, String>>> tagsByUser) {
         boolean isUserGroup = "user".equals(groupBy);
@@ -3156,16 +3254,15 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
             Map<String, List<String>> sensitive = sensitiveMap != null ? sensitiveMap : Collections.emptyMap();
-            Map<String, String> usernames = usernameMap != null ? usernameMap : Collections.emptyMap();
-            Map<String, Map<String, String>> userMeta = userMetadataMap != null ? userMetadataMap : Collections.emptyMap();
-            Map<String, List<Map<String, String>>> tagsByUser = tagsByUsername != null ? tagsByUsername : Collections.emptyMap();
+            Map<String, String> usernames = getOrComputeUsernameMap();
+            Map<String, List<Map<String, String>>> tagsByUser = getOrComputeTagsByUsername();
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS)
             );
 
-            Map<String, HostGroupSummary> groups = classifyHostGroupedRows(collections, groupBy, traffic, risk, sensitive, usernames, userMeta, null, null, false, tagsByUser);
+            Map<String, HostGroupSummary> groups = classifyHostGroupedRows(collections, groupBy, traffic, risk, sensitive, usernames, null, null, false, tagsByUser);
             List<HostGroupSummary> all = new ArrayList<>(groups.values());
 
             if (StringUtils.isNotBlank(queryValue)) {
@@ -3234,18 +3331,17 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         try {
             Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
-            Map<String, String> usernames = usernameMap != null ? usernameMap : Collections.emptyMap();
-            Map<String, Map<String, String>> userMeta = userMetadataMap != null ? userMetadataMap : Collections.emptyMap();
-            Map<String, List<Map<String, String>>> tagsByUser = tagsByUsername != null ? tagsByUsername : Collections.emptyMap();
+            Map<String, String> usernames = getOrComputeUsernameMap();
+            Map<String, List<Map<String, String>>> tagsByUser = getOrComputeTagsByUsername();
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS)
             );
 
             Map<String, HostGroupSummary> userGroups = classifyHostGroupedRows(collections, "user", traffic, risk,
-                    Collections.emptyMap(), usernames, userMeta, null, null, false, tagsByUser);
+                    Collections.emptyMap(), usernames, null, null, false, tagsByUser);
             Map<String, HostGroupSummary> deviceGroups = classifyHostGroupedRows(collections, "device", traffic, risk,
-                    Collections.emptyMap(), usernames, Collections.emptyMap(), null, null, false, tagsByUser);
+                    Collections.emptyMap(), usernames, null, null, false, tagsByUser);
 
             long usersAgenticAssetsTotal = 0;
             for (HostGroupSummary g : userGroups.values()) {
@@ -3476,10 +3572,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         try {
             Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
             Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
-            Map<String, Map<String, String>> deviceMeta = deviceMetadataMap != null ? deviceMetadataMap : Collections.emptyMap();
-            Map<String, String> usernames = usernameMap != null ? usernameMap : Collections.emptyMap();
+            Map<String, Map<String, String>> deviceMeta = getOrComputeDeviceMetadataMap();
+            Map<String, String> usernames = getOrComputeUsernameMap();
             Map<String, Map<String, Integer>> violations = violationsByCollectionId != null ? violationsByCollectionId : Collections.emptyMap();
-            Map<String, List<Map<String, String>>> tagsByUser = tagsByUsername != null ? tagsByUsername : Collections.emptyMap();
+            Map<String, List<Map<String, String>>> tagsByUser = getOrComputeTagsByUsername();
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),
@@ -3515,7 +3611,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
 
             Map<String, HostGroupSummary> groups = classifyHostGroupedRows(collections, "device", traffic, risk,
-                    Collections.emptyMap(), usernames, Collections.emptyMap(), deviceMeta, violations, true, tagsByUser);
+                    Collections.emptyMap(), usernames, deviceMeta, violations, true, tagsByUser);
             List<HostGroupSummary> all = new ArrayList<>(groups.values());
 
             if (StringUtils.isNotBlank(queryValue)) {
@@ -3669,8 +3765,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     public String fetchDeviceEndpointsStats() {
         response = new BasicDBObject();
         try {
-            Map<String, String> usernames = usernameMap != null ? usernameMap : Collections.emptyMap();
-            Map<String, Map<String, String>> deviceMeta = deviceMetadataMap != null ? deviceMetadataMap : Collections.emptyMap();
+            Map<String, String> usernames = getOrComputeUsernameMap();
+            Map<String, Map<String, String>> deviceMeta = getOrComputeDeviceMetadataMap();
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.empty(),

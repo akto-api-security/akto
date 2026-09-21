@@ -582,6 +582,92 @@ This event means the guardrail **successfully protected** the data - the sensiti
 `
     },
 
+    // ─── Overpowered Agent ──────────────────────────────────────────────────────
+    {
+        prefixes: ["OverpoweredAgent", "overpowered_agent", "Overpowered Agent", "ExcessiveAgency", "excessive_agency"],
+        heading: "Overpowered Agent Detected",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "The agent has standing access to a high-risk tool (destructive, financial, or otherwise irreversible) that has never actually been invoked in observed traffic. The capability is provisioned but unused - pure exposure with no offsetting business value."
+            },
+            {
+                heading: "Why is it dangerous?",
+                body: "An unused, high-risk tool is a standing liability rather than a working feature: it still counts as attack surface for prompt injection, compromised credentials, or a model that decides on its own to call it, but there's no legitimate traffic pattern to distinguish an authorised call from an abusive one. The broader the agent's permissions relative to its actual task, the larger the blast radius of a single manipulated turn."
+            }
+        ],
+        remediation: `## What to do
+
+### Immediate
+- Confirm the tool is genuinely unused by checking traffic/audit logs over a representative window (not just the sample that triggered this alert).
+- Identify who registered this tool for the agent and why - most "unused high-risk tool" cases trace back to a broad default toolset rather than a deliberate decision.
+
+### Structural fixes
+1. **Apply least privilege** - grant only the tools the agent's task actually requires. Remove this tool from the agent's toolset if it serves no purpose the agent needs.
+2. **Require human-in-the-loop for high-risk tools** - if the tool must stay available for occasional legitimate use, add an approval step before execution instead of leaving it directly callable.
+3. **Re-review the toolset periodically** - as agents and their prompts evolve, tools that were once needed can become dead weight. Treat an unused high-risk tool the same as an unused IAM permission: revoke it.
+4. **Log all tool invocations** - so the next review can tell "unused" from "used but not yet sampled" with confidence.
+`
+    },
+
+    // ─── Tool Poisoning ─────────────────────────────────────────────────────────
+    {
+        prefixes: ["ToolPoisoning", "tool_poisoning", "RugPull", "rug_pull"],
+        templateIdPrefixes: ["ToolPoisoningPolicy", "tool-poisoning-policy"],
+        heading: "Tool Poisoning Detected",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "A tool the agent already trusts - one that was reviewed and approved - has had its definition altered after the fact (a \"rug pull\"), or was malicious from the start with instructions hidden in its description or schema rather than in its visible output. Because a tool's description is read by the model on every tool-list call but is rarely re-reviewed by a human, an attacker can smuggle in an instruction that no user or reviewer ever sees."
+            },
+            {
+                heading: "Why is it dangerous?",
+                body: "The tool keeps working normally on the surface - correct results, no errors - while quietly directing the agent to take an extra, unauthorised action: exfiltrating data to an external endpoint, invoking a second, more sensitive tool, or overriding its own instructions. Because nothing in the visible conversation or output looks wrong, this bypasses both human review and output-only monitoring."
+            }
+        ],
+        remediation: `## What to do
+
+### Immediate
+- Diff the tool's current description and schema against its last-approved version to confirm what changed and when.
+- Check what the tool has actually been invoked to do since the change - especially any outbound network calls or chained tool invocations.
+
+### Structural fixes
+1. **Pin and hash tool definitions** - fingerprint each approved tool's name, description and schema; alert on any change instead of silently trusting whatever the server currently returns.
+2. **Re-review on every change, not just on first approval** - a tool that passed review once should not be trusted indefinitely; treat a definition change as a new, unreviewed tool.
+3. **Scan tool descriptions for hidden instructions** - apply the same content-filtering guardrails used on user input to tool metadata, not just user-facing text.
+4. **Require human-in-the-loop for tools that change** - until re-approved, route calls to a changed tool through manual approval rather than silently blocking or allowing it.
+`
+    },
+
+    // ─── Agent Memory Poisoning ─────────────────────────────────────────────────
+    {
+        prefixes: ["AgentMemoryPoisoning", "agent_memory_poisoning", "MemoryPoisoning", "memory_poisoning", "ContextPoisoning", "context_poisoning"],
+        templateIdPrefixes: ["AgentMemoryPoisoningPolicy", "agent-memory-poisoning-policy", "MemoryPoisoningPolicy"],
+        heading: "Agent Memory Poisoning Detected",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "An adversary injected false or malicious content into data the agent later treats as trusted long-term memory - a document, a RAG result, or a prior session summary - rather than attacking the current conversation directly. The injected instruction sits dormant until a future session retrieves that memory as context, at which point the agent acts on it as if it were a verified fact."
+            },
+            {
+                heading: "Why is it dangerous?",
+                body: "Prompt-injection filters only scan the live conversation turn, so a payload smuggled in through stored memory is invisible to them - it can silently persist for days, survive across sessions and even across users, and by the time it fires there is no live attacker message to point to, only a memory entry that looks like ordinary context."
+            }
+        ],
+        remediation: `## What to do
+
+### Immediate
+- Identify and purge the poisoned memory entry - trace it back to the document or session that introduced it and remove every downstream memory record derived from it.
+- Audit any decisions the agent made while this memory entry was active, especially approvals or privilege changes.
+
+### Structural fixes
+1. **Never write memory directly from untrusted input** - documents, RAG chunks, tool output and user messages should pass through the same content-filtering guardrails before being summarised into long-term memory, not just before being shown to the user.
+2. **Tag memory with provenance and trust level** - record where each memory entry came from and require a higher bar before treating externally-sourced content as an instruction rather than as data.
+3. **Re-verify high-risk actions against source data, not memory** - before an approval, refund, or privilege change, confirm the underlying claim against its original source rather than trusting a summarised memory of it.
+4. **Expire and re-validate stale memory** - memory older than a defined window should be re-checked against current guardrail policies before continuing to influence agent behaviour.
+`
+    },
+
     // ─── MCP Server Not in Allowed List ────────────────────────────────────────
     {
         prefixes: ["McpServerNotInAllowedList", "McpServer", "mcp_server"],

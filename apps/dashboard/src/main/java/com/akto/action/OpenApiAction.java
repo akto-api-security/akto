@@ -77,6 +77,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
     private final boolean skipKafka = DashboardMode.isLocalDeployment();
 
     private int apiCollectionId;
+    private String collectionName;
     private String openAPIString = null;
     private boolean includeHeaders = true;
 
@@ -414,6 +415,12 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
         return SUCCESS.toUpperCase();
     }
 
+    // Akto derives an OpenAPI collection's id from its name, so the two always agree.
+    private static int deriveCollectionId(String collectionName) {
+        int id = collectionName.hashCode();
+        return id < 0 ? id * -1 : id;
+    }
+
     public PostmanAction.ImportType importType;
     public String importFile(){
         if(importType == null || uploadId == null){
@@ -438,15 +445,19 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
         FileUploadLogsDao.instance.getSwaggerMCollection().find(Filters.and(filters.toArray(new Bson[0]))).into(uploads);
         int accountId = Context.accountId.get();
 
+        // Returned in the response so callers know which collection this import lands in.
+        collectionName = swaggerFileUpload.getCollectionName();
+        if (collectionName != null) {
+            apiCollectionId = deriveCollectionId(collectionName);
+        }
+
         new Thread(()-> {
             Context.accountId.set(accountId);
             loggerMaker.debugAndAddToDb(String.format("Starting thread to import %d swagger apis, import type: %s", uploads.size(), importType), LogDb.DASHBOARD);
             String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
 
             try {
-                String collectionId = swaggerFileUpload.getCollectionName();
-                int aktoCollectionId = collectionId.hashCode();
-                aktoCollectionId = aktoCollectionId < 0 ? aktoCollectionId * -1: aktoCollectionId;
+                int aktoCollectionId = deriveCollectionId(swaggerFileUpload.getCollectionName());
                 List<String> msgs = new ArrayList<>();
                 loggerMaker.debugAndAddToDb(String.format("Processing swagger collection %s, aktoCollectionId: %s", swaggerFileUpload.getCollectionName(), aktoCollectionId), LogDb.DASHBOARD);
                 for(SwaggerUploadLog upload : uploads){
@@ -474,6 +485,10 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
     public int getApiCollectionId() {
         return this.apiCollectionId;
+    }
+
+    public String getCollectionName() {
+        return this.collectionName;
     }
 
     public void setApiCollectionId(int apiCollectionId) {
