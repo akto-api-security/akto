@@ -90,6 +90,7 @@ cp global-hooks/config.json ~/.copilot/config.json
 | `LOG_DIR` | `~/github/hooks/logs` | Directory for hook log files |
 | `LOG_LEVEL` | `INFO` | Log verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `LOG_PAYLOADS` | `false` | Set to `true` to log full request/response payloads |
+| `AKTO_HEARTBEAT_ENABLED` | `false` | Set to `true` to register this device with the abstractor (`/api/updateModuleInfoForHeartbeat`). Required for device-to-user resolution in traces; no heartbeat is sent while it is off |
 
 ## Logs
 

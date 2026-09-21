@@ -6,6 +6,8 @@ Sends agent registration info (device ID, username, module type) to the
 Akto cyborg service (/api/updateModuleInfoForHeartbeat), mirroring the
 Go AgentInfoPublisher in mcp-endpoint-shield.
 
+Disabled by default: set AKTO_HEARTBEAT_ENABLED=true to register the device.
+
 Since hooks are short-lived processes (not long-running), a file-based
 timestamp cache is used to rate-limit sends to once every 30 seconds.
 """
@@ -34,6 +36,13 @@ _AKTO_API_TOKEN = (
     or os.getenv("AKTO_API_TOKEN", "")
 )
 _HEARTBEAT_TIMEOUT = 3.0  # short timeout — must not block the hook
+
+# Heartbeat is opt-in. Device registration is a separate concern from guardrails —
+# an install that only wants prompt/tool validation should not announce itself to
+# the abstractor — so this stays off unless AKTO_HEARTBEAT_ENABLED is set to true.
+# Without it mini-runtime cannot resolve the device to a user, so any deployment
+# that needs traces or LLM observability must turn it on.
+_HEARTBEAT_ENABLED = os.getenv("AKTO_HEARTBEAT_ENABLED", "false").strip().lower() == "true"
 
 
 def _agent_id_file(log_dir: str) -> str:
@@ -112,6 +121,11 @@ def send_heartbeat(log_dir: str, logger=None) -> None:
         log_dir: Resolved (expanded) log directory path used by the hook.
         logger:  Optional logger for debug output.
     """
+    if not _HEARTBEAT_ENABLED:
+        if logger:
+            logger.debug("Heartbeat disabled (AKTO_HEARTBEAT_ENABLED is not true)")
+        return
+
     try:
         os.makedirs(log_dir, exist_ok=True)
 
