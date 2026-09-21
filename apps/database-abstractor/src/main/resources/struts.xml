@@ -104,7 +104,9 @@
         <action name="api/bulkUpdateModuleInfoForHeartbeat" class="com.akto.action.DbAction" method="bulkUpdateModuleInfo">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -1704,7 +1706,9 @@
         <action name="api/insertProtectionLog" class="com.akto.action.DbAction" method="insertProtectionLog">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -1868,7 +1872,9 @@
         <action name="api/ingestMetricsData" class="com.akto.action.DbAction" method="ingestMetricsData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -2694,7 +2700,9 @@
         <action name="api/bulkWriteAgentTrafficLogs" class="com.akto.action.DbAction" method="bulkWriteAgentTrafficLogs">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
