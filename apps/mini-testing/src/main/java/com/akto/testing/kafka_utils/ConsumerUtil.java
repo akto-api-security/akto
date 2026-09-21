@@ -317,7 +317,13 @@ public class ConsumerUtil {
                 // takes longer than that under normal broker load should not be fatal to the whole
                 // pipeline. See statelessrun9's 18:43 incident: a commit slower than the default
                 // killed pc-control while the delay itself was recoverable.
-                .offsetCommitTimeout(Duration.ofSeconds(30))
+                //
+                // Must stay above the underlying KafkaConsumer's own default.api.timeout.ms (60s
+                // default), which bounds a single commit attempt - otherwise a slow-but-recoverable
+                // attempt (observed: 60.006s, statelessrun12's 17:08/17:22 incidents) exhausts the
+                // whole budget before even one attempt completes, leaving zero room for the retry
+                // this setting exists to allow. 30s was below that floor; 90s clears it with margin.
+                .offsetCommitTimeout(Duration.ofSeconds(90))
                 .batchSize(1)
                 .maxFailureHistory(3)
                 .build();
