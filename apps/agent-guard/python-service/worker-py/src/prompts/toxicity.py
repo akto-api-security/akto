@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from ._abcd import convert_examples, to_abcd
+
 # What each dashboard harmful-content category covers. The operator picks a
 # sensitivity per category, so the prompt has to name them the same way the UI
 # does or the setting means nothing.
@@ -69,6 +71,15 @@ HIGH_EXAMPLES = {
     "misconduct": MISCONDUCT_HIGH_EXAMPLES,
 }
 
+# The same blocks with their outputs collapsed to letters, for the ABCD contract.
+# Note most of these carry confidence 0.80-0.88 and therefore become C, not D —
+# a faithful reading of the calibration the JSON prompt already uses. C blocks
+# exactly like D (the gateway branches on is_valid, not on risk_score).
+HIGH_EXAMPLES_ABCD = {
+    category: convert_examples(examples, "isToxic", f"toxicity/{category}")
+    for category, examples in HIGH_EXAMPLES.items()
+}
+
 GEMMA = """You are a security system that detects toxic content.
 
 Toxic content includes:
@@ -118,6 +129,17 @@ Text to analyze:
 %s"""
 
 
+# Single-letter variant, derived from GEMMA so the rules stay in one place.
+GEMMA_ABCD = to_abcd(
+    GEMMA,
+    flag_key="isToxic",
+    safe="NOT TOXIC",
+    flag="TOXIC",
+    near_miss="profanity, slurs quoted to explain them, or hostile-sounding criticism aimed at work rather than a person",
+    label="toxicity",
+)
+
+
 def _sensitivity_for(category: str, severity: str) -> str:
     normalised = str(severity).upper()
     if str(category).lower() == "insults":
@@ -134,7 +156,7 @@ def _severity_for(categories: Any, category: str) -> str | None:
     return None
 
 
-def _format_categories(categories: Any) -> str:
+def _format_categories(categories: Any, response_format: str = "") -> str:
     """Render the operator's enabled categories, or "" to scan for all of them."""
     if not isinstance(categories, dict) or not categories:
         return ""
@@ -147,18 +169,27 @@ def _format_categories(categories: Any) -> str:
         lines.append(f"- {name} ({str(severity).upper()}): {definition} — {guidance}")
     if not lines:
         return ""
+    # The out-of-scope instruction has to name the answer in the contract the
+    # model is actually answering in; "leave matchedCategory empty" is
+    # meaningless when the reply is one character.
+    out_of_scope = "answer A" if response_format == "abcd" else "score it as not toxic and leave matchedCategory empty"
     return (
         "\nThe operator enabled only these categories, each with a sensitivity. "
         "Content that is toxic in a category NOT listed here is out of scope for this scan: "
-        "score it as not toxic and leave matchedCategory empty. "
+        f"{out_of_scope}. "
         "When a listed category's sensitivity guidance expands or narrows the base "
         "definition above, prefer that guidance over any conflicting few-shot.\n" + "\n".join(lines) + "\n"
     )
 
 
-def build(config: dict[str, Any], text: str) -> str:
+def build(config: dict[str, Any], text: str, response_format: str = "") -> str:
     categories = config.get("harmfulCategories")
+    abcd = response_format == "abcd"
+    examples_by_category = HIGH_EXAMPLES_ABCD if abcd else HIGH_EXAMPLES
     extra_examples = "".join(
-        "\n" + examples for category, examples in HIGH_EXAMPLES.items() if _severity_for(categories, category) == "HIGH"
+        "\n" + examples
+        for category, examples in examples_by_category.items()
+        if _severity_for(categories, category) == "HIGH"
     )
-    return GEMMA % (_format_categories(categories), extra_examples, text)
+    template = GEMMA_ABCD if abcd else GEMMA
+    return template % (_format_categories(categories, response_format), extra_examples, text)
