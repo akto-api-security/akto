@@ -1,11 +1,13 @@
 package com.akto.service.insights;
 
+import com.akto.dto.rbac.RbacEnums.Feature;
 import lombok.Getter;
 
 /**
  * The Atlas Discovery insights — the original 10 agentic-AI-governance cards, plus 8
- * guardrail/violation cards merged in from feature/dashbaord/guardrail-insights. Category
- * nests here rather than in its own file — it only ever describes an InsightId.
+ * guardrail/violation cards merged in from feature/dashbaord/guardrail-insights — plus the
+ * API_POSTURE and TESTING_POSTURE groups added for the "Ask Akto" overlay. Category nests here
+ * rather than in its own file — it only ever describes an InsightId.
  */
 @Getter
 public enum InsightId {
@@ -28,7 +30,17 @@ public enum InsightId {
     PROMPT_INJECTION_REPEATS("Prompt injection repeats", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
     LIKELY_FALSE_POSITIVES("Likely false positives", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS, true),
     ALERT_MODE_REAL_HITS("Alert-mode policies catching real hits", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
-    POLICY_HYGIENE("Policy hygiene", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS);
+    POLICY_HYGIENE("Policy hygiene", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+
+    // — API posture insights (Ask Akto overlay) —
+    UNAUTHENTICATED_SENSITIVE_APIS("Unauthenticated APIs exposed", InsightId.Category.ACTIONABLE, InsightId.Group.API_POSTURE),
+    UNTESTED_HIGH_RISK_APIS("High-risk APIs never tested", InsightId.Category.ACTIONABLE, InsightId.Group.API_POSTURE),
+    SENSITIVE_DATA_HOTSPOTS("Sensitive data returned in responses", InsightId.Category.ACTIONABLE, InsightId.Group.API_POSTURE),
+
+    // — testing posture insights (Ask Akto overlay) —
+    AGING_OPEN_CRITICALS("Issues open longer than 30 days", InsightId.Category.ACTIONABLE, InsightId.Group.TESTING_POSTURE),
+    ISSUE_CONCENTRATION("Where open issues are concentrated", InsightId.Category.ACTIONABLE, InsightId.Group.TESTING_POSTURE),
+    ISSUE_RECURRENCE("Findings that keep recurring", InsightId.Category.ACTIONABLE, InsightId.Group.TESTING_POSTURE);
 
     private final String title;
     private final Category category;
@@ -56,11 +68,28 @@ public enum InsightId {
         READ_ONLY
     }
 
-    /** Which surface an insight belongs to — Atlas Discovery vs the guardrail/violations set
-     *  merged in from feature/dashbaord/guardrail-insights. Callers filter listInsights by this
-     *  so the two never mix in the same list; see InsightService.listInsights. */
+    /**
+     * Which surface an insight belongs to. ATLAS_DISCOVERY and GUARDRAIL_VIOLATIONS are the
+     * original agentic-flavoured groups (still never mixed in the same listInsights(ctx, group)
+     * call — see InsightService.listInsights); API_POSTURE and TESTING_POSTURE were added for
+     * the Ask Akto overlay, which DOES read several groups in one request (InsightService.listBrief),
+     * rendering each as its own section.
+     *
+     * requiredFeature is the RBAC gate for this group, used by InsightService.groupVisible to
+     * decide whether to include or omit the group in an aggregate response — putting it on the
+     * enum means a new group can't be added without answering "who can see this".
+     */
+    @Getter
     public enum Group {
-        ATLAS_DISCOVERY,
-        GUARDRAIL_VIOLATIONS
+        ATLAS_DISCOVERY(Feature.API_COLLECTIONS),
+        GUARDRAIL_VIOLATIONS(Feature.API_COLLECTIONS),
+        API_POSTURE(Feature.API_COLLECTIONS),
+        TESTING_POSTURE(Feature.ISSUES);
+
+        private final Feature requiredFeature;
+
+        Group(Feature requiredFeature) {
+            this.requiredFeature = requiredFeature;
+        }
     }
 }

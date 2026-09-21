@@ -16,6 +16,7 @@ import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.nhi_governance.NhiIdentityDao;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.DeviceTag;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.McpAllowlist;
@@ -26,6 +27,9 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.AgenticObserveUtil;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.usage.UsageMetricCalculator;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import org.apache.commons.lang3.StringUtils;
@@ -69,6 +73,9 @@ public class InsightDataLoader {
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
     private static final int EXTERNAL_CALL_TIMEOUT_SECONDS = 8;
 
+    // Row caps and other constants for the lazy API_POSTURE/TESTING_POSTURE reads now live on
+    // InsightLazySources itself, next to the code that uses them.
+
     public InsightDataBundle load(InsightContext ctx) {
         // Threat-backend calls run in worker threads — Context ThreadLocals must be
         // captured here and re-set inside each task, or the worker queries the wrong
@@ -89,7 +96,10 @@ public class InsightDataLoader {
                 Filters.empty(),
                 Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING,
                         ApiCollection.SKILLS, ApiCollection.START_TS, ApiCollection.BASE_RISK_SCORE,
-                        ApiCollection.BASE_RISK_SCORE_REASON, ApiCollection.DESCRIPTION, ApiCollection._DEACTIVATED));
+                        ApiCollection.BASE_RISK_SCORE_REASON, ApiCollection.DESCRIPTION, ApiCollection._DEACTIVATED,
+                        // IS_OUT_OF_TESTING_SCOPE: added for UntestedHighRiskApisProvider (API_POSTURE) — every
+                        // other provider is unaffected by one extra projected field.
+                        ApiCollection.IS_OUT_OF_TESTING_SCOPE));
         Map<String, List<ApiCollection>> collectionsByServiceName = indexByServiceName(collections);
 
         Map<String, String> deviceIdToUsername = loadDeviceIdToUsername();
@@ -129,10 +139,12 @@ public class InsightDataLoader {
             threatBackendAvailable = false;
         }
 
+        InsightLazySources lazy = new InsightLazySources(ctx);
+
         return new InsightDataBundle(ctx, collections, collectionsByServiceName, deviceIdToUsername, userTags,
                 auditRows, policies, allowlistNamesLower, sensitiveByCollection, userAnalysis, nhiIdentities,
                 hostSeverityCounts, subCategoryCounts, skillSeverityCounts, threatBackendAvailable,
-                activeCollections, collectionLastTrafficSeen, threatAccess);
+                activeCollections, collectionLastTrafficSeen, threatAccess, lazy);
     }
 
     private <T> Callable<T> withContext(int accountId, Integer userId, CONTEXT_SOURCE contextSource, Callable<T> body) {

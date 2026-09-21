@@ -543,6 +543,57 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         return pipeline;
     }
 
+    /** Sensitive subType (PII class) -> number of distinct endpoints exposing it in a RESPONSE.
+     *  Deliberately an API count, not a hit/location count: SingleTypeInfo.count is NOT a
+     *  reliable hit counter (APICatalogSync clamps its increment to 1 per sync cycle, so it's
+     *  closer to "sync windows this param appeared in" than real traffic volume) — this mirrors
+     *  CustomDataTypeAction#getCountOfApiVsDataType's own established approach instead: group by
+     *  endpoint, collect the distinct subTypes each endpoint exposes, then count endpoints per
+     *  subType in Java. Response-only (responseCode > -1), unlike generateFilterForSubtypes above
+     *  (whose inResponseOnly parameter is dead code — it always ORs in the request side too).
+     *  extraFilter is ANDed in before the RBAC collection filter — pass demo/deactivated
+     *  exclusion, a context-source collection scope, or both. */
+    public Map<String, Integer> responseSensitiveSubtypeApiCounts(Bson extraFilter) {
+        Map<String, Integer> countByType = new HashMap<>();
+        try {
+            List<String> sensitiveSubtypes = new ArrayList<>();
+            sensitiveSubtypes.addAll(sensitiveSubTypeInResponseNames());
+            sensitiveSubtypes.addAll(sensitiveSubTypeNames());
+
+            List<Bson> matchClauses = new ArrayList<>();
+            matchClauses.add(Filters.in(SingleTypeInfo.SUB_TYPE, sensitiveSubtypes));
+            matchClauses.add(Filters.gt(SingleTypeInfo._RESPONSE_CODE, -1)); // -1 = request side, not response
+            if (extraFilter != null) matchClauses.add(extraFilter);
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if (collectionIds != null) matchClauses.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds));
+            } catch (Exception ignored) {
+            }
+
+            BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + SingleTypeInfo._API_COLLECTION_ID)
+                    .append(SingleTypeInfo._URL, "$" + SingleTypeInfo._URL)
+                    .append(SingleTypeInfo._METHOD, "$" + SingleTypeInfo._METHOD);
+            List<Bson> pipeline = new ArrayList<>();
+            pipeline.add(Aggregates.match(Filters.and(matchClauses)));
+            pipeline.add(Aggregates.group(groupedId, Accumulators.addToSet("subTypes", "$" + SingleTypeInfo.SUB_TYPE)));
+            pipeline.add(Aggregates.project(Projections.fields(Projections.include("_id", "subTypes"))));
+
+            try (MongoCursor<BasicDBObject> cursor = getMCollection().aggregate(pipeline, BasicDBObject.class).cursor()) {
+                while (cursor.hasNext()) {
+                    BasicDBObject doc = cursor.next();
+                    @SuppressWarnings("unchecked")
+                    List<String> subTypes = (List<String>) doc.get("subTypes");
+                    if (subTypes == null) continue;
+                    for (String subType : subTypes) countByType.merge(subType, 1, Integer::sum);
+                }
+            }
+        } catch (Exception ignored) {
+            // Matches every other best-effort RBAC/aggregation helper in this class: callers treat
+            // an empty map the same as "nothing found", not as a distinguishable failure.
+        }
+        return countByType;
+    }
+
     public Map<Integer,List<String>> getSensitiveSubtypesDetectedForCollection(List<String> sensitiveParameters){
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId");
         List<Bson> pipeline = generateFilterForSubtypes(sensitiveParameters, groupedId, false, Filters.empty());

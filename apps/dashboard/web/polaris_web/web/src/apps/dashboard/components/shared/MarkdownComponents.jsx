@@ -29,7 +29,18 @@ export const markdownComponents = {
             <code className="markdown-code-block">{children}</code>
         );
     },
-    pre: ({ children }) => <pre className="markdown-pre">{children}</pre>,
+    // A chart fence (```chart:pie etc.) is emitted as a code block, so react-markdown wraps it in
+    // `pre` the same as any other code block — without this check every chart would render inside
+    // the monospace .markdown-pre box. `code`'s own renderer above returns a bare ChartRenderer
+    // element (not wrapped in <code>) when it detects one, so a chart is recognizable here by its
+    // child's element type.
+    pre: ({ children }) => {
+        const child = Array.isArray(children) ? children[0] : children;
+        if (React.isValidElement(child) && child.type === ChartRenderer) {
+            return <>{children}</>;
+        }
+        return <pre className="markdown-pre">{children}</pre>;
+    },
     blockquote: ({ children }) => <blockquote className="markdown-blockquote">{children}</blockquote>,
     strong: ({ children }) => <strong className="markdown-strong">{children}</strong>,
     em: ({ children }) => <em className="markdown-em">{children}</em>,

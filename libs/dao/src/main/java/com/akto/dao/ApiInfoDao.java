@@ -103,6 +103,15 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[] {ApiInfo.PARENT_MCP_TOOL_NAMES }, false);
+
+        // isSensitive has no index of its own anywhere above — a count filtered on it (e.g.
+        // RecommendationCatalog's unauthenticated+sensitive tile) falls back to a full collection
+        // scan of api_info, the fattest/highest-cardinality collection in the schema. Narrows the
+        // scan to just sensitive rows; the allAuthTypesFound exact-array-match that follows it in
+        // that filter is left unindexed — a multikey compound index over an exact-array-equality
+        // match needs more care than a one-line addition here to get right.
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] {ApiInfo.IS_SENSITIVE }, false);
     }
     
 

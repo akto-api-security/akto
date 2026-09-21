@@ -11,9 +11,16 @@ import com.akto.dto.McpAuditInfo;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.nhi_governance.NhiIdentity;
 
+import com.akto.dao.context.Context;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 /**
  * One immutable snapshot of every Mongo/threat-backend read the 10 providers need,
@@ -50,6 +57,10 @@ public class InsightDataBundle {
 
     private final InsightsThreatBackendAccess threatAccess;
 
+    // API_POSTURE / TESTING_POSTURE lazy reads — see the memo()/withCtx() javadocs below.
+    private final InsightLazySources lazy;
+    private final Map<String, Object> lazyCache = new ConcurrentHashMap<>();
+
     public InsightDataBundle(InsightContext ctx,
                               List<ApiCollection> collections,
                               Map<String, List<ApiCollection>> collectionsByServiceName,
@@ -67,7 +78,8 @@ public class InsightDataBundle {
                               boolean threatBackendAvailable,
                               List<ApiCollection> activeCollections,
                               Map<Integer, Integer> collectionLastTrafficSeen,
-                              InsightsThreatBackendAccess threatAccess) {
+                              InsightsThreatBackendAccess threatAccess,
+                              InsightLazySources lazy) {
         this.ctx = ctx;
         this.collections = collections;
         this.collectionsByServiceName = collectionsByServiceName;
@@ -86,6 +98,7 @@ public class InsightDataBundle {
         this.activeCollections = activeCollections;
         this.collectionLastTrafficSeen = collectionLastTrafficSeen;
         this.threatAccess = threatAccess;
+        this.lazy = lazy;
     }
 
     public List<ApiCollection> collectionsForServiceName(String serviceName) {
@@ -158,5 +171,80 @@ public class InsightDataBundle {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private <T> T withCtx(Supplier<T> s) {
+        Integer prevAcc = Context.accountId.get();
+        Integer prevUser = Context.userId.get();
+        CONTEXT_SOURCE prevSrc = Context.contextSource.get();
+        try {
+            Context.accountId.set(ctx.getAccountId());
+            Context.userId.set(ctx.getUserId());
+            Context.contextSource.set(ctx.getContextSource());
+            return s.get();
+        } finally {
+            if (prevAcc == null) Context.accountId.remove(); else Context.accountId.set(prevAcc);
+            if (prevUser == null) Context.userId.remove(); else Context.userId.set(prevUser);
+            if (prevSrc == null) Context.contextSource.remove(); else Context.contextSource.set(prevSrc);
+        }
+    }
+
+    /**
+     * Memoizes one lazy read per bundle instance, so N providers sharing one read (e.g. three
+     * API_POSTURE providers all wanting apiInfoRows()) still pay for it once. ConcurrentHashMap
+     * .computeIfAbsent is NOT reentrant — a supplier here must never call another memo()'d
+     * accessor, or a hash collision can deadlock. Every supplier below is therefore built only
+     * from what InsightDataLoader already loaded eagerly (collections -> collection ids), never
+     * from another lazy field.
+     */
+    @SuppressWarnings("unchecked")
+    private <T> T memo(String key, Supplier<T> s) {
+        return (T) lazyCache.computeIfAbsent(key, k -> withCtx(s));
+    }
+
+    /**
+     * Bounded, RBAC-scoped api_info rows for API_POSTURE providers. Capped at
+     * InsightLazySources.API_INFO_ROW_CAP — a provider that reads this MUST check
+     * isApiInfoRowsTruncated() and, if true, set metricsComplete=false and add a Gap rather than
+     * silently treating the capped list as the whole account (a truncated read must never become
+     * a denominator).
+     */
+    public List<ApiInfo> apiInfoRows() {
+        return memo("apiInfoRows", lazy::apiInfoRows);
+    }
+
+    public boolean isApiInfoRowsTruncated() {
+        apiInfoRows(); // ensure the memoized read has actually run — the flag is a side effect of it
+        return lazy.isApiInfoRowsTruncated();
+    }
+
+    /** subType (PII class) -> number of distinct endpoints exposing it in a response — an API
+     *  count, not a hit/location count. See SingleTypeInfoDao.responseSensitiveSubtypeApiCounts()
+     *  for why SingleTypeInfo.count isn't summed here (it isn't a reliable hit counter). */
+    public Map<String, Integer> sensitiveApiCountBySubType() {
+        return memo("sensitiveApiCountBySubType", lazy::sensitiveApiCountBySubType);
+    }
+
+    /** apiCollectionId -> {severity -> open-issue count}, RBAC-scoped via
+     *  TestingRunIssuesDao.addCollectionsFilterForDashboard — see
+     *  InsightLazySources.openIssueSeverityByCollection() for why that filter, not
+     *  TestingRunIssuesDao.getSeveritiesMapForCollections's own weaker best-effort one, is used
+     *  here. */
+    public Map<Integer, Map<String, Integer>> openIssueSeverityByCollection() {
+        return memo("openIssueSeverityByCollection", lazy::openIssueSeverityByCollection);
+    }
+
+    /** OPEN issues with creationTime older than 30 days (wall clock, not ctx — ctx's end
+     *  timestamp can be a far-future "All time" sentinel). */
+    public List<TestingRunIssues> agingOpenIssues() {
+        return memo("agingOpenIssues", lazy::agingOpenIssues);
+    }
+
+    /** {apiInfoKey, testSubType} -> how many distinct test runs saw that finding — the
+     *  repetition score. See InsightLazySources.issueRecurrence() for the merge across
+     *  vulnerable_testing_run_results and the legacy testing_run_result collection, and why
+     *  distinctRuns is an $addToSet of summaryId rather than a raw document count. */
+    public List<IssueRecurrenceRow> issueRecurrence() {
+        return memo("issueRecurrence", lazy::issueRecurrence);
     }
 }

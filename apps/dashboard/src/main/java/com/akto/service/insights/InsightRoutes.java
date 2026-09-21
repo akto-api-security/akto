@@ -15,4 +15,13 @@ public final class InsightRoutes {
     public static final String GUARDRAIL_ACTIVITY = "/dashboard/guardrails/activity";
     public static final String GUARDRAIL_MISCONFIGURATIONS = "/dashboard/guardrails/misconfigurations";
     public static final String AGENTIC_ASSET_DEVICES = "/dashboard/observe/agentic-assets-legacy/devices";
+
+    // — added for API_POSTURE / TESTING_POSTURE (Ask Akto overlay) —
+    public static final String ISSUES = "/dashboard/issues";
+    public static final String TESTING = "/dashboard/testing";
+    public static final String SENSITIVE_DATA = "/dashboard/observe/sensitive";
+    public static final String API_CHANGES = "/dashboard/observe/changes";
+
+    // — added for the RecommendationCatalog AGENTIC domain —
+    public static final String THREAT_ACTIVITY = "/dashboard/protection/threat-activity";
 }
