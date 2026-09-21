@@ -416,7 +416,16 @@ public class Main {
                         loggerMaker.errorAndAddToDb("Module found busy while shutdown hook was triggered for mini-testing: " + customMiniTestingServiceName);
                     }
                     loggerMaker.infoAndAddToDb("Shutdown hook triggered for mini-testing: " + customMiniTestingServiceName);
-                    shutdown();
+                    // Cleanup only - never System.exit() here. The JVM is already mid-shutdown by
+                    // the time any hook runs (that's what triggered it, whether a signal or our
+                    // own explicit call elsewhere), and a hook calling exit() again deadlocks:
+                    // confirmed live, the second call blocks forever trying to re-enter the same
+                    // shutdown sequence the first call is still holding open waiting for this hook
+                    // to finish. Every prior SIGTERM/Ctrl-C hit this identically - just always
+                    // masked within seconds by something else (run-bench.sh's SIGKILL escalation,
+                    // Kubernetes' pod termination grace period) forcibly ending the deadlock before
+                    // anyone noticed it wasn't a real shutdown.
+                    cleanupResources();
                 }
             });
             runModule();
@@ -433,7 +442,17 @@ public class Main {
         }
     }
 
+    /** The only place that actually calls System.exit() - reached from main()'s own non-hook
+     *  finally block (runModule() returned or threw), never from the shutdown hook itself. */
     private static void shutdown() {
+        cleanupResources();
+        loggerMaker.infoAndAddToDb("Invoking System.exit(0) for mini-testing: " + customMiniTestingServiceName);
+        System.exit(0);
+    }
+
+    /** No System.exit() here - safe to call from the shutdown hook's own thread, where the JVM is
+     *  already exiting and calling exit() again would deadlock (see the hook's own comment). */
+    private static void cleanupResources() {
         try {
             UtilityServer.stop();
         } catch (Exception e) {
@@ -444,9 +463,8 @@ public class Main {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Exception while performing shutdown tasks");
         }
-
-        loggerMaker.infoAndAddToDb("Invoking System.exit(0) for mini-testing: " + customMiniTestingServiceName);
-        System.exit(0);
+        // the one shared AdminClient outlives every caller (Producer, ConsumerUtil) - close it here, once
+        com.akto.testing.kafka_utils.KafkaAdminClient.close();
     }
 
     private static void runModule() throws InterruptedException, IOException {
@@ -726,7 +744,8 @@ public class Main {
                                 dataActor.insertTestingRunResultSummary(trrs);
                                 summaryId = trrs.getId();
                             } else {
-                                trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start);
+                                trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start, leaseToken, TestingLease.LEASE_SECONDS);
+                                if (trrs != null) TestingLease.getInstance().adopt(leaseToken);
                                 summaryId = trrs.getId();
                             }
                         }
@@ -736,7 +755,8 @@ public class Main {
                 }
 
                 if (summaryId == null) {
-                    trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start);
+                    trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start, leaseToken, TestingLease.LEASE_SECONDS);
+                    if (trrs != null) TestingLease.getInstance().adopt(leaseToken);
                     summaryId = trrs.getId();
                 }
 
@@ -761,16 +781,22 @@ public class Main {
                         // doInitOnly rebuilds the in-memory test configuration without re-producing,
                         // and notably skips initProducer's delete of the topic we came back for
                         testingProducer.initProducer(testingRun, summaryId, isResumeCase, syncLimit);
-                        int runTime = maxRunTime;
                         int pickedUpTimestamp = trrs != null ? trrs.getStartTimestamp() : Context.now();
-                        if (isResumeCase && trrs != null) {
-                            // keep the original deadline rather than restarting the clock
-                            int elapsed = Context.now() - trrs.getStartTimestamp();
-                            runTime = Math.max(0, maxRunTime - elapsed);
-                            loggerMaker.infoAndAddToDb("Resume run time: maxRunTime=" + maxRunTime
-                                    + "s elapsed=" + elapsed + "s remaining=" + runTime + "s");
-                        }
-                        testingConsumer.init(runTime, summaryId.toHexString(), pickedUpTimestamp);
+                        /*
+                         * Pass the FULL maxRunTime, not a shrunk "remaining" delta - ConsumerUtil's
+                         * own MAX_RUNTIME check already compares (Context.now() - pickedUpTimestamp)
+                         * i.e. elapsed since the ORIGINAL start, against whatever we pass here. If we
+                         * pass an already-shrunk delta on top of that, the subtraction effectively
+                         * happens twice: elapsed >= (maxRunTime - elapsed), i.e. the run's real
+                         * deadline arrives at HALF the intended budget. The old file-based mechanism
+                         * never hit this because TestingStateStore held the full original maxRunTime
+                         * (write-once, never shrunk) and just kept overriding whatever delta got
+                         * passed in - so it silently masked the fact that the delta was never needed.
+                         * Confirmed live: durationSec=3681 firing MAX_RUNTIME against a 7200s budget.
+                         */
+                        loggerMaker.infoAndAddToDb("Resume: maxRunTime=" + maxRunTime
+                                + "s elapsed=" + (Context.now() - pickedUpTimestamp) + "s");
+                        testingConsumer.init(maxRunTime, summaryId.toHexString(), pickedUpTimestamp);
                     }else{
                         testExecutor.init(testingRun, summaryId, syncLimit, false);
                     }
