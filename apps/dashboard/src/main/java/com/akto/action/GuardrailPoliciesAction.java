@@ -429,6 +429,7 @@ public class GuardrailPoliciesAction extends UserAction {
         // right before this call, so it must overwrite any stale snapshot from a previous save.
         updates.add(Updates.set("userMetadata", p.getUserMetadata()));
         updates.add(Updates.set("blockPersonalAccounts", p.isBlockPersonalAccounts()));
+        updates.add(Updates.set("blockPublicShare", p.isBlockPublicShare()));
         if (StringUtils.isNotBlank(p.getBehaviour())) {
             updates.add(Updates.set("behaviour", p.getBehaviour()));
         }

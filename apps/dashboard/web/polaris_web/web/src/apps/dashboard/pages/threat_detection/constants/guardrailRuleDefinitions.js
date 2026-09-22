@@ -784,6 +784,26 @@ Identify the specific rule from the \`ruleViolated\` field:
 - If this account *should* be allowed (it was blocked by mistake, or it is actually a valid work account), update the personal-accounts policy to permit it.
 - If the same user keeps hitting this block, it usually means they need a reminder to switch to their company account rather than any technical change.
 `
+    },
+
+    // ─── Public Share ───────────────────────────────────────────────────────────
+    {
+        prefixes: ["BlockPublicShare", "block_public_share", "public_share"],
+        heading: "Public Sharing Blocked",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "A chat or artifact share request was set to public, making it visible to anyone with the link rather than only the organisation or invited users. This is an intentional policy block, not a detected attack."
+            },
+            {
+                heading: "Why is it blocked?",
+                body: "A public link removes the organisation's control over who can view the shared content, with no record of who it may be forwarded to. Restricting sharing to the organisation or named invitees keeps the content within governance and compliance boundaries."
+            }
+        ],
+        remediation: `### Recommended actions
+- **If public sharing should be permitted for this case**, an administrator can disable the \`Block public sharing\` option under the guardrail policy's Access restrictions.
+- **If users repeatedly encounter this block**, advise them to share with the organisation or specific individuals instead of setting the link to public.
+`
     }
 ];
 
