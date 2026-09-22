@@ -131,22 +131,18 @@ public class GuardrailsClient {
 
                 if (response.isSuccessful()) {
                     try {
-                        Map<String, Object> verdict = objectMapper.readValue(responseBody, Map.class);
-                        if (verdict != null && Boolean.TRUE.equals(verdict.get("failOpen"))) {
-                            alertFailOpen(request, endpoint, "upstream_fail_open");
-                        }
-                        return verdict;
+                        return objectMapper.readValue(responseBody, Map.class);
                     } catch (Exception parseEx) {
                         loggerMaker.warnAndAddToDb(
                             "Guardrails response not parseable, failing open - path: {}, error: {}",
                             request.get("path"), parseEx.getMessage());
-                        return failOpen(request, endpoint, "invalid guardrails response: " + parseEx.getMessage(), "invalid_response");
+                        return buildFailOpenResponse("invalid guardrails response: " + parseEx.getMessage());
                     }
                 }
                 loggerMaker.warnAndAddToDb(
                     "Guardrails service returned error status {}, failing open - path: {}",
                     response.code(), request.get("path"));
-                return failOpen(request, endpoint, "Guardrails service error: HTTP " + response.code(), "HTTP_" + response.code());
+                return buildFailOpenResponse("Guardrails service error: HTTP " + response.code());
             }
 
         } catch (Exception e) {
@@ -155,28 +151,25 @@ public class GuardrailsClient {
                 loggerMaker.warnAndAddToDb(
                     "Guardrails unavailable ({}), failing open - path: {}, method: {}, account: {}",
                     e.getMessage(), request.get("path"), request.get("method"), request.get("akto_account_id"));
-                return failOpen(request, endpoint, e.getMessage(), e.getClass().getSimpleName());
+            } else {
+                loggerMaker.errorAndAddToDb(e, "Unexpected error calling guardrails service: {}", e.getMessage());
             }
-            loggerMaker.errorAndAddToDb(e, "Unexpected error calling guardrails service: {}", e.getMessage());
-            return failOpen(request, endpoint, e.getMessage(), e.getClass().getSimpleName());
+
+            alertServiceUnreachable(endpoint, e);
+            return buildFailOpenResponse(e.getMessage());
         }
     }
 
-    private Map<String, Object> failOpen(Map<String, Object> request, String endpoint,
-                                         String error, String category) {
-        alertFailOpen(request, endpoint, category);
-        return buildFailOpenResponse(error);
-    }
-
-    private void alertFailOpen(Map<String, Object> request, String endpoint, String category) {
+    /** Endpoint and exception type only: never request data, which may carry customer payloads. */
+    private void alertServiceUnreachable(String endpoint, Exception cause) {
         String account = OperationalAlerts.deploymentAccountId();
         try {
             alerts.accept("guardrails:" + account + ":" + endpoint,
-                    "Guardrails failed open; traffic was allowed without a reliable verdict"
+                    "Guardrails service unreachable; traffic was allowed without a verdict"
                     + "\nAccount: " + account + "\nEndpoint: " + OperationalAlerts.label(endpoint)
-                    + "\nFailure: " + category);
+                    + "\nFailure: " + cause.getClass().getSimpleName());
         } catch (Exception alertError) {
-            loggerMaker.warn("Could not enqueue guardrails fail-open alert");
+            loggerMaker.warn("Could not enqueue guardrails unreachable alert");
         }
     }
 
