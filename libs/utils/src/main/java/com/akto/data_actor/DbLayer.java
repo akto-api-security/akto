@@ -2226,8 +2226,36 @@ public class DbLayer {
     }
 
     public static void updateStartTsTestRunResultSummary(String summaryId) {
-        TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(TestingRunResultSummary.ID, new ObjectId(summaryId)),
-                Updates.set(TestingRunResultSummary.START_TIMESTAMP, Context.now()));
+        updateStartTsTestRunResultSummary(summaryId, null);
+    }
+
+    /**
+     * Also called for the rerun case, where summaryId is the ORIGINAL (already-COMPLETED) summary
+     * being reopened for a fresh, narrow drain of just the selected result(s) - not the throwaway
+     * summary the caller's own claim/lease was minted against. Without stamping that same lease
+     * here too, every write during the drain (renewal, result recording) CAS-fails against
+     * whatever stale/absent leaseToken this document still carries, and the pod self-fences almost
+     * immediately with LEASE_LOST. Confirmed live: a rerun's original summary kept the leaseToken
+     * from its *original* run, 18+ hours stale, completely unrelated to the fresh token the rerun
+     * attempt had just adopted.
+     *
+     * leaseToken nullable for backward compatibility with a not-yet-upgraded mini-testing client
+     * that still calls the old 1-arg form - in that case this is exactly the old unconditional
+     * timestamp bump, no state/lease change.
+     */
+    public static void updateStartTsTestRunResultSummary(String summaryId, String leaseToken) {
+        Bson update;
+        if (StringUtils.isNotEmpty(leaseToken)) {
+            update = Updates.combine(
+                    Updates.set(TestingRunResultSummary.START_TIMESTAMP, Context.now()),
+                    Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
+                    Updates.set(TestingRunResultSummary.LEASE_TOKEN, leaseToken),
+                    Updates.set(TestingRunResultSummary.LEASE_EXPIRY_TS, Context.now() + DEFAULT_LEASE_SECONDS));
+        } else {
+            update = Updates.set(TestingRunResultSummary.START_TIMESTAMP, Context.now());
+        }
+        TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                Filters.eq(TestingRunResultSummary.ID, new ObjectId(summaryId)), update);
     }
 
     public static void updateTestRunResultSummaryNoUpsert(String testingRunResultSummaryId) {
