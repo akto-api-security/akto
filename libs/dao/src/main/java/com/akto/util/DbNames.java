@@ -49,7 +49,8 @@ public class DbNames {
         return value;
     }
 
-    static String validate(String value) {
+    /** Returns null when the name is a legal Mongo database name, else the reason it is not. */
+    public static String validate(String value) {
         if (value.length() > MAX_LENGTH) {
             return "database name longer than " + MAX_LENGTH + " characters";
         }
