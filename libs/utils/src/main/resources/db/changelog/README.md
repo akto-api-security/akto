@@ -4,9 +4,24 @@ This directory contains Liquibase changelogs for MongoDB/Cosmos DB migrations.
 
 Runtime entry point:
 
-- `common.xml` runs once against the `common` database.
-- `billing.xml` runs once against the `billing` database.
+- `common.xml` runs once against the common database (`common` by default, see below).
+- `billing.xml` runs once against the billing database (`billing` by default, see below).
 - `account.xml` runs once per account database.
+
+The scope folder names above are fixed; only the target database names are configurable:
+
+| Env var | Default | Database |
+| --- | --- | --- |
+| `AKTO_DB_NAME_COMMON` | `common` | shared, non-account data (users, accounts, configs, RBAC) |
+| `AKTO_DB_NAME_BILLING` | `billing` | organizations, usage metrics, tokens |
+
+Both are resolved by `com.akto.util.DbNames`. Set them identically on **every** service sharing the
+Mongo deployment (dashboard, billing, testing, runtime, threat-detection, database-abstractor and the
+otel-ingestion service), otherwise services will read and write different databases. An invalid value
+is logged and ignored in favour of the default. Renaming after first boot needs a data migration --
+nothing copies the existing databases across.
+
+Account databases are named after the account id and are not configurable.
 
 Each root changelog includes its matching `baseline-*.xml` file and then includes all migration files from its scope folder:
 
