@@ -1,9 +1,5 @@
 name: Staging
 
-env:
-  GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
-  GAR_REGISTRY: ${{ vars.GCP_REGION || 'us-central1' }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}
-
 # Controls when the workflow will run
 on:
   push:
@@ -473,36 +469,19 @@ jobs:
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-      - name: Authenticate to Google Cloud
-        if: steps.should_build.outputs.run == 'true' && vars.GCP_PROJECT_ID != ''
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-      - name: Set up Cloud SDK
-        if: steps.should_build.outputs.run == 'true' && vars.GCP_PROJECT_ID != ''
-        uses: google-github-actions/setup-gcloud@v2
-      - name: Configure Docker for Artifact Registry
-        if: steps.should_build.outputs.run == 'true' && vars.GCP_PROJECT_ID != ''
-        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
       - name: Build and push ${{ matrix.image }}
         if: steps.should_build.outputs.run == 'true'
         env:
           ECR_REGISTRY: aktosecurity
           IMAGE_TAG: ${{ needs.package-java.outputs.IMAGE_TAG }}
-          GAR_ENABLED: ${{ vars.GCP_PROJECT_ID != '' }}
           IMAGE_NAME: ${{ matrix.image }}
           CONTEXT: ${{ matrix.context }}
         run: |
           set -euo pipefail
           echo "$IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
-          GAR_TAG=""
-          if [ "$GAR_ENABLED" = "true" ]; then
-            GAR_TAG="-t $GAR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
-          fi
           docker buildx build --platform linux/arm64/v8,linux/amd64 \
             -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
-            $GAR_TAG \
             "$CONTEXT" --push
 
   build-guardrails-service:
@@ -520,22 +499,10 @@ jobs:
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-      - name: Authenticate to Google Cloud
-        if: vars.GCP_PROJECT_ID != ''
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-      - name: Set up Cloud SDK
-        if: vars.GCP_PROJECT_ID != ''
-        uses: google-github-actions/setup-gcloud@v2
-      - name: Configure Docker for Artifact Registry
-        if: vars.GCP_PROJECT_ID != ''
-        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
       - name: Build and push guardrails-service
         env:
           ECR_REGISTRY: aktosecurity
           IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
-          GAR_ENABLED: ${{ vars.GCP_PROJECT_ID != '' }}
         run: |
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
@@ -543,13 +510,8 @@ jobs:
           chmod +x setup-netrc.sh
           # token expires in 1 year [2026-12-17]
           GITHUB_TOKEN=${{ secrets.AKTO_GITHUB_TOKEN }} ./setup-netrc.sh
-          GAR_TAG=""
-          if [ "$GAR_ENABLED" = "true" ]; then
-            GAR_TAG="-t $GAR_REGISTRY/guardrails-service:$IMAGE_TAG"
-          fi
           docker buildx build --platform linux/arm64/v8,linux/amd64 \
             -t $ECR_REGISTRY/guardrails-service:$IMAGE_TAG \
-            $GAR_TAG \
             . --push
 
   build-otel-ingestion-service:
@@ -628,34 +590,17 @@ jobs:
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-      - name: Authenticate to Google Cloud
-        if: steps.should_build.outputs.run == 'true' && vars.GCP_PROJECT_ID != ''
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-      - name: Set up Cloud SDK
-        if: steps.should_build.outputs.run == 'true' && vars.GCP_PROJECT_ID != ''
-        uses: google-github-actions/setup-gcloud@v2
-      - name: Configure Docker for Artifact Registry
-        if: steps.should_build.outputs.run == 'true' && vars.GCP_PROJECT_ID != ''
-        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
       - name: Build and push ${{ matrix.image }}
         if: steps.should_build.outputs.run == 'true'
         env:
           ECR_REGISTRY: aktosecurity
           IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
-          GAR_ENABLED: ${{ vars.GCP_PROJECT_ID != '' }}
           IMAGE_NAME: ${{ matrix.image }}
           CONTEXT: ${{ matrix.context }}
         run: |
           set -euo pipefail
           echo "$IMAGE_TAG" >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
-          GAR_TAG=""
-          if [ "$GAR_ENABLED" = "true" ]; then
-            GAR_TAG="-t $GAR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
-          fi
           docker buildx build --platform linux/arm64/v8,linux/amd64 \
             -t $ECR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
-            $GAR_TAG \
             "$CONTEXT" --push
