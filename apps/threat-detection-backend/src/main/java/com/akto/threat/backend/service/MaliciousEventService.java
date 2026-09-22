@@ -1,6 +1,7 @@
 package com.akto.threat.backend.service;
 
 import com.akto.dao.AgenticSessionContextDao;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.threat.backend.utils.ThreatUtils;
@@ -13,6 +14,8 @@ import com.akto.proto.generated.threat_detection.message.malicious_event.v1.Mali
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.OwaspCategory;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListGuardrailViolationPayloadsRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListGuardrailViolationPayloadsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterRequest;
@@ -37,8 +40,10 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.DistinctIterable;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Sorts;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -849,6 +854,84 @@ public class MaliciousEventService {
         cursor.close();
       }
     }
+  }
+
+  // Batched, cursor-paginated fetch of the raw request/response payload (latestApiOrig) behind a
+  // set of guardrail-policy violations. listMaliciousRequests cannot serve this: its response
+  // hard-codes payload to "" for every row (see .setPayload("") below), and adding a payload field
+  // to that request risks an unrecognized-field parse failure on an un-redeployed caller (see the
+  // proto comment on ListGuardrailViolationPayloadsRequest). Sorted/paginated on the raw _id
+  // ascending — filterId does not appear in an existing _id-ordered index, but this endpoint is
+  // used by an internal LLM scan job, not an interactive list view, so a collection scan bounded by
+  // contextSource + filterId + detectedAt (existing contextSource_1_filterId_1_detectedAt_-1 index)
+  // followed by an in-memory _id sort over the matched page is an acceptable cost; add an
+  // {contextSource, filterId, _id} index if this needs to scale further.
+  public ListGuardrailViolationPayloadsResponse listGuardrailViolationPayloads(
+      String accountId, ListGuardrailViolationPayloadsRequest request, String contextSource) {
+
+    if (!shouldNotCreateIndexes.getOrDefault(accountId, false)) {
+      createIndexIfAbsent(accountId);
+    }
+
+    int limit = request.getLimit() > 0 ? request.getLimit() : 50;
+    List<String> filterIds = request.getFilterIdsList();
+
+    Document query = ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId);
+    if (!filterIds.isEmpty()) {
+      query.append("filterId", new Document("$in", filterIds));
+    }
+    // Only rows that actually carry a payload are useful to the LLM attribution step.
+    query.append("latestApiOrig", new Document("$exists", true).append("$ne", ""));
+
+    if (request.hasDetectedAtTimeRange()) {
+      TimeRangeFilter timeRange = request.getDetectedAtTimeRange();
+      long start = timeRange.hasStart() ? timeRange.getStart() : 0;
+      long end = timeRange.hasEnd() ? timeRange.getEnd() : Long.MAX_VALUE;
+      query.append("detectedAt", new Document("$gte", start).append("$lte", end));
+    }
+
+    String cursorParam = request.hasCursor() ? request.getCursor() : null;
+    if (cursorParam != null && !cursorParam.isEmpty()) {
+      try {
+        query.append("_id", new Document("$gt", new ObjectId(cursorParam)));
+      } catch (IllegalArgumentException e) {
+        logger.error("Invalid cursor ObjectId for listGuardrailViolationPayloads: " + cursorParam);
+        return ListGuardrailViolationPayloadsResponse.newBuilder().build();
+      }
+    }
+
+    List<ListGuardrailViolationPayloadsResponse.ViolationPayload> payloads = new ArrayList<>();
+    MongoCursor<Document> cursor = null;
+    try {
+      cursor = maliciousEventDao.getDocumentCollection(accountId)
+          .find(query)
+          .projection(Projections.include("refId", "filterId", "detectedAt", "latestApiOrig"))
+          .sort(Sorts.ascending("_id"))
+          .limit(limit)
+          .cursor();
+
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        String orig = HttpResponseParams.getSampleStringFromProtoString(doc.getString("latestApiOrig"));
+        Object detectedAtRaw = doc.get("detectedAt");
+        long detectedAt = detectedAtRaw instanceof Number ? ((Number) detectedAtRaw).longValue() : 0L;
+        payloads.add(ListGuardrailViolationPayloadsResponse.ViolationPayload.newBuilder()
+            .setRefId(doc.getString("refId") != null ? doc.getString("refId") : "")
+            .setFilterId(doc.getString("filterId") != null ? doc.getString("filterId") : "")
+            .setDetectedAt(detectedAt)
+            .setOrig(orig != null ? orig : "")
+            .setCursor(doc.getObjectId("_id").toHexString())
+            .build());
+      }
+    } finally {
+      if (cursor != null) {
+        cursor.close();
+      }
+    }
+
+    return ListGuardrailViolationPayloadsResponse.newBuilder()
+        .addAllPayloads(payloads)
+        .build();
   }
 
   // metadata is stored as proto-text (`risk_score: "0.95"`) or JSON (`"riskScore": "0.95"`).

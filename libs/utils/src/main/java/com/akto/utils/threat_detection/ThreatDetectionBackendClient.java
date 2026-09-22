@@ -2,6 +2,7 @@ package com.akto.utils.threat_detection;
 
 import com.akto.ProtoMessageUtils;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListGuardrailViolationPayloadsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,6 +32,7 @@ public final class ThreatDetectionBackendClient {
 
     private static final String RECORD_MALICIOUS_EVENT_PATH = "/api/threat_detection/record_malicious_event";
     private static final String LIST_MALICIOUS_REQUESTS_PATH = "/api/dashboard/list_malicious_requests";
+    private static final String LIST_GUARDRAIL_VIOLATION_PAYLOADS_PATH = "/api/dashboard/list_guardrail_violation_payloads";
 
     private ThreatDetectionBackendClient() {
     }
@@ -173,6 +175,62 @@ public final class ThreatDetectionBackendClient {
             String responseBody = resp.body() != null ? resp.body().string() : "";
             return ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
                 ListMaliciousRequestsResponse.class, responseBody
+            ).orElse(null);
+        }
+    }
+
+    /**
+     * One page of guardrail-violation payloads (real request/response text) for the given policy
+     * names, seek-paginated on the raw Mongo {@code _id} — pass the previous page's last row's
+     * {@code cursor} back in to continue, empty/{@code null} for the first page. Used by
+     * {@code ComplianceClauseScanService} to feed real traffic to the clause-attribution LLM
+     * handler; {@link #listMaliciousRequests} cannot serve this since its response hard-codes
+     * payload to {@code ""} for every row.
+     *
+     * @param filterIds guardrail policy names (== event {@code filterId}) to restrict to
+     * @param cursor previous page's last {@code ViolationPayload.cursor}, or null/empty for page 1
+     */
+    public static ListGuardrailViolationPayloadsResponse listGuardrailViolationPayloads(
+            int accountId,
+            int startTimestamp,
+            int endTimestamp,
+            java.util.List<String> filterIds,
+            String cursor,
+            int limit,
+            String contextSourceValue) throws Exception {
+        String url = backendUrl() + LIST_GUARDRAIL_VIOLATION_PAYLOADS_PATH;
+
+        Map<String, Object> timeRange = new HashMap<>();
+        if (startTimestamp > 0) {
+            timeRange.put("start", startTimestamp);
+        }
+        if (endTimestamp > 0) {
+            timeRange.put("end", endTimestamp);
+        }
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("filterIds", filterIds == null ? java.util.Collections.emptyList() : filterIds);
+        body.put("detectedAtTimeRange", timeRange);
+        body.put("limit", limit);
+        if (cursor != null && !cursor.isEmpty()) {
+            body.put("cursor", cursor);
+        }
+
+        String msg = objectMapper.valueToTree(body).toString();
+
+        RequestBody requestBody = RequestBody.create(msg, JSON);
+        Request request = new Request.Builder()
+            .url(url)
+            .post(requestBody)
+            .addHeader("Authorization", "Bearer " + apiToken(accountId))
+            .addHeader("Content-Type", "application/json")
+            .addHeader("x-context-source", contextSourceValue == null ? "" : contextSourceValue)
+            .build();
+
+        try (Response resp = httpClient.newCall(request).execute()) {
+            String responseBody = resp.body() != null ? resp.body().string() : "";
+            return ProtoMessageUtils.<ListGuardrailViolationPayloadsResponse>toProtoMessage(
+                ListGuardrailViolationPayloadsResponse.class, responseBody
             ).orElse(null);
         }
     }
