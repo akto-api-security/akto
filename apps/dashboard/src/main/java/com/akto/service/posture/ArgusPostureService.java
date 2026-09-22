@@ -34,6 +34,7 @@ public class ArgusPostureService {
     private static final String ENV_STAGING     = "Staging";
     private static final String ENV_DEVELOPMENT = "Development";
 
+    private static final String ENV_ID_ALL         = "all";
     private static final String ENV_ID_PRODUCTION  = "production";
     private static final String ENV_ID_STAGING     = "staging";
     private static final String ENV_ID_DEVELOPMENT = "development";
@@ -58,9 +59,9 @@ public class ArgusPostureService {
 
     public BasicDBObject buildSummary(List<ApiCollection> scoped, List<GuardrailPolicies> policies,
                                       Map<Integer, List<String>> sensitiveByCollection,
-                                      Map<String, Integer> environmentCounts) {
+                                      Map<String, Integer> environmentCounts, String environment) {
         List<BasicDBObject> kpis = new ArrayList<>();
-        kpis.add(assetsKpi(scoped, environmentCounts));
+        kpis.add(assetsKpi(scoped, environment));
         kpis.add(highRiskAgentsKpi());
         kpis.add(identityAccessKpi());
         kpis.add(privilegedToolsKpi());
@@ -73,9 +74,17 @@ public class ArgusPostureService {
         return response;
     }
 
-    private BasicDBObject assetsKpi(List<ApiCollection> assets, Map<String, Integer> environmentCounts) {
+    private BasicDBObject assetsKpi(List<ApiCollection> assets, String environment) {
         BasicDBObject kpi = kpi(KPI_ASSETS, "Assets", (long) assets.size());
-        kpi.put("footnote", environmentCounts.getOrDefault(ENV_PRODUCTION, 0) + " production");
+
+        if (isAllEnvironments(environment)) {
+            long production = 0;
+            for (ApiCollection asset : assets) {
+                if (ENV_PRODUCTION.equals(envBucket(envTagValue(asset)))) production++;
+            }
+            kpi.put("footnote", production + " production");
+        }
+
         long externallyExposed = 0;
         kpi.put("secondaryFootnote", externallyExposed + " externally exposed");
         kpi.put("secondaryTone", riskTone(externallyExposed, "warning"));
@@ -129,10 +138,9 @@ public class ArgusPostureService {
         kpi.put("tone", toneForPercent(0d));
 
         if (assets.isEmpty()) {
-            kpi.put("value", 100d);
-            kpi.put("tone", toneForPercent(100d));
+            kpi.put("value", 0d);
             kpi.put("secondaryFootnote", "0 assets missing required controls");
-            kpi.put("secondaryTone", riskTone(0, "warning"));
+            kpi.put("secondaryTone", riskTone(0, "critical"));
             return kpi;
         }
 
@@ -208,12 +216,24 @@ public class ArgusPostureService {
         }
     }
 
+    private static String envTagValue(ApiCollection c) {
+        if (c == null || c.getEnvType() == null) return null;
+        for (CollectionTags tag : c.getEnvType()) {
+            if (tag != null && Constants.AKTO_ENV_TYPE_TAG.equalsIgnoreCase(tag.getKeyName())) return tag.getValue();
+        }
+        return null;
+    }
+
     public static String envBucket(String envTagValue) {
         if (isBlank(envTagValue)) return ENV_PRODUCTION;
         String value = envTagValue.trim().toUpperCase(Locale.ROOT);
         if (DEV_ENVS.contains(value)) return ENV_DEVELOPMENT;
         if (STAGING_ENVS.contains(value)) return ENV_STAGING;
         return ENV_PRODUCTION;
+    }
+
+    private static boolean isAllEnvironments(String environment) {
+        return isBlank(environment) || ENV_ID_ALL.equalsIgnoreCase(environment.trim());
     }
 
     public static Bson filterForEnvironment(String environment) {
@@ -253,7 +273,7 @@ public class ArgusPostureService {
 
     private static List<BasicDBObject> environments(Map<String, Integer> counts) {
         List<BasicDBObject> out = new ArrayList<>();
-        out.add(environment("all", "All environments", null));
+        out.add(environment(ENV_ID_ALL, "All environments", null));
         out.add(environment(ENV_ID_PRODUCTION, ENV_PRODUCTION, counts.getOrDefault(ENV_PRODUCTION, 0)));
         out.add(environment(ENV_ID_STAGING, ENV_STAGING, counts.getOrDefault(ENV_STAGING, 0)));
         out.add(environment(ENV_ID_DEVELOPMENT, ENV_DEVELOPMENT, counts.getOrDefault(ENV_DEVELOPMENT, 0)));

@@ -54,7 +54,7 @@ public class ArgusPostureAction extends UserAction {
             Map<Integer, List<String>> sensitiveByCollection =
                     insightDataLoader.loadSensitiveByCollection(scoped);
 
-            this.response = argusPostureService.buildSummary(scoped, policies, sensitiveByCollection, environmentCounts);
+            this.response = argusPostureService.buildSummary(scoped, policies, sensitiveByCollection, environmentCounts, environment);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error building Argus posture summary: " + e.getMessage());
