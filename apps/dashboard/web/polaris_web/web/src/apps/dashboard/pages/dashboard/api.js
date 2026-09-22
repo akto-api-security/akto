@@ -296,6 +296,18 @@ const api = {
         })
     },
 
+    fetchArgusPostureSummary: async (startTimestamp, endTimestamp, environment) => {
+        return await request({
+            url: '/api/fetchArgusPostureSummary',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp,
+                environment
+            }
+        })
+    },
+
     fetchPostureSummary: async (startTimestamp, endTimestamp) => {
         return await request({
             url: '/api/fetchPostureSummary',

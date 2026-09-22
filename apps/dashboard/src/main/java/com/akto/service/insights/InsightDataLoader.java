@@ -272,7 +272,7 @@ public class InsightDataLoader {
     }
 
     /** Reuses GuardrailPoliciesDao's own contextSource filter, then resolves device targeting per policy. */
-    private List<GuardrailPolicies> loadPolicies() {
+    public List<GuardrailPolicies> loadPolicies() {
         try {
             List<GuardrailPolicies> all = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(0, 5000);
             List<GuardrailPolicies> active = new ArrayList<>();
@@ -325,7 +325,7 @@ public class InsightDataLoader {
         }
     }
 
-    private Map<Integer, List<String>> loadSensitiveByCollection(List<ApiCollection> collections) {
+    public Map<Integer, List<String>> loadSensitiveByCollection(List<ApiCollection> collections) {
         try {
             List<String> subtypes = new ArrayList<>();
             subtypes.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames());

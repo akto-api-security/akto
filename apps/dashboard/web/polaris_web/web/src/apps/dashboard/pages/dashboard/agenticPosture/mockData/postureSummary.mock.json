@@ -16,8 +16,8 @@
     },
     "kpis": [
         {
-            "id": "agents",
-            "label": "Agents",
+            "id": "assets",
+            "label": "Assets",
             "value": 184,
             "footnote": "42 production",
             "secondaryFootnote": "11 externally exposed",

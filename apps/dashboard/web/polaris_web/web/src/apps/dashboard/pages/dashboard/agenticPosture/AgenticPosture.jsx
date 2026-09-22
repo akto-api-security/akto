@@ -57,7 +57,7 @@ function AgenticPosture() {
             try {
                 const startTimestamp = getTimeEpoch('since')
                 const endTimestamp = getTimeEpoch('until')
-                const resp = await postureDataSource.fetchPostureSummary(startTimestamp, endTimestamp)
+                const resp = await postureDataSource.fetchPostureSummary(startTimestamp, endTimestamp, selectedEnv)
                 if (!cancelled) setPageData(resp || {})
             } catch (error) {
                 console.error('Error fetching posture summary:', error)
@@ -69,7 +69,7 @@ function AgenticPosture() {
         load()
         return () => { cancelled = true }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currDateRange])
+    }, [currDateRange, selectedEnv])
 
     const openAgent = (groupKey) => navigate(`/dashboard/agentic-posture/agents/${encodeURIComponent(groupKey)}`)
     const openKpiLink = (kpi) => { if (kpi.linkGroupKey) openAgent(kpi.linkGroupKey) }
