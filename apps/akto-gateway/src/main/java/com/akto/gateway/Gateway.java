@@ -35,14 +35,15 @@ public class Gateway {
     }
 
     public Map<String, Object> processHttpProxy(Map<String, Object> requestData) {
-        loggerMaker.infoAndAddToDb(
-            "Processing HTTP proxy request - path: {}, method: {}, guardrails: {}, response_guardrails: {}, ingest_data: {}, activityId: {}",
-            requestData.get("path"),
-            requestData.get("method"),
-            requestData.get("guardrails"),
-            requestData.get("response_guardrails"),
-            requestData.get("ingest_data"),
-            requestData.get("activityId"));
+        try {
+            loggerMaker.infoAndAddToDb(
+                "Processing HTTP proxy request - complete requestData: {}",
+                objectMapper.writeValueAsString(requestData)
+            );
+        } catch (Exception e) {
+            loggerMaker.warnAndAddToDb("Failed to log complete requestData: " + e.getMessage());
+        }
+       
 
         String activityId = getStringField(requestData, "activityId");
         if (activityId != null && !activityId.isEmpty()) {
