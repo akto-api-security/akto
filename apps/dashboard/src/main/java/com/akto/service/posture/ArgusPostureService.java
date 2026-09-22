@@ -41,9 +41,8 @@ public class ArgusPostureService {
     private static final List<String> DEV_ENVS     = Arrays.asList("DEV");
     private static final List<String> STAGING_ENVS = Arrays.asList("STAGING", "PREPROD", "UAT", "QA", "INTEG");
 
-    private static final double TONE_SUCCESS_AT = 90d;
-    private static final double TONE_WARNING_AT = 70d;
-    private static final double TONE_SERIOUS_AT = 40d;
+    private static final double TONE_SUCCESS_AT = 95d;
+    private static final double TONE_WARNING_AT = 60d;
 
     private static final String CONTROL_APPROVAL          = "approvalWorkflow";
     private static final String CONTROL_RATE_LIMIT        = "rateLimit";
@@ -285,7 +284,6 @@ public class ArgusPostureService {
     private static String toneForPercent(double percent) {
         if (percent >= TONE_SUCCESS_AT) return "success";
         if (percent >= TONE_WARNING_AT) return "warning";
-        if (percent >= TONE_SERIOUS_AT) return "serious";
         return "critical";
     }
 
