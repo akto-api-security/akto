@@ -87,6 +87,7 @@ message ListMaliciousRequestsRequest {
     uint32 limit = 2;
     map<string, int32> sort = 3;
     Filter filter = 4;
+    optional bool minimal_fields = 5;
 }
 
 message FetchAlertFiltersRequest {

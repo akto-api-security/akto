@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack, Popover, ActionList, Scrollable, Avatar, Box, Banner } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
+import BackfillReplayModal from "./components/BackfillReplayModal";
 import InsightsFlyout from "@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout";
 import InsightsEntryButton from "@/apps/dashboard/pages/observe/agentic/insights/InsightsEntryButton";
 import useInsightsEntryPoint from "@/apps/dashboard/pages/observe/agentic/insights/useInsightsEntryPoint";
@@ -171,6 +172,7 @@ function GuardrailPolicies() {
     const [presetsPopoverActive, setPresetsPopoverActive] = useState(false);
     const [pendingPolicyName, setPendingPolicyName] = useState(null);
     const [openedViaDeepLink, setOpenedViaDeepLink] = useState(false);
+    const [backfillPolicies, setBackfillPolicies] = useState([]);
     const insights = useInsightsEntryPoint();
     // No date-range filter on this page today — insights default to the last 30 days,
     // same window AgenticAssetsPage's own DateRangeFilter opens on.
@@ -488,14 +490,27 @@ function GuardrailPolicies() {
         if (isEndpointSecurityCategory()) {
             const targetTags = policy.targetTags || {};
             const targetDeviceIds = policy.targetDeviceIds || [];
-            const tagKeyCount = Object.keys(targetTags).filter(k => (targetTags[k] || []).length > 0).length;
-            if (tagKeyCount === 0 && targetDeviceIds.length === 0) {
+            const negatedTargetTags = policy.negatedTargetTags || {};
+            const negatedTargetDeviceIds = !!policy.negatedTargetDeviceIds;
+            // Exclude-with-zero still needs a line — same reasoning as the server-scope part() above.
+            const tagKeyCount = Object.keys(targetTags).filter(k => (targetTags[k] || []).length > 0 || negatedTargetTags[k]).length;
+            if (tagKeyCount === 0 && targetDeviceIds.length === 0 && !negatedTargetDeviceIds) {
                 details.push({ label: "Target Users", value: "All users" });
             } else {
                 const userParts = Object.entries(targetTags)
-                    .filter(([, values]) => (values || []).length > 0)
-                    .map(([key, values]) => `${values.length} ${key.charAt(0).toUpperCase()}${key.slice(1)}${values.length !== 1 ? 's' : ''}`);
-                if (targetDeviceIds.length > 0) userParts.push(`${targetDeviceIds.length} User${targetDeviceIds.length !== 1 ? 's' : ''}`);
+                    .filter(([key, values]) => (values || []).length > 0 || negatedTargetTags[key])
+                    .map(([key, values]) => {
+                        const label = `${key.charAt(0).toUpperCase()}${key.slice(1)}${values.length !== 1 ? 's' : ''}`;
+                        return negatedTargetTags[key]
+                            ? (values.length > 0 ? `All ${label} except ${values.length}` : `All ${label}`)
+                            : `${values.length} ${label}`;
+                    });
+                if (targetDeviceIds.length > 0 || negatedTargetDeviceIds) {
+                    const label = `User${targetDeviceIds.length !== 1 ? 's' : ''}`;
+                    userParts.push(negatedTargetDeviceIds
+                        ? (targetDeviceIds.length > 0 ? `All ${label} except ${targetDeviceIds.length}` : `All ${label}`)
+                        : `${targetDeviceIds.length} ${label}`);
+                }
                 details.push({ label: "Target Users", value: userParts.join(", ") });
             }
         }
@@ -599,6 +614,16 @@ function GuardrailPolicies() {
     const promotedBulkActions = (selectedPolicies) => {
         return [
             {
+                content: `Backfill histor${selectedPolicies.length > 1 ? "ies" : "y"} for ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}`,
+                onAction: () => {
+                    const selectedRows = tablePolicyData.filter(row => selectedPolicies.includes(row.id));
+                    setBackfillPolicies(selectedRows.map(row => ({
+                        name: row.originalData.name,
+                        hexId: row.originalData.hexId,
+                    })));
+                },
+            },
+            {
                 content: `Delete ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}`,
                 onAction: async () => {
                     const deleteConfirmationMessage = `Are you sure you want to delete ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}?`;
@@ -699,6 +724,10 @@ function GuardrailPolicies() {
                 // Explicit "Users" picks (beta) — independent of targetDeviceIds; matched
                 // downstream by email via userMetadata (see GuardrailPoliciesAction#createGuardrailPolicy).
                 targetUserNames: guardrailData.targetUserNames || [],
+                // Include/Exclude toggles for the three targeting dimensions above.
+                negatedTargetTags: guardrailData.negatedTargetTags || {},
+                negatedTargetDeviceIds: guardrailData.negatedTargetDeviceIds || false,
+                negatedTargetUserNames: guardrailData.negatedTargetUserNames || false,
                 // Identities behind the selected targets (both targetDeviceIds and
                 // targetUserNames) — CreateGuardrailPage already resolved these from
                 // fetchAgenticUsers; re-fetched authoritatively by the backend on save.
@@ -875,6 +904,11 @@ function GuardrailPolicies() {
                 group={INSIGHT_GROUP.ATLAS_DISCOVERY}
             />
         )}
+        <BackfillReplayModal
+            open={backfillPolicies.length > 0}
+            onClose={() => setBackfillPolicies([])}
+            policies={backfillPolicies}
+        />
     </>
 }
 

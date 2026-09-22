@@ -102,9 +102,12 @@ public class ModuleInfoConstants {
             put("ENABLE_PROMPT_HOOKS_CODEX", "Prompt Hooks path for Codex");
             put("ENABLE_PROMPT_HOOKS_GITHUB_CLI", "Prompt Hooks path for GitHub CLI");
             put("ENABLE_CLAUDE_SETTINGS_CONFIG_SCAN", "Claude Settings Config");
+            put("ENABLE_CLAUDE_DESKTOP_SETTINGS_CONFIG_SCAN", "Claude Desktop Settings Config");
             put("ENABLE_CODEX_SETTINGS_CONFIG_SCAN", "Codex Settings Config");
             put("ENABLE_COPILOT_CLI_SETTINGS_CONFIG_SCAN", "Copilot CLI Settings Config");
             put("ENABLE_SYSTEM_PROXY", "Enable System Proxy");
+            put("ENABLE_AUTO_UPDATE", "Enable Auto Update");
+            put("UPDATE_TO_LATEST_VERSION", "Update To Latest Version");
         }});
     }};
 

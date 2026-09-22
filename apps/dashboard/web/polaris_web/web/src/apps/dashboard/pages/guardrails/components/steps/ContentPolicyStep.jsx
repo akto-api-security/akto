@@ -40,7 +40,6 @@ export const ContentPolicyConfig = {
             if (total > 0) filters.push(`${total} denied topic${total !== 1 ? 's' : ''}`);
         }
         if (enableHarmfulCategories) filters.push('Harmful categories');
-        if (enableBasePromptRule) filters.push('Intent verification');
         return filters.length > 0 ? filters.join(', ') : null;
     }
 };
@@ -106,7 +105,7 @@ const ContentPolicyStep = ({
                     acc[framework] = true;
                     return acc;
                 }, {});
-                suggestions[index] = { suggested: topic.compliance, accepted };
+                suggestions[index] = { suggested: topic.compliance, accepted, evaluated: true };
             }
         });
         if (Object.keys(suggestions).length > 0) {
@@ -303,7 +302,7 @@ const ContentPolicyStep = ({
             }, {});
             setTopicComplianceSuggestions(prev => ({
                 ...prev,
-                [index]: { suggested, accepted, loading: false }
+                [index]: { suggested, accepted, loading: false, evaluated: true }
             }));
 
             setDeniedTopics(prev => {
@@ -388,9 +387,8 @@ const ContentPolicyStep = ({
                         loading={suggestion?.loading}
                         complianceMap={acceptedCompliance}
                         onRemove={(framework) => toggleFrameworkAcceptance(index, framework)}
-                        onAdd={Object.keys(suggestion?.suggested || {}).length > 0
-                            ? (framework) => toggleFrameworkAcceptance(index, framework)
-                            : undefined}
+                        onAdd={(framework) => toggleFrameworkAcceptance(index, framework)}
+                        evaluated={!!suggestion?.evaluated}
                     />
                 </VerticalStack>
             </Box>
@@ -456,9 +454,8 @@ const ContentPolicyStep = ({
                         topicComplianceSuggestions[editingIndex]?.accepted || {}
                     )}
                     onRemove={(framework) => toggleFrameworkAcceptance(editingIndex, framework)}
-                    onAdd={Object.keys(topicComplianceSuggestions[editingIndex]?.suggested || {}).length > 0
-                        ? (framework) => toggleFrameworkAcceptance(editingIndex, framework)
-                        : undefined}
+                    onAdd={(framework) => toggleFrameworkAcceptance(editingIndex, framework)}
+                    evaluated={!!topicComplianceSuggestions[editingIndex]?.evaluated}
                 />
                 <HorizontalStack align="end" gap="2">
                     <Button onClick={cancelEditing}>Cancel</Button>
@@ -689,23 +686,6 @@ const ContentPolicyStep = ({
                     )}
                 </Box>
 
-                {/* Intent Based Guardrails (Base Prompt) */}
-                <Box>
-                    <Checkbox
-                        label={
-                            <HorizontalStack gap="1" blockAlign="center">
-                                <RuleLabelWithTag name="Enable agent intent verification" threats={RULE_OWASP_THREATS.intentVerification} />
-                                <ControlInfoIcon
-                                    {...CONTENT_POLICY_DESCRIPTIONS.intentVerification}
-                                    onTryPrompt={onTryPrompt}
-                                />
-                            </HorizontalStack>
-                        }
-                        checked={enableBasePromptRule}
-                        onChange={setEnableBasePromptRule}
-                        helpText="Verify if agent requests match the intent of the base prompt. The base prompt is automatically detected from traffic, and user inputs filling placeholders like {var} or {} are checked against this intent."
-                    />
-                </Box>
             </VerticalStack>
         </VerticalStack>
     );

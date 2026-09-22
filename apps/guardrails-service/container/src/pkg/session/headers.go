@@ -1,13 +1,16 @@
 package session
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ExtractSessionID extracts session ID from headers with fallback chain
@@ -27,20 +30,32 @@ func ExtractSessionID(headers map[string]string) string {
 	return ""
 }
 
-// ExtractInstallerUserEmail extracts the installer-supplied user email, used to resolve
-// which devices a request's user is associated with for device-targeted policies. Checked
-// both http.Header-canonicalized and raw lowercase (stdio custom-header maps) forms.
-func ExtractInstallerUserEmail(headers map[string]string) string {
-	candidates := []string{
-		"X-Akto-Installer-User_email", "x-akto-installer-user_email",
-	}
+var installerUserEmailHeaders = []string{
+	"X-Akto-Installer-User_email", "x-akto-installer-user_email",
+}
 
-	for _, key := range candidates {
+// ExtractInstallerUserEmail extracts the installer-supplied user email, used to resolve
+// which devices a request's user is associated with for device-targeted policies.
+func ExtractInstallerUserEmail(headers map[string]string) string {
+	for _, key := range installerUserEmailHeaders {
 		if val, ok := headers[key]; ok && val != "" {
 			return val
 		}
 	}
 	return ""
+}
+
+func CopyIdentityHeaders(dst map[string]string, h http.Header) {
+	if dst == nil || h == nil {
+		return
+	}
+	for _, key := range installerUserEmailHeaders {
+		// http.Header.Get is case-insensitive, so the first key covers both spellings.
+		if val := strings.TrimSpace(h.Get(key)); val != "" {
+			dst[installerUserEmailHeaders[0]] = val
+			return
+		}
+	}
 }
 
 // ExtractRequestID extracts request ID from various headers with fallback
@@ -85,7 +100,7 @@ func isSessionEnabled() bool {
 	return enabled
 }
 
-func ExtractSessionIDsFromRequest(r *http.Request, requestHeadersJSON string) (sessionID, requestID string) {
+func ExtractSessionIDsFromRequest(r *http.Request, requestHeadersJSON, correlationSeed string) (sessionID, requestID string) {
 	if !isSessionEnabled() {
 		return "", ""
 	}
@@ -111,7 +126,41 @@ func ExtractSessionIDsFromRequest(r *http.Request, requestHeadersJSON string) (s
 	if requestID == "" {
 		requestID = bodyRequest
 	}
+
+	// No caller in the current data path emits a request id. Kong used to inject
+	// x-kong-request-id and TrackRequest/TrackResponse still refuse to record
+	// anything without one, so an empty value here silently disables the whole
+	// session feature. Derive one instead of dropping the turn.
+	if requestID == "" && sessionID != "" {
+		requestID = deriveRequestID(sessionID, correlationSeed)
+	}
 	return sessionID, requestID
+}
+
+// deriveRequestID synthesizes a correlation id when no header carries one.
+// Request and response validation arrive as two separate calls, so the id has to
+// be derivable from something both of them hold: the request payload. Hashing it
+// together with the session id keeps the value identical across the pair (so
+// TrackResponse still finds its pending request) without putting payload text
+// into an id that gets logged.
+func deriveRequestID(sessionID, correlationSeed string) string {
+	if strings.TrimSpace(correlationSeed) == "" {
+		return randomRequestID()
+	}
+	sum := sha256.Sum256([]byte(sessionID + "\x00" + correlationSeed))
+	return "drv-" + hex.EncodeToString(sum[:])[:16]
+}
+
+// randomRequestID is the last resort for callers with no single request payload
+// to hash (file validation posts multipart form data). Tracking still works and
+// the session is still created; only request/response pairing is lost, so
+// TrackResponse records a response-only turn instead of discarding it.
+func randomRequestID() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("rnd-%d", time.Now().UnixNano())
+	}
+	return "rnd-" + hex.EncodeToString(b[:])
 }
 
 // extractSessionIDsFromHeadersJSON parses a JSON-encoded headers map (string→string,

@@ -2,6 +2,7 @@
 Common utilities for Akto AI agent hooks (Claude CLI, Cursor, and others).
 Shared config, HTTP, ingestion payload building, transcript reading, and hook runners.
 """
+import base64
 import json
 import logging
 import os
@@ -274,19 +275,114 @@ def _alias_camel_keys(input_data: Dict[str, Any]) -> Dict[str, Any]:
     return input_data
 
 
-# Connectors whose hook stdin carries no user identity, so it is resolved from the
-# agent's own profile file instead. For these the locally resolved value is
+# ── Locally resolved identity ──────────────────────────────────────────────────
+#
+# Some agents carry no user identity on their hook stdin, so the email is read from
+# the agent's own profile file instead. For these the locally resolved value is
 # AUTHORITATIVE: it must overwrite — and when empty, delete — whatever the session
 # state row holds, because the row may have been written before a login or logout.
 # (cursor/github pass user_email through on stdin; they must not be touched here.)
-_LOCAL_IDENTITY_CONNECTORS = {"claude_code_cli"}
+#
+# Readers live here, keyed by connector, rather than in each agent's own
+# akto_machine_id.py: that file is a separate copy per agent (claude's and codex's
+# differ by ~55 lines), so a per-agent helper would mean one copy of the same logic
+# per connector. This module is installed into every agent's hooks dir, so one map
+# serves them all and a new agent is a single small function.
+
+
+def _profile_home(subdir: str, env_override: str = "") -> str:
+    """Path to an agent's profile dir: $<env_override> if set, else ~/<subdir>.
+
+    The override is expanded rather than used verbatim: os.open() performs no
+    tilde expansion, and these vars reach us unexpanded from quoted assignments
+    ("~/.codex"), launchd plists and MDM-provisioned environments — which would
+    otherwise resolve nothing at all. abspath() keeps a relative override from
+    resolving against the hook's cwd, which is whatever project the user is in.
+
+    Under root/launchd ~ is /var/root, so the console user's home is used instead.
+    That lookup is best effort: get_username() falls back to the literal "unknown"
+    when the console user cannot be determined and getpwnam() raises KeyError for
+    it, so any failure degrades to ~ instead of abandoning the resolution (the
+    caller cannot tell an exception from "signed out" — both yield no header).
+    """
+    override = (os.environ.get(env_override) or "").strip() if env_override else ""
+    if override:
+        return os.path.abspath(os.path.expanduser(os.path.expandvars(override)))
+
+    home = os.path.expanduser("~")
+    if hasattr(os, "getuid"):  # absent on Windows
+        try:
+            if os.getuid() == 0:
+                user = get_username()
+                if user and user not in ("unknown", "root"):
+                    import pwd  # Unix-only
+                    home = pwd.getpwnam(user).pw_dir
+        except Exception:
+            pass  # ImportError, KeyError (no such user), anything else — keep ~
+    return os.path.join(home, subdir)
+
+
+def _email_from_jwt_claim(token: Any, claim: str = "email") -> str:
+    """One claim from a JWT's payload segment ('' if absent/undecodable).
+
+    The token is NOT verified: this reads a local file to label our own telemetry,
+    it authenticates nobody. An EXPIRED token is still used — the claim identifies
+    the account, and refusing it would blank the header between token refreshes.
+    """
+    if not isinstance(token, str) or token.count(".") < 2:
+        return ""
+    try:
+        seg = token.split(".")[1]
+        payload = json.loads(base64.urlsafe_b64decode(seg + "=" * (-len(seg) % 4)))
+        return str(payload.get(claim) or "").strip()
+    except Exception:
+        return ""
+
+
+def _codex_user_email() -> str:
+    """Signed-in Codex account, from $CODEX_HOME/auth.json (default ~/.codex).
+
+    Shared by the Codex CLI and the codex bundled in ChatGPT.app — both read this
+    same file. The address is the `email` claim inside tokens.id_token, not a plain
+    key. Returns "" for an API-key login (no tokens block), which has no email at
+    all. Only the claim is ever returned; the tokens themselves are never logged.
+    """
+    try:
+        path = os.path.join(_profile_home(".codex", "CODEX_HOME"), "auth.json")
+        with open(path, encoding="utf-8") as f:
+            auth = json.load(f)
+        email = _email_from_jwt_claim((auth.get("tokens") or {}).get("id_token"))
+        if not email:  # shape drift / other login paths
+            email = str(auth.get("email") or "").strip()
+        return email if "@" in email else ""
+    except Exception:
+        return ""
+
+
+# connector → reader. Membership here is what makes a connector locally resolved.
+_PROFILE_READERS = {
+    "codex_cli": _codex_user_email,
+}
+
+_LOCAL_IDENTITY_CONNECTORS = {"claude_code_cli"} | set(_PROFILE_READERS)
 
 
 def _local_user_email() -> str:
-    """Current account email for connectors that resolve identity locally ('' if none)."""
+    """Current account email for connectors that resolve identity locally ('' if none).
+
+    The agent's own akto_machine_id.get_user_email wins when it exists (claude ships
+    one); otherwise the connector's reader from _PROFILE_READERS is used.
+    """
     try:
         from akto_machine_id import get_user_email
         return get_user_email()
+    except Exception:
+        pass
+    reader = _PROFILE_READERS.get(AKTO_CONNECTOR)
+    if reader is None:
+        return ""
+    try:
+        return reader()
     except Exception:
         return ""
 

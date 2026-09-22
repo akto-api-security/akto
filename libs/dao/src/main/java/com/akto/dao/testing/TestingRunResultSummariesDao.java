@@ -149,6 +149,14 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
 
         IndexOptions sparseIndex = new IndexOptions().sparse(true);
 
+        /*
+         * mini-testing polls for attempts whose lease has lapsed, so that predicate runs on a loop.
+         * Sparse because only summaries currently owned by a module carry the field - a single
+         * field sparse index omits the rest, which keeps it to the handful of in-flight runs.
+         */
+        Bson leaseExpiryIndex = Indexes.ascending(TestingRunResultSummary.LEASE_EXPIRY_TS);
+        createIndexIfAbsent(dbName, getCollName(), leaseExpiryIndex, sparseIndex.name("leaseExpiryTs_1"));
+
         Bson branchIndex = Indexes.ascending("metadata.branch");
         createIndexIfAbsent(dbName, getCollName(), branchIndex, sparseIndex.name("metadata.branch_1"));
         Bson repositoryIndex = Indexes.ascending("metadata.repository");

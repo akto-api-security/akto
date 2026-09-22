@@ -105,10 +105,21 @@ public class GuardrailPolicies {
     // userMetadata's userNames rather than reading it back off the fetched policy.
     @BsonIgnore
     private List<String> targetUserNames;
+    // Include/Exclude for targetUserNames/userMetadata. Evaluated in the Go validator (XORed
+    // against the email match), not resolved server-side like device/tag negation below.
+    private boolean negatedTargetUserNames;
     // Arbitrary device-tag key → values — AND across keys, OR within one key's values. See
     // scripts/migrate_guardrail_target_teams_roles_to_tags.js for converting pre-existing
     // policies that used the old fixed targetTeams/targetRoles fields.
     private Map<String, List<String>> targetTags;
+
+    // Per-tag-key Include/Exclude, keyed like targetTags. Per-key (not one flag for the whole
+    // map) because keys AND together — one flag could only negate the whole conjunction.
+    private Map<String, Boolean> negatedTargetTags;
+
+    // Include/Exclude for targetDeviceIds. Only one Device row can exist per policy, so unlike
+    // negatedTargetTags this doesn't need to be keyed.
+    private boolean negatedTargetDeviceIds;
     // null (never set) = targetTags/targetDeviceIds all empty, no targeting configured → apply to all devices.
     // Non-null (possibly empty) List = targeting configured → apply only to these device labels;
     // an empty List means targeting resolved to zero matching devices, so apply to none.

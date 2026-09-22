@@ -43,17 +43,25 @@ type ValidationHandler struct {
 	cfg              *config.Config
 	fileRegistry     *fileprocessor.Registry
 	metrics          *metrics.Accumulator
+	policyGate       policyGate
 }
+
+// policyGate mirrors validator.Service.HasApplicablePolicies.
+type policyGate func(contextSource, requestHeaders string) (bool, error)
 
 // NewValidationHandler creates a new validation handler
 func NewValidationHandler(validatorService *validator.Service, logger *zap.Logger, cfg *config.Config, fileRegistry *fileprocessor.Registry, acc *metrics.Accumulator) *ValidationHandler {
-	return &ValidationHandler{
+	h := &ValidationHandler{
 		validatorService: validatorService,
 		logger:           logger,
 		cfg:              cfg,
 		fileRegistry:     fileRegistry,
 		metrics:          acc,
 	}
+	if validatorService != nil {
+		h.policyGate = validatorService.HasApplicablePolicies
+	}
+	return h
 }
 
 // IngestData handles batch data ingestion and validation
@@ -169,7 +177,7 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 
 	// Extract session and request IDs from headers (falling back to the body's
 	// requestHeaders JSON for traffic forwarded via /api/http-proxy).
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, req.RequestHeaders)
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, req.RequestHeaders, req.RequestPayload)
 
 	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Request received for guardrailing | Path: %s | Method: %s | Account: %s | Session: %s | Payload: %.300s",
 		req.Path, req.Method, req.AktoAccountID, sessionID, req.RequestPayload))
@@ -277,7 +285,7 @@ func (h *ValidationHandler) ValidateRequestWithPolicy(c *gin.Context) {
 		zap.String("contextSource", req.ContextSource),
 		zap.String("policyName", req.Policy.Name))
 
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, "")
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, "", req.Payload)
 
 	// Default skipThreat to false if not provided
 	skipThreat := false
@@ -334,6 +342,11 @@ func (h *ValidationHandler) ReplayWithPolicy(c *gin.Context) {
 		BaselinePolicy *mcp.GuardrailsPolicy  `json:"baselinePolicy,omitempty"`
 		ContextSource  string                 `json:"contextSource,omitempty"`
 		Items          []validator.ReplayItem `json:"items" binding:"required,min=1"`
+		// IncludeDetectionDetails additionally populates category/subCategory/severity on each
+		// detected verdict, for a caller that persists a real malicious_events record from the
+		// replay (e.g. a backfill job) rather than just showing a detected/not-detected count.
+		// Omitted by the dashboard's compare feature, which sees identical behavior to before.
+		IncludeDetectionDetails bool `json:"includeDetectionDetails,omitempty"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -352,7 +365,7 @@ func (h *ValidationHandler) ReplayWithPolicy(c *gin.Context) {
 	}
 
 	verdicts, err := h.validatorService.ReplayWithPolicy(
-		c.Request.Context(), req.Items, req.Policy, req.BaselinePolicy, req.ContextSource)
+		c.Request.Context(), req.Items, req.Policy, req.BaselinePolicy, req.ContextSource, req.IncludeDetectionDetails)
 	if err != nil {
 		h.logger.Error("ReplayWithPolicy failed",
 			zap.String("policyName", req.Policy.Name),
@@ -433,7 +446,7 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		return
 	}
 
-	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, req.RequestHeaders)
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request, req.RequestHeaders, req.RequestPayload)
 
 	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Response received for guardrailing | Path: %s | Method: %s | Account: %s | Session: %s | Payload: %.300s",
 		req.Path, req.Method, req.AktoAccountID, sessionID, responseBody))

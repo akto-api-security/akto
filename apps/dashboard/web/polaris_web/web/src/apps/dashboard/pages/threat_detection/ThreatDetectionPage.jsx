@@ -29,6 +29,7 @@ import WebhookIntegrationModal from "./components/WebhookIntegrationModal";
 import { updateThreatFiltersStore } from "./utils/threatFilters";
 import { applyThreatActivityTableFilter } from "./utils/threatDashboardUtils";
 import { redactSampleDataByKeywords } from "./utils/redactSampleData";
+import { downloadMaliciousEventsAsJson, downloadMaliciousEventsAsCsv } from "./utils/exportEvents";
 import { resolveComplianceClauseMap, extractBehaviour } from "./utils/formatUtils";
 import LocalStore from "@/apps/main/LocalStorageStore";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
@@ -328,7 +329,7 @@ function ThreatDetectionPage() {
         }
         const specialAccounts = [1776384040, 1776625569, 1776626846];
         if (specialAccounts.includes(Number(window.ACTIVE_ACCOUNT))) return values.ranges[4];
-        return func.getLast30DaysRange();
+        return values.ranges[2];
     }, [location.state, searchParams]);
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
 
@@ -345,6 +346,7 @@ function ThreatDetectionPage() {
     }, [searchParams]);
     const [showDetails, setShowDetails] = useState(false);
     const applyPayloadSearchRef = useRef(() => {});
+    const applyExportRef = useRef(async () => ({ maliciousEvents: [] }));
     const [sampleData, setSampleData] = useState([])
     const [showNewTab, setShowNewTab] = useState(false)
     const [categoryCount, setCategoryCount] = useState([]);
@@ -759,6 +761,7 @@ function ThreatDetectionPage() {
             initialTab={queryParams.status ? queryParams.status.toLowerCase() : undefined}
             label={LABELS.THREAT}
             onRegisterPayloadSearch={(fn) => { applyPayloadSearchRef.current = fn; }}
+            onRegisterExport={(fn) => { applyExportRef.current = fn; }}
         />,
         !showNewTab ? <NormalSampleDetails
             title={"Attacker payload"}
@@ -786,52 +789,16 @@ function ThreatDetectionPage() {
 
     ]
 
+    // Both reuse the exact filters/tab/search currently applied on the table (registered by
+    // SusDataTable via onRegisterExport), instead of dumping every event regardless of filters.
     const exportJson = async () => {
-        const jsonFileName = "malicious_events.json"
-        const res = await api.fetchSuspectSampleData(
-            0,
-            [],
-            [],
-            [],
-            [],
-            {detectedAt: -1},
-            startTimestamp,
-            endTimestamp,
-            [],
-            2000,
-            'EVENTS',
-            null,
-            LABELS.THREAT // Filter for threat protection (not guardrail)
-        );
-        // Transform to match the mongoDB format
-        let jsonData = (res?.maliciousEvents || []).map(ev => ({
-            _id: ev.id, // or whatever unique id you have
-            actor: ev.actor,
-            category: ev.category,
-            country: ev.country,
-            detectedAt: { $numberLong: String(ev.timestamp) || String(ev.detectedAt) },
-            eventType: ev.eventType,
-            filterId: ev.filterId,
-            latestApiCollectionId: ev.apiCollectionId || ev.latestApiCollectionId,
-            latestApiEndpoint: ev.url || ev.latestApiEndpoint,
-            latestApiIp: ev.ip || ev.latestApiIp,
-            latestApiMethod: ev.method || ev.latestApiMethod,
-            subCategory: ev.subCategory,
-            type: ev.type,
-            refId: ev.refId,
-            severity: ev.severity,
-            latestApiOrig:
-              ev.payload != null || ev.latestApiOrig != null
-                ? redactSampleDataByKeywords(ev.payload ?? ev.latestApiOrig)
-                : ev.payload ?? ev.latestApiOrig,
-            metadata: ev.metadata,
-        }));
+        const res = await applyExportRef.current();
+        downloadMaliciousEventsAsJson(res?.maliciousEvents, `malicious_events_${res?.tab || 'active'}.json`);
+    }
 
-        let blob = new Blob([JSON.stringify(jsonData, null, 2)], {
-            type: "application/json;charset=UTF-8"
-        });
-        saveAs(blob, jsonFileName);
-        func.setToast(true, false, "JSON exported successfully");
+    const exportCsv = async () => {
+        const res = await applyExportRef.current();
+        downloadMaliciousEventsAsCsv(res?.maliciousEvents, `malicious_events_${res?.tab || 'active'}`);
     }
 
     const exportToAdx = async () => {
@@ -904,8 +871,13 @@ function ThreatDetectionPage() {
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         },
                                         {
-                                            content: 'Export',
+                                            content: 'Export as JSON',
                                             onAction: () => exportJson(),
+                                            prefix: <Box><Icon source={FileMinor} /></Box>
+                                        },
+                                        {
+                                            content: 'Export as CSV',
+                                            onAction: () => exportCsv(),
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         },
                                         {

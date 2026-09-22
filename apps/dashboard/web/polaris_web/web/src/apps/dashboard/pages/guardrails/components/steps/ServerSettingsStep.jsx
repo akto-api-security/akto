@@ -1,6 +1,6 @@
 import { VerticalStack, HorizontalStack, Text, FormLayout, Box, Checkbox, RadioButton, Popover, TextField, Link, Tag, Banner, Badge, Button, InlineError } from "@shopify/polaris";
 import { DeleteMinor } from "@shopify/polaris-icons";
-import { useState, useEffect, useRef, useReducer } from "react";
+import { useState, useEffect, useRef, useReducer, useMemo } from "react";
 import DropdownSearch, { ALL_VALUES_SENTINEL } from "../../../../components/shared/DropdownSearch";
 import Dropdown from "../../../../components/layouts/Dropdown";
 import AssetIcon from "../../../observe/agentic/AssetIcon";
@@ -23,26 +23,27 @@ export const ServerSettingsConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, negatedAgentServers, negatedMcpServers, negatedLlmServers, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTags, targetDeviceIds, targetUserNames }) => {
+    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, negatedAgentServers, negatedMcpServers, negatedLlmServers, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTags, targetDeviceIds, targetUserNames, negatedTargetTags, negatedTargetDeviceIds, negatedTargetUserNames }) => {
         const appSettings = (applyOnRequest || applyOnResponse) ?
             ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
         const behaviourSuffix = policyBehaviour ? `Rule behaviour: ${policyBehaviour}` : '';
+        // Shared "N X" / "All X except N" phrasing — used for both the agentic-asset buckets and
+        // the device/tag/user targeting below.
+        const part = (negated, arr, singular) => {
+            const count = arr?.length || 0;
+            if (negated) return count > 0 ? `All ${singular} except ${count}` : `All ${singular}`;
+            if (count === 1 && arr[0] === ALL_VALUES_SENTINEL) return `All ${singular}`;
+            return count > 0 ? `${count} ${singular}` : null;
+        };
         let summary = '';
         if (applyToAllServers) {
             summary += 'All assets';
         } else {
-            const parts = [];
-            const part = (negated, arr, singular) => {
-                const count = arr?.length || 0;
-                if (negated) return count > 0 ? `All ${singular} except ${count}` : `All ${singular}`;
-                if (count === 1 && arr[0] === ALL_VALUES_SENTINEL) return `All ${singular}`;
-                return count > 0 ? `${count} ${singular}` : null;
-            };
-            [
+            const parts = [
                 part(negatedMcpServers, selectedMcpServers, 'MCP'),
                 part(negatedAgentServers, selectedAgentServers, 'Agents'),
                 part(negatedLlmServers, selectedBrowserLlms, 'LLMs'),
-            ].filter(Boolean).forEach(p => parts.push(p));
+            ].filter(Boolean);
             summary += parts.join(', ') || 'No assets';
         }
         if (applyToAllUsers) {
@@ -50,13 +51,16 @@ export const ServerSettingsConfig = {
         } else {
             const userParts = [];
             Object.entries(targetTags || {}).forEach(([key, values]) => {
-                if (values?.length > 0) {
+                if (values?.length > 0 || negatedTargetTags?.[key]) {
                     const label = key.charAt(0).toUpperCase() + key.slice(1);
-                    userParts.push(`${values.length} ${label}${values.length !== 1 ? 's' : ''}`);
+                    const p = part(!!negatedTargetTags?.[key], values, `${label}${(values?.length || 0) !== 1 ? 's' : ''}`);
+                    if (p) userParts.push(p);
                 }
             });
-            if (targetDeviceIds?.length > 0) userParts.push(`${targetDeviceIds.length} Device${targetDeviceIds.length !== 1 ? 's' : ''}`);
-            if (targetUserNames?.length > 0) userParts.push(`${targetUserNames.length} User${targetUserNames.length !== 1 ? 's' : ''}`);
+            const devicePart = part(negatedTargetDeviceIds, targetDeviceIds, `Device${targetDeviceIds?.length !== 1 ? 's' : ''}`);
+            if (devicePart) userParts.push(devicePart);
+            const userPart = part(negatedTargetUserNames, targetUserNames, `User${targetUserNames?.length !== 1 ? 's' : ''}`);
+            if (userPart) userParts.push(userPart);
             if (userParts.length > 0) summary += ` | ${userParts.join(', ')}`;
         }
         summary += `${appSettings} ${behaviourSuffix}`;
@@ -77,13 +81,18 @@ const deviceIdSuffix = (deviceId) => {
     return idx >= 0 ? deviceId.slice(idx + 1) : deviceId.slice(0, 8);
 };
 
-const CountPopover = ({ count, label, items }) => {
+const CountPopover = ({ count, label, items, text }) => {
     const [active, setActive] = useState(false);
+    const [pinned, setPinned] = useState(false);
     const [search, setSearch] = useState('');
     const closeTimer = useRef(null);
 
     const open = () => { if (closeTimer.current) clearTimeout(closeTimer.current); setActive(true); };
-    const scheduleClose = () => { closeTimer.current = setTimeout(() => { setActive(false); setSearch(''); }, 150); };
+    const scheduleClose = () => {
+        if (pinned) return;
+        closeTimer.current = setTimeout(() => setActive(false), 200);
+    };
+    const pin = () => { open(); setPinned(true); };
 
     const filtered = (items || []).filter(item =>
         (item.label || '').toLowerCase().includes(search.toLowerCase())
@@ -93,10 +102,10 @@ const CountPopover = ({ count, label, items }) => {
             active={active}
             activator={
                 <span onMouseEnter={open} onMouseLeave={scheduleClose} style={{ cursor: 'pointer' }}>
-                    <Link>{count} {label}</Link>
+                    <Link>{text || `${count} ${label}`}</Link>
                 </span>
             }
-            onClose={() => { setActive(false); setSearch(''); }}
+            onClose={() => { setActive(false); setPinned(false); setSearch(''); }}
         >
             <div onMouseEnter={open} onMouseLeave={scheduleClose}>
                 <Popover.Pane fixed>
@@ -105,6 +114,7 @@ const CountPopover = ({ count, label, items }) => {
                             placeholder={`Search ${label}...`}
                             value={search}
                             onChange={setSearch}
+                            onFocus={pin}
                             autoComplete="off"
                         />
                     </Box>
@@ -189,6 +199,12 @@ const ServerSettingsStep = ({
     setTargetDeviceIds,
     targetUserNames,
     setTargetUserNames,
+    negatedTargetTags,
+    setNegatedTargetTags,
+    negatedTargetDeviceIds,
+    setNegatedTargetDeviceIds,
+    negatedTargetUserNames,
+    setNegatedTargetUserNames,
     availableTagKeyValues = [],
     availableDevices,
     availableUsers = [],
@@ -206,18 +222,19 @@ const ServerSettingsStep = ({
     const [agenticConditions, agenticDispatch] = useReducer(conditionsReducer, null, () => {
         const conds = [];
         // A negated row with zero values ("Exclude nothing") is meaningful — keep it, don't drop it on reopen
-        if ((selectedAgentServers || []).length > 0 || negatedAgentServers) conds.push({ type: 'AGENT', values: selectedAgentServers, negated: negatedAgentServers });
-        if ((selectedMcpServers || []).length > 0 || negatedMcpServers) conds.push({ type: 'MCP_SERVER', values: selectedMcpServers, negated: negatedMcpServers });
-        if ((selectedBrowserLlms || []).length > 0 || negatedLlmServers) conds.push({ type: 'LLM', values: selectedBrowserLlms, negated: negatedLlmServers });
+        if ((selectedAgentServers || []).length > 0 || negatedAgentServers) conds.push({ type: 'AGENT', values: selectedAgentServers, otherValues: [], negated: negatedAgentServers });
+        if ((selectedMcpServers || []).length > 0 || negatedMcpServers) conds.push({ type: 'MCP_SERVER', values: selectedMcpServers, otherValues: [], negated: negatedMcpServers });
+        if ((selectedBrowserLlms || []).length > 0 || negatedLlmServers) conds.push({ type: 'LLM', values: selectedBrowserLlms, otherValues: [], negated: negatedLlmServers });
         return conds;
     });
 
     const [userConditions, userDispatch] = useReducer(conditionsReducer, null, () => {
+        // A negated DEVICE/USER row with zero values ("Exclude nothing") is meaningful — keep it.
         const conds = Object.entries(targetTags || {})
             .filter(([, values]) => (values || []).length > 0)
-            .map(([key, values]) => ({ type: key, values }));
-        if ((targetDeviceIds || []).length > 0) conds.push({ type: 'DEVICE', values: targetDeviceIds });
-        if ((targetUserNames || []).length > 0) conds.push({ type: 'USER', values: targetUserNames });
+            .map(([key, values]) => ({ type: key, values, otherValues: [], negated: !!negatedTargetTags?.[key] }));
+        if ((targetDeviceIds || []).length > 0 || negatedTargetDeviceIds) conds.push({ type: 'DEVICE', values: targetDeviceIds, otherValues: [], negated: negatedTargetDeviceIds });
+        if ((targetUserNames || []).length > 0 || negatedTargetUserNames) conds.push({ type: 'USER', values: targetUserNames, otherValues: [], negated: negatedTargetUserNames });
         return conds;
     });
 
@@ -258,19 +275,34 @@ const ServerSettingsStep = ({
             return { ...opt, label: formatDisplayName(svc), media: <AssetIcon type={assetType} assetTagValue={svc} size={16} /> };
         }).sort((a, b) => a.label.localeCompare(b.label));
 
+    const deviceOptionsSorted = useMemo(
+        () => (availableDevices || []).slice().sort((a, b) => a.label.localeCompare(b.label)),
+        [availableDevices]
+    );
+    const userOptionsSorted = useMemo(
+        () => (availableUsers || []).slice().sort((a, b) => a.label.localeCompare(b.label)),
+        [availableUsers]
+    );
+    const tagOptionsSortedByKey = useMemo(() => {
+        const map = {};
+        (availableTagKeyValues || []).forEach(({ key, values }) => {
+            map[key] = (values || []).map(v => ({ label: v, value: v })).sort((a, b) => a.label.localeCompare(b.label));
+        });
+        return map;
+    }, [availableTagKeyValues]);
+
     const getOptionsForType = (type) => {
         switch (type) {
             case 'AGENT': return enrichOptions(agentOptions, 'AI Agent');
             case 'MCP_SERVER': return enrichOptions(mcpOptions, 'MCP Server');
             case 'LLM': return enrichOptions(llmOptions, 'LLM');
-            case 'DEVICE': return (availableDevices || []).slice().sort((a, b) => a.label.localeCompare(b.label));
-            case 'USER': return (availableUsers || []).slice().sort((a, b) => a.label.localeCompare(b.label));
-            default: {
-                const entry = (availableTagKeyValues || []).find(k => k.key === type);
-                return (entry?.values || []).map(v => ({ label: v, value: v })).sort((a, b) => a.label.localeCompare(b.label));
-            }
+            case 'DEVICE': return deviceOptionsSorted;
+            case 'USER': return userOptionsSorted;
+            default: return tagOptionsSortedByKey[type] || [];
         }
     };
+
+    const DISPLAY_CAP = 1000;
 
     const compatibleMcpServers = isBlockMode ? (mcpServers || []).filter(s => s.isInline) : (mcpServers || []);
     const compatibleAgentServers = isBlockMode ? (agentServers || []).filter(s => s.isInline) : (agentServers || []);
@@ -376,6 +408,18 @@ const ServerSettingsStep = ({
             default: return null;
         }
     };
+    // TAG keys are dynamic, so negation is per key rather than fixed booleans like the agentic
+    // buckets above; DEVICE and USER each only ever have one row, so they stay plain booleans.
+    const userNegationProps = (type) => {
+        switch (type) {
+            case 'DEVICE': return { negated: negatedTargetDeviceIds, onToggle: setNegatedTargetDeviceIds };
+            case 'USER': return { negated: negatedTargetUserNames, onToggle: setNegatedTargetUserNames };
+            default: return {
+                negated: !!negatedTargetTags?.[type],
+                onToggle: (val) => setNegatedTargetTags(prev => ({ ...(prev || {}), [type]: val })),
+            };
+        }
+    };
     // Custom underline-tab strip, not Polaris LegacyTabs — LegacyTabs collapses into a "..." overflow menu at this popover's width
     const NEGATION_TABS = [
         { label: 'Include', value: false },
@@ -405,6 +449,27 @@ const ServerSettingsStep = ({
             })}
         </div>
     );
+
+    const typeLabel = (typeOptions, type) => (typeOptions.find(o => o.value === type)?.label || type)
+        .replace(/\s*\[\d+\]/, '')
+        .replace(/\s*\(Beta\)/i, '')
+        .trim();
+
+    const rowCaption = (typeOptions, condition, negated) => {
+        const opts = getOptionsForType(condition.type);
+        const label = typeLabel(typeOptions, condition.type);
+        const values = condition.values || [];
+        const isIncludeAll = !negated && values.length === 1 && values[0] === ALL_VALUES_SENTINEL;
+        const isExcludeNone = negated && values.length === 0;
+        if (isIncludeAll || isExcludeNone) {
+            return { text: `All ${label}`, items: opts, label };
+        }
+        if (values.length === 0) return null;
+        const items = values.map(v => ({ value: v, label: opts.find(o => o.value === v)?.label || v }));
+        return negated
+            ? { text: `All ${label} except ${values.length}`, items, label }
+            : { text: `${values.length} ${label}`, items, label };
+    };
 
     const renderConditionRows = (conditions, typeOptions, dispatch, operator = 'OR', showError = false, getNegationProps = null) => {
         const usedTypes = new Set(conditions.map(c => c.type));
@@ -442,7 +507,7 @@ const ServerSettingsStep = ({
                                         selected={(val) => {
                                             dispatch({ type: 'updateKey', index, key: 'type', obj: val });
                                             dispatch({ type: 'updateKey', index, key: 'values', obj: [] });
-                                            // Row's type changed — reset the old type's toggle so Exclude can't linger with no row showing it
+                                            dispatch({ type: 'updateKey', index, key: 'otherValues', obj: [] });
                                             negationProps?.onToggle(false);
                                         }}
                                     />
@@ -453,9 +518,16 @@ const ServerSettingsStep = ({
                                         id={`cond-val-${condition.type}-${index}`}
                                         placeholder="Select value"
                                         headerContent={negationProps ? negationHeader(negated, (val) => {
-                                            // Switching tabs starts fresh — carrying over values would silently reinterpret them (included <-> excluded).
+                                            if (val === negated) return; // clicking the already-active tab is a no-op
+                                            // Swap rather than clear: the polarity you're leaving keeps its picks in
+                                            // otherValues, restored if you switch back without touching the other tab.
+                                            // Only clears the first time you visit a tab you've never touched — never
+                                            // silently reinterprets one polarity's picks as the other's. Two updateKey
+                                            // dispatches, not one combined action — both read from this closure's
+                                            // condition snapshot, so dispatch order between them doesn't matter.
                                             negationProps.onToggle(val);
-                                            dispatch({ type: 'updateKey', index, key: 'values', obj: [] });
+                                            dispatch({ type: 'updateKey', index, key: 'values', obj: condition.otherValues || [] });
+                                            dispatch({ type: 'updateKey', index, key: 'otherValues', obj: condition.values || [] });
                                         }) : undefined}
                                         optionsList={sortSelectedFirst(getOptionsForType(condition.type), condition.values || [])}
                                         setSelected={(vals) => dispatch({ type: 'updateKey', index, key: 'values', obj: vals })}
@@ -468,7 +540,7 @@ const ServerSettingsStep = ({
                                             ? ((condition.values || []).length > 0 ? `All except ${condition.values.length}` : 'All selected')
                                             : ((condition.values || []).length === 1 && condition.values[0] === ALL_VALUES_SENTINEL ? 'All selected'
                                                 : (condition.values || []).length > 0 ? `${condition.values.length} selected` : undefined)}
-                                        sliceMaxVal={getOptionsForType(condition.type).length || 20}
+                                        sliceMaxVal={DISPLAY_CAP}
                                     />
                                 </div>
                                 <Button icon={DeleteMinor} onClick={() => {
@@ -477,12 +549,29 @@ const ServerSettingsStep = ({
                                     negationProps?.onToggle(false);
                                 }} />
                             </HorizontalStack>
-                            {condition.type === 'USER' && (
-                                <Banner tone="info">{USER_BETA_BANNER_TEXT}</Banner>
-                            )}
                         </VerticalStack>
                     );
                 })}
+                {(() => {
+                    const segments = conditions
+                        .map(c => rowCaption(typeOptions, c, !!getNegationProps?.(c.type)?.negated))
+                        .filter(Boolean);
+                    if (segments.length === 0) return null;
+                    return (
+                        <HorizontalStack gap="1" blockAlign="center" wrap>
+                            <Text variant="bodyMd" color="subdued">This includes</Text>
+                            {segments.flatMap((seg, i) => [
+                                <CountPopover key={`seg-${i}`} text={seg.text} label={seg.label} items={seg.items} />,
+                                i < segments.length - 1 && (
+                                    <Text key={`sep-${i}`} variant="bodyMd" color="subdued">
+                                        {i === segments.length - 2 ? '&' : ','}
+                                    </Text>
+                                )
+                            ]).filter(Boolean)}
+                            <Text variant="bodyMd" color="subdued">.</Text>
+                        </HorizontalStack>
+                    );
+                })()}
                 <HorizontalStack gap="4" blockAlign="center">
                     {!allTypesFilled && <Button onClick={() => dispatch({ type: 'add', obj: { type: nextUnusedType, values: [] } })}>Add condition</Button>}
                     {conditions.length > 0 && (
@@ -494,6 +583,9 @@ const ServerSettingsStep = ({
                 </HorizontalStack>
                 {showError && isDirty && (
                     <InlineError message='Add at least one condition, or switch to "Apply to all".' fieldID="" />
+                )}
+                {conditions.some(c => c.type === 'USER') && (
+                    <Banner tone="info">{USER_BETA_BANNER_TEXT}</Banner>
                 )}
             </VerticalStack>
         );
@@ -626,8 +718,11 @@ const ServerSettingsStep = ({
                                         id="select_users_teams"
                                         name="userTargeting"
                                         onChange={() => setApplyToAllUsers(false)}
-                                        disabled={(availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0 && (availableUsers || []).length === 0}
+                                        disabled={!usersLoading && (availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0 && (availableUsers || []).length === 0}
                                         helpText={(() => {
+                                            if (usersLoading) {
+                                                return "Loading device tags and users…";
+                                            }
                                             const noOptions = (availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0 && (availableUsers || []).length === 0;
                                             if (noOptions) {
                                                 return "No device tags or users found. Devices must report in before you can target them here.";
@@ -638,10 +733,15 @@ const ServerSettingsStep = ({
                                             // Devices and Users are two independent pools (see targetDeviceIds/targetUserNames) —
                                             // shown as two separate counts rather than one merged "N users" figure, which would
                                             // hide which half of the selection actually contributed the count.
-                                            const matchedUserItems = (targetUserNames || []).map(name => {
-                                                const option = (availableUsers || []).find(o => o.value === name);
-                                                return { value: name, label: option?.label || name };
-                                            });
+                                            // Negated (Exclude) means "everyone except these picks" — mirror matchingDeviceRows'
+                                            // negation handling instead of showing the raw pick count/list, which would render
+                                            // an Exclude-3 selection as if only 3 people were in scope instead of the other ~97.
+                                            const matchedUserItems = negatedTargetUserNames
+                                                ? (availableUsers || []).filter(o => !(targetUserNames || []).includes(o.value))
+                                                : (targetUserNames || []).map(name => {
+                                                    const option = (availableUsers || []).find(o => o.value === name);
+                                                    return { value: name, label: option?.label || name };
+                                                });
                                             const nonZeroItems = [
                                                 matchingDeviceRows.length > 0 && { count: matchingDeviceRows.length, label: "Devices", items: matchingDeviceRows.map(r => ({ value: r.deviceId, label: `${r.username} · ${deviceIdSuffix(r.deviceId)}` })) },
                                                 matchedUserItems.length > 0 && { count: matchedUserItems.length, label: "Users", items: matchedUserItems },
@@ -665,7 +765,7 @@ const ServerSettingsStep = ({
                                     />
                                     {!applyToAllUsers && (
                                         <Box paddingInlineStart="6">
-                                            {renderConditionRows(userConditions, userTypeOptions, userDispatch, 'AND', showUserConditionError)}
+                                            {renderConditionRows(userConditions, userTypeOptions, userDispatch, 'AND', showUserConditionError, userNegationProps)}
                                         </Box>
                                     )}
                                 </VerticalStack>

@@ -86,6 +86,36 @@ export default {
         });
     },
 
+    // Vendors tab — vendor names observed in endpoint-shield traffic, each with its traffic
+    // count and current approval state (approval shares the same mcp_allowlist collection as
+    // MCP servers, so an approved vendor also counts toward RiskScoreCalculator's vendor-risk
+    // sub-score on the posture page).
+    async fetchVendorAudit() {
+        const resp = await request({
+            url: '/api/fetchVendorAllowlistAudit',
+            method: 'post',
+            data: {},
+        });
+        return resp?.vendorAudit || [];
+    },
+    async addVendorAllowlistEntries(vendorNames) {
+        const list = Array.isArray(vendorNames) ? vendorNames : [vendorNames];
+        const names = [...new Set(list.map((v) => String(v ?? '').trim()).filter(Boolean))];
+        if (!names.length) return null;
+        return request({
+            url: '/api/addVendorAllowlistEntry',
+            method: 'post',
+            data: { vendorNames: names },
+        });
+    },
+    async removeVendorAllowlistEntry(vendorName) {
+        return request({
+            url: '/api/removeVendorAllowlistEntry',
+            method: 'post',
+            data: { vendorName },
+        });
+    },
+
     // Paginated AGENT_SKILL audit rows from mcp_audit_info — same response shape as
     // fetchAuditData ({ auditData: [...], total: N }). One row per (skill, mcpHost)
     // detection. The Skills tab uses this both for table rows and for the badge count.
@@ -258,11 +288,11 @@ export default {
     // maliciousSkillKeys is NOT sent — AgenticObserveAction computes/caches it itself now
     // (getOrBuildSkillData) instead of requiring the whole account-wide set (14,218 entries /
     // ~500KB+ on Atlas Scale Test) to be re-POSTed on every paginated request.
-    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap } = {}) {
+    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, filters, violationsByCollectionId, skillViolationsByName } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsSummary',
             method: 'post',
-            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, userAnalysisFlatMap, filters, violationsByCollectionId, skillViolationsByName, usernameMap, userMetadataMap },
+            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, filters, violationsByCollectionId, skillViolationsByName },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0, distinctUsernames: resp?.distinctUsernames || [] }
     },
@@ -270,16 +300,15 @@ export default {
     // deviceCount+deviceSample) for exactly ONE group — fetched only when a user opens that asset's flyout, not
     // shipped for every row of every fetchAgenticAssetsSummary page (that used to make a single
     // 50-row page 16MB, mostly from raw per-device breakdowns on rows with hundreds of devices).
-    // trafficMap/riskScoreMap/userAnalysisFlatMap enrich the one asset's own device list the same
-    // way fetchAgenticAssetsSummary's rows used to — needed by the Overview tab's topology graph.
+    // trafficMap/riskScoreMap enrich this one asset's device list — needed by the Overview tab's topology graph.
     // skillCount (not the full skill-name list) is all the Overview tab's topology graph needs —
     // the Components tab re-derives its own full skill listing independently when opened (see
     // AgenticObserveAction.fetchAgenticAssetDetail's own comment), so the names were dead weight.
-    async fetchAgenticAssetDetail({ groupKey, rowType, trafficMap, riskScoreMap, userAnalysisFlatMap } = {}) {
+    async fetchAgenticAssetDetail({ groupKey, rowType, trafficMap, riskScoreMap, startTimestamp, endTimestamp } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetDetail',
             method: 'post',
-            data: { groupKey, rowType, trafficMap, riskScoreMap, userAnalysisFlatMap },
+            data: { groupKey, rowType, trafficMap, riskScoreMap, startTimestamp, endTimestamp },
         })
         return {
             hostNames: resp?.assetHostNames || [],
@@ -354,14 +383,12 @@ export default {
         return out;
     },
     // Server-side paginated device list for ONE asset's flyout Devices tab — scoped to just
-    // that asset's own apiCollectionIds (cheap), not the whole account. usernameMap is the
-    // same Endpoint Shield map already fetched once for the main grid (fetchEndpointShieldUserMetadata),
-    // reused here so search/sort can work against the resolved person's name, not just deviceId.
-    async fetchAgenticAssetDevicesPage({ apiCollectionIds, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, userAnalysisFlatMap, usernameMap } = {}) {
+    // that asset's own apiCollectionIds (cheap), not the whole account. Usernames resolve server-side now.
+    async fetchAgenticAssetDevicesPage({ apiCollectionIds, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, startTimestamp, endTimestamp } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetDevicesPage',
             method: 'post',
-            data: { apiCollectionIds, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, userAnalysisFlatMap, usernameMap },
+            data: { apiCollectionIds, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, startTimestamp, endTimestamp },
         })
         return { devices: resp?.devices || [], total: resp?.total || 0 }
     },
@@ -375,11 +402,11 @@ export default {
     // point requiring the client to fetch/repost a whole-account map for a handful of entries.
     // groupKey names the asset being drilled into — plugin rows need it so their child row can be the
     // plugin itself rather than the agent collection it was discovered on.
-    async fetchAgenticAssetEndpointsPage({ apiCollectionIds, rowType, groupKey, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters } = {}) {
+    async fetchAgenticAssetEndpointsPage({ apiCollectionIds, rowType, groupKey, skip, limit, sortKey, sortOrder, queryValue, filters } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetEndpointsPage',
             method: 'post',
-            data: { apiCollectionIds, rowType, groupKey, skip, limit, sortKey, sortOrder, queryValue, usernameMap, filters },
+            data: { apiCollectionIds, rowType, groupKey, skip, limit, sortKey, sortOrder, queryValue, filters },
         })
         return {
             endpoints: resp?.endpoints || [],
@@ -404,11 +431,11 @@ export default {
     // pass as fetchAgenticAssetsSummary, aggregated rather than paginated. Also returns trend/delta
     // for the Agentic Assets + Violations cards and the Top Used Applications / Top Assets with
     // Violations lists — all derived server-side from data already fetched at mount, no new fetch.
-    async fetchAgenticAssetsStats({ trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap } = {}) {
+    async fetchAgenticAssetsStats({ trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsStats',
             method: 'post',
-            data: { trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName, userAnalysisFlatMap },
+            data: { trafficMap, riskScoreMap, startTimestamp, endTimestamp, violationsByCollectionId, skillViolationsByName },
         })
         return {
             totalAssets: resp?.totalAssets || 0,
@@ -425,21 +452,21 @@ export default {
     },
     // Paginated, sorted, searchable user/device rows for Users-and-Devices / Endpoints — same
     // lightweight-summary-first-then-slice shape as fetchAgenticAssetsSummary. groupBy: "user"|"device".
-    async fetchUsersAndDevicesSummary({ groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap, tagsByUsername } = {}) {
+    async fetchUsersAndDevicesSummary({ groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap } = {}) {
         const resp = await request({
             url: '/api/fetchUsersAndDevicesSummary',
             method: 'post',
-            data: { groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap, usernameMap, userMetadataMap, tagsByUsername },
+            data: { groupBy, skip, limit, sortKey, sortOrder, queryValue, filters, trafficMap, riskScoreMap, sensitiveMap },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0 }
     },
     // Tab-header counts ("Users (N)" / "Devices (N)") for Users-and-Devices / Endpoints, each tab's
     // "Agentic assets" total, plus distinct device-tag keys for the Tags filter/"Edit device tags" modal.
-    async fetchUsersAndDevicesStats({ trafficMap, riskScoreMap, usernameMap, userMetadataMap, tagsByUsername } = {}) {
+    async fetchUsersAndDevicesStats({ trafficMap, riskScoreMap } = {}) {
         const resp = await request({
             url: '/api/fetchUsersAndDevicesStats',
             method: 'post',
-            data: { trafficMap, riskScoreMap, usernameMap, userMetadataMap, tagsByUsername },
+            data: { trafficMap, riskScoreMap },
         })
         return {
             usersCount: resp?.usersCount || 0,
@@ -452,21 +479,21 @@ export default {
     },
     // Paginated top-level device rows for Endpoints' tree grid, or (when parentDeviceId is set) one
     // device's (device,service) children — see AgenticObserveAction.fetchDeviceEndpointsSummary.
-    async fetchDeviceEndpointsSummary({ parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters, tagsByUsername } = {}) {
+    async fetchDeviceEndpointsSummary({ parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, violationsByCollectionId, filters } = {}) {
         const resp = await request({
             url: '/api/fetchDeviceEndpointsSummary',
             method: 'post',
-            data: { parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, usernameMap, deviceMetadataMap, violationsByCollectionId, filters, tagsByUsername },
+            data: { parentDeviceId, skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, violationsByCollectionId, filters },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0 }
     },
     // Endpoints header stats: trend charts, deltas, Browsers/Endpoints/Users totals — see
     // AgenticObserveAction.fetchDeviceEndpointsStats.
-    async fetchDeviceEndpointsStats({ usernameMap, deviceMetadataMap, startTimestamp, endTimestamp } = {}) {
+    async fetchDeviceEndpointsStats({ startTimestamp, endTimestamp } = {}) {
         const resp = await request({
             url: '/api/fetchDeviceEndpointsStats',
             method: 'post',
-            data: { usernameMap, deviceMetadataMap, startTimestamp, endTimestamp },
+            data: { startTimestamp, endTimestamp },
         })
         return {
             deviceCount: resp?.deviceCount || 0,

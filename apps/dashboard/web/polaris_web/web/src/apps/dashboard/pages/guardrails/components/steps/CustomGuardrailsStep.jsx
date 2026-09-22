@@ -73,7 +73,7 @@ export const CustomGuardrailsConfig = {
 
 const CustomGuardrailsStep = ({
     onTryPrompt,
-    // LLM prompt based rule
+    // LLM prompt based detection
     enableLlmPrompt,
     setEnableLlmPrompt,
     llmRule,
@@ -101,7 +101,7 @@ const CustomGuardrailsStep = ({
     useEffect(() => {
         if (llmCompliance && Object.keys(llmCompliance).length > 0) {
             const accepted = Object.keys(llmCompliance).reduce((acc, framework) => { acc[framework] = true; return acc; }, {});
-            setLlmRuleCompliance({ loading: false, suggested: llmCompliance, accepted });
+            setLlmRuleCompliance({ loading: false, suggested: llmCompliance, accepted, evaluated: true });
         }
     }, []);
 
@@ -136,11 +136,12 @@ const CustomGuardrailsStep = ({
                 acc[framework] = true;
                 return acc;
             }, {});
-            setLlmRuleCompliance({ loading: false, suggested, accepted });
+            setLlmRuleCompliance({ loading: false, suggested, accepted, evaluated: true });
             setLlmCompliance(buildComplianceMap(suggested, accepted));
         } catch (error) {
             if (reqId !== requestIdRef.current) return;
             console.error('Error fetching compliance suggestions:', error);
+            // Leave evaluated false: a failed call is not a finding of "nothing maps".
             setLlmRuleCompliance({ loading: false, suggested: {}, accepted: {} });
         }
     };
@@ -201,12 +202,12 @@ const CustomGuardrailsStep = ({
             <OwaspTag stepNumber={6} />
 
             <VerticalStack gap="4">
-                {/* LLM Prompt Based Rule */}
+                {/* LLM Prompt Based Detection */}
                 <Box>
                     <Checkbox
                         label={
                             <HorizontalStack gap="1" blockAlign="center">
-                                <Text as="span">LLM prompt based rule</Text>
+                                <Text as="span">LLM prompt based detection</Text>
                                 <ControlInfoIcon
                                     {...CUSTOM_GUARDRAILS_DESCRIPTIONS.llmPromptRule}
                                     onTryPrompt={onTryPrompt}
@@ -225,7 +226,7 @@ const CustomGuardrailsStep = ({
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <FormLayout>
                                 <TextField
-                                    label="Prompt"
+                                    label="Detection instruction"
                                     value={llmRule}
                                     onChange={setLlmRule}
                                     multiline={4}
@@ -237,7 +238,8 @@ const CustomGuardrailsStep = ({
                                     loading={llmRuleCompliance.loading}
                                     complianceMap={buildComplianceMap(llmRuleCompliance.suggested, llmRuleCompliance.accepted)}
                                     onRemove={toggleLlmFramework}
-                                    onAdd={Object.keys(llmRuleCompliance.suggested).length > 0 ? toggleLlmFramework : undefined}
+                                    onAdd={toggleLlmFramework}
+                                    evaluated={!!llmRuleCompliance.evaluated}
                                 />
                             </FormLayout>
                         </Box>
@@ -266,11 +268,23 @@ const CustomGuardrailsStep = ({
                     {enableLlmRedaction && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <VerticalStack gap="4">
-                                <Banner>
-                                    Requires Akto browser extension v1.0.69 or later. Currently
-                                    supported only via the browser extension. Endpoint Shield
-                                    Agent support is coming soon.
-                                </Banner>
+                                <VerticalStack gap="0">
+                                    <Banner>
+                                        Requires Akto browser extension v1.0.69 or later. Currently
+                                        supported only via the browser extension. Endpoint Shield
+                                        Agent support is coming soon.
+                                    </Banner>
+                                    <Banner status="warning">
+                                        <VerticalStack gap="1">
+                                            <Text variant="bodyMd">
+                                                Prompts are never blocked. Text matching your redaction instruction will be redacted from the prompt.
+                                            </Text>
+                                            <Text variant="bodyMd">
+                                                File uploads are always blocked if they contain matching text.
+                                            </Text>
+                                        </VerticalStack>
+                                    </Banner>
+                                </VerticalStack>
                                 <FormLayout>
                                     <TextField
                                         label="Redaction instruction"

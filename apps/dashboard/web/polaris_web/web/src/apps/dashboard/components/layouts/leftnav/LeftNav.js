@@ -7,7 +7,6 @@ import {
     DiamondAlertMinor,
     FinancesMinor,
     LockMajor,
-    AutomationFilledMajor,
     MagicMinor,
     SocialAdMajor,
 } from "@shopify/polaris-icons";
@@ -119,11 +118,6 @@ export default function LeftNav() {
     ];
     const isAllowedDashboardUser = window.USER_NAME && allowedDashboardUsers.includes(window.USER_NAME.toLowerCase());
 
-
-    // Allowed users to for NHI Data
-    const allowedNhiUsers = ["ankush@akto.io", "umesh@akto.io"];
-    const isAllowedNhiUser = window.USER_NAME && allowedNhiUsers.includes(window.USER_NAME.toLowerCase());
-
     const navItems = useMemo(() => {
         let items = [
             {
@@ -186,7 +180,9 @@ export default function LeftNav() {
                 icon: ReportFilledMinor,
                 onClick: () => {
                     handleSelect("dashboard_endpoint_posture");
-                    navigate("/dashboard/endpoint-dashboard");
+                    // The new posture page is still only for the internal test account; every
+                    // other @akto.io account keeps landing on the older EndpointPosture page.
+                    navigate(activeAccount === 1779231193 ? "/dashboard/security-posture" : "/dashboard/endpoint-dashboard");
                     setActive("normal");
                 },
                 selected: leftNavSelected === "dashboard_endpoint_posture",

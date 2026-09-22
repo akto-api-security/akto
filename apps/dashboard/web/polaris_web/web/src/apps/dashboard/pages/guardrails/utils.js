@@ -21,6 +21,7 @@ export const GUARDRAIL_BEHAVIOUR = {
 // Display label only — the stored `value` stays "approval"/"human_approval" (backend + guardrails-service depend on it).
 export const GUARDRAIL_BEHAVIOUR_OPTIONS = [
     { label: "Block", value: GUARDRAIL_BEHAVIOUR.BLOCK },
+    { label: "Warn (Beta)", value: GUARDRAIL_BEHAVIOUR.WARN },
     { label: "Alert", value: GUARDRAIL_BEHAVIOUR.ALERT },
     { label: "Human Approval", value: GUARDRAIL_BEHAVIOUR.APPROVAL },
     { label: "Human Approval (Beta)", value: GUARDRAIL_BEHAVIOUR.HUMAN_APPROVAL },
@@ -28,6 +29,7 @@ export const GUARDRAIL_BEHAVIOUR_OPTIONS = [
 
 export const GUARDRAIL_BEHAVIOUR_TOOLTIP_LINES = [
     "Block: Stop the content when this rule matches.",
+    "Warn: Hold the content once, then allow it through on an identical resend.",
     "Alert: Raise an alert for review without blocking.",
     "Human Approval: Hold the content until a reviewer approves or rejects it.",
 ];

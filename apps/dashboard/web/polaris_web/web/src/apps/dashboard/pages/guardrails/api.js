@@ -91,6 +91,14 @@ export default {
         })
         return resp
     },
+    async startGuardrailPolicyBackfillReplay({ policyName, hexId, startTimestamp, endTimestamp }) {
+        const resp = await request({
+            url: '/api/startPolicyBackfillReplay',
+            method: 'post',
+            data: { policyName, hexId, backfillStartTimestamp: startTimestamp, backfillEndTimestamp: endTimestamp }
+        })
+        return resp
+    },
 
     async fetchBrowserExtensionConfigs() {
         const resp = await request({
@@ -113,6 +121,15 @@ export default {
             url: '/api/setBrowserExtensionConfigActive',
             method: 'post',
             data: { browserExtensionConfig: { host, active } }
+        })
+        return resp
+    },
+
+    async setBrowserExtensionConfigsActive(hosts, active) {
+        const resp = await request({
+            url: '/api/setBrowserExtensionConfigsActive',
+            method: 'post',
+            data: { hosts, browserExtensionConfig: { active } }
         })
         return resp
     },
@@ -158,6 +175,15 @@ export default {
             url: '/api/deleteConfigFieldPolicies',
             method: 'post',
             data: { policyIds }
+        })
+        return resp
+    },
+
+    async suggestGuardrailCompliance(inputType, payload) {
+        const resp = await request({
+            url: '/api/ask_ai',
+            method: 'post',
+            data: { type: 'suggest_guardrail_compliance', meta: { inputType, ...payload } }
         })
         return resp
     },
