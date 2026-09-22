@@ -31,13 +31,10 @@ if [ "$MEM_LIMIT_BYTES" = "max" ]; then
     MEM_LIMIT_BYTES=$(free -b | awk '/Mem:/ {print $2}')
 fi
 
-# 3. Convert the memory limit from bytes to MB (integer division)
+# 3. Convert the memory limit from bytes to MB (integer division) - used below only for
+# monitor_memory's usage-percent threshold, not for sizing the JVM heap (see start_java).
 MEM_LIMIT_MB=$((MEM_LIMIT_BYTES / 1024 / 1024))
 echo "Detected container memory limit: ${MEM_LIMIT_MB} MB" | tee -a "$LOG_FILE"
-
-# 4. Calculate 80% of that limit for Xmx
-XMX_MEM=$((MEM_LIMIT_MB * 80 / 100))
-echo "Calculated -Xmx value: ${XMX_MEM} MB" | tee -a "$LOG_FILE"
 
 # Function to rotate the log file
 rotate_log() {
@@ -99,7 +96,12 @@ start_java() {
     # Start Java (stdout+stderr → FIFO)
     # --add-opens: Java 17 strong-encapsulation opens needed by reflective libraries
     # (MongoDB POJO codec, etc.). Single-token "=" form.
-    java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m \
+    # No explicit -Xmx: an explicit 80%-of-cgroup heap left too little room for this
+    # workload's off-heap usage (100 concurrent test workers, Kafka parallel-consumer
+    # buffers, bulk-write payload buffering) and caused repeated OOM kills under real
+    # load. The JVM's own cgroup-aware default (MaxRAMPercentage=25%) is what ran
+    # reliably before the restart-loop rewrite - so leave heap sizing to the JVM.
+    java -XX:+ExitOnOutOfMemoryError \
         --add-opens=java.base/java.lang=ALL-UNNAMED \
         --add-opens=java.base/java.util=ALL-UNNAMED \
         --add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
