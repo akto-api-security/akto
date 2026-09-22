@@ -1,5 +1,10 @@
 name: Staging
 
+# NOTE: Google Artifact Registry (GAR) image push was removed in PR #6496
+# (https://github.com/akto-api-security/akto/pull/6496) — images now go to
+# DockerHub and ECR only. Revert that PR to restore the GCP_REGION /
+# GAR_REGISTRY env vars, the gcloud auth steps, and the GAR image tags.
+
 # Controls when the workflow will run
 on:
   push:
