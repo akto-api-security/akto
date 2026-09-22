@@ -15,8 +15,6 @@ import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightService;
 import com.akto.service.posture.PostureService;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
-import com.akto.dao.GuardrailPoliciesDao;
-import com.akto.dto.GuardrailPolicies;
 import com.akto.utils.search.SearchClient;
 import com.akto.utils.search.SearchClientFactory;
 import com.mongodb.BasicDBObject;
@@ -133,8 +131,6 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                     () -> fetchTotalInspectedActions(accountId, startTimestamp, endTimestamp)));
             Future<List<Integer>> weeklyAttackCountsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
                     () -> fetchViolationsMonthlyTotals(trendStartTs, trendEndTs, trendBoundaries, null)));
-            Future<List<GuardrailPolicies>> allPoliciesFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
-                    () -> GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(0, 5000)));
             // Raw events over [rawEventFetchStartTs, trendEndTs] — the wider of the trend window
             // and biggestMoversStartTs (see above), so one fetch serves both "Biggest movers"
             // (which filters back down to its own narrower window itself — see biggestMovers) and
@@ -157,7 +153,6 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
             List<Integer> weeklyAttackCounts = timedGet("weeklyAttackCountsFuture", weeklyAttackCountsFuture);
             List<DashboardMaliciousEvent> trendWindowEvents =
                     timedGet("trendWindowEventsFuture (limit " + MAX_THREAT_FETCH_LIMIT + ")", trendWindowEventsFuture);
-            List<GuardrailPolicies> allPoliciesIncludingInactive = timedGet("allPoliciesFuture", allPoliciesFuture);
 
             // bundle.collections, not bundle.activeCollections: the latter is loaded via a
             // narrow projection (id/hostName/startTs only, for PolicyHygieneProvider's cheap
@@ -170,7 +165,7 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
 
             response = postureService.buildSummary(bundle, priorHostSeverity, priorSubCategory,
                     endpointCollections, totalInspectedActions,
-                    weeklyAttackCounts, trendWindowEvents, allPoliciesIncludingInactive);
+                    weeklyAttackCounts, trendWindowEvents);
 
             // "Act now" — reuses the Insights feature wholesale rather than a parallel action
             // list: same bundle (already cached above under this exact ctx), same worst-first/
