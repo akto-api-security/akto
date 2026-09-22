@@ -44,13 +44,13 @@ public class ArgusPostureService {
     private static final double TONE_SUCCESS_AT = 95d;
     private static final double TONE_WARNING_AT = 60d;
 
-    private static final String CONTROL_APPROVAL          = "approvalWorkflow";
     private static final String CONTROL_RATE_LIMIT        = "rateLimit";
     private static final String CONTROL_PROMPT_INJECTION  = "promptInjectionFiltering";
+    private static final String CONTROL_PII               = "piiDetection";
     private static final String CONTROL_OUTPUT_VALIDATION = "outputValidation";
 
     private static final List<String> DEFAULT_REQUIRED_CONTROLS = Arrays.asList(
-            CONTROL_APPROVAL, CONTROL_RATE_LIMIT, CONTROL_PROMPT_INJECTION, CONTROL_OUTPUT_VALIDATION);
+            CONTROL_RATE_LIMIT, CONTROL_PROMPT_INJECTION, CONTROL_PII, CONTROL_OUTPUT_VALIDATION);
 
     private static List<String> requiredControls(ApiCollection asset) {
         return DEFAULT_REQUIRED_CONTROLS;
@@ -183,9 +183,6 @@ public class ArgusPostureService {
         if (p == null || control == null) return false;
 
         switch (control) {
-            case CONTROL_APPROVAL:
-                return "approval".equalsIgnoreCase(p.getBehaviour());
-
             case CONTROL_RATE_LIMIT: {
                 GuardrailPolicies.AnomalyDetection anomaly = p.getAnomalyDetection();
                 if (anomaly != null && anomaly.isEnabled()
@@ -201,12 +198,11 @@ public class ArgusPostureService {
                 return filtering != null && filtering.get("promptAttacks") != null;
             }
 
-            case CONTROL_OUTPUT_VALIDATION:
-                if (!p.isApplyOnResponse()) return false;
-                return notEmpty(p.getRedactionRules())
-                        || notEmpty(p.getPiiTypes())
-                        || notEmpty(p.getRegexPatternsV2());
+            case CONTROL_PII:
+                return notEmpty(p.getPiiTypes());
 
+            case CONTROL_OUTPUT_VALIDATION:
+                return p.isApplyOnResponse();
             default:
                 return false;
         }
